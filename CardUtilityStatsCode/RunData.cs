@@ -20,6 +20,19 @@ public class RunData
     public int? FloorReached { get; set; }
     public string Outcome { get; set; } = "in_progress";  // in_progress | win | loss | abandoned
 
+    /// <summary>
+    /// The game's own run identifier — Unix seconds of run start, sourced from
+    /// <c>RunManager._startTime</c>. The game saves its run history to
+    /// <c>{StartTime}.run</c>, so this field is the correlation key for M5
+    /// (Run History integration): user clicks a past run in the game, the
+    /// game knows its start_time, we find our file where <see cref="GameStartTime"/>
+    /// matches. Our file name stays a GUID for identity independence.
+    ///
+    /// Null for runs created before this field was added or runs that observed
+    /// combat before RunStarted fired (edge case — mod loaded mid-run).
+    /// </summary>
+    public long? GameStartTime { get; set; }
+
     /// <summary>Per-card aggregates. Keyed by card definition ID (e.g. "STRIKE_KIN"). Upgraded and base versions share a key for now; upgrade breakout is a future issue.</summary>
     public Dictionary<string, CardAggregate> Aggregates { get; set; } = new();
 

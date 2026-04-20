@@ -74,10 +74,14 @@ public static class RunTracker
                 Character = runState.Players.FirstOrDefault()?.Character?.Id.Entry,
                 Ascension = runState.AscensionLevel,
                 FloorReached = runState.TotalFloor,
+                // Publicizer gives us the private _startTime field. This is the
+                // game's own run identifier — matches the filename it uses for
+                // its run-history save ({StartTime}.run). Enables M5 correlation.
+                GameStartTime = RunManager.Instance._startTime,
             };
             _pendingCombat = null;
 
-            MainFile.Logger.Info($"RunStarted: {_currentRun.RunId} character={_currentRun.Character} ascension={_currentRun.Ascension}");
+            MainFile.Logger.Info($"RunStarted: {_currentRun.RunId} character={_currentRun.Character} ascension={_currentRun.Ascension} game_start_time={_currentRun.GameStartTime}");
             RunStorage.SaveAsync(_currentRun);
         }
     }
