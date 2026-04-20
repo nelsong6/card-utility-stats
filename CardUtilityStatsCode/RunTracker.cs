@@ -86,6 +86,43 @@ public static class RunTracker
         }
     }
 
+    /// <summary>
+    /// Called from the RunManager.OnEnded postfix. Stamps the final outcome and
+    /// EndedAt on the current run, persists it, and nulls the tracker state so
+    /// the next RunStarted starts fresh.
+    ///
+    /// Outcome priority (matches the game's own truth):
+    ///   abandoned   — user chose Abandon Run (IsAbandoned)
+    ///   win         — cleared final act boss (isVictory && !IsAbandoned)
+    ///   loss        — player died (neither of the above)
+    /// </summary>
+    public static void OnRunEnded(string outcome)
+    {
+        lock (_lock)
+        {
+            if (_currentRun == null) return;
+
+            _currentRun.Outcome = outcome;
+            _currentRun.EndedAt = Now();
+            _currentRun.UpdatedAt = _currentRun.EndedAt;
+
+            // Capture final floor too — run could have ended mid-combat (loss)
+            // with map position already advanced, or mid-rest, etc.
+            var runState = RunManager.Instance.State;
+            if (runState != null)
+            {
+                _currentRun.FloorReached = runState.TotalFloor;
+            }
+
+            MainFile.Logger.Info($"RunEnded: {_currentRun.RunId} outcome={outcome} floor={_currentRun.FloorReached}");
+            RunStorage.SaveAsync(_currentRun);
+
+            // Clear state so the next OnRunStarted sees a clean slate.
+            _currentRun = null;
+            _pendingCombat = null;
+        }
+    }
+
     private static void OnCombatSetUp(CombatState state)
     {
         lock (_lock)
