@@ -32,12 +32,14 @@ A **"View Stats"** checkbox sits next to the game's existing "View Upgrades" tog
 
 | Milestone | Scope | Status |
 |---|---|---|
-| **M1** | Attack damage attribution — the 4 numbers above | [#5](https://github.com/nelsong6/card-stats/issues/5) |
-| **M2** | Block attribution (needs [#1](https://github.com/nelsong6/card-stats/issues/1) resolved) | — |
-| **M3** | Utility card closure (energy, draw) | — |
-| **M4** | In-game UI: "View Stats" checkbox on deck view | — |
-| **M5** | Run History integration — browse past-run stats | — |
+| **M1** | Attack damage attribution — the 4 numbers above | ✅ [#5](https://github.com/nelsong6/card-stats/issues/5) |
+| **M2** | Block attribution (needs [#1](https://github.com/nelsong6/card-stats/issues/1) resolved) | [#6](https://github.com/nelsong6/card-stats/issues/6) |
+| **M3** | Utility card closure (energy, draw) | [#7](https://github.com/nelsong6/card-stats/issues/7) |
+| **M4** | In-game UI: "View Stats" checkbox on deck view | [#8](https://github.com/nelsong6/card-stats/issues/8) |
+| **M5** | Run History integration — browse past-run stats | [#9](https://github.com/nelsong6/card-stats/issues/9) |
 | **M6** | Publish v0.1 to Nexus | — |
+
+Additional open: [#10 Run outcome detection](https://github.com/nelsong6/card-stats/issues/10) — non-blocking for M1–M3, required before M6.
 
 ## Storage
 
