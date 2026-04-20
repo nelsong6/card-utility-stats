@@ -1,8 +1,8 @@
-# CardStats
+# CardUtilityStats
 
 Per-card attribution stats mod for [Slay the Spire 2](https://store.steampowered.com/app/2868840/Slay_the_Spire_2/). For every card you play, tracks what actually happened — effective damage vs. overkill, block that absorbed vs. wasted, drawn cards played vs. idle, energy generated vs. unused.
 
-**Status:** Early WIP. Scaffold only. No actual attribution code yet — see [issue #5](https://github.com/nelsong6/card-stats/issues/5) for M1 progress.
+**Status:** Early WIP. Scaffold only. No actual attribution code yet — see [issue #5](https://github.com/nelsong6/card-utility-stats/issues/5) for M1 progress.
 
 ## Why
 
@@ -17,7 +17,7 @@ Existing stats mods answer "how often did I *pick* this card" ([SlayTheStats](ht
 - `overkill` — damage past enemy HP (wasted)
 - `effective_damage` — what actually counted
 
-**Block cards** — how much of the generated block actually absorbed incoming damage vs. expired unused. Per-card block attribution uses a heuristic (see [issue #1](https://github.com/nelsong6/card-stats/issues/1)).
+**Block cards** — how much of the generated block actually absorbed incoming damage vs. expired unused. Per-card block attribution uses a heuristic (see [issue #1](https://github.com/nelsong6/card-utility-stats/issues/1)).
 
 **Utility cards** — closure tracking:
 
@@ -26,24 +26,24 @@ Existing stats mods answer "how often did I *pick* this card" ([SlayTheStats](ht
 
 ## How you'd use it
 
-A **"View Stats"** checkbox sits next to the game's existing "View Upgrades" toggle on deck-view screens (current run and past runs). Mutually exclusive with View Upgrades — it replaces the card's description text with its attribution stats for that run. Available only on screens showing cards in your actual deck (not on the generic Compendium, since lifetime aggregation doesn't exist yet — see [issue #2](https://github.com/nelsong6/card-stats/issues/2)).
+A **"View Stats"** checkbox sits next to the game's existing "View Upgrades" toggle on deck-view screens (current run and past runs). Mutually exclusive with View Upgrades — it replaces the card's description text with its attribution stats for that run. Available only on screens showing cards in your actual deck (not on the generic Compendium, since lifetime aggregation doesn't exist yet — see [issue #2](https://github.com/nelsong6/card-utility-stats/issues/2)).
 
 ## Roadmap
 
 | Milestone | Scope | Status |
 |---|---|---|
-| **M1** | Attack damage attribution — the 4 numbers above | ✅ [#5](https://github.com/nelsong6/card-stats/issues/5) |
-| **M2** | Block attribution (needs [#1](https://github.com/nelsong6/card-stats/issues/1) resolved) | [#6](https://github.com/nelsong6/card-stats/issues/6) |
-| **M3** | Utility card closure (energy, draw) | [#7](https://github.com/nelsong6/card-stats/issues/7) |
-| **M4** | In-game UI: "View Stats" checkbox on deck view | [#8](https://github.com/nelsong6/card-stats/issues/8) |
-| **M5** | Run History integration — browse past-run stats | [#9](https://github.com/nelsong6/card-stats/issues/9) |
+| **M1** | Attack damage attribution — the 4 numbers above | ✅ [#5](https://github.com/nelsong6/card-utility-stats/issues/5) |
+| **M2** | Block attribution (needs [#1](https://github.com/nelsong6/card-utility-stats/issues/1) resolved) | [#6](https://github.com/nelsong6/card-utility-stats/issues/6) |
+| **M3** | Utility card closure (energy, draw) | [#7](https://github.com/nelsong6/card-utility-stats/issues/7) |
+| **M4** | In-game UI: "View Stats" checkbox on deck view | [#8](https://github.com/nelsong6/card-utility-stats/issues/8) |
+| **M5** | Run History integration — browse past-run stats | [#9](https://github.com/nelsong6/card-utility-stats/issues/9) |
 | **M6** | Publish v0.1 to Nexus | — |
 
-Additional open: [#10 Run outcome detection](https://github.com/nelsong6/card-stats/issues/10) — non-blocking for M1–M3, required before M6.
+Additional open: [#10 Run outcome detection](https://github.com/nelsong6/card-utility-stats/issues/10) — non-blocking for M1–M3, required before M6.
 
 ## Storage
 
-Per-run JSON files at `<game>/mods/CardStats/runs/<run-id>.json`. Contains both aggregated stats (fast for UI) and a full event log (one entry per card-played event, for future analysis). Schema versioned — see [issue #4](https://github.com/nelsong6/card-stats/issues/4).
+Per-run JSON files at `<game>/mods/CardUtilityStats/runs/<run-id>.json`. Contains both aggregated stats (fast for UI) and a full event log (one entry per card-played event, for future analysis). Schema versioned — see [issue #4](https://github.com/nelsong6/card-utility-stats/issues/4).
 
 ## Requirements
 
@@ -52,7 +52,7 @@ Per-run JSON files at `<game>/mods/CardStats/runs/<run-id>.json`. Contains both 
 
 ## Install
 
-Drop `CardStats.dll` and `CardStats.json` (and `CardStats.pck` once UI lands) into `<game install>/mods/`. Requires BaseLib.
+Drop `CardUtilityStats.dll` and `CardUtilityStats.json` (and `CardUtilityStats.pck` once UI lands) into `<game install>/mods/`. Requires BaseLib.
 
 ## Build from source
 
@@ -72,7 +72,7 @@ XML
 dotnet build -c Release
 ```
 
-The build's `CopyToModsFolderOnBuild` target auto-deploys the `.dll` and manifest to `<game>/mods/CardStats/`. No manual copy step.
+The build's `CopyToModsFolderOnBuild` target auto-deploys the `.dll` and manifest to `<game>/mods/CardUtilityStats/`. No manual copy step.
 
 ## Credits
 

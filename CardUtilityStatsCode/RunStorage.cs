@@ -5,12 +5,12 @@ using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Godot;
 
-namespace CardStats.CardStatsCode;
+namespace CardUtilityStats.CardUtilityStatsCode;
 
 /// <summary>
 /// Persists RunData to JSON on disk. Files land in Godot's user:// directory
 /// (typically %APPDATA%/Godot/app_userdata/Slay the Spire 2/ on Windows), under
-/// a CardStats/runs/ subdirectory. One file per run, named by run_id.
+/// a CardUtilityStats/runs/ subdirectory. One file per run, named by run_id.
 ///
 /// Writes are fire-and-forget on a background task to avoid blocking the game.
 /// Each save overwrites the full file — the in-memory RunData is always the
@@ -26,7 +26,7 @@ public static class RunStorage
     };
 
     /// <summary>Resolved absolute path to runs/ directory. Created on first save.</summary>
-    public static string RunsDir => ProjectSettings.GlobalizePath("user://CardStats/runs/");
+    public static string RunsDir => ProjectSettings.GlobalizePath("user://CardUtilityStats/runs/");
 
     /// <summary>Serialize and write the run data to disk without blocking the caller.</summary>
     public static void SaveAsync(RunData data)

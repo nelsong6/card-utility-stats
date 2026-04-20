@@ -37,15 +37,15 @@
         <PackageReference Include="Alchyr.Sts2.ModAnalyzers" Version="*" />
         <!-- Generates a .pck file when building if only using simple assets. May not work on all setups. Uncomment to test. -->
         <!-- <PackageReference Include="BSchneppe.StS2.PckPacker" Version="0.1.1" PrivateAssets="All" /> -->
-        <AdditionalFiles Include="CardStats/localization/**/*.json"/> <!-- Used by analyzer -->
+        <AdditionalFiles Include="CardUtilityStats/localization/**/*.json"/> <!-- Used by analyzer -->
     </ItemGroup>
 
     <ItemGroup>
-        <Compile Remove="CardStats/**" />
+        <Compile Remove="CardUtilityStats/**" />
         <Compile Remove="materials/**" />
         <Compile Remove="shaders/**" />
         <Compile Remove="images/**" />
-        <EmbeddedResource Remove="CardStats/**" />
+        <EmbeddedResource Remove="CardUtilityStats/**" />
         <EmbeddedResource Remove="materials/**" />
         <EmbeddedResource Remove="shaders/**" />
         <EmbeddedResource Remove="images/**" />
@@ -54,9 +54,9 @@
     <ItemGroup>
         <None Condition="Exists('Directory.Build.props')" Include="Directory.Build.props"/>
         <None Include=".gitignore" />
-        <None Include="CardStats.json" />
+        <None Include="CardUtilityStats.json" />
         <None Include="project.godot"/>
-        <None Include="CardStats/**" />
+        <None Include="CardUtilityStats/**" />
     </ItemGroup>
     
     <Target Name="CheckDependencyPaths" >

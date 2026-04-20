@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
 
-namespace CardStats.CardStatsCode;
+namespace CardUtilityStats.CardUtilityStatsCode;
 
 /// <summary>
 /// Serialized shape of one run's stats. Written to disk as JSON.
 /// Schema changes MUST bump <see cref="SchemaVersion"/> and add migration.
-/// See https://github.com/nelsong6/card-stats/issues/4
+/// See https://github.com/nelsong6/card-utility-stats/issues/4
 /// </summary>
 public class RunData
 {
