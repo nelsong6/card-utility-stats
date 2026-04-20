@@ -134,9 +134,25 @@ public static class ViewStatsInjectorPatch
             var cloneVisuals = innerTickbox.GetNodeOrNull<Control>("TickboxVisuals");
             if (cloneVisuals != null)
             {
+                // Give the clone its own material instance. Godot's Duplicate()
+                // shares Resource references by default (materials are Resources),
+                // so without this our hover-tween shader changes would mutate
+                // the ORIGINAL checkbox's rendering too. Duplicating the material
+                // gives the clone independent shader state.
+                if (cloneVisuals.Material != null)
+                {
+                    cloneVisuals.Material = (Material)cloneVisuals.Material.Duplicate();
+                }
+
                 innerTickbox._imageContainer = cloneVisuals;
                 innerTickbox._tickedImage = cloneVisuals.GetNodeOrNull<Control>("Ticked");
                 innerTickbox._notTickedImage = cloneVisuals.GetNodeOrNull<Control>("NotTicked");
+                // Rewire the remaining NTickbox fields that OnFocus/OnRelease
+                // tweens animate. Without these, mousing over the clone ran
+                // shader/scale tweens against the original's material and
+                // produced visual glitches (clone visuals vanishing).
+                innerTickbox._hsv = cloneVisuals.Material as ShaderMaterial;
+                innerTickbox._baseScale = cloneVisuals.Scale;
 
                 // Initial render: force the clone to show unticked state explicitly.
                 if (innerTickbox._tickedImage != null) innerTickbox._tickedImage.Visible = false;

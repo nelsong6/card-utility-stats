@@ -10,12 +10,26 @@ namespace CardUtilityStats.Core;
 /// shell invokes via reflection across the ALC boundary:
 ///
 ///   public static void Initialize()   — called on first load and each reload
-///   public static void Shutdown()     — called before the ALC is unloaded
+///   public static void Shutdown()     — called before the ALC is orphaned
 ///
 /// Each assembly load generates a unique Harmony ID so <c>UnpatchAll(id)</c>
 /// in Shutdown only removes this load's patches (no risk of stomping on other
-/// mods' patches). Static fields here live in the collectible ALC, so they
-/// vanish along with the assembly on unload.
+/// mods' patches).
+///
+/// Hot-reload model (BepInEx ScriptEngine pattern):
+/// On reload, the Loader calls Shutdown(), then orphans the whole assembly
+/// (it stays in memory until process exit — maybe 50KB leaked per reload,
+/// which is negligible for dev sessions under ~100 reloads). The Shutdown
+/// contract is the critical discipline: unless we release every reference
+/// the game holds back to us (Harmony patches, event subscriptions, UI
+/// nodes), the orphaned assembly will still receive callbacks and behave
+/// as "phantom" code alongside the freshly-loaded copy.
+///
+/// We previously tried collectible AssemblyLoadContext (to actually reclaim
+/// memory on unload) but that approach is "fundamentally flawed" per
+/// Microsoft's own runtime team: it requires every dependency to be
+/// collectible-safe, and Harmony + Godot + Publicizer + BaseLib are not.
+/// See research commit for details.
 /// </summary>
 public static class CoreMain
 {
@@ -24,7 +38,7 @@ public static class CoreMain
     // Unique per-load so reload cycles don't collide in Harmony's global patch registry.
     private static readonly string _harmonyId = $"{ModId}.{Guid.NewGuid():N}";
 
-    // Uses the game's own logger. Tagged with ModId so log lines are greppable.
+    // Uses the game's own logger so output lands in godot.log alongside other mod logging.
     public static Logger Logger { get; } = new(ModId, LogType.Generic);
 
     private static Harmony? _harmony;
@@ -43,13 +57,24 @@ public static class CoreMain
 
         RunTracker.InitializeHooks();
 
+        // Visible confirmation on screen so hot reload has immediate feedback.
+        // Kept in Core (not Loader) so toast text/style can be tweaked and
+        // hot-reloaded without game restart.
+        var tree = Godot.Engine.GetMainLoop() as Godot.SceneTree;
+        if (tree != null)
+        {
+            var stamp = DateTime.Now.ToString("HH:mm:ss");
+            HotReloadToast.Show(tree, $"✅ Hot reload working! {stamp}");
+        }
+
         Logger.Info("Core.Initialize complete");
     }
 
     /// <summary>
-    /// Called by the Loader before unloading this assembly. Must release
+    /// Called by the Loader before orphaning this assembly. Must release
     /// every reference the game or Harmony holds back to this assembly,
-    /// else the ALC can't collect and we'll leak assemblies on each reload.
+    /// else the orphaned assembly will continue to receive callbacks as a
+    /// "phantom" running alongside the fresh copy.
     ///
     /// Cleanup order matters: UI first (user-visible), then event
     /// subscriptions (stop receiving callbacks we can no longer handle),

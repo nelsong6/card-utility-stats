@@ -1,12 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk" InitialTargets="CheckDependencyPaths">
     <!--
-        Hot-reloaded Core assembly. Loaded at runtime by the Loader into a
-        collectible AssemblyLoadContext, so changes land with an F5 reload
-        instead of a game restart.
+        Hot-reloaded Core assembly. Loaded at runtime by the Loader via
+        LoadFromAssemblyPath on a temp copy (BepInEx ScriptEngine pattern)
+        so the file in mods/ stays unlocked and we can rebuild + redeploy
+        while the game runs. Reload is F5 in-game.
 
-        This is plain Microsoft.NET.Sdk (not Godot.NET.Sdk) because we don't
-        need Godot's source generators or scene tooling here — just C# code
-        referencing GodotSharp for the Godot API. Matches STS2MCP's pattern.
+        Plain Microsoft.NET.Sdk (not Godot.NET.Sdk) because we don't need
+        Godot's source generators or scene tooling here — just C# code
+        referencing GodotSharp for the Godot API.
     -->
     <Import Project="..\Sts2PathDiscovery.props"/>
     <PropertyGroup>
@@ -17,6 +18,14 @@
         <AssemblyName>CardUtilityStats.Core</AssemblyName>
         <RootNamespace>CardUtilityStats.Core</RootNamespace>
         <NoWarn>$(NoWarn);MSB3270</NoWarn>
+        <!-- Build-time unique version so the AssemblyLoadContext treats each
+             rebuild as a distinct identity. Without this, LoadFromStream /
+             LoadFromAssemblyPath both dedupe by Name+Version and return the
+             cached old assembly — hot reload silently becomes a no-op.
+             Ticks-based stamp gives sub-second granularity. -->
+        <AssemblyVersion>1.0.0.$([MSBuild]::Modulo($([System.DateTime]::Now.Ticks), 65535))</AssemblyVersion>
+        <FileVersion>$(AssemblyVersion)</FileVersion>
+        <Version>$(AssemblyVersion)</Version>
     </PropertyGroup>
 
     <ItemGroup Condition="Exists('$(Sts2DataDir)')" >
@@ -34,7 +43,10 @@
         </Reference>
     </ItemGroup>
 
-    <!-- Publicize private/protected members of the game assembly so we can read internals without reflection. -->
+    <!-- Publicize private/protected members of the game assembly so we can
+         read internals without reflection. This works fine with
+         non-collectible ALC; it was only problematic under the failed
+         collectible-ALC experiment (see commit history). -->
     <ItemGroup Condition="True">
         <Publicize Include="sts2" IncludeVirtualMembers="false" IncludeCompilerGeneratedMembers="false" />
     </ItemGroup>
@@ -59,8 +71,7 @@
     </Target>
 
     <!-- Deploy the Core DLL alongside the Loader's DLL in the mods folder.
-         The Loader reads "CardUtilityStats.Core.dll" from its own directory
-         and loads it into a collectible ALC. -->
+         The Loader reads it from there and copies to a temp path for loading. -->
     <Target Name="CopyCoreToModsFolderOnBuild" AfterTargets="PostBuildEvent">
         <Message Text="Copying Core .dll to mods folder." Importance="high" />
         <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ModsPath)CardUtilityStats/" />

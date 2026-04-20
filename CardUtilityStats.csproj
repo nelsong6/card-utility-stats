@@ -8,6 +8,9 @@
         <DefaultItemExcludes>packages/**</DefaultItemExcludes>
         <AppOutputBase>$(MSBuildProjectDirectory)\</AppOutputBase>
         <PathMap>$(AppOutputBase)=.\</PathMap>
+        <!-- Godot.NET.Sdk defaults to false here; we need true so Mono.Cecil
+             and other NuGet deps land in bin/Release for us to copy into mods/. -->
+        <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     </PropertyGroup>
 
     <PropertyGroup>
@@ -35,6 +38,10 @@
         <PackageReference Include="Alchyr.Sts2.BaseLib" Version="*" PrivateAssets="All"/>
         <PackageReference Include="Krafs.Publicizer" Version="2.3.0" PrivateAssets="All"/>
         <PackageReference Include="Alchyr.Sts2.ModAnalyzers" Version="*" />
+        <!-- Mono.Cecil: rewrites the Core assembly's manifest name per load so
+             the ALC treats each reload as a distinct assembly. Without this,
+             .NET dedupes by short name and hot reload silently no-ops. -->
+        <PackageReference Include="Mono.Cecil" Version="0.11.5" />
         <!-- Generates a .pck file when building if only using simple assets. May not work on all setups. Uncomment to test. -->
         <!-- <PackageReference Include="BSchneppe.StS2.PckPacker" Version="0.1.1" PrivateAssets="All" /> -->
         <AdditionalFiles Include="CardUtilityStats/localization/**/*.json"/> <!-- Used by analyzer -->
@@ -72,9 +79,16 @@
     </Target>
 
     <Target Name="CopyToModsFolderOnBuild" AfterTargets="PostBuildEvent">
-        <Message Text="Copying .dll and manifest to mods folder." Importance="high" />
+        <Message Text="Copying .dll, manifest, and dependencies to mods folder." Importance="high" />
         <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ModsPath)$(MSBuildProjectName)/" />
         <Copy SourceFiles="$(AssemblyName).json" DestinationFolder="$(ModsPath)$(MSBuildProjectName)/" />
+        <!-- Copy NuGet dependency DLLs (Mono.Cecil, its companions) alongside
+             the Loader so CLR assembly resolution finds them at runtime.
+             Filter to avoid copying huge framework assemblies by accident. -->
+        <ItemGroup>
+            <LoaderRuntimeDeps Include="$(TargetDir)Mono.Cecil*.dll" />
+        </ItemGroup>
+        <Copy SourceFiles="@(LoaderRuntimeDeps)" DestinationFolder="$(ModsPath)$(MSBuildProjectName)/" />
     </Target>
 
     <Target Name="CopyQuickPck" AfterTargets="PackPck" Condition="Exists('$(PckPackerOutputPath)') And '$(PckPackerSkipped)' != 'true'">
