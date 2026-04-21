@@ -5,8 +5,10 @@ using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Combat.History.Entries;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
+using MegaCrit.Sts2.Core.Entities.Powers;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Models.Powers;
 using MegaCrit.Sts2.Core.Rooms;
 using MegaCrit.Sts2.Core.Runs;
 
@@ -41,6 +43,7 @@ public static class RunTracker
     private static CardModel? _pendingDrawSourceCard;
     private static CardModel? _pendingEffectSourceCard;
     private static int _pendingEffectSourceHistoryCount;
+    private static readonly List<PendingPowerChangeAttempt> _pendingPowerChangeAttempts = new();
     private static int _pendingPlayerBlockClearAmount;
     private static bool _pendingPlayerBlockClearArmed;
 
@@ -349,6 +352,7 @@ public static class RunTracker
         _pendingDrawSourceCard = null;
         _pendingEffectSourceCard = null;
         _pendingEffectSourceHistoryCount = 0;
+        _pendingPowerChangeAttempts.Clear();
         _pendingPlayerBlockClearAmount = 0;
         _pendingPlayerBlockClearArmed = false;
     }
@@ -1208,6 +1212,142 @@ public static class RunTracker
         }
     }
 
+    public static void NotePowerAmountChangeAttempt(
+        PowerModel power,
+        decimal amount,
+        Creature target,
+        Creature? applier,
+        CardModel? cardSource)
+    {
+        lock (_lock)
+        {
+            _pendingPowerChangeAttempts.Add(new PendingPowerChangeAttempt
+            {
+                Power = power,
+                Target = target,
+                Applier = applier,
+                RequestedAmount = amount,
+                CardSource = cardSource != null ? Canonical(cardSource) : null,
+            });
+        }
+    }
+
+    public static void RecordArtifactBlockedDebuffAttempt(
+        PowerModel canonicalPower,
+        Creature target,
+        decimal requestedAmount,
+        Creature? applier,
+        IEnumerable<AbstractModel>? modifiers,
+        decimal modifiedAmount)
+    {
+        lock (_lock)
+        {
+            var attempt = TakePendingPowerChangeAttemptLocked(canonicalPower, target, applier, requestedAmount);
+
+            if (modifiedAmount != 0m) return;
+            if (canonicalPower.GetTypeForAmount(requestedAmount) != PowerType.Debuff) return;
+            if (!WasArtifactBlock(target, modifiers)) return;
+
+            var sourceCard = ResolvePowerChangeSourceCardLocked(attempt, applier);
+            if (sourceCard == null)
+            {
+                CoreMain.LogDebug(
+                    $"Artifact-blocked debuff unattributed power={canonicalPower.Id} amount={requestedAmount} " +
+                    $"target={DescribeCreature(target)} applier={DescribeCreature(applier)}");
+                return;
+            }
+
+            _pendingCombat ??= new PendingCombat();
+            var instanceId = GetOrAssignInstanceId(sourceCard);
+            var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
+            var effect = GetOrCreateAppliedEffect(agg, canonicalPower);
+            effect.TimesBlockedByArtifact++;
+            effect.TotalAmountBlockedByArtifact += requestedAmount;
+        }
+    }
+
+    private static PendingPowerChangeAttempt? TakePendingPowerChangeAttemptLocked(
+        PowerModel power,
+        Creature target,
+        Creature? applier,
+        decimal requestedAmount)
+    {
+        for (int i = _pendingPowerChangeAttempts.Count - 1; i >= 0; i--)
+        {
+            var attempt = _pendingPowerChangeAttempts[i];
+            if (!ReferenceEquals(attempt.Power, power)) continue;
+            if (!ReferenceEquals(attempt.Target, target)) continue;
+            if (!ReferenceEquals(attempt.Applier, applier)) continue;
+            if (attempt.RequestedAmount != requestedAmount) continue;
+
+            _pendingPowerChangeAttempts.RemoveAt(i);
+            return attempt;
+        }
+
+        for (int i = _pendingPowerChangeAttempts.Count - 1; i >= 0; i--)
+        {
+            var attempt = _pendingPowerChangeAttempts[i];
+            if (!ReferenceEquals(attempt.Power, power)) continue;
+            if (!ReferenceEquals(attempt.Target, target)) continue;
+
+            _pendingPowerChangeAttempts.RemoveAt(i);
+            return attempt;
+        }
+
+        return null;
+    }
+
+    private static CardModel? ResolvePowerChangeSourceCardLocked(
+        PendingPowerChangeAttempt? attempt,
+        Creature? applier)
+    {
+        if (attempt?.CardSource != null) return attempt.CardSource;
+
+        var applierPlayer = applier?.Player;
+        if (applierPlayer != null && _pendingEffectSourceCard != null && IsOwnedBy(_pendingEffectSourceCard, applierPlayer))
+        {
+            int historyCount = CombatManager.Instance?.History?.Entries?.Count() ?? 0;
+            if (historyCount == _pendingEffectSourceHistoryCount)
+                return _pendingEffectSourceCard;
+        }
+
+        var causingPlay = FindCurrentlyResolvingCardPlay();
+        if (causingPlay?.Card != null) return Canonical(causingPlay.Card);
+
+        if (_recentCompletedPlayerCardPlay?.Card != null)
+        {
+            int historyCount = CombatManager.Instance?.History?.Entries?.Count() ?? 0;
+            if (historyCount == _recentCompletedPlayerCardPlayHistoryCount)
+                return Canonical(_recentCompletedPlayerCardPlay.Card);
+        }
+
+        return null;
+    }
+
+    private static bool WasArtifactModifier(IEnumerable<AbstractModel>? modifiers)
+    {
+        if (modifiers == null) return false;
+        foreach (var modifier in modifiers)
+        {
+            if (modifier is ArtifactPower) return true;
+        }
+        return false;
+    }
+
+    private static bool WasArtifactBlock(Creature target, IEnumerable<AbstractModel>? modifiers)
+    {
+        if (WasArtifactModifier(modifiers)) return true;
+
+        try
+        {
+            return target.HasPower(ModelDb.GetId(typeof(ArtifactPower)));
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static CardModel? FindLikelyBlockSourceCard(Creature receiver)
     {
         var targetPlayer = receiver.Player;
@@ -1664,6 +1804,8 @@ public static class RunTracker
 
             effect.TimesApplied += kv.Value.TimesApplied;
             effect.TotalAmountApplied += kv.Value.TotalAmountApplied;
+            effect.TimesBlockedByArtifact += kv.Value.TimesBlockedByArtifact;
+            effect.TotalAmountBlockedByArtifact += kv.Value.TotalAmountBlockedByArtifact;
             if (string.IsNullOrWhiteSpace(effect.DisplayName) && !string.IsNullOrWhiteSpace(kv.Value.DisplayName))
                 effect.DisplayName = kv.Value.DisplayName;
             if (string.IsNullOrWhiteSpace(effect.IconPath) && !string.IsNullOrWhiteSpace(kv.Value.IconPath))
@@ -1744,4 +1886,13 @@ internal sealed class BlockChunk
     public int Remaining { get; set; }
     public int Sequence { get; init; }
     public bool CountsForCardStats => CardInstanceId != null;
+}
+
+internal sealed class PendingPowerChangeAttempt
+{
+    public required PowerModel Power { get; init; }
+    public required Creature Target { get; init; }
+    public Creature? Applier { get; init; }
+    public required decimal RequestedAmount { get; init; }
+    public CardModel? CardSource { get; init; }
 }
