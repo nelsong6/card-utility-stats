@@ -134,6 +134,7 @@ public static class RunTracker
                     TotalEffective = committed.TotalEffective,
                     Kills = committed.Kills,
                     TotalEnergySpent = committed.TotalEnergySpent,
+                    TotalEnergyGenerated = committed.TotalEnergyGenerated,
                     TotalBlockGained = committed.TotalBlockGained,
                     TimesDrawn = committed.TimesDrawn,
                     FloorAdded = committed.FloorAdded,
@@ -159,6 +160,7 @@ public static class RunTracker
                 result.TotalEffective += pending.TotalEffective;
                 result.Kills += pending.Kills;
                 result.TotalEnergySpent += pending.TotalEnergySpent;
+                result.TotalEnergyGenerated += pending.TotalEnergyGenerated;
                 result.TotalBlockGained += pending.TotalBlockGained;
                 result.TimesDrawn += pending.TimesDrawn;
                 result.TimesDiscarded += pending.TimesDiscarded;
@@ -639,6 +641,7 @@ public static class RunTracker
                 runAgg.TotalEffective += combatAgg.TotalEffective;
                 runAgg.Kills += combatAgg.Kills;
                 runAgg.TotalEnergySpent += combatAgg.TotalEnergySpent;
+                runAgg.TotalEnergyGenerated += combatAgg.TotalEnergyGenerated;
                 runAgg.TotalBlockGained += combatAgg.TotalBlockGained;
                 runAgg.TimesDrawn += combatAgg.TimesDrawn;
                 runAgg.TimesDiscarded += combatAgg.TimesDiscarded;
@@ -808,6 +811,54 @@ public static class RunTracker
                 Target = cardPlay.Target?.Monster?.Id.ToString(),
                 EnergySpent = cardPlay.Resources.EnergySpent,
             });
+        }
+    }
+
+    /// <summary>
+    /// Record energy added to the player's pool while a card is currently
+    /// resolving. Called from <see cref="Patches.PlayerGainEnergyPatch"/>,
+    /// which patches <c>PlayerCombatState.GainEnergy</c> and forwards the
+    /// ACTUAL post-clamp delta rather than the requested amount.
+    ///
+    /// Attribution rule: only count gains that happen during a live
+    /// CardPlayStartedEntry → CardPlayFinishedEntry window, and only if the
+    /// resolving card's owner matches the PlayerCombatState being modified.
+    /// This keeps relic / power / start-of-turn gains out of the card stat.
+    /// </summary>
+    public static void RecordEnergyGained(MegaCrit.Sts2.Core.Entities.Players.PlayerCombatState combatState, int amount)
+    {
+        if (amount <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var causingPlay = FindCurrentlyResolvingCardPlay();
+                if (causingPlay?.Card == null) return;
+
+                var sourceCard = causingPlay.Card;
+                var targetPlayer = combatState._player;
+                if (targetPlayer != null && sourceCard.Owner != null
+                    && !ReferenceEquals(sourceCard.Owner, targetPlayer))
+                    return;
+
+                _pendingCombat ??= new PendingCombat();
+                var instanceId = GetOrAssignInstanceId(sourceCard);
+                var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
+                agg.TotalEnergyGenerated += amount;
+
+                _pendingCombat.CombatEvents.Add(new CardEvent
+                {
+                    T = Now(),
+                    Type = "energy_gained",
+                    CardId = instanceId,
+                    EnergyGained = amount,
+                });
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordEnergyGained failed: {e.Message}");
+            }
         }
     }
 

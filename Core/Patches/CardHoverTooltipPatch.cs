@@ -104,7 +104,7 @@ public static class CardHoverShowPatch
     /// <paramref name="compact"/> controls density:
     ///   - true (hand hovers): just the high-signal numbers the player
     ///     needs mid-combat — Played/Drawn, Total damage (if attack),
-    ///     Block gained (if any), Kills (if any). Skips lineage, energy
+    ///     Energy gained (if any), Block gained (if any), Kills (if any). Skips lineage, energy
     ///     details, averages, percentages.
     ///   - false (deck view, graveyard, draw pile, etc.): full breakdown
     ///     including lineage and all tabled stats.
@@ -222,7 +222,17 @@ public static class CardHoverShowPatch
             Row3(sb, "Played/Drawn", $"{agg.Plays}/{agg.TimesDrawn}", $"{playRate:F0}%");
         }
 
-        // Energy section — only rendered when the card's cost is actually
+        // Energy-gain rows — cards like Adrenaline / Concentrate / energy
+        // pot-style effects need a direct "what did this card give me?"
+        // stat, independent of the existing energy-spent cost tracking.
+        if (agg.TotalEnergyGenerated > 0)
+        {
+            float avgGenerated = agg.Plays > 0 ? (float)agg.TotalEnergyGenerated / agg.Plays : 0f;
+            Row3(sb, "Energy gained", agg.TotalEnergyGenerated.ToString(), "");
+            Row3(sb, "Avg gained", $"{avgGenerated:F1}", "");
+        }
+
+        // Energy-spent rows — only rendered when the card's cost is actually
         // variable (see IsEnergyInteresting). Same 3-col layout as every
         // other stat row; percent column stays empty since there's nothing
         // to percentage-ify here.
@@ -328,8 +338,8 @@ public static class CardHoverShowPatch
     /// numbers only — the player's deciding what to play, not studying
     /// lifetime performance.
     ///
-    /// Shows: Played/Drawn ratio, Total damage (if attack), Block gained
-    /// (if any), Kills (if any). Skips: lineage, energy details, per-play
+    /// Shows: Played/Drawn ratio, Total damage (if attack), Energy gained
+    /// (if any), Block gained (if any), Kills (if any). Skips: lineage, most energy details, per-play
     /// averages, overkill/blocked percentages. Everything uses the same
     /// 3-col layout as the full view for visual consistency.
     /// </summary>
@@ -352,6 +362,9 @@ public static class CardHoverShowPatch
 
         if (isAttack || agg.TotalEffective > 0)
             Row3(sb, "Total damage", agg.TotalEffective.ToString(), "");
+
+        if (agg.TotalEnergyGenerated > 0)
+            Row3(sb, "Energy gained", agg.TotalEnergyGenerated.ToString(), "");
 
         if (agg.TotalBlockGained > 0)
             Row3(sb, "Block gained", agg.TotalBlockGained.ToString(), "");

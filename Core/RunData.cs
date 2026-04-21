@@ -97,6 +97,13 @@ public class CardAggregate
     // Average is derived on the display side via TotalEnergySpent / Plays.
     public int TotalEnergySpent { get; set; }
 
+    // M3j: Energy generated directly by this card while it is resolving.
+    // Sourced from PlayerCombatState.GainEnergy, attributed to the currently-
+    // resolving card play. Tracks the ACTUAL amount added to the pool after
+    // clamping / prevention, not the raw text on the card, so "gain 1" under
+    // a no-energy-gain effect correctly records 0.
+    public int TotalEnergyGenerated { get; set; }
+
     // M2a: Block gained (INTENDED side only — how much block this card
     // contributed over the run, summed across plays). Sourced from the
     // game's BlockGainedEntry which carries a direct CardPlay attribution,
@@ -199,6 +206,7 @@ public class CardEvent
     // card_played fields
     public string? Target { get; set; }          // if the card targeted an enemy, their entity id (e.g. "KIN_PRIEST_0")
     public int? EnergySpent { get; set; }        // actual energy paid for this play (accounts for cost modifiers)
+    public int? EnergyGained { get; set; }       // actual energy added to the pool while this card was resolving
 
     // card_upgraded fields (and general-purpose: Floor also stamped on
     // other event types when useful). UpgradeLevel is the NEW level AFTER
