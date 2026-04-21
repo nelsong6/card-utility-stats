@@ -409,10 +409,21 @@ public static class RunTracker
                     return;
                 }
 
-                var saved = RunStorage.FindByGameStartTime(gameStartTime);
+                var saved = RunStorage.FindByGameStartTime(gameStartTime, out var foundUnsupportedMatch);
                 if (saved == null)
                 {
-                    CoreMain.Logger.Info($"TryResumeActiveRun: no saved run matches game_start_time={gameStartTime}; tracking will begin fresh on next combat");
+                    if (foundUnsupportedMatch)
+                    {
+                        CoreMain.Logger.Info(
+                            $"TryResumeActiveRun: found saved run for game_start_time={gameStartTime}, " +
+                            "but its schema is not resumable into current live tracking");
+                    }
+                    else
+                    {
+                        CoreMain.Logger.Info(
+                            $"TryResumeActiveRun: no saved run matches game_start_time={gameStartTime}; " +
+                            "tracking will begin fresh on next combat");
+                    }
                     return;
                 }
 

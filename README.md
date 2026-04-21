@@ -51,7 +51,7 @@ Open: [#10 Run outcome detection](https://github.com/nelsong6/card-utility-stats
 
 ## Storage
 
-Per-run JSON files at `%APPDATA%/SlayTheSpire2/CardUtilityStats/runs/<run-id>.json` (Godot's `user://` path). Contains both aggregated stats (fast for UI) and a full event log (one entry per card-played / damage-received / card-upgraded / block-gained / card-removed event, for future analysis). Schema versioned — see [issue #4](https://github.com/nelsong6/card-utility-stats/issues/4). Session preferences (checkbox state) at `prefs.json` in the same dir.
+Per-run JSON files at `%APPDATA%/SlayTheSpire2/CardUtilityStats/runs/<run-id>.json` (Godot's `user://` path). Contains both aggregated stats (fast for UI) and a full event log (one entry per card-played / damage-received / card-upgraded / block-gained / card-removed event, for future analysis). Schema versioned — see [issue #4](https://github.com/nelsong6/card-utility-stats/issues/4). Current hot-reload resume expects the per-instance `v2` shape; older pooled `v1` files are legacy data, not resumable live state. Session preferences (checkbox state) at `prefs.json` in the same dir.
 
 ## Requirements
 

@@ -1,7 +1,7 @@
 using System;
 using HarmonyLib;
-using MegaCrit.Sts2.Core.Logging;
 using CardUtilityStats.Core.Patches;
+using MegaCrit.Sts2.Core.Logging;
 
 namespace CardUtilityStats.Core;
 
@@ -38,8 +38,9 @@ public static class CoreMain
     // Unique per-load so reload cycles don't collide in Harmony's global patch registry.
     private static readonly string _harmonyId = $"{ModId}.{Guid.NewGuid():N}";
 
-    // Uses the game's own logger so output lands in godot.log alongside other mod logging.
-    public static Logger Logger { get; } = new(ModId, LogType.Generic);
+    // Upgrades to the game's own logger during Initialize(), but remains safe
+    // to call from tests / offline tooling before Godot exists.
+    public static SafeLogger Logger { get; } = new(ModId, LogType.Generic);
 
     /// <summary>
     /// Our own debug gate — when true, per-event and per-hook logs write out;
@@ -65,6 +66,8 @@ public static class CoreMain
     /// </summary>
     public static void Initialize()
     {
+        Logger.ActivateGameLogger();
+
         // Read debug gate from env var. Any non-empty truthy value enables;
         // default (unset / "0" / "false") stays quiet. Read in Initialize so
         // a dev can flip it between hot-reloads by changing their shell env

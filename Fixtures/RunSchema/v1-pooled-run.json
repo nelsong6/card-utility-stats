@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "run_id": "fixture-v1-pooled",
+  "started_at": "2026-04-18T10:00:00Z",
+  "updated_at": "2026-04-18T10:15:00Z",
+  "ended_at": "2026-04-18T10:16:10Z",
+  "character": "KIN",
+  "ascension": 3,
+  "floor_reached": 12,
+  "outcome": "loss",
+  "game_start_time": 1713434400,
+  "aggregates": {
+    "CARD.STRIKE_KIN": {
+      "plays": 2,
+      "total_intended": 12,
+      "total_blocked": 1,
+      "total_overkill": 0,
+      "total_effective": 11,
+      "kills": 1
+    },
+    "CARD.GUARD_KIN": {
+      "plays": 1,
+      "total_intended": 0,
+      "total_blocked": 0,
+      "total_overkill": 0,
+      "total_effective": 0,
+      "kills": 0
+    }
+  },
+  "events": [
+    {
+      "t": "2026-04-18T10:01:00Z",
+      "type": "card_played",
+      "card_id": "CARD.STRIKE_KIN",
+      "target": "KIN_PRIEST_0"
+    },
+    {
+      "t": "2026-04-18T10:01:00Z",
+      "type": "damage_received",
+      "card_id": "CARD.STRIKE_KIN",
+      "receiver": "KIN_PRIEST_0",
+      "blocked": 1,
+      "unblocked": 5,
+      "overkill": 0,
+      "killed": false
+    },
+    {
+      "t": "2026-04-18T10:06:00Z",
+      "type": "card_played",
+      "card_id": "CARD.GUARD_KIN"
+    }
+  ]
+}

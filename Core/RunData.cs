@@ -10,11 +10,13 @@ namespace CardUtilityStats.Core;
 /// </summary>
 public class RunData
 {
+    public const int CurrentSchemaVersion = 2;
+
     // v1: aggregates keyed by card definition id (pooled across instances)
     // v2: aggregates keyed by per-instance id ("CARD.STRIKE_SILENT#1") —
     //     each physical card in the deck gets its own entry. Pooled view
     //     tracked as feature request in issue #11.
-    public int SchemaVersion { get; set; } = 2;
+    public int SchemaVersion { get; set; } = CurrentSchemaVersion;
     public string RunId { get; set; } = "";
     public string StartedAt { get; set; } = "";  // ISO-8601 UTC
     public string UpdatedAt { get; set; } = "";
