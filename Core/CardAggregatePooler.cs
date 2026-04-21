@@ -49,6 +49,7 @@ internal static class CardAggregatePooler
         target.TimesExhausted += source.TimesExhausted;
         target.TotalHpLost += source.TotalHpLost;
         target.TimesCardsDrawn += source.TimesCardsDrawn;
+        target.TimesCardsAddedToHand += source.TimesCardsAddedToHand;
         MergeAppliedEffectsInto(target.AppliedEffects, source.AppliedEffects);
     }
 

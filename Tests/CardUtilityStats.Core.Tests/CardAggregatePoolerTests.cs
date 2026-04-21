@@ -14,6 +14,7 @@ public class CardAggregatePoolerTests
             TotalEffective = 4,
             TotalBlocked = 1,
             TimesExhausted = 1,
+            TimesCardsAddedToHand = 3,
         };
         first.AppliedEffects["POWER.ARTIFACT"] = new AppliedEffectAggregate
         {
@@ -29,6 +30,7 @@ public class CardAggregatePoolerTests
             TotalEffective = 11,
             TotalBlocked = 2,
             TimesExhausted = 2,
+            TimesCardsAddedToHand = 4,
         };
         second.AppliedEffects["POWER.VULNERABLE"] = new AppliedEffectAggregate
         {
@@ -59,6 +61,7 @@ public class CardAggregatePoolerTests
         Assert.Equal(15, pooled.TotalEffective);
         Assert.Equal(3, pooled.TotalBlocked);
         Assert.Equal(3, pooled.TimesExhausted);
+        Assert.Equal(7, pooled.TimesCardsAddedToHand);
 
         var artifact = pooled.AppliedEffects["POWER.ARTIFACT"];
         Assert.Equal(1, artifact.TimesBlockedByArtifact);

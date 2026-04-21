@@ -1545,6 +1545,32 @@ public static class RunTracker
         return null;
     }
 
+    private static CardModel? FindLikelyHandAddSourceCard(Player targetPlayer, AbstractModel? source)
+    {
+        if (source is CardModel sourceCard && IsOwnedBy(sourceCard, targetPlayer))
+            return Canonical(sourceCard);
+
+        if (_pendingEffectSourceCard != null && IsOwnedBy(_pendingEffectSourceCard, targetPlayer))
+        {
+            int historyCount = CombatManager.Instance?.History?.Entries?.Count() ?? 0;
+            if (historyCount <= _pendingEffectSourceHistoryCount + 1)
+                return _pendingEffectSourceCard;
+        }
+
+        var causingPlay = FindCurrentlyResolvingCardPlay();
+        if (causingPlay?.Card != null && IsOwnedBy(causingPlay.Card, targetPlayer))
+            return Canonical(causingPlay.Card);
+
+        if (_recentCompletedPlayerCardPlay?.Card != null && IsOwnedBy(_recentCompletedPlayerCardPlay.Card, targetPlayer))
+        {
+            int historyCount = CombatManager.Instance?.History?.Entries?.Count() ?? 0;
+            if (historyCount <= _recentCompletedPlayerCardPlayHistoryCount + 1)
+                return Canonical(_recentCompletedPlayerCardPlay.Card);
+        }
+
+        return null;
+    }
+
     private static bool IsOwnedBy(CardModel card, Player targetPlayer)
     {
         if (targetPlayer == null) return true;
@@ -1590,6 +1616,38 @@ public static class RunTracker
                 {
                     CoreMain.LogDebug($"RecordDrawFromCard attribution failed: {e.Message}");
                 }
+            }
+        }
+    }
+
+    public static void RecordCardAddedToHand(CardModel card, MegaCrit.Sts2.Core.Entities.Cards.PileType oldPile, AbstractModel? source)
+    {
+        lock (_lock)
+        {
+            if (card == null) return;
+            if (oldPile != MegaCrit.Sts2.Core.Entities.Cards.PileType.None) return;
+            if (card.Pile?.Type != MegaCrit.Sts2.Core.Entities.Cards.PileType.Hand) return;
+
+            _pendingCombat ??= new PendingCombat();
+
+            try
+            {
+                var sourceCard = FindLikelyHandAddSourceCard(card.Owner, source);
+                if (sourceCard == null)
+                {
+                    CoreMain.LogDebug($"CardAddedToHand unattributed card={card.Id} title='{card.Title}'");
+                    return;
+                }
+
+                if (ReferenceEquals(Canonical(sourceCard), Canonical(card))) return;
+
+                var causerId = GetOrAssignInstanceId(sourceCard);
+                var causerAgg = GetOrCreateAggregate(_pendingCombat, causerId);
+                causerAgg.TimesCardsAddedToHand++;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordCardAddedToHand attribution failed: {e.Message}");
             }
         }
     }
@@ -1906,6 +1964,7 @@ public static class RunTracker
             TimesExhausted = source.TimesExhausted,
             TotalHpLost = source.TotalHpLost,
             TimesCardsDrawn = source.TimesCardsDrawn,
+            TimesCardsAddedToHand = source.TimesCardsAddedToHand,
             FloorAdded = source.FloorAdded,
             InitialUpgradeLevel = source.InitialUpgradeLevel,
             Removed = source.Removed,
@@ -1937,6 +1996,7 @@ public static class RunTracker
         target.TimesExhausted += source.TimesExhausted;
         target.TotalHpLost += source.TotalHpLost;
         target.TimesCardsDrawn += source.TimesCardsDrawn;
+        target.TimesCardsAddedToHand += source.TimesCardsAddedToHand;
         MergeAppliedEffectsInto(target.AppliedEffects, source.AppliedEffects);
     }
 

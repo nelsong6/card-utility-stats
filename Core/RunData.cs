@@ -10,7 +10,7 @@ namespace CardUtilityStats.Core;
 /// </summary>
 public class RunData
 {
-    public const int CurrentSchemaVersion = 6;
+    public const int CurrentSchemaVersion = 7;
 
     // v1: aggregates keyed by card definition id (pooled across instances)
     // v2: aggregates keyed by per-instance id ("CARD.STRIKE_SILENT#1") —
@@ -26,6 +26,9 @@ public class RunData
     //     files remain resumable with the new fields defaulting to 0.
     // v6: add per-effect Artifact-blocked debuff counters. Also additive;
     //     older v5 files remain resumable with the new fields defaulting to 0.
+    // v7: add per-card "times cards added directly to hand" attribution.
+    //     Also additive; older v6 files remain resumable with the new field
+    //     defaulting to 0.
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
     public string RunId { get; set; } = "";
     public string StartedAt { get; set; } = "";  // ISO-8601 UTC
@@ -172,6 +175,15 @@ public class CardAggregate
     // Acrobatics etc. depending on the character). Excludes turn-start
     // auto-draw via the game's FromHandDraw flag.
     public int TimesCardsDrawn { get; set; }
+
+    // M3i2: Direct hand-add attribution. When THIS card's play causes
+    // OTHER cards to be created/inserted directly into the player's hand
+    // without going through the draw pipeline. Covers Crash Landing-style
+    // "fill the hand with statuses" effects and any future direct-to-hand
+    // generation where actual hand capacity should determine the observed
+    // count. Cards redirected elsewhere (for example, to discard because
+    // the hand is full) do NOT count here.
+    public int TimesCardsAddedToHand { get; set; }
 
     // M4a: Effect / power application summary for this specific card
     // instance. First pass tracks ONLY that the card caused a power/effect
