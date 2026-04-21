@@ -88,19 +88,50 @@ public class SchemaLoadingTests
     }
 
     [Fact]
-    public void HistoricalLoad_AcceptsCurrentV6Fixture()
+    public void HistoricalLoad_AcceptsLegacyResumableV6Fixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("v6-per-instance-artifact-block-run.json"));
 
         Assert.NotNull(loaded);
-        Assert.Equal(RunData.CurrentSchemaVersion, loaded!.SourceSchemaVersion);
-        Assert.False(loaded.IsLegacy);
+        Assert.Equal(6, loaded!.SourceSchemaVersion);
+        Assert.True(loaded.IsLegacy);
         Assert.True(loaded.SupportsResume);
         Assert.True(loaded.HasPerInstanceIdentity);
         Assert.Equal(6, loaded.Data.Aggregates["CARD.DEFEND_KIN#1"].TotalBlockEffective);
         var effect = loaded.Data.Aggregates["CARD.BASH_KIN#1"].AppliedEffects["POWER.WEAK"];
         Assert.Equal(1, effect.TimesBlockedByArtifact);
         Assert.Equal(2m, effect.TotalAmountBlockedByArtifact);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsLegacyResumableV7Fixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("v7-per-instance-poison-damage-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.Equal(7, loaded!.SourceSchemaVersion);
+        Assert.True(loaded.IsLegacy);
+        Assert.True(loaded.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        var effect = loaded.Data.Aggregates["CARD.DEADLY_POISON#1"].AppliedEffects["POWER.POISON"];
+        Assert.Equal(9m, effect.TotalTriggeredEffectiveDamage);
+        Assert.Equal(3m, effect.TotalTriggeredOverkill);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsCurrentV8Fixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("v8-per-instance-regent-stars-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.Equal(8, loaded!.SourceSchemaVersion);
+        Assert.False(loaded.IsLegacy);
+        Assert.True(loaded.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        Assert.Equal(2, loaded.Data.Aggregates["CARD.VENERATE#1"].TotalStarsGenerated);
+        Assert.Equal(2, loaded.Data.Aggregates["CARD.STARDUST#1"].TotalStarsSpent);
+        Assert.Equal(2, loaded.Data.Events[1].StarsSpent);
     }
 
     [Fact]
@@ -162,16 +193,40 @@ public class SchemaLoadingTests
     }
 
     [Fact]
-    public void ResumableLoad_AcceptsCurrentV6Fixture()
+    public void ResumableLoad_AcceptsLegacyResumableV6Fixture()
     {
         var resumed = RunStorage.LoadResumable(FixturePath("v6-per-instance-artifact-block-run.json"));
 
         Assert.NotNull(resumed);
-        Assert.Equal(RunData.CurrentSchemaVersion, resumed!.SchemaVersion);
+        Assert.Equal(6, resumed!.SchemaVersion);
         Assert.Equal(6, resumed.Aggregates["CARD.DEFEND_KIN#1"].TotalBlockEffective);
         var effect = resumed.Aggregates["CARD.BASH_KIN#1"].AppliedEffects["POWER.WEAK"];
         Assert.Equal(1, effect.TimesBlockedByArtifact);
         Assert.Equal(2m, effect.TotalAmountBlockedByArtifact);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsLegacyResumableV7Fixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v7-per-instance-poison-damage-run.json"));
+
+        Assert.NotNull(resumed);
+        Assert.Equal(7, resumed!.SchemaVersion);
+        var effect = resumed.Aggregates["CARD.DEADLY_POISON#1"].AppliedEffects["POWER.POISON"];
+        Assert.Equal(9m, effect.TotalTriggeredEffectiveDamage);
+        Assert.Equal(3m, effect.TotalTriggeredOverkill);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsCurrentV8Fixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v8-per-instance-regent-stars-run.json"));
+
+        Assert.NotNull(resumed);
+        Assert.Equal(8, resumed!.SchemaVersion);
+        Assert.Equal(2, resumed.Aggregates["CARD.VENERATE#1"].TotalStarsGenerated);
+        Assert.Equal(2, resumed.Aggregates["CARD.STARDUST#1"].TotalStarsSpent);
+        Assert.Equal(1, resumed.Aggregates["CARD.VENERATE#1"].TimesDrawn);
     }
 
     [Fact]
