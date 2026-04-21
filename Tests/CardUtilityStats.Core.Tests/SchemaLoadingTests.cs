@@ -58,18 +58,33 @@ public class SchemaLoadingTests
     }
 
     [Fact]
-    public void HistoricalLoad_AcceptsCurrentV4Fixture()
+    public void HistoricalLoad_AcceptsLegacyResumableV4Fixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("v4-per-instance-effects-exhaust-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.Equal(4, loaded!.SourceSchemaVersion);
+        Assert.True(loaded.IsLegacy);
+        Assert.True(loaded.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        var agg = loaded.Data.Aggregates["CARD.NECROBINDER_POWER#1"];
+        Assert.Equal(1, agg.TimesExhausted);
+        Assert.Equal(9m, agg.AppliedEffects["POWER.NECROBINDER_TRIGGER"].TotalAmountApplied);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsCurrentV5Fixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("v5-per-instance-block-ledger-run.json"));
 
         Assert.NotNull(loaded);
         Assert.Equal(RunData.CurrentSchemaVersion, loaded!.SourceSchemaVersion);
         Assert.False(loaded.IsLegacy);
         Assert.True(loaded.SupportsResume);
         Assert.True(loaded.HasPerInstanceIdentity);
-        var agg = loaded.Data.Aggregates["CARD.NECROBINDER_POWER#1"];
-        Assert.Equal(1, agg.TimesExhausted);
-        Assert.Equal(9m, agg.AppliedEffects["POWER.NECROBINDER_TRIGGER"].TotalAmountApplied);
+        var agg = loaded.Data.Aggregates["CARD.DEFEND_KIN#1"];
+        Assert.Equal(6, agg.TotalBlockEffective);
+        Assert.Equal(4, agg.TotalBlockWasted);
     }
 
     [Fact]
@@ -110,13 +125,24 @@ public class SchemaLoadingTests
     }
 
     [Fact]
-    public void ResumableLoad_AcceptsCurrentV4Fixture()
+    public void ResumableLoad_AcceptsLegacyResumableV4Fixture()
     {
         var resumed = RunStorage.LoadResumable(FixturePath("v4-per-instance-effects-exhaust-run.json"));
 
         Assert.NotNull(resumed);
-        Assert.Equal(RunData.CurrentSchemaVersion, resumed!.SchemaVersion);
+        Assert.Equal(4, resumed!.SchemaVersion);
         Assert.Equal(1, resumed.Aggregates["CARD.NECROBINDER_POWER#1"].TimesExhausted);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsCurrentV5Fixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v5-per-instance-block-ledger-run.json"));
+
+        Assert.NotNull(resumed);
+        Assert.Equal(RunData.CurrentSchemaVersion, resumed!.SchemaVersion);
+        Assert.Equal(6, resumed.Aggregates["CARD.DEFEND_KIN#1"].TotalBlockEffective);
+        Assert.Equal(4, resumed.Aggregates["CARD.DEFEND_KIN#1"].TotalBlockWasted);
     }
 
     [Fact]

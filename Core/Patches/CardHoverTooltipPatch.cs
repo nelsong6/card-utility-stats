@@ -285,15 +285,19 @@ public static class CardHoverShowPatch
             if (agg.Kills > 0) Row3(sb, "Kills", agg.Kills.ToString(), "");
         }
 
-        // Block gained — only rendered for cards that have actually
-        // produced block. Covers pure block cards (Defend), hybrids
-        // (Iron Wave), and side-effect block grants. M2b (block absorption)
-        // is parked; intended-block is what this surface.
+        // Block gained — rendered for cards that have actually produced
+        // block. Absorbed uses FIFO consumption across the player's block
+        // ledger; wasted uses LIFO across whatever survived until clear/
+        // expiry, which matches the "later block was redundant overfill"
+        // mental model described in issue #6.
         if (agg.TotalBlockGained > 0)
         {
             float avgBlock = agg.Plays > 0 ? (float)agg.TotalBlockGained / agg.Plays : 0f;
-            Row3(sb, "Block gained", agg.TotalBlockGained.ToString(), "");
-            Row3(sb, "Avg block", $"{avgBlock:F1}", "");
+            float absorbedPct = 100f * agg.TotalBlockEffective / agg.TotalBlockGained;
+            float wastedPct = 100f * agg.TotalBlockWasted / agg.TotalBlockGained;
+            RowDual(sb, "Block gained", agg.TotalBlockGained.ToString(), "Avg block", $"{avgBlock:F1}");
+            Row3(sb, "Absorbed", agg.TotalBlockEffective.ToString(), $"{absorbedPct:F0}%");
+            Row3(sb, "Wasted", agg.TotalBlockWasted.ToString(), $"{wastedPct:F0}%");
         }
 
         // Discarded count — shown only when > 0 because for most cards
@@ -440,6 +444,22 @@ public static class CardHoverShowPatch
         sb.Append($"[cell expand=4 padding=0,0,12,0][color=#e0e0e0]{label}[/color][/cell]");
         sb.Append($"[cell expand=1 padding=0,0,12,0][right][b]{value}[/b][/right][/cell]");
         sb.Append($"[cell expand=1 padding=0,0,4,0][right][color=#b5b5b5]{pct}[/color][/right][/cell]");
+        sb.Append("[/table]\n");
+    }
+
+    /// <summary>
+    /// Emit a two-stat row for closely-related values that read better side by
+    /// side than stacked vertically. Used for compact pairs like
+    /// "Block gained" / "Avg block" where both numbers belong to the same
+    /// section and neither needs a percentage column.
+    /// </summary>
+    private static void RowDual(StringBuilder sb, string leftLabel, string leftValue, string rightLabel, string rightValue)
+    {
+        sb.Append("[table=4]");
+        sb.Append($"[cell expand=3 padding=0,0,12,0][color=#e0e0e0]{leftLabel}[/color][/cell]");
+        sb.Append($"[cell expand=1 padding=0,0,18,0][right][b]{leftValue}[/b][/right][/cell]");
+        sb.Append($"[cell expand=3 padding=0,0,12,0][color=#e0e0e0]{rightLabel}[/color][/cell]");
+        sb.Append($"[cell expand=1 padding=0,0,4,0][right][b]{rightValue}[/b][/right][/cell]");
         sb.Append("[/table]\n");
     }
 

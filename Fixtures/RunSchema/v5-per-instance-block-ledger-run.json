@@ -1,0 +1,56 @@
+{
+  "schema_version": 5,
+  "run_id": "fixture-v5-per-instance-block-ledger",
+  "started_at": "2026-04-20T11:30:00Z",
+  "updated_at": "2026-04-20T11:40:00Z",
+  "ended_at": "2026-04-20T11:41:10Z",
+  "character": "KIN",
+  "ascension": 4,
+  "floor_reached": 19,
+  "outcome": "win",
+  "game_start_time": 1713612600,
+  "aggregates": {
+    "CARD.DEFEND_KIN#1": {
+      "plays": 2,
+      "total_intended": 0,
+      "total_blocked": 0,
+      "total_overkill": 0,
+      "total_effective": 0,
+      "kills": 0,
+      "total_energy_spent": 2,
+      "total_energy_generated": 0,
+      "total_block_gained": 10,
+      "total_block_effective": 6,
+      "total_block_wasted": 4,
+      "times_drawn": 2,
+      "times_discarded": 0,
+      "times_placed_on_top_from_hand": 0,
+      "times_placed_on_top_from_discard": 0,
+      "times_exhausted_other_cards": 0,
+      "times_exhausted": 0,
+      "total_hp_lost": 0,
+      "times_cards_drawn": 0,
+      "applied_effects": {},
+      "floor_added": 1,
+      "initial_upgrade_level": 0,
+      "removed": false
+    }
+  },
+  "events": [
+    {
+      "t": "2026-04-20T11:32:00Z",
+      "type": "card_played",
+      "card_id": "CARD.DEFEND_KIN#1",
+      "energy_spent": 1,
+      "floor": 9
+    }
+  ],
+  "instance_numbers_by_def": {
+    "CARD.DEFEND_KIN": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.DEFEND_KIN": 1
+  }
+}

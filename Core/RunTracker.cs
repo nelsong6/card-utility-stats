@@ -4,6 +4,7 @@ using System.Linq;
 using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Combat.History.Entries;
 using MegaCrit.Sts2.Core.Entities.Cards;
+using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Rooms;
@@ -40,6 +41,8 @@ public static class RunTracker
     private static CardModel? _pendingDrawSourceCard;
     private static CardModel? _pendingEffectSourceCard;
     private static int _pendingEffectSourceHistoryCount;
+    private static int _pendingPlayerBlockClearAmount;
+    private static bool _pendingPlayerBlockClearArmed;
 
     // Per-instance identity. Every physical card in the player's deck gets
     // a stable number the first time we observe it — NOT just when it's
@@ -338,6 +341,18 @@ public static class RunTracker
         RunStorage.SaveAsync(_currentRun);
     }
 
+    private static void ResetCombatContextState()
+    {
+        _currentPlayerCardPlay = null;
+        _recentCompletedPlayerCardPlay = null;
+        _recentCompletedPlayerCardPlayHistoryCount = 0;
+        _pendingDrawSourceCard = null;
+        _pendingEffectSourceCard = null;
+        _pendingEffectSourceHistoryCount = 0;
+        _pendingPlayerBlockClearAmount = 0;
+        _pendingPlayerBlockClearArmed = false;
+    }
+
     /// <summary>
     /// On Core assembly reload, detect if the game is in an active run and,
     /// if so, load the matching run file from disk and rebuild the
@@ -517,12 +532,7 @@ public static class RunTracker
             // not a hangover from a previous run.
             _instanceNumbers.Clear();
             _defCounters.Clear();
-            _currentPlayerCardPlay = null;
-            _recentCompletedPlayerCardPlay = null;
-            _recentCompletedPlayerCardPlayHistoryCount = 0;
-            _pendingDrawSourceCard = null;
-            _pendingEffectSourceCard = null;
-            _pendingEffectSourceHistoryCount = 0;
+            ResetCombatContextState();
 
             string now = Now();
             _currentRun = new RunData
@@ -586,12 +596,7 @@ public static class RunTracker
             // Clear state so the next OnRunStarted sees a clean slate.
             _currentRun = null;
             _pendingCombat = null;
-            _currentPlayerCardPlay = null;
-            _recentCompletedPlayerCardPlay = null;
-            _recentCompletedPlayerCardPlayHistoryCount = 0;
-            _pendingDrawSourceCard = null;
-            _pendingEffectSourceCard = null;
-            _pendingEffectSourceHistoryCount = 0;
+            ResetCombatContextState();
         }
     }
 
@@ -602,12 +607,7 @@ public static class RunTracker
             // Fresh pending buffer for this combat. Anything accumulated from a prior
             // combat that didn't get a CombatEnded (shouldn't happen but defensive) is dropped.
             _pendingCombat = new PendingCombat();
-            _currentPlayerCardPlay = null;
-            _recentCompletedPlayerCardPlay = null;
-            _recentCompletedPlayerCardPlayHistoryCount = 0;
-            _pendingDrawSourceCard = null;
-            _pendingEffectSourceCard = null;
-            _pendingEffectSourceHistoryCount = 0;
+            ResetCombatContextState();
         }
     }
 
@@ -626,6 +626,11 @@ public static class RunTracker
                 StartedAt = Now(),
                 UpdatedAt = Now(),
             };
+
+            // Surviving player block at combat end never absorbed future
+            // damage, so treat any remaining ledger as wasted before
+            // promoting the combat aggregates into the run.
+            AttributeUnusedBlockLocked(TotalTrackedPlayerBlockLocked());
 
             // Promote pending buffer into the run's committed state.
             foreach (var (cardId, combatAgg) in _pendingCombat.CombatAggregates)
@@ -646,12 +651,7 @@ public static class RunTracker
             _currentRun.UpdatedAt = Now();
 
             _pendingCombat = null;
-            _currentPlayerCardPlay = null;
-            _recentCompletedPlayerCardPlay = null;
-            _recentCompletedPlayerCardPlayHistoryCount = 0;
-            _pendingDrawSourceCard = null;
-            _pendingEffectSourceCard = null;
-            _pendingEffectSourceHistoryCount = 0;
+            ResetCombatContextState();
             SaveCurrentRun();
         }
     }
@@ -719,27 +719,12 @@ public static class RunTracker
                     RecordCardExhausted(cex.Card);
                     break;
                 case BlockGainedEntry bge:
-                    if (bge.CardPlay?.Card != null)
-                    {
-                        CoreMain.LogDebug($"  -> RecordBlock from '{bge.CardPlay.Card.Title}' amount={bge.Amount}");
-                        RecordBlockFromCard(bge);
-                    }
-                    else
-                    {
-                        // Diagnostic: game emitted block without card attribution.
-                        // Observed: Defend plays that don't fire BlockGainedEntry
-                        // with CardPlay, leading to undercount on the per-card
-                        // stat. Always-on (not CUS_DEBUG-gated) — these lines
-                        // are the signal we need to figure out WHERE the miss
-                        // is coming from (power proc, different code path,
-                        // character-specific mechanic, etc.).
-                        var recvDesc = DescribeCreature(bge.Receiver);
-                        CoreMain.Logger.Info(
-                            $"BlockGainedEntry CardPlay=null " +
-                            $"receiver={recvDesc} amount={bge.Amount}");
-                    }
+                    RecordBlockGainedEntry(bge);
                     break;
                 case DamageReceivedEntry dre:
+                    if (dre.Receiver.IsPlayer)
+                        RecordPlayerBlockedDamage(dre);
+
                     if (dre.CardSource != null)
                     {
                         CoreMain.LogDebug($"  -> RecordDamage from '{dre.CardSource.Title}' intended={dre.Result.BlockedDamage + dre.Result.UnblockedDamage} canonicalHash={Canonical(dre.CardSource).GetHashCode()}");
@@ -747,22 +732,25 @@ public static class RunTracker
                     }
                     else
                     {
-                        // Diagnostic: the game emitted a DamageReceivedEntry
-                        // but didn't attribute it to a card. We silently dropped
-                        // these before, but it caused ambiguity — hovering a
-                        // card showed "Played 1" with no damage stats, and we
-                        // couldn't tell if the game emitted null-source damage
-                        // we dropped, or didn't emit anything at all. Always-on
-                        // (not CUS_DEBUG-gated) because these should be rare
-                        // and when they happen we want to know without the user
-                        // having to reproduce under a debug flag.
-                        var recvDesc = DescribeCreature(dre.Receiver);
-                        var dealerDesc = DescribeCreature(dre.Dealer);
-                        CoreMain.Logger.Info(
-                            $"DamageReceivedEntry CardSource=null " +
-                            $"receiver={recvDesc} dealer={dealerDesc} " +
-                            $"blocked={dre.Result.BlockedDamage} unblocked={dre.Result.UnblockedDamage} " +
-                            $"overkill={dre.Result.OverkillDamage} killed={dre.Result.WasTargetKilled}");
+                        if (!dre.Receiver.IsPlayer)
+                        {
+                            // Diagnostic: the game emitted a DamageReceivedEntry
+                            // but didn't attribute it to a card. We silently dropped
+                            // these before, but it caused ambiguity — hovering a
+                            // card showed "Played 1" with no damage stats, and we
+                            // couldn't tell if the game emitted null-source damage
+                            // we dropped, or didn't emit anything at all. Always-on
+                            // (not CUS_DEBUG-gated) because these should be rare
+                            // and when they happen we want to know without the user
+                            // having to reproduce under a debug flag.
+                            var recvDesc = DescribeCreature(dre.Receiver);
+                            var dealerDesc = DescribeCreature(dre.Dealer);
+                            CoreMain.Logger.Info(
+                                $"DamageReceivedEntry CardSource=null " +
+                                $"receiver={recvDesc} dealer={dealerDesc} " +
+                                $"blocked={dre.Result.BlockedDamage} unblocked={dre.Result.UnblockedDamage} " +
+                                $"overkill={dre.Result.OverkillDamage} killed={dre.Result.WasTargetKilled}");
+                        }
                     }
                     break;
                 case PowerReceivedEntry pre when pre.Power != null:
@@ -1220,6 +1208,25 @@ public static class RunTracker
         }
     }
 
+    private static CardModel? FindLikelyBlockSourceCard(Creature receiver)
+    {
+        var targetPlayer = receiver.Player;
+        if (targetPlayer == null) return null;
+
+        var causingPlay = FindCurrentlyResolvingCardPlay();
+        if (causingPlay?.Card != null && IsOwnedBy(causingPlay.Card, targetPlayer))
+            return Canonical(causingPlay.Card);
+
+        if (_recentCompletedPlayerCardPlay?.Card != null && IsOwnedBy(_recentCompletedPlayerCardPlay.Card, targetPlayer))
+        {
+            int historyCount = CombatManager.Instance?.History?.Entries?.Count() ?? 0;
+            if (historyCount <= _recentCompletedPlayerCardPlayHistoryCount + 1)
+                return Canonical(_recentCompletedPlayerCardPlay.Card);
+        }
+
+        return null;
+    }
+
     private static CardModel? FindLikelyDrawSourceCard(Player targetPlayer)
     {
         if (_pendingEffectSourceCard != null && IsOwnedBy(_pendingEffectSourceCard, targetPlayer))
@@ -1322,23 +1329,194 @@ public static class RunTracker
         }
     }
 
-    private static void RecordBlockFromCard(BlockGainedEntry entry)
+    private static void RecordBlockGainedEntry(BlockGainedEntry entry)
     {
         lock (_lock)
         {
             _pendingCombat ??= new PendingCombat();
-            var instanceId = GetOrAssignInstanceId(entry.CardPlay!.Card);
-            var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
-            agg.TotalBlockGained += entry.Amount;
 
-            _pendingCombat.CombatEvents.Add(new CardEvent
+            string? instanceId = null;
+            if (entry.CardPlay?.Card != null)
             {
-                T = Now(),
-                Type = "block_gained",
-                CardId = instanceId,
-                Blocked = entry.Amount,  // reuse the existing "Blocked" int? field
-            });
+                instanceId = GetOrAssignInstanceId(entry.CardPlay.Card);
+            }
+            else if (entry.Receiver.IsPlayer)
+            {
+                var fallbackCard = FindLikelyBlockSourceCard(entry.Receiver);
+                if (fallbackCard != null)
+                    instanceId = GetOrAssignInstanceId(fallbackCard);
+            }
+
+            if (instanceId != null)
+            {
+                var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
+                agg.TotalBlockGained += entry.Amount;
+
+                _pendingCombat.CombatEvents.Add(new CardEvent
+                {
+                    T = Now(),
+                    Type = "block_gained",
+                    CardId = instanceId,
+                    Blocked = entry.Amount,
+                });
+            }
+            else if (entry.Receiver.IsPlayer)
+            {
+                var recvDesc = DescribeCreature(entry.Receiver);
+                CoreMain.LogDebug(
+                    $"BlockGainedEntry unattributed receiver={recvDesc} amount={entry.Amount}");
+            }
+
+            if (entry.Receiver.IsPlayer)
+            {
+                AppendPlayerBlockChunkLocked(instanceId, entry.Amount);
+                ReconcilePlayerBlockLedgerLocked(entry.Receiver);
+            }
         }
+    }
+
+    private static void RecordPlayerBlockedDamage(DamageReceivedEntry entry)
+    {
+        if (!entry.Receiver.IsPlayer) return;
+
+        int blocked = entry.Result.BlockedDamage;
+        if (blocked <= 0) return;
+
+        lock (_lock)
+        {
+            _pendingCombat ??= new PendingCombat();
+            AttributeBlockedDamageLocked(blocked);
+            ReconcilePlayerBlockLedgerLocked(entry.Receiver);
+        }
+    }
+
+    public static void NotePotentialPlayerBlockClear(Creature creature)
+    {
+        lock (_lock)
+        {
+            if (!creature.IsPlayer) return;
+            _pendingPlayerBlockClearAmount = Math.Max(0, creature.Block);
+            _pendingPlayerBlockClearArmed = _pendingPlayerBlockClearAmount > 0;
+        }
+    }
+
+    public static void NotePlayerBlockClearPrevented(Creature creature)
+    {
+        lock (_lock)
+        {
+            if (!creature.IsPlayer) return;
+            ClearPendingPlayerBlockClearLocked();
+        }
+    }
+
+    public static void NotePlayerBlockCleared(Creature creature)
+    {
+        lock (_lock)
+        {
+            if (!creature.IsPlayer) return;
+
+            if (_pendingCombat == null)
+            {
+                ClearPendingPlayerBlockClearLocked();
+                return;
+            }
+
+            int actualRemaining = Math.Max(0, creature.Block);
+            int removed = _pendingPlayerBlockClearArmed
+                ? Math.Max(0, _pendingPlayerBlockClearAmount - actualRemaining)
+                : TotalTrackedPlayerBlockLocked();
+
+            AttributeUnusedBlockLocked(removed);
+            ReconcilePlayerBlockLedgerLocked(creature);
+            ClearPendingPlayerBlockClearLocked();
+        }
+    }
+
+    private static void AppendPlayerBlockChunkLocked(string? cardInstanceId, int amount)
+    {
+        if (_pendingCombat == null || amount <= 0) return;
+
+        _pendingCombat.PlayerBlockLedger.Add(new BlockChunk
+        {
+            CardInstanceId = cardInstanceId,
+            Remaining = amount,
+            Sequence = _pendingCombat.NextBlockSequence++,
+        });
+    }
+
+    private static void AttributeBlockedDamageLocked(int blocked)
+    {
+        if (_pendingCombat == null || blocked <= 0) return;
+
+        int remainingToAttribute = blocked;
+        for (int i = 0; i < _pendingCombat.PlayerBlockLedger.Count && remainingToAttribute > 0; i++)
+        {
+            var chunk = _pendingCombat.PlayerBlockLedger[i];
+            if (chunk.Remaining <= 0) continue;
+
+            int consumed = Math.Min(chunk.Remaining, remainingToAttribute);
+            chunk.Remaining -= consumed;
+            remainingToAttribute -= consumed;
+
+            if (chunk.CardInstanceId != null)
+            {
+                var agg = GetOrCreateAggregate(_pendingCombat, chunk.CardInstanceId);
+                agg.TotalBlockEffective += consumed;
+            }
+        }
+
+        _pendingCombat.PlayerBlockLedger.RemoveAll(chunk => chunk.Remaining <= 0);
+    }
+
+    private static void AttributeUnusedBlockLocked(int unusedBlockToRemove)
+    {
+        if (_pendingCombat == null || unusedBlockToRemove <= 0) return;
+
+        for (int i = _pendingCombat.PlayerBlockLedger.Count - 1; i >= 0 && unusedBlockToRemove > 0; i--)
+        {
+            var chunk = _pendingCombat.PlayerBlockLedger[i];
+            if (chunk.Remaining <= 0) continue;
+
+            int wasted = Math.Min(chunk.Remaining, unusedBlockToRemove);
+            chunk.Remaining -= wasted;
+            unusedBlockToRemove -= wasted;
+
+            if (chunk.CardInstanceId != null)
+            {
+                var agg = GetOrCreateAggregate(_pendingCombat, chunk.CardInstanceId);
+                agg.TotalBlockWasted += wasted;
+            }
+        }
+
+        _pendingCombat.PlayerBlockLedger.RemoveAll(chunk => chunk.Remaining <= 0);
+    }
+
+    private static int TotalTrackedPlayerBlockLocked()
+    {
+        return _pendingCombat?.PlayerBlockLedger.Sum(chunk => chunk.Remaining) ?? 0;
+    }
+
+    private static void ReconcilePlayerBlockLedgerLocked(Creature creature)
+    {
+        if (_pendingCombat == null || !creature.IsPlayer) return;
+
+        int actualBlock = Math.Max(0, creature.Block);
+        int trackedBlock = TotalTrackedPlayerBlockLocked();
+
+        if (trackedBlock > actualBlock)
+        {
+            AttributeUnusedBlockLocked(trackedBlock - actualBlock);
+        }
+        else if (trackedBlock < actualBlock)
+        {
+            AppendPlayerBlockChunkLocked(cardInstanceId: null, amount: actualBlock - trackedBlock);
+        }
+    }
+
+    private static void ClearPendingPlayerBlockClearLocked()
+    {
+        _pendingPlayerBlockClearAmount = 0;
+        _pendingPlayerBlockClearArmed = false;
     }
 
     private static void RecordDamageFromCard(DamageReceivedEntry entry)
@@ -1423,6 +1601,8 @@ public static class RunTracker
             TotalEnergySpent = source.TotalEnergySpent,
             TotalEnergyGenerated = source.TotalEnergyGenerated,
             TotalBlockGained = source.TotalBlockGained,
+            TotalBlockEffective = source.TotalBlockEffective,
+            TotalBlockWasted = source.TotalBlockWasted,
             TimesDrawn = source.TimesDrawn,
             TimesDiscarded = source.TimesDiscarded,
             TimesPlacedOnTopFromHand = source.TimesPlacedOnTopFromHand,
@@ -1452,6 +1632,8 @@ public static class RunTracker
         target.TotalEnergySpent += source.TotalEnergySpent;
         target.TotalEnergyGenerated += source.TotalEnergyGenerated;
         target.TotalBlockGained += source.TotalBlockGained;
+        target.TotalBlockEffective += source.TotalBlockEffective;
+        target.TotalBlockWasted += source.TotalBlockWasted;
         target.TimesDrawn += source.TimesDrawn;
         target.TimesDiscarded += source.TimesDiscarded;
         target.TimesPlacedOnTopFromHand += source.TimesPlacedOnTopFromHand;
@@ -1552,4 +1734,14 @@ internal class PendingCombat
 {
     public Dictionary<string, CardAggregate> CombatAggregates { get; } = new();
     public List<CardEvent> CombatEvents { get; } = new();
+    public List<BlockChunk> PlayerBlockLedger { get; } = new();
+    public int NextBlockSequence { get; set; }
+}
+
+internal sealed class BlockChunk
+{
+    public string? CardInstanceId { get; init; }
+    public int Remaining { get; set; }
+    public int Sequence { get; init; }
+    public bool CountsForCardStats => CardInstanceId != null;
 }

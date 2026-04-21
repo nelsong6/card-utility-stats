@@ -10,7 +10,7 @@ namespace CardUtilityStats.Core;
 /// </summary>
 public class RunData
 {
-    public const int CurrentSchemaVersion = 4;
+    public const int CurrentSchemaVersion = 5;
 
     // v1: aggregates keyed by card definition id (pooled across instances)
     // v2: aggregates keyed by per-instance id ("CARD.STRIKE_SILENT#1") —
@@ -22,6 +22,8 @@ public class RunData
     //     as an empty dictionary.
     // v4: add "this card was exhausted" count. Also additive; older v3 files
     //     remain resumable with the new field defaulting to 0.
+    // v5: add block absorption / waste aggregates. Also additive; older v4
+    //     files remain resumable with the new fields defaulting to 0.
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
     public string RunId { get; set; } = "";
     public string StartedAt { get; set; } = "";  // ISO-8601 UTC
@@ -112,13 +114,12 @@ public class CardAggregate
     // a no-energy-gain effect correctly records 0.
     public int TotalEnergyGenerated { get; set; }
 
-    // M2a: Block gained (INTENDED side only — how much block this card
-    // contributed over the run, summed across plays). Sourced from the
-    // game's BlockGainedEntry which carries a direct CardPlay attribution,
-    // so no heuristic needed on the add side. The ABSORBED side (how much
-    // of the gained block actually absorbed damage before expiring at
-    // turn end) is the hard attribution problem parked for later (M2b).
+    // M2a: Block gained (how much block this card contributed over the run,
+    // summed across plays). M2b extends this with absorbed/wasted splits
+    // using an ordered provenance ledger for the player's block pool.
     public int TotalBlockGained { get; set; }
+    public int TotalBlockEffective { get; set; }
+    public int TotalBlockWasted { get; set; }
 
     // M3c: Draw count. Every time this card instance gets drawn — at
     // turn start or via card-effect draw ("draw 2 cards"). Shows up-
@@ -209,8 +210,6 @@ public class CardAggregate
     public int? RemovedAtFloor { get; set; }
     public MegaCrit.Sts2.Core.Saves.Runs.SerializableCard? RemovedSnapshot { get; set; }
 
-    // M2: Block attribution (see issue #1 for heuristic). Null until M2.
-    // M3b: Block-related closure (block added / absorbed). Null until M2/M3b.
     // M3c: Draw count attribution. Null until M3c.
 }
 
