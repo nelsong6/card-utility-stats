@@ -6,22 +6,6 @@ namespace CardUtilityStats.Core.Tests;
 public class PoisonLedgerMathTests
 {
     [Fact]
-    public void AllocateContributions_SplitsAcrossSourcesInSequenceOrder()
-    {
-        var chunks = new List<PersistentContributionChunk>
-        {
-            new() { CardInstanceId = "CARD.NOXIOUS_FUMES#1", Amount = 2m, Sequence = 0 },
-            new() { CardInstanceId = "CARD.NOXIOUS_FUMES#2", Amount = 3m, Sequence = 1 },
-        };
-
-        var (amounts, remainder) = PoisonLedgerMath.AllocateContributions(chunks, 5m);
-
-        Assert.Equal(0m, remainder);
-        Assert.Equal(2m, amounts["CARD.NOXIOUS_FUMES#1"]);
-        Assert.Equal(3m, amounts["CARD.NOXIOUS_FUMES#2"]);
-    }
-
-    [Fact]
     public void PoisonDamageAndDecay_PreserveSourceLedgerAcrossTicks()
     {
         var chunks = new List<PoisonChunk>

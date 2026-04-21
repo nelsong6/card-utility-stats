@@ -9,42 +9,8 @@ internal sealed class PoisonChunk
     public int Sequence { get; init; }
 }
 
-internal sealed class PersistentContributionChunk
-{
-    public string CardInstanceId { get; init; } = "";
-    public decimal Amount { get; set; }
-    public int Sequence { get; init; }
-}
-
 internal static class PoisonLedgerMath
 {
-    public static (Dictionary<string, decimal> Amounts, decimal UnattributedAmount) AllocateContributions(
-        IReadOnlyList<PersistentContributionChunk> chunks,
-        decimal amount)
-    {
-        var allocations = new Dictionary<string, decimal>();
-        if (chunks.Count == 0 || amount <= 0m) return (allocations, amount);
-
-        decimal remaining = amount;
-        foreach (var chunk in chunks.OrderBy(c => c.Sequence))
-        {
-            if (remaining <= 0m) break;
-            if (chunk.Amount <= 0m) continue;
-
-            decimal portion = Math.Min(chunk.Amount, remaining);
-            if (portion <= 0m) continue;
-
-            if (allocations.TryGetValue(chunk.CardInstanceId, out var existing))
-                allocations[chunk.CardInstanceId] = existing + portion;
-            else
-                allocations[chunk.CardInstanceId] = portion;
-
-            remaining -= portion;
-        }
-
-        return (allocations, remaining);
-    }
-
     public static (Dictionary<string, decimal> Amounts, decimal UnattributedAmount) AttributeDamage(
         IReadOnlyList<PoisonChunk> chunks,
         decimal damage)

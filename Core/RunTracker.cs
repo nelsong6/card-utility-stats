@@ -1242,15 +1242,23 @@ public static class RunTracker
             var owner = GetPowerReceiverCreature(power);
             if (owner == null) return;
 
+            var sourceCardInstanceId = FindNoxiousFumesEffectSourceLocked(power);
+            if (sourceCardInstanceId == null)
+            {
+                CoreMain.LogDebug(
+                    $"Noxious Fumes tick missing effect source owner={DescribeCreature(owner)} amount={power.Amount}");
+                return;
+            }
+
             int recipients = CountLikelyNoxiousFumesRecipients(power, owner);
             if (recipients <= 0) return;
 
-            _pendingNoxiousFumesApplications.RemoveAll(window => ReferenceEquals(window.Owner, owner));
+            _pendingNoxiousFumesApplications.RemoveAll(window => ReferenceEquals(window.Applier, owner));
             _pendingNoxiousFumesApplications.Add(new PendingNoxiousFumesApplicationWindow
             {
-                Owner = owner,
+                Applier = owner,
+                SourceCardInstanceId = sourceCardInstanceId,
                 RemainingApplications = recipients,
-                AmountPerApplication = power.Amount,
             });
         }
     }
@@ -1479,20 +1487,6 @@ public static class RunTracker
         });
     }
 
-    private static void RecordNoxiousFumesContributionLocked(Creature owner, string instanceId, decimal amount)
-    {
-        if (amount <= 0m) return;
-
-        _pendingCombat ??= new PendingCombat();
-        var ledger = GetOrCreateNoxiousFumesLedgerLocked(owner);
-        ledger.Chunks.Add(new PersistentContributionChunk
-        {
-            CardInstanceId = instanceId,
-            Amount = amount,
-            Sequence = ledger.NextSequence++,
-        });
-    }
-
     private static bool TryRecordNoxiousFumesPoisonApplicationLocked(
         PowerModel poisonPower,
         Creature target,
@@ -1503,30 +1497,8 @@ public static class RunTracker
 
         var window = TakePendingNoxiousFumesApplicationLocked(applier);
         if (window == null) return false;
-
-        var ledger = FindNoxiousFumesLedgerLocked(window.Owner);
-        if (ledger == null || ledger.Chunks.Count == 0)
-        {
-            CoreMain.LogDebug(
-                $"Noxious Fumes poison application missing source ledger target={DescribeCreature(target)} " +
-                $"applier={DescribeCreature(applier)} amount={amount}");
-            return false;
-        }
-
-        var (allocations, unattributed) = PoisonLedgerMath.AllocateContributions(ledger.Chunks, amount);
-        foreach (var kv in allocations)
-        {
-            RecordPoisonApplicationLocked(kv.Key, poisonPower, target, kv.Value);
-        }
-
-        if (unattributed > 0m)
-        {
-            CoreMain.LogDebug(
-                $"Noxious Fumes poison application under-attributed target={DescribeCreature(target)} " +
-                $"applier={DescribeCreature(applier)} amount={amount} remainder={unattributed}");
-        }
-
-        return allocations.Count > 0;
+        RecordPoisonApplicationLocked(window.SourceCardInstanceId, poisonPower, target, amount);
+        return true;
     }
 
     private static bool TryRecordNoxiousFumesPoisonArtifactBlockLocked(
@@ -1539,31 +1511,9 @@ public static class RunTracker
 
         var window = TakePendingNoxiousFumesApplicationLocked(applier);
         if (window == null) return false;
-
-        var ledger = FindNoxiousFumesLedgerLocked(window.Owner);
-        if (ledger == null || ledger.Chunks.Count == 0)
-        {
-            CoreMain.LogDebug(
-                $"Noxious Fumes poison Artifact block missing source ledger target={DescribeCreature(target)} " +
-                $"applier={DescribeCreature(applier)} amount={requestedAmount}");
-            return false;
-        }
-
-        var (allocations, unattributed) = PoisonLedgerMath.AllocateContributions(ledger.Chunks, requestedAmount);
         _pendingCombat ??= new PendingCombat();
-        foreach (var kv in allocations)
-        {
-            RecordArtifactBlockedEffectLocked(kv.Key, poisonPower, kv.Value);
-        }
-
-        if (unattributed > 0m)
-        {
-            CoreMain.LogDebug(
-                $"Noxious Fumes poison Artifact block under-attributed target={DescribeCreature(target)} " +
-                $"applier={DescribeCreature(applier)} amount={requestedAmount} remainder={unattributed}");
-        }
-
-        return allocations.Count > 0;
+        RecordArtifactBlockedEffectLocked(window.SourceCardInstanceId, poisonPower, requestedAmount);
+        return true;
     }
 
     private static PendingNoxiousFumesApplicationWindow? TakePendingNoxiousFumesApplicationLocked(Creature? applier)
@@ -1573,7 +1523,7 @@ public static class RunTracker
         for (int i = _pendingNoxiousFumesApplications.Count - 1; i >= 0; i--)
         {
             var window = _pendingNoxiousFumesApplications[i];
-            if (!ReferenceEquals(window.Owner, applier)) continue;
+            if (!ReferenceEquals(window.Applier, applier)) continue;
 
             window.RemainingApplications--;
             if (window.RemainingApplications <= 0)
@@ -1681,29 +1631,32 @@ public static class RunTracker
         _pendingCombat?.PoisonLedgers.RemoveAll(ledger => ReferenceEquals(ledger.Target, target));
     }
 
-    private static NoxiousFumesSourceLedger GetOrCreateNoxiousFumesLedgerLocked(Creature owner)
+    private static void TrackNoxiousFumesEffectSourceLocked(NoxiousFumesPower power, string sourceCardInstanceId)
     {
         _pendingCombat ??= new PendingCombat();
 
-        foreach (var ledger in _pendingCombat.NoxiousFumesLedgers)
+        foreach (var source in _pendingCombat.NoxiousFumesEffectSources)
         {
-            if (ReferenceEquals(ledger.Owner, owner))
-                return ledger;
+            if (!ReferenceEquals(source.Power, power)) continue;
+            source.SourceCardInstanceId = sourceCardInstanceId;
+            return;
         }
 
-        var created = new NoxiousFumesSourceLedger { Owner = owner };
-        _pendingCombat.NoxiousFumesLedgers.Add(created);
-        return created;
+        _pendingCombat.NoxiousFumesEffectSources.Add(new NoxiousFumesEffectSource
+        {
+            Power = power,
+            SourceCardInstanceId = sourceCardInstanceId,
+        });
     }
 
-    private static NoxiousFumesSourceLedger? FindNoxiousFumesLedgerLocked(Creature owner)
+    private static string? FindNoxiousFumesEffectSourceLocked(NoxiousFumesPower power)
     {
         if (_pendingCombat == null) return null;
 
-        foreach (var ledger in _pendingCombat.NoxiousFumesLedgers)
+        foreach (var source in _pendingCombat.NoxiousFumesEffectSources)
         {
-            if (ReferenceEquals(ledger.Owner, owner))
-                return ledger;
+            if (ReferenceEquals(source.Power, power))
+                return source.SourceCardInstanceId;
         }
 
         return null;
@@ -1826,8 +1779,8 @@ public static class RunTracker
                         RecordAppliedEffectLocked(instanceId, entry.Power, entry.Amount);
                     }
 
-                    if (IsNoxiousFumesPower(entry.Power) && target != null && target.IsPlayer)
-                        RecordNoxiousFumesContributionLocked(target, instanceId, entry.Amount);
+                    if (entry.Power is NoxiousFumesPower noxiousFumesPower && target != null && target.IsPlayer)
+                        TrackNoxiousFumesEffectSourceLocked(noxiousFumesPower, instanceId);
 
                     return;
                 }
@@ -2259,7 +2212,7 @@ internal class PendingCombat
     public List<CardEvent> CombatEvents { get; } = new();
     public List<BlockChunk> PlayerBlockLedger { get; } = new();
     public List<PoisonTargetLedger> PoisonLedgers { get; } = new();
-    public List<NoxiousFumesSourceLedger> NoxiousFumesLedgers { get; } = new();
+    public List<NoxiousFumesEffectSource> NoxiousFumesEffectSources { get; } = new();
     public int NextBlockSequence { get; set; }
 }
 
@@ -2287,11 +2240,10 @@ internal sealed class PoisonTargetLedger
     public int NextSequence { get; set; }
 }
 
-internal sealed class NoxiousFumesSourceLedger
+internal sealed class NoxiousFumesEffectSource
 {
-    public required Creature Owner { get; init; }
-    public List<PersistentContributionChunk> Chunks { get; } = new();
-    public int NextSequence { get; set; }
+    public required NoxiousFumesPower Power { get; init; }
+    public string SourceCardInstanceId { get; set; } = "";
 }
 
 internal sealed class PendingPoisonTick
@@ -2302,7 +2254,7 @@ internal sealed class PendingPoisonTick
 
 internal sealed class PendingNoxiousFumesApplicationWindow
 {
-    public required Creature Owner { get; init; }
+    public required Creature Applier { get; init; }
+    public string SourceCardInstanceId { get; init; } = "";
     public int RemainingApplications { get; set; }
-    public decimal AmountPerApplication { get; init; }
 }
