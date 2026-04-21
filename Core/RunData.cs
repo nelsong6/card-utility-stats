@@ -10,12 +10,18 @@ namespace CardUtilityStats.Core;
 /// </summary>
 public class RunData
 {
-    public const int CurrentSchemaVersion = 2;
+    public const int CurrentSchemaVersion = 4;
 
     // v1: aggregates keyed by card definition id (pooled across instances)
     // v2: aggregates keyed by per-instance id ("CARD.STRIKE_SILENT#1") —
     //     each physical card in the deck gets its own entry. Pooled view
     //     tracked as feature request in issue #11.
+    // v3: per-card aggregates can now include effect-application summaries
+    //     keyed by power/effect id. Older v2 files remain resumable because
+    //     the new nested field is additive; missing data simply deserializes
+    //     as an empty dictionary.
+    // v4: add "this card was exhausted" count. Also additive; older v3 files
+    //     remain resumable with the new field defaulting to 0.
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
     public string RunId { get; set; } = "";
     public string StartedAt { get; set; } = "";  // ISO-8601 UTC
@@ -144,6 +150,12 @@ public class CardAggregate
     // — different signal, different meaning.
     public int TimesExhaustedOtherCards { get; set; }
 
+    // M3g2: How often THIS card itself got exhausted, regardless of cause.
+    // Useful for exhaust-tag cards, ephemeral generated cards, and effects
+    // that consume a card from hand/discard. Shown only when > 0 on the
+    // full tooltip.
+    public int TimesExhausted { get; set; }
+
     // M3h: Player HP loss from playing this card. Tracks Ironclad-style
     // self-damage (Hemokinesis, Offering, Combust tick, etc.). Uses the
     // damage's UnblockedDamage, which is POST-reduction — so Tungsten Rod
@@ -157,6 +169,13 @@ public class CardAggregate
     // Acrobatics etc. depending on the character). Excludes turn-start
     // auto-draw via the game's FromHandDraw flag.
     public int TimesCardsDrawn { get; set; }
+
+    // M4a: Effect / power application summary for this specific card
+    // instance. First pass tracks ONLY that the card caused a power/effect
+    // to be applied, not what the downstream effect later did. Keyed by the
+    // game's power id (e.g. "POWER.NECROBINDER_TRIGGER"), with localized
+    // display text cached for tooltip rendering.
+    public Dictionary<string, AppliedEffectAggregate> AppliedEffects { get; set; } = new();
 
     // M3d: Per-instance lineage (when the card entered the deck and at
     // what upgrade level). Lets us distinguish between "card arrived
@@ -193,6 +212,20 @@ public class CardAggregate
     // M2: Block attribution (see issue #1 for heuristic). Null until M2.
     // M3b: Block-related closure (block added / absorbed). Null until M2/M3b.
     // M3c: Draw count attribution. Null until M3c.
+}
+
+/// <summary>
+/// First-pass effect/power tracking credited back to a card instance.
+/// Keeps enough display metadata for tooltip rendering without forcing the
+/// UI to re-query live game state for historical runs.
+/// </summary>
+public class AppliedEffectAggregate
+{
+    public string EffectId { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public string? IconPath { get; set; }
+    public int TimesApplied { get; set; }
+    public decimal TotalAmountApplied { get; set; }
 }
 
 /// <summary>

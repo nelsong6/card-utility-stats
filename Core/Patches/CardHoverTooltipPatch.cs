@@ -222,6 +222,8 @@ public static class CardHoverShowPatch
             Row3(sb, "Played/Drawn", $"{agg.Plays}/{agg.TimesDrawn}", $"{playRate:F0}%");
         }
 
+        AppendAppliedEffects(sb, agg, compact: false);
+
         // Energy-gain rows — cards like Adrenaline / Concentrate / energy
         // pot-style effects need a direct "what did this card give me?"
         // stat, independent of the existing energy-spent cost tracking.
@@ -311,6 +313,12 @@ public static class CardHoverShowPatch
         if (agg.TimesExhaustedOtherCards > 0)
             Row3(sb, "Exhausted others", agg.TimesExhaustedOtherCards.ToString(), "");
 
+        // How often THIS card itself got exhausted. Full-view only; useful
+        // for exhaust-tag cards and ephemeral generated cards, but not worth
+        // the space in the compact in-hand view.
+        if (agg.TimesExhausted > 0)
+            Row3(sb, "Exhausted", agg.TimesExhausted.ToString(), "");
+
         // Draw attribution — cards drawn as a result of playing THIS card.
         // Counts only card-effect draws (not turn-start auto-draw).
         if (agg.TimesCardsDrawn > 0)
@@ -368,6 +376,8 @@ public static class CardHoverShowPatch
 
         if (agg.TotalBlockGained > 0)
             Row3(sb, "Block gained", agg.TotalBlockGained.ToString(), "");
+
+        AppendAppliedEffects(sb, agg, compact: true);
 
         if (agg.Kills > 0)
             Row3(sb, "Kills", agg.Kills.ToString(), "");
@@ -428,6 +438,35 @@ public static class CardHoverShowPatch
         sb.Append($"[cell expand=1 padding=0,0,12,0][right][b]{value}[/b][/right][/cell]");
         sb.Append($"[cell expand=1 padding=0,0,4,0][right][color=#b5b5b5]{pct}[/color][/right][/cell]");
         sb.Append("[/table]\n");
+    }
+
+    private static void AppendAppliedEffects(StringBuilder sb, CardAggregate agg, bool compact)
+    {
+        if (agg.AppliedEffects == null || agg.AppliedEffects.Count == 0) return;
+
+        if (!compact)
+            sb.Append("[color=#b5b5b5]Effects applied[/color]\n");
+
+        int shown = 0;
+        foreach (var effect in agg.AppliedEffects.Values
+                     .OrderByDescending(e => e.TimesApplied)
+                     .ThenBy(e => e.DisplayName))
+        {
+            if (compact && shown >= 2) break;
+
+            var label = string.IsNullOrWhiteSpace(effect.DisplayName) ? effect.EffectId : effect.DisplayName;
+            var value = FormatDecimal(effect.TotalAmountApplied);
+            var extra = effect.TimesApplied > 1 ? $"{effect.TimesApplied}x" : "1x";
+            Row3(sb, label, value, extra);
+            shown++;
+        }
+    }
+
+    private static string FormatDecimal(decimal value)
+    {
+        return decimal.Truncate(value) == value
+            ? value.ToString("0")
+            : value.ToString("0.##");
     }
 
     /// <summary>

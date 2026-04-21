@@ -124,51 +124,12 @@ public static class RunTracker
             CardAggregate? result = null;
 
             if (_currentRun != null && _currentRun.Aggregates.TryGetValue(instanceId, out var committed))
-            {
-                result = new CardAggregate
-                {
-                    Plays = committed.Plays,
-                    TotalIntended = committed.TotalIntended,
-                    TotalBlocked = committed.TotalBlocked,
-                    TotalOverkill = committed.TotalOverkill,
-                    TotalEffective = committed.TotalEffective,
-                    Kills = committed.Kills,
-                    TotalEnergySpent = committed.TotalEnergySpent,
-                    TotalEnergyGenerated = committed.TotalEnergyGenerated,
-                    TotalBlockGained = committed.TotalBlockGained,
-                    TimesDrawn = committed.TimesDrawn,
-                    FloorAdded = committed.FloorAdded,
-                    InitialUpgradeLevel = committed.InitialUpgradeLevel,
-                    Removed = committed.Removed,
-                    RemovedAtFloor = committed.RemovedAtFloor,
-                    TimesDiscarded = committed.TimesDiscarded,
-                    TimesPlacedOnTopFromHand = committed.TimesPlacedOnTopFromHand,
-                    TimesPlacedOnTopFromDiscard = committed.TimesPlacedOnTopFromDiscard,
-                    TimesExhaustedOtherCards = committed.TimesExhaustedOtherCards,
-                    TotalHpLost = committed.TotalHpLost,
-                    TimesCardsDrawn = committed.TimesCardsDrawn,
-                };
-            }
+                result = CloneAggregate(committed);
 
             if (_pendingCombat != null && _pendingCombat.CombatAggregates.TryGetValue(instanceId, out var pending))
             {
                 result ??= new CardAggregate();
-                result.Plays += pending.Plays;
-                result.TotalIntended += pending.TotalIntended;
-                result.TotalBlocked += pending.TotalBlocked;
-                result.TotalOverkill += pending.TotalOverkill;
-                result.TotalEffective += pending.TotalEffective;
-                result.Kills += pending.Kills;
-                result.TotalEnergySpent += pending.TotalEnergySpent;
-                result.TotalEnergyGenerated += pending.TotalEnergyGenerated;
-                result.TotalBlockGained += pending.TotalBlockGained;
-                result.TimesDrawn += pending.TimesDrawn;
-                result.TimesDiscarded += pending.TimesDiscarded;
-                result.TimesPlacedOnTopFromHand += pending.TimesPlacedOnTopFromHand;
-                result.TimesPlacedOnTopFromDiscard += pending.TimesPlacedOnTopFromDiscard;
-                result.TimesExhaustedOtherCards += pending.TimesExhaustedOtherCards;
-                result.TotalHpLost += pending.TotalHpLost;
-                result.TimesCardsDrawn += pending.TimesCardsDrawn;
+                MergeAggregateInto(result, pending);
             }
 
             return result;
@@ -645,22 +606,7 @@ public static class RunTracker
             foreach (var (cardId, combatAgg) in _pendingCombat.CombatAggregates)
             {
                 var runAgg = GetOrCreateAggregate(_currentRun, cardId);
-                runAgg.Plays += combatAgg.Plays;
-                runAgg.TotalIntended += combatAgg.TotalIntended;
-                runAgg.TotalBlocked += combatAgg.TotalBlocked;
-                runAgg.TotalOverkill += combatAgg.TotalOverkill;
-                runAgg.TotalEffective += combatAgg.TotalEffective;
-                runAgg.Kills += combatAgg.Kills;
-                runAgg.TotalEnergySpent += combatAgg.TotalEnergySpent;
-                runAgg.TotalEnergyGenerated += combatAgg.TotalEnergyGenerated;
-                runAgg.TotalBlockGained += combatAgg.TotalBlockGained;
-                runAgg.TimesDrawn += combatAgg.TimesDrawn;
-                runAgg.TimesDiscarded += combatAgg.TimesDiscarded;
-                runAgg.TimesPlacedOnTopFromHand += combatAgg.TimesPlacedOnTopFromHand;
-                runAgg.TimesPlacedOnTopFromDiscard += combatAgg.TimesPlacedOnTopFromDiscard;
-                runAgg.TimesExhaustedOtherCards += combatAgg.TimesExhaustedOtherCards;
-                runAgg.TotalHpLost += combatAgg.TotalHpLost;
-                runAgg.TimesCardsDrawn += combatAgg.TimesCardsDrawn;
+                MergeAggregateInto(runAgg, combatAgg);
             }
             _currentRun.Events.AddRange(_pendingCombat.CombatEvents);
 
@@ -783,6 +729,9 @@ public static class RunTracker
                             $"blocked={dre.Result.BlockedDamage} unblocked={dre.Result.UnblockedDamage} " +
                             $"overkill={dre.Result.OverkillDamage} killed={dre.Result.WasTargetKilled}");
                     }
+                    break;
+                case PowerReceivedEntry pre when pre.Power != null:
+                    RecordPowerReceived(pre);
                     break;
             }
         }
@@ -1127,6 +1076,11 @@ public static class RunTracker
     {
         lock (_lock)
         {
+            _pendingCombat ??= new PendingCombat();
+            var exhaustedId = GetOrAssignInstanceId(exhaustedCard);
+            var exhaustedAgg = GetOrCreateAggregate(_pendingCombat, exhaustedId);
+            exhaustedAgg.TimesExhausted++;
+
             try
             {
                 var causingPlay = FindCurrentlyResolvingCardPlay();
@@ -1134,8 +1088,6 @@ public static class RunTracker
 
                 // Skip self-exhaust — "exhausted OTHER cards" is the stat.
                 if (ReferenceEquals(Canonical(causingPlay.Card), Canonical(exhaustedCard))) return;
-
-                _pendingCombat ??= new PendingCombat();
                 var instanceId = GetOrAssignInstanceId(causingPlay.Card);
                 var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
                 agg.TimesExhaustedOtherCards++;
@@ -1200,6 +1152,36 @@ public static class RunTracker
                 {
                     CoreMain.LogDebug($"RecordDrawFromCard attribution failed: {e.Message}");
                 }
+            }
+        }
+    }
+
+    private static void RecordPowerReceived(PowerReceivedEntry entry)
+    {
+        lock (_lock)
+        {
+            _pendingCombat ??= new PendingCombat();
+
+            try
+            {
+                var causingPlay = FindCurrentlyResolvingCardPlay();
+                if (causingPlay?.Card == null)
+                {
+                    CoreMain.LogDebug(
+                        $"PowerReceivedEntry unattributed power={entry.Power.Id} amount={entry.Amount} " +
+                        $"applier={DescribeCreature(entry.Applier)}");
+                    return;
+                }
+
+                var instanceId = GetOrAssignInstanceId(causingPlay.Card);
+                var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
+                var effect = GetOrCreateAppliedEffect(agg, entry.Power);
+                effect.TimesApplied++;
+                effect.TotalAmountApplied += entry.Amount;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPowerReceived failed: {e.Message}");
             }
         }
     }
@@ -1290,6 +1272,118 @@ public static class RunTracker
             run.Aggregates[cardId] = agg;
         }
         return agg;
+    }
+
+    private static CardAggregate CloneAggregate(CardAggregate source)
+    {
+        var clone = new CardAggregate
+        {
+            Plays = source.Plays,
+            TotalIntended = source.TotalIntended,
+            TotalBlocked = source.TotalBlocked,
+            TotalOverkill = source.TotalOverkill,
+            TotalEffective = source.TotalEffective,
+            Kills = source.Kills,
+            TotalEnergySpent = source.TotalEnergySpent,
+            TotalEnergyGenerated = source.TotalEnergyGenerated,
+            TotalBlockGained = source.TotalBlockGained,
+            TimesDrawn = source.TimesDrawn,
+            TimesDiscarded = source.TimesDiscarded,
+            TimesPlacedOnTopFromHand = source.TimesPlacedOnTopFromHand,
+            TimesPlacedOnTopFromDiscard = source.TimesPlacedOnTopFromDiscard,
+            TimesExhaustedOtherCards = source.TimesExhaustedOtherCards,
+            TimesExhausted = source.TimesExhausted,
+            TotalHpLost = source.TotalHpLost,
+            TimesCardsDrawn = source.TimesCardsDrawn,
+            FloorAdded = source.FloorAdded,
+            InitialUpgradeLevel = source.InitialUpgradeLevel,
+            Removed = source.Removed,
+            RemovedAtFloor = source.RemovedAtFloor,
+            RemovedSnapshot = source.RemovedSnapshot,
+        };
+        MergeAppliedEffectsInto(clone.AppliedEffects, source.AppliedEffects);
+        return clone;
+    }
+
+    private static void MergeAggregateInto(CardAggregate target, CardAggregate source)
+    {
+        target.Plays += source.Plays;
+        target.TotalIntended += source.TotalIntended;
+        target.TotalBlocked += source.TotalBlocked;
+        target.TotalOverkill += source.TotalOverkill;
+        target.TotalEffective += source.TotalEffective;
+        target.Kills += source.Kills;
+        target.TotalEnergySpent += source.TotalEnergySpent;
+        target.TotalEnergyGenerated += source.TotalEnergyGenerated;
+        target.TotalBlockGained += source.TotalBlockGained;
+        target.TimesDrawn += source.TimesDrawn;
+        target.TimesDiscarded += source.TimesDiscarded;
+        target.TimesPlacedOnTopFromHand += source.TimesPlacedOnTopFromHand;
+        target.TimesPlacedOnTopFromDiscard += source.TimesPlacedOnTopFromDiscard;
+        target.TimesExhaustedOtherCards += source.TimesExhaustedOtherCards;
+        target.TimesExhausted += source.TimesExhausted;
+        target.TotalHpLost += source.TotalHpLost;
+        target.TimesCardsDrawn += source.TimesCardsDrawn;
+        MergeAppliedEffectsInto(target.AppliedEffects, source.AppliedEffects);
+    }
+
+    private static void MergeAppliedEffectsInto(
+        Dictionary<string, AppliedEffectAggregate> target,
+        Dictionary<string, AppliedEffectAggregate> source)
+    {
+        foreach (var kv in source)
+        {
+            if (!target.TryGetValue(kv.Key, out var effect))
+            {
+                effect = new AppliedEffectAggregate
+                {
+                    EffectId = kv.Value.EffectId,
+                    DisplayName = kv.Value.DisplayName,
+                    IconPath = kv.Value.IconPath,
+                };
+                target[kv.Key] = effect;
+            }
+
+            effect.TimesApplied += kv.Value.TimesApplied;
+            effect.TotalAmountApplied += kv.Value.TotalAmountApplied;
+            if (string.IsNullOrWhiteSpace(effect.DisplayName) && !string.IsNullOrWhiteSpace(kv.Value.DisplayName))
+                effect.DisplayName = kv.Value.DisplayName;
+            if (string.IsNullOrWhiteSpace(effect.IconPath) && !string.IsNullOrWhiteSpace(kv.Value.IconPath))
+                effect.IconPath = kv.Value.IconPath;
+        }
+    }
+
+    private static AppliedEffectAggregate GetOrCreateAppliedEffect(CardAggregate agg, PowerModel power)
+    {
+        var effectId = power.Id.ToString();
+        if (!agg.AppliedEffects.TryGetValue(effectId, out var effect))
+        {
+            effect = new AppliedEffectAggregate
+            {
+                EffectId = effectId,
+                DisplayName = GetPowerDisplayName(power),
+                IconPath = !string.IsNullOrWhiteSpace(power.IconPath) ? power.IconPath : power.PackedIconPath,
+            };
+            agg.AppliedEffects[effectId] = effect;
+        }
+        return effect;
+    }
+
+    private static string GetPowerDisplayName(PowerModel power)
+    {
+        try
+        {
+            var title = power.Title.GetFormattedText();
+            if (!string.IsNullOrWhiteSpace(title)) return title;
+        }
+        catch { }
+        try
+        {
+            var title = power.Title.GetRawText();
+            if (!string.IsNullOrWhiteSpace(title)) return title;
+        }
+        catch { }
+        return power.Id.ToString();
     }
 
     private static string Now() => DateTime.UtcNow.ToString("o");

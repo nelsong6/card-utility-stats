@@ -26,17 +26,50 @@ public class SchemaLoadingTests
     }
 
     [Fact]
-    public void HistoricalLoad_AcceptsCurrentV2Fixture()
+    public void HistoricalLoad_AcceptsLegacyResumableV2Fixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("v2-per-instance-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.Equal(2, loaded!.SourceSchemaVersion);
+        Assert.True(loaded.IsLegacy);
+        Assert.True(loaded.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Contains("resumable", loaded.CompatibilityNote!, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("CARD.STRIKE_KIN#1", loaded.Data.Aggregates.Keys);
+        Assert.Equal(1, loaded.Data.DefCounters["CARD.STRIKE_KIN"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsLegacyResumableV3Fixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("v3-per-instance-effects-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.Equal(3, loaded!.SourceSchemaVersion);
+        Assert.True(loaded.IsLegacy);
+        Assert.True(loaded.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Contains("resumable", loaded.CompatibilityNote!, StringComparison.OrdinalIgnoreCase);
+        var agg = loaded.Data.Aggregates["CARD.NECROBINDER_POWER#1"];
+        var effect = agg.AppliedEffects["POWER.NECROBINDER_TRIGGER"];
+        Assert.Equal("Necrobinder Trigger", effect.DisplayName);
+        Assert.Equal(3, effect.TimesApplied);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsCurrentV4Fixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("v4-per-instance-effects-exhaust-run.json"));
 
         Assert.NotNull(loaded);
         Assert.Equal(RunData.CurrentSchemaVersion, loaded!.SourceSchemaVersion);
         Assert.False(loaded.IsLegacy);
         Assert.True(loaded.SupportsResume);
         Assert.True(loaded.HasPerInstanceIdentity);
-        Assert.Contains("CARD.STRIKE_KIN#1", loaded.Data.Aggregates.Keys);
-        Assert.Equal(1, loaded.Data.DefCounters["CARD.STRIKE_KIN"]);
+        var agg = loaded.Data.Aggregates["CARD.NECROBINDER_POWER#1"];
+        Assert.Equal(1, agg.TimesExhausted);
+        Assert.Equal(9m, agg.AppliedEffects["POWER.NECROBINDER_TRIGGER"].TotalAmountApplied);
     }
 
     [Fact]
@@ -56,13 +89,34 @@ public class SchemaLoadingTests
     }
 
     [Fact]
-    public void ResumableLoad_AcceptsCurrentV2Fixture()
+    public void ResumableLoad_AcceptsLegacyResumableV2Fixture()
     {
         var resumed = RunStorage.LoadResumable(FixturePath("v2-per-instance-run.json"));
 
         Assert.NotNull(resumed);
-        Assert.Equal(RunData.CurrentSchemaVersion, resumed!.SchemaVersion);
+        Assert.Equal(2, resumed!.SchemaVersion);
         Assert.Contains("CARD.ENERGY_SURGE#1", resumed.Aggregates.Keys);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsLegacyResumableV3Fixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v3-per-instance-effects-run.json"));
+
+        Assert.NotNull(resumed);
+        Assert.Equal(3, resumed!.SchemaVersion);
+        var effect = resumed.Aggregates["CARD.NECROBINDER_POWER#1"].AppliedEffects["POWER.NECROBINDER_TRIGGER"];
+        Assert.Equal(3m, effect.TotalAmountApplied);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsCurrentV4Fixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v4-per-instance-effects-exhaust-run.json"));
+
+        Assert.NotNull(resumed);
+        Assert.Equal(RunData.CurrentSchemaVersion, resumed!.SchemaVersion);
+        Assert.Equal(1, resumed.Aggregates["CARD.NECROBINDER_POWER#1"].TimesExhausted);
     }
 
     [Fact]

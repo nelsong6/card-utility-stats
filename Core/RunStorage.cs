@@ -98,11 +98,13 @@ public static class RunStorage
                     HasPerInstanceIdentity = false,
                     CompatibilityNote =
                         "Schema v1 stores pooled per-definition aggregates only. " +
-                        "It is readable as historical data, but it cannot rebuild v2 per-instance live state.",
+                        "It is readable as historical data, but it cannot rebuild current per-instance live state.",
                     Data = data,
                 };
             }
 
+            case 2:
+            case 3:
             case RunData.CurrentSchemaVersion:
             {
                 var data = DeserializeRunData(path);
@@ -113,6 +115,9 @@ public static class RunStorage
                     SourceSchemaVersion = header.SchemaVersion,
                     SupportsResume = true,
                     HasPerInstanceIdentity = true,
+                    CompatibilityNote = header.SchemaVersion == RunData.CurrentSchemaVersion
+                        ? null
+                        : $"Schema v{header.SchemaVersion} remains resumable under v{RunData.CurrentSchemaVersion} because newer fields are additive.",
                     Data = data,
                 };
             }
