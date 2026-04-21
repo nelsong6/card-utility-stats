@@ -89,9 +89,26 @@ public class SchemaLoadingTests
     }
 
     [Fact]
-    public void HistoricalLoad_AcceptsCurrentV6Fixture()
+    public void HistoricalLoad_AcceptsLegacyResumableV6ArtifactFixture()
     {
-        var loaded = RunStorage.LoadHistorical(FixturePath("v6-target-coverage-run.json"));
+        var loaded = RunStorage.LoadHistorical(FixturePath("v6-per-instance-artifact-block-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.Equal(6, loaded!.SourceSchemaVersion);
+        Assert.True(loaded.IsLegacy);
+        Assert.True(loaded.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Equal(6, loaded.Data.Aggregates["CARD.DEFEND_KIN#1"].TotalBlockEffective);
+        Assert.Equal(0, loaded.Data.Aggregates["CARD.DEFEND_KIN#1"].TotalTargetsHit);
+        var effect = loaded.Data.Aggregates["CARD.BASH_KIN#1"].AppliedEffects["POWER.WEAK"];
+        Assert.Equal(1, effect.TimesBlockedByArtifact);
+        Assert.Equal(2m, effect.TotalAmountBlockedByArtifact);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsCurrentV7Fixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("v7-target-coverage-run.json"));
 
         Assert.NotNull(loaded);
         Assert.Equal(RunData.CurrentSchemaVersion, loaded!.SourceSchemaVersion);
@@ -163,9 +180,22 @@ public class SchemaLoadingTests
     }
 
     [Fact]
-    public void ResumableLoad_AcceptsCurrentV6Fixture()
+    public void ResumableLoad_AcceptsLegacyResumableV6ArtifactFixture()
     {
-        var resumed = RunStorage.LoadResumable(FixturePath("v6-target-coverage-run.json"));
+        var resumed = RunStorage.LoadResumable(FixturePath("v6-per-instance-artifact-block-run.json"));
+
+        Assert.NotNull(resumed);
+        Assert.Equal(6, resumed!.SchemaVersion);
+        Assert.Equal(0, resumed.Aggregates["CARD.DEFEND_KIN#1"].TotalTargetsHit);
+        var effect = resumed.Aggregates["CARD.BASH_KIN#1"].AppliedEffects["POWER.WEAK"];
+        Assert.Equal(1, effect.TimesBlockedByArtifact);
+        Assert.Equal(2m, effect.TotalAmountBlockedByArtifact);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsCurrentV7Fixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v7-target-coverage-run.json"));
 
         Assert.NotNull(resumed);
         Assert.Equal(RunData.CurrentSchemaVersion, resumed!.SchemaVersion);

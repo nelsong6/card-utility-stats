@@ -1,6 +1,6 @@
 {
-  "schema_version": 6,
-  "run_id": "fixture-v6-target-coverage",
+  "schema_version": 7,
+  "run_id": "fixture-v7-target-coverage",
   "started_at": "2026-04-20T12:05:00Z",
   "updated_at": "2026-04-20T12:17:00Z",
   "ended_at": "2026-04-20T12:18:20Z",
