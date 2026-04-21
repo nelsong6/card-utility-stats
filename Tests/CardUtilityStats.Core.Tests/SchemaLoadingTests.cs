@@ -119,6 +119,22 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsCurrentV8Fixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("v8-per-instance-regent-stars-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.Equal(8, loaded!.SourceSchemaVersion);
+        Assert.False(loaded.IsLegacy);
+        Assert.True(loaded.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        Assert.Equal(2, loaded.Data.Aggregates["CARD.VENERATE#1"].TotalStarsGenerated);
+        Assert.Equal(2, loaded.Data.Aggregates["CARD.STARDUST#1"].TotalStarsSpent);
+        Assert.Equal(2, loaded.Data.Events[1].StarsSpent);
+    }
+
+    [Fact]
     public void HistoricalLoad_RejectsUnknownSchemaFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("v999-unknown-run.json"));
@@ -199,6 +215,18 @@ public class SchemaLoadingTests
         var effect = resumed.Aggregates["CARD.DEADLY_POISON#1"].AppliedEffects["POWER.POISON"];
         Assert.Equal(9m, effect.TotalTriggeredEffectiveDamage);
         Assert.Equal(3m, effect.TotalTriggeredOverkill);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsCurrentV8Fixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v8-per-instance-regent-stars-run.json"));
+
+        Assert.NotNull(resumed);
+        Assert.Equal(8, resumed!.SchemaVersion);
+        Assert.Equal(2, resumed.Aggregates["CARD.VENERATE#1"].TotalStarsGenerated);
+        Assert.Equal(2, resumed.Aggregates["CARD.STARDUST#1"].TotalStarsSpent);
+        Assert.Equal(1, resumed.Aggregates["CARD.VENERATE#1"].TimesDrawn);
     }
 
     [Fact]
