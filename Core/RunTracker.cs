@@ -5,8 +5,10 @@ using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Combat.History.Entries;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
+using MegaCrit.Sts2.Core.Entities.Powers;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Models.Powers;
 using MegaCrit.Sts2.Core.Rooms;
 using MegaCrit.Sts2.Core.Runs;
 
@@ -32,6 +34,8 @@ namespace CardUtilityStats.Core;
 /// </summary>
 public static class RunTracker
 {
+    private const string ShivDefinitionId = "CARD.SHIV";
+    private const string ShivGeneratedEventType = "shiv_generated";
     private const string SovereignBladeDefinitionId = "CARD.SOVEREIGN_BLADE";
     private const string SovereignBladeForgedEventType = "sovereign_blade_forged";
 
@@ -44,8 +48,11 @@ public static class RunTracker
     private static CardModel? _pendingDrawSourceCard;
     private static CardModel? _pendingEffectSourceCard;
     private static int _pendingEffectSourceHistoryCount;
+    private static readonly List<PendingPowerChangeAttempt> _pendingPowerChangeAttempts = new();
     private static int _pendingPlayerBlockClearAmount;
     private static bool _pendingPlayerBlockClearArmed;
+    private static bool _shivAvailableThisRun;
+    private static CardModel? _shivDeckViewCard;
     private static bool _sovereignBladeAvailableThisRun;
     private static CardModel? _sovereignBladeDeckViewCard;
 
@@ -129,6 +136,8 @@ public static class RunTracker
     {
         lock (_lock)
         {
+            if (IsShivDeckViewCardLocked(card))
+                return GetShivDeckViewAggregateLocked();
             if (IsSovereignBladeDeckViewCardLocked(card))
                 return GetSovereignBladeDeckViewAggregateLocked();
 
@@ -186,6 +195,40 @@ public static class RunTracker
         }
     }
 
+    public static bool IsShivDeckViewCard(CardModel card)
+    {
+        if (card == null) return false;
+        lock (_lock) return IsShivDeckViewCardLocked(card);
+    }
+
+    private static bool IsShivDeckViewCardLocked(CardModel card)
+    {
+        return _shivDeckViewCard != null
+            && ReferenceEquals(Canonical(card), _shivDeckViewCard);
+    }
+
+    private static CardAggregate? GetShivDeckViewAggregateLocked()
+    {
+        CardAggregate? pooled = null;
+
+        if (_currentRun != null)
+            pooled = CardAggregatePooler.PoolByDefinition(_currentRun.Aggregates, ShivDefinitionId);
+
+        if (_pendingCombat != null)
+        {
+            var pending = CardAggregatePooler.PoolByDefinition(
+                _pendingCombat.CombatAggregates,
+                ShivDefinitionId);
+            if (pending != null)
+            {
+                pooled ??= new CardAggregate();
+                CardAggregatePooler.MergeInto(pooled, pending);
+            }
+        }
+
+        return pooled;
+    }
+
     public static bool IsSovereignBladeDeckViewCard(CardModel card)
     {
         if (card == null) return false;
@@ -220,6 +263,25 @@ public static class RunTracker
         return pooled;
     }
 
+    private static bool HasShivDataLocked()
+    {
+        if (_currentRun?.Events.Any(e => e.Type == ShivGeneratedEventType) == true)
+            return true;
+
+        if (_pendingCombat?.CombatEvents.Any(e => e.Type == ShivGeneratedEventType) == true)
+            return true;
+
+        if (_currentRun?.Aggregates.Keys.Any(key =>
+                CardAggregatePooler.IsAggregateForDefinition(key, ShivDefinitionId)) == true)
+            return true;
+
+        if (_pendingCombat?.CombatAggregates.Keys.Any(key =>
+                CardAggregatePooler.IsAggregateForDefinition(key, ShivDefinitionId)) == true)
+            return true;
+
+        return false;
+    }
+
     private static bool HasSovereignBladeDataLocked()
     {
         if (_currentRun?.Events.Any(e => e.Type == SovereignBladeForgedEventType) == true)
@@ -239,11 +301,36 @@ public static class RunTracker
         return false;
     }
 
+    private static void RefreshShivAvailabilityLocked()
+    {
+        _shivAvailableThisRun = HasShivDataLocked();
+        if (!_shivAvailableThisRun)
+            _shivDeckViewCard = null;
+    }
+
     private static void RefreshSovereignBladeAvailabilityLocked()
     {
         _sovereignBladeAvailableThisRun = HasSovereignBladeDataLocked();
         if (!_sovereignBladeAvailableThisRun)
             _sovereignBladeDeckViewCard = null;
+    }
+
+    private static CardModel? GetShivDeckViewCardLocked()
+    {
+        if (!_shivAvailableThisRun) return null;
+        if (_shivDeckViewCard != null) return _shivDeckViewCard;
+
+        try
+        {
+            var modelId = ModelId.Deserialize(ShivDefinitionId);
+            _shivDeckViewCard = ModelDb.GetById<CardModel>(modelId).ToMutable();
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"GetShivDeckViewCardLocked failed: {e.Message}");
+        }
+
+        return _shivDeckViewCard;
     }
 
     private static CardModel? GetSovereignBladeDeckViewCardLocked()
@@ -435,6 +522,7 @@ public static class RunTracker
         _pendingDrawSourceCard = null;
         _pendingEffectSourceCard = null;
         _pendingEffectSourceHistoryCount = 0;
+        _pendingPowerChangeAttempts.Clear();
         _pendingPlayerBlockClearAmount = 0;
         _pendingPlayerBlockClearArmed = false;
     }
@@ -500,6 +588,7 @@ public static class RunTracker
                 _pendingCombat = null;
                 _instanceNumbers.Clear();
                 _defCounters.Clear();
+                _shivDeckViewCard = null;
                 _sovereignBladeDeckViewCard = null;
 
                 // Restore monotonic counters first so any lazy-assign after
@@ -594,6 +683,7 @@ public static class RunTracker
                     $"reconstructed_removed={reconstructedRemoved} " +
                     $"restored_numbers={restored} unmatched_in_deck={unmatched}");
 
+                RefreshShivAvailabilityLocked();
                 RefreshSovereignBladeAvailabilityLocked();
             }
             catch (Exception e)
@@ -622,6 +712,8 @@ public static class RunTracker
             _instanceNumbers.Clear();
             _defCounters.Clear();
             ResetCombatContextState();
+            _shivAvailableThisRun = false;
+            _shivDeckViewCard = null;
             _sovereignBladeAvailableThisRun = false;
             _sovereignBladeDeckViewCard = null;
 
@@ -688,6 +780,8 @@ public static class RunTracker
             _currentRun = null;
             _pendingCombat = null;
             ResetCombatContextState();
+            _shivAvailableThisRun = false;
+            _shivDeckViewCard = null;
             _sovereignBladeAvailableThisRun = false;
             _sovereignBladeDeckViewCard = null;
         }
@@ -1138,16 +1232,22 @@ public static class RunTracker
 
     /// <summary>
     /// Additional cards to surface in the full-deck screen when ViewStats is
-    /// enabled. Today that includes removed cards plus the synthetic
-    /// deck-level Sovereign Blade once Forge has been activated this run.
+    /// enabled. Today that includes removed cards plus pooled synthetic
+    /// deck-level meta cards for Shiv and Sovereign Blade once the run has
+    /// generated them.
     /// </summary>
     public static IReadOnlyList<CardModel> GetSupplementalDeckViewCards()
     {
         lock (_lock)
         {
+            RefreshShivAvailabilityLocked();
             RefreshSovereignBladeAvailabilityLocked();
 
             var result = GetRemovedCardsLocked();
+
+            var shiv = GetShivDeckViewCardLocked();
+            if (shiv != null && !result.Contains(shiv))
+                result.Add(shiv);
 
             var sovereignBlade = GetSovereignBladeDeckViewCardLocked();
             if (sovereignBlade != null && !result.Contains(sovereignBlade))
@@ -1329,6 +1429,40 @@ public static class RunTracker
         }
     }
 
+    public static void RecordShivGenerated(CardModel? card)
+    {
+        if (card == null) return;
+
+        lock (_lock)
+        {
+            if (!string.Equals(Canonical(card).Id.ToString(), ShivDefinitionId, StringComparison.Ordinal))
+                return;
+
+            _shivAvailableThisRun = true;
+
+            _currentRun ??= new RunData
+            {
+                RunId = Guid.NewGuid().ToString("N"),
+                StartedAt = Now(),
+                UpdatedAt = Now(),
+            };
+            _pendingCombat ??= new PendingCombat();
+
+            bool alreadyRecorded =
+                _currentRun.Events.Any(e => e.Type == ShivGeneratedEventType) ||
+                _pendingCombat.CombatEvents.Any(e => e.Type == ShivGeneratedEventType);
+            if (alreadyRecorded) return;
+
+            _pendingCombat.CombatEvents.Add(new CardEvent
+            {
+                T = Now(),
+                Type = ShivGeneratedEventType,
+                CardId = ShivDefinitionId,
+                Floor = RunManager.Instance.State?.TotalFloor,
+            });
+        }
+    }
+
     public static void RecordSovereignBladeForged()
     {
         lock (_lock)
@@ -1355,6 +1489,142 @@ public static class RunTracker
                 CardId = SovereignBladeDefinitionId,
                 Floor = RunManager.Instance.State?.TotalFloor,
             });
+        }
+    }
+
+    public static void NotePowerAmountChangeAttempt(
+        PowerModel power,
+        decimal amount,
+        Creature target,
+        Creature? applier,
+        CardModel? cardSource)
+    {
+        lock (_lock)
+        {
+            _pendingPowerChangeAttempts.Add(new PendingPowerChangeAttempt
+            {
+                Power = power,
+                Target = target,
+                Applier = applier,
+                RequestedAmount = amount,
+                CardSource = cardSource != null ? Canonical(cardSource) : null,
+            });
+        }
+    }
+
+    public static void RecordArtifactBlockedDebuffAttempt(
+        PowerModel canonicalPower,
+        Creature target,
+        decimal requestedAmount,
+        Creature? applier,
+        IEnumerable<AbstractModel>? modifiers,
+        decimal modifiedAmount)
+    {
+        lock (_lock)
+        {
+            var attempt = TakePendingPowerChangeAttemptLocked(canonicalPower, target, applier, requestedAmount);
+
+            if (modifiedAmount != 0m) return;
+            if (canonicalPower.GetTypeForAmount(requestedAmount) != PowerType.Debuff) return;
+            if (!WasArtifactBlock(target, modifiers)) return;
+
+            var sourceCard = ResolvePowerChangeSourceCardLocked(attempt, applier);
+            if (sourceCard == null)
+            {
+                CoreMain.LogDebug(
+                    $"Artifact-blocked debuff unattributed power={canonicalPower.Id} amount={requestedAmount} " +
+                    $"target={DescribeCreature(target)} applier={DescribeCreature(applier)}");
+                return;
+            }
+
+            _pendingCombat ??= new PendingCombat();
+            var instanceId = GetOrAssignInstanceId(sourceCard);
+            var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
+            var effect = GetOrCreateAppliedEffect(agg, canonicalPower);
+            effect.TimesBlockedByArtifact++;
+            effect.TotalAmountBlockedByArtifact += requestedAmount;
+        }
+    }
+
+    private static PendingPowerChangeAttempt? TakePendingPowerChangeAttemptLocked(
+        PowerModel power,
+        Creature target,
+        Creature? applier,
+        decimal requestedAmount)
+    {
+        for (int i = _pendingPowerChangeAttempts.Count - 1; i >= 0; i--)
+        {
+            var attempt = _pendingPowerChangeAttempts[i];
+            if (!ReferenceEquals(attempt.Power, power)) continue;
+            if (!ReferenceEquals(attempt.Target, target)) continue;
+            if (!ReferenceEquals(attempt.Applier, applier)) continue;
+            if (attempt.RequestedAmount != requestedAmount) continue;
+
+            _pendingPowerChangeAttempts.RemoveAt(i);
+            return attempt;
+        }
+
+        for (int i = _pendingPowerChangeAttempts.Count - 1; i >= 0; i--)
+        {
+            var attempt = _pendingPowerChangeAttempts[i];
+            if (!ReferenceEquals(attempt.Power, power)) continue;
+            if (!ReferenceEquals(attempt.Target, target)) continue;
+
+            _pendingPowerChangeAttempts.RemoveAt(i);
+            return attempt;
+        }
+
+        return null;
+    }
+
+    private static CardModel? ResolvePowerChangeSourceCardLocked(
+        PendingPowerChangeAttempt? attempt,
+        Creature? applier)
+    {
+        if (attempt?.CardSource != null) return attempt.CardSource;
+
+        var applierPlayer = applier?.Player;
+        if (applierPlayer != null && _pendingEffectSourceCard != null && IsOwnedBy(_pendingEffectSourceCard, applierPlayer))
+        {
+            int historyCount = CombatManager.Instance?.History?.Entries?.Count() ?? 0;
+            if (historyCount == _pendingEffectSourceHistoryCount)
+                return _pendingEffectSourceCard;
+        }
+
+        var causingPlay = FindCurrentlyResolvingCardPlay();
+        if (causingPlay?.Card != null) return Canonical(causingPlay.Card);
+
+        if (_recentCompletedPlayerCardPlay?.Card != null)
+        {
+            int historyCount = CombatManager.Instance?.History?.Entries?.Count() ?? 0;
+            if (historyCount == _recentCompletedPlayerCardPlayHistoryCount)
+                return Canonical(_recentCompletedPlayerCardPlay.Card);
+        }
+
+        return null;
+    }
+
+    private static bool WasArtifactModifier(IEnumerable<AbstractModel>? modifiers)
+    {
+        if (modifiers == null) return false;
+        foreach (var modifier in modifiers)
+        {
+            if (modifier is ArtifactPower) return true;
+        }
+        return false;
+    }
+
+    private static bool WasArtifactBlock(Creature target, IEnumerable<AbstractModel>? modifiers)
+    {
+        if (WasArtifactModifier(modifiers)) return true;
+
+        try
+        {
+            return target.HasPower(ModelDb.GetId(typeof(ArtifactPower)));
+        }
+        catch
+        {
+            return false;
         }
     }
 
@@ -1814,6 +2084,8 @@ public static class RunTracker
 
             effect.TimesApplied += kv.Value.TimesApplied;
             effect.TotalAmountApplied += kv.Value.TotalAmountApplied;
+            effect.TimesBlockedByArtifact += kv.Value.TimesBlockedByArtifact;
+            effect.TotalAmountBlockedByArtifact += kv.Value.TotalAmountBlockedByArtifact;
             if (string.IsNullOrWhiteSpace(effect.DisplayName) && !string.IsNullOrWhiteSpace(kv.Value.DisplayName))
                 effect.DisplayName = kv.Value.DisplayName;
             if (string.IsNullOrWhiteSpace(effect.IconPath) && !string.IsNullOrWhiteSpace(kv.Value.IconPath))
@@ -1894,4 +2166,13 @@ internal sealed class BlockChunk
     public int Remaining { get; set; }
     public int Sequence { get; init; }
     public bool CountsForCardStats => CardInstanceId != null;
+}
+
+internal sealed class PendingPowerChangeAttempt
+{
+    public required PowerModel Power { get; init; }
+    public required Creature Target { get; init; }
+    public Creature? Applier { get; init; }
+    public required decimal RequestedAmount { get; init; }
+    public CardModel? CardSource { get; init; }
 }

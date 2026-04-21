@@ -23,6 +23,8 @@ namespace CardUtilityStats.Core.Patches;
 [HarmonyPatch(typeof(NCardHolder), "CreateHoverTips")]
 public static class CardHoverShowPatch
 {
+    private const int InlineKeywordIconSize = 16;
+    private const string ShivMetaNote = "Reflects All Shiv Usage";
     private const string SovereignBladeMetaNote = "Reflects All Sovereign Blade Usage";
 
     [HarmonyPostfix]
@@ -119,13 +121,19 @@ public static class CardHoverShowPatch
     {
         var run = RunTracker.Current;
         var sb = new StringBuilder();
+        bool isShivMetaCard = RunTracker.IsShivDeckViewCard(cardModel);
         bool isSovereignBladeMetaCard = RunTracker.IsSovereignBladeDeckViewCard(cardModel);
+        bool isSupplementalMetaCard = isShivMetaCard || isSovereignBladeMetaCard;
 
         // The card identity now lives in the gold title slot for both compact
         // and full views, so repeating it again in the body just adds noise.
-
-        if (isSovereignBladeMetaCard)
-            sb.Append($"[color=#b5b5b5]{SovereignBladeMetaNote}[/color]\n");
+        // Supplemental meta cards (pooled Shiv / Sovereign Blade)
+        // get a red explanatory banner instead of the generic ephemeral
+        // "not present in deck" note.
+        if (isShivMetaCard)
+            sb.Append($"[color=#e04c4c][b]{ShivMetaNote}[/b][/color]\n");
+        else if (isSovereignBladeMetaCard)
+            sb.Append($"[color=#e04c4c][b]{SovereignBladeMetaNote}[/b][/color]\n");
 
         // Merges committed run + current pending combat so mid-combat plays
         // show up immediately (don't wait for CombatEnded). If we have no
@@ -202,11 +210,13 @@ public static class CardHoverShowPatch
             // Distinguish "was removed from deck" from "never entered deck"
             // (combat-generated ephemerals like Souls/Shivs). Removed gets
             // a red bold banner since it's an important run decision to
-            // flag at a glance; ephemerals get the subdued "not present"
-            // note since it's expected and less attention-worthy.
+            // flag at a glance. Supplemental deck-view meta cards already
+            // emitted their own explanatory red banner above, so we suppress
+            // the generic "not present" line for them. Other ephemerals keep
+            // the subdued grey note.
             if (agg.Removed)
                 sb.Append("[color=#e04c4c][b]Card Removed[/b][/color]\n");
-            else
+            else if (!isSupplementalMetaCard)
                 sb.Append("[color=#b5b5b5]Card not present in deck[/color]\n");
         }
 
@@ -232,6 +242,7 @@ public static class CardHoverShowPatch
         }
 
         AppendAppliedEffects(sb, agg, compact: false);
+        AppendArtifactBlockedSummary(sb, agg);
 
         // Energy-gain rows — cards like Adrenaline / Concentrate / energy
         // pot-style effects need a direct "what did this card give me?"
@@ -391,6 +402,7 @@ public static class CardHoverShowPatch
             Row3(sb, "Block gained", agg.TotalBlockGained.ToString(), "");
 
         AppendAppliedEffects(sb, agg, compact: true);
+        AppendArtifactBlockedSummary(sb, agg);
 
         if (agg.Kills > 0)
             Row3(sb, "Kills", agg.Kills.ToString(), "");
@@ -472,14 +484,20 @@ public static class CardHoverShowPatch
     private static void AppendAppliedEffects(StringBuilder sb, CardAggregate agg, bool compact)
     {
         if (agg.AppliedEffects == null || agg.AppliedEffects.Count == 0) return;
+        bool hasArtifactBlockedSummary = GetArtifactBlockedTotals(agg).Times > 0;
+        var visibleEffects = agg.AppliedEffects.Values
+            .Where(effect => ShouldShowAppliedEffectRow(effect, hasArtifactBlockedSummary))
+            .OrderByDescending(e => e.TimesApplied)
+            .ThenBy(e => e.DisplayName)
+            .ToList();
+
+        if (visibleEffects.Count == 0) return;
 
         if (!compact)
             sb.Append("[color=#b5b5b5]Effects applied[/color]\n");
 
         int shown = 0;
-        foreach (var effect in agg.AppliedEffects.Values
-                     .OrderByDescending(e => e.TimesApplied)
-                     .ThenBy(e => e.DisplayName))
+        foreach (var effect in visibleEffects)
         {
             if (compact && shown >= 2) break;
 
@@ -489,6 +507,67 @@ public static class CardHoverShowPatch
             Row3(sb, label, value, extra);
             shown++;
         }
+    }
+
+    private static void AppendArtifactBlockedSummary(StringBuilder sb, CardAggregate agg)
+    {
+        var (times, amount) = GetArtifactBlockedTotals(agg);
+        if (times <= 0) return;
+
+        var label = GetArtifactStrippedLabel(agg);
+        var value = times.ToString();
+        var extra = amount != times ? $"{FormatDecimal(amount)} amt" : "";
+        Row3(sb, label, value, extra);
+    }
+
+    private static (int Times, decimal Amount) GetArtifactBlockedTotals(CardAggregate agg)
+    {
+        if (agg.AppliedEffects == null || agg.AppliedEffects.Count == 0)
+            return (0, 0m);
+
+        int times = 0;
+        decimal amount = 0m;
+        foreach (var effect in agg.AppliedEffects.Values)
+        {
+            times += effect.TimesBlockedByArtifact;
+            amount += effect.TotalAmountBlockedByArtifact;
+        }
+
+        return (times, amount);
+    }
+
+    private static bool ShouldShowAppliedEffectRow(AppliedEffectAggregate effect, bool hasArtifactBlockedSummary)
+    {
+        if (effect.TotalAmountApplied == 0m && effect.TimesBlockedByArtifact > 0)
+            return false;
+
+        if (hasArtifactBlockedSummary && IsArtifactEffect(effect) && effect.TotalAmountApplied < 0m)
+            return false;
+
+        return true;
+    }
+
+    private static string GetArtifactStrippedLabel(CardAggregate agg)
+    {
+        if (agg.AppliedEffects != null)
+        {
+            foreach (var effect in agg.AppliedEffects.Values)
+            {
+                if (!IsArtifactEffect(effect) || string.IsNullOrWhiteSpace(effect.IconPath)) continue;
+                return $"[img={InlineKeywordIconSize}x{InlineKeywordIconSize}]{effect.IconPath}[/img] stripped";
+            }
+        }
+
+        return "Artifact stripped";
+    }
+
+    private static bool IsArtifactEffect(AppliedEffectAggregate effect)
+    {
+        if (!string.IsNullOrWhiteSpace(effect.EffectId) &&
+            effect.EffectId.Contains("ARTIFACT_POWER", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return string.Equals(effect.DisplayName, "Artifact", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string FormatDecimal(decimal value)

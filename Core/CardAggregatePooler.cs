@@ -71,6 +71,8 @@ internal static class CardAggregatePooler
 
             effect.TimesApplied += kv.Value.TimesApplied;
             effect.TotalAmountApplied += kv.Value.TotalAmountApplied;
+            effect.TimesBlockedByArtifact += kv.Value.TimesBlockedByArtifact;
+            effect.TotalAmountBlockedByArtifact += kv.Value.TotalAmountBlockedByArtifact;
             if (string.IsNullOrWhiteSpace(effect.DisplayName) && !string.IsNullOrWhiteSpace(kv.Value.DisplayName))
                 effect.DisplayName = kv.Value.DisplayName;
             if (string.IsNullOrWhiteSpace(effect.IconPath) && !string.IsNullOrWhiteSpace(kv.Value.IconPath))
