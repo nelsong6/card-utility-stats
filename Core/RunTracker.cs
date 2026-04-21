@@ -36,7 +36,9 @@ public static class RunTracker
     private static RunData? _currentRun;
     private static PendingCombat? _pendingCombat;
     private static CardPlay? _currentPlayerCardPlay;
+    private static HashSet<string>? _currentPlayerCardTargetsHit;
     private static CardPlay? _recentCompletedPlayerCardPlay;
+    private static HashSet<string>? _recentCompletedPlayerCardTargetsHit;
     private static int _recentCompletedPlayerCardPlayHistoryCount;
     private static CardModel? _pendingDrawSourceCard;
     private static CardModel? _pendingEffectSourceCard;
@@ -344,7 +346,9 @@ public static class RunTracker
     private static void ResetCombatContextState()
     {
         _currentPlayerCardPlay = null;
+        _currentPlayerCardTargetsHit = null;
         _recentCompletedPlayerCardPlay = null;
+        _recentCompletedPlayerCardTargetsHit = null;
         _recentCompletedPlayerCardPlayHistoryCount = 0;
         _pendingDrawSourceCard = null;
         _pendingEffectSourceCard = null;
@@ -802,7 +806,9 @@ public static class RunTracker
         lock (_lock)
         {
             _currentPlayerCardPlay = cardPlay;
+            _currentPlayerCardTargetsHit = new HashSet<string>(StringComparer.Ordinal);
             _recentCompletedPlayerCardPlay = null;
+            _recentCompletedPlayerCardTargetsHit = null;
             _recentCompletedPlayerCardPlayHistoryCount = 0;
             _pendingDrawSourceCard = null;
             _pendingEffectSourceCard = null;
@@ -819,6 +825,12 @@ public static class RunTracker
                 && ReferenceEquals(Canonical(_currentPlayerCardPlay.Card), Canonical(cardPlay.Card)))
             {
                 _currentPlayerCardPlay = null;
+                _recentCompletedPlayerCardTargetsHit = _currentPlayerCardTargetsHit;
+                _currentPlayerCardTargetsHit = null;
+            }
+            else
+            {
+                _recentCompletedPlayerCardTargetsHit = new HashSet<string>(StringComparer.Ordinal);
             }
 
             _recentCompletedPlayerCardPlay = cardPlay;
@@ -1541,12 +1553,14 @@ public static class RunTracker
             else
             {
                 // Enemy damage — offensive stats.
+                string? receiverId = entry.Receiver.Monster?.Id.ToString();
                 int intended = result.BlockedDamage + result.UnblockedDamage;
                 int effective = result.UnblockedDamage - result.OverkillDamage;
                 agg.TotalIntended += intended;
                 agg.TotalBlocked += result.BlockedDamage;
                 agg.TotalOverkill += result.OverkillDamage;
                 agg.TotalEffective += effective;
+                NoteTargetCoverageHitLocked(entry.CardSource!, agg, receiverId);
                 if (result.WasTargetKilled) agg.Kills++;
             }
 
@@ -1564,6 +1578,41 @@ public static class RunTracker
                 Killed = result.WasTargetKilled,
             });
         }
+    }
+
+    private static void NoteTargetCoverageHitLocked(CardModel sourceCard, CardAggregate agg, string? receiverId)
+    {
+        if (string.IsNullOrWhiteSpace(receiverId)) return;
+
+        var seenThisPlay = GetTargetCoverageWindowLocked(sourceCard);
+        if (seenThisPlay == null) return;
+
+        if (seenThisPlay.Add(receiverId))
+            agg.TotalTargetsHit++;
+    }
+
+    private static HashSet<string>? GetTargetCoverageWindowLocked(CardModel sourceCard)
+    {
+        var canonicalSource = Canonical(sourceCard);
+        if (_currentPlayerCardPlay?.Card != null
+            && ReferenceEquals(Canonical(_currentPlayerCardPlay.Card), canonicalSource))
+        {
+            _currentPlayerCardTargetsHit ??= new HashSet<string>(StringComparer.Ordinal);
+            return _currentPlayerCardTargetsHit;
+        }
+
+        if (_recentCompletedPlayerCardPlay?.Card != null
+            && ReferenceEquals(Canonical(_recentCompletedPlayerCardPlay.Card), canonicalSource))
+        {
+            int historyCount = CombatManager.Instance?.History?.Entries?.Count() ?? 0;
+            if (historyCount <= _recentCompletedPlayerCardPlayHistoryCount + 1)
+            {
+                _recentCompletedPlayerCardTargetsHit ??= new HashSet<string>(StringComparer.Ordinal);
+                return _recentCompletedPlayerCardTargetsHit;
+            }
+        }
+
+        return null;
     }
 
     // -------- Helpers --------
@@ -1598,6 +1647,7 @@ public static class RunTracker
             TotalOverkill = source.TotalOverkill,
             TotalEffective = source.TotalEffective,
             Kills = source.Kills,
+            TotalTargetsHit = source.TotalTargetsHit,
             TotalEnergySpent = source.TotalEnergySpent,
             TotalEnergyGenerated = source.TotalEnergyGenerated,
             TotalBlockGained = source.TotalBlockGained,
@@ -1629,6 +1679,7 @@ public static class RunTracker
         target.TotalOverkill += source.TotalOverkill;
         target.TotalEffective += source.TotalEffective;
         target.Kills += source.Kills;
+        target.TotalTargetsHit += source.TotalTargetsHit;
         target.TotalEnergySpent += source.TotalEnergySpent;
         target.TotalEnergyGenerated += source.TotalEnergyGenerated;
         target.TotalBlockGained += source.TotalBlockGained;

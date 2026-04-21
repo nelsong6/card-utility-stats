@@ -142,6 +142,7 @@ public static class CardHoverShowPatch
         // div-by-zero for the unplayed case.
         float avgIntended = agg.Plays > 0 ? (float)agg.TotalIntended / agg.Plays : 0f;
         float avgEffective = agg.Plays > 0 ? (float)agg.TotalEffective / agg.Plays : 0f;
+        float avgTargetsHit = agg.Plays > 0 ? (float)agg.TotalTargetsHit / agg.Plays : 0f;
         float overkillPct = agg.TotalIntended > 0 ? 100f * agg.TotalOverkill / agg.TotalIntended : 0f;
         float blockedPct = agg.TotalIntended > 0 ? 100f * agg.TotalBlocked / agg.TotalIntended : 0f;
 
@@ -269,6 +270,11 @@ public static class CardHoverShowPatch
             // Avg intended intentionally omitted pending issue #15.
             Row3(sb, "Total damage", agg.TotalEffective.ToString(), "");
             Row3(sb, "Avg effective", $"{avgEffective:F1}", "");
+            if (agg.TotalTargetsHit > 0)
+            {
+                Row3(sb, "Targets hit", agg.TotalTargetsHit.ToString(), "");
+                Row3(sb, "Avg targets", $"{avgTargetsHit:F1}", "");
+            }
             _ = avgIntended;  // still computed above; silence unused warning
 
             // Clarify 0 damage for attacks that played without dealing any:
@@ -353,8 +359,9 @@ public static class CardHoverShowPatch
     /// numbers only — the player's deciding what to play, not studying
     /// lifetime performance.
     ///
-    /// Shows: Played/Drawn ratio, Total damage (if attack), Energy gained
-    /// (if any), Block gained (if any), Kills (if any). Skips: lineage, most energy details, per-play
+    /// Shows: Played/Drawn ratio, Total damage (if attack), Targets hit (for
+    /// multi-target cards), Energy gained (if any), Block gained (if any),
+    /// Kills (if any). Skips: lineage, most energy details, per-play
     /// averages, overkill/blocked percentages. Everything uses the same
     /// 3-col layout as the full view for visual consistency.
     /// </summary>
@@ -377,6 +384,9 @@ public static class CardHoverShowPatch
 
         if (isAttack || agg.TotalEffective > 0)
             Row3(sb, "Total damage", agg.TotalEffective.ToString(), "");
+
+        if (agg.TotalTargetsHit > agg.Plays)
+            Row3(sb, "Targets hit", agg.TotalTargetsHit.ToString(), "");
 
         if (agg.TotalEnergyGenerated > 0)
             Row3(sb, "Energy gained", agg.TotalEnergyGenerated.ToString(), "");

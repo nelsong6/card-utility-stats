@@ -10,7 +10,7 @@ namespace CardUtilityStats.Core;
 /// </summary>
 public class RunData
 {
-    public const int CurrentSchemaVersion = 5;
+    public const int CurrentSchemaVersion = 6;
 
     // v1: aggregates keyed by card definition id (pooled across instances)
     // v2: aggregates keyed by per-instance id ("CARD.STRIKE_SILENT#1") —
@@ -24,6 +24,10 @@ public class RunData
     //     remain resumable with the new field defaulting to 0.
     // v5: add block absorption / waste aggregates. Also additive; older v4
     //     files remain resumable with the new fields defaulting to 0.
+    // v6: add target-coverage aggregation for multi-target attacks. Counts
+    //     unique enemy receivers per play, summed across the run. Also
+    //     additive; older v5 files remain resumable with the new field
+    //     defaulting to 0.
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
     public string RunId { get; set; } = "";
     public string StartedAt { get; set; } = "";  // ISO-8601 UTC
@@ -99,6 +103,7 @@ public class CardAggregate
     public int TotalOverkill { get; set; }   // damage past target HP (wasted)
     public int TotalEffective { get; set; }  // damage that actually moved HP (intended - blocked - overkill)
     public int Kills { get; set; }           // times the card landed a killing blow
+    public int TotalTargetsHit { get; set; } // unique enemy receivers hit, summed once per play per receiver
 
     // M3a: Energy spent. Sum of CardPlay.Resources.EnergySpent across every
     // play of this card instance. Uses EnergySpent (actual energy paid) not

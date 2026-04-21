@@ -73,18 +73,34 @@ public class SchemaLoadingTests
     }
 
     [Fact]
-    public void HistoricalLoad_AcceptsCurrentV5Fixture()
+    public void HistoricalLoad_AcceptsLegacyResumableV5Fixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("v5-per-instance-block-ledger-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.Equal(5, loaded!.SourceSchemaVersion);
+        Assert.True(loaded.IsLegacy);
+        Assert.True(loaded.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        var agg = loaded.Data.Aggregates["CARD.DEFEND_KIN#1"];
+        Assert.Equal(6, agg.TotalBlockEffective);
+        Assert.Equal(4, agg.TotalBlockWasted);
+        Assert.Equal(0, agg.TotalTargetsHit);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsCurrentV6Fixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("v6-target-coverage-run.json"));
 
         Assert.NotNull(loaded);
         Assert.Equal(RunData.CurrentSchemaVersion, loaded!.SourceSchemaVersion);
         Assert.False(loaded.IsLegacy);
         Assert.True(loaded.SupportsResume);
         Assert.True(loaded.HasPerInstanceIdentity);
-        var agg = loaded.Data.Aggregates["CARD.DEFEND_KIN#1"];
-        Assert.Equal(6, agg.TotalBlockEffective);
-        Assert.Equal(4, agg.TotalBlockWasted);
+        var agg = loaded.Data.Aggregates["CARD.CLEAVE_KIN#1"];
+        Assert.Equal(7, agg.TotalTargetsHit);
+        Assert.Equal(25, agg.TotalEffective);
     }
 
     [Fact]
@@ -135,14 +151,26 @@ public class SchemaLoadingTests
     }
 
     [Fact]
-    public void ResumableLoad_AcceptsCurrentV5Fixture()
+    public void ResumableLoad_AcceptsLegacyResumableV5Fixture()
     {
         var resumed = RunStorage.LoadResumable(FixturePath("v5-per-instance-block-ledger-run.json"));
 
         Assert.NotNull(resumed);
-        Assert.Equal(RunData.CurrentSchemaVersion, resumed!.SchemaVersion);
+        Assert.Equal(5, resumed!.SchemaVersion);
         Assert.Equal(6, resumed.Aggregates["CARD.DEFEND_KIN#1"].TotalBlockEffective);
         Assert.Equal(4, resumed.Aggregates["CARD.DEFEND_KIN#1"].TotalBlockWasted);
+        Assert.Equal(0, resumed.Aggregates["CARD.DEFEND_KIN#1"].TotalTargetsHit);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsCurrentV6Fixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v6-target-coverage-run.json"));
+
+        Assert.NotNull(resumed);
+        Assert.Equal(RunData.CurrentSchemaVersion, resumed!.SchemaVersion);
+        Assert.Equal(7, resumed.Aggregates["CARD.CLEAVE_KIN#1"].TotalTargetsHit);
+        Assert.Equal(25, resumed.Aggregates["CARD.CLEAVE_KIN#1"].TotalEffective);
     }
 
     [Fact]
