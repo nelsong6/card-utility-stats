@@ -83,11 +83,15 @@ public static class CardHoverShowPatch
             // because it's an inspection moment.
             bool compact = __instance is NHandCardHolder;
             var body = BuildBodyBBCode(cardModel, displayName, compact);
-            // Match SlayTheStats' header layout: generic descriptor on the left,
-            // mod brand on the right. The hovered card's identity goes into the
-            // body as its first line (since it's instance-specific — "Strike 4"
-            // vs. "Strike 5" — and the user needs to see which one).
-            StatsTooltip.Show(tree, __instance, "Card Utility", "CardUtilityStats", body);
+            // Reuse the gold title slot for the hovered card's instance name
+            // on every surface. That's the highest-signal identity marker,
+            // and it keeps the compact and full tooltips visually aligned.
+            StatsTooltip.Show(
+                tree,
+                __instance,
+                displayName,
+                "CardUtilityStats",
+                body);
         }
         catch (System.Exception e)
         {
@@ -114,9 +118,8 @@ public static class CardHoverShowPatch
         var run = RunTracker.Current;
         var sb = new StringBuilder();
 
-        // First line: card identity (instance-specific, e.g. "Strike 4").
-        // Subdued color so it reads as context, not as a competing header.
-        sb.Append($"[color=#b5b5b5]{displayName}[/color]\n");
+        // The card identity now lives in the gold title slot for both compact
+        // and full views, so repeating it again in the body just adds noise.
 
         // Merges committed run + current pending combat so mid-combat plays
         // show up immediately (don't wait for CombatEnded). If we have no

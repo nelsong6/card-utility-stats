@@ -41,6 +41,7 @@ public static class StatsTooltip
 {
     private const float PanelWidth = 348f;
     private const float InnerWidth = 326f;
+    private const float HeaderHeight = 28f;
     private const float StackGap = 8f;
     private const float ViewportPad = 8f;
     private const float ShadowOffset = 8f;
@@ -54,6 +55,7 @@ public static class StatsTooltip
 
     private static PanelContainer? _panel;
     private static NinePatchRect? _shadow;
+    private static Control? _headerRow;
     private static Label? _titleLabel;
     private static Label? _brandLabel;
     private static RichTextLabel? _statsLabel;
@@ -164,14 +166,14 @@ public static class StatsTooltip
         _panel.AddChild(vbox);
 
         // --- Header row: title (left) + brand (right) --------------------
-        var header = new Control
+        _headerRow = new Control
         {
             Name = "HeaderRow",
-            CustomMinimumSize = new Vector2(0, 28),
+            CustomMinimumSize = new Vector2(0, HeaderHeight),
             SizeFlagsHorizontal = Control.SizeFlags.Fill | Control.SizeFlags.Expand,
             MouseFilter = Control.MouseFilterEnum.Ignore,
         };
-        vbox.AddChild(header);
+        vbox.AddChild(_headerRow);
 
         _titleLabel = new Label
         {
@@ -183,7 +185,7 @@ public static class StatsTooltip
             VerticalAlignment = VerticalAlignment.Top,
         };
         ApplyTitleStyle(_titleLabel);
-        header.AddChild(_titleLabel);
+        _headerRow.AddChild(_titleLabel);
 
         _brandLabel = new Label
         {
@@ -198,7 +200,7 @@ public static class StatsTooltip
             VerticalAlignment = VerticalAlignment.Top,
         };
         ApplyBrandStyle(_brandLabel);
-        header.AddChild(_brandLabel);
+        _headerRow.AddChild(_brandLabel);
 
         // --- Stats body ---------------------------------------------------
         _statsLabel = new RichTextLabel
@@ -264,13 +266,23 @@ public static class StatsTooltip
     /// and body. Separating these lets the header use crisp label text
     /// styling instead of BBCode inline inside a RichTextLabel.
     /// </summary>
-    public static void Show(SceneTree tree, Control anchor, string titleText, string brandText, string bodyBBCode)
+    public static void Show(
+        SceneTree tree,
+        Control anchor,
+        string titleText,
+        string brandText,
+        string bodyBBCode,
+        bool showHeader = true)
     {
         EnsureBuilt(tree);
-        if (_panel == null || _statsLabel == null || _titleLabel == null || _brandLabel == null) return;
+        if (_panel == null || _headerRow == null || _statsLabel == null || _titleLabel == null || _brandLabel == null) return;
 
+        _headerRow.Visible = showHeader;
+        _headerRow.CustomMinimumSize = new Vector2(0, showHeader ? HeaderHeight : 0f);
         _titleLabel.Text = titleText;
+        _titleLabel.Visible = showHeader && !string.IsNullOrWhiteSpace(titleText);
         _brandLabel.Text = brandText;
+        _brandLabel.Visible = showHeader && !string.IsNullOrWhiteSpace(brandText);
         _statsLabel.Text = bodyBBCode;
         _panel.Visible = true;
         if (_shadow != null && GodotObject.IsInstanceValid(_shadow)) _shadow.Visible = true;
@@ -298,6 +310,7 @@ public static class StatsTooltip
         if (_panel != null && GodotObject.IsInstanceValid(_panel)) _panel.QueueFree();
         _shadow = null;
         _panel = null;
+        _headerRow = null;
         _titleLabel = null;
         _brandLabel = null;
         _statsLabel = null;
