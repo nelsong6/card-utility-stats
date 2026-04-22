@@ -76,6 +76,64 @@ The intended steady state is hybrid:
 
 This gives the machine fast reaction time without making webhooks or event delivery the only correctness path.
 
+## Dashboard Push Events
+
+The worker can optionally push signed lifecycle events to a remote dashboard backend so the dashboard changes status immediately when this side machine starts or finishes work.
+
+Supported event transitions include:
+
+- `worker_run_started`
+- `issue_claimed`
+- `issue_finished`
+- `queue_empty`
+- `worker_run_finished`
+- `worker_run_failed`
+
+The worker signs each event with a short-lived HS256 JWT and posts it to the configured dashboard endpoint.
+
+### Worker-side setup
+
+1. Store the shared JWT secret on the side machine.
+2. Recommended secret name: `codex-queue-jwt-secret`
+3. The worker looks for the secret in either:
+   - environment variable `CODEX_QUEUE_JWT_SECRET`
+   - PowerShell SecretManagement via `Get-Secret -Name codex-queue-jwt-secret -AsPlainText`
+
+If you use PowerShell SecretManagement, an example is:
+
+```powershell
+Set-Secret -Name codex-queue-jwt-secret -Secret 'replace-with-long-random-secret'
+```
+
+### Endpoint configuration
+
+The worker only pushes events when `DashboardEventUrl` is configured.
+
+There are two intended ways to provide that:
+
+- GitHub Actions wake path
+  - set repository variable `CODEX_QUEUE_PUSH_EVENT_URL`
+- Local scheduled task path
+  - reinstall the scheduled task with `-DashboardEventUrl`
+
+Example:
+
+```powershell
+.\ops\codex-queue\Install-IssueQueueWorkerTask.ps1 `
+  -RepoRoot 'D:\repos\card-utility-stats' `
+  -WorkerName 'sts2-side-a' `
+  -DashboardEventUrl 'https://diagrams.romaine.life/ci/codex/push'
+```
+
+### Backend-side setup
+
+The receiving dashboard backend must know the same shared secret.
+
+For the `diagrams` backend this can come from either:
+
+- Key Vault secret `codex-queue-jwt-secret`
+- environment variable `CODEX_QUEUE_JWT_SECRET`
+
 ## Current Scope
 
 The worker is repo-specific right now:

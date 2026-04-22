@@ -3,6 +3,7 @@ param(
     [string]$RepoRoot = "D:\repos\card-utility-stats",
     [string]$TaskName = "Codex Issue Queue Worker",
     [string]$WorkerName = "sts2-side-a",
+    [string]$DashboardEventUrl = "",
     [int]$IntervalMinutes = 30
 )
 
@@ -13,7 +14,12 @@ if (-not (Test-Path -LiteralPath $scriptPath)) {
     throw "Worker script not found at $scriptPath"
 }
 
-$action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoLogo -NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`" -RepoRoot `"$RepoRoot`" -WorkerName `"$WorkerName`""
+$arguments = "-NoLogo -NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`" -RepoRoot `"$RepoRoot`" -WorkerName `"$WorkerName`""
+if (-not [string]::IsNullOrWhiteSpace($DashboardEventUrl)) {
+    $arguments += " -DashboardEventUrl `"$DashboardEventUrl`""
+}
+
+$action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $arguments
 $trigger = New-ScheduledTaskTrigger -Once -At ((Get-Date).AddMinutes(1)) -RepetitionInterval (New-TimeSpan -Minutes $IntervalMinutes)
 $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable
 

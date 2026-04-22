@@ -7,6 +7,12 @@ param(
     [string]$ActiveLabel = "codex-active",
     [string]$BlockedLabel = "codex-blocked",
     [string]$CompleteLabel = "codex-complete",
+    [string]$DashboardEventUrl = "",
+    [string]$DashboardEventSecretName = "codex-queue-jwt-secret",
+    [string]$DashboardEventSecretEnvironmentVariable = "CODEX_QUEUE_JWT_SECRET",
+    [string]$DashboardEventAudience = "diagrams-codex-queue",
+    [string]$DashboardEventIssuer = "codex-queue-worker",
+    [int]$DashboardEventTimeoutSeconds = 10,
     [int]$MaxIssuesPerRun = 100,
     [int]$MaxAttemptsPerIssue = 3
 )
@@ -99,6 +105,135 @@ function Ensure-LocalCodexBinary {
     }
 
     return $targetPath
+}
+
+function ConvertTo-Base64Url {
+    param(
+        [Parameter(Mandatory = $true)]
+        [byte[]]$Bytes
+    )
+
+    return ([Convert]::ToBase64String($Bytes)).TrimEnd("=").Replace("+", "-").Replace("/", "_")
+}
+
+function New-Hs256Jwt {
+    param(
+        [Parameter(Mandatory = $true)]
+        [hashtable]$Claims,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Secret
+    )
+
+    $headerJson = @{ alg = "HS256"; typ = "JWT" } | ConvertTo-Json -Compress
+    $payloadJson = $Claims | ConvertTo-Json -Compress -Depth 10
+
+    $encodedHeader = ConvertTo-Base64Url -Bytes ([System.Text.Encoding]::UTF8.GetBytes($headerJson))
+    $encodedPayload = ConvertTo-Base64Url -Bytes ([System.Text.Encoding]::UTF8.GetBytes($payloadJson))
+    $unsignedToken = "$encodedHeader.$encodedPayload"
+
+    $hmac = [System.Security.Cryptography.HMACSHA256]::new([System.Text.Encoding]::UTF8.GetBytes($Secret))
+    try {
+        $signatureBytes = $hmac.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($unsignedToken))
+    }
+    finally {
+        $hmac.Dispose()
+    }
+
+    $encodedSignature = ConvertTo-Base64Url -Bytes $signatureBytes
+    return "$unsignedToken.$encodedSignature"
+}
+
+function Get-DashboardEventSecret {
+    if ($script:DashboardEventSecret) {
+        return $script:DashboardEventSecret
+    }
+
+    $secret = [Environment]::GetEnvironmentVariable($DashboardEventSecretEnvironmentVariable, "Process")
+    if ([string]::IsNullOrWhiteSpace($secret)) {
+        $secret = [Environment]::GetEnvironmentVariable($DashboardEventSecretEnvironmentVariable, "User")
+    }
+    if ([string]::IsNullOrWhiteSpace($secret)) {
+        $secret = [Environment]::GetEnvironmentVariable($DashboardEventSecretEnvironmentVariable, "Machine")
+    }
+
+    if ([string]::IsNullOrWhiteSpace($secret) -and (Get-Command Get-Secret -ErrorAction SilentlyContinue)) {
+        try {
+            $secret = Get-Secret -Name $DashboardEventSecretName -AsPlainText -ErrorAction Stop
+        }
+        catch {
+            $secret = $null
+        }
+    }
+
+    if ([string]::IsNullOrWhiteSpace($secret)) {
+        if (-not $script:DashboardSecretWarningIssued) {
+            Write-Log "Dashboard push is enabled but no JWT secret was found in environment variable '$DashboardEventSecretEnvironmentVariable' or Get-Secret '$DashboardEventSecretName'."
+            $script:DashboardSecretWarningIssued = $true
+        }
+        return $null
+    }
+
+    $script:DashboardEventSecret = $secret
+    return $script:DashboardEventSecret
+}
+
+function Send-DashboardEvent {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Type,
+
+        [hashtable]$Data = @{}
+    )
+
+    if ([string]::IsNullOrWhiteSpace($DashboardEventUrl)) {
+        return
+    }
+
+    $secret = Get-DashboardEventSecret
+    if ([string]::IsNullOrWhiteSpace($secret)) {
+        return
+    }
+
+    $now = [DateTimeOffset]::UtcNow
+    $claims = @{
+        iss = $DashboardEventIssuer
+        sub = $WorkerName
+        aud = $DashboardEventAudience
+        iat = [int]$now.ToUnixTimeSeconds()
+        exp = [int]$now.AddMinutes(5).ToUnixTimeSeconds()
+        jti = [guid]::NewGuid().ToString()
+        repo = $RepoSlug
+    }
+
+    $payload = @{
+        type = $Type
+        repo = $RepoSlug
+        worker = $WorkerName
+        host = $env:COMPUTERNAME
+        occurred_at = $now.ToString("o")
+        run_id = $script:QueueRunId
+    }
+
+    foreach ($key in $Data.Keys) {
+        if ($null -ne $Data[$key]) {
+            $payload[$key] = $Data[$key]
+        }
+    }
+
+    try {
+        $token = New-Hs256Jwt -Claims $claims -Secret $secret
+        Invoke-RestMethod `
+            -Method Post `
+            -Uri $DashboardEventUrl `
+            -Headers @{ Authorization = "Bearer $token" } `
+            -ContentType "application/json" `
+            -Body ($payload | ConvertTo-Json -Compress -Depth 10) `
+            -TimeoutSec $DashboardEventTimeoutSeconds | Out-Null
+    }
+    catch {
+        Write-Log "Dashboard push event '$Type' failed: $($_.Exception.Message)"
+    }
 }
 
 function Invoke-GhJson {
@@ -581,40 +716,79 @@ function Release-Lock {
 Add-ToolPath
 
 $stateRoot = Get-StateRoot -RepoSlugValue $RepoSlug
+$script:QueueRunId = [guid]::NewGuid().ToString()
 $script:WorkerLogPath = Join-Path $stateRoot "worker.log"
 $lockPath = Acquire-Lock -StateRoot $stateRoot
 if (-not $lockPath) {
     exit 0
 }
 
+$processedCount = 0
 try {
-    Ensure-QueueLabels -Repo $RepoSlug
-    $codexPath = Ensure-LocalCodexBinary -StateRoot $stateRoot
-    Write-Log "Using local Codex binary at $codexPath"
-
-    $processedCount = 0
-    while ($processedCount -lt $MaxIssuesPerRun) {
-        $nextIssue = Get-NextQueuedIssue -Repo $RepoSlug
-        if (-not $nextIssue) {
-            Write-Log "Queue is empty."
-            break
+    try {
+        Ensure-QueueLabels -Repo $RepoSlug
+        $codexPath = Ensure-LocalCodexBinary -StateRoot $stateRoot
+        Write-Log "Using local Codex binary at $codexPath"
+        Send-DashboardEvent -Type "worker_run_started" -Data @{
+            state_root = $stateRoot
+            message = "Worker run started."
+            processed_count = $processedCount
         }
 
-        $issueNumber = [int]$nextIssue.number
-        Write-Log "Claiming issue #$issueNumber - $($nextIssue.title)"
+        while ($processedCount -lt $MaxIssuesPerRun) {
+            $nextIssue = Get-NextQueuedIssue -Repo $RepoSlug
+            if (-not $nextIssue) {
+                Write-Log "Queue is empty."
+                Send-DashboardEvent -Type "queue_empty" -Data @{
+                    message = "Queue is empty."
+                    processed_count = $processedCount
+                }
+                break
+            }
 
-        Edit-IssueLabels -Repo $RepoSlug -IssueNumber $issueNumber -AddLabels @($ActiveLabel) -RemoveLabels @($BlockedLabel, $CompleteLabel)
-        Comment-OnIssue -Repo $RepoSlug -IssueNumber $issueNumber -Body "Autonomous worker `$WorkerName` claimed this issue and is starting work now."
+            $issueNumber = [int]$nextIssue.number
+            Write-Log "Claiming issue #$issueNumber - $($nextIssue.title)"
 
-        $packet = Get-IssuePacket -Repo $RepoSlug -IssueNumber $issueNumber
-        $invocation = Invoke-CodexIssueRun -CodexPath $codexPath -RepoRootValue $RepoRoot -StateRoot $stateRoot -Repo $RepoSlug -Worker $WorkerName -IssueNumber $issueNumber -IssuePacket $packet
-        $outcome = Apply-ResultToIssue -Repo $RepoSlug -StateRoot $stateRoot -Worker $WorkerName -IssueNumber $issueNumber -InvocationResult $invocation
+            Edit-IssueLabels -Repo $RepoSlug -IssueNumber $issueNumber -AddLabels @($ActiveLabel) -RemoveLabels @($BlockedLabel, $CompleteLabel)
+            Comment-OnIssue -Repo $RepoSlug -IssueNumber $issueNumber -Body "Autonomous worker `$WorkerName` claimed this issue and is starting work now."
+            Send-DashboardEvent -Type "issue_claimed" -Data @{
+                issue_number = $issueNumber
+                issue_title = $nextIssue.title
+                issue_url = $nextIssue.url
+                processed_count = $processedCount
+                message = "Claimed issue #$issueNumber."
+            }
 
-        Write-Log "Issue #$issueNumber finished with queue outcome '$outcome'."
-        $processedCount += 1
+            $packet = Get-IssuePacket -Repo $RepoSlug -IssueNumber $issueNumber
+            $invocation = Invoke-CodexIssueRun -CodexPath $codexPath -RepoRootValue $RepoRoot -StateRoot $stateRoot -Repo $RepoSlug -Worker $WorkerName -IssueNumber $issueNumber -IssuePacket $packet
+            $outcome = Apply-ResultToIssue -Repo $RepoSlug -StateRoot $stateRoot -Worker $WorkerName -IssueNumber $issueNumber -InvocationResult $invocation
+
+            Write-Log "Issue #$issueNumber finished with queue outcome '$outcome'."
+            $processedCount += 1
+            Send-DashboardEvent -Type "issue_finished" -Data @{
+                issue_number = $issueNumber
+                issue_title = $nextIssue.title
+                issue_url = $nextIssue.url
+                outcome = $outcome
+                processed_count = $processedCount
+                message = "Issue #$issueNumber finished with outcome '$outcome'."
+            }
+        }
+
+        Write-Log "Processed $processedCount issue(s) this run."
+        Send-DashboardEvent -Type "worker_run_finished" -Data @{
+            outcome = "idle"
+            processed_count = $processedCount
+            message = "Worker run finished."
+        }
     }
-
-    Write-Log "Processed $processedCount issue(s) this run."
+    catch {
+        Send-DashboardEvent -Type "worker_run_failed" -Data @{
+            processed_count = $processedCount
+            message = $_.Exception.Message
+        }
+        throw
+    }
 }
 finally {
     Release-Lock -LockPath $lockPath
