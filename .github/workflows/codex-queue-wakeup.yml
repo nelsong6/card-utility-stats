@@ -1,0 +1,40 @@
+name: Codex Queue Wakeup
+
+on:
+  issues:
+    types:
+      - opened
+      - reopened
+      - labeled
+  workflow_dispatch:
+
+concurrency:
+  group: codex-queue-worker
+  cancel-in-progress: false
+
+jobs:
+  wake-queue-worker:
+    name: Wake autonomous issue worker
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issues' && (
+        (github.event.action == 'labeled' && github.event.label.name == 'codex-queue') ||
+        contains(github.event.issue.labels.*.name, 'codex-queue')
+      ))
+    runs-on:
+      - self-hosted
+      - windows
+      - sts2-live
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run queue worker
+        shell: pwsh
+        run: |
+          ./ops/codex-queue/Run-IssueQueueWorker.ps1 `
+            -RepoRoot $env:GITHUB_WORKSPACE `
+            -WorkerName 'sts2-side-a'

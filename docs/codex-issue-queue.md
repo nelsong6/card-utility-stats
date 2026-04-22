@@ -67,13 +67,14 @@ Instead, the bootstrap step copies the installed Codex CLI into a normal local p
 
 ## Scheduling
 
-The intended steady state is:
+The intended steady state is hybrid:
 
-- a Windows Scheduled Task wakes the queue worker regularly
+- GitHub issue events wake the queue worker immediately on the self-hosted runner
+- a Windows Scheduled Task still wakes the queue worker periodically as a recovery mechanism
 - each invocation drains the queue until empty
 - if another invocation starts while one is already running, the lock file causes it to exit cleanly
 
-This gives the machine a real queue-draining process without requiring a permanently open terminal window or a human babysitter.
+This gives the machine fast reaction time without making webhooks or event delivery the only correctness path.
 
 ## Current Scope
 

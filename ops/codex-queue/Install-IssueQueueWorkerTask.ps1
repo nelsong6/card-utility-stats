@@ -3,7 +3,7 @@ param(
     [string]$RepoRoot = "D:\repos\card-utility-stats",
     [string]$TaskName = "Codex Issue Queue Worker",
     [string]$WorkerName = "sts2-side-a",
-    [int]$IntervalMinutes = 5
+    [int]$IntervalMinutes = 30
 )
 
 $ErrorActionPreference = "Stop"
