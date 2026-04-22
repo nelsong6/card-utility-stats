@@ -27,6 +27,7 @@ public static class CardHoverShowPatch
     private const string ShivMetaNote = "Reflects All Shiv Usage";
     private const string BlockIconPath = "res://images/ui/combat/block.png";
     private const string DrawCardsNextTurnPowerIconPath = "res://images/atlases/power_atlas.sprites/draw_cards_next_turn_power.tres";
+    private const string BlockedDrawIconPath = DrawCardsNextTurnPowerIconPath;
     private const string EnergyPotionIconPath = "res://images/atlases/potion_atlas.sprites/energy_potion.tres";
     private const string StarIconPath = "res://images/packed/sprite_fonts/star_icon.png";
     private const string SovereignBladeMetaNote = "Reflects All Sovereign Blade Usage";
@@ -266,6 +267,13 @@ public static class CardHoverShowPatch
             Row3(sb, GetStarStatLabel("avg gained"), $"{avgGenerated:F1}", "");
         }
 
+        if (agg.TotalForgeGenerated > 0m)
+        {
+            decimal avgGenerated = agg.Plays > 0 ? agg.TotalForgeGenerated / agg.Plays : 0m;
+            Row3(sb, GetForgeStatLabel("gained"), FormatDecimal(agg.TotalForgeGenerated), "");
+            Row3(sb, GetForgeStatLabel("avg gained"), FormatDecimal(avgGenerated), "");
+        }
+
         // Energy-spent rows — only rendered when the card's cost is actually
         // variable (see IsEnergyInteresting). Same 3-col layout as every
         // other stat row; percent column stays empty since there's nothing
@@ -362,12 +370,7 @@ public static class CardHoverShowPatch
         if (agg.TimesExhausted > 0)
             Row3(sb, "Exhausted", agg.TimesExhausted.ToString(), "");
 
-        // Draw attribution — cards drawn as a result of playing THIS card.
-        // Counts only card-effect draws (not turn-start auto-draw).
-        if (agg.TimesCardsDrawn > 0)
-            Row3(sb, GetDrawStatLabel("cards drawn"), agg.TimesCardsDrawn.ToString(), "");
-        if (agg.TimesCardsDrawBlocked > 0)
-            Row3(sb, GetDrawStatLabel("draws blocked"), agg.TimesCardsDrawBlocked.ToString(), "");
+        AppendCardDrawStats(sb, agg);
 
         // HP lost from playing this card — Ironclad self-damage cards.
         // POST-reduction value, so Tungsten Rod / buffer interactions
@@ -421,6 +424,9 @@ public static class CardHoverShowPatch
 
         if (agg.TotalStarsGenerated > 0)
             Row3(sb, GetStarStatLabel("gained"), agg.TotalStarsGenerated.ToString(), "");
+
+        if (agg.TotalForgeGenerated > 0m)
+            Row3(sb, GetForgeStatLabel("gained"), FormatDecimal(agg.TotalForgeGenerated), "");
 
         if (agg.TotalBlockGained > 0)
             Row3(sb, GetBlockStatLabel("gained"), agg.TotalBlockGained.ToString(), "");
@@ -622,6 +628,15 @@ public static class CardHoverShowPatch
         return GetInlineIconStatLabel(StarIconPath, suffix);
     }
 
+    private static string GetForgeStatLabel(string suffix)
+    {
+        return suffix switch
+        {
+            "avg gained" => "Forge avg",
+            _ => $"Forge {suffix}",
+        };
+    }
+
     private static string GetInlineIconStatLabel(string iconPath, string suffix)
     {
         var normalizedPath = NormalizeResourcePath(iconPath);
@@ -662,6 +677,10 @@ public static class CardHoverShowPatch
             var value = FormatDecimal(effect.TotalAmountApplied);
             var extra = effect.TimesApplied > 1 ? $"{effect.TimesApplied}x" : "1x";
             Row3(sb, label, value, extra);
+
+            if (!compact && effect.TotalTriggeredCardsDrawBlocked > 0)
+                Row3(sb, GetAppliedEffectBlockedDrawLabel(effect), effect.TotalTriggeredCardsDrawBlocked.ToString(), "");
+
             shown++;
         }
     }
@@ -744,12 +763,65 @@ public static class CardHoverShowPatch
     private static string GetAppliedEffectLabel(AppliedEffectAggregate effect)
     {
         var label = string.IsNullOrWhiteSpace(effect.DisplayName) ? effect.EffectId : effect.DisplayName;
+        if (!string.IsNullOrWhiteSpace(effect.IconPath))
+            return GetInlineIconStatLabel(effect.IconPath, label);
         if (IsEnergyEffect(effect))
             return GetEnergyEffectLabel(label);
         if (IsStarEffect(effect))
             return GetStarEffectLabel(label);
 
         return label;
+    }
+
+    private static string GetAppliedEffectBlockedDrawLabel(AppliedEffectAggregate effect)
+    {
+        return GetBlockedDrawStatLabel("cards blocked");
+    }
+
+    private static string GetBlockedDrawStatLabel(string suffix)
+    {
+        return GetInlineIconStatLabel(BlockedDrawIconPath, suffix);
+    }
+
+    private static void AppendCardDrawStats(StringBuilder sb, CardAggregate agg)
+    {
+        int attempted = agg.TimesCardsDrawAttempted;
+        if (attempted <= 0)
+            attempted = agg.TimesCardsDrawn + agg.TimesCardsDrawBlocked;
+
+        if (attempted > agg.TimesCardsDrawn)
+        {
+            Row3(sb, GetDrawStatLabel("drawn / tried"), $"{agg.TimesCardsDrawn}/{attempted}", "");
+            AppendBlockedDrawReasonRows(sb, agg, attempted - agg.TimesCardsDrawn);
+            return;
+        }
+
+        if (agg.TimesCardsDrawn > 0)
+            Row3(sb, GetDrawStatLabel("cards drawn"), agg.TimesCardsDrawn.ToString(), "");
+    }
+
+    private static void AppendBlockedDrawReasonRows(StringBuilder sb, CardAggregate agg, int blockedGap)
+    {
+        if (blockedGap <= 0) return;
+
+        int categorized = 0;
+        foreach (var reason in agg.BlockedDrawReasons.Values
+                     .OrderByDescending(r => r.Count)
+                     .ThenBy(r => r.DisplayName))
+        {
+            if (reason.Count <= 0) continue;
+            Row3(sb, GetBlockedDrawReasonLabel(reason.DisplayName), reason.Count.ToString(), "");
+            categorized += reason.Count;
+        }
+
+        int uncategorized = Math.Max(0, blockedGap - categorized);
+        if (uncategorized > 0)
+            Row3(sb, GetBlockedDrawReasonLabel("other"), uncategorized.ToString(), "");
+    }
+
+    private static string GetBlockedDrawReasonLabel(string reasonDisplayName)
+    {
+        return GetBlockedDrawStatLabel($"blocked by {reasonDisplayName}");
     }
 
     private static bool IsEnergyEffect(AppliedEffectAggregate effect)

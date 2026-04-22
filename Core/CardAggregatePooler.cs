@@ -38,6 +38,9 @@ internal static class CardAggregatePooler
         target.Kills += source.Kills;
         target.TotalEnergySpent += source.TotalEnergySpent;
         target.TotalEnergyGenerated += source.TotalEnergyGenerated;
+        target.TotalStarsSpent += source.TotalStarsSpent;
+        target.TotalStarsGenerated += source.TotalStarsGenerated;
+        target.TotalForgeGenerated += source.TotalForgeGenerated;
         target.TotalBlockGained += source.TotalBlockGained;
         target.TotalBlockEffective += source.TotalBlockEffective;
         target.TotalBlockWasted += source.TotalBlockWasted;
@@ -49,8 +52,32 @@ internal static class CardAggregatePooler
         target.TimesExhausted += source.TimesExhausted;
         target.TotalHpLost += source.TotalHpLost;
         target.TimesCardsDrawn += source.TimesCardsDrawn;
+        target.TimesCardsDrawAttempted += source.TimesCardsDrawAttempted;
         target.TimesCardsDrawBlocked += source.TimesCardsDrawBlocked;
+        MergeBlockedDrawReasonsInto(target.BlockedDrawReasons, source.BlockedDrawReasons);
         MergeAppliedEffectsInto(target.AppliedEffects, source.AppliedEffects);
+    }
+
+    private static void MergeBlockedDrawReasonsInto(
+        Dictionary<string, BlockedDrawReasonAggregate> target,
+        Dictionary<string, BlockedDrawReasonAggregate> source)
+    {
+        foreach (var kv in source)
+        {
+            if (!target.TryGetValue(kv.Key, out var reason))
+            {
+                reason = new BlockedDrawReasonAggregate
+                {
+                    ReasonId = kv.Value.ReasonId,
+                    DisplayName = kv.Value.DisplayName,
+                };
+                target[kv.Key] = reason;
+            }
+
+            reason.Count += kv.Value.Count;
+            if (string.IsNullOrWhiteSpace(reason.DisplayName) && !string.IsNullOrWhiteSpace(kv.Value.DisplayName))
+                reason.DisplayName = kv.Value.DisplayName;
+        }
     }
 
     private static void MergeAppliedEffectsInto(
@@ -74,6 +101,9 @@ internal static class CardAggregatePooler
             effect.TotalAmountApplied += kv.Value.TotalAmountApplied;
             effect.TimesBlockedByArtifact += kv.Value.TimesBlockedByArtifact;
             effect.TotalAmountBlockedByArtifact += kv.Value.TotalAmountBlockedByArtifact;
+            effect.TotalTriggeredEffectiveDamage += kv.Value.TotalTriggeredEffectiveDamage;
+            effect.TotalTriggeredOverkill += kv.Value.TotalTriggeredOverkill;
+            effect.TotalTriggeredCardsDrawBlocked += kv.Value.TotalTriggeredCardsDrawBlocked;
             if (string.IsNullOrWhiteSpace(effect.DisplayName) && !string.IsNullOrWhiteSpace(kv.Value.DisplayName))
                 effect.DisplayName = kv.Value.DisplayName;
             if (string.IsNullOrWhiteSpace(effect.IconPath) && !string.IsNullOrWhiteSpace(kv.Value.IconPath))

@@ -49,6 +49,7 @@ public static class RunTracker
     private static CardPlay? _recentCompletedPlayerCardPlay;
     private static int _recentCompletedPlayerCardPlayHistoryCount;
     private static CardModel? _pendingDrawSourceCard;
+    private static readonly List<PendingDrawAttempt> _pendingDrawAttempts = new();
     private static CardModel? _pendingEffectSourceCard;
     private static int _pendingEffectSourceHistoryCount;
     private static readonly List<PendingPowerChangeAttempt> _pendingPowerChangeAttempts = new();
@@ -610,6 +611,7 @@ public static class RunTracker
         _recentCompletedPlayerCardPlay = null;
         _recentCompletedPlayerCardPlayHistoryCount = 0;
         _pendingDrawSourceCard = null;
+        _pendingDrawAttempts.Clear();
         _pendingEffectSourceCard = null;
         _pendingEffectSourceHistoryCount = 0;
         _pendingPowerChangeAttempts.Clear();
@@ -1099,6 +1101,7 @@ public static class RunTracker
             _recentCompletedPlayerCardPlay = null;
             _recentCompletedPlayerCardPlayHistoryCount = 0;
             _pendingDrawSourceCard = null;
+            _pendingDrawAttempts.Clear();
             _pendingEffectSourceCard = null;
             _pendingEffectSourceHistoryCount = 0;
         }
@@ -1206,6 +1209,45 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordStarsGained failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record forge added by a card. Sourced directly from
+    /// <see cref="Patches.HookAfterForgePatch"/>, which sees the actual
+    /// forge amount passed through the game's Forge command path.
+    /// </summary>
+    public static void RecordForgeGranted(decimal amount, Player? forger, AbstractModel? source)
+    {
+        if (amount <= 0m) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (source is not CardModel sourceCard) return;
+                if (forger != null && sourceCard.Owner != null
+                    && !ReferenceEquals(sourceCard.Owner, forger))
+                    return;
+
+                _pendingCombat ??= new PendingCombat();
+                var instanceId = GetOrAssignInstanceId(sourceCard);
+                var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
+                agg.TotalForgeGenerated += amount;
+
+                _pendingCombat.CombatEvents.Add(new CardEvent
+                {
+                    T = Now(),
+                    Type = "forge_gained",
+                    CardId = instanceId,
+                    ForgeGained = amount,
+                    Floor = RunManager.Instance?.State?.TotalFloor,
+                });
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordForgeGranted failed: {e.Message}");
             }
         }
     }
@@ -1557,10 +1599,23 @@ public static class RunTracker
             try
             {
                 _pendingDrawSourceCard = FindLikelyDrawSourceCard(player);
+                if (_pendingDrawSourceCard != null)
+                {
+                    _pendingCombat ??= new PendingCombat();
+                    var sourceId = GetOrAssignInstanceId(_pendingDrawSourceCard);
+                    var sourceAgg = GetOrCreateAggregate(_pendingCombat, sourceId);
+                    sourceAgg.TimesCardsDrawAttempted++;
+                    _pendingDrawAttempts.Add(new PendingDrawAttempt
+                    {
+                        Player = player,
+                        SourceCard = _pendingDrawSourceCard,
+                    });
+                }
             }
             catch (Exception e)
             {
                 _pendingDrawSourceCard = null;
+                _pendingDrawAttempts.Clear();
                 CoreMain.LogDebug($"NoteDrawAttempt failed: {e.Message}");
             }
         }
@@ -1851,6 +1906,210 @@ public static class RunTracker
         }
     }
 
+    private static BlockedDrawReasonAggregate GetOrCreateBlockedDrawReason(
+        CardAggregate agg,
+        string reasonId,
+        string displayName)
+    {
+        if (!agg.BlockedDrawReasons.TryGetValue(reasonId, out var reason))
+        {
+            reason = new BlockedDrawReasonAggregate
+            {
+                ReasonId = reasonId,
+                DisplayName = displayName,
+            };
+            agg.BlockedDrawReasons[reasonId] = reason;
+        }
+        else if (string.IsNullOrWhiteSpace(reason.DisplayName) && !string.IsNullOrWhiteSpace(displayName))
+        {
+            reason.DisplayName = displayName;
+        }
+
+        return reason;
+    }
+
+    private static void RecordBlockedDrawReason(
+        CardAggregate agg,
+        string reasonId,
+        string displayName)
+    {
+        var reason = GetOrCreateBlockedDrawReason(agg, reasonId, displayName);
+        reason.Count++;
+    }
+
+    private static void TrackPlayerPowerOwnershipLocked(
+        PowerModel power,
+        string instanceId,
+        AppliedEffectAggregate effect)
+    {
+        if (_pendingCombat == null) return;
+
+        _pendingCombat.PlayerPowerOwnershipByModifier[power] = new PlayerPowerOwnershipShare
+        {
+            CardInstanceId = instanceId,
+            EffectId = effect.EffectId,
+            DisplayName = effect.DisplayName,
+            IconPath = effect.IconPath,
+        };
+    }
+
+    private static bool TryResolvePlayerPowerOwnershipLocked(
+        AbstractModel modifier,
+        out PlayerPowerOwnershipShare? ownership)
+    {
+        ownership = null;
+        if (_pendingCombat == null) return false;
+
+        if (_pendingCombat.PlayerPowerOwnershipByModifier.TryGetValue(modifier, out ownership))
+            return ownership != null;
+
+        if (modifier is not PowerModel power)
+            return false;
+
+        PlayerPowerOwnershipShare? match = null;
+        string effectId = power.Id.ToString();
+        foreach (var candidate in _pendingCombat.PlayerPowerOwnershipByModifier.Values)
+        {
+            if (!string.Equals(candidate.EffectId, effectId, StringComparison.Ordinal))
+                continue;
+
+            if (match != null &&
+                (!string.Equals(match.CardInstanceId, candidate.CardInstanceId, StringComparison.Ordinal)
+                 || !string.Equals(match.DisplayName, candidate.DisplayName, StringComparison.Ordinal)
+                 || !string.Equals(match.IconPath, candidate.IconPath, StringComparison.Ordinal)))
+            {
+                return false;
+            }
+
+            match = candidate;
+        }
+
+        ownership = match;
+        return ownership != null;
+    }
+
+    private static (string ReasonId, string DisplayName) ResolveBlockedDrawReasonLocked(
+        Player player,
+        AbstractModel? modifier,
+        PlayerPowerOwnershipShare? ownership)
+    {
+        if (ownership != null)
+            return ($"effect:{ownership.EffectId}", ownership.DisplayName);
+
+        if (modifier is PowerModel power)
+            return ($"effect:{power.Id}", GetPowerDisplayName(power));
+
+        if (IsLikelyHandFull(player))
+            return ("full_hand", "hand full");
+
+        if (modifier != null)
+            return ($"modifier:{modifier.GetType().FullName}", GetModifierDisplayName(modifier));
+
+        return ("other", "other");
+    }
+
+    private static string GetModifierDisplayName(AbstractModel modifier)
+    {
+        if (modifier is PowerModel power)
+            return GetPowerDisplayName(power);
+
+        var typeName = modifier.GetType().Name;
+        if (typeName.EndsWith("Power", StringComparison.OrdinalIgnoreCase))
+            typeName = typeName.Substring(0, typeName.Length - "Power".Length);
+
+        return string.IsNullOrWhiteSpace(typeName) ? "Other" : typeName;
+    }
+
+    private static bool IsLikelyHandFull(Player player)
+    {
+        const int defaultHandLimit = 10;
+
+        try
+        {
+            if (player == null) return false;
+
+            object? handObject = TryReadMemberValue(player, ["Hand", "HandPile", "CardsInHand"]);
+            if (handObject == null) return false;
+
+            int? handCount = TryReadCollectionCount(handObject);
+            if (!handCount.HasValue) return false;
+
+            int handLimit =
+                TryReadIntMember(player, ["MaxHandSize", "HandLimit", "MaxCardsInHand"])
+                ?? TryReadIntMember(handObject, ["MaxSize", "MaxCards", "Limit", "Capacity"])
+                ?? defaultHandLimit;
+
+            return handLimit > 0 && handCount.Value >= handLimit;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static object? TryReadMemberValue(object source, IReadOnlyList<string> memberNames)
+    {
+        var type = source.GetType();
+        foreach (var memberName in memberNames)
+        {
+            var prop = type.GetProperty(memberName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (prop != null && prop.CanRead)
+            {
+                try
+                {
+                    var value = prop.GetValue(source);
+                    if (value != null) return value;
+                }
+                catch { }
+            }
+
+            var field = type.GetField(memberName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (field != null)
+            {
+                try
+                {
+                    var value = field.GetValue(source);
+                    if (value != null) return value;
+                }
+                catch { }
+            }
+        }
+
+        return null;
+    }
+
+    private static int? TryReadIntMember(object source, IReadOnlyList<string> memberNames)
+    {
+        var value = TryReadMemberValue(source, memberNames);
+        if (value == null) return null;
+
+        try
+        {
+            return Convert.ToInt32(value);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static int? TryReadCollectionCount(object source)
+    {
+        var count = TryReadIntMember(source, ["Count"]);
+        if (count.HasValue) return count;
+
+        var cards = TryReadMemberValue(source, ["Cards", "_cards"]);
+        if (cards == null) return null;
+
+        count = TryReadIntMember(cards, ["Count", "Length"]);
+        if (count.HasValue) return count;
+
+        if (cards is System.Collections.ICollection collection)
+            return collection.Count;
+
+        return null;
+    }
+
     private static CardModel? FindLikelyBlockSourceCard(Creature receiver)
     {
         var targetPlayer = receiver.Player;
@@ -1900,6 +2159,32 @@ public static class RunTracker
         return ReferenceEquals(card.Owner, targetPlayer);
     }
 
+    private static bool TryConsumePendingDrawAttempt(Player? player, out PendingDrawAttempt? attempt)
+    {
+        attempt = null;
+        if (_pendingDrawAttempts.Count == 0) return false;
+
+        int index = -1;
+        if (player != null)
+        {
+            for (int i = 0; i < _pendingDrawAttempts.Count; i++)
+            {
+                if (ReferenceEquals(_pendingDrawAttempts[i].Player, player))
+                {
+                    index = i;
+                    break;
+                }
+            }
+        }
+
+        if (index < 0)
+            index = 0;
+
+        attempt = _pendingDrawAttempts[index];
+        _pendingDrawAttempts.RemoveAt(index);
+        return true;
+    }
+
     public static void RecordDrawFromCard(CardModel card, bool fromHandDraw)
     {
         lock (_lock)
@@ -1919,7 +2204,11 @@ public static class RunTracker
             {
                 try
                 {
-                    var sourceCard = _pendingDrawSourceCard;
+                    CardModel? sourceCard = null;
+                    if (TryConsumePendingDrawAttempt(card.Owner, out var pendingAttempt))
+                        sourceCard = pendingAttempt!.SourceCard;
+
+                    sourceCard ??= _pendingDrawSourceCard;
                     if (sourceCard == null)
                     {
                         var causingPlay = FindCurrentlyResolvingCardPlay();
@@ -1952,22 +2241,97 @@ public static class RunTracker
 
             try
             {
-                var sourceCard = _pendingDrawSourceCard ?? FindLikelyDrawSourceCard(player);
-                if (sourceCard == null)
-                {
-                    CoreMain.LogDebug(
-                        $"Blocked draw unattributed modifier={modifier?.GetType().Name ?? "null"}");
-                    return;
-                }
+                CardModel? sourceCard = null;
+                if (TryConsumePendingDrawAttempt(player, out var pendingAttempt))
+                    sourceCard = pendingAttempt!.SourceCard;
 
-                var sourceId = GetOrAssignInstanceId(sourceCard);
-                var sourceAgg = GetOrCreateAggregate(_pendingCombat, sourceId);
-                sourceAgg.TimesCardsDrawBlocked++;
+                sourceCard ??= _pendingDrawSourceCard ?? FindLikelyDrawSourceCard(player);
+                RecordBlockedDrawAttemptLocked(player, sourceCard, modifier);
             }
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordBlockedDrawAttempt failed: {e.Message}");
             }
+        }
+    }
+
+    /// <summary>
+    /// Catch draw-pile exits that never arrive in Hand. Full-hand redirects
+    /// can bypass Hook.ShouldDraw's false path, so the draw-card still needs
+    /// a blocked-attempt attribution even though no No Draw-like modifier
+    /// actually vetoed the draw.
+    /// </summary>
+    public static void RecordCardChangedPiles(CardModel card, PileType oldPile)
+    {
+        lock (_lock)
+        {
+            try
+            {
+                if (oldPile != PileType.Draw) return;
+                if (card?.Pile?.Type == PileType.Hand) return;
+                if (card?.Owner is not Player player) return;
+                if (!IsLikelyHandFull(player)) return;
+                if (!TryConsumePendingDrawAttempt(player, out var pendingAttempt)) return;
+
+                RecordBlockedDrawAttemptLocked(
+                    player,
+                    pendingAttempt!.SourceCard,
+                    modifier: null,
+                    forcedReasonId: "full_hand",
+                    forcedDisplayName: "hand full",
+                    suppressBlockingEffect: true);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordCardChangedPiles failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void RecordBlockedDrawAttemptLocked(
+        Player player,
+        CardModel? sourceCard,
+        AbstractModel? modifier,
+        string? forcedReasonId = null,
+        string? forcedDisplayName = null,
+        bool suppressBlockingEffect = false)
+    {
+        bool recordedSourceBlockedDraw = false;
+        CardAggregate? sourceAgg = null;
+        if (sourceCard != null)
+        {
+            var sourceId = GetOrAssignInstanceId(sourceCard);
+            sourceAgg = GetOrCreateAggregate(_pendingCombat!, sourceId);
+            sourceAgg.TimesCardsDrawBlocked++;
+            recordedSourceBlockedDraw = true;
+        }
+
+        bool recordedBlockingEffect = false;
+        PlayerPowerOwnershipShare? ownership = null;
+        if (!suppressBlockingEffect && modifier != null && TryResolvePlayerPowerOwnershipLocked(modifier, out ownership))
+        {
+            var blockerAgg = GetOrCreateAggregate(_pendingCombat!, ownership!.CardInstanceId);
+            var blockerEffect = GetOrCreateAppliedEffect(
+                blockerAgg,
+                ownership.EffectId,
+                ownership.DisplayName,
+                ownership.IconPath);
+            blockerEffect.TotalTriggeredCardsDrawBlocked++;
+            recordedBlockingEffect = true;
+        }
+
+        if (sourceAgg != null)
+        {
+            var reason = forcedReasonId != null
+                ? (forcedReasonId, forcedDisplayName ?? forcedReasonId)
+                : ResolveBlockedDrawReasonLocked(player, modifier, ownership);
+            RecordBlockedDrawReason(sourceAgg, reason.Item1, reason.Item2);
+        }
+
+        if (!recordedSourceBlockedDraw && !recordedBlockingEffect)
+        {
+            CoreMain.LogDebug(
+                $"Blocked draw unattributed modifier={modifier?.GetType().Name ?? "null"}");
         }
     }
 
@@ -1994,9 +2358,12 @@ public static class RunTracker
                 effect.TimesApplied++;
                 effect.TotalAmountApplied += entry.Amount;
 
+                var target = TryResolvePowerReceivedTarget(entry);
+                if (target?.IsPlayer == true && entry.Amount > 0m)
+                    TrackPlayerPowerOwnershipLocked(entry.Power, instanceId, effect);
+
                 if (entry.Amount > 0m && IsPoisonPower(entry.Power))
                 {
-                    var target = TryResolvePowerReceivedTarget(entry);
                     if (target != null && !target.IsPlayer)
                         AddPoisonOwnershipLocked(target, instanceId, entry.Power, entry.Amount);
                 }
@@ -2471,6 +2838,7 @@ public static class RunTracker
             TotalEnergyGenerated = source.TotalEnergyGenerated,
             TotalStarsSpent = source.TotalStarsSpent,
             TotalStarsGenerated = source.TotalStarsGenerated,
+            TotalForgeGenerated = source.TotalForgeGenerated,
             TotalBlockGained = source.TotalBlockGained,
             TotalBlockEffective = source.TotalBlockEffective,
             TotalBlockWasted = source.TotalBlockWasted,
@@ -2482,6 +2850,7 @@ public static class RunTracker
             TimesExhausted = source.TimesExhausted,
             TotalHpLost = source.TotalHpLost,
             TimesCardsDrawn = source.TimesCardsDrawn,
+            TimesCardsDrawAttempted = source.TimesCardsDrawAttempted,
             TimesCardsDrawBlocked = source.TimesCardsDrawBlocked,
             FloorAdded = source.FloorAdded,
             InitialUpgradeLevel = source.InitialUpgradeLevel,
@@ -2489,6 +2858,7 @@ public static class RunTracker
             RemovedAtFloor = source.RemovedAtFloor,
             RemovedSnapshot = source.RemovedSnapshot,
         };
+        MergeBlockedDrawReasonsInto(clone.BlockedDrawReasons, source.BlockedDrawReasons);
         MergeAppliedEffectsInto(clone.AppliedEffects, source.AppliedEffects);
         return clone;
     }
@@ -2505,6 +2875,7 @@ public static class RunTracker
         target.TotalEnergyGenerated += source.TotalEnergyGenerated;
         target.TotalStarsSpent += source.TotalStarsSpent;
         target.TotalStarsGenerated += source.TotalStarsGenerated;
+        target.TotalForgeGenerated += source.TotalForgeGenerated;
         target.TotalBlockGained += source.TotalBlockGained;
         target.TotalBlockEffective += source.TotalBlockEffective;
         target.TotalBlockWasted += source.TotalBlockWasted;
@@ -2516,8 +2887,32 @@ public static class RunTracker
         target.TimesExhausted += source.TimesExhausted;
         target.TotalHpLost += source.TotalHpLost;
         target.TimesCardsDrawn += source.TimesCardsDrawn;
+        target.TimesCardsDrawAttempted += source.TimesCardsDrawAttempted;
         target.TimesCardsDrawBlocked += source.TimesCardsDrawBlocked;
+        MergeBlockedDrawReasonsInto(target.BlockedDrawReasons, source.BlockedDrawReasons);
         MergeAppliedEffectsInto(target.AppliedEffects, source.AppliedEffects);
+    }
+
+    private static void MergeBlockedDrawReasonsInto(
+        Dictionary<string, BlockedDrawReasonAggregate> target,
+        Dictionary<string, BlockedDrawReasonAggregate> source)
+    {
+        foreach (var kv in source)
+        {
+            if (!target.TryGetValue(kv.Key, out var reason))
+            {
+                reason = new BlockedDrawReasonAggregate
+                {
+                    ReasonId = kv.Value.ReasonId,
+                    DisplayName = kv.Value.DisplayName,
+                };
+                target[kv.Key] = reason;
+            }
+
+            reason.Count += kv.Value.Count;
+            if (string.IsNullOrWhiteSpace(reason.DisplayName) && !string.IsNullOrWhiteSpace(kv.Value.DisplayName))
+                reason.DisplayName = kv.Value.DisplayName;
+        }
     }
 
     private static void MergeAppliedEffectsInto(
@@ -2543,6 +2938,7 @@ public static class RunTracker
             effect.TotalAmountBlockedByArtifact += kv.Value.TotalAmountBlockedByArtifact;
             effect.TotalTriggeredEffectiveDamage += kv.Value.TotalTriggeredEffectiveDamage;
             effect.TotalTriggeredOverkill += kv.Value.TotalTriggeredOverkill;
+            effect.TotalTriggeredCardsDrawBlocked += kv.Value.TotalTriggeredCardsDrawBlocked;
             if (string.IsNullOrWhiteSpace(effect.DisplayName) && !string.IsNullOrWhiteSpace(kv.Value.DisplayName))
                 effect.DisplayName = kv.Value.DisplayName;
             if (string.IsNullOrWhiteSpace(effect.IconPath) && !string.IsNullOrWhiteSpace(kv.Value.IconPath))
@@ -2798,6 +3194,8 @@ internal class PendingCombat
     public Dictionary<string, CardAggregate> CombatAggregates { get; } = new();
     public List<CardEvent> CombatEvents { get; } = new();
     public List<BlockChunk> PlayerBlockLedger { get; } = new();
+    public Dictionary<AbstractModel, PlayerPowerOwnershipShare> PlayerPowerOwnershipByModifier { get; }
+        = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Creature, Dictionary<PoisonOwnershipKey, PoisonOwnershipShare>> PoisonOwnershipByTarget { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Creature, PendingPoisonTick> PendingPoisonTicks { get; }
@@ -2820,6 +3218,20 @@ internal sealed class PendingPowerChangeAttempt
     public Creature? Applier { get; init; }
     public required decimal RequestedAmount { get; init; }
     public CardModel? CardSource { get; init; }
+}
+
+internal sealed class PendingDrawAttempt
+{
+    public required Player Player { get; init; }
+    public required CardModel SourceCard { get; init; }
+}
+
+internal sealed class PlayerPowerOwnershipShare
+{
+    public required string CardInstanceId { get; init; }
+    public required string EffectId { get; init; }
+    public required string DisplayName { get; init; }
+    public string? IconPath { get; init; }
 }
 
 internal readonly record struct PoisonOwnershipKey(string CardInstanceId, string EffectId);

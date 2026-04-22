@@ -10,7 +10,7 @@ namespace CardUtilityStats.Core;
 /// </summary>
 public class RunData
 {
-    public const int CurrentSchemaVersion = 9;
+    public const int CurrentSchemaVersion = 13;
 
     // v1: aggregates keyed by card definition id (pooled across instances)
     // v2: aggregates keyed by per-instance id ("CARD.STRIKE_SILENT#1") —
@@ -35,6 +35,22 @@ public class RunData
     //     resumable with the new fields defaulting to 0.
     // v9: add per-card blocked-draw attribution counts. Also additive;
     //     older v8 files remain resumable with the new field defaulting to 0.
+    // v10: add per-card forge granted tracking so forge cards can report
+    //      the actual forge added during their resolution. Also additive;
+    //      older v9 files remain resumable with the new field defaulting
+    //      to 0.
+    // v11: add per-effect downstream blocked-draw counts so powers like
+    //      No Draw can report how many cards they actually prevented from
+    //      being drawn. Also additive; older v10 files remain resumable with
+    //      the new field defaulting to 0.
+    // v12: add per-card attempted draw counts so draw cards can show what
+    //      they tried to draw versus what actually landed. Also additive;
+    //      older v11 files remain resumable with the new field defaulting
+    //      to 0.
+    // v13: add per-card blocked-draw reason categories so draw cards can
+    //      say why their missing draws were prevented (No Draw, hand full,
+    //      other). Also additive; older v12 files remain resumable with the
+    //      new field defaulting to empty.
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
     public string RunId { get; set; } = "";
     public string StartedAt { get; set; } = "";  // ISO-8601 UTC
@@ -130,6 +146,11 @@ public class CardAggregate
     public int TotalStarsSpent { get; set; }
     public int TotalStarsGenerated { get; set; }
 
+    // M3l: Forge granted directly by this card while it is resolving.
+    // Stored as decimal because the game's forge command path is decimal-
+    // backed even when current cards mostly use whole numbers.
+    public decimal TotalForgeGenerated { get; set; }
+
     // M2a: Block gained (how much block this card contributed over the run,
     // summed across plays). M2b extends this with absorbed/wasted splits
     // using an ordered provenance ledger for the player's block pool.
@@ -187,12 +208,25 @@ public class CardAggregate
     // auto-draw via the game's FromHandDraw flag.
     public int TimesCardsDrawn { get; set; }
 
+    // M3i1: Total card draw attempts caused by THIS card's play, regardless
+    // of whether each draw actually succeeded. Lets the tooltip show the gap
+    // between "tried to draw X" and "actually drew Y" without caring whether
+    // the miss came from No Draw, full hand fallback, or another prevention
+    // path.
+    public int TimesCardsDrawAttempted { get; set; }
+
     // M3i2: Blocked draw attribution. When THIS card's play ATTEMPTS to draw
     // cards but a draw-prevention hook vetoes the attempt (Battle Trance,
     // future "can't draw" effects, etc.). Counts blocked cards separately
     // from successful draws so draw cards don't silently look like they drew
     // zero when the game explicitly prevented them.
     public int TimesCardsDrawBlocked { get; set; }
+
+    // M3i3: Categorized blocked-draw reasons for THIS card's draw attempts.
+    // Keeps the card-side gap explainable without caring about the exact
+    // blocker implementation: No Draw, hand full, or an "other" bucket when
+    // the game prevented the draw for some reason we didn't categorize yet.
+    public Dictionary<string, BlockedDrawReasonAggregate> BlockedDrawReasons { get; set; } = new();
 
     // M4a: Effect / power application summary for this specific card
     // instance. First pass tracks ONLY that the card caused a power/effect
@@ -252,6 +286,14 @@ public class AppliedEffectAggregate
     public decimal TotalAmountBlockedByArtifact { get; set; }
     public decimal TotalTriggeredEffectiveDamage { get; set; }
     public decimal TotalTriggeredOverkill { get; set; }
+    public int TotalTriggeredCardsDrawBlocked { get; set; }
+}
+
+public class BlockedDrawReasonAggregate
+{
+    public string ReasonId { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public int Count { get; set; }
 }
 
 /// <summary>
@@ -270,6 +312,7 @@ public class CardEvent
     public int? EnergyGained { get; set; }       // actual energy added to the pool while this card was resolving
     public int? StarsSpent { get; set; }         // actual stars paid for this play
     public int? StarsGained { get; set; }        // actual stars added while this card was resolving
+    public decimal? ForgeGained { get; set; }    // actual forge added while this card was resolving
 
     // card_upgraded fields (and general-purpose: Floor also stamped on
     // other event types when useful). UpgradeLevel is the NEW level AFTER

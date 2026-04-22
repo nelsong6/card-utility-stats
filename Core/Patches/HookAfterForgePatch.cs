@@ -1,4 +1,5 @@
 using HarmonyLib;
+using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Hooks;
 using MegaCrit.Sts2.Core.Models;
 
@@ -14,10 +15,11 @@ namespace CardUtilityStats.Core.Patches;
 public static class HookAfterForgePatch
 {
     [HarmonyPostfix]
-    public static void Postfix(AbstractModel source)
+    public static void Postfix(decimal amount, Player forger, AbstractModel? source)
     {
         try
         {
+            RunTracker.RecordForgeGranted(amount, forger, source);
             RunTracker.RecordSovereignBladeForged();
             RunTracker.NoteEffectSource(source);
         }

@@ -147,7 +147,7 @@ public class PoisonTooltipTests
     }
 
     [Fact]
-    public void AppendAppliedEffects_UsesEnergyPotionIconForEnergyEffects()
+    public void AppendAppliedEffects_UsesEffectIconForEnergyEffects()
     {
         var agg = new CardAggregate
         {
@@ -168,12 +168,12 @@ public class PoisonTooltipTests
         AppendAppliedEffects(sb, agg, compact: false, excludePoison: false);
         var text = sb.ToString();
 
-        Assert.Contains("[img=16x16]res://images/atlases/potion_atlas.sprites/energy_potion.tres[/img] Next Turn", text);
+        Assert.Contains("[img=16x16]res://images/atlases/power_atlas.sprites/energy_next_turn_power.tres[/img] Energy Next Turn", text);
         Assert.Contains("[b]2[/b]", text);
     }
 
     [Fact]
-    public void AppendAppliedEffects_UsesStarIconForStarEffects()
+    public void AppendAppliedEffects_UsesEffectIconForStarEffects()
     {
         var agg = new CardAggregate
         {
@@ -194,7 +194,36 @@ public class PoisonTooltipTests
         AppendAppliedEffects(sb, agg, compact: false, excludePoison: false);
         var text = sb.ToString();
 
-        Assert.Contains("[img=16x16]res://images/packed/sprite_fonts/star_icon.png[/img] Next Turn", text);
+        Assert.Contains("[img=16x16]res://images/atlases/power_atlas.sprites/star_next_turn_power.tres[/img] Star Next Turn", text);
+        Assert.Contains("[b]2[/b]", text);
+    }
+
+    [Fact]
+    public void AppendAppliedEffects_ShowsDownstreamBlockedDrawsForNoDraw()
+    {
+        var agg = new CardAggregate
+        {
+            AppliedEffects =
+            {
+                ["POWER.NO_DRAW"] = new AppliedEffectAggregate
+                {
+                    EffectId = "POWER.NO_DRAW",
+                    DisplayName = "No Draw",
+                    IconPath = "res://images/atlases/power_atlas.sprites/no_draw_power.tres",
+                    TimesApplied = 1,
+                    TotalAmountApplied = 1m,
+                    TotalTriggeredCardsDrawBlocked = 2,
+                },
+            }
+        };
+
+        var sb = new StringBuilder();
+        AppendAppliedEffects(sb, agg, compact: false, excludePoison: false);
+        var text = sb.ToString();
+
+        Assert.Contains("[img=16x16]res://images/atlases/power_atlas.sprites/no_draw_power.tres[/img] No Draw", text);
+        Assert.Contains("[b]1[/b]", text);
+        Assert.Contains("[img=16x16]res://images/atlases/power_atlas.sprites/draw_cards_next_turn_power.tres[/img] cards blocked", text);
         Assert.Contains("[b]2[/b]", text);
     }
 

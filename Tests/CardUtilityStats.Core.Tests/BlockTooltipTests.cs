@@ -27,9 +27,17 @@ public class BlockTooltipTests
         typeof(CardHoverShowPatch).GetMethod("GetStarStatLabel", BindingFlags.NonPublic | BindingFlags.Static)
         ?? throw new InvalidOperationException("GetStarStatLabel not found.");
 
+    private static readonly MethodInfo GetForgeStatLabelMethod =
+        typeof(CardHoverShowPatch).GetMethod("GetForgeStatLabel", BindingFlags.NonPublic | BindingFlags.Static)
+        ?? throw new InvalidOperationException("GetForgeStatLabel not found.");
+
     private static readonly MethodInfo AppendCompactBodyMethod =
         typeof(CardHoverShowPatch).GetMethod("AppendCompactBody", BindingFlags.NonPublic | BindingFlags.Static)
         ?? throw new InvalidOperationException("AppendCompactBody not found.");
+
+    private static readonly MethodInfo AppendCardDrawStatsMethod =
+        typeof(CardHoverShowPatch).GetMethod("AppendCardDrawStats", BindingFlags.NonPublic | BindingFlags.Static)
+        ?? throw new InvalidOperationException("AppendCardDrawStats not found.");
 
     [Fact]
     public void GetBlockStatLabel_UsesShieldIcon()
@@ -78,6 +86,15 @@ public class BlockTooltipTests
     }
 
     [Fact]
+    public void GetDrawStatLabel_UsesDrawCardsNextTurnPowerIconForAttemptedRows()
+    {
+        var label = (string)(GetDrawStatLabelMethod.Invoke(null, new object?[] { "drawn / tried" })
+            ?? throw new InvalidOperationException("GetDrawStatLabel returned null."));
+
+        Assert.Equal("[img=16x16]res://images/atlases/power_atlas.sprites/draw_cards_next_turn_power.tres[/img] drawn / tried", label);
+    }
+
+    [Fact]
     public void GetEnergyStatLabel_UsesEnergyPotionIcon()
     {
         var label = (string)(GetEnergyStatLabelMethod.Invoke(null, new object?[] { "gained" })
@@ -93,6 +110,15 @@ public class BlockTooltipTests
             ?? throw new InvalidOperationException("GetStarStatLabel returned null."));
 
         Assert.Equal("[img=16x16]res://images/packed/sprite_fonts/star_icon.png[/img] gained", label);
+    }
+
+    [Fact]
+    public void GetForgeStatLabel_UsesQuietTextLabel()
+    {
+        var label = (string)(GetForgeStatLabelMethod.Invoke(null, new object?[] { "gained" })
+            ?? throw new InvalidOperationException("GetForgeStatLabel returned null."));
+
+        Assert.Equal("Forge gained", label);
     }
 
     [Fact]
@@ -147,6 +173,98 @@ public class BlockTooltipTests
         var text = sb.ToString();
 
         Assert.Contains("[img=16x16]res://images/packed/sprite_fonts/star_icon.png[/img] gained", text);
+        Assert.Contains("[b]2[/b]", text);
+    }
+
+    [Fact]
+    public void AppendCompactBody_UsesQuietTextForForgeRows()
+    {
+        var cardModel = CreateCardModel(CardType.Skill);
+        var agg = new CardAggregate
+        {
+            Plays = 2,
+            TimesDrawn = 3,
+            TotalForgeGenerated = 6m,
+        };
+
+        var sb = new StringBuilder();
+        _ = AppendCompactBodyMethod.Invoke(null, new object?[] { sb, cardModel, agg });
+        var text = sb.ToString();
+
+        Assert.Contains("Forge gained", text);
+        Assert.DoesNotContain("[img=16x16]", text);
+        Assert.Contains("[b]6[/b]", text);
+    }
+
+    [Fact]
+    public void AppendCardDrawStats_ShowsActualVersusAttemptedWhenGapExists()
+    {
+        var agg = new CardAggregate
+        {
+            TimesCardsDrawn = 1,
+            TimesCardsDrawAttempted = 3,
+            BlockedDrawReasons =
+            {
+                ["effect:POWER.NO_DRAW"] = new BlockedDrawReasonAggregate
+                {
+                    ReasonId = "effect:POWER.NO_DRAW",
+                    DisplayName = "No Draw",
+                    Count = 2,
+                }
+            }
+        };
+
+        var sb = new StringBuilder();
+        _ = AppendCardDrawStatsMethod.Invoke(null, new object?[] { sb, agg });
+        var text = sb.ToString();
+
+        Assert.Contains("[img=16x16]res://images/atlases/power_atlas.sprites/draw_cards_next_turn_power.tres[/img] drawn / tried", text);
+        Assert.Contains("[b]1/3[/b]", text);
+        Assert.Contains("[img=16x16]res://images/atlases/power_atlas.sprites/draw_cards_next_turn_power.tres[/img] blocked by No Draw", text);
+        Assert.Contains("[b]2[/b]", text);
+    }
+
+    [Fact]
+    public void AppendCardDrawStats_FallsBackToLegacyBlockedGapWhenAttemptedIsMissing()
+    {
+        var agg = new CardAggregate
+        {
+            TimesCardsDrawn = 0,
+            TimesCardsDrawBlocked = 3,
+        };
+
+        var sb = new StringBuilder();
+        _ = AppendCardDrawStatsMethod.Invoke(null, new object?[] { sb, agg });
+        var text = sb.ToString();
+
+        Assert.Contains("[img=16x16]res://images/atlases/power_atlas.sprites/draw_cards_next_turn_power.tres[/img] drawn / tried", text);
+        Assert.Contains("[b]0/3[/b]", text);
+        Assert.Contains("[img=16x16]res://images/atlases/power_atlas.sprites/draw_cards_next_turn_power.tres[/img] blocked by other", text);
+    }
+
+    [Fact]
+    public void AppendCardDrawStats_ShowsHandFullReasonWhenCategorized()
+    {
+        var agg = new CardAggregate
+        {
+            TimesCardsDrawn = 1,
+            TimesCardsDrawAttempted = 3,
+            BlockedDrawReasons =
+            {
+                ["full_hand"] = new BlockedDrawReasonAggregate
+                {
+                    ReasonId = "full_hand",
+                    DisplayName = "hand full",
+                    Count = 2,
+                }
+            }
+        };
+
+        var sb = new StringBuilder();
+        _ = AppendCardDrawStatsMethod.Invoke(null, new object?[] { sb, agg });
+        var text = sb.ToString();
+
+        Assert.Contains("[img=16x16]res://images/atlases/power_atlas.sprites/draw_cards_next_turn_power.tres[/img] blocked by hand full", text);
         Assert.Contains("[b]2[/b]", text);
     }
 

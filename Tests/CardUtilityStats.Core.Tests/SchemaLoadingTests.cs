@@ -134,9 +134,87 @@ public class SchemaLoadingTests
     }
 
     [Fact]
-    public void HistoricalLoad_AcceptsCurrentV9Fixture()
+    public void HistoricalLoad_AcceptsLegacyResumableV9BlockedDrawFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("v9-per-instance-blocked-draw-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.Equal(9, loaded!.SourceSchemaVersion);
+        Assert.True(loaded.IsLegacy);
+        Assert.True(loaded.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Contains("resumable", loaded.CompatibilityNote!, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(2, loaded.Data.Aggregates["CARD.POMMEL_STRIKE#1"].TimesCardsDrawBlocked);
+        Assert.Equal(1, loaded.Data.Aggregates["CARD.POMMEL_STRIKE#1"].TimesCardsDrawn);
+        Assert.Equal(0, loaded.Data.Aggregates["CARD.POMMEL_STRIKE#1"].TotalStarsGenerated);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsLegacyResumableV9ForgeFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("v9-per-instance-forge-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.Equal(9, loaded!.SourceSchemaVersion);
+        Assert.True(loaded.IsLegacy);
+        Assert.True(loaded.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Contains("resumable", loaded.CompatibilityNote!, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(9m, loaded.Data.Aggregates["CARD.REFINE_BLADE#1"].TotalForgeGenerated);
+        Assert.Equal(5m, loaded.Data.Events[0].ForgeGained);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsLegacyResumableV10ForgeFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("v10-per-instance-forge-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.Equal(10, loaded!.SourceSchemaVersion);
+        Assert.True(loaded.IsLegacy);
+        Assert.True(loaded.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Contains("resumable", loaded.CompatibilityNote!, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(9m, loaded.Data.Aggregates["CARD.REFINE_BLADE#1"].TotalForgeGenerated);
+        Assert.Equal(0, loaded.Data.Aggregates["CARD.REFINE_BLADE#1"].TimesCardsDrawBlocked);
+        Assert.Equal(4m, loaded.Data.Events[2].ForgeGained);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsLegacyResumableV11Fixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("v11-per-instance-no-draw-blocked-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.Equal(11, loaded!.SourceSchemaVersion);
+        Assert.True(loaded.IsLegacy);
+        Assert.True(loaded.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        var effect = loaded.Data.Aggregates["CARD.BATTLE_TRANCE#1"].AppliedEffects["POWER.NO_DRAW"];
+        Assert.Equal(2, effect.TotalTriggeredCardsDrawBlocked);
+        Assert.Equal(2, loaded.Data.Aggregates["CARD.POMMEL_STRIKE#1"].TimesCardsDrawBlocked);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsLegacyResumableV12Fixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("v12-per-instance-draw-attempt-gap-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.Equal(12, loaded!.SourceSchemaVersion);
+        Assert.True(loaded.IsLegacy);
+        Assert.True(loaded.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        var blocker = loaded.Data.Aggregates["CARD.BATTLE_TRANCE#1"].AppliedEffects["POWER.NO_DRAW"];
+        Assert.Equal(3, blocker.TotalTriggeredCardsDrawBlocked);
+        Assert.Equal(3, loaded.Data.Aggregates["CARD.BATTLE_TRANCE#2"].TimesCardsDrawAttempted);
+        Assert.Equal(0, loaded.Data.Aggregates["CARD.BATTLE_TRANCE#2"].TimesCardsDrawn);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsCurrentV13Fixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("v13-per-instance-blocked-draw-reasons-run.json"));
 
         Assert.NotNull(loaded);
         Assert.Equal(RunData.CurrentSchemaVersion, loaded!.SourceSchemaVersion);
@@ -144,9 +222,11 @@ public class SchemaLoadingTests
         Assert.True(loaded.SupportsResume);
         Assert.True(loaded.HasPerInstanceIdentity);
         Assert.Null(loaded.CompatibilityNote);
-        Assert.Equal(2, loaded.Data.Aggregates["CARD.POMMEL_STRIKE#1"].TimesCardsDrawBlocked);
-        Assert.Equal(1, loaded.Data.Aggregates["CARD.POMMEL_STRIKE#1"].TimesCardsDrawn);
-        Assert.Equal(0, loaded.Data.Aggregates["CARD.POMMEL_STRIKE#1"].TotalStarsGenerated);
+        var blocker = loaded.Data.Aggregates["CARD.BATTLE_TRANCE#1"].AppliedEffects["POWER.NO_DRAW"];
+        Assert.Equal(3, blocker.TotalTriggeredCardsDrawBlocked);
+        var reason = loaded.Data.Aggregates["CARD.BATTLE_TRANCE#2"].BlockedDrawReasons["effect:POWER.NO_DRAW"];
+        Assert.Equal("No Draw", reason.DisplayName);
+        Assert.Equal(3, reason.Count);
     }
 
     [Fact]
@@ -245,15 +325,76 @@ public class SchemaLoadingTests
     }
 
     [Fact]
-    public void ResumableLoad_AcceptsCurrentV9Fixture()
+    public void ResumableLoad_AcceptsLegacyResumableV9BlockedDrawFixture()
     {
         var resumed = RunStorage.LoadResumable(FixturePath("v9-per-instance-blocked-draw-run.json"));
 
         Assert.NotNull(resumed);
-        Assert.Equal(RunData.CurrentSchemaVersion, resumed!.SchemaVersion);
+        Assert.Equal(9, resumed!.SchemaVersion);
         Assert.Equal(2, resumed.Aggregates["CARD.POMMEL_STRIKE#1"].TimesCardsDrawBlocked);
         Assert.Equal(1, resumed.Aggregates["CARD.POMMEL_STRIKE#1"].TimesCardsDrawn);
         Assert.Equal(0, resumed.Aggregates["CARD.POMMEL_STRIKE#1"].TotalStarsSpent);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsLegacyResumableV9ForgeFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v9-per-instance-forge-run.json"));
+
+        Assert.NotNull(resumed);
+        Assert.Equal(9, resumed!.SchemaVersion);
+        Assert.Equal(9m, resumed.Aggregates["CARD.REFINE_BLADE#1"].TotalForgeGenerated);
+        Assert.Equal(0, resumed.Aggregates["CARD.REFINE_BLADE#1"].TimesCardsDrawBlocked);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsLegacyResumableV10ForgeFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v10-per-instance-forge-run.json"));
+
+        Assert.NotNull(resumed);
+        Assert.Equal(10, resumed!.SchemaVersion);
+        Assert.Equal(9m, resumed.Aggregates["CARD.REFINE_BLADE#1"].TotalForgeGenerated);
+        Assert.Equal(0, resumed.Aggregates["CARD.REFINE_BLADE#1"].TimesCardsDrawBlocked);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsLegacyResumableV11Fixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v11-per-instance-no-draw-blocked-run.json"));
+
+        Assert.NotNull(resumed);
+        Assert.Equal(11, resumed!.SchemaVersion);
+        var effect = resumed.Aggregates["CARD.BATTLE_TRANCE#1"].AppliedEffects["POWER.NO_DRAW"];
+        Assert.Equal(2, effect.TotalTriggeredCardsDrawBlocked);
+        Assert.Equal(2, resumed.Aggregates["CARD.POMMEL_STRIKE#1"].TimesCardsDrawBlocked);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsLegacyResumableV12Fixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v12-per-instance-draw-attempt-gap-run.json"));
+
+        Assert.NotNull(resumed);
+        Assert.Equal(12, resumed!.SchemaVersion);
+        var blocker = resumed.Aggregates["CARD.BATTLE_TRANCE#1"].AppliedEffects["POWER.NO_DRAW"];
+        Assert.Equal(3, blocker.TotalTriggeredCardsDrawBlocked);
+        Assert.Equal(3, resumed.Aggregates["CARD.BATTLE_TRANCE#2"].TimesCardsDrawAttempted);
+        Assert.Equal(0, resumed.Aggregates["CARD.BATTLE_TRANCE#2"].TimesCardsDrawn);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsCurrentV13Fixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v13-per-instance-blocked-draw-reasons-run.json"));
+
+        Assert.NotNull(resumed);
+        Assert.Equal(RunData.CurrentSchemaVersion, resumed!.SchemaVersion);
+        var blocker = resumed.Aggregates["CARD.BATTLE_TRANCE#1"].AppliedEffects["POWER.NO_DRAW"];
+        Assert.Equal(3, blocker.TotalTriggeredCardsDrawBlocked);
+        var reason = resumed.Aggregates["CARD.BATTLE_TRANCE#2"].BlockedDrawReasons["effect:POWER.NO_DRAW"];
+        Assert.Equal("No Draw", reason.DisplayName);
+        Assert.Equal(3, reason.Count);
     }
 
     [Fact]
