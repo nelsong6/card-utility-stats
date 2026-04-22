@@ -17,6 +17,8 @@ public static class PowerExecutionSourcePatch
 {
     private static readonly HashSet<string> TargetMethodNames = new(StringComparer.Ordinal)
     {
+        "AfterBlockCleared",
+        "AfterBlockGained",
         "AfterCardDrawn",
         "AfterCardPlayed",
         "AfterCardExhausted",
@@ -24,8 +26,11 @@ public static class PowerExecutionSourcePatch
         "AfterEnergyReset",
         "AfterEnergySpent",
         "AfterPowerAmountChanged",
+        "AfterSideTurnStart",
         "AfterTurnEnd",
+        "BeforeSideTurnStart",
         "BeforeCardPlayed",
+        "BeforeTurnEndEarly",
     };
 
     public static IEnumerable<MethodBase> TargetMethods()

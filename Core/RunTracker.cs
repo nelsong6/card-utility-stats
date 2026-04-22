@@ -2271,20 +2271,28 @@ public static class RunTracker
         return null;
     }
 
-    private static CardModel? FindLikelyBlockSourceCard(Creature receiver)
+    private static string? ResolveLikelyBlockSourceInstanceIdLocked(Creature receiver)
     {
         var targetPlayer = receiver.Player;
         if (targetPlayer == null) return null;
 
+        var executionSource = _executionSourceFrame.Value?.Source;
+        if (executionSource != null)
+        {
+            var ownedSourceInstanceId = ResolveOwnedSourceInstanceIdLocked(executionSource, targetPlayer);
+            if (ownedSourceInstanceId != null)
+                return ownedSourceInstanceId;
+        }
+
         var causingPlay = FindCurrentlyResolvingCardPlay();
         if (causingPlay?.Card != null && IsOwnedBy(causingPlay.Card, targetPlayer))
-            return Canonical(causingPlay.Card);
+            return GetOrAssignInstanceId(causingPlay.Card);
 
         if (_recentCompletedPlayerCardPlay?.Card != null && IsOwnedBy(_recentCompletedPlayerCardPlay.Card, targetPlayer))
         {
             int historyCount = CombatManager.Instance?.History?.Entries?.Count() ?? 0;
             if (historyCount <= _recentCompletedPlayerCardPlayHistoryCount + 1)
-                return Canonical(_recentCompletedPlayerCardPlay.Card);
+                return GetOrAssignInstanceId(_recentCompletedPlayerCardPlay.Card);
         }
 
         return null;
@@ -2714,9 +2722,7 @@ public static class RunTracker
             }
             else if (entry.Receiver.IsPlayer)
             {
-                var fallbackCard = FindLikelyBlockSourceCard(entry.Receiver);
-                if (fallbackCard != null)
-                    instanceId = GetOrAssignInstanceId(fallbackCard);
+                instanceId = ResolveLikelyBlockSourceInstanceIdLocked(entry.Receiver);
             }
 
             if (instanceId != null)
