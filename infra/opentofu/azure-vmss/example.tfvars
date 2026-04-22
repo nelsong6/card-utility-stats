@@ -4,9 +4,9 @@ location    = "West US 3"
 admin_username = "runneradmin"
 
 # Phase 0: create only the temporary builder VM.
-enable_builder_vm          = true
-enable_vmss                = false
-builder_vm_sku             = "Standard_D4s_v5"
+enable_builder_vm = true
+enable_vmss       = false
+builder_vm_sku    = "Standard_D4s_v5"
 # Optional: set this to get a stable Azure FQDN like
 # <label>.<region>.cloudapp.azure.com for the builder VM public IP.
 # builder_public_ip_dns_label = "card-utility-stats-builder"
