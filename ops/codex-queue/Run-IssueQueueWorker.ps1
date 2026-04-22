@@ -1,0 +1,621 @@
+[CmdletBinding()]
+param(
+    [string]$RepoRoot = "D:\repos\card-utility-stats",
+    [string]$RepoSlug = "nelsong6/card-utility-stats",
+    [string]$WorkerName = "sts2-side-a",
+    [string]$QueueLabel = "codex-queue",
+    [string]$ActiveLabel = "codex-active",
+    [string]$BlockedLabel = "codex-blocked",
+    [string]$CompleteLabel = "codex-complete",
+    [int]$MaxIssuesPerRun = 100,
+    [int]$MaxAttemptsPerIssue = 3
+)
+
+$ErrorActionPreference = "Stop"
+
+function Write-Log {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Message
+    )
+
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $line = "[$timestamp] $Message"
+    Write-Host $line
+
+    if ($script:WorkerLogPath) {
+        Add-Content -LiteralPath $script:WorkerLogPath -Value $line
+    }
+}
+
+function Ensure-Directory {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    New-Item -ItemType Directory -Force -Path $Path | Out-Null
+    return $Path
+}
+
+function Get-StateRoot {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepoSlugValue
+    )
+
+    $safeRepoSlug = $RepoSlugValue.Replace("/", "-")
+    return Ensure-Directory -Path (Join-Path $env:LOCALAPPDATA "CodexIssueQueue\$safeRepoSlug")
+}
+
+function Add-ToolPath {
+    $paths = @(
+        "C:\Program Files\Git\cmd",
+        "C:\Program Files\GitHub CLI",
+        "C:\Program Files\PowerShell\7"
+    )
+
+    foreach ($path in $paths) {
+        if ((Test-Path -LiteralPath $path) -and -not (($env:PATH -split ";") -contains $path)) {
+            $env:PATH = "$path;$env:PATH"
+        }
+    }
+}
+
+function Ensure-LocalCodexBinary {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$StateRoot
+    )
+
+    $candidatePaths = @(
+        "C:\Program Files\WindowsApps\OpenAI.Codex_26.421.620.0_x64__2p2nqsd0c76g0\app\resources\codex.exe"
+    )
+
+    $sourcePath = $null
+    foreach ($candidate in $candidatePaths) {
+        if (Test-Path -LiteralPath $candidate) {
+            $sourcePath = $candidate
+            break
+        }
+    }
+
+    if (-not $sourcePath) {
+        throw "Unable to locate the installed Codex CLI binary."
+    }
+
+    $binDir = Ensure-Directory -Path (Join-Path $StateRoot "bin")
+    $targetPath = Join-Path $binDir "codex.exe"
+
+    $shouldCopy = $true
+    if (Test-Path -LiteralPath $targetPath) {
+        $sourceInfo = Get-Item -LiteralPath $sourcePath
+        $targetInfo = Get-Item -LiteralPath $targetPath
+        $shouldCopy = $sourceInfo.Length -ne $targetInfo.Length -or $sourceInfo.LastWriteTimeUtc -gt $targetInfo.LastWriteTimeUtc
+    }
+
+    if ($shouldCopy) {
+        Copy-Item -LiteralPath $sourcePath -Destination $targetPath -Force
+    }
+
+    return $targetPath
+}
+
+function Invoke-GhJson {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments
+    )
+
+    $json = & gh @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "gh command failed: gh $($Arguments -join ' ')"
+    }
+
+    if ([string]::IsNullOrWhiteSpace($json)) {
+        return $null
+    }
+
+    return $json | ConvertFrom-Json
+}
+
+function Ensure-Label {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Repo,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Name,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Color,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Description
+    )
+
+    $existing = Invoke-GhJson -Arguments @("label", "list", "--repo", $Repo, "--limit", "200", "--json", "name")
+    if ($existing.name -contains $Name) {
+        return
+    }
+
+    & gh label create $Name --repo $Repo --color $Color --description $Description | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to create label '$Name'."
+    }
+}
+
+function Ensure-QueueLabels {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Repo
+    )
+
+    Ensure-Label -Repo $Repo -Name $QueueLabel -Color "0e8a16" -Description "Queued for autonomous Codex processing"
+    Ensure-Label -Repo $Repo -Name $ActiveLabel -Color "fbca04" -Description "Currently being processed by the Codex queue worker"
+    Ensure-Label -Repo $Repo -Name $BlockedLabel -Color "d93f0b" -Description "Blocked pending human action or missing prerequisites"
+    Ensure-Label -Repo $Repo -Name $CompleteLabel -Color "1d76db" -Description "Processed by the Codex queue worker"
+}
+
+function Get-AttemptFilePath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$StateRoot,
+
+        [Parameter(Mandatory = $true)]
+        [int]$IssueNumber
+    )
+
+    $attemptsDir = Ensure-Directory -Path (Join-Path $StateRoot "attempts")
+    return Join-Path $attemptsDir "$IssueNumber.json"
+}
+
+function Get-IssueAttemptCount {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$StateRoot,
+
+        [Parameter(Mandatory = $true)]
+        [int]$IssueNumber
+    )
+
+    $path = Get-AttemptFilePath -StateRoot $StateRoot -IssueNumber $IssueNumber
+    if (-not (Test-Path -LiteralPath $path)) {
+        return 0
+    }
+
+    return ((Get-Content -LiteralPath $path -Raw | ConvertFrom-Json).attempts)
+}
+
+function Set-IssueAttemptCount {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$StateRoot,
+
+        [Parameter(Mandatory = $true)]
+        [int]$IssueNumber,
+
+        [Parameter(Mandatory = $true)]
+        [int]$Attempts
+    )
+
+    $payload = @{
+        issue_number = $IssueNumber
+        attempts = $Attempts
+        updated_at = (Get-Date).ToString("o")
+    }
+
+    $payload | ConvertTo-Json | Set-Content -LiteralPath (Get-AttemptFilePath -StateRoot $StateRoot -IssueNumber $IssueNumber)
+}
+
+function Clear-IssueAttemptCount {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$StateRoot,
+
+        [Parameter(Mandatory = $true)]
+        [int]$IssueNumber
+    )
+
+    $path = Get-AttemptFilePath -StateRoot $StateRoot -IssueNumber $IssueNumber
+    if (Test-Path -LiteralPath $path) {
+        Remove-Item -LiteralPath $path -Force
+    }
+}
+
+function Get-NextQueuedIssue {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Repo
+    )
+
+    $issues = Invoke-GhJson -Arguments @(
+        "issue", "list",
+        "--repo", $Repo,
+        "--state", "open",
+        "--label", $QueueLabel,
+        "--limit", "100",
+        "--json", "number,title,createdAt,labels,url"
+    )
+
+    if (-not $issues) {
+        return $null
+    }
+
+    $eligible = $issues | Where-Object {
+        $labelNames = @($_.labels | ForEach-Object { $_.name })
+        -not ($labelNames -contains $ActiveLabel)
+    }
+
+    if (-not $eligible) {
+        return $null
+    }
+
+    return $eligible | Sort-Object createdAt | Select-Object -First 1
+}
+
+function Get-IssuePacket {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Repo,
+
+        [Parameter(Mandatory = $true)]
+        [int]$IssueNumber
+    )
+
+    return Invoke-GhJson -Arguments @(
+        "issue", "view", $IssueNumber.ToString(),
+        "--repo", $Repo,
+        "--json", "number,title,body,labels,comments,author,url,assignees,projectItems"
+    )
+}
+
+function Edit-IssueLabels {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Repo,
+
+        [Parameter(Mandatory = $true)]
+        [int]$IssueNumber,
+
+        [string[]]$AddLabels = @(),
+
+        [string[]]$RemoveLabels = @()
+    )
+
+    $args = @("issue", "edit", $IssueNumber.ToString(), "--repo", $Repo)
+
+    foreach ($label in $AddLabels) {
+        if (-not [string]::IsNullOrWhiteSpace($label)) {
+            $args += @("--add-label", $label)
+        }
+    }
+
+    foreach ($label in $RemoveLabels) {
+        if (-not [string]::IsNullOrWhiteSpace($label)) {
+            $args += @("--remove-label", $label)
+        }
+    }
+
+    & gh @args | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to edit labels for issue #$IssueNumber."
+    }
+}
+
+function Comment-OnIssue {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Repo,
+
+        [Parameter(Mandatory = $true)]
+        [int]$IssueNumber,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Body
+    )
+
+    & gh issue comment $IssueNumber --repo $Repo --body $Body | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to comment on issue #$IssueNumber."
+    }
+}
+
+function Invoke-CodexIssueRun {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$CodexPath,
+
+        [Parameter(Mandatory = $true)]
+        [string]$RepoRootValue,
+
+        [Parameter(Mandatory = $true)]
+        [string]$StateRoot,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Repo,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Worker,
+
+        [Parameter(Mandatory = $true)]
+        [int]$IssueNumber,
+
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$IssuePacket
+    )
+
+    $issueRunRoot = Ensure-Directory -Path (Join-Path $StateRoot "runs\$IssueNumber")
+    $attempt = (Get-IssueAttemptCount -StateRoot $StateRoot -IssueNumber $IssueNumber) + 1
+    Set-IssueAttemptCount -StateRoot $StateRoot -IssueNumber $IssueNumber -Attempts $attempt
+
+    $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+    $runDir = Ensure-Directory -Path (Join-Path $issueRunRoot "$timestamp-attempt-$attempt")
+    $packetPath = Join-Path $runDir "issue-packet.json"
+    $promptPath = Join-Path $runDir "prompt.md"
+    $stdoutPath = Join-Path $runDir "codex-stdout.log"
+    $stderrPath = Join-Path $runDir "codex-stderr.log"
+    $resultPath = Join-Path $runDir "codex-result.json"
+    $schemaPath = Join-Path $RepoRootValue "ops\codex-queue\issue-output-schema.json"
+    $instructionsPath = Join-Path $RepoRootValue "ops\codex-queue\worker-instructions.md"
+
+    $IssuePacket | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $packetPath
+
+    $instructions = Get-Content -LiteralPath $instructionsPath -Raw
+    $prompt = @"
+$instructions
+
+Repository:
+- slug: $Repo
+- local_path: $RepoRootValue
+- worker_name: $Worker
+
+Target issue:
+- number: $IssueNumber
+- packet_path: $packetPath
+
+Execution requirements:
+- Read the issue packet before acting.
+- Handle exactly this one issue.
+- Use GitHub CLI if you need to inspect PRs or issues.
+- Use git locally for branch/commit work.
+- Do not wait for a human if the issue can be advanced.
+- Return JSON that matches the schema file at: $schemaPath
+"@
+
+    $prompt | Set-Content -LiteralPath $promptPath
+
+    $args = @(
+        "exec",
+        "--cd", $RepoRootValue,
+        "--add-dir", $runDir,
+        "--dangerously-bypass-approvals-and-sandbox",
+        "--output-schema", $schemaPath,
+        "--output-last-message", $resultPath,
+        "-"
+    )
+
+    Get-Content -LiteralPath $promptPath -Raw |
+        & $CodexPath @args 1> $stdoutPath 2> $stderrPath
+    $exitCode = $LASTEXITCODE
+
+    $resultObject = $null
+    if (Test-Path -LiteralPath $resultPath) {
+        try {
+            $resultObject = Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json
+        }
+        catch {
+            $resultObject = $null
+        }
+    }
+
+    return @{
+        Attempt = $attempt
+        ExitCode = $exitCode
+        RunDirectory = $runDir
+        Result = $resultObject
+        StdoutPath = $stdoutPath
+        StderrPath = $stderrPath
+        ResultPath = $resultPath
+    }
+}
+
+function Format-WorkerComment {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Worker,
+
+        [Parameter(Mandatory = $true)]
+        [int]$Attempt,
+
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$Result
+    )
+
+    $validationLines = @()
+    foreach ($line in $Result.validation) {
+        $validationLines += "- $line"
+    }
+
+    if (-not $validationLines) {
+        $validationLines = @("- No validation details were reported.")
+    }
+
+    $prLine = if ($Result.pr_url) { "- PR: $($Result.pr_url)" } else { "- PR: none" }
+    $branchLine = if ($Result.branch) { "- Branch: $($Result.branch)" } else { "- Branch: none" }
+    $commitLine = if ($Result.commit) { "- Commit: $($Result.commit)" } else { "- Commit: none" }
+
+    return @"
+Autonomous worker update from `$Worker`:
+
+- Attempt: $Attempt
+- Status: $($Result.status)
+$branchLine
+$commitLine
+$prLine
+
+Summary:
+$($Result.summary)
+
+Validation:
+$($validationLines -join [Environment]::NewLine)
+
+Worker note:
+$($Result.issue_comment)
+"@
+}
+
+function Apply-ResultToIssue {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Repo,
+
+        [Parameter(Mandatory = $true)]
+        [string]$StateRoot,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Worker,
+
+        [Parameter(Mandatory = $true)]
+        [int]$IssueNumber,
+
+        [Parameter(Mandatory = $true)]
+        [hashtable]$InvocationResult
+    )
+
+    $attempt = $InvocationResult.Attempt
+    $result = $InvocationResult.Result
+    $exitCode = $InvocationResult.ExitCode
+
+    if ($exitCode -ne 0 -or -not $result) {
+        if ($attempt -ge $MaxAttemptsPerIssue) {
+            Edit-IssueLabels -Repo $Repo -IssueNumber $IssueNumber -AddLabels @($BlockedLabel) -RemoveLabels @($ActiveLabel, $QueueLabel)
+            Comment-OnIssue -Repo $Repo -IssueNumber $IssueNumber -Body @"
+Autonomous worker `$Worker` could not complete issue #$IssueNumber after $attempt attempts.
+
+- Codex exit code: $exitCode
+- Last run directory: $($InvocationResult.RunDirectory)
+
+The issue has been moved out of the queue and marked blocked for human review.
+"@
+            return "blocked"
+        }
+
+        Edit-IssueLabels -Repo $Repo -IssueNumber $IssueNumber -RemoveLabels @($ActiveLabel)
+        Comment-OnIssue -Repo $Repo -IssueNumber $IssueNumber -Body @"
+Autonomous worker `$Worker` failed attempt $attempt on issue #$IssueNumber.
+
+- Codex exit code: $exitCode
+- Last run directory: $($InvocationResult.RunDirectory)
+
+The issue remains queued and will be retried automatically.
+"@
+        return "retry"
+    }
+
+    $comment = Format-WorkerComment -Worker $Worker -Attempt $attempt -Result $result
+    Comment-OnIssue -Repo $Repo -IssueNumber $IssueNumber -Body $comment
+
+    switch ($result.status) {
+        "completed" {
+            Edit-IssueLabels -Repo $Repo -IssueNumber $IssueNumber -AddLabels @($CompleteLabel) -RemoveLabels @($QueueLabel, $ActiveLabel, $BlockedLabel)
+            Clear-IssueAttemptCount -StateRoot $StateRoot -IssueNumber $IssueNumber
+            return "completed"
+        }
+        "blocked" {
+            Edit-IssueLabels -Repo $Repo -IssueNumber $IssueNumber -AddLabels @($BlockedLabel) -RemoveLabels @($QueueLabel, $ActiveLabel)
+            return "blocked"
+        }
+        "needs_human" {
+            Edit-IssueLabels -Repo $Repo -IssueNumber $IssueNumber -AddLabels @($BlockedLabel) -RemoveLabels @($QueueLabel, $ActiveLabel)
+            return "needs_human"
+        }
+        default {
+            if ($attempt -ge $MaxAttemptsPerIssue) {
+                Edit-IssueLabels -Repo $Repo -IssueNumber $IssueNumber -AddLabels @($BlockedLabel) -RemoveLabels @($QueueLabel, $ActiveLabel)
+                return "blocked"
+            }
+
+            Edit-IssueLabels -Repo $Repo -IssueNumber $IssueNumber -RemoveLabels @($ActiveLabel)
+            return "retry"
+        }
+    }
+}
+
+function Acquire-Lock {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$StateRoot
+    )
+
+    $lockPath = Join-Path $StateRoot "worker.lock"
+
+    if (Test-Path -LiteralPath $lockPath) {
+        $existing = Get-Content -LiteralPath $lockPath -Raw | ConvertFrom-Json
+        $pidValue = [int]$existing.pid
+        if (Get-Process -Id $pidValue -ErrorAction SilentlyContinue) {
+            Write-Log "Another queue worker process is already active (PID $pidValue). Exiting."
+            return $null
+        }
+    }
+
+    $payload = @{
+        pid = $PID
+        created_at = (Get-Date).ToString("o")
+        repo = $RepoSlug
+    }
+    $payload | ConvertTo-Json | Set-Content -LiteralPath $lockPath
+    return $lockPath
+}
+
+function Release-Lock {
+    param(
+        [string]$LockPath
+    )
+
+    if ($LockPath -and (Test-Path -LiteralPath $LockPath)) {
+        Remove-Item -LiteralPath $LockPath -Force
+    }
+}
+
+Add-ToolPath
+
+$stateRoot = Get-StateRoot -RepoSlugValue $RepoSlug
+$script:WorkerLogPath = Join-Path $stateRoot "worker.log"
+$lockPath = Acquire-Lock -StateRoot $stateRoot
+if (-not $lockPath) {
+    exit 0
+}
+
+try {
+    Ensure-QueueLabels -Repo $RepoSlug
+    $codexPath = Ensure-LocalCodexBinary -StateRoot $stateRoot
+    Write-Log "Using local Codex binary at $codexPath"
+
+    $processedCount = 0
+    while ($processedCount -lt $MaxIssuesPerRun) {
+        $nextIssue = Get-NextQueuedIssue -Repo $RepoSlug
+        if (-not $nextIssue) {
+            Write-Log "Queue is empty."
+            break
+        }
+
+        $issueNumber = [int]$nextIssue.number
+        Write-Log "Claiming issue #$issueNumber - $($nextIssue.title)"
+
+        Edit-IssueLabels -Repo $RepoSlug -IssueNumber $issueNumber -AddLabels @($ActiveLabel) -RemoveLabels @($BlockedLabel, $CompleteLabel)
+        Comment-OnIssue -Repo $RepoSlug -IssueNumber $issueNumber -Body "Autonomous worker `$WorkerName` claimed this issue and is starting work now."
+
+        $packet = Get-IssuePacket -Repo $RepoSlug -IssueNumber $issueNumber
+        $invocation = Invoke-CodexIssueRun -CodexPath $codexPath -RepoRootValue $RepoRoot -StateRoot $stateRoot -Repo $RepoSlug -Worker $WorkerName -IssueNumber $issueNumber -IssuePacket $packet
+        $outcome = Apply-ResultToIssue -Repo $RepoSlug -StateRoot $stateRoot -Worker $WorkerName -IssueNumber $issueNumber -InvocationResult $invocation
+
+        Write-Log "Issue #$issueNumber finished with queue outcome '$outcome'."
+        $processedCount += 1
+    }
+
+    Write-Log "Processed $processedCount issue(s) this run."
+}
+finally {
+    Release-Lock -LockPath $lockPath
+}
