@@ -93,8 +93,10 @@ jobs:
           fi
 
           echo "::add-mask::$RDP_ALLOWED_CIDRS"
-          echo "rdp_allowed_cidrs=$RDP_ALLOWED_CIDRS" >> "$GITHUB_OUTPUT"
-          echo "enable_rdp_rule=$ENABLE_RDP_RULE" >> "$GITHUB_OUTPUT"
+
+          printf '{\n  "enable_rdp_rule": %s,\n  "rdp_allowed_cidrs": %s\n}\n' \
+            "$ENABLE_RDP_RULE" \
+            "$RDP_ALLOWED_CIDRS" > runtime.auto.tfvars.json
 
       - name: OpenTofu init
         run: |
@@ -111,15 +113,6 @@ jobs:
 
       - name: OpenTofu validate
         run: tofu validate -no-color
-
-      - name: Write runtime tfvars
-        env:
-          ENABLE_RDP_RULE: ${{ steps.secrets.outputs.enable_rdp_rule }}
-          RDP_ALLOWED_CIDRS: ${{ steps.secrets.outputs.rdp_allowed_cidrs }}
-        run: |
-          printf '{\n  "enable_rdp_rule": %s,\n  "rdp_allowed_cidrs": %s\n}\n' \
-            "$ENABLE_RDP_RULE" \
-            "$RDP_ALLOWED_CIDRS" > runtime.auto.tfvars.json
 
       - name: OpenTofu plan
         env:
