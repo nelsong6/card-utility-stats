@@ -1242,25 +1242,48 @@ public static class RunTracker
 
     private static string? ResolveOwnedSourceInstanceIdLocked(AbstractModel source, Player? targetPlayer)
     {
+        return TryResolveOwnedSourceAttributionLocked(
+            source,
+            targetPlayer,
+            out var sourceInstanceId,
+            out _)
+            ? sourceInstanceId
+            : null;
+    }
+
+    private static bool TryResolveOwnedSourceAttributionLocked(
+        AbstractModel? source,
+        Player? targetPlayer,
+        out string? sourceInstanceId,
+        out Player? sourceOwnerPlayer)
+    {
+        sourceInstanceId = null;
+        sourceOwnerPlayer = null;
+        if (source == null) return false;
+
         if (source is CardModel sourceCard)
         {
             if (targetPlayer != null && sourceCard.Owner != null
                 && !ReferenceEquals(sourceCard.Owner, targetPlayer))
-                return null;
+                return false;
 
-            return GetOrAssignInstanceId(sourceCard);
+            sourceInstanceId = GetOrAssignInstanceId(sourceCard);
+            sourceOwnerPlayer = sourceCard.Owner;
+            return true;
         }
 
         if (TryResolvePlayerPowerOwnershipLocked(source, out var ownership) && ownership != null)
         {
             if (targetPlayer != null && ownership.OwnerPlayer != null
                 && !ReferenceEquals(ownership.OwnerPlayer, targetPlayer))
-                return null;
+                return false;
 
-            return ownership.CardInstanceId;
+            sourceInstanceId = ownership.CardInstanceId;
+            sourceOwnerPlayer = ownership.OwnerPlayer;
+            return true;
         }
 
-        return null;
+        return false;
     }
 
     /// <summary>
@@ -2572,8 +2595,9 @@ public static class RunTracker
 
             try
             {
-                var causingPlay = FindCurrentlyResolvingCardPlay();
-                if (causingPlay?.Card == null)
+                var target = TryResolvePowerReceivedTarget(entry) ?? SafeGetPowerOwner(entry.Power);
+                if (!TryResolvePowerReceivedSourceLocked(entry, target, out var sourceInstanceId, out var sourceOwnerPlayer)
+                    || sourceInstanceId == null)
                 {
                     CoreMain.LogDebug(
                         $"PowerReceivedEntry unattributed power={entry.Power.Id} amount={entry.Amount} " +
@@ -2581,20 +2605,18 @@ public static class RunTracker
                     return;
                 }
 
-                var instanceId = GetOrAssignInstanceId(causingPlay.Card);
-                var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
+                var agg = GetOrCreateAggregate(_pendingCombat, sourceInstanceId);
                 var effect = GetOrCreateAppliedEffect(agg, entry.Power);
                 effect.TimesApplied++;
                 effect.TotalAmountApplied += entry.Amount;
 
-                var target = TryResolvePowerReceivedTarget(entry);
                 if (target?.IsPlayer == true && entry.Amount > 0m)
-                    TrackPlayerPowerOwnershipLocked(entry.Power, instanceId, effect, causingPlay.Card.Owner);
+                    TrackPlayerPowerOwnershipLocked(entry.Power, sourceInstanceId, effect, sourceOwnerPlayer);
 
                 if (entry.Amount > 0m && IsPoisonPower(entry.Power))
                 {
                     if (target != null && !target.IsPlayer)
-                        AddPoisonOwnershipLocked(target, instanceId, entry.Power, entry.Amount);
+                        AddPoisonOwnershipLocked(target, sourceInstanceId, entry.Power, entry.Amount);
                 }
             }
             catch (Exception e)
@@ -2602,6 +2624,67 @@ public static class RunTracker
                 CoreMain.LogDebug($"RecordPowerReceived failed: {e.Message}");
             }
         }
+    }
+
+    private static bool TryResolvePowerReceivedSourceLocked(
+        PowerReceivedEntry entry,
+        Creature? target,
+        out string? sourceInstanceId,
+        out Player? sourceOwnerPlayer)
+    {
+        sourceInstanceId = null;
+        sourceOwnerPlayer = null;
+
+        var targetPlayer = target?.IsPlayer == true ? target.Player : null;
+        var attempt = target != null
+            ? TakePendingPowerChangeAttemptLocked(entry.Power, target, entry.Applier, entry.Amount)
+            : null;
+
+        if (attempt?.CardSource != null
+            && TryResolveOwnedSourceAttributionLocked(
+                attempt.CardSource,
+                targetPlayer,
+                out sourceInstanceId,
+                out sourceOwnerPlayer))
+        {
+            return true;
+        }
+
+        if (TryResolveOwnedSourceAttributionLocked(
+            _executionSourceFrame.Value?.Source,
+            targetPlayer,
+            out sourceInstanceId,
+            out sourceOwnerPlayer))
+        {
+            return true;
+        }
+
+        var causingPlay = FindCurrentlyResolvingCardPlay();
+        if (causingPlay?.Card != null
+            && TryResolveOwnedSourceAttributionLocked(
+                causingPlay.Card,
+                targetPlayer,
+                out sourceInstanceId,
+                out sourceOwnerPlayer))
+        {
+            return true;
+        }
+
+        if (_recentCompletedPlayerCardPlay?.Card != null)
+        {
+            int historyCount = CombatManager.Instance?.History?.Entries?.Count() ?? 0;
+            if (historyCount == _recentCompletedPlayerCardPlayHistoryCount
+                && TryResolveOwnedSourceAttributionLocked(
+                    Canonical(_recentCompletedPlayerCardPlay.Card),
+                    targetPlayer,
+                    out sourceInstanceId,
+                    out sourceOwnerPlayer))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool TryRecordPoisonTickDamage(DamageReceivedEntry entry)
@@ -3237,6 +3320,18 @@ public static class RunTracker
             return true;
 
         return string.Equals(GetPowerDisplayName(power), "Poison", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static Creature? SafeGetPowerOwner(PowerModel power)
+    {
+        try
+        {
+            return power.Owner;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static Creature? TryResolvePowerReceivedTarget(PowerReceivedEntry entry)
