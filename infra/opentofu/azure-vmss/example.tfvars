@@ -9,9 +9,9 @@ enable_vmss        = false
 builder_vm_sku     = "Standard_D4s_v5"
 create_nat_gateway = false
 
-# The GitHub Actions workflow can inject TF_VAR_enable_rdp_rule and
-# TF_VAR_rdp_allowed_cidrs from the Key Vault secret
-# `card-utility-stats-rdp-allowed-cidrs`, so this file does not need to
+# If `rdp_allowed_cidrs` is left empty, the root will read
+# `card-utility-stats-rdp-allowed-cidrs` from the configured Key Vault via
+# the `azurerm_key_vault_secret` data source, so this file does not need to
 # hardcode a personal public IP.
 
 # Phase 1+: flip enable_vmss to true and point this at the captured worker image.

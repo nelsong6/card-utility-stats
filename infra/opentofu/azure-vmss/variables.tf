@@ -103,9 +103,27 @@ variable "admin_username" {
 }
 
 variable "admin_password" {
-  description = "Local administrator password for Windows VM instances. Supply via TF_VAR_admin_password in CI."
+  description = "Optional local administrator password override. If null, the root reads the password from Key Vault."
   type        = string
+  default     = null
   sensitive   = true
+}
+
+variable "key_vault_name" {
+  description = "Shared Key Vault name used for Terraform data-source secret reads."
+  type        = string
+}
+
+variable "key_vault_resource_group_name" {
+  description = "Resource group containing the shared Key Vault."
+  type        = string
+  default     = "infra"
+}
+
+variable "admin_password_secret_name" {
+  description = "Key Vault secret name containing the local admin password."
+  type        = string
+  default     = "card-utility-stats-vm-admin-password"
 }
 
 variable "enable_vmss" {
@@ -270,15 +288,21 @@ variable "vtpm_enabled" {
 }
 
 variable "enable_rdp_rule" {
-  description = "Add an NSG rule allowing inbound RDP from rdp_allowed_cidrs."
+  description = "Add an NSG rule allowing inbound RDP from the effective CIDR list."
   type        = bool
   default     = false
 }
 
 variable "rdp_allowed_cidrs" {
-  description = "CIDRs allowed to reach RDP when enable_rdp_rule is true."
+  description = "Explicit CIDRs allowed to reach RDP. When empty, the root may load the CIDRs from Key Vault."
   type        = list(string)
   default     = []
+}
+
+variable "rdp_allowed_cidrs_secret_name" {
+  description = "Optional Key Vault secret name containing a JSON array of RDP allowlist CIDRs."
+  type        = string
+  default     = "card-utility-stats-rdp-allowed-cidrs"
 }
 
 variable "tags" {

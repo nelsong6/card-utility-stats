@@ -56,8 +56,8 @@ That workflow:
 - logs into Azure with OIDC
 - uses repository variables `ARM_CLIENT_ID`, `ARM_TENANT_ID`, `ARM_SUBSCRIPTION_ID`
 - uses repository variable `KEY_VAULT_NAME`
-- fetches the VM admin password from Azure Key Vault at runtime
-- optionally fetches `card-utility-stats-rdp-allowed-cidrs` from Azure Key Vault and maps it to `TF_VAR_enable_rdp_rule` / `TF_VAR_rdp_allowed_cidrs`
+- passes `KEY_VAULT_NAME` into Terraform as `TF_VAR_key_vault_name`
+- lets the root read the VM admin password and optional RDP CIDR allowlist from Azure Key Vault through `azurerm` data sources
 - initializes the `azurerm` backend
 - runs `tofu fmt -check`
 - runs `tofu validate`
@@ -131,4 +131,4 @@ The workflow injects the backend values at runtime so that:
 
 - This root creates the compute/network shell, not the full worker bootstrap inside the guest.
 - Runner registration, Codex auth, Steam offline state, and STS2 driver setup still belong in the golden image and/or first-boot bootstrap layer described in [docs/vmss-worker-bootstrap.md](../../../docs/vmss-worker-bootstrap.md).
-- The builder VM shares the same subnet and NSG as the VMSS. If you need RDP through GitHub Actions, store trusted CIDRs in the Key Vault secret `card-utility-stats-rdp-allowed-cidrs`. Local runs can still set `enable_rdp_rule` and `rdp_allowed_cidrs` directly.
+- The builder VM shares the same subnet and NSG as the VMSS. If you need RDP through GitHub Actions, store trusted CIDRs in the Key Vault secret `card-utility-stats-rdp-allowed-cidrs` and let Terraform read them through the `azurerm_key_vault_secret` data source. Local runs can still set `enable_rdp_rule` and `rdp_allowed_cidrs` directly.

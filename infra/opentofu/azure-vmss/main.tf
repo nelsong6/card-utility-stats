@@ -11,6 +11,11 @@ locals {
   builder_nic_name       = coalesce(var.builder_nic_name, "nic-${var.name_prefix}-builder")
   builder_public_ip_name = coalesce(var.builder_public_ip_name, "pip-${var.name_prefix}-builder")
   builder_computer_name  = coalesce(var.builder_computer_name, substr(replace(local.builder_vm_name, "-", ""), 0, 15))
+  effective_admin_password = var.admin_password != null ? var.admin_password : data.azurerm_key_vault_secret.admin_password[0].value
+  effective_rdp_allowed_cidrs = length(var.rdp_allowed_cidrs) > 0 ? var.rdp_allowed_cidrs : (
+    var.rdp_allowed_cidrs_secret_name == null ? [] : tolist(jsondecode(nonsensitive(data.azurerm_key_vault_secret.rdp_allowed_cidrs[0].value)))
+  )
+  effective_enable_rdp_rule = var.enable_rdp_rule || length(local.effective_rdp_allowed_cidrs) > 0
 
   tags = merge(
     {
@@ -34,6 +39,25 @@ locals {
       "role" = "builder-vm"
     }
   )
+}
+
+data "azurerm_key_vault" "shared" {
+  name                = var.key_vault_name
+  resource_group_name = var.key_vault_resource_group_name
+}
+
+data "azurerm_key_vault_secret" "admin_password" {
+  count = var.admin_password == null ? 1 : 0
+
+  name         = var.admin_password_secret_name
+  key_vault_id = data.azurerm_key_vault.shared.id
+}
+
+data "azurerm_key_vault_secret" "rdp_allowed_cidrs" {
+  count = length(var.rdp_allowed_cidrs) == 0 && var.rdp_allowed_cidrs_secret_name != null ? 1 : 0
+
+  name         = var.rdp_allowed_cidrs_secret_name
+  key_vault_id = data.azurerm_key_vault.shared.id
 }
 
 resource "azurerm_resource_group" "vmss" {
@@ -66,7 +90,7 @@ resource "azurerm_network_security_group" "vmss" {
 }
 
 resource "azurerm_network_security_rule" "rdp" {
-  count = var.enable_rdp_rule && length(var.rdp_allowed_cidrs) > 0 ? 1 : 0
+  count = local.effective_enable_rdp_rule && length(local.effective_rdp_allowed_cidrs) > 0 ? 1 : 0
 
   name                        = "allow-rdp"
   priority                    = 1000
@@ -75,7 +99,7 @@ resource "azurerm_network_security_rule" "rdp" {
   protocol                    = "Tcp"
   source_port_range           = "*"
   destination_port_range      = "3389"
-  source_address_prefixes     = var.rdp_allowed_cidrs
+  source_address_prefixes     = local.effective_rdp_allowed_cidrs
   destination_address_prefix  = "*"
   resource_group_name         = azurerm_resource_group.vmss.name
   network_security_group_name = azurerm_network_security_group.vmss.name
@@ -134,7 +158,7 @@ resource "azurerm_windows_virtual_machine_scale_set" "vmss" {
   instances           = var.instance_count
 
   admin_username       = var.admin_username
-  admin_password       = var.admin_password
+  admin_password       = local.effective_admin_password
   computer_name_prefix = local.computer_name_prefix
 
   encryption_at_host_enabled = var.encryption_at_host_enabled
@@ -224,7 +248,7 @@ resource "azurerm_windows_virtual_machine" "builder" {
   size                = var.builder_vm_sku
 
   admin_username = var.admin_username
-  admin_password = var.admin_password
+  admin_password = local.effective_admin_password
 
   computer_name         = local.builder_computer_name
   network_interface_ids = [azurerm_network_interface.builder[0].id]

@@ -50,6 +50,7 @@ jobs:
       ARM_USE_AZUREAD: true
       ARM_USE_OIDC: true
       TF_IN_AUTOMATION: true
+      TF_VAR_key_vault_name: ${{ vars.KEY_VAULT_NAME }}
       DEFAULT_TFVARS_FILE: infra/opentofu/azure-vmss/example.tfvars
       DEFAULT_STATE_KEY: card-utility-stats/azure-vmss.tfstate
 
@@ -70,34 +71,6 @@ jobs:
           tofu_version: 1.10.5
           tofu_wrapper: false
 
-      - name: Fetch VM admin password from Key Vault
-        id: secrets
-        run: |
-          VM_ADMIN_PASSWORD=$(az keyvault secret show \
-            --vault-name "${{ vars.KEY_VAULT_NAME }}" \
-            --name "card-utility-stats-vm-admin-password" \
-            --query value -o tsv)
-          echo "::add-mask::$VM_ADMIN_PASSWORD"
-          echo "vm_admin_password=$VM_ADMIN_PASSWORD" >> "$GITHUB_OUTPUT"
-
-          RDP_ALLOWED_CIDRS=$(az keyvault secret show \
-            --vault-name "${{ vars.KEY_VAULT_NAME }}" \
-            --name "card-utility-stats-rdp-allowed-cidrs" \
-            --query value -o tsv 2>/dev/null || true)
-
-          if [[ -z "$RDP_ALLOWED_CIDRS" ]]; then
-            RDP_ALLOWED_CIDRS="[]"
-            ENABLE_RDP_RULE="false"
-          else
-            ENABLE_RDP_RULE="true"
-          fi
-
-          echo "::add-mask::$RDP_ALLOWED_CIDRS"
-
-          printf '{\n  "enable_rdp_rule": %s,\n  "rdp_allowed_cidrs": %s\n}\n' \
-            "$ENABLE_RDP_RULE" \
-            "$RDP_ALLOWED_CIDRS" > runtime.auto.tfvars.json
-
       - name: OpenTofu init
         run: |
           tofu init -input=false \
@@ -117,7 +90,6 @@ jobs:
       - name: OpenTofu plan
         env:
           TFVARS_FILE: ${{ github.event.inputs.tfvars_file || 'infra/opentofu/azure-vmss/example.tfvars' }}
-          TF_VAR_admin_password: ${{ steps.secrets.outputs.vm_admin_password }}
         run: |
           set -euo pipefail
 
@@ -178,6 +150,4 @@ jobs:
 
       - name: OpenTofu apply
         if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.apply) }}
-        env:
-          TF_VAR_admin_password: ${{ steps.secrets.outputs.vm_admin_password }}
         run: tofu apply -input=false -auto-approve tfplan
