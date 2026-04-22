@@ -24,7 +24,7 @@ jobs:
     runs-on:
       - self-hosted
       - windows
-      - sts2-live
+      - codex-queue
 
     steps:
       - name: Checkout repository
@@ -37,5 +37,4 @@ jobs:
         run: |
           ./ops/codex-queue/Run-IssueQueueWorker.ps1 `
             -RepoRoot $env:GITHUB_WORKSPACE `
-            -WorkerName 'sts2-side-a' `
             -DashboardEventUrl '${{ vars.CODEX_QUEUE_PUSH_EVENT_URL }}'

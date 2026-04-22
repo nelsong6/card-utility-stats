@@ -1,29 +1,36 @@
 # Live Worker Pipeline
 
-Issue [#51](https://github.com/nelsong6/card-utility-stats/issues/51) proposes a control-plane / worker-pool split:
+Issue [#51](https://github.com/nelsong6/card-utility-stats/issues/51) started as a control-plane / worker-pool split:
 
 - the main work machine edits code, dispatches runs, and reviews artifacts
-- dedicated Windows side machines run Slay the Spire 2 and execute live scenarios
+- dedicated Windows workers run Slay the Spire 2 and execute live scenarios
 
-This document is the first milestone implementation plan for that setup using GitHub Actions self-hosted runners.
+The deployment target is now Azure VM Scale Sets (VMSS) rather than named physical side laptops. This document describes the first VMSS-backed milestone using GitHub Actions self-hosted runners.
 
 ## Current Rollout Phase
 
-The target design is still a small worker pool, but the current rollout should start with one side machine first.
+The target design is:
 
-Current shape:
+- a scalable Windows VMSS for live STS2 execution
+- a singleton queue host for autonomous Codex issue draining
+- repo-owned scenario manifests, artifact contracts, and runner-side harness scripts
 
-- one Windows self-hosted worker machine
-- that machine is labeled both `sts2-live` and `sts2-side-a`
-- the workflow still targets the shared `sts2-live` label so a second worker can be added later without changing the workflow contract
+The current first step should stay conservative:
+
+- prove the workflow on one manually configured Windows VM first
+- capture that VM as the golden image
+- create a VMSS at capacity `1`
+- register the first instance as both `sts2-live` and `codex-queue`
+- keep that combined role only while capacity is `1`
+- split queue and live roles before scaling live execution beyond one instance
 
 ## Current First Milestone
 
 The repo now includes:
 
-- a manual GitHub Actions workflow at [.github/workflows/live-sts2-manual.yml](D:/repos/card-utility-stats/.github/workflows/live-sts2-manual.yml:1)
-- a runner-side harness at [scripts/ci/run-live-scenario.ps1](D:/repos/card-utility-stats/scripts/ci/run-live-scenario.ps1:1)
-- checked-in scenario manifests under [LiveScenarios](D:/repos/card-utility-stats/LiveScenarios/README.md:1)
+- a manual GitHub Actions workflow at [.github/workflows/live-sts2-manual.yml](../.github/workflows/live-sts2-manual.yml)
+- a runner-side harness at [scripts/ci/run-live-scenario.ps1](../scripts/ci/run-live-scenario.ps1)
+- checked-in scenario manifests under [LiveScenarios](../LiveScenarios/README.md)
 
 The first pass is intentionally conservative:
 
@@ -34,57 +41,64 @@ The first pass is intentionally conservative:
 - hand off to a worker-local live-driver script
 - upload artifacts back to GitHub Actions
 
-The workflow does not try to solve worker reset, Steam login recovery, or MCP/game automation orchestration centrally yet. Those remain worker-local concerns until the live path is stable.
+The workflow does not try to solve VM reimage policy, Steam recovery, or MCP/game automation orchestration centrally yet. Those remain worker-local concerns until the live path is stable.
 
-## Worker Model
+## Recommended Pool Shape
 
-Register the first side machine as a self-hosted GitHub Actions runner for this repo.
+Phase 1 combined host:
 
-When a second machine exists later, reuse the same shared label strategy.
+- one Windows VM or VMSS instance
+- labels: `self-hosted`, `windows`, `sts2-live`, `codex-queue`
+- runs both the manual live workflow and the autonomous issue queue
 
-Recommended shared labels:
+Phase 2 split roles:
 
-- `self-hosted`
-- `windows`
-- `sts2-live`
+- live execution pool: VMSS instances labeled `self-hosted`, `windows`, `sts2-live`
+- queue host: one dedicated VM or capacity-1 VMSS instance labeled `self-hosted`, `windows`, `codex-queue`
+- optional canary label for experiments such as `sts2-live-canary`
 
-Recommended unique label for the first machine:
+Why split the roles before scaling?
 
-- `sts2-side-a`
+- the live workflow is safe to scale horizontally because GitHub Actions selects one runner per job
+- the queue worker is not yet safe to scale horizontally because its lock is local to one machine; see [docs/codex-issue-queue.md](./codex-issue-queue.md)
 
-Use the shared label for normal queueing. Keep the unique labels available for debugging or machine-specific dispatch later.
+## VMSS Worker Model
 
-## Required Worker Software
+Each VMSS instance should boot from an image that already contains:
 
-Each side machine should have:
+- Steam installed and ready to launch Slay the Spire 2 in offline mode
+- Slay the Spire 2 installed locally and launched at least once
+- GitHub Actions runner bits or a first-boot runner registration bootstrap
+- PowerShell 7
+- GitHub CLI
+- Git
+- .NET 9 SDK available locally, or allow `actions/setup-dotnet` to acquire it per run
+- the worker-local STS2 scenario driver plus any MCP/window automation dependencies it needs
 
-- Steam installed and able to launch Slay the Spire 2 without interactive repair prompts
-- Slay the Spire 2 installed locally
-- GitHub Actions runner service installed and running
-- PowerShell 7 available for workflow steps
-- .NET 9 SDK available, or allow `actions/setup-dotnet` to acquire it per run
-- whatever local MCP bridge / window automation tooling will eventually drive STS2
+If an instance also carries the `codex-queue` role, it additionally needs working Codex CLI access and GitHub CLI auth for unattended issue/PR operations.
 
-Recommended but not enforced yet:
+Runner identity should come from the VMSS instance itself:
 
-- disable sleep while the runner service is active
-- use a dedicated Windows user profile for the runner
-- keep Steam in a stable logged-in state
-- keep game resolution and display arrangement fixed so screenshot comparisons remain meaningful
+- default worker identity: runner name or hostname
+- optional override: `CARD_UTILITY_STATS_WORKER_NAME`
+- avoid hard-coded laptop-style names in workflow configuration
 
 ## Required Worker Environment Variables
 
-Set these on each side machine before expecting live scenario execution to succeed:
+Set these on the worker image or during first-boot bootstrap before expecting live scenario execution to succeed:
 
 - `CARD_UTILITY_STATS_STS2_PATH`
   - Absolute path to the local Slay the Spire 2 install.
   - Example: `D:\SteamLibrary\steamapps\common\Slay the Spire 2`
 - `CARD_UTILITY_STATS_LIVE_DRIVER`
-  - Absolute path to the worker-local PowerShell script that actually launches the game, drives the scenario, and captures screenshots/logs.
+  - Absolute path to the worker-local PowerShell script that launches the game, drives the scenario, and captures screenshots/logs.
   - Example: `D:\automation\card-utility-stats\Invoke-Sts2Scenario.ps1`
 - `CARD_UTILITY_STATS_RUN_DATA_DIR`
   - Optional override for the directory containing run JSON output.
   - Default if omitted: `%APPDATA%\SlayTheSpire2\CardUtilityStats\runs`
+- `CARD_UTILITY_STATS_WORKER_NAME`
+  - Optional friendly worker name override for dashboards and queue comments.
+  - Default if omitted: the runner name or VM hostname
 
 The repo-owned workflow handles build/test/artifact staging. The worker-local driver handles game-specific automation.
 
@@ -169,14 +183,17 @@ Current fields:
 
 The `driver` object is the worker-local handoff payload. The repo documents the shape and expected semantics, but the first version does not require a single global scenario engine yet.
 
-## Next Steps
+## Rollout Order
 
-After the bootstrap pipeline is proven on the first side machine, the next likely improvements are:
+1. Prove one end-to-end live run on a hand-built Windows VM.
+2. Capture that VM as the golden image.
+3. Create a VMSS at capacity `1` and label the instance for both `sts2-live` and `codex-queue`.
+4. Validate the manual workflow with `execute_live_driver=false`, then with `execute_live_driver=true`.
+5. Enable the queue worker only after GitHub CLI auth and Codex auth are configured on the queue host.
+6. Split `codex-queue` away from `sts2-live` before scaling live execution above one instance.
+7. Add health checks, image refresh cadence, and autoscale rules after the single-instance path is stable.
 
-- add a real worker reset routine before each run
-- promote the worker-local driver contract into a repo-managed script package
-- standardize screenshot naming and metadata
-- add machine health checks
-- split quick validation runs from full live scenario runs
-- add a second `sts2-live` worker once the single-machine path is stable
-- optionally add a second workflow for queued branch validation against the shared `sts2-live` pool
+## Related Docs
+
+- [docs/codex-issue-queue.md](./codex-issue-queue.md)
+- [docs/vmss-worker-bootstrap.md](./vmss-worker-bootstrap.md)

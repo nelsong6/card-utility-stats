@@ -2,7 +2,7 @@
 param(
     [string]$RepoRoot = "D:\repos\card-utility-stats",
     [string]$TaskName = "Codex Issue Queue Worker",
-    [string]$WorkerName = "sts2-side-a",
+    [string]$WorkerName = "",
     [string]$DashboardEventUrl = "",
     [int]$IntervalMinutes = 30
 )
@@ -14,7 +14,10 @@ if (-not (Test-Path -LiteralPath $scriptPath)) {
     throw "Worker script not found at $scriptPath"
 }
 
-$arguments = "-NoLogo -NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`" -RepoRoot `"$RepoRoot`" -WorkerName `"$WorkerName`""
+$arguments = "-NoLogo -NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`" -RepoRoot `"$RepoRoot`""
+if (-not [string]::IsNullOrWhiteSpace($WorkerName)) {
+    $arguments += " -WorkerName `"$WorkerName`""
+}
 if (-not [string]::IsNullOrWhiteSpace($DashboardEventUrl)) {
     $arguments += " -DashboardEventUrl `"$DashboardEventUrl`""
 }

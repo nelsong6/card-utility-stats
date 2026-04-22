@@ -1,11 +1,11 @@
 # Codex Issue Queue
 
-This side machine is not just a one-off CI runner anymore. It is intended to become a persistent autonomous issue worker for `card-utility-stats`.
+The autonomous issue queue is intended to run on a dedicated queue host, not on every live STS2 worker. In Azure terms, that usually means one standalone VM or one VMSS instance/pool kept at capacity `1`.
 
 The key requirement is operational, not prompt-based:
 
-- the machine can stay on by itself
-- Codex can run headlessly on the machine
+- the queue host can stay on by itself
+- Codex can run headlessly on the queue host
 - issues are processed through an actual queue
 - the queue is drained one issue at a time until empty
 - progress does not depend on a human repeatedly telling Codex to continue
@@ -59,6 +59,26 @@ This directly addresses the failure mode where Codex says "I'll keep going throu
 - the queue worker is responsible for continuing to the next issue
 - the queue drain only stops when the queue is empty, the worker is blocked, or the machine/process fails
 
+## VMSS Deployment Note
+
+The current queue worker only prevents overlap on one machine by using a local lock file.
+
+That means:
+
+- it is safe against duplicate queue runs on the same host
+- it is not yet a distributed lease/claim system across multiple hosts
+
+Because of that, do not scale the queue role horizontally yet.
+
+Current recommendation:
+
+- give the queue host its own runner label: `codex-queue`
+- run the scheduled task only on that queue host
+- if one VM or VMSS instance is doing both queue and live work, keep capacity at `1`
+- split queue and live roles before scaling the `sts2-live` pool beyond one instance
+
+The live workflow can scale out earlier because GitHub Actions already handles runner selection for a single workflow job.
+
 ## Headless Codex
 
 The worker does not rely on the packaged WindowsApps alias for `codex.exe`, which is awkward to execute from unattended shells.
@@ -69,16 +89,16 @@ Instead, the bootstrap step copies the installed Codex CLI into a normal local p
 
 The intended steady state is hybrid:
 
-- GitHub issue events wake the queue worker immediately on the self-hosted runner
-- a Windows Scheduled Task still wakes the queue worker periodically as a recovery mechanism
+- GitHub issue events wake the queue worker immediately on a dedicated runner labeled `codex-queue`
+- a Windows Scheduled Task still wakes the queue worker periodically on that same queue host as a recovery mechanism
 - each invocation drains the queue until empty
 - if another invocation starts while one is already running, the lock file causes it to exit cleanly
 
-This gives the machine fast reaction time without making webhooks or event delivery the only correctness path.
+This gives the queue host fast reaction time without making event delivery the only correctness path.
 
 ## Dashboard Push Events
 
-The worker can optionally push signed lifecycle events to a remote dashboard backend so the dashboard changes status immediately when this side machine starts or finishes work.
+The worker can optionally push signed lifecycle events to a remote dashboard backend so the dashboard changes status immediately when the queue host starts or finishes work.
 
 Supported event transitions include:
 
@@ -91,9 +111,9 @@ Supported event transitions include:
 
 The worker signs each event with a short-lived HS256 JWT and posts it to the configured dashboard endpoint.
 
-### Worker-side setup
+### Queue-host setup
 
-1. Store the shared JWT secret on the side machine.
+1. Store the shared JWT secret on the queue host.
 2. Recommended secret name: `codex-queue-jwt-secret`
 3. The worker looks for the secret in either:
    - environment variable `CODEX_QUEUE_JWT_SECRET`
@@ -121,9 +141,10 @@ Example:
 ```powershell
 .\ops\codex-queue\Install-IssueQueueWorkerTask.ps1 `
   -RepoRoot 'D:\repos\card-utility-stats' `
-  -WorkerName 'sts2-side-a' `
   -DashboardEventUrl 'https://diagrams.romaine.life/ci/codex/push'
 ```
+
+If you want a friendlier worker name in comments and dashboard events, set `CARD_UTILITY_STATS_WORKER_NAME` on the queue host. Otherwise the script will use the runner name or VM hostname.
 
 ### Backend-side setup
 
@@ -140,6 +161,6 @@ The worker is repo-specific right now:
 
 - repo: `nelsong6/card-utility-stats`
 - local checkout: `D:\repos\card-utility-stats`
-- worker name: `sts2-side-a`
+- queue role label: `codex-queue`
 
-That is intentional. The first milestone is to make the pattern real and reliable on one side machine. If it works, the queue worker can later be generalized into a shared automation repo.
+That is intentional. The first milestone is to make the pattern real and reliable on one queue host. Once that is stable, the worker can later be generalized into a shared automation repo or upgraded to use a distributed claim/lease model.

@@ -2,7 +2,7 @@
 param(
     [string]$RepoRoot = "D:\repos\card-utility-stats",
     [string]$RepoSlug = "nelsong6/card-utility-stats",
-    [string]$WorkerName = "sts2-side-a",
+    [string]$WorkerName = "",
     [string]$QueueLabel = "codex-queue",
     [string]$ActiveLabel = "codex-active",
     [string]$BlockedLabel = "codex-blocked",
@@ -66,6 +66,22 @@ function Add-ToolPath {
             $env:PATH = "$path;$env:PATH"
         }
     }
+}
+
+function Get-DefaultWorkerName {
+    $candidates = @(
+        [Environment]::GetEnvironmentVariable("CARD_UTILITY_STATS_WORKER_NAME", "Process"),
+        [Environment]::GetEnvironmentVariable("CARD_UTILITY_STATS_WORKER_NAME", "User"),
+        [Environment]::GetEnvironmentVariable("CARD_UTILITY_STATS_WORKER_NAME", "Machine"),
+        $env:RUNNER_NAME,
+        $env:COMPUTERNAME
+    ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+
+    if ($candidates.Count -gt 0) {
+        return $candidates[0]
+    }
+
+    return "codex-queue-worker"
 }
 
 function Ensure-LocalCodexBinary {
@@ -714,6 +730,10 @@ function Release-Lock {
 }
 
 Add-ToolPath
+
+if ([string]::IsNullOrWhiteSpace($WorkerName)) {
+    $WorkerName = Get-DefaultWorkerName
+}
 
 $stateRoot = Get-StateRoot -RepoSlugValue $RepoSlug
 $script:QueueRunId = [guid]::NewGuid().ToString()

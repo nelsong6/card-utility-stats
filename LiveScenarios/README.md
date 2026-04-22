@@ -19,7 +19,7 @@ Each scenario file is JSON with:
 - `artifact_expectations`
 - `driver`
 
-The `driver` payload is intentionally flexible for the bootstrap phase. It gives us a checked-in, reviewable scenario contract without forcing a single automation engine before the side machines are live.
+The `driver` payload is intentionally flexible for the bootstrap phase. It gives us a checked-in, reviewable scenario contract without forcing a single automation engine before the VMSS-backed workers are live.
 
 ## Initial Scenarios
 
