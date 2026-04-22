@@ -4,10 +4,10 @@ location    = "West US 3"
 admin_username = "runneradmin"
 
 # Phase 0: create only the temporary builder VM.
-enable_builder_vm  = true
-enable_vmss        = false
-builder_vm_sku     = "Standard_D4s_v5"
-create_nat_gateway = false
+enable_builder_vm          = true
+enable_vmss                = false
+builder_vm_sku             = "Standard_D4s_v5"
+create_nat_gateway         = false
 encryption_at_host_enabled = false
 
 # If `rdp_allowed_cidrs` is left empty, the root will read
