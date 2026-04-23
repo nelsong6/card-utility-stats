@@ -168,10 +168,17 @@ function Get-GitHubRunner {
     }
 
     try {
-        $payload = & gh api "repos/$Repo/actions/runners" | ConvertFrom-Json
+        $payloadJson = & gh api "repos/$Repo/actions/runners" 2>$null
+        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($payloadJson)) {
+            $global:LASTEXITCODE = 0
+            return $null
+        }
+
+        $payload = $payloadJson | ConvertFrom-Json
         return $payload.runners | Where-Object { $_.name -eq $Name } | Select-Object -First 1
     }
     catch {
+        $global:LASTEXITCODE = 0
         return $null
     }
 }
@@ -315,3 +322,5 @@ $report | ConvertTo-Json -Depth 10
 if ($overall -eq "fail") {
     exit 1
 }
+
+exit 0
