@@ -593,9 +593,16 @@ Execution requirements:
         "-"
     )
 
-    Get-Content -LiteralPath $promptPath -Raw |
-        & $CodexPath @args 1> $stdoutPath 2> $stderrPath
-    $exitCode = $LASTEXITCODE
+    $process = Start-Process `
+        -FilePath $CodexPath `
+        -ArgumentList $args `
+        -RedirectStandardInput $promptPath `
+        -RedirectStandardOutput $stdoutPath `
+        -RedirectStandardError $stderrPath `
+        -NoNewWindow `
+        -Wait `
+        -PassThru
+    $exitCode = $process.ExitCode
 
     $resultObject = $null
     if (Test-Path -LiteralPath $resultPath) {
@@ -644,7 +651,7 @@ function Format-WorkerComment {
     $commitLine = if ($Result.commit) { "- Commit: $($Result.commit)" } else { "- Commit: none" }
 
     return @"
-Autonomous worker update from `$Worker`:
+Autonomous worker update from ``$Worker``:
 
 - Attempt: $Attempt
 - Status: $($Result.status)
@@ -689,7 +696,7 @@ function Apply-ResultToIssue {
         if ($attempt -ge $MaxAttemptsPerIssue) {
             Edit-IssueLabels -Repo $Repo -IssueNumber $IssueNumber -AddLabels @($BlockedLabel) -RemoveLabels @($ActiveLabel, $QueueLabel)
             Comment-OnIssue -Repo $Repo -IssueNumber $IssueNumber -Body @"
-Autonomous worker `$Worker` could not complete issue #$IssueNumber after $attempt attempts.
+Autonomous worker ``$Worker`` could not complete issue #$IssueNumber after $attempt attempts.
 
 - Codex exit code: $exitCode
 - Last run directory: $($InvocationResult.RunDirectory)
@@ -701,7 +708,7 @@ The issue has been moved out of the queue and marked blocked for human review.
 
         Edit-IssueLabels -Repo $Repo -IssueNumber $IssueNumber -RemoveLabels @($ActiveLabel)
         Comment-OnIssue -Repo $Repo -IssueNumber $IssueNumber -Body @"
-Autonomous worker `$Worker` failed attempt $attempt on issue #$IssueNumber.
+Autonomous worker ``$Worker`` failed attempt $attempt on issue #$IssueNumber.
 
 - Codex exit code: $exitCode
 - Last run directory: $($InvocationResult.RunDirectory)
@@ -817,7 +824,7 @@ try {
             Write-Log "Claiming issue #$issueNumber - $($nextIssue.title)"
 
             Edit-IssueLabels -Repo $RepoSlug -IssueNumber $issueNumber -AddLabels @($ActiveLabel) -RemoveLabels @($BlockedLabel, $CompleteLabel)
-            Comment-OnIssue -Repo $RepoSlug -IssueNumber $issueNumber -Body "Autonomous worker `$WorkerName` claimed this issue and is starting work now."
+            Comment-OnIssue -Repo $RepoSlug -IssueNumber $issueNumber -Body "Autonomous worker ``$WorkerName`` claimed this issue and is starting work now."
             Send-DashboardEvent -Type "issue_claimed" -Data @{
                 issue_number = $issueNumber
                 issue_title = $nextIssue.title
@@ -827,7 +834,21 @@ try {
             }
 
             $packet = Get-IssuePacket -Repo $RepoSlug -IssueNumber $issueNumber
-            $invocation = Invoke-CodexIssueRun -CodexPath $codexPath -RepoRootValue $RepoRoot -StateRoot $stateRoot -Repo $RepoSlug -Worker $WorkerName -IssueNumber $issueNumber -IssuePacket $packet
+            try {
+                $invocation = Invoke-CodexIssueRun -CodexPath $codexPath -RepoRootValue $RepoRoot -StateRoot $stateRoot -Repo $RepoSlug -Worker $WorkerName -IssueNumber $issueNumber -IssuePacket $packet
+            }
+            catch {
+                Write-Log "Codex invocation for issue #$issueNumber failed before producing a result: $($_.Exception.Message)"
+                $invocation = @{
+                    Attempt = Get-IssueAttemptCount -StateRoot $stateRoot -IssueNumber $issueNumber
+                    ExitCode = 1
+                    RunDirectory = $stateRoot
+                    Result = $null
+                    StdoutPath = $null
+                    StderrPath = $null
+                    ResultPath = $null
+                }
+            }
             $outcome = Apply-ResultToIssue -Repo $RepoSlug -StateRoot $stateRoot -Worker $WorkerName -IssueNumber $issueNumber -InvocationResult $invocation
 
             Write-Log "Issue #$issueNumber finished with queue outcome '$outcome'."
