@@ -12,6 +12,17 @@ This repo now uses a **pull-only** workflow with GitHub as the source of truth. 
 - Read and write repo state through GitHub-backed tools only.
 - If a remote branch, commit, or PR cannot be produced, stop and report blocked.
 
+## Scratch Workspace Guard Rails
+
+When local filesystem access is helpful for drafting, validation, or temporary analysis:
+
+- Treat `D:\repos\...` checkouts as read-only reference context.
+- Do not edit tracked files in place under `D:\repos\...` unless the user explicitly approves that exact exception.
+- Prefer a disposable workspace outside the repo tree, such as `D:\automation\scratch\...`.
+- Publish the final repository change through GitHub-backed tools only.
+- Delete or discard the scratch workspace after the remote change is published.
+- Avoid local `git` commands entirely for repo work unless the user explicitly approves that exact exception.
+
 ## Current Truths
 
 - Runtime is split into a stable loader and a hot-reloaded core.
