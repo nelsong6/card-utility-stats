@@ -4,8 +4,9 @@ param(
     [string]$WorkerName = $env:COMPUTERNAME,
     [string]$RunnerName = "",
     [string[]]$RunnerLabels = @("codex-queue"),
-    [string]$CodexHome = "D:\automation\codex\home",
+    [string]$ClaudeInstallRoot = "D:\automation\claude-code",
     [string]$QueueStateRoot = "D:\automation\card-utility-stats\codex-queue-state",
+    [switch]$InstallClaudeCode,
     [switch]$SetMachineEnvironment,
     [switch]$AddRunnerLabels
 )
@@ -81,15 +82,39 @@ function Add-GitHubRunnerLabels {
     }
 }
 
-$resolvedCodexHome = Ensure-Directory -Path $CodexHome
+function Install-ClaudeCode {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$InstallRoot
+    )
+
+    $resolvedRoot = Ensure-Directory -Path $InstallRoot
+    & npm.cmd install --prefix $resolvedRoot @anthropic-ai/claude-code
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to install Claude Code CLI."
+    }
+
+    $claudePath = Join-Path $resolvedRoot "node_modules\.bin\claude.cmd"
+    if (-not (Test-Path -LiteralPath $claudePath)) {
+        throw "Claude Code CLI was not found at $claudePath."
+    }
+
+    Grant-RunnerAccess -Path $resolvedRoot
+    return $claudePath
+}
+
 $resolvedQueueStateRoot = Ensure-Directory -Path $QueueStateRoot
-Grant-RunnerAccess -Path $resolvedCodexHome
 Grant-RunnerAccess -Path $resolvedQueueStateRoot
+
+$resolvedClaudePath = Join-Path $ClaudeInstallRoot "node_modules\.bin\claude.cmd"
+if ($InstallClaudeCode) {
+    $resolvedClaudePath = Install-ClaudeCode -InstallRoot $ClaudeInstallRoot
+}
 
 if ($SetMachineEnvironment) {
     Set-MachineEnvironmentVariable -Name "CARD_UTILITY_STATS_WORKER_NAME" -Value $WorkerName
-    Set-MachineEnvironmentVariable -Name "CODEX_HOME" -Value $resolvedCodexHome
     Set-MachineEnvironmentVariable -Name "CODEX_ISSUE_QUEUE_STATE_ROOT" -Value $resolvedQueueStateRoot
+    Set-MachineEnvironmentVariable -Name "CLAUDE_CLI_PATH" -Value $resolvedClaudePath
 }
 
 if ($AddRunnerLabels) {
@@ -100,7 +125,7 @@ if ($AddRunnerLabels) {
 Write-Host ""
 Write-Host "Codex queue host profile:"
 Write-Host "- Worker name: $WorkerName"
-Write-Host "- CODEX_HOME: $resolvedCodexHome"
+Write-Host "- Claude CLI path: $resolvedClaudePath"
 Write-Host "- Queue state root: $resolvedQueueStateRoot"
 Write-Host "- Runner labels requested: $($RunnerLabels -join ', ')"
 Write-Host ""

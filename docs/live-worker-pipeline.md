@@ -271,7 +271,7 @@ Currently supported in-game actions:
 2. Capture that VM as the golden image.
 3. Create a VMSS at capacity `1` and label the instance for both `sts2-live` and `codex-queue`.
 4. Validate the manual workflow with `execute_live_driver=false`, then with `execute_live_driver=true`.
-5. Enable the queue worker only after GitHub CLI auth and Codex auth are configured on the queue host.
+5. Enable the queue worker only after GitHub CLI auth and Claude Code API-key auth are configured on the queue host.
 6. Split `codex-queue` away from `sts2-live` before scaling live execution above one instance.
 7. Add health checks, image refresh cadence, and autoscale rules after the single-instance path is stable.
 

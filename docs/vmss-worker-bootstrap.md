@@ -63,7 +63,7 @@ Checklist:
 If this VM is also the queue host, additionally:
 
 - configure `gh auth` for unattended issue and PR commands
-- configure Codex auth on the machine
+- configure Claude Code API-key auth on the machine
 - install the queue scheduled task with [ops/codex-queue/Install-IssueQueueWorkerTask.ps1](../ops/codex-queue/Install-IssueQueueWorkerTask.ps1)
 
 ### Phase 1: Capture The Golden Image
@@ -135,9 +135,9 @@ The VMSS design needs three kinds of auth/configuration:
   - needed on every instance that accepts workflow jobs
 - GitHub CLI auth
   - needed on the queue host because the scheduled task can run outside GitHub Actions
-- Codex auth
-  - needed anywhere the autonomous queue worker is expected to invoke Codex headlessly
-  - GitHub Actions queue wakeups load Azure Key Vault secret `card-utility-stats`, which is exposed to Codex as `OPENAI_API_KEY`
+- Claude Code auth
+  - needed anywhere the autonomous queue worker is expected to invoke Claude Code headlessly
+  - GitHub Actions queue wakeups load Azure Key Vault secret `card-utility-stats`, which is exposed to Claude Code as `ANTHROPIC_API_KEY`
 
 Additional secrets:
 

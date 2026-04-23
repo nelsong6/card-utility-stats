@@ -45,7 +45,7 @@ jobs:
           tenant-id: ${{ vars.ARM_TENANT_ID }}
           subscription-id: ${{ vars.KEY_VAULT_SUBSCRIPTION_ID || vars.ARM_SUBSCRIPTION_ID }}
 
-      - name: Load Codex API key from Key Vault
+      - name: Load Anthropic API key from Key Vault
         shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         run: |
           $keyVaultName = '${{ vars.KEY_VAULT_NAME }}'
@@ -55,26 +55,30 @@ jobs:
             throw "Missing repository variable KEY_VAULT_NAME."
           }
 
-          $openAiApiKey = az keyvault secret show `
+          $anthropicApiKey = az keyvault secret show `
             --vault-name $keyVaultName `
             --name $secretName `
             --query value `
             --output tsv
 
-          if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($openAiApiKey)) {
+          if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($anthropicApiKey)) {
             throw "Unable to load Key Vault secret '$secretName' from vault '$keyVaultName'."
           }
 
-          Write-Host "::add-mask::$openAiApiKey"
-          "OPENAI_API_KEY=$openAiApiKey" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "::add-mask::$anthropicApiKey"
+          "ANTHROPIC_API_KEY=$anthropicApiKey" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Run queue worker
         env:
+          CLAUDE_CLI_PATH: D:\automation\claude-code\node_modules\.bin\claude.cmd
           GH_TOKEN: ${{ github.token }}
         shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         run: |
-          if ([string]::IsNullOrWhiteSpace($env:OPENAI_API_KEY)) {
-            throw "OPENAI_API_KEY was not loaded from Azure Key Vault."
+          if ([string]::IsNullOrWhiteSpace($env:ANTHROPIC_API_KEY)) {
+            throw "ANTHROPIC_API_KEY was not loaded from Azure Key Vault."
+          }
+          if ([string]::IsNullOrWhiteSpace($env:CLAUDE_CLI_PATH) -or -not (Test-Path -LiteralPath $env:CLAUDE_CLI_PATH)) {
+            throw "Claude Code CLI was not found at '$env:CLAUDE_CLI_PATH'. Install it once with: npm.cmd install --prefix D:\automation\claude-code @anthropic-ai/claude-code"
           }
 
           ./ops/codex-queue/Run-IssueQueueWorker.ps1 `

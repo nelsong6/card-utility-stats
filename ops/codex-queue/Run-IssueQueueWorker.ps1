@@ -14,6 +14,9 @@ param(
     [string]$DashboardEventIssuer = "codex-queue-worker",
     [int]$DashboardEventTimeoutSeconds = 10,
     [string]$StateRoot = "",
+    [string]$ClaudeCliPath = "",
+    [string]$ClaudeModel = "sonnet",
+    [decimal]$ClaudeMaxBudgetUsd = 5.00,
     [int]$MaxIssuesPerRun = 100,
     [int]$MaxAttemptsPerIssue = 3
 )
@@ -103,90 +106,41 @@ function Get-DefaultWorkerName {
     return "codex-queue-worker"
 }
 
-function Ensure-LocalCodexBinary {
+function Resolve-ClaudeCliPath {
     param(
-        [Parameter(Mandatory = $true)]
-        [string]$StateRoot
+        [string]$ExplicitPath = ""
     )
 
     $candidatePaths = New-Object System.Collections.Generic.List[string]
 
+    if (-not [string]::IsNullOrWhiteSpace($ExplicitPath)) {
+        $candidatePaths.Add($ExplicitPath)
+    }
+
     foreach ($scope in @("Process", "User", "Machine")) {
-        $explicitPath = [Environment]::GetEnvironmentVariable("CODEX_CLI_PATH", $scope)
-        if (-not [string]::IsNullOrWhiteSpace($explicitPath)) {
-            $candidatePaths.Add($explicitPath)
+        $configuredPath = [Environment]::GetEnvironmentVariable("CLAUDE_CLI_PATH", $scope)
+        if (-not [string]::IsNullOrWhiteSpace($configuredPath)) {
+            $candidatePaths.Add($configuredPath)
         }
     }
 
-    $codexCommand = Get-Command codex -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($codexCommand) {
-        if (-not [string]::IsNullOrWhiteSpace($codexCommand.Source)) {
-            $candidatePaths.Add($codexCommand.Source)
+    $claudeCommand = Get-Command claude -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($claudeCommand) {
+        if (-not [string]::IsNullOrWhiteSpace($claudeCommand.Source)) {
+            $candidatePaths.Add($claudeCommand.Source)
         }
-        elseif (-not [string]::IsNullOrWhiteSpace($codexCommand.Path)) {
-            $candidatePaths.Add($codexCommand.Path)
+        elseif (-not [string]::IsNullOrWhiteSpace($claudeCommand.Path)) {
+            $candidatePaths.Add($claudeCommand.Path)
         }
     }
 
-    if (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
-        $candidatePaths.Add((Join-Path $env:LOCALAPPDATA "OpenAI\Codex\bin\codex.exe"))
-    }
-
-    $userRoot = "C:\Users"
-    if (Test-Path -LiteralPath $userRoot) {
-        Get-ChildItem -LiteralPath $userRoot -Directory -ErrorAction SilentlyContinue |
-            ForEach-Object {
-                $candidatePaths.Add((Join-Path $_.FullName "AppData\Local\OpenAI\Codex\bin\codex.exe"))
-            }
-    }
-
-    $windowsAppsRoots = @()
-    if (-not [string]::IsNullOrWhiteSpace($env:ProgramFiles)) {
-        $windowsAppsRoots += (Join-Path $env:ProgramFiles "WindowsApps")
-    }
-    $windowsAppsRoots += "C:\Program Files\WindowsApps"
-
-    foreach ($root in ($windowsAppsRoots | Select-Object -Unique)) {
-        if (-not (Test-Path -LiteralPath $root)) {
-            continue
-        }
-
-        Get-ChildItem -LiteralPath $root -Directory -Filter "OpenAI.Codex_*" -ErrorAction SilentlyContinue |
-            Sort-Object LastWriteTimeUtc -Descending |
-            ForEach-Object {
-                $candidatePaths.Add((Join-Path $_.FullName "app\resources\codex.exe"))
-            }
-    }
-
-    $candidatePaths.Add("C:\Program Files\WindowsApps\OpenAI.Codex_26.421.620.0_x64__2p2nqsd0c76g0\app\resources\codex.exe")
-
-    $sourcePath = $null
     foreach ($candidate in ($candidatePaths | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)) {
         if (Test-Path -LiteralPath $candidate) {
-            $sourcePath = $candidate
-            break
+            return $candidate
         }
     }
 
-    if (-not $sourcePath) {
-        throw "Unable to locate the installed Codex CLI binary."
-    }
-
-    $binDir = Ensure-Directory -Path (Join-Path $StateRoot "bin")
-    $targetPath = Join-Path $binDir "codex.exe"
-
-    $shouldCopy = $true
-    if (Test-Path -LiteralPath $targetPath) {
-        $sourceInfo = Get-Item -LiteralPath $sourcePath
-        $targetInfo = Get-Item -LiteralPath $targetPath
-        $shouldCopy = $sourceInfo.Length -ne $targetInfo.Length -or $sourceInfo.LastWriteTimeUtc -gt $targetInfo.LastWriteTimeUtc
-    }
-
-    if ($shouldCopy) {
-        Copy-Item -LiteralPath $sourcePath -Destination $targetPath -Force
-    }
-
-    return $targetPath
+    throw "Unable to locate the Claude Code CLI. Set CLAUDE_CLI_PATH or install the 'claude' command."
 }
 
 function ConvertTo-Base64Url {
@@ -568,10 +522,10 @@ function Comment-OnIssue {
     }
 }
 
-function Invoke-CodexIssueRun {
+function Invoke-ClaudeIssueRun {
     param(
         [Parameter(Mandatory = $true)]
-        [string]$CodexPath,
+        [string]$ClaudePath,
 
         [Parameter(Mandatory = $true)]
         [string]$RepoRootValue,
@@ -600,9 +554,9 @@ function Invoke-CodexIssueRun {
     $runDir = Ensure-Directory -Path (Join-Path $issueRunRoot "$timestamp-attempt-$attempt")
     $packetPath = Join-Path $runDir "issue-packet.json"
     $promptPath = Join-Path $runDir "prompt.md"
-    $stdoutPath = Join-Path $runDir "codex-stdout.log"
-    $stderrPath = Join-Path $runDir "codex-stderr.log"
-    $resultPath = Join-Path $runDir "codex-result.json"
+    $stdoutPath = Join-Path $runDir "claude-stdout.log"
+    $stderrPath = Join-Path $runDir "claude-stderr.log"
+    $resultPath = Join-Path $runDir "claude-result.json"
     $schemaPath = Join-Path $RepoRootValue "ops\codex-queue\issue-output-schema.json"
     $instructionsPath = Join-Path $RepoRootValue "ops\codex-queue\worker-instructions.md"
 
@@ -627,24 +581,28 @@ Execution requirements:
 - Use GitHub CLI if you need to inspect PRs or issues.
 - Use git locally for branch/commit work.
 - Do not wait for a human if the issue can be advanced.
-- Return JSON that matches the schema file at: $schemaPath
+- Return only JSON that matches the schema file at: $schemaPath
 "@
 
     $prompt | Set-Content -LiteralPath $promptPath
+    $schemaJson = Get-Content -LiteralPath $schemaPath -Raw | ConvertFrom-Json | ConvertTo-Json -Compress -Depth 20
 
     $args = @(
-        "exec",
-        "--cd", $RepoRootValue,
+        "-p",
+        "--bare",
+        "--model", $ClaudeModel,
+        "--permission-mode", "bypassPermissions",
+        "--output-format", "text",
+        "--no-session-persistence",
+        "--max-budget-usd", $ClaudeMaxBudgetUsd.ToString([Globalization.CultureInfo]::InvariantCulture),
         "--add-dir", $runDir,
-        "--dangerously-bypass-approvals-and-sandbox",
-        "--output-schema", $schemaPath,
-        "--output-last-message", $resultPath,
-        "-"
+        "--json-schema", $schemaJson
     )
 
     $process = Start-Process `
-        -FilePath $CodexPath `
+        -FilePath $ClaudePath `
         -ArgumentList $args `
+        -WorkingDirectory $RepoRootValue `
         -RedirectStandardInput $promptPath `
         -RedirectStandardOutput $stdoutPath `
         -RedirectStandardError $stderrPath `
@@ -654,13 +612,20 @@ Execution requirements:
     $exitCode = $process.ExitCode
 
     $resultObject = $null
-    if (Test-Path -LiteralPath $resultPath) {
-        try {
-            $resultObject = Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json
+    if (Test-Path -LiteralPath $stdoutPath) {
+        $stdoutText = (Get-Content -LiteralPath $stdoutPath -Raw).Trim()
+        if (-not [string]::IsNullOrWhiteSpace($stdoutText)) {
+            try {
+                $resultObject = $stdoutText | ConvertFrom-Json
+            }
+            catch {
+                $resultObject = $null
+            }
         }
-        catch {
-            $resultObject = $null
-        }
+    }
+
+    if ($resultObject) {
+        $resultObject | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $resultPath
     }
 
     return @{
@@ -758,7 +723,7 @@ function Apply-ResultToIssue {
             Comment-OnIssue -Repo $Repo -IssueNumber $IssueNumber -Body @"
 Autonomous worker ``$Worker`` could not complete issue #$IssueNumber after $attempt attempts.
 
-- Codex exit code: $exitCode
+- Agent exit code: $exitCode
 - Last run directory: $($InvocationResult.RunDirectory)
 $diagnostics
 
@@ -771,7 +736,7 @@ The issue has been moved out of the queue and marked blocked for human review.
         Comment-OnIssue -Repo $Repo -IssueNumber $IssueNumber -Body @"
 Autonomous worker ``$Worker`` failed attempt $attempt on issue #$IssueNumber.
 
-- Codex exit code: $exitCode
+- Agent exit code: $exitCode
 - Last run directory: $($InvocationResult.RunDirectory)
 $diagnostics
 
@@ -864,8 +829,8 @@ $processedIssueNumbersThisRun = New-Object 'System.Collections.Generic.HashSet[i
 try {
     try {
         Ensure-QueueLabels -Repo $RepoSlug
-        $codexPath = Ensure-LocalCodexBinary -StateRoot $stateRoot
-        Write-Log "Using local Codex binary at $codexPath"
+        $claudePath = Resolve-ClaudeCliPath -ExplicitPath $ClaudeCliPath
+        Write-Log "Using Claude Code CLI at $claudePath"
         Send-DashboardEvent -Type "worker_run_started" -Data @{
             state_root = $stateRoot
             message = "Worker run started."
@@ -898,10 +863,10 @@ try {
 
             $packet = Get-IssuePacket -Repo $RepoSlug -IssueNumber $issueNumber
             try {
-                $invocation = Invoke-CodexIssueRun -CodexPath $codexPath -RepoRootValue $RepoRoot -StateRoot $stateRoot -Repo $RepoSlug -Worker $WorkerName -IssueNumber $issueNumber -IssuePacket $packet
+                $invocation = Invoke-ClaudeIssueRun -ClaudePath $claudePath -RepoRootValue $RepoRoot -StateRoot $stateRoot -Repo $RepoSlug -Worker $WorkerName -IssueNumber $issueNumber -IssuePacket $packet
             }
             catch {
-                Write-Log "Codex invocation for issue #$issueNumber failed before producing a result: $($_.Exception.Message)"
+                Write-Log "Claude invocation for issue #$issueNumber failed before producing a result: $($_.Exception.Message)"
                 $invocation = @{
                     Attempt = Get-IssueAttemptCount -StateRoot $stateRoot -IssueNumber $issueNumber
                     ExitCode = 1

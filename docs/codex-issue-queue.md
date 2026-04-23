@@ -79,21 +79,25 @@ Current recommendation:
 
 The live workflow can scale out earlier because GitHub Actions already handles runner selection for a single workflow job.
 
-## Headless Codex
+## Headless Agent
 
-The worker does not rely on the packaged WindowsApps alias for `codex.exe`, which is awkward to execute from unattended shells.
+The queue worker owns the queue loop, and Claude Code owns the one-issue coding agent run.
 
-Instead, the bootstrap step copies the installed Codex CLI into a normal local path and executes that copy. The copied CLI still uses the existing `~/.codex` auth and configuration on the machine.
+Each Windows queue host should install Claude Code once at:
 
-For GitHub Actions wakeups, the repo uses API-key auth for repeatability across laptops, desktop PCs, and VMSS instances. Store the key in Azure Key Vault as:
+- `D:\automation\claude-code\node_modules\.bin\claude.cmd`
+
+The GitHub Actions wakeup checks that path before claiming an issue. This avoids reinstalling Claude Code on every run while keeping the setup repeatable across the laptop, the next PC, and VMSS instances.
+
+For GitHub Actions wakeups, the repo uses Anthropic API-key auth for repeatability across laptops, desktop PCs, and VMSS instances. Store the key in Azure Key Vault as:
 
 - Key Vault secret name: `card-utility-stats`
 
-The workflow loads that process-specific secret and maps it to the standard environment variable Codex expects:
+The workflow loads that process-specific secret and maps it to the standard environment variable Claude Code expects:
 
-- `OPENAI_API_KEY`
+- `ANTHROPIC_API_KEY`
 
-This keeps the secret name scoped to this automation while avoiding custom Codex configuration on every runner. If the secret is absent or inaccessible, the queue wakeup fails before claiming an issue.
+This keeps the secret name scoped to this automation while avoiding custom Claude configuration on every runner. If the secret is absent or inaccessible, the queue wakeup fails before claiming an issue.
 
 The workflow expects these repository variables to already point at the Key Vault subscription and vault:
 
@@ -109,15 +113,17 @@ Each Windows queue host should use the same shape so the laptop, the next PC, an
 
 - a stable worker name such as `sts2-side-a`
 - GitHub runner label `codex-queue`
+- Claude Code installed once at `D:\automation\claude-code`
 - a persistent queue state directory outside the disposable Actions workspace
 - a machine-level `CODEX_ISSUE_QUEUE_STATE_ROOT`
 
-Use the initializer to create the local directories, grant the runner service account access, and optionally attach runner labels:
+Use the initializer to install Claude Code, create the local directories, grant the runner service account access, and optionally attach runner labels:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops\codex-queue\Initialize-CodexQueueHost.ps1 `
   -WorkerName 'sts2-side-a' `
   -RunnerName 'sts2-side-a' `
+  -InstallClaudeCode `
   -SetMachineEnvironment `
   -AddRunnerLabels
 ```
