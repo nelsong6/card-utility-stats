@@ -12,7 +12,7 @@ The intended flow is:
 2. GitHub Actions selects one self-hosted Windows runner labeled `issue-agent`.
 3. Claude receives the exact issue number from the event.
 4. Claude uses the project `.mcp.json` and the `sts2-modding` MCP server directly for STS2 inspection/control.
-5. Claude comments on the issue, updates labels, and opens a PR if code changes are required.
+5. Claude comments on the issue, updates labels, opens a PR if code changes are required, and records validation artifacts for review.
 
 ## Direct MCP Rule
 
@@ -50,13 +50,17 @@ The issue-agent workflow:
 - loads Azure Key Vault secret `card-utility-stats`
 - maps it to `ANTHROPIC_API_KEY`
 - streams Claude activity into the Actions log
-- uploads agent logs as artifacts after every run
+- uploads validation artifacts after every run
 
-Uploaded logs:
+Uploaded artifacts:
 
 - `claude-issue-agent-events.jsonl`
 - `claude-issue-agent-summary.log`
 - `claude-issue-agent-debug.log`
+- screenshots saved under `sts2-screenshots/`
+- additional validation artifacts saved under `sts2-artifacts/`
+
+For card- and tooltip-facing issues, runs should include at least one screenshot from a representative in-run test case, along with a test-case summary describing what was set up, what was exercised, and what the screenshot proves. Use judgment for additional coverage, but keep each issue or pull request to 10 screenshots or fewer and split broader work when needed.
 
 ## VMSS Direction
 
