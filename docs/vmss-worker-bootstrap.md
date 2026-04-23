@@ -1,171 +1,87 @@
 # Azure VMSS Worker Bootstrap
 
-This document turns the issue-51 worker-pool idea into an operational Azure plan.
+This document is the current VMSS direction after removing the old queue-worker and bridge-request architecture.
 
-The goal is:
+## Goal
 
-- no STS2 install on the primary work machine
-- repeatable Windows workers for live scenario execution
-- enough structure to scale later without rethinking the whole pipeline
+Build Windows workers that can:
 
-## IaC Entry Point
-
-The repo-owned infrastructure entry point for the first VMSS shell now lives at [infra/opentofu/azure-vmss/README.md](../infra/opentofu/azure-vmss/README.md).
-
-That slice is intentionally limited to:
-
-- network and outbound egress
-- an optional temporary builder VM for the image-seeding phase
-- the Windows VMSS shell
-- GitHub Actions based OpenTofu plan/apply
-- the Azure OIDC handoff expected from `infra-bootstrap`
-
-It does not yet replace the guest bootstrap and golden image work described below.
+- run GitHub Actions jobs
+- launch Claude Code headlessly
+- use the STS2 Modding MCP server directly
+- support remote visibility through Actions logs and uploaded artifacts
 
 ## Target Topology
 
 ```mermaid
 flowchart LR
-    A["Work computer<br/>Codex + editor + scenario design"] --> B["GitHub Actions<br/>manual live runs + queue wakeups"]
-    B --> C["Queue host<br/>single VM or VMSS capacity 1<br/>labels: codex-queue"]
-    B --> D["Live worker pool<br/>Azure VMSS<br/>labels: sts2-live"]
-    C --> E["Headless Codex<br/>issue queue + scheduled task"]
-    D --> F["Steam offline + STS2 + live driver<br/>build / deploy / run scenario"]
-    E --> G["Issue comments + status + dashboard"]
-    F --> H["Artifacts<br/>screenshots + logs + run JSON"]
+    A["Work computer"] --> B["GitHub Actions issue events"]
+    B --> C["Windows self-hosted runner<br/>label: codex-queue"]
+    C --> D["Claude Code"]
+    D --> E["STS2 Modding MCP"]
+    E --> F["Slay the Spire 2"]
+    D --> G["Issue comments / labels / PR"]
+    D --> H["Actions logs + uploaded agent artifacts"]
 ```
 
-Phase 1 can combine the queue host and live worker onto one VM or one VMSS instance, but only while capacity remains `1`.
+GitHub Actions is the queue. There is no repo-owned queue worker or scheduled task layer in this model.
 
-## Recommended Deployment Phases
+## Worker Image Requirements
 
-### Phase 0: Provision One Builder VM
+Each worker image should already contain:
 
-Before building a scale set, provision one temporary Windows builder VM from the OpenTofu root and prove the exact workflow there.
+- Steam
+- Slay the Spire 2
+- GitHub Actions runner
+- Git
+- GitHub CLI
+- .NET 9 SDK
+- Python 3.12
+- Claude Code installed at `D:\automation\claude-code`
+- STS2 Modding MCP installed at `D:\repos\sts2-modding-mcp`
 
-Checklist:
+Recommended stable paths:
 
-- set `enable_builder_vm = true`
-- set `enable_vmss = false`
-- set the Key Vault secret `card-utility-stats-rdp-allowed-cidrs` to your current public IP as a JSON array, or set `enable_rdp_rule` / `rdp_allowed_cidrs` directly for non-CI runs
-- install PowerShell 7
-- install Git
-- install GitHub CLI
-- install .NET 9 SDK
-- install Steam
-- install Slay the Spire 2
-- launch STS2 once and confirm Steam offline mode is stable
-- install GitHub Actions runner and apply labels `sts2-live` and `codex-queue`
-- install the worker-local live driver and any MCP/window automation dependencies
-- run `Live STS2 Manual Test` with `execute_live_driver=false`
-- run `Live STS2 Manual Test` with `execute_live_driver=true`
+- `D:\repos\card-utility-stats`
+- `D:\repos\sts2-modding-mcp`
+- `D:\SteamLibrary\steamapps\common\Slay the Spire 2`
+- `D:\automation\claude-code`
 
-If this VM is also the queue host, additionally:
+## Runner Labels
 
-- configure `gh auth` for unattended issue and PR commands
-- configure Claude Code API-key auth on the machine
-- install the queue scheduled task with [ops/codex-queue/Install-IssueQueueWorkerTask.ps1](../ops/codex-queue/Install-IssueQueueWorkerTask.ps1)
+For the current issue-agent model, the important label is:
 
-### Phase 1: Capture The Golden Image
+- `codex-queue`
 
-The image should already contain the slow, stateful setup steps:
+That label now means "runner that can process one issue-agent job," not "machine running a local queue worker."
 
-- Windows version and updates pinned to a known-good baseline
-- Steam installed
-- Slay the Spire 2 installed under a stable path
-- STS2 launched once so first-run prompts are already resolved
-- PowerShell 7, Git, GitHub CLI, and .NET 9 installed
-- a predictable folder layout such as:
-  - `D:\SteamLibrary\steamapps\common\Slay the Spire 2`
-  - `D:\automation\card-utility-stats`
-  - `D:\artifacts\card-utility-stats`
-- environment variables configured:
-  - `CARD_UTILITY_STATS_STS2_PATH`
-  - `CARD_UTILITY_STATS_LIVE_DRIVER`
-  - optionally `CARD_UTILITY_STATS_RUN_DATA_DIR`
-  - optionally `CARD_UTILITY_STATS_WORKER_NAME`
+## Auth
 
-Recommended image settings:
+The runner should be able to:
 
-- disable sleep while the runner is active
-- keep resolution and monitor layout fixed for screenshot consistency
-- use a dedicated Windows profile for the runner
-- keep local automation tools outside the repo workspace so repo checkouts stay disposable
+- use Azure OIDC through GitHub Actions
+- read Azure Key Vault secret `card-utility-stats`
+- expose that secret to Claude Code as `ANTHROPIC_API_KEY`
 
-### Phase 2: First-Boot Bootstrap
+## Validation
 
-Each VMSS instance should perform a short bootstrap on first boot.
+Minimum validation checklist for a new VMSS node:
 
-That bootstrap should:
+1. runner comes online with `self-hosted`, `windows`, and `codex-queue`
+2. `.mcp.json` exists in the repo checkout
+3. `claude.exe mcp list` shows `sts2-modding`
+4. STS2 MCP bridge ports are reachable when the game is running
+5. a test issue-agent run uploads:
+   - `claude-issue-agent-events.jsonl`
+   - `claude-issue-agent-summary.log`
+   - `claude-issue-agent-debug.log`
 
-- derive a worker identity from the VM hostname unless `CARD_UTILITY_STATS_WORKER_NAME` overrides it
-- register or reconnect the GitHub Actions runner
-- assign labels based on role:
-  - live workers: `self-hosted`, `windows`, `sts2-live`
-  - queue host: `self-hosted`, `windows`, `codex-queue`
-  - combined phase-1 host: both `sts2-live` and `codex-queue`
-- verify that `CARD_UTILITY_STATS_STS2_PATH` exists
-- verify that `CARD_UTILITY_STATS_LIVE_DRIVER` exists
-- create local artifact/state directories if missing
-- install or refresh the queue scheduled task only when the host carries the `codex-queue` role
-- write a small local health log so failed boots are diagnosable
+## What Was Removed
 
-The bootstrap should be idempotent. Reimaging or recycling an instance should not require manual repair steps.
+This VMSS direction no longer depends on:
 
-## Role Split
-
-Once the single-instance path is stable, split responsibilities:
-
-- queue host
-  - capacity `1`
-  - runner label `codex-queue`
-  - owns the scheduled task and issue-drain loop
-- live worker pool
-  - capacity `1+`
-  - runner label `sts2-live`
-  - owns manual or queued live scenario execution
-
-This split matters because the queue worker does not yet have a distributed lock. Scaling it beyond one host would risk duplicate claims.
-
-## Auth And Secrets
-
-The VMSS design needs three kinds of auth/configuration:
-
-- GitHub Actions runner registration
-  - needed on every instance that accepts workflow jobs
-- GitHub CLI auth
-  - needed on the queue host because the scheduled task can run outside GitHub Actions
-- Claude Code auth
-  - needed anywhere the autonomous queue worker is expected to invoke Claude Code headlessly
-  - GitHub Actions queue wakeups load Azure Key Vault secret `card-utility-stats`, which is exposed to Claude Code as `ANTHROPIC_API_KEY`
-
-Additional secrets:
-
-- `CODEX_QUEUE_JWT_SECRET`
-  - only required when dashboard push events are enabled
-- any Azure-managed secret source you prefer for bootstrap
-  - environment variables are fine for a first pass
-  - Key Vault is better once the layout stabilizes
-
-## Validation Checklist
-
-Validate in this order:
-
-1. runner comes online with the expected labels
-2. `live-sts2-manual.yml` succeeds with `execute_live_driver=false`
-3. `live-sts2-manual.yml` succeeds with `execute_live_driver=true`
-4. artifacts include screenshots, logs, build output, and run JSON when expected
-5. the queue host can process a single test issue labeled `codex-queue`
-6. the queue scheduled task can recover after reboot without manual intervention
-7. a reimaged or newly created instance can rejoin the pool cleanly
-
-## Scale-Out Rules
-
-Start simple:
-
-- keep the combined host at capacity `1`
-- do not autoscale until the image and bootstrap are stable
-- scale only the `sts2-live` pool first
-- keep the `codex-queue` role singleton until a real distributed claim/lease model exists
-
-When scale-out becomes useful, prefer reimaging from a fresh image over accumulating manual fixes on long-lived instances.
+- queue-worker scheduled tasks
+- repo-managed scenario manifests
+- worker-local live-driver scripts
+- filesystem bridge request directories
+- in-game `active-request.json` automation

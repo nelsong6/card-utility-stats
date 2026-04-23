@@ -1,105 +1,49 @@
 # Codex Issue Queue
 
-The autonomous issue queue is intended to run on a dedicated queue host, not on every live STS2 worker. In Azure terms, that usually means one standalone VM or one VMSS instance/pool kept at capacity `1`.
+The current queue model is GitHub Actions driven.
 
-The key requirement is operational, not prompt-based:
-
-- the queue host can stay on by itself
-- Codex can run headlessly on the queue host
-- issues are processed through an actual queue
-- the queue is drained one issue at a time until empty
-- progress does not depend on a human repeatedly telling Codex to continue
+There is no repo-owned queue worker, scheduled task, filesystem lock, or outer loop script anymore. GitHub itself is the queue and dispatch layer.
 
 ## Queue Contract
 
-The queue is defined by GitHub issue labels.
-
-Issues are eligible for autonomous work when they have:
+An issue is eligible for autonomous work when it has:
 
 - `codex-queue`
 
-Queue state is tracked with:
+The issue-agent workflow is triggered by the GitHub issue event, and GitHub passes the exact issue number into the run.
 
-- `codex-active`
-- `codex-blocked`
-- `codex-complete`
-
-Recommended meaning:
+Queue/result labels are:
 
 - `codex-queue`
-  - ready for the worker to pick up
-- `codex-active`
-  - currently claimed by the worker
 - `codex-blocked`
-  - removed from the queue pending human input or missing prerequisites
 - `codex-complete`
-  - processed by the queue worker and no longer queued
 
 ## Processing Model
 
-The worker script does not process "a couple of issues if the model remembers."
+The processing model is intentionally simple:
 
-Instead it performs this deterministic loop:
+1. GitHub issue event fires.
+2. GitHub Actions starts one workflow job on a self-hosted runner labeled `codex-queue`.
+3. Claude is launched for that exact issue number only.
+4. Claude owns the issue work: code changes, comments, labels, tests, and PR creation.
 
-1. acquire a local lock so only one queue run is active on the machine
-2. find the oldest open issue labeled `codex-queue`
-3. claim it by adding `codex-active`
-4. invoke Codex headlessly against the repository for that issue
-5. read the structured result from Codex
-6. update labels/comments based on that result
-7. repeat until no queued issues remain
+There is no second script that chooses issues, reads structured result files, or drains a local queue.
 
-That outer loop is owned by the script, not by the model.
+## Runner Contract
 
-## Why This Matters
+Each Windows issue-agent host should provide:
 
-This directly addresses the failure mode where Codex says "I'll keep going through 50 items" but stops after 2 or 3. In this design:
+- self-hosted GitHub Actions runner labeled `codex-queue`
+- Claude Code installed at `D:\automation\claude-code`
+- project checkout under `D:\repos\card-utility-stats`
+- STS2 Modding MCP checkout under `D:\repos\sts2-modding-mcp`
+- project `.mcp.json` configured to point at `sts2-modding`
 
-- each Codex run is responsible for one issue only
-- the queue worker is responsible for continuing to the next issue
-- the queue drain only stops when the queue is empty, the worker is blocked, or the machine/process fails
-
-## VMSS Deployment Note
-
-The current queue worker only prevents overlap on one machine by using a local lock file.
-
-That means:
-
-- it is safe against duplicate queue runs on the same host
-- it is not yet a distributed lease/claim system across multiple hosts
-
-Because of that, do not scale the queue role horizontally yet.
-
-Current recommendation:
-
-- give the queue host its own runner label: `codex-queue`
-- run the scheduled task only on that queue host
-- if one VM or VMSS instance is doing both queue and live work, keep capacity at `1`
-- split queue and live roles before scaling the `sts2-live` pool beyond one instance
-
-The live workflow can scale out earlier because GitHub Actions already handles runner selection for a single workflow job.
-
-## Headless Agent
-
-The queue worker owns the queue loop, and Claude Code owns the one-issue coding agent run.
-
-Each Windows queue host should install Claude Code once at:
-
-- `D:\automation\claude-code\node_modules\@anthropic-ai\claude-code\bin\claude.exe`
-
-The GitHub Actions wakeup checks that path before claiming an issue. This avoids reinstalling Claude Code on every run while keeping the setup repeatable across the laptop, the next PC, and VMSS instances.
-
-For GitHub Actions wakeups, the repo uses Anthropic API-key auth for repeatability across laptops, desktop PCs, and VMSS instances. Store the key in Azure Key Vault as:
-
-- Key Vault secret name: `card-utility-stats`
-
-The workflow loads that process-specific secret and maps it to the standard environment variable Claude Code expects:
+The workflow loads Azure Key Vault secret `card-utility-stats` and exposes it to Claude Code as:
 
 - `ANTHROPIC_API_KEY`
 
-This keeps the secret name scoped to this automation while avoiding custom Claude configuration on every runner. If the secret is absent or inaccessible, the queue wakeup fails before claiming an issue.
-
-The workflow expects these repository variables to already point at the Key Vault subscription and vault:
+Required repository variables:
 
 - `ARM_CLIENT_ID`
 - `ARM_TENANT_ID`
@@ -107,118 +51,25 @@ The workflow expects these repository variables to already point at the Key Vaul
 - `KEY_VAULT_NAME`
 - `KEY_VAULT_SUBSCRIPTION_ID`
 
-## Reusable Queue Host Setup
+## Visibility
 
-Each Windows queue host should use the same shape so the laptop, the next PC, and VMSS workers are interchangeable:
+The issue-agent workflow writes and uploads:
 
-- a stable worker name such as `sts2-side-a`
-- GitHub runner label `codex-queue`
-- Claude Code installed once at `D:\automation\claude-code`
-- STS2 Modding MCP cloned and initialized at `D:\repos\sts2-modding-mcp`
-- project-scoped MCP config present at `D:\repos\card-utility-stats\.mcp.json`
-- a persistent queue state directory outside the disposable Actions workspace
-- a machine-level `CODEX_ISSUE_QUEUE_STATE_ROOT`
+- `claude-issue-agent-events.jsonl`
+- `claude-issue-agent-summary.log`
+- `claude-issue-agent-debug.log`
 
-Use the initializer to install Claude Code, create the local directories, grant the runner service account access, and optionally attach runner labels:
+These are uploaded as Actions artifacts after every run, even on failure, so the post-run Claude trace is visible from another machine.
 
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops\codex-queue\Initialize-CodexQueueHost.ps1 `
-  -WorkerName 'sts2-side-a' `
-  -RunnerName 'sts2-side-a' `
-  -InstallClaudeCode `
-  -SetMachineEnvironment `
-  -AddRunnerLabels
-```
+## Direct Control Rule
 
-Restart the GitHub runner service after changing machine-level environment variables.
+For STS2 work, Claude should use direct MCP/game control through `sts2-modding`.
 
-For live STS2 issues, verify Claude Code can see the project MCP server before enabling queue work:
+The issue-agent path should not use:
 
-```powershell
-& D:\automation\claude-code\node_modules\@anthropic-ai\claude-code\bin\claude.exe mcp list
-```
+- `LiveScenarios/`
+- `ops/live-worker/`
+- filesystem request queues such as `request.json`, `ready.json`, `accepted.json`, or `result.json`
+- `D:\automation\card-utility-stats-live-bridge`
 
-Expected result includes `sts2-modding` connected. With STS2 running, the MCP bridge mods should also expose:
-
-- `localhost:21337` for game control/playtesting
-- `localhost:27020` for Godot scene inspection
-
-## Scheduling
-
-The intended steady state is hybrid:
-
-- GitHub issue events wake the queue worker immediately on a dedicated runner labeled `codex-queue`
-- a Windows Scheduled Task still wakes the queue worker periodically on that same queue host as a recovery mechanism
-- each invocation drains the queue until empty
-- if another invocation starts while one is already running, the lock file causes it to exit cleanly
-
-This gives the queue host fast reaction time without making event delivery the only correctness path.
-
-## Dashboard Push Events
-
-The worker can optionally push signed lifecycle events to a remote dashboard backend so the dashboard changes status immediately when the queue host starts or finishes work.
-
-Supported event transitions include:
-
-- `worker_run_started`
-- `issue_claimed`
-- `issue_finished`
-- `queue_empty`
-- `worker_run_finished`
-- `worker_run_failed`
-
-The worker signs each event with a short-lived HS256 JWT and posts it to the configured dashboard endpoint.
-
-### Queue-host setup
-
-1. Store the shared JWT secret on the queue host.
-2. Recommended secret name: `codex-queue-jwt-secret`
-3. The worker looks for the secret in either:
-   - environment variable `CODEX_QUEUE_JWT_SECRET`
-   - PowerShell SecretManagement via `Get-Secret -Name codex-queue-jwt-secret -AsPlainText`
-
-If you use PowerShell SecretManagement, an example is:
-
-```powershell
-Set-Secret -Name codex-queue-jwt-secret -Secret 'replace-with-long-random-secret'
-```
-
-### Endpoint configuration
-
-The worker only pushes events when `DashboardEventUrl` is configured.
-
-There are two intended ways to provide that:
-
-- GitHub Actions wake path
-  - set repository variable `CODEX_QUEUE_PUSH_EVENT_URL`
-- Local scheduled task path
-  - reinstall the scheduled task with `-DashboardEventUrl`
-
-Example:
-
-```powershell
-.\ops\codex-queue\Install-IssueQueueWorkerTask.ps1 `
-  -RepoRoot 'D:\repos\card-utility-stats' `
-  -DashboardEventUrl 'https://diagrams.romaine.life/ci/codex/push'
-```
-
-If you want a friendlier worker name in comments and dashboard events, set `CARD_UTILITY_STATS_WORKER_NAME` on the queue host. Otherwise the script will use the runner name or VM hostname.
-
-### Backend-side setup
-
-The receiving dashboard backend must know the same shared secret.
-
-For the `diagrams` backend this can come from either:
-
-- Key Vault secret `codex-queue-jwt-secret`
-- environment variable `CODEX_QUEUE_JWT_SECRET`
-
-## Current Scope
-
-The worker is repo-specific right now:
-
-- repo: `nelsong6/card-utility-stats`
-- local checkout: `D:\repos\card-utility-stats`
-- queue role label: `codex-queue`
-
-That is intentional. The first milestone is to make the pattern real and reliable on one queue host. Once that is stable, the worker can later be generalized into a shared automation repo or upgraded to use a distributed claim/lease model.
+If the current MCP surface is insufficient for an issue, Claude should report the blocker on the issue instead of reviving side infrastructure.

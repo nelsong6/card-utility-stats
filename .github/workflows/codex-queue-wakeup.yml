@@ -131,6 +131,9 @@ jobs:
           - Use the local checkout at `$env:GITHUB_WORKSPACE`.
           - Use `gh`, `git`, tests, and MCP tools as needed.
           - Use the project MCP config at `$mcpConfig`; for live STS2 work, use the `sts2-modding` MCP server.
+          - Use direct MCP/game control. Do not use or debug any legacy filesystem bridge or scenario-request queue.
+          - Do not use `LiveScenarios/`, `ops/live-worker/`, `scripts/ci/run-live-scenario.ps1`, or any `request.json` / `ready.json` / `accepted.json` / `result.json` workflow.
+          - Do not read from or write to `D:\automation\card-utility-stats-live-bridge`.
           - Comment on the issue with what you did, what you observed, and any PR/screenshot/artifact links or paths.
           - If you complete the issue, remove `codex-queue` and add `codex-complete`.
           - If you are blocked, comment with the blocker, remove `codex-queue`, and add `codex-blocked`.
@@ -138,6 +141,7 @@ jobs:
           - Do not wait for a human continuation unless the issue is genuinely blocked.
 
           For this validation path, prefer a minimal live STS2 MCP proof over broad code changes.
+          If the issue cannot be completed through the current direct GitHub Actions + MCP surface, stop and report that blocker instead of inventing side infrastructure.
           "@
           $prompt | Set-Content -LiteralPath $promptPath -Encoding UTF8
           $promptText = Get-Content -LiteralPath $promptPath -Raw
