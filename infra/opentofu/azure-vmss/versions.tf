@@ -14,3 +14,10 @@ terraform {
 provider "azurerm" {
   features {}
 }
+
+provider "azurerm" {
+  alias           = "shared"
+  subscription_id = var.key_vault_subscription_id
+
+  features {}
+}

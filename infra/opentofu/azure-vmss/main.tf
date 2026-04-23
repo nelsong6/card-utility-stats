@@ -47,6 +47,8 @@ locals {
 }
 
 data "azurerm_key_vault" "shared" {
+  provider = azurerm.shared
+
   name                = var.key_vault_name
   resource_group_name = var.key_vault_resource_group_name
 }
@@ -54,12 +56,16 @@ data "azurerm_key_vault" "shared" {
 data "azurerm_key_vault_secret" "admin_password" {
   count = var.admin_password == null ? 1 : 0
 
+  provider = azurerm.shared
+
   name         = var.admin_password_secret_name
   key_vault_id = data.azurerm_key_vault.shared.id
 }
 
 data "azurerm_key_vault_secret" "rdp_allowed_cidrs" {
   count = length(var.rdp_allowed_cidrs) == 0 && var.rdp_allowed_cidrs_secret_name != null ? 1 : 0
+
+  provider = azurerm.shared
 
   name         = var.rdp_allowed_cidrs_secret_name
   key_vault_id = data.azurerm_key_vault.shared.id

@@ -120,6 +120,12 @@ variable "key_vault_resource_group_name" {
   default     = "infra"
 }
 
+variable "key_vault_subscription_id" {
+  description = "Optional Azure subscription ID containing the shared Key Vault. When null, the deployment subscription is used."
+  type        = string
+  default     = null
+}
+
 variable "admin_password_secret_name" {
   description = "Key Vault secret name containing the local admin password."
   type        = string
