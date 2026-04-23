@@ -419,6 +419,8 @@ public static class CardHoverShowPatch
             Row3(sb, "Played/Drawn", $"{agg.Plays}/{agg.TimesDrawn}", $"{playRate:F0}%");
         }
 
+        AppendMakeItSoStats(sb, cardModel, agg, compact: true);
+
         if (isAttack || agg.TotalEffective > 0)
             Row3(sb, "Total damage", agg.TotalEffective.ToString(), "");
 
@@ -667,10 +669,10 @@ public static class CardHoverShowPatch
         int threshold)
     {
         if (currentCounter.HasValue && threshold > 0)
-            Row3(sb, "Skill counter", $"{currentCounter.Value}/{threshold}", "");
+            Row3(sb, "Trigger progress", $"{currentCounter.Value}/{threshold}", "");
 
         if (!compact && agg.TimesSummonedToHand > 0)
-            Row3(sb, "Summoned to hand", agg.TimesSummonedToHand.ToString(), "");
+            Row3(sb, "Times triggered", agg.TimesSummonedToHand.ToString(), "");
     }
     private static string GetInlineIconStatLabel(string iconPath, string suffix)
     {
