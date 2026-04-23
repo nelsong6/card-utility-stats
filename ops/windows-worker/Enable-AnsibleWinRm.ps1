@@ -22,7 +22,7 @@ if ($listenersText -notmatch "Transport = HTTPS") {
         -NotAfter (Get-Date).AddYears(3)
 
     $selector = "winrm/config/Listener?Address=*+Transport=HTTPS"
-    $value = "@{Hostname=\"$hostname\";CertificateThumbprint=\"$($cert.Thumbprint)\"}"
+    $value = "@{Hostname=`"$hostname`";CertificateThumbprint=`"$($cert.Thumbprint)`"}"
     winrm create $selector $value | Out-Null
 }
 
