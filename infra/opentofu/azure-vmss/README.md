@@ -81,7 +81,6 @@ That workflow:
 - runs `tofu fmt -check`
 - runs `tofu validate`
 - runs `tofu plan`
-- applies automatically on pushes to `main`
 - supports manual plan-only or plan+apply via `workflow_dispatch`
 
 ## infra-bootstrap Handoff
