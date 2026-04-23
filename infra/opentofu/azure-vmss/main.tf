@@ -21,6 +21,15 @@ locals {
     )
   )
   effective_enable_rdp_rule = var.enable_rdp_rule || length(local.effective_rdp_allowed_cidrs) > 0
+  winrm_allowed_cidrs_secret_value = length(var.winrm_allowed_cidrs) > 0 || var.winrm_allowed_cidrs_secret_name == null ? null : nonsensitive(data.azurerm_key_vault_secret.winrm_allowed_cidrs[0].value)
+  effective_winrm_allowed_cidrs = length(var.winrm_allowed_cidrs) > 0 ? var.winrm_allowed_cidrs : (
+    var.winrm_allowed_cidrs_secret_name == null ? [] : (
+      can(jsondecode(local.winrm_allowed_cidrs_secret_value))
+      ? tolist(jsondecode(local.winrm_allowed_cidrs_secret_value))
+      : [for cidr in split(",", trimsuffix(trimprefix(trimspace(local.winrm_allowed_cidrs_secret_value), "["), "]")) : trimspace(cidr) if trimspace(cidr) != ""]
+    )
+  )
+  effective_enable_winrm_rule = var.enable_winrm_rule || length(local.effective_winrm_allowed_cidrs) > 0
 
   tags = merge(
     {
@@ -71,6 +80,15 @@ data "azurerm_key_vault_secret" "rdp_allowed_cidrs" {
   key_vault_id = data.azurerm_key_vault.shared.id
 }
 
+data "azurerm_key_vault_secret" "winrm_allowed_cidrs" {
+  count = length(var.winrm_allowed_cidrs) == 0 && var.winrm_allowed_cidrs_secret_name != null ? 1 : 0
+
+  provider = azurerm.shared
+
+  name         = var.winrm_allowed_cidrs_secret_name
+  key_vault_id = data.azurerm_key_vault.shared.id
+}
+
 resource "azurerm_resource_group" "vmss" {
   name     = local.resource_group_name
   location = var.location
@@ -111,6 +129,22 @@ resource "azurerm_network_security_rule" "rdp" {
   source_port_range           = "*"
   destination_port_range      = "3389"
   source_address_prefixes     = local.effective_rdp_allowed_cidrs
+  destination_address_prefix  = "*"
+  resource_group_name         = azurerm_resource_group.vmss.name
+  network_security_group_name = azurerm_network_security_group.vmss.name
+}
+
+resource "azurerm_network_security_rule" "winrm" {
+  count = local.effective_enable_winrm_rule && length(local.effective_winrm_allowed_cidrs) > 0 ? 1 : 0
+
+  name                        = "allow-winrm"
+  priority                    = 1010
+  direction                   = "Inbound"
+  access                      = "Allow"
+  protocol                    = "Tcp"
+  source_port_range           = "*"
+  destination_port_range      = "5986"
+  source_address_prefixes     = local.effective_winrm_allowed_cidrs
   destination_address_prefix  = "*"
   resource_group_name         = azurerm_resource_group.vmss.name
   network_security_group_name = azurerm_network_security_group.vmss.name
