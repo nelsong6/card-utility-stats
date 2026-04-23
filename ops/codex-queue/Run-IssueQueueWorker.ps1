@@ -17,6 +17,8 @@ param(
     [string]$ClaudeCliPath = "",
     [string]$ClaudeModel = "sonnet",
     [decimal]$ClaudeMaxBudgetUsd = 5.00,
+    [int]$ClaudeMaxTurns = 20,
+    [int]$ClaudeTimeoutSeconds = 1800,
     [int]$MaxIssuesPerRun = 100,
     [int]$MaxAttemptsPerIssue = 3
 )
@@ -556,6 +558,7 @@ function Invoke-ClaudeIssueRun {
     $promptPath = Join-Path $runDir "prompt.md"
     $stdoutPath = Join-Path $runDir "claude-stdout.log"
     $stderrPath = Join-Path $runDir "claude-stderr.log"
+    $debugPath = Join-Path $runDir "claude-debug.log"
     $resultPath = Join-Path $runDir "claude-result.json"
     $schemaPath = Join-Path $RepoRootValue "ops\codex-queue\issue-output-schema.json"
     $instructionsPath = Join-Path $RepoRootValue "ops\codex-queue\worker-instructions.md"
@@ -592,9 +595,11 @@ Execution requirements:
         "--bare",
         "--model", $ClaudeModel,
         "--permission-mode", "bypassPermissions",
+        "--debug-file", $debugPath,
         "--output-format", "text",
         "--no-session-persistence",
         "--max-budget-usd", $ClaudeMaxBudgetUsd.ToString([Globalization.CultureInfo]::InvariantCulture),
+        "--max-turns", $ClaudeMaxTurns.ToString([Globalization.CultureInfo]::InvariantCulture),
         "--add-dir", $runDir,
         "--json-schema", $schemaJson
     )
@@ -607,9 +612,16 @@ Execution requirements:
         -RedirectStandardOutput $stdoutPath `
         -RedirectStandardError $stderrPath `
         -NoNewWindow `
-        -Wait `
         -PassThru
-    $exitCode = $process.ExitCode
+
+    if (-not $process.WaitForExit($ClaudeTimeoutSeconds * 1000)) {
+        Add-Content -LiteralPath $stderrPath -Value "Claude Code timed out after $ClaudeTimeoutSeconds second(s)."
+        & taskkill.exe /PID $process.Id /T /F | Out-Null
+        $exitCode = 124
+    }
+    else {
+        $exitCode = $process.ExitCode
+    }
 
     $resultObject = $null
     if (Test-Path -LiteralPath $stdoutPath) {
@@ -635,6 +647,7 @@ Execution requirements:
         Result = $resultObject
         StdoutPath = $stdoutPath
         StderrPath = $stderrPath
+        DebugPath = $debugPath
         ResultPath = $resultPath
     }
 }
@@ -707,6 +720,7 @@ function Apply-ResultToIssue {
     $exitCode = $InvocationResult.ExitCode
     $stdoutTail = Get-TextFileTail -Path $InvocationResult.StdoutPath
     $stderrTail = Get-TextFileTail -Path $InvocationResult.StderrPath
+    $debugTail = Get-TextFileTail -Path $InvocationResult.DebugPath
 
     $diagnostics = ""
     $markdownFence = ([string][char]96) * 3
@@ -715,6 +729,9 @@ function Apply-ResultToIssue {
     }
     if (-not [string]::IsNullOrWhiteSpace($stdoutTail)) {
         $diagnostics += [Environment]::NewLine + "Stdout tail:" + [Environment]::NewLine + $markdownFence + "text" + [Environment]::NewLine + $stdoutTail + [Environment]::NewLine + $markdownFence + [Environment]::NewLine
+    }
+    if (-not [string]::IsNullOrWhiteSpace($debugTail)) {
+        $diagnostics += [Environment]::NewLine + "Debug tail:" + [Environment]::NewLine + $markdownFence + "text" + [Environment]::NewLine + $debugTail + [Environment]::NewLine + $markdownFence + [Environment]::NewLine
     }
 
     if ($exitCode -ne 0 -or -not $result) {
@@ -874,6 +891,7 @@ try {
                     Result = $null
                     StdoutPath = $null
                     StderrPath = $null
+                    DebugPath = $null
                     ResultPath = $null
                 }
             }

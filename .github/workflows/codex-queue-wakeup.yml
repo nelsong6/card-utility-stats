@@ -71,6 +71,7 @@ jobs:
       - name: Run queue worker
         env:
           CLAUDE_CLI_PATH: D:\automation\claude-code\node_modules\.bin\claude.cmd
+          CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
           GH_TOKEN: ${{ github.token }}
         shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         run: |
