@@ -714,6 +714,7 @@ function Invoke-ClaudeIssueRun {
     $launcherPath = Join-Path $runDir "invoke-claude.ps1"
     $schemaPath = Join-Path $RepoRootValue "ops\codex-queue\issue-output-schema.json"
     $instructionsPath = Join-Path $RepoRootValue "ops\codex-queue\worker-instructions.md"
+    $mcpConfigPath = Join-Path $RepoRootValue ".mcp.json"
 
     $IssuePacket | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $packetPath
 
@@ -754,6 +755,7 @@ Execution requirements:
     "--debug-file", $(ConvertTo-PowerShellSingleQuotedString -Value $debugPath),
     "--output-format", "json",
     "--no-session-persistence",
+    "--mcp-config", $(ConvertTo-PowerShellSingleQuotedString -Value $mcpConfigPath),
     "--max-budget-usd", $(ConvertTo-PowerShellSingleQuotedString -Value $budgetText),
     "--max-turns", $(ConvertTo-PowerShellSingleQuotedString -Value $maxTurnsText),
     "--add-dir", $(ConvertTo-PowerShellSingleQuotedString -Value $runDir)
