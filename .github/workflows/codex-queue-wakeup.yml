@@ -110,29 +110,32 @@ jobs:
           $mcpConfig = Join-Path $env:GITHUB_WORKSPACE ".mcp.json"
           $promptPath = Join-Path $env:RUNNER_TEMP "claude-issue-agent-prompt.md"
           $prompt = @"
-You are Claude Code running as the issue agent for $($env:REPO_SLUG) on issue #$issueNumber.
+          You are Claude Code running as the issue agent for $($env:REPO_SLUG) on issue #$issueNumber.
 
-Read the issue and comments yourself using GitHub CLI:
+          GitHub Actions triggered this job for issue #$issueNumber. That issue number is authoritative.
+          Do not scan for other queued issues, do not choose a different issue, and do not process more than this one issue.
 
-``````
-gh issue view $issueNumber --repo $($env:REPO_SLUG) --comments
-``````
+          Read the issue and comments yourself using GitHub CLI:
 
-You own the result. GitHub Actions is only launching you; there is no queue worker or result parser.
+          ``````
+          gh issue view $issueNumber --repo $($env:REPO_SLUG) --comments
+          ``````
 
-Expectations:
-- Work exactly this issue.
-- Use the local checkout at `$env:GITHUB_WORKSPACE`.
-- Use `gh`, `git`, tests, and MCP tools as needed.
-- Use the project MCP config at `$mcpConfig`; for live STS2 work, use the `sts2-modding` MCP server.
-- Comment on the issue with what you did, what you observed, and any PR/screenshot/artifact links or paths.
-- If you complete the issue, remove `codex-queue` and add `codex-complete`.
-- If you are blocked, comment with the blocker, remove `codex-queue`, and add `codex-blocked`.
-- If you make code changes, create a branch, commit, push, and open a PR.
-- Do not wait for a human continuation unless the issue is genuinely blocked.
+          You own the result. GitHub Actions is only launching you; there is no queue worker or result parser.
 
-For this validation path, prefer a minimal live STS2 MCP proof over broad code changes.
-"@
+          Expectations:
+          - Work exactly this issue.
+          - Use the local checkout at `$env:GITHUB_WORKSPACE`.
+          - Use `gh`, `git`, tests, and MCP tools as needed.
+          - Use the project MCP config at `$mcpConfig`; for live STS2 work, use the `sts2-modding` MCP server.
+          - Comment on the issue with what you did, what you observed, and any PR/screenshot/artifact links or paths.
+          - If you complete the issue, remove `codex-queue` and add `codex-complete`.
+          - If you are blocked, comment with the blocker, remove `codex-queue`, and add `codex-blocked`.
+          - If you make code changes, create a branch, commit, push, and open a PR.
+          - Do not wait for a human continuation unless the issue is genuinely blocked.
+
+          For this validation path, prefer a minimal live STS2 MCP proof over broad code changes.
+          "@
           $prompt | Set-Content -LiteralPath $promptPath -Encoding UTF8
           $promptText = Get-Content -LiteralPath $promptPath -Raw
 
