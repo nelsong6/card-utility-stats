@@ -53,6 +53,19 @@ Required repository variables:
 - `KEY_VAULT_NAME`
 - `KEY_VAULT_SUBSCRIPTION_ID`
 
+## MCP Requirement
+
+For STS2 issue-agent work, `sts2-modding` is a hard prerequisite.
+
+- `.mcp.json` must declare `sts2-modding`
+- Claude must be able to list and connect to `sts2-modding` before the issue agent starts
+- `sts2-modding` must pass a minimal no-side-effect readiness probe before the main task begins
+- if any of those checks fail, stop immediately and report a blocker
+- do not fall back to raw TCP bridge calls, ad hoc PowerShell bridge scripts, Azure Python imports, Windows API clicking, or other non-MCP workarounds
+- missing MCP capability is a tooling gap to report, not a reason to invent side automation
+
+In this environment, stateful STS2 work should go through approved MCP tools rather than improvised side paths.
+
 ## Visibility
 
 The issue-agent workflow writes and uploads validation artifacts:
