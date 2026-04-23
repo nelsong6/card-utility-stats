@@ -35,9 +35,23 @@ public static class ScenarioAutomation
         if (_node != null && GodotObject.IsInstanceValid(_node))
             return;
 
-        _node = new ScenarioAutomationNode();
-        tree.Root.CallDeferred(Node.MethodName.AddChild, _node);
-        CoreMain.Logger.Info("[CUS-live] Scenario automation node scheduled.");
+        _node = new ScenarioAutomationNode
+        {
+            Name = "CardUtilityStatsScenarioAutomation",
+            ProcessMode = Node.ProcessModeEnum.Always
+        };
+
+        try
+        {
+            tree.Root.AddChild(_node);
+            CoreMain.Logger.Info("[CUS-live] Scenario automation node attached.");
+        }
+        catch (Exception e)
+        {
+            CoreMain.Logger.Warn($"[CUS-live] Direct scenario automation node attach failed; scheduling deferred attach: {e.Message}");
+            tree.Root.CallDeferred(Node.MethodName.AddChild, _node);
+            CoreMain.Logger.Info("[CUS-live] Scenario automation node scheduled.");
+        }
     }
 
     public static void Shutdown()
