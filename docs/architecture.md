@@ -9,18 +9,24 @@ This codebase has two big goals:
 
 ### Loader
 
-- [Loader/LoaderMain.cs](D:/repos/CardUtilityStats/Loader/LoaderMain.cs:14) is the stable bootstrap loaded once by BaseLib.
+- [Loader/LoaderMain.cs](D:/repos/CardUtilityStats/Loader/LoaderMain.cs:14) is the stable bootstrap loaded once by the game's mod manager.
 - It owns the `F5` workflow:
   - copy the Core DLL to a fresh temp path
   - load that copy
   - call `CoreMain.Initialize()`
   - on reload, call the previous `CoreMain.Shutdown()` first
+- It also owns the stable BaseLib boundary:
+  - [Config/CardUtilityStatsConfig.cs](D:/repos/CardUtilityStats/Config/CardUtilityStatsConfig.cs:1) defines the BaseLib-backed mod settings UI
+  - [Loader/RuntimeOptionsBridge.cs](D:/repos/CardUtilityStats/Loader/RuntimeOptionsBridge.cs:1) exposes a stable runtime-options bridge to the hot-reloaded Core
+  - [Api/CardUtilityStatsApiRegistry.cs](D:/repos/CardUtilityStats/Api/CardUtilityStatsApiRegistry.cs:1) exposes a small public API surface other mods can call into
 - The loader does not try to truly unload old contexts; it relies on explicit cleanup plus process-lifetime tolerance.
 
 ### Core
 
 - [Core/CoreMain.cs](D:/repos/CardUtilityStats/Core/CoreMain.cs:8) is the hot-reloaded entry point.
 - It applies Harmony patches, wires tracker hooks, resumes active run state after reload, and tears all of that back down on `Shutdown()`.
+- The Core intentionally does not reference BaseLib directly anymore.
+- Loader-owned config is consumed through [Core/RuntimeOptions.cs](D:/repos/CardUtilityStats/Core/RuntimeOptions.cs:1), which keeps the hot-reloaded assembly focused on domain logic instead of framework glue.
 
 ## Data Flow
 
@@ -78,6 +84,7 @@ When attribution is not naturally one-card-to-one-outcome, the code prefers:
 - [Core/Patches/ViewStatsInjectorPatch.cs](D:/repos/CardUtilityStats/Core/Patches/ViewStatsInjectorPatch.cs:11) injects the `View Stats` toggle into the deck view.
 - [Core/Patches/CardHoverTooltipPatch.cs](D:/repos/CardUtilityStats/Core/Patches/CardHoverTooltipPatch.cs:11) builds compact and full tooltip bodies.
 - [Core/StatsTooltip.cs](D:/repos/CardUtilityStats/Core/StatsTooltip.cs:1) renders the side tooltip panel.
+- [Config/CardUtilityStatsConfig.cs](D:/repos/CardUtilityStats/Config/CardUtilityStatsConfig.cs:1) provides the persistent mod-settings UI for runtime display options.
 
 Current UI conventions:
 
