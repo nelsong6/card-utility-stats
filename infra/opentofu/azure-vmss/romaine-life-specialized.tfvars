@@ -22,6 +22,7 @@ winrm_allowed_cidrs = ["10.0.0.0/22"]
 
 instance_count = 1
 vm_sku         = "Standard_NV6ads_A10_v5"
+upgrade_mode   = "Automatic"
 
 # Specialized Azure Compute Gallery image captured from the prepared builder VM
 # on 2026-04-23. This preserves the Steam and STS2 state we validated by hand.
