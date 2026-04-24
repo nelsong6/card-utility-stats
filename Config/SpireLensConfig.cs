@@ -1,8 +1,8 @@
 using BaseLib.Config;
 
-namespace CardUtilityStats.Config;
+namespace SpireLens.Config;
 
-public sealed class CardUtilityStatsConfig : SimpleModConfig
+public sealed class SpireLensConfig : SimpleModConfig
 {
     [ConfigSection("Deck View")]
     public static bool ViewStatsToggleEnabled { get; set; }

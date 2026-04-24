@@ -2,13 +2,13 @@ using System;
 using System.Linq;
 using System.Reflection;
 using System.Text.Json;
-using CardUtilityStats.Loader;
+using SpireLens.Loader;
 
-namespace CardUtilityStats.Api;
+namespace SpireLens.Api;
 
-public static class CardUtilityStatsApiRegistry
+public static class SpireLensApiRegistry
 {
-    public static ICardUtilityStatsApi Api { get; } = new ReflectionBackedCardUtilityStatsApi();
+    public static ISpireLensApi Api { get; } = new ReflectionBackedSpireLensApi();
 
     public static bool IsCoreLoaded => Api.IsCoreLoaded;
     public static int CurrentSchemaVersion => Api.CurrentSchemaVersion;
@@ -16,17 +16,17 @@ public static class CardUtilityStatsApiRegistry
     public static string? GetCurrentRunJson() => Api.GetCurrentRunJson();
     public static string? TryGetCardAggregateJson(object? cardModel) => Api.TryGetCardAggregateJson(cardModel);
 
-    private sealed class ReflectionBackedCardUtilityStatsApi : ICardUtilityStatsApi
+    private sealed class ReflectionBackedSpireLensApi : ISpireLensApi
     {
         private static readonly JsonSerializerOptions JsonOptions = new();
 
-        public bool IsCoreLoaded => ResolveLatestCoreType("CardUtilityStats.Core.RunTracker") != null;
+        public bool IsCoreLoaded => ResolveLatestCoreType("SpireLens.Core.RunTracker") != null;
 
         public int CurrentSchemaVersion
         {
             get
             {
-                var field = ResolveLatestCoreType("CardUtilityStats.Core.RunData")
+                var field = ResolveLatestCoreType("SpireLens.Core.RunData")
                     ?.GetField("CurrentSchemaVersion", BindingFlags.Public | BindingFlags.Static);
                 var value = field?.GetValue(null);
                 return value is int schemaVersion ? schemaVersion : 0;
@@ -40,7 +40,7 @@ public static class CardUtilityStatsApiRegistry
 
         public string? GetCurrentRunJson()
         {
-            var currentRun = ResolveLatestCoreType("CardUtilityStats.Core.RunTracker")
+            var currentRun = ResolveLatestCoreType("SpireLens.Core.RunTracker")
                 ?.GetProperty("Current", BindingFlags.Public | BindingFlags.Static)
                 ?.GetValue(null);
             return Serialize(currentRun);
@@ -50,7 +50,7 @@ public static class CardUtilityStatsApiRegistry
         {
             if (cardModel == null) return null;
 
-            var method = ResolveLatestCoreType("CardUtilityStats.Core.RunTracker")
+            var method = ResolveLatestCoreType("SpireLens.Core.RunTracker")
                 ?.GetMethod("GetEffectiveAggregate", BindingFlags.Public | BindingFlags.Static);
             if (method == null) return null;
 
@@ -74,7 +74,7 @@ public static class CardUtilityStatsApiRegistry
 
         private static int GetCoreGeneration(Assembly assembly)
         {
-            const string prefix = "CardUtilityStats.Core.";
+            const string prefix = "SpireLens.Core.";
             var name = assembly.GetName().Name ?? string.Empty;
             if (name.StartsWith(prefix, StringComparison.Ordinal) &&
                 int.TryParse(name.Substring(prefix.Length), out var generation))

@@ -1,6 +1,6 @@
-namespace CardUtilityStats.Api;
+namespace SpireLens.Api;
 
-public interface ICardUtilityStatsApi
+public interface ISpireLensApi
 {
     bool IsCoreLoaded { get; }
     int CurrentSchemaVersion { get; }
