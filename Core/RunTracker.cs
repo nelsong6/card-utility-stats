@@ -3200,9 +3200,9 @@ public static class RunTracker
         }
     }
 
-    private static int CountSkillsPlayedThisTurnLocked(Player owner, CombatState? combatState)
+    private static int CountSkillsPlayedThisTurnLocked(Player owner, ICombatState? combatState)
     {
-        if (combatState == null) return 0;
+        if (combatState is not CombatState concreteCombatState) return 0;
 
         try
         {
@@ -3213,7 +3213,7 @@ public static class RunTracker
                 e.CardPlay?.Card != null
                 && ReferenceEquals(e.CardPlay.Card.Owner, owner)
                 && e.CardPlay.Card.Type == CardType.Skill
-                && e.HappenedThisTurn(combatState));
+                && e.HappenedThisTurn(concreteCombatState));
         }
         catch
         {
