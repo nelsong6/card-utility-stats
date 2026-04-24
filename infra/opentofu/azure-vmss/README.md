@@ -1,5 +1,12 @@
 # Azure VMSS OpenTofu Root
 
+This root is paused for active `issue-agent` deployment work.
+
+The current live path is the laptop-first runner flow documented in
+[docs/laptop-issue-agent-runner.md](../../../docs/laptop-issue-agent-runner.md).
+Keep this directory only as historical or future reference for Azure compute
+experiments.
+
 This directory contains the first-pass OpenTofu root for the Azure-hosted STS2 worker pool.
 
 It is intentionally CI-first:
@@ -91,6 +98,12 @@ That workflow:
 - runs `tofu plan`
 - supports manual plan-only or plan+apply via `workflow_dispatch`
 
+Important current boundary:
+
+- do not treat this root as the current source of truth for live worker deploys
+- the repo is using a local self-hosted Windows runner for `issue-agent` work
+- Azure builder and VMSS work is paused
+
 ## infra-bootstrap Handoff
 
 This repo likely needs its Azure app registration and GitHub OIDC trust created outside this repo, via `infra-bootstrap`.
@@ -165,13 +178,8 @@ Current repo status:
   in gallery `cardutilitystatsdevgallery`
 - [romaine-life-specialized.tfvars](./romaine-life-specialized.tfvars) points
   `source_image_id` at that captured image and enables the VMSS path
-- the GitHub Actions OpenTofu workflow now plans that tfvars file cleanly
-- the root now includes a first-boot runner registration path that:
-  - grants the VMSS managed identity `Key Vault Secrets User` on the shared vault
-  - downloads [ops/windows-worker/Initialize-IssueAgentRunner.ps1](../../../ops/windows-worker/Initialize-IssueAgentRunner.ps1) through a VMSS custom-script extension
-  - reads the `github-pat` secret from Key Vault
-  - registers each VMSS instance as a repository-scoped GitHub Actions runner with the `issue-agent` label
-- the next operational step is to apply the specialized tfvars file and confirm the new runner appears online in GitHub
+- the Azure builder and VMSS path is not the active execution path anymore
+- leave these files in place only if we revisit Azure-hosted workers later
 
 ## Important Limits
 

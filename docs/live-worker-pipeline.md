@@ -30,11 +30,14 @@ If the MCP surface is insufficient for a task, the correct result is a blocker r
 
 ## Worker Layout
 
-Standard Windows worker layout:
+The active worker path is a local Windows machine, usually the laptop.
 
-- `D:\repos\card-utility-stats`
-- `D:\repos\sts2-modding-mcp`
-- `D:\automation\claude-code`
+Common local layout:
+
+- repo checkout wherever GitHub Actions places `GITHUB_WORKSPACE`
+- STS2 Modding MCP checkout at any stable local path referenced by `.mcp.json`
+- Claude Code at one of the documented default locations or repository variable
+  `ISSUE_AGENT_CLAUDE_CLI_PATH`
 
 The project `.mcp.json` should point Claude to `sts2-modding`.
 
@@ -62,9 +65,12 @@ Uploaded artifacts:
 
 For card- and tooltip-facing issues, runs should include at least one screenshot from a representative in-run test case, along with a test-case summary describing what was set up, what was exercised, and what the screenshot proves. Use judgment for additional coverage, but keep each issue or pull request to 10 screenshots or fewer and split broader work when needed.
 
-## VMSS Direction
+## Current Deployment Direction
 
-VMSS is still a valid target, but the worker image should be built around:
+The current deployment direction is not VMSS. The active path is a local
+Windows issue-agent runner with the `issue-agent` label.
+
+That runner should still be built around:
 
 - GitHub Actions runner
 - Claude Code
@@ -81,4 +87,5 @@ Not around:
 ## Related Docs
 
 - [docs/issue-agent.md](./issue-agent.md)
+- [docs/laptop-issue-agent-runner.md](./laptop-issue-agent-runner.md)
 - [docs/vmss-worker-bootstrap.md](./vmss-worker-bootstrap.md)

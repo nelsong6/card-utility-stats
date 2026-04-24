@@ -36,9 +36,11 @@ There is no second script that chooses issues, reads structured result files, or
 Each Windows issue-agent host should provide:
 
 - self-hosted GitHub Actions runner labeled `issue-agent`
-- Claude Code installed at `D:\automation\claude-code`
-- project checkout under `D:\repos\card-utility-stats`
-- STS2 Modding MCP checkout under `D:\repos\sts2-modding-mcp`
+- Claude Code installed locally and discoverable either through repository
+  variable `ISSUE_AGENT_CLAUDE_CLI_PATH` or one of the documented default
+  locations
+- a normal Actions checkout for this repo under `GITHUB_WORKSPACE`
+- an STS2 Modding MCP checkout wherever the local `.mcp.json` points to it
 - project `.mcp.json` configured to point at `sts2-modding`
 
 The workflow loads Azure Key Vault secret `card-utility-stats` and exposes it to Claude Code as:
@@ -52,6 +54,15 @@ Required repository variables:
 - `ARM_SUBSCRIPTION_ID`
 - `KEY_VAULT_NAME`
 - `KEY_VAULT_SUBSCRIPTION_ID`
+
+## Local Host Bring-Up
+
+The active host path is now laptop-first.
+
+Use [docs/laptop-issue-agent-runner.md](./laptop-issue-agent-runner.md) for the
+local Windows runner setup and
+[ops/windows-worker/Register-LocalIssueAgentRunner.ps1](../ops/windows-worker/Register-LocalIssueAgentRunner.ps1)
+to register the machine as the repository runner.
 
 ## MCP Requirement
 

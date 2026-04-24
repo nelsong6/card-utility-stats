@@ -1,6 +1,11 @@
 # Azure VMSS Worker Bootstrap
 
-This document is the current VMSS direction after removing the old queue-worker and bridge-request architecture.
+This document is now historical reference only.
+
+The active `issue-agent` deployment path is the local Windows runner described
+in [docs/laptop-issue-agent-runner.md](./laptop-issue-agent-runner.md). The
+Azure builder / VMSS path is paused and should not be treated as the current
+execution model.
 
 ## Goal
 
@@ -76,42 +81,11 @@ Minimum validation checklist for a new VMSS node:
    - `claude-issue-agent-summary.log`
    - `claude-issue-agent-debug.log`
 
-## Current Status
+## Status
 
-The builder path has now been proven far enough to freeze a first reusable
-image:
+Keep this doc as a record of the Azure image/bootstrap investigation only.
 
-- the standalone Azure builder VM was prepared by hand with Steam login, STS2
-  install, first launch, and Steam offline mode confirmation
-- the repo-side WinRM and private Ansible workflows both completed successfully
-  against that builder
-- a specialized Azure Compute Gallery image was captured from the prepared
-  builder as:
-  - gallery: `cardutilitystatsdevgallery`
-  - image definition: `issue-agent-specialized`
-  - image version: `1.0.0`
-- the image-backed VMSS config now lives at:
-  - [infra/opentofu/azure-vmss/romaine-life-specialized.tfvars](../../../infra/opentofu/azure-vmss/romaine-life-specialized.tfvars)
-- the OpenTofu workflow now plans that config cleanly with exactly one VMSS
-  resource to add
-
-That repo-side runner-registration gap is now implemented:
-
-- [infra/opentofu/azure-vmss/main.tf](../../../infra/opentofu/azure-vmss/main.tf)
-  grants the VMSS managed identity `Key Vault Secrets User` on the shared Key
-  Vault and attaches a VMSS custom-script extension
-- [ops/windows-worker/Initialize-IssueAgentRunner.ps1](../../../ops/windows-worker/Initialize-IssueAgentRunner.ps1)
-  uses that managed identity to read the `github-pat` secret, then configures
-  `D:\actions-runner` as a Windows service-backed repository runner
-- [infra/opentofu/azure-vmss/romaine-life-specialized.tfvars](../../../infra/opentofu/azure-vmss/romaine-life-specialized.tfvars)
-  now enables explicit NAT egress and the first-boot runner bootstrap path
-
-The next operational step is no longer "write the bootstrap." It is:
-
-1. apply the specialized VMSS config
-2. confirm a new self-hosted runner comes online with labels including
-   `issue-agent`
-3. dispatch a real issue-agent workflow run against that runner
+Do not use it as the next-step guide for live issue-agent work.
 
 ## Ansible Layer
 

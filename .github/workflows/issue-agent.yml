@@ -38,6 +38,33 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Resolve issue-agent host paths
+        env:
+          CONFIGURED_CLAUDE_CLI_PATH: ${{ vars.ISSUE_AGENT_CLAUDE_CLI_PATH }}
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $candidates = @()
+
+          if (-not [string]::IsNullOrWhiteSpace($env:CONFIGURED_CLAUDE_CLI_PATH)) {
+            $candidates += $env:CONFIGURED_CLAUDE_CLI_PATH
+          }
+
+          $candidates += @(
+            'D:\automation\claude-code\node_modules\@anthropic-ai\claude-code\bin\claude.exe',
+            'C:\automation\claude-code\node_modules\@anthropic-ai\claude-code\bin\claude.exe',
+            (Join-Path $env:USERPROFILE 'automation\claude-code\node_modules\@anthropic-ai\claude-code\bin\claude.exe')
+          )
+
+          $claudePath = $candidates |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) -and (Test-Path -LiteralPath $_) } |
+            Select-Object -First 1
+
+          if (-not $claudePath) {
+            throw "Claude Code CLI was not found. Set repository variable ISSUE_AGENT_CLAUDE_CLI_PATH or install Claude under one of the documented default locations."
+          }
+
+          "CLAUDE_CLI_PATH=$claudePath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Azure login
         uses: azure/login@v3
         with:
@@ -70,7 +97,6 @@ jobs:
 
       - name: Verify Claude and MCP
         env:
-          CLAUDE_CLI_PATH: D:\automation\claude-code\node_modules\@anthropic-ai\claude-code\bin\claude.exe
           CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
         shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         run: |
@@ -172,7 +198,6 @@ jobs:
 
       - name: Run Claude issue agent
         env:
-          CLAUDE_CLI_PATH: D:\automation\claude-code\node_modules\@anthropic-ai\claude-code\bin\claude.exe
           CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
           GH_TOKEN: ${{ github.token }}
           EVENT_ISSUE_NUMBER: ${{ github.event.issue.number }}
