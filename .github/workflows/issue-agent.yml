@@ -21,6 +21,8 @@ permissions:
 jobs:
   run-issue-agent:
     name: Run Claude for one issue
+    env:
+      ISSUE_AGENT_CHECKOUT_PATH: issue-agent-src/${{ github.run_id }}-${{ github.run_attempt }}
     if: |
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'issues' && (
@@ -41,18 +43,21 @@ jobs:
             throw "GITHUB_WORKSPACE is not set."
           }
 
-          function Stop-RunnerProcesses {
-            param([Parameter(Mandatory = $true)][string]$WorkspacePath)
+          $checkoutRoot = Join-Path $workspace "issue-agent-src"
+          New-Item -ItemType Directory -Force -Path $checkoutRoot | Out-Null
+
+          function Stop-RunnerBuildProcesses {
+            param(
+              [Parameter(Mandatory = $true)][string]$WorkspacePath,
+              [Parameter(Mandatory = $true)][string]$CheckoutRootPath
+            )
 
             $processIds = New-Object 'System.Collections.Generic.HashSet[int]'
-
-            Get-Process -Name SlayTheSpire2 -ErrorAction SilentlyContinue | ForEach-Object {
-              [void]$processIds.Add($_.Id)
-            }
-
             $hints = @(
               $WorkspacePath,
+              $CheckoutRootPath,
               $env:RUNNER_WORKSPACE,
+              "issue-agent-build",
               "CardUtilityStats.Core.dll"
             ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
 
@@ -71,7 +76,7 @@ jobs:
             foreach ($processId in $processIds) {
               try {
                 $process = Get-Process -Id $processId -ErrorAction Stop
-                Write-Host "Stopping stale process $($process.ProcessName) ($processId)."
+                Write-Host "Stopping stale runner build process $($process.ProcessName) ($processId)."
                 Stop-Process -Id $processId -Force -ErrorAction Stop
               } catch {
                 Write-Warning "Unable to stop process ${processId}: $($_.Exception.Message)"
@@ -83,44 +88,24 @@ jobs:
             }
           }
 
-          Stop-RunnerProcesses -WorkspacePath $workspace
+          Stop-RunnerBuildProcesses -WorkspacePath $workspace -CheckoutRootPath $checkoutRoot
 
-          if (-not (Test-Path -LiteralPath $workspace)) {
-            exit 0
-          }
-
-          $gitDir = Join-Path $workspace ".git"
-          if (-not (Test-Path -LiteralPath $gitDir)) {
-            Write-Host "Workspace is not a git repository. Removing orphaned contents from '$workspace'."
-            Get-ChildItem -LiteralPath $workspace -Force -ErrorAction SilentlyContinue |
-              Remove-Item -Recurse -Force -ErrorAction Stop
-            exit 0
-          }
-
-          $stalePaths = @(
-            (Join-Path $workspace "Core\\bin"),
-            (Join-Path $workspace "Core\\obj"),
-            (Join-Path $workspace "Tests\\CardUtilityStats.Core.Tests\\bin"),
-            (Join-Path $workspace "Tests\\CardUtilityStats.Core.Tests\\obj")
-          )
-
-          foreach ($path in $stalePaths) {
-            if (-not (Test-Path -LiteralPath $path)) {
-              continue
+          Get-ChildItem -LiteralPath $checkoutRoot -Directory -ErrorAction SilentlyContinue |
+            Where-Object { $_.LastWriteTimeUtc -lt (Get-Date).ToUniversalTime().AddDays(-2) } |
+            ForEach-Object {
+              try {
+                Write-Host "Removing stale checkout folder '$($_.FullName)'."
+                Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop
+              } catch {
+                Write-Warning "Unable to remove stale checkout folder '$($_.FullName)': $($_.Exception.Message)"
+              }
             }
-
-            try {
-              Remove-Item -LiteralPath $path -Recurse -Force -ErrorAction Stop
-              Write-Host "Removed stale build output '$path'."
-            } catch {
-              Write-Warning "Unable to remove stale build output '$path': $($_.Exception.Message)"
-            }
-          }
 
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          path: ${{ env.ISSUE_AGENT_CHECKOUT_PATH }}
 
       - name: Resolve issue-agent host paths
         env:
@@ -147,7 +132,17 @@ jobs:
             throw "Claude Code CLI was not found. Set repository variable ISSUE_AGENT_CLAUDE_CLI_PATH or install Claude under one of the documented default locations."
           }
 
+          $repoRoot = Join-Path $env:GITHUB_WORKSPACE $env:ISSUE_AGENT_CHECKOUT_PATH
+          if (-not (Test-Path -LiteralPath $repoRoot)) {
+            throw "Issue-agent checkout was not found at '$repoRoot'."
+          }
+
+          $buildRoot = Join-Path $env:RUNNER_TEMP ("issue-agent-build\$($env:GITHUB_RUN_ID)-$($env:GITHUB_RUN_ATTEMPT)")
+          New-Item -ItemType Directory -Force -Path $buildRoot | Out-Null
+
           "CLAUDE_CLI_PATH=$claudePath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "ISSUE_AGENT_REPO_ROOT=$repoRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "ISSUE_AGENT_BUILD_ROOT=$buildRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Azure login
         uses: azure/login@v3
@@ -191,7 +186,17 @@ jobs:
             throw "Claude Code CLI was not found at '$env:CLAUDE_CLI_PATH'. Install it once with: npm.cmd install --prefix D:\automation\claude-code @anthropic-ai/claude-code"
           }
 
-          $mcpConfig = Join-Path $env:GITHUB_WORKSPACE ".mcp.json"
+          $repoRoot = $env:ISSUE_AGENT_REPO_ROOT
+          if ([string]::IsNullOrWhiteSpace($repoRoot)) {
+            $repoRoot = Join-Path $env:GITHUB_WORKSPACE $env:ISSUE_AGENT_CHECKOUT_PATH
+          }
+          if (-not (Test-Path -LiteralPath $repoRoot)) {
+            throw "Issue-agent checkout was not found at '$repoRoot'."
+          }
+
+          Set-Location -LiteralPath $repoRoot
+
+          $mcpConfig = Join-Path $repoRoot ".mcp.json"
           if (-not (Test-Path -LiteralPath $mcpConfig)) {
             throw "MCP config was not found at '$mcpConfig'."
           }
@@ -238,7 +243,7 @@ jobs:
             --strict-mcp-config `
             "--mcp-config=$mcpConfig" `
             --max-budget-usd "1.00" `
-            --add-dir $env:GITHUB_WORKSPACE 2>&1 |
+            --add-dir $repoRoot 2>&1 |
             ForEach-Object {
               $line = [string]$_
 
@@ -297,7 +302,17 @@ jobs:
             throw "No issue number was provided by the event or workflow_dispatch input."
           }
 
-          $mcpConfig = Join-Path $env:GITHUB_WORKSPACE ".mcp.json"
+          $repoRoot = $env:ISSUE_AGENT_REPO_ROOT
+          if ([string]::IsNullOrWhiteSpace($repoRoot)) {
+            $repoRoot = Join-Path $env:GITHUB_WORKSPACE $env:ISSUE_AGENT_CHECKOUT_PATH
+          }
+          if (-not (Test-Path -LiteralPath $repoRoot)) {
+            throw "Issue-agent checkout was not found at '$repoRoot'."
+          }
+
+          Set-Location -LiteralPath $repoRoot
+
+          $mcpConfig = Join-Path $repoRoot ".mcp.json"
           $promptPath = Join-Path $env:RUNNER_TEMP "claude-issue-agent-prompt.md"
           $streamLogPath = Join-Path $env:RUNNER_TEMP "claude-issue-agent-events.jsonl"
           $debugLogPath = Join-Path $env:RUNNER_TEMP "claude-issue-agent-debug.log"
@@ -326,10 +341,18 @@ jobs:
 
           You own the result. GitHub Actions is only launching you; there is no queue worker or result parser.
 
+          Recovery-first live-state policy:
+          - If STS2 or the bridge is already running, treat that as recoverable by default, not automatic failure.
+          - Before live validation, inspect the current state with `bridge_ping` and `bridge_get_full_state`.
+          - If a previous run or screen is already active, normalize it with MCP tools such as `bridge_auto_proceed`, `bridge_restart_run`, `bridge_navigate_menu`, and `bridge_start_run` until you reach a known-good baseline.
+          - Only report a blocker if MCP cannot normalize the game to a known-good state.
+          - Do not try to kill Slay the Spire 2 with ad hoc shell or process-management commands unless a human explicitly tells you to.
+
           Expectations:
           - Work exactly this issue.
-          - Use the local checkout at `$env:GITHUB_WORKSPACE`.
+          - Use the local checkout at `$env:ISSUE_AGENT_REPO_ROOT`.
           - Use `gh`, `git`, tests, and MCP tools as needed.
+          - For build or test commands in GitHub Actions, do not use the repo's default `bin/obj` outputs. Use isolated outputs under `$env:ISSUE_AGENT_BUILD_ROOT`, for example with MSBuild properties like `/p:BaseOutputPath=...` and `/p:BaseIntermediateOutputPath=...`.
           - Use the project MCP config at `$mcpConfig`; for live STS2 work, use the `sts2-modding` MCP server.
           - `sts2-modding` is a hard prerequisite for live STS2 work. If it is unavailable, unhealthy, or unusable, stop immediately and report a blocker.
           - All stateful STS2 work must go through approved MCP tools. Do not use raw TCP bridge calls, ad hoc PowerShell bridge scripts, Azure Python imports, Windows API clicking, or other non-MCP workarounds.
@@ -348,6 +371,7 @@ jobs:
           - Use judgment on how many screenshots to include, but do not exceed 10 screenshots for a single issue or pull request.
           - If adequate proof would require more than 10 screenshots, split the work into smaller branches or pull requests instead of overloading one.
           - If screenshot capture is impossible, stop and report the blocker instead of completing the issue without screenshot artifacts.
+          - After live validation, leave STS2 in a recoverable MCP-managed state when practical instead of assuming the workflow will force-close it for you.
           - Comment on the issue with what you did, what you observed, and any PR/screenshot/artifact links or paths.
           - In the issue comment and pull request summary, include the test-case summary and the screenshot or artifact links or paths.
           - If you complete the issue, remove `issue-agent` and add `issue-agent-complete`.
@@ -407,7 +431,7 @@ jobs:
             --strict-mcp-config `
             "--mcp-config=$mcpConfig" `
             --max-budget-usd "15.00" `
-            --add-dir $env:GITHUB_WORKSPACE 2>&1 |
+            --add-dir $repoRoot 2>&1 |
             ForEach-Object {
               $line = [string]$_
 
@@ -467,24 +491,34 @@ jobs:
             ${{ runner.temp }}/sts2-screenshots/**/*.png
             ${{ runner.temp }}/sts2-artifacts/**/*
 
-      - name: Stop issue-agent live processes
+      - name: Stop issue-agent runner build processes
         if: always()
         shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         run: |
           $workspace = $env:GITHUB_WORKSPACE
           if ([string]::IsNullOrWhiteSpace($workspace)) {
-            $workspace = "C:\actions-runner-card-utility-stats\_work\card-utility-stats\card-utility-stats"
+            $workspace = "C:\actions-runner-card-utility-stats\_work\card-utility-stats"
           }
 
-          Get-Process -Name SlayTheSpire2 -ErrorAction SilentlyContinue | ForEach-Object {
-            Write-Host "Stopping SlayTheSpire2 process $($_.Id) after issue-agent run."
-            Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
-          }
+          $checkoutRoot = Join-Path $workspace "issue-agent-src"
+          $buildRoot = $env:ISSUE_AGENT_BUILD_ROOT
+
+          $hints = @(
+            $checkoutRoot,
+            $buildRoot,
+            "issue-agent-build",
+            "CardUtilityStats.Core.dll"
+          ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
 
           Get-CimInstance Win32_Process | Where-Object {
-            $_.Name -in @('dotnet.exe', 'testhost.exe', 'vstest.console.exe') -and
-            [string]$_.CommandLine -like "*$workspace*"
+            $_.Name -in @('dotnet.exe', 'testhost.exe', 'vstest.console.exe')
           } | ForEach-Object {
-            Write-Host "Stopping stale test/build process $($_.Name) ($($_.ProcessId)) after issue-agent run."
-            Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+            $commandLine = [string]$_.CommandLine
+            foreach ($hint in $hints) {
+              if ($commandLine -like "*$hint*") {
+                Write-Host "Stopping stale runner build process $($_.Name) ($($_.ProcessId)) after issue-agent run."
+                Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+                break
+              }
+            }
           }
