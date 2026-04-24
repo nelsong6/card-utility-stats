@@ -389,29 +389,20 @@ resource "azurerm_role_assignment" "vmss_key_vault_secrets_user" {
   skip_service_principal_aad_check = true
 }
 
-resource "azapi_resource" "issue_agent_runner_bootstrap" {
+resource "azurerm_virtual_machine_scale_set_extension" "issue_agent_runner_bootstrap" {
   count = var.enable_vmss && var.enable_issue_agent_runner_bootstrap ? 1 : 0
 
-  type      = "Microsoft.Compute/virtualMachineScaleSets/extensions@2024-11-01"
-  name      = "issue-agent-runner-bootstrap"
-  parent_id = azapi_resource.vmss[0].id
+  name                         = "issue-agent-runner-bootstrap"
+  virtual_machine_scale_set_id = azapi_resource.vmss[0].id
+  publisher                    = "Microsoft.Compute"
+  type                         = "CustomScriptExtension"
+  type_handler_version         = "1.10"
+  auto_upgrade_minor_version   = true
 
-  body = {
-    properties = {
-      autoUpgradeMinorVersion = true
-      enableAutomaticUpgrade  = false
-      publisher               = "Microsoft.Compute"
-      settings = {
-        commandToExecute = local.issue_agent_runner_extension_command_with_group
-        fileUris         = [local.issue_agent_runner_script_url]
-      }
-      suppressFailures   = false
-      type               = "CustomScriptExtension"
-      typeHandlerVersion = "1.10"
-    }
-  }
-
-  schema_validation_enabled = false
+  settings = jsonencode({
+    commandToExecute = local.issue_agent_runner_extension_command_with_group
+    fileUris         = [local.issue_agent_runner_script_url]
+  })
 
   depends_on = [
     azurerm_role_assignment.vmss_key_vault_secrets_user,
