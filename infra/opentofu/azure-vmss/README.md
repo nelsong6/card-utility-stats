@@ -70,6 +70,7 @@ The worker VMSS in this root is private-only by default. It does not currently e
 - [main.tf](./main.tf)
 - [outputs.tf](./outputs.tf)
 - [example.tfvars](./example.tfvars)
+- [romaine-life-specialized.tfvars](./romaine-life-specialized.tfvars)
 
 ## CI Workflow
 
@@ -153,6 +154,18 @@ The workflow injects the backend values at runtime so that:
    - optionally set `create_nat_gateway = true` for the VMSS phase
    - optionally set `winrm_allowed_cidrs` for a private Ansible runner subnet such as the AKS node subnet
 12. Re-run the workflow to stand up the VMSS from the captured image.
+
+Current repo status:
+
+- the prepared builder VM has already been captured into the specialized Azure
+  Compute Gallery image definition `issue-agent-specialized`, version `1.0.0`,
+  in gallery `cardutilitystatsdevgallery`
+- [romaine-life-specialized.tfvars](./romaine-life-specialized.tfvars) points
+  `source_image_id` at that captured image and enables the VMSS path
+- the GitHub Actions OpenTofu workflow now plans that tfvars file cleanly
+- do not treat that as full worker readiness yet: the current image path still
+  needs a first-boot runner registration step before VMSS nodes can service
+  `issue-agent` jobs automatically
 
 ## Important Limits
 

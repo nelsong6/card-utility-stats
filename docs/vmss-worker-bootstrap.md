@@ -76,6 +76,35 @@ Minimum validation checklist for a new VMSS node:
    - `claude-issue-agent-summary.log`
    - `claude-issue-agent-debug.log`
 
+## Current Status
+
+The builder path has now been proven far enough to freeze a first reusable
+image:
+
+- the standalone Azure builder VM was prepared by hand with Steam login, STS2
+  install, first launch, and Steam offline mode confirmation
+- the repo-side WinRM and private Ansible workflows both completed successfully
+  against that builder
+- a specialized Azure Compute Gallery image was captured from the prepared
+  builder as:
+  - gallery: `cardutilitystatsdevgallery`
+  - image definition: `issue-agent-specialized`
+  - image version: `1.0.0`
+- the image-backed VMSS config now lives at:
+  - [infra/opentofu/azure-vmss/romaine-life-specialized.tfvars](../../../infra/opentofu/azure-vmss/romaine-life-specialized.tfvars)
+- the OpenTofu workflow now plans that config cleanly with exactly one VMSS
+  resource to add
+
+Important current gap:
+
+- the image path installs the GitHub Actions runner files, but it does not yet
+  register and run a Windows self-hosted runner service with the `issue-agent`
+  label on first boot
+- because of that, applying the VMSS config now would create Azure instances,
+  but they would not yet pick up `issue-agent` jobs automatically
+- the next durable step is first-boot runner registration for VMSS instances,
+  not more builder tweaking
+
 ## Ansible Layer
 
 Guest configuration should now be authored in:
