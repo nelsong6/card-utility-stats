@@ -45,7 +45,7 @@ locals {
     offer     = var.marketplace_image.offer
     sku       = var.marketplace_image.sku
     version   = var.marketplace_image.version
-  } : {
+    } : {
     id = var.source_image_id
   }
   vmss_security_profile = var.encryption_at_host_enabled || var.secure_boot_enabled || var.vtpm_enabled ? merge(
@@ -90,7 +90,7 @@ locals {
       }
       priority = "Regular"
       storageProfile = {
-        dataDisks = []
+        dataDisks      = []
         imageReference = local.vmss_image_reference
         osDisk = {
           caching      = var.os_disk_caching
@@ -105,9 +105,9 @@ locals {
     },
     local.vmss_image_is_specialized ? {} : {
       osProfile = {
-        adminPassword       = local.effective_admin_password
-        adminUsername       = var.admin_username
-        computerNamePrefix  = local.computer_name_prefix
+        adminPassword      = local.effective_admin_password
+        adminUsername      = var.admin_username
+        computerNamePrefix = local.computer_name_prefix
         windowsConfiguration = {
           enableAutomaticUpdates = true
           provisionVMAgent       = true

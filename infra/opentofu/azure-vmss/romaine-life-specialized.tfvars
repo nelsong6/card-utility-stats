@@ -25,7 +25,7 @@ vm_sku         = "Standard_NV6ads_A10_v5"
 
 # Specialized Azure Compute Gallery image captured from the prepared builder VM
 # on 2026-04-23. This preserves the Steam and STS2 state we validated by hand.
-source_image_id = "/subscriptions/606a1ca1-5833-4d21-8937-d0fcd97cd0a0/resourceGroups/rg-card-utility-stats-dev/providers/Microsoft.Compute/galleries/cardutilitystatsdevgallery/images/issue-agent-specialized"
+source_image_id     = "/subscriptions/606a1ca1-5833-4d21-8937-d0fcd97cd0a0/resourceGroups/rg-card-utility-stats-dev/providers/Microsoft.Compute/galleries/cardutilitystatsdevgallery/images/issue-agent-specialized"
 vmss_image_os_state = "specialized"
 
 tags = {
