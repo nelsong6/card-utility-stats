@@ -144,6 +144,25 @@ jobs:
           "ISSUE_AGENT_REPO_ROOT=$repoRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "ISSUE_AGENT_BUILD_ROOT=$buildRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
+      - name: Restart STS2 for clean issue-agent baseline
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $repoRoot = $env:ISSUE_AGENT_REPO_ROOT
+          if ([string]::IsNullOrWhiteSpace($repoRoot)) {
+            $repoRoot = Join-Path $env:GITHUB_WORKSPACE $env:ISSUE_AGENT_CHECKOUT_PATH
+          }
+
+          $scriptPath = Join-Path $repoRoot ".github\scripts\restart-sts2.ps1"
+          if (-not (Test-Path -LiteralPath $scriptPath)) {
+            throw "STS2 restart script was not found at '$scriptPath'."
+          }
+
+          & $scriptPath `
+            -Mode Restart `
+            -McpConfigPath (Join-Path $repoRoot ".mcp.json") `
+            -StartupTimeoutSeconds 240 `
+            -ShutdownTimeoutSeconds 45
+
       - name: Azure login
         uses: azure/login@v3
         with:
@@ -241,12 +260,12 @@ jobs:
 
           You own the result. GitHub Actions is only launching you; there is no queue worker or result parser.
 
-          Recovery-first live-state policy:
-          - If STS2 or the bridge is already running, treat that as recoverable by default, not automatic failure.
-          - Before live validation, inspect the current state with `bridge_ping` and `bridge_get_full_state`.
-          - If a previous run or screen is already active, normalize it with MCP tools such as `bridge_auto_proceed`, `bridge_restart_run`, `bridge_navigate_menu`, and `bridge_start_run` until you reach a known-good baseline.
-          - Only report a blocker if MCP cannot normalize the game to a known-good state.
-          - Do not try to kill Slay the Spire 2 with ad hoc shell or process-management commands unless a human explicitly tells you to.
+          Clean STS2 baseline policy:
+          - The workflow restarts STS2 before launching you and waits for the MCP bridge to answer `bridge_ping`.
+          - Start from that fresh game process instead of spending time recovering stale GameOver, reward, overlay, or prior-run state.
+          - Before live validation, confirm the current state with `bridge_ping` and `bridge_get_full_state`.
+          - If the fresh bridge or game state is not usable, stop and report a blocker instead of improvising side automation.
+          - Do not try to kill or restart Slay the Spire 2 yourself; the workflow owns process restart and final cleanup.
 
           Expectations:
           - Work exactly this issue.
@@ -271,7 +290,7 @@ jobs:
           - Use judgment on how many screenshots to include, but do not exceed 10 screenshots for a single issue or pull request.
           - If adequate proof would require more than 10 screenshots, split the work into smaller branches or pull requests instead of overloading one.
           - If screenshot capture is impossible, stop and report the blocker instead of completing the issue without screenshot artifacts.
-          - After live validation, leave STS2 in a recoverable MCP-managed state when practical instead of assuming the workflow will force-close it for you.
+          - The workflow stops STS2 after the job; you do not need to leave it running for the next issue-agent run.
           - Comment on the issue with what you did, what you observed, and any PR/screenshot/artifact links or paths.
           - In the issue comment and pull request summary, include the test-case summary and the screenshot or artifact links or paths.
           - If you complete the issue, remove `issue-agent` and add `issue-agent-complete`.
@@ -429,6 +448,26 @@ jobs:
             -HeadSha $env:GITHUB_SHA `
             -RefName $env:GITHUB_REF_NAME
 
+      - name: Stop STS2 after issue-agent run
+        if: always()
+        continue-on-error: true
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $repoRoot = $env:ISSUE_AGENT_REPO_ROOT
+          if ([string]::IsNullOrWhiteSpace($repoRoot)) {
+            $repoRoot = Join-Path $env:GITHUB_WORKSPACE $env:ISSUE_AGENT_CHECKOUT_PATH
+          }
+
+          $scriptPath = Join-Path $repoRoot ".github\scripts\restart-sts2.ps1"
+          if (-not (Test-Path -LiteralPath $scriptPath)) {
+            Write-Warning "STS2 restart script was not found at '$scriptPath'."
+            return
+          }
+
+          & $scriptPath `
+            -Mode Stop `
+            -McpConfigPath (Join-Path $repoRoot ".mcp.json") `
+            -ShutdownTimeoutSeconds 45
       - name: Stop issue-agent runner build processes
         if: always()
         shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
