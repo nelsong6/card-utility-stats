@@ -79,6 +79,11 @@ function Get-RunnerService {
     return Get-Service | Where-Object { $_.Name -like "$ServiceNamePrefix*" } | Select-Object -First 1
 }
 
+function Get-InstanceMetadata {
+    $metadataUri = "http://169.254.169.254/metadata/instance/compute?api-version=2021-02-01"
+    return Invoke-RestMethod -Headers @{ Metadata = "true" } -Method Get -Uri $metadataUri -TimeoutSec 5
+}
+
 function Ensure-RunnerServiceRunning {
     param([Parameter(Mandatory = $true)][string]$ServiceName)
 
@@ -170,6 +175,19 @@ $configCmdPath = Join-Path $RunnerRoot "config.cmd"
 $runnerConfigPath = Join-Path $RunnerRoot ".runner"
 $serviceNamePrefix = "actions.runner.$($RepositorySlug -replace '/', '-')."
 $runnerName = "$RunnerNamePrefix-$env:COMPUTERNAME"
+
+try {
+    $instanceMetadata = Invoke-WithRetry -Description "Azure instance metadata" -MaxAttempts 6 -DelaySeconds 5 -ScriptBlock {
+        Get-InstanceMetadata
+    }
+
+    $metadataName = [string]$instanceMetadata.name
+    if (-not [string]::IsNullOrWhiteSpace($metadataName)) {
+        $runnerName = (($RunnerNamePrefix, $metadataName) -join "-") -replace "[^A-Za-z0-9._-]", "-"
+    }
+} catch {
+    Write-Host "Azure instance metadata was unavailable. Falling back to COMPUTERNAME for the runner name."
+}
 
 if (-not (Test-Path -LiteralPath $configCmdPath)) {
     throw "GitHub Actions runner config was not found at '$configCmdPath'."

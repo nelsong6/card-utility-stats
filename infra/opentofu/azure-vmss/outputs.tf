@@ -15,17 +15,17 @@ output "subnet_id" {
 
 output "vmss_id" {
   description = "Azure resource ID of the Windows VM scale set."
-  value       = var.enable_vmss ? azurerm_windows_virtual_machine_scale_set.vmss[0].id : null
+  value       = var.enable_vmss ? azapi_resource.vmss[0].id : null
 }
 
 output "vmss_name" {
   description = "Name of the Windows VM scale set."
-  value       = var.enable_vmss ? azurerm_windows_virtual_machine_scale_set.vmss[0].name : null
+  value       = var.enable_vmss ? azapi_resource.vmss[0].name : null
 }
 
 output "vmss_identity_principal_id" {
   description = "System-assigned managed identity principal ID for the VMSS."
-  value       = var.enable_vmss ? azurerm_windows_virtual_machine_scale_set.vmss[0].identity[0].principal_id : null
+  value       = var.enable_vmss ? azapi_resource.vmss[0].output.principal_id : null
 }
 
 output "nat_gateway_public_ip_address" {

@@ -39,6 +39,85 @@ locals {
   issue_agent_runner_script_relative_path = "ops/windows-worker/Initialize-IssueAgentRunner.ps1"
   issue_agent_runner_script_source_path   = "${path.root}/../../../${local.issue_agent_runner_script_relative_path}"
   issue_agent_runner_group                = try(trimspace(var.issue_agent_runner_group), "")
+  vmss_image_is_specialized               = var.vmss_image_os_state == "specialized"
+  vmss_image_reference = var.source_image_id == null ? {
+    publisher = var.marketplace_image.publisher
+    offer     = var.marketplace_image.offer
+    sku       = var.marketplace_image.sku
+    version   = var.marketplace_image.version
+  } : {
+    id = var.source_image_id
+  }
+  vmss_security_profile = var.encryption_at_host_enabled || var.secure_boot_enabled || var.vtpm_enabled ? merge(
+    var.encryption_at_host_enabled ? {
+      encryptionAtHost = true
+    } : {},
+    var.secure_boot_enabled || var.vtpm_enabled ? {
+      uefiSettings = {
+        secureBootEnabled = var.secure_boot_enabled
+        vTpmEnabled       = var.vtpm_enabled
+      }
+    } : {},
+  ) : null
+  vmss_virtual_machine_profile = merge(
+    {
+      extensionProfile = {
+        extensionsTimeBudget = "PT1H30M"
+      }
+      networkProfile = {
+        networkInterfaceConfigurations = [
+          {
+            name = "${var.name_prefix}-nic"
+            properties = {
+              enableAcceleratedNetworking = false
+              enableIPForwarding          = false
+              ipConfigurations = [
+                {
+                  name = "internal"
+                  properties = {
+                    primary                 = true
+                    privateIPAddressVersion = "IPv4"
+                    subnet = {
+                      id = azurerm_subnet.vmss.id
+                    }
+                  }
+                },
+              ]
+              primary = true
+            }
+          },
+        ]
+      }
+      priority = "Regular"
+      storageProfile = {
+        dataDisks = []
+        imageReference = local.vmss_image_reference
+        osDisk = {
+          caching      = var.os_disk_caching
+          createOption = "FromImage"
+          diskSizeGB   = var.os_disk_size_gb
+          managedDisk = {
+            storageAccountType = var.os_disk_storage_account_type
+          }
+          osType = "Windows"
+        }
+      }
+    },
+    local.vmss_image_is_specialized ? {} : {
+      osProfile = {
+        adminPassword       = local.effective_admin_password
+        adminUsername       = var.admin_username
+        computerNamePrefix  = local.computer_name_prefix
+        windowsConfiguration = {
+          enableAutomaticUpdates = true
+          provisionVMAgent       = true
+        }
+      }
+    },
+    local.vmss_security_profile == null ? {} : {
+      securityProfile = local.vmss_security_profile
+    },
+  )
   issue_agent_runner_script_url = format(
     "https://raw.githubusercontent.com/%s/%s/%s?v=%s",
     var.issue_agent_repository_slug,
@@ -225,60 +304,48 @@ resource "azurerm_subnet_nat_gateway_association" "vmss" {
   nat_gateway_id = azurerm_nat_gateway.vmss[0].id
 }
 
-resource "azurerm_windows_virtual_machine_scale_set" "vmss" {
+resource "azapi_resource" "vmss" {
   count = var.enable_vmss ? 1 : 0
 
-  name                = local.vmss_name
-  location            = azurerm_resource_group.vmss.location
-  resource_group_name = azurerm_resource_group.vmss.name
-  sku                 = var.vm_sku
-  instances           = var.instance_count
-
-  admin_username       = var.admin_username
-  admin_password       = local.effective_admin_password
-  computer_name_prefix = local.computer_name_prefix
-
-  encryption_at_host_enabled = var.encryption_at_host_enabled
-  secure_boot_enabled        = var.secure_boot_enabled
-  vtpm_enabled               = var.vtpm_enabled
-  overprovision              = false
-  upgrade_mode               = var.upgrade_mode
-  zones                      = length(var.zones) == 0 ? null : var.zones
-  source_image_id            = var.source_image_id
-
-  dynamic "source_image_reference" {
-    for_each = var.source_image_id == null ? [var.marketplace_image] : []
-
-    content {
-      publisher = source_image_reference.value.publisher
-      offer     = source_image_reference.value.offer
-      sku       = source_image_reference.value.sku
-      version   = source_image_reference.value.version
-    }
-  }
-
-  os_disk {
-    caching              = var.os_disk_caching
-    storage_account_type = var.os_disk_storage_account_type
-    disk_size_gb         = var.os_disk_size_gb
-  }
-
-  network_interface {
-    name    = "${var.name_prefix}-nic"
-    primary = true
-
-    ip_configuration {
-      name      = "internal"
-      primary   = true
-      subnet_id = azurerm_subnet.vmss.id
-    }
-  }
+  type      = "Microsoft.Compute/virtualMachineScaleSets@2024-11-01"
+  name      = local.vmss_name
+  parent_id = azurerm_resource_group.vmss.id
+  location  = azurerm_resource_group.vmss.location
 
   identity {
     type = "SystemAssigned"
   }
 
   tags = local.vmss_tags
+
+  body = merge(
+    {
+      properties = {
+        doNotRunExtensionsOnOverprovisionedVMs = false
+        orchestrationMode                      = "Uniform"
+        overprovision                          = false
+        singlePlacementGroup                   = true
+        upgradePolicy = {
+          mode = var.upgrade_mode
+        }
+        virtualMachineProfile = local.vmss_virtual_machine_profile
+      }
+      sku = {
+        capacity = var.instance_count
+        name     = var.vm_sku
+        tier     = "Standard"
+      }
+    },
+    length(var.zones) == 0 ? {} : {
+      zones = var.zones
+    }
+  )
+
+  schema_validation_enabled = false
+  response_export_values = {
+    principal_id = "identity.principalId"
+    tenant_id    = "identity.tenantId"
+  }
 
   lifecycle {
     precondition {
@@ -290,7 +357,18 @@ resource "azurerm_windows_virtual_machine_scale_set" "vmss" {
       condition     = !var.enable_issue_agent_runner_bootstrap || var.create_nat_gateway || var.subnet_default_outbound_access_enabled
       error_message = "enable_issue_agent_runner_bootstrap requires outbound internet access via create_nat_gateway or subnet_default_outbound_access_enabled."
     }
+
+    precondition {
+      condition     = !local.vmss_image_is_specialized || var.source_image_id != null
+      error_message = "vmss_image_os_state=specialized requires source_image_id to point at a specialized gallery image."
+    }
   }
+
+  depends_on = [
+    azurerm_subnet_network_security_group_association.vmss,
+    azurerm_nat_gateway_public_ip_association.vmss,
+    azurerm_subnet_nat_gateway_association.vmss,
+  ]
 }
 
 resource "azurerm_role_assignment" "vmss_key_vault_secrets_user" {
@@ -300,25 +378,34 @@ resource "azurerm_role_assignment" "vmss_key_vault_secrets_user" {
 
   scope                            = data.azurerm_key_vault.shared.id
   role_definition_name             = "Key Vault Secrets User"
-  principal_id                     = azurerm_windows_virtual_machine_scale_set.vmss[0].identity[0].principal_id
+  principal_id                     = azapi_resource.vmss[0].output.principal_id
   principal_type                   = "ServicePrincipal"
   skip_service_principal_aad_check = true
 }
 
-resource "azurerm_virtual_machine_scale_set_extension" "issue_agent_runner_bootstrap" {
+resource "azapi_resource" "issue_agent_runner_bootstrap" {
   count = var.enable_vmss && var.enable_issue_agent_runner_bootstrap ? 1 : 0
 
-  name                         = "issue-agent-runner-bootstrap"
-  virtual_machine_scale_set_id = azurerm_windows_virtual_machine_scale_set.vmss[0].id
-  publisher                    = "Microsoft.Compute"
-  type                         = "CustomScriptExtension"
-  type_handler_version         = "1.10"
-  auto_upgrade_minor_version   = true
+  type      = "Microsoft.Compute/virtualMachineScaleSets/extensions@2024-11-01"
+  name      = "issue-agent-runner-bootstrap"
+  parent_id = azapi_resource.vmss[0].id
 
-  settings = jsonencode({
-    fileUris         = [local.issue_agent_runner_script_url]
-    commandToExecute = local.issue_agent_runner_extension_command_with_group
-  })
+  body = {
+    properties = {
+      autoUpgradeMinorVersion = true
+      enableAutomaticUpgrade  = false
+      publisher               = "Microsoft.Compute"
+      settings = {
+        commandToExecute = local.issue_agent_runner_extension_command_with_group
+        fileUris         = [local.issue_agent_runner_script_url]
+      }
+      suppressFailures   = false
+      type               = "CustomScriptExtension"
+      typeHandlerVersion = "1.10"
+    }
+  }
+
+  schema_validation_enabled = false
 
   depends_on = [
     azurerm_role_assignment.vmss_key_vault_secrets_user,

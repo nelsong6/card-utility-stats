@@ -31,6 +31,7 @@ vm_sku         = "Standard_NV6ads_A10_v5"
 # Point this at your prepared Windows runner image once the golden image exists.
 # Leave it unset while building the seed VM from the marketplace image.
 source_image_id = null
+# vmss_image_os_state = "specialized"
 
 tags = {
   environment = "dev"

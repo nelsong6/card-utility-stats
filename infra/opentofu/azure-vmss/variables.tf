@@ -243,6 +243,17 @@ variable "source_image_id" {
   default     = null
 }
 
+variable "vmss_image_os_state" {
+  description = "Whether the VMSS source image is generalized or specialized."
+  type        = string
+  default     = "generalized"
+
+  validation {
+    condition     = contains(["generalized", "specialized"], var.vmss_image_os_state)
+    error_message = "vmss_image_os_state must be generalized or specialized."
+  }
+}
+
 variable "marketplace_image" {
   description = "Marketplace image to use when source_image_id is not provided."
   type = object({
