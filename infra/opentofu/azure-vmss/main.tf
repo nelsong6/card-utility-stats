@@ -31,6 +31,37 @@ locals {
   )
   effective_enable_winrm_rule = var.enable_winrm_rule || length(local.effective_winrm_allowed_cidrs) > 0
 
+  issue_agent_runner_labels = [
+    for label in var.issue_agent_runner_labels : trimspace(label)
+    if trimspace(label) != ""
+  ]
+  issue_agent_runner_labels_csv           = join(",", local.issue_agent_runner_labels)
+  issue_agent_runner_script_relative_path = "ops/windows-worker/Initialize-IssueAgentRunner.ps1"
+  issue_agent_runner_script_source_path   = "${path.root}/../../../${local.issue_agent_runner_script_relative_path}"
+  issue_agent_runner_script_url = format(
+    "https://raw.githubusercontent.com/%s/%s/%s?v=%s",
+    var.issue_agent_repository_slug,
+    var.issue_agent_runner_script_ref,
+    local.issue_agent_runner_script_relative_path,
+    substr(filesha256(local.issue_agent_runner_script_source_path), 0, 12),
+  )
+  issue_agent_runner_extension_command = format(
+    "powershell.exe -ExecutionPolicy Bypass -File Initialize-IssueAgentRunner.ps1 -RepositorySlug \"%s\" -RepositoryUrl \"%s\" -KeyVaultName \"%s\" -KeyVaultUri \"%s\" -GitHubPatSecretName \"%s\" -RunnerRoot \"%s\" -RunnerLabels \"%s\" -RunnerNamePrefix \"%s\"",
+    var.issue_agent_repository_slug,
+    "https://github.com/${var.issue_agent_repository_slug}",
+    data.azurerm_key_vault.shared.name,
+    data.azurerm_key_vault.shared.vault_uri,
+    var.issue_agent_runner_pat_secret_name,
+    var.issue_agent_runner_root,
+    local.issue_agent_runner_labels_csv,
+    var.issue_agent_runner_name_prefix,
+  )
+  issue_agent_runner_extension_command_with_group = trimspace(coalesce(var.issue_agent_runner_group, "")) == "" ? local.issue_agent_runner_extension_command : format(
+    "%s -RunnerGroup \"%s\"",
+    local.issue_agent_runner_extension_command,
+    trimspace(coalesce(var.issue_agent_runner_group, "")),
+  )
+
   tags = merge(
     {
       "managed-by" = "opentofu"
@@ -253,7 +284,44 @@ resource "azurerm_windows_virtual_machine_scale_set" "vmss" {
       condition     = var.instance_count >= 1
       error_message = "instance_count must be at least 1 when enable_vmss is true."
     }
+
+    precondition {
+      condition     = !var.enable_issue_agent_runner_bootstrap || var.create_nat_gateway || var.subnet_default_outbound_access_enabled
+      error_message = "enable_issue_agent_runner_bootstrap requires outbound internet access via create_nat_gateway or subnet_default_outbound_access_enabled."
+    }
   }
+}
+
+resource "azurerm_role_assignment" "vmss_key_vault_secrets_user" {
+  count = var.enable_vmss && var.enable_issue_agent_runner_bootstrap ? 1 : 0
+
+  provider = azurerm.shared
+
+  scope                            = data.azurerm_key_vault.shared.id
+  role_definition_name             = "Key Vault Secrets User"
+  principal_id                     = azurerm_windows_virtual_machine_scale_set.vmss[0].identity[0].principal_id
+  principal_type                   = "ServicePrincipal"
+  skip_service_principal_aad_check = true
+}
+
+resource "azurerm_virtual_machine_scale_set_extension" "issue_agent_runner_bootstrap" {
+  count = var.enable_vmss && var.enable_issue_agent_runner_bootstrap ? 1 : 0
+
+  name                         = "issue-agent-runner-bootstrap"
+  virtual_machine_scale_set_id = azurerm_windows_virtual_machine_scale_set.vmss[0].id
+  publisher                    = "Microsoft.Compute"
+  type                         = "CustomScriptExtension"
+  type_handler_version         = "1.10"
+  auto_upgrade_minor_version   = true
+
+  settings = jsonencode({
+    fileUris         = [local.issue_agent_runner_script_url]
+    commandToExecute = local.issue_agent_runner_extension_command_with_group
+  })
+
+  depends_on = [
+    azurerm_role_assignment.vmss_key_vault_secrets_user,
+  ]
 }
 
 resource "azurerm_public_ip" "builder" {

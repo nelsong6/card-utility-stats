@@ -25,6 +25,8 @@ winrm_allowed_cidrs = ["10.0.0.0/22"]
 # Phase 1+: flip enable_vmss to true and point this at the captured worker image.
 instance_count = 1
 vm_sku         = "Standard_NV6ads_A10_v5"
+# enable_issue_agent_runner_bootstrap = true
+# issue_agent_runner_script_ref       = "main"
 
 # Point this at your prepared Windows runner image once the golden image exists.
 # Leave it unset while building the seed VM from the marketplace image.

@@ -10,7 +10,10 @@ enable_builder_vm = true
 enable_vmss       = true
 builder_vm_sku    = "Standard_NV6ads_A10_v5"
 
-create_nat_gateway         = false
+# VMSS instances need outbound internet so first-boot runner registration can
+# reach GitHub and the shared Key Vault.
+create_nat_gateway                  = true
+enable_issue_agent_runner_bootstrap = true
 encryption_at_host_enabled = false
 
 # Private WinRM from the infra-aks node subnet so the Ansible control runner

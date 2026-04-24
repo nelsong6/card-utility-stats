@@ -95,15 +95,23 @@ image:
 - the OpenTofu workflow now plans that config cleanly with exactly one VMSS
   resource to add
 
-Important current gap:
+That repo-side runner-registration gap is now implemented:
 
-- the image path installs the GitHub Actions runner files, but it does not yet
-  register and run a Windows self-hosted runner service with the `issue-agent`
-  label on first boot
-- because of that, applying the VMSS config now would create Azure instances,
-  but they would not yet pick up `issue-agent` jobs automatically
-- the next durable step is first-boot runner registration for VMSS instances,
-  not more builder tweaking
+- [infra/opentofu/azure-vmss/main.tf](../../../infra/opentofu/azure-vmss/main.tf)
+  grants the VMSS managed identity `Key Vault Secrets User` on the shared Key
+  Vault and attaches a VMSS custom-script extension
+- [ops/windows-worker/Initialize-IssueAgentRunner.ps1](../../../ops/windows-worker/Initialize-IssueAgentRunner.ps1)
+  uses that managed identity to read the `github-pat` secret, then configures
+  `D:\actions-runner` as a Windows service-backed repository runner
+- [infra/opentofu/azure-vmss/romaine-life-specialized.tfvars](../../../infra/opentofu/azure-vmss/romaine-life-specialized.tfvars)
+  now enables explicit NAT egress and the first-boot runner bootstrap path
+
+The next operational step is no longer "write the bootstrap." It is:
+
+1. apply the specialized VMSS config
+2. confirm a new self-hosted runner comes online with labels including
+   `issue-agent`
+3. dispatch a real issue-agent workflow run against that runner
 
 ## Ansible Layer
 

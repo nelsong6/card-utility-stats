@@ -138,6 +138,64 @@ variable "enable_vmss" {
   default     = true
 }
 
+variable "enable_issue_agent_runner_bootstrap" {
+  description = "Whether to register each VMSS instance as a GitHub self-hosted runner on first boot."
+  type        = bool
+  default     = false
+}
+
+variable "issue_agent_repository_slug" {
+  description = "GitHub owner/repository slug used for self-hosted runner registration."
+  type        = string
+  default     = "nelsong6/card-utility-stats"
+
+  validation {
+    condition     = can(regex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", var.issue_agent_repository_slug))
+    error_message = "issue_agent_repository_slug must be in owner/repository form."
+  }
+}
+
+variable "issue_agent_runner_pat_secret_name" {
+  description = "Key Vault secret name containing the GitHub PAT used to mint runner registration tokens."
+  type        = string
+  default     = "github-pat"
+}
+
+variable "issue_agent_runner_labels" {
+  description = "Additional labels to register on each GitHub self-hosted runner."
+  type        = list(string)
+  default     = ["issue-agent"]
+
+  validation {
+    condition     = length([for label in var.issue_agent_runner_labels : trimspace(label) if trimspace(label) != ""]) > 0
+    error_message = "issue_agent_runner_labels must contain at least one non-empty label."
+  }
+}
+
+variable "issue_agent_runner_group" {
+  description = "Optional GitHub runner group for organization- or enterprise-level runner registration. Leave null for repository-scoped runners."
+  type        = string
+  default     = null
+}
+
+variable "issue_agent_runner_name_prefix" {
+  description = "Prefix used when deriving the GitHub runner name from the Windows computer name."
+  type        = string
+  default     = "issue-agent"
+}
+
+variable "issue_agent_runner_root" {
+  description = "Filesystem path containing the unpacked GitHub Actions runner files inside the image."
+  type        = string
+  default     = "D:\\actions-runner"
+}
+
+variable "issue_agent_runner_script_ref" {
+  description = "Git ref used when downloading the first-boot runner bootstrap script from raw GitHub."
+  type        = string
+  default     = "main"
+}
+
 variable "vm_sku" {
   description = "Azure VM size for the scale set instances."
   type        = string

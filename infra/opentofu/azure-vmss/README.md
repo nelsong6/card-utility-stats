@@ -19,6 +19,7 @@ It is intentionally CI-first:
 - one NAT gateway plus one Standard public IP for explicit outbound access
 - optionally, one standalone Windows builder VM with a public IP and system-assigned managed identity
 - optionally, one Windows VM Scale Set with a system-assigned managed identity
+- optionally, one Key Vault role assignment plus one VMSS custom-script extension to self-register `issue-agent` runners on first boot
 
 The NAT gateway is included because the workers need reliable outbound internet access for GitHub, Steam, mod dependencies, and artifact upload. That is also the safer long-term Azure posture for new subnets. For the temporary builder-only phase, you can set `create_nat_gateway = false` and let the builder VM use its own public IP.
 
@@ -40,6 +41,7 @@ This root supports a staged path:
    - capture the builder VM into an Azure Compute Gallery image
    - set `enable_vmss = true`
    - set `source_image_id` to the Shared Image Gallery image definition or version ID
+   - set `enable_issue_agent_runner_bootstrap = true`
    - optionally disable or destroy the builder VM once the image is proven
 
 The long-term VMSS path should use `source_image_id`. The builder VM exists only to create that image without requiring the work laptop to host STS2.
@@ -150,8 +152,9 @@ The workflow injects the backend values at runtime so that:
 11. Update the `.tfvars` file:
    - set `enable_vmss = true`
    - set `source_image_id` to the gallery image definition or version ID
+   - set `enable_issue_agent_runner_bootstrap = true`
    - optionally set `enable_builder_vm = false` if you no longer need the seed box
-   - optionally set `create_nat_gateway = true` for the VMSS phase
+   - set `create_nat_gateway = true` for the VMSS phase so first-boot runner registration has outbound egress
    - optionally set `winrm_allowed_cidrs` for a private Ansible runner subnet such as the AKS node subnet
 12. Re-run the workflow to stand up the VMSS from the captured image.
 
@@ -163,14 +166,17 @@ Current repo status:
 - [romaine-life-specialized.tfvars](./romaine-life-specialized.tfvars) points
   `source_image_id` at that captured image and enables the VMSS path
 - the GitHub Actions OpenTofu workflow now plans that tfvars file cleanly
-- do not treat that as full worker readiness yet: the current image path still
-  needs a first-boot runner registration step before VMSS nodes can service
-  `issue-agent` jobs automatically
+- the root now includes a first-boot runner registration path that:
+  - grants the VMSS managed identity `Key Vault Secrets User` on the shared vault
+  - downloads [ops/windows-worker/Initialize-IssueAgentRunner.ps1](../../../ops/windows-worker/Initialize-IssueAgentRunner.ps1) through a VMSS custom-script extension
+  - reads the `github-pat` secret from Key Vault
+  - registers each VMSS instance as a repository-scoped GitHub Actions runner with the `issue-agent` label
+- the next operational step is to apply the specialized tfvars file and confirm the new runner appears online in GitHub
 
 ## Important Limits
 
 - This root creates the compute/network shell, not the full worker bootstrap inside the guest.
-- Runner registration, Codex auth, Steam offline state, and STS2 driver setup still belong in the golden image and/or first-boot bootstrap layer described in [docs/vmss-worker-bootstrap.md](../../../docs/vmss-worker-bootstrap.md).
+- GitHub runner registration is now handled by the VMSS first-boot bootstrap layer, but Codex auth, Steam offline state, and STS2 tooling still belong in the golden image and/or guest bootstrap described in [docs/vmss-worker-bootstrap.md](../../../docs/vmss-worker-bootstrap.md).
 - The builder VM shares the same subnet and NSG as the VMSS. If you need RDP through GitHub Actions, store trusted CIDRs in the Key Vault secret `card-utility-stats-rdp-allowed-cidrs` and let Terraform read them through the `azurerm_key_vault_secret` data source. Local runs can still set `enable_rdp_rule` and `rdp_allowed_cidrs` directly.
 - Private WinRM is supported through the same pattern by setting `winrm_allowed_cidrs` or `winrm_allowed_cidrs_secret_name`. Keep WinRM scoped to trusted private ranges such as the AKS node subnet instead of opening `5986` broadly.
 - For a trusted RDP certificate, connect by hostname, not by raw IP address. A public CA certificate for `builder.romaine.life` will not validate if the client connects to `20.x.x.x`.
