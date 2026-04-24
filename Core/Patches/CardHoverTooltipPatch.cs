@@ -44,6 +44,10 @@ public static class CardHoverShowPatch
         // hovers on cards with multiple keyword tooltips like Coolheaded),
         // we stack above instead.
 
+        RuntimeOptionsProvider.Refresh();
+        if (__instance is NHandCardHolder && !RuntimeOptionsProvider.Current.ShowHandTooltips)
+            return;
+
         // Gate on our checkbox state. If it's not even injected yet (no deck
         // view opened this session) or unchecked, do nothing.
         var tickbox = ViewStatsInjectorPatch.LastInjectedTickbox;
@@ -411,6 +415,7 @@ public static class CardHoverShowPatch
 
         if (isUnplayable)
         {
+            // For unplayable cards, just show Drawn. Played is always 0.
             Row3(sb, GetDrawStatLabel("drawn"), agg.TimesDrawn.ToString(), "");
         }
         else
@@ -419,8 +424,8 @@ public static class CardHoverShowPatch
             Row3(sb, "Played/Drawn", $"{agg.Plays}/{agg.TimesDrawn}", $"{playRate:F0}%");
         }
 
-        if (isAttack || agg.TotalEffective > 0)
-            Row3(sb, "Total damage", agg.TotalEffective.ToString(), "");
+        bool hasDedicatedPoison = AppendDedicatedPoisonStats(sb, agg, compact: true);
+        AppendAppliedEffects(sb, agg, compact: true, excludePoison: hasDedicatedPoison);
 
         if (agg.TotalEnergyGenerated > 0)
             Row3(sb, GetEnergyStatLabel("gained"), agg.TotalEnergyGenerated.ToString(), "");
@@ -431,23 +436,27 @@ public static class CardHoverShowPatch
         if (agg.TotalForgeGenerated > 0m)
             Row3(sb, GetForgeStatLabel("gained"), FormatDecimal(agg.TotalForgeGenerated), "");
 
+        AppendMakeItSoStats(sb, cardModel, agg, compact: true);
+
+        bool showDamage = isAttack || agg.TotalIntended > 0;
+        if (showDamage)
+        {
+            Row3(sb, "Total damage", agg.TotalEffective.ToString(), "");
+            if (agg.Kills > 0) Row3(sb, "Kills", agg.Kills.ToString(), "");
+        }
+
         if (agg.TotalBlockGained > 0)
             Row3(sb, GetBlockStatLabel("gained"), agg.TotalBlockGained.ToString(), "");
 
-        bool hasDedicatedPoison = AppendDedicatedPoisonStats(sb, agg, compact: true);
-        AppendAppliedEffects(sb, agg, compact: true, excludePoison: hasDedicatedPoison);
-        AppendArtifactBlockedSummary(sb, agg, excludePoison: hasDedicatedPoison);
-
-        if (agg.Kills > 0)
-            Row3(sb, "Kills", agg.Kills.ToString(), "");
+        if (agg.TotalHpLost > 0)
+            Row3(sb, "HP lost", agg.TotalHpLost.ToString(), "");
     }
 
     /// <summary>
-    /// Whether this card is a member of the player's permanent deck, vs.
-    /// a transient combat-only card (Souls, Shivs, short-lived generated
-    /// cards, transformed cards that haven't been added to the deck).
-    /// We canonicalize both sides — combat clones' DeckVersion points at
-    /// their deck original, so comparing canonical refs lands correctly.
+    /// A deck card is "in deck" if its canonical deck reference still
+    /// exists in the player's permanent deck list. Combat clones point back
+    /// to the deck original via DeckVersion; deck-view cards are already the
+    /// canonical object. Removed cards are intentionally NOT in the list.
     ///
     /// If we can't read the deck state (no active run, etc.) we default to
     /// TRUE so we fall back to the normal lineage display. That's the safer
