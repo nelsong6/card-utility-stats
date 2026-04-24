@@ -28,8 +28,8 @@ namespace CardUtilityStats.Core;
 /// We previously tried collectible AssemblyLoadContext (to actually reclaim
 /// memory on unload) but that approach is "fundamentally flawed" per
 /// Microsoft's own runtime team: it requires every dependency to be
-/// collectible-safe, and Harmony + Godot + Publicizer + BaseLib are not.
-/// See research commit for details.
+/// collectible-safe, and Harmony + Godot + Publicizer + loader-side BaseLib
+/// are not. See research commit for details.
 /// </summary>
 public static class CoreMain
 {
@@ -45,9 +45,10 @@ public static class CoreMain
     /// <summary>
     /// Our own debug gate — when true, per-event and per-hook logs write out;
     /// when false, only structural milestones (Initialize/Shutdown/RunStarted/
-    /// CombatEnded etc.) do. Toggled by the CUS_DEBUG environment variable
-    /// at Initialize time. NOT using MegaCrit's GlobalLogLevel because that's
-    /// process-wide — flipping it would make every other mod spam too.
+    /// CombatEnded etc.) do. Toggled by the BaseLib-backed settings UI or the
+    /// CUS_DEBUG environment variable. NOT using MegaCrit's GlobalLogLevel
+    /// because that's process-wide — flipping it would make every other mod
+    /// spam too.
     /// </summary>
     public static bool DebugLogging { get; private set; }
 
@@ -67,15 +68,16 @@ public static class CoreMain
     public static void Initialize()
     {
         Logger.ActivateGameLogger();
+        RuntimeOptionsProvider.Refresh();
 
-        // Read debug gate from env var. Any non-empty truthy value enables;
-        // default (unset / "0" / "false") stays quiet. Read in Initialize so
-        // a dev can flip it between hot-reloads by changing their shell env
-        // before relaunching — though in practice once set it usually stays.
+        // Read debug gate from both config and env var. The env var remains a
+        // handy one-off override for development sessions without touching the
+        // persisted settings UI toggle.
         var envDebug = System.Environment.GetEnvironmentVariable("CUS_DEBUG");
-        DebugLogging = !string.IsNullOrEmpty(envDebug)
+        var envDebugEnabled = !string.IsNullOrEmpty(envDebug)
             && envDebug != "0"
             && !envDebug.Equals("false", StringComparison.OrdinalIgnoreCase);
+        DebugLogging = RuntimeOptionsProvider.Current.EnableDebugLogging || envDebugEnabled;
 
         Logger.Info($"Core.Initialize starting (harmony_id={_harmonyId}, debug={DebugLogging})");
 
