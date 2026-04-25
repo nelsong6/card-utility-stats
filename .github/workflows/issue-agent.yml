@@ -183,7 +183,7 @@ jobs:
           Write-Host "::add-mask::$anthropicApiKey"
           "ANTHROPIC_API_KEY=$anthropicApiKey" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Run phased Claude issue agent
-        timeout-minutes: 8
+        timeout-minutes: 25
         env:
           CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
           GH_TOKEN: ${{ github.token }}
