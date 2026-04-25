@@ -15,7 +15,6 @@ on:
 permissions:
   contents: write
   issues: write
-  id-token: write
   pull-requests: write
 
 jobs:
@@ -160,39 +159,30 @@ jobs:
           & $scriptPath `
             -Mode Restart `
             -McpConfigPath (Join-Path $repoRoot ".mcp.json") `
-            -StartupTimeoutSeconds 240 `
+            -StartupTimeoutSeconds 60 `
             -ShutdownTimeoutSeconds 45
 
-      - name: Azure login
-        uses: azure/login@v3
-        with:
-          client-id: ${{ vars.ARM_CLIENT_ID }}
-          tenant-id: ${{ vars.ARM_TENANT_ID }}
-          subscription-id: ${{ vars.KEY_VAULT_SUBSCRIPTION_ID || vars.ARM_SUBSCRIPTION_ID }}
-
-      - name: Load Anthropic API key from Key Vault
+      - name: Load Anthropic API key from local runner file
+        env:
+          CONFIGURED_ANTHROPIC_KEY_PATH: ${{ vars.ISSUE_AGENT_ANTHROPIC_KEY_PATH }}
         shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         run: |
-          $keyVaultName = '${{ vars.KEY_VAULT_NAME }}'
-          $secretName = 'spirelens'
-
-          if ([string]::IsNullOrWhiteSpace($keyVaultName)) {
-            throw "Missing repository variable KEY_VAULT_NAME."
+          $keyPath = $env:CONFIGURED_ANTHROPIC_KEY_PATH
+          if ([string]::IsNullOrWhiteSpace($keyPath)) {
+            $keyPath = 'C:\ProgramData\SpireLens\anthropic-api-key.txt'
           }
 
-          $anthropicApiKey = az keyvault secret show `
-            --vault-name $keyVaultName `
-            --name $secretName `
-            --query value `
-            --output tsv
+          if (-not (Test-Path -LiteralPath $keyPath)) {
+            throw "Anthropic API key file was not found at '$keyPath'. Run the Key Vault bootstrap script on this runner or set repository variable ISSUE_AGENT_ANTHROPIC_KEY_PATH."
+          }
 
-          if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($anthropicApiKey)) {
-            throw "Unable to load Key Vault secret '$secretName' from vault '$keyVaultName'."
+          $anthropicApiKey = (Get-Content -LiteralPath $keyPath -Raw).Trim()
+          if ([string]::IsNullOrWhiteSpace($anthropicApiKey)) {
+            throw "Anthropic API key file '$keyPath' is empty."
           }
 
           Write-Host "::add-mask::$anthropicApiKey"
           "ANTHROPIC_API_KEY=$anthropicApiKey" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-
       - name: Run Claude issue agent
         env:
           CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
@@ -261,10 +251,10 @@ jobs:
           You own the result. GitHub Actions is only launching you; there is no queue worker or result parser.
 
           Clean STS2 baseline policy:
-          - The workflow restarts STS2 before launching you and waits for the MCP bridge to answer `bridge_ping`.
+          - The workflow restarts STS2 before launching you and waits for the in-game `SpireLensMcpBridge` HTTP bridge to answer `bridge_ping`.
           - Start from that fresh game process instead of spending time recovering stale GameOver, reward, overlay, or prior-run state.
           - Before live validation, confirm the current state with `bridge_ping` and `bridge_get_full_state`.
-          - If the fresh bridge or game state is not usable, stop and report a blocker instead of improvising side automation.
+          - If the fresh `SpireLensMcpBridge` bridge or game state is not usable, stop and report a blocker instead of improvising side automation.
           - Do not try to kill or restart Slay the Spire 2 yourself; the workflow owns process restart and final cleanup.
 
           Expectations:
@@ -272,8 +262,8 @@ jobs:
           - Use the local checkout at `$env:ISSUE_AGENT_REPO_ROOT`.
           - Use `gh`, `git`, tests, and MCP tools as needed.
           - For build or test commands in GitHub Actions, do not use the repo's default `bin/obj` outputs. Use isolated outputs under `$env:ISSUE_AGENT_BUILD_ROOT`, for example with MSBuild properties like `/p:BaseOutputPath=...` and `/p:BaseIntermediateOutputPath=...`.
-          - Use the project MCP config at `$mcpConfig`; for live STS2 work, use the `sts2-modding` MCP server.
-          - `sts2-modding` is a hard prerequisite for live STS2 work. If it is unavailable, unhealthy, or unusable, stop immediately and report a blocker.
+          - Use the project MCP config at `$mcpConfig`; for live STS2 work, use the `spire-lens-mcp` MCP server. That external MCP server talks to the in-game `SpireLensMcpBridge` mod over localhost:15526.
+          - `spire-lens-mcp` is a hard prerequisite for live STS2 work. If it is unavailable, unhealthy, or unusable, stop immediately and report a blocker.
           - All stateful STS2 work must go through approved MCP tools. Do not use raw TCP bridge calls, ad hoc PowerShell bridge scripts, Azure Python imports, Windows API clicking, or other non-MCP workarounds.
           - Use direct MCP/game control. Do not use or debug any legacy filesystem bridge or scenario-request queue.
           - Missing MCP capability is a tooling gap to report, not a reason to invent side automation.

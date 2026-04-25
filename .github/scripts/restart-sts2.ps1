@@ -20,9 +20,9 @@ function Get-Sts2GameDir {
     }
 
     $config = Get-Content -LiteralPath $ConfigPath -Raw | ConvertFrom-Json
-    $server = $config.mcpServers.'sts2-modding'
+    $server = $config.mcpServers.'spire-lens-mcp'
     if ($null -eq $server -or $null -eq $server.env -or [string]::IsNullOrWhiteSpace([string]$server.env.STS2_GAME_DIR)) {
-        throw "MCP config '$ConfigPath' does not define mcpServers.sts2-modding.env.STS2_GAME_DIR."
+        throw "MCP config '$ConfigPath' does not define mcpServers.spire-lens-mcp.env.STS2_GAME_DIR."
     }
 
     $gameDir = [string]$server.env.STS2_GAME_DIR
@@ -51,8 +51,8 @@ function Invoke-BridgePing {
         [int]$TimeoutMilliseconds = 2000
     )
 
-    # SpireLens MCP exposes an HTTP server on this port; the index route
-    # answers with `{"message": "Hello from SpireLens MCP v...", "status": "ok"}`.
+    # SpireLensMcpBridge exposes an HTTP server on this port; the index route
+    # answers with `{"message": "Hello from SpireLensMcpBridge v...", "status": "ok"}`.
     $uri = "http://${HostName}:${Port}/"
     $timeoutSec = [int][Math]::Max(1, [Math]::Ceiling($TimeoutMilliseconds / 1000.0))
 
@@ -84,7 +84,7 @@ function Wait-BridgeUnavailable {
         Start-Sleep -Seconds 1
     }
 
-    Write-Warning "STS2 bridge still answered ping after waiting $TimeoutSeconds second(s) for shutdown. Continuing with restart."
+    Write-Warning "SpireLensMcpBridge still answered ping after waiting $TimeoutSeconds second(s) for shutdown. Continuing with restart."
 }
 
 function Stop-Sts2 {
@@ -156,6 +156,134 @@ function Start-Sts2 {
     Start-Process -FilePath $exePath -ArgumentList $Arguments -WorkingDirectory $GameDir | Out-Null
 }
 
+function Get-Sts2LogDirs {
+    @(
+        (Join-Path $env:APPDATA 'SlayTheSpire2\logs'),
+        (Join-Path $env:LOCALAPPDATA 'SlayTheSpire2\logs'),
+        'C:\Windows\ServiceProfiles\NetworkService\AppData\Roaming\SlayTheSpire2\logs',
+        'C:\Windows\ServiceProfiles\NetworkService\AppData\Local\SlayTheSpire2\logs',
+        'C:\Windows\System32\config\systemprofile\AppData\Roaming\SlayTheSpire2\logs',
+        'C:\Windows\System32\config\systemprofile\AppData\Local\SlayTheSpire2\logs'
+    ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique
+}
+
+function Copy-Sts2DiagnosticArtifacts {
+    param([string]$GameDir)
+
+    $artifactRoot = $env:VALIDATION_ARTIFACT_DIR
+    if ([string]::IsNullOrWhiteSpace($artifactRoot) -and -not [string]::IsNullOrWhiteSpace($env:RUNNER_TEMP)) {
+        $artifactRoot = Join-Path $env:RUNNER_TEMP 'sts2-artifacts'
+    }
+    if ([string]::IsNullOrWhiteSpace($artifactRoot)) {
+        return
+    }
+
+    $diagRoot = Join-Path $artifactRoot 'sts2-startup-diagnostics'
+    $logsRoot = Join-Path $diagRoot 'logs'
+    New-Item -ItemType Directory -Force -Path $logsRoot | Out-Null
+
+    $snapshotPath = Join-Path $diagRoot 'startup-diagnostics.txt'
+    $lines = New-Object System.Collections.Generic.List[string]
+    $lines.Add("timestamp=$((Get-Date).ToString('o'))")
+    $lines.Add("identity=$([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)")
+    $lines.Add("gameDir=$GameDir")
+    $lines.Add("APPDATA=$env:APPDATA")
+    $lines.Add("LOCALAPPDATA=$env:LOCALAPPDATA")
+    $lines.Add("RUNNER_TEMP=$env:RUNNER_TEMP")
+    $lines.Add('')
+    $lines.Add('STS2 processes:')
+    Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -in @('SlayTheSpire2.exe', 'crashpad_handler.exe') } |
+        ForEach-Object { $lines.Add("  $($_.Name) pid=$($_.ProcessId) session=$($_.SessionId) path=$($_.ExecutablePath) cmd=$($_.CommandLine)") }
+
+    $lines.Add('')
+    $lines.Add('Installed mods:')
+    $modsDir = Join-Path $GameDir 'mods'
+    if (Test-Path -LiteralPath $modsDir) {
+        Get-ChildItem -LiteralPath $modsDir -Recurse -File -ErrorAction SilentlyContinue |
+            Sort-Object FullName |
+            ForEach-Object { $lines.Add("  $($_.FullName) len=$($_.Length) mtime=$($_.LastWriteTime.ToString('o'))") }
+    } else {
+        $lines.Add("  mods directory not found: $modsDir")
+    }
+    $lines | Set-Content -LiteralPath $snapshotPath -Encoding UTF8
+
+    $index = 0
+    foreach ($logDir in Get-Sts2LogDirs) {
+        if (-not (Test-Path -LiteralPath $logDir)) {
+            continue
+        }
+
+        $safeName = ($logDir -replace '[:\\/ ]', '_').Trim('_')
+        $targetDir = Join-Path $logsRoot $safeName
+        New-Item -ItemType Directory -Force -Path $targetDir | Out-Null
+
+        Get-ChildItem -LiteralPath $logDir -File -ErrorAction SilentlyContinue |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 8 |
+            ForEach-Object {
+                $index += 1
+                $targetName = ('{0:000}-{1}' -f $index, $_.Name)
+                Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $targetDir $targetName) -Force -ErrorAction SilentlyContinue
+            }
+    }
+
+    Write-Host "Saved STS2 startup diagnostic artifacts under '$diagRoot'."
+}
+
+function Show-Sts2BridgeDiagnostics {
+    param([string]$GameDir)
+
+    Copy-Sts2DiagnosticArtifacts -GameDir $GameDir
+
+    Write-Host '--- SpireLensMcpBridge diagnostics ---'
+    Write-Host "Process identity: $([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)"
+    Write-Host "APPDATA=$env:APPDATA"
+    Write-Host "LOCALAPPDATA=$env:LOCALAPPDATA"
+
+    Write-Host 'Installed mods:'
+    $modsDir = Join-Path $GameDir 'mods'
+    if (Test-Path -LiteralPath $modsDir) {
+        Get-ChildItem -LiteralPath $modsDir -Force -ErrorAction SilentlyContinue |
+            ForEach-Object { Write-Host "  dir $($_.Name) path=$($_.FullName)" }
+        Get-ChildItem -LiteralPath $modsDir -Recurse -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -match 'SpireLens|BaseLib|Mcp|Bridge|\.json$|\.conf$' } |
+            Sort-Object FullName |
+            ForEach-Object { Write-Host "  file $($_.FullName) len=$($_.Length) mtime=$($_.LastWriteTime.ToString('o'))" }
+    } else {
+        Write-Host "  mods directory not found: $modsDir"
+    }
+
+    Write-Host 'STS2 processes visible to runner:'
+    Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -in @('SlayTheSpire2.exe', 'crashpad_handler.exe') } |
+        ForEach-Object { Write-Host "  $($_.Name) pid=$($_.ProcessId) session=$($_.SessionId) path=$($_.ExecutablePath)" }
+
+    foreach ($logDir in Get-Sts2LogDirs) {
+        Write-Host "Checking log dir: $logDir"
+        if (-not (Test-Path -LiteralPath $logDir)) {
+            Write-Host '  not found or not accessible'
+            continue
+        }
+
+        Get-ChildItem -LiteralPath $logDir -File -ErrorAction SilentlyContinue |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 3 |
+            ForEach-Object {
+                Write-Host "  log $($_.FullName) mtime=$($_.LastWriteTime.ToString('o')) len=$($_.Length)"
+                try {
+                    Get-Content -LiteralPath $_.FullName -Tail 160 -ErrorAction Stop |
+                        Where-Object { $_ -match 'SpireLens|Mcp|Bridge|BaseLib|mod|Mod|HttpListener|Failed|Exception|ERROR|WARN|Loaded' } |
+                        ForEach-Object { Write-Host "    $_" }
+                } catch {
+                    Write-Host "    unable to read log: $($_.Exception.Message)"
+                }
+            }
+    }
+
+    Write-Host '--- end SpireLensMcpBridge diagnostics ---'
+}
+
 function Wait-Sts2Ready {
     param(
         [string]$GameDir,
@@ -171,11 +299,11 @@ function Wait-Sts2Ready {
         if ($processes.Count -gt 0) {
             $ping = Invoke-BridgePing -HostName $HostName -Port $Port -TimeoutMilliseconds 2500
             if ($ping.ok) {
-                Write-Host "STS2 bridge is ready on ${HostName}:${Port}."
+                Write-Host "SpireLensMcpBridge is ready on ${HostName}:${Port}."
                 return
             }
             $lastError = [string]$ping.error
-            Write-Host "Waiting for STS2 bridge readiness: $lastError"
+            Write-Host "Waiting for SpireLensMcpBridge readiness: $lastError"
         } else {
             $lastError = 'SlayTheSpire2.exe is not running yet'
             Write-Host 'Waiting for SlayTheSpire2.exe to start.'
@@ -183,7 +311,8 @@ function Wait-Sts2Ready {
         Start-Sleep -Seconds 3
     }
 
-    throw "Timed out waiting $TimeoutSeconds second(s) for STS2 bridge readiness. Last status: $lastError"
+    Show-Sts2BridgeDiagnostics -GameDir $GameDir
+    throw "Timed out waiting $TimeoutSeconds second(s) for SpireLensMcpBridge readiness. Last status: $lastError"
 }
 
 $gameDir = Get-Sts2GameDir -ConfigPath $McpConfigPath
