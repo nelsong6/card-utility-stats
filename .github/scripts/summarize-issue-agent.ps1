@@ -202,6 +202,40 @@ $lines.Add("| Head SHA | $HeadSha |")
 $lines.Add("| Ref | $RefName |")
 $lines.Add("| Persistent local logs | `$persistentRoot` |")
 $lines.Add('')
+$phaseCostRows = New-Object System.Collections.Generic.List[string]
+foreach ($phaseName in $phaseNames) {
+    $phaseCostRows.Add("| $phaseName | $0.0000 | 0 | 0 | 0 | 0 | 0 |")
+}
+if (-not [string]::IsNullOrWhiteSpace($EventLogPath) -and (Test-Path -LiteralPath $EventLogPath)) {
+    $phaseBuckets = @{}
+    foreach ($phaseName in $phaseNames) {
+        $phaseBuckets[$phaseName] = [ordered]@{ Cost = 0.0; Turns = 0; Input = 0; Output = 0; CacheCreate = 0; CacheRead = 0 }
+    }
+    Get-Content -LiteralPath $EventLogPath -ErrorAction SilentlyContinue | ForEach-Object {
+        try {
+            $record = $_ | ConvertFrom-Json -ErrorAction Stop
+            if ($record.kind -ne 'result') { return }
+            $phaseName = [string](Get-NestedPropertyValue -Object $record -Path @('data', 'phase'))
+            if (-not $phaseBuckets.ContainsKey($phaseName)) { return }
+            $resultEvent = $record.message | ConvertFrom-Json -ErrorAction Stop
+            if ($null -ne $resultEvent.total_cost_usd) { $phaseBuckets[$phaseName].Cost += [double]$resultEvent.total_cost_usd }
+            if ($null -ne $resultEvent.num_turns) { $phaseBuckets[$phaseName].Turns += [int]$resultEvent.num_turns }
+            if ($null -ne $resultEvent.usage) {
+                if ($null -ne $resultEvent.usage.input_tokens) { $phaseBuckets[$phaseName].Input += [int64]$resultEvent.usage.input_tokens }
+                if ($null -ne $resultEvent.usage.output_tokens) { $phaseBuckets[$phaseName].Output += [int64]$resultEvent.usage.output_tokens }
+                if ($null -ne $resultEvent.usage.cache_creation_input_tokens) { $phaseBuckets[$phaseName].CacheCreate += [int64]$resultEvent.usage.cache_creation_input_tokens }
+                if ($null -ne $resultEvent.usage.cache_read_input_tokens) { $phaseBuckets[$phaseName].CacheRead += [int64]$resultEvent.usage.cache_read_input_tokens }
+            }
+        } catch {
+        }
+    }
+    $phaseCostRows.Clear()
+    foreach ($phaseName in $phaseNames) {
+        $bucket = $phaseBuckets[$phaseName]
+        $phaseCostRows.Add("| $phaseName | $(Format-Usd $bucket.Cost) | $($bucket.Turns) | $($bucket.Input) | $($bucket.Output) | $($bucket.CacheCreate) | $($bucket.CacheRead) |")
+    }
+}
+
 $lines.Add('### Phase Results')
 $lines.Add('')
 $lines.Add('| Phase | Status | Abort reason | Retryable | Human action | Markdown |')
@@ -212,6 +246,12 @@ foreach ($phaseName in $phaseNames) {
     $mdState = if (Test-Path -LiteralPath (Join-Path $ValidationArtifactDir $mdName)) { '`' + $mdName + '`' } else { '_missing_' }
     $lines.Add("| $phaseName | $(Format-Cell (Get-PropertyValue -Object $phase -Name 'status')) | $(Format-Cell (Get-PropertyValue -Object $phase -Name 'abort_reason')) | $(Format-Cell (Get-PropertyValue -Object $phase -Name 'retryable')) | $(Format-Cell (Get-PropertyValue -Object $phase -Name 'human_action_required')) | $mdState |")
 }
+$lines.Add('')
+$lines.Add('### Claude Cost By Phase')
+$lines.Add('')
+$lines.Add('| Phase | Cost | Turns | Input | Output | Cache create | Cache read |')
+$lines.Add('| --- | ---: | ---: | ---: | ---: | ---: | ---: |')
+foreach ($phaseCostRow in $phaseCostRows) { $lines.Add($phaseCostRow) }
 $lines.Add('')
 $lines.Add('### Evidence')
 $lines.Add('')
