@@ -261,7 +261,21 @@ jobs:
           - Work exactly this issue.
           - Use the local checkout at `$env:ISSUE_AGENT_REPO_ROOT`.
           - Use `gh`, `git`, tests, and MCP tools as needed.
-          - For build or test commands in GitHub Actions, do not use the repo's default `bin/obj` outputs. Use isolated outputs under `$env:ISSUE_AGENT_BUILD_ROOT`, for example with MSBuild properties like `/p:BaseOutputPath=...` and `/p:BaseIntermediateOutputPath=...`.
+          - For build/test validation on this Windows issue-agent runner, use the repo-native output layout. Do not pass custom `BaseOutputPath`, `BaseIntermediateOutputPath`, `OutputPath`, or `IntermediateOutputPath` properties; this repo's STS2/publicized assembly references are sensitive to those overrides.
+          - Use this known-good validation sequence:
+
+            ``````powershell
+            $sts2DataDir = "D:\SteamLibrary\steamapps\common\Slay the Spire 2\data_sts2_windows_x86_64"
+
+            dotnet build "Tests\SpireLens.Core.Tests\SpireLens.Core.Tests.csproj" `
+              -c Debug `
+              "-p:Sts2DataDir=$sts2DataDir"
+
+            dotnet test "Tests\SpireLens.Core.Tests\SpireLens.Core.Tests.csproj" `
+              -c Debug `
+              --no-build `
+              "-p:Sts2DataDir=$sts2DataDir"
+            ``````
           - Use the project MCP config at `$mcpConfig`; for live STS2 work, use the `spire-lens-mcp` MCP server. That external MCP server talks to the in-game `SpireLensMcpBridge` mod over localhost:15526.
           - `spire-lens-mcp` is a hard prerequisite for live STS2 work. If it is unavailable, unhealthy, or unusable, stop immediately and report a blocker.
           - All stateful STS2 work must go through approved MCP tools. Do not use raw TCP bridge calls, ad hoc PowerShell bridge scripts, Azure Python imports, Windows API clicking, or other non-MCP workarounds.
