@@ -310,17 +310,47 @@ jobs:
 
           Expectations:
           Guard rail contract:
-          Result contract:
-          - Before exiting, write `$env:VALIDATION_ARTIFACT_DIR\issue-agent-result.json`.
-          - The JSON result is the authoritative machine-readable claim about the run. Do not mark an issue complete unless this file exists and accurately reflects the evidence.
+          Layered result contract:
+          - Treat the run as three ordered layers: investigation, implementation, verification.
+          - Each layer must write its own JSON file in `$env:VALIDATION_ARTIFACT_DIR` before the next layer starts:
+            - `issue-agent-investigation.json`
+            - `issue-agent-implementation.json`
+            - `issue-agent-verification.json`
+          - If a layer aborts, stop immediately after writing that layer file and the top-level `issue-agent-result.json`. Do not continue into later layers.
+          - Each layer result must use this shape:
+
+            ``````json
+            {
+              "layer": "investigation | implementation | verification",
+              "status": "pass | abort",
+              "abort_reason": null,
+              "retryable": false,
+              "human_action_required": false,
+              "notes": "short, evidence-specific explanation"
+            }
+            ``````
+
+          - Investigation owns facts, card identity, character identity, MCP/game-state discovery, and validation plan. Allowed investigation abort reasons: `card_not_found`, `card_ambiguous`, `character_not_found`, `metadata_unavailable`, `mcp_capability_missing`, `game_state_unreachable`, `validation_plan_impossible`.
+          - Implementation owns code changes only. Allowed implementation abort reasons: `change_too_large`, `requires_new_library`, `requires_architecture_change`, `unsafe_refactor`, `missing_code_context`, `conflicting_requirements`, `cannot_implement_without_guessing`.
+          - Verification owns tests, live MCP proof, screenshots, and final pass/fail. Allowed verification abort reasons: `unit_tests_failed`, `live_validation_failed`, `screenshot_missing`, `screenshot_not_relevant`, `mcp_state_mismatch`, `claimed_result_not_observed`, `artifact_contract_missing`.
+          - Before exiting, also write `$env:VALIDATION_ARTIFACT_DIR\issue-agent-result.json` as the rollup. The JSON result is the authoritative machine-readable claim about the run. Do not mark an issue complete unless this file exists and accurately reflects the layer files and evidence.
           - Use explicit booleans for pass/fail claims. Use `null` only when a check was not applicable or was blocked before it could run.
           - Keep notes short and evidence-specific. Do not use notes to soften a failed boolean.
-          - Required schema:
+          - Required rollup schema:
 
             ``````json
             {
               "issue_number": 123,
               "status": "complete | blocked | pr_opened | failed",
+              "abort_layer": null,
+              "abort_reason": null,
+              "retryable": false,
+              "human_action_required": false,
+              "layers": {
+                "investigation": { "status": "pass | abort", "abort_reason": null },
+                "implementation": { "status": "pass | abort | not_run", "abort_reason": null },
+                "verification": { "status": "pass | abort | not_run", "abort_reason": null }
+              },
               "unit_tests": { "passed": true, "status": "pass | fail | not_run | blocked", "notes": "" },
               "live_mcp_validation": { "passed": true, "status": "pass | fail | not_run | blocked", "notes": "" },
               "screenshot_validation": { "passed": true, "status": "pass | fail | not_run | blocked", "count": 1, "notes": "" },
