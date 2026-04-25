@@ -23,7 +23,6 @@ jobs:
     name: Run Claude for one issue
     env:
       ISSUE_AGENT_CHECKOUT_PATH: issue-agent-src/${{ github.run_id }}-${{ github.run_attempt }}
-      AZURE_CONFIG_DIR: ${{ runner.temp }}/azure-cli-${{ github.run_id }}-${{ github.run_attempt }}
     if: |
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'issues' && (
@@ -165,6 +164,8 @@ jobs:
             -ShutdownTimeoutSeconds 45
 
       - name: Prepare isolated Azure CLI config
+        env:
+          AZURE_CONFIG_DIR: ${{ runner.temp }}/azure-cli-${{ github.run_id }}-${{ github.run_attempt }}
         shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         run: |
           if ([string]::IsNullOrWhiteSpace($env:AZURE_CONFIG_DIR)) {
@@ -176,6 +177,8 @@ jobs:
           Write-Host "Using isolated Azure CLI config dir: $env:AZURE_CONFIG_DIR"
 
       - name: Azure login
+        env:
+          AZURE_CONFIG_DIR: ${{ runner.temp }}/azure-cli-${{ github.run_id }}-${{ github.run_attempt }}
         uses: azure/login@v3
         with:
           client-id: ${{ vars.ARM_CLIENT_ID }}
@@ -183,6 +186,8 @@ jobs:
           subscription-id: ${{ vars.KEY_VAULT_SUBSCRIPTION_ID || vars.ARM_SUBSCRIPTION_ID }}
 
       - name: Load Anthropic API key from Key Vault
+        env:
+          AZURE_CONFIG_DIR: ${{ runner.temp }}/azure-cli-${{ github.run_id }}-${{ github.run_attempt }}
         shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         run: |
           $keyVaultName = '${{ vars.KEY_VAULT_NAME }}'
