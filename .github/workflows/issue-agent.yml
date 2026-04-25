@@ -160,7 +160,7 @@ jobs:
           & $scriptPath `
             -Mode Restart `
             -McpConfigPath (Join-Path $repoRoot ".mcp.json") `
-            -StartupTimeoutSeconds 240 `
+            -StartupTimeoutSeconds 60 `
             -ShutdownTimeoutSeconds 45
 
       - name: Azure login
