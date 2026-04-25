@@ -323,7 +323,7 @@ $lines.Add('### Screenshot Files')
 $lines.Add('')
 $lines.Add((Get-FileListText -LiteralPath $ScreenshotDir -Filter '*.png'))
 $lines.Add('')
-$linesif ($publishedScreenshotImages.Count -gt 0) {
+if ($publishedScreenshotImages.Count -gt 0) {
     $lines.Add('### Screenshot Previews')
     $lines.Add('')
     foreach ($imageMarkdown in $publishedScreenshotImages) { $lines.Add($imageMarkdown) }
