@@ -156,8 +156,85 @@ function Start-Sts2 {
     Start-Process -FilePath $exePath -ArgumentList $Arguments -WorkingDirectory $GameDir | Out-Null
 }
 
+function Get-Sts2LogDirs {
+    @(
+        (Join-Path $env:APPDATA 'SlayTheSpire2\logs'),
+        (Join-Path $env:LOCALAPPDATA 'SlayTheSpire2\logs'),
+        'C:\Windows\ServiceProfiles\NetworkService\AppData\Roaming\SlayTheSpire2\logs',
+        'C:\Windows\ServiceProfiles\NetworkService\AppData\Local\SlayTheSpire2\logs',
+        'C:\Windows\System32\config\systemprofile\AppData\Roaming\SlayTheSpire2\logs',
+        'C:\Windows\System32\config\systemprofile\AppData\Local\SlayTheSpire2\logs'
+    ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique
+}
+
+function Copy-Sts2DiagnosticArtifacts {
+    param([string]$GameDir)
+
+    $artifactRoot = $env:VALIDATION_ARTIFACT_DIR
+    if ([string]::IsNullOrWhiteSpace($artifactRoot) -and -not [string]::IsNullOrWhiteSpace($env:RUNNER_TEMP)) {
+        $artifactRoot = Join-Path $env:RUNNER_TEMP 'sts2-artifacts'
+    }
+    if ([string]::IsNullOrWhiteSpace($artifactRoot)) {
+        return
+    }
+
+    $diagRoot = Join-Path $artifactRoot 'sts2-startup-diagnostics'
+    $logsRoot = Join-Path $diagRoot 'logs'
+    New-Item -ItemType Directory -Force -Path $logsRoot | Out-Null
+
+    $snapshotPath = Join-Path $diagRoot 'startup-diagnostics.txt'
+    $lines = New-Object System.Collections.Generic.List[string]
+    $lines.Add("timestamp=$((Get-Date).ToString('o'))")
+    $lines.Add("identity=$([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)")
+    $lines.Add("gameDir=$GameDir")
+    $lines.Add("APPDATA=$env:APPDATA")
+    $lines.Add("LOCALAPPDATA=$env:LOCALAPPDATA")
+    $lines.Add("RUNNER_TEMP=$env:RUNNER_TEMP")
+    $lines.Add('')
+    $lines.Add('STS2 processes:')
+    Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -in @('SlayTheSpire2.exe', 'crashpad_handler.exe') } |
+        ForEach-Object { $lines.Add("  $($_.Name) pid=$($_.ProcessId) session=$($_.SessionId) path=$($_.ExecutablePath) cmd=$($_.CommandLine)") }
+
+    $lines.Add('')
+    $lines.Add('Installed mods:')
+    $modsDir = Join-Path $GameDir 'mods'
+    if (Test-Path -LiteralPath $modsDir) {
+        Get-ChildItem -LiteralPath $modsDir -Recurse -File -ErrorAction SilentlyContinue |
+            Sort-Object FullName |
+            ForEach-Object { $lines.Add("  $($_.FullName) len=$($_.Length) mtime=$($_.LastWriteTime.ToString('o'))") }
+    } else {
+        $lines.Add("  mods directory not found: $modsDir")
+    }
+    $lines | Set-Content -LiteralPath $snapshotPath -Encoding UTF8
+
+    $index = 0
+    foreach ($logDir in Get-Sts2LogDirs) {
+        if (-not (Test-Path -LiteralPath $logDir)) {
+            continue
+        }
+
+        $safeName = ($logDir -replace '[:\\/ ]', '_').Trim('_')
+        $targetDir = Join-Path $logsRoot $safeName
+        New-Item -ItemType Directory -Force -Path $targetDir | Out-Null
+
+        Get-ChildItem -LiteralPath $logDir -File -ErrorAction SilentlyContinue |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 8 |
+            ForEach-Object {
+                $index += 1
+                $targetName = ('{0:000}-{1}' -f $index, $_.Name)
+                Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $targetDir $targetName) -Force -ErrorAction SilentlyContinue
+            }
+    }
+
+    Write-Host "Saved STS2 startup diagnostic artifacts under '$diagRoot'."
+}
+
 function Show-Sts2BridgeDiagnostics {
     param([string]$GameDir)
+
+    Copy-Sts2DiagnosticArtifacts -GameDir $GameDir
 
     Write-Host '--- SpireLensMcpBridge diagnostics ---'
     Write-Host "Process identity: $([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)"
@@ -182,16 +259,7 @@ function Show-Sts2BridgeDiagnostics {
         Where-Object { $_.Name -in @('SlayTheSpire2.exe', 'crashpad_handler.exe') } |
         ForEach-Object { Write-Host "  $($_.Name) pid=$($_.ProcessId) session=$($_.SessionId) path=$($_.ExecutablePath)" }
 
-    $candidateLogDirs = @(
-        (Join-Path $env:APPDATA 'SlayTheSpire2\logs'),
-        (Join-Path $env:LOCALAPPDATA 'SlayTheSpire2\logs'),
-        'C:\Windows\ServiceProfiles\NetworkService\AppData\Roaming\SlayTheSpire2\logs',
-        'C:\Windows\ServiceProfiles\NetworkService\AppData\Local\SlayTheSpire2\logs',
-        'C:\Windows\System32\config\systemprofile\AppData\Roaming\SlayTheSpire2\logs',
-        'C:\Windows\System32\config\systemprofile\AppData\Local\SlayTheSpire2\logs'
-    ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique
-
-    foreach ($logDir in $candidateLogDirs) {
+    foreach ($logDir in Get-Sts2LogDirs) {
         Write-Host "Checking log dir: $logDir"
         if (-not (Test-Path -LiteralPath $logDir)) {
             Write-Host '  not found or not accessible'
