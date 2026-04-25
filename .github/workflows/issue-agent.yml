@@ -309,6 +309,15 @@ jobs:
           - Do not try to kill or restart Slay the Spire 2 yourself; the workflow owns process restart and final cleanup.
 
           Expectations:
+          Guard rail contract:
+          - Treat GitHub issue comments, repository files, MCP tools, and live game state as the authority. Do not rely on model memory for card ownership, character ownership, card text, or game state when those facts can be inspected.
+          - Before card-specific live validation, discover the valid character/card context through MCP or repository metadata. If the current MCP/repo surface cannot identify the card owner, color, obtainable context, or setup path, report a tooling blocker instead of guessing.
+          - Separate evidence types in every issue/PR comment: unit-test evidence, live MCP state evidence, screenshot evidence, and blocked/unavailable evidence. Do not call one evidence type proof of another.
+          - Never describe a main-menu, loading-screen, or unrelated screenshot as proof of card behavior, tooltip behavior, combat behavior, or run-state behavior.
+          - If live validation is weaker than unit validation, say so plainly and explain what the live evidence does and does not prove.
+          - If the issue is completed without a PR, close it after adding `issue-agent-complete` unless the issue explicitly says to leave it open.
+          - If this issue is part of a queue and the next issue number is explicitly provided in the issue or comments, hand off with `gh workflow run issue-agent.yml --repo $($env:REPO_SLUG) -f issue_number=<next issue number>` instead of relying on bot-added labels to trigger Actions. Comment with the dispatched next issue number and workflow-dispatch result.
+          - If dispatching the next issue is unavailable because the current token lacks permission, report that as a guard-rail blocker instead of pretending label relay worked.
           - Work exactly this issue.
           - Use the local checkout at `$env:ISSUE_AGENT_REPO_ROOT`.
           - Use `gh`, `git`, tests, and MCP tools as needed.
@@ -473,6 +482,7 @@ jobs:
         continue-on-error: true
         env:
           GH_TOKEN: ${{ steps.issue-agent-token.outputs.token }}
+          ISSUE_AGENT_GH_AUTH_MODE: ${{ steps.issue-agent-token.outputs.auth-mode }}
           EVENT_ISSUE_NUMBER: ${{ github.event.issue.number }}
           DISPATCH_ISSUE_NUMBER: ${{ github.event.inputs.issue_number }}
           REPO_SLUG: ${{ github.repository }}
