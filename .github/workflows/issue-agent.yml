@@ -142,24 +142,6 @@ jobs:
           "ISSUE_AGENT_REPO_ROOT=$repoRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "ISSUE_AGENT_BUILD_ROOT=$buildRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
-      - name: Comment issue-agent run link
-        env:
-          GH_TOKEN: ${{ github.token }}
-          EVENT_ISSUE_NUMBER: ${{ github.event.issue.number }}
-          DISPATCH_ISSUE_NUMBER: ${{ github.event.inputs.issue_number }}
-          REPO_SLUG: ${{ github.repository }}
-        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
-        run: |
-          $issueNumber = $env:EVENT_ISSUE_NUMBER
-          if ([string]::IsNullOrWhiteSpace($issueNumber)) {
-            $issueNumber = $env:DISPATCH_ISSUE_NUMBER
-          }
-          if ([string]::IsNullOrWhiteSpace($issueNumber)) {
-            throw "No issue number was provided by the event or workflow_dispatch input."
-          }
-
-          $runUrl = "https://github.com/$($env:REPO_SLUG)/actions/runs/$($env:GITHUB_RUN_ID)"
-          gh issue comment $issueNumber --repo $env:REPO_SLUG --body "Issue-agent run started: [$($env:GITHUB_RUN_ID)]($runUrl)"
       - name: Restart STS2 for clean issue-agent baseline
         shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         run: |
