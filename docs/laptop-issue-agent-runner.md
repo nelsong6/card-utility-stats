@@ -54,11 +54,10 @@ Create it once from an elevated PowerShell session on each runner machine:
 $secretDir = 'C:\ProgramData\SpireLens'
 $keyPath = Join-Path $secretDir 'anthropic-api-key.txt'
 New-Item -ItemType Directory -Force -Path $secretDir | Out-Null
-Read-Host 'Anthropic API key' -AsSecureString |
-  ConvertFrom-SecureString -AsPlainText |
-  Set-Content -LiteralPath $keyPath -NoNewline -Encoding ascii
+$key = Read-Host 'Anthropic API key'
+Set-Content -LiteralPath $keyPath -Value $key -NoNewline -Encoding ascii
 icacls $secretDir /inheritance:r | Out-Null
-icacls $secretDir /grant 'Administrators:(OI)(CI)F' 'SYSTEM:(OI)(CI)F' "$env:USERNAME:(OI)(CI)R" | Out-Null
+icacls $secretDir /grant 'Administrators:(OI)(CI)F' 'SYSTEM:(OI)(CI)F' "$($env:USERNAME):(OI)(CI)R" | Out-Null
 ```
 
 If a machine needs a different path, set repository variable
