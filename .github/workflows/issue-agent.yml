@@ -201,7 +201,7 @@ jobs:
 
           Write-Host "::add-mask::$anthropicApiKey"
           "ANTHROPIC_API_KEY=$anthropicApiKey" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-      - name: Run Claude issue agent
+      - name: Run phased Claude issue agent
         env:
           CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
           GH_TOKEN: ${{ github.token }}
@@ -211,10 +211,10 @@ jobs:
         shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         run: |
           if ([string]::IsNullOrWhiteSpace($env:ANTHROPIC_API_KEY)) {
-            throw "ANTHROPIC_API_KEY was not loaded from Azure Key Vault."
+            throw "ANTHROPIC_API_KEY was not loaded from the local runner file."
           }
           if ([string]::IsNullOrWhiteSpace($env:CLAUDE_CLI_PATH) -or -not (Test-Path -LiteralPath $env:CLAUDE_CLI_PATH)) {
-            throw "Claude Code CLI was not found at '$env:CLAUDE_CLI_PATH'. Install it once with: npm.cmd install --prefix D:\automation\claude-code @anthropic-ai/claude-code"
+            throw "Claude Code CLI was not found at '$env:CLAUDE_CLI_PATH'."
           }
 
           $issueNumber = $env:EVENT_ISSUE_NUMBER
@@ -233,197 +233,27 @@ jobs:
             throw "Issue-agent checkout was not found at '$repoRoot'."
           }
 
-          Set-Location -LiteralPath $repoRoot
-
           $mcpConfig = Join-Path $repoRoot ".mcp.json"
           if (-not (Test-Path -LiteralPath $mcpConfig)) {
             throw "MCP config was not found at '$mcpConfig'."
           }
 
-          $promptPath = Join-Path $env:RUNNER_TEMP "claude-issue-agent-prompt.md"
-          $streamLogPath = Join-Path $env:RUNNER_TEMP "claude-issue-agent-events.jsonl"
-          $debugLogPath = Join-Path $env:RUNNER_TEMP "claude-issue-agent-debug.log"
-          $summaryLogPath = Join-Path $env:RUNNER_TEMP "claude-issue-agent-summary.log"
-          $screenshotDir = Join-Path $env:RUNNER_TEMP "sts2-screenshots"
-          $validationArtifactDir = Join-Path $env:RUNNER_TEMP "sts2-artifacts"
-
-          Remove-Item -LiteralPath $streamLogPath, $debugLogPath, $summaryLogPath -ErrorAction SilentlyContinue
-          Remove-Item -LiteralPath $screenshotDir, $validationArtifactDir -Recurse -Force -ErrorAction SilentlyContinue
-          New-Item -ItemType Directory -Force -Path $screenshotDir, $validationArtifactDir | Out-Null
-
-          $env:SCREENSHOT_DIR = $screenshotDir
-          $env:VALIDATION_ARTIFACT_DIR = $validationArtifactDir
-
-          $prompt = @"
-          You are Claude Code running as the issue agent for $($env:REPO_SLUG) on issue #$issueNumber.
-
-          GitHub Actions triggered this job for issue #$issueNumber. That issue number is authoritative.
-          Do not scan for other queued issues, do not choose a different issue, and do not process more than this one issue.
-
-          Read the issue and comments yourself using GitHub CLI:
-
-          ``````
-          gh issue view $issueNumber --repo $($env:REPO_SLUG) --comments
-          ``````
-
-          You own the result. GitHub Actions is only launching you; there is no queue worker or result parser.
-
-          Clean STS2 baseline policy:
-          - The workflow restarts STS2 before launching you and waits for the in-game `SpireLensMcpBridge` HTTP bridge to answer `bridge_ping`.
-          - Start from that fresh game process instead of spending time recovering stale GameOver, reward, overlay, or prior-run state.
-          - Before live validation, confirm the current state with `bridge_ping` and `bridge_get_full_state`.
-          - If the fresh `SpireLensMcpBridge` bridge or game state is not usable, stop and report a blocker instead of improvising side automation.
-          - Do not try to kill or restart Slay the Spire 2 yourself; the workflow owns process restart and final cleanup.
-
-          Expectations:
-          - Work exactly this issue.
-          - Use the local checkout at `$env:ISSUE_AGENT_REPO_ROOT`.
-          - Use `gh`, `git`, tests, and MCP tools as needed.
-          - For build/test validation on this Windows issue-agent runner, use the repo-native output layout. Do not pass custom `BaseOutputPath`, `BaseIntermediateOutputPath`, `OutputPath`, or `IntermediateOutputPath` properties; this repo's STS2/publicized assembly references are sensitive to those overrides.
-          - Use this known-good validation sequence:
-
-            ``````powershell
-            $sts2DataDir = "D:\SteamLibrary\steamapps\common\Slay the Spire 2\data_sts2_windows_x86_64"
-
-            dotnet build "Tests\SpireLens.Core.Tests\SpireLens.Core.Tests.csproj" `
-              -c Debug `
-              "-p:Sts2DataDir=$sts2DataDir"
-
-            dotnet test "Tests\SpireLens.Core.Tests\SpireLens.Core.Tests.csproj" `
-              -c Debug `
-              --no-build `
-              "-p:Sts2DataDir=$sts2DataDir"
-            ``````
-          - Use the project MCP config at `$mcpConfig`; for live STS2 work, use the `spire-lens-mcp` MCP server. That external MCP server talks to the in-game `SpireLensMcpBridge` mod over localhost:15526.
-          - `spire-lens-mcp` is a hard prerequisite for live STS2 work. If it is unavailable, unhealthy, or unusable, stop immediately and report a blocker.
-          - All stateful STS2 work must go through approved MCP tools. Do not use raw TCP bridge calls, ad hoc PowerShell bridge scripts, Azure Python imports, Windows API clicking, or other non-MCP workarounds.
-          - Use direct MCP/game control. Do not use or debug any legacy filesystem bridge or scenario-request queue.
-          - Missing MCP capability is a tooling gap to report, not a reason to invent side automation.
-          - After building and deploying SpireLens.Core.dll, explicitly call the MCP `reload_spirelens_core` tool before screenshotting changed SpireLens behavior.
-          - If validation needs an active run and the game is at the main menu, use the MCP `start_singleplayer_run` tool, then use `enter_debug_room` when a specific room setup is needed.
-          - If `reload_spirelens_core`, `start_singleplayer_run`, or `enter_debug_room` is unavailable or fails, report that as a live-validation blocker. Do not treat a main-menu screenshot as proof of changed tooltip or in-run behavior.
-          - Do not use `LiveScenarios/`, `ops/live-worker/`, `scripts/ci/run-live-scenario.ps1`, or any `request.json` / `ready.json` / `accepted.json` / `result.json` workflow.
-          - Do not read from or write to `D:\automation\spirelens-live-bridge`.
-          - For STS2 issue-agent work, capture screenshot artifacts of the affected card or tooltip states before marking the issue complete.
-          - Always include at least one screenshot.
-          - Save screenshots to `$screenshotDir` and any extra validation artifacts to `$validationArtifactDir` so the workflow can upload them.
-          - If the issue is about a specific card, include at least one screenshot showing that card's stats working in a representative in-run test case.
-          - Document the test case used for the screenshot artifacts: what was set up, what was exercised, and what each screenshot is intended to prove.
-          - Capture screenshots after the behavior is working, not just during setup.
-          - For tooltip-related changes, capture the affected tooltip states and use judgment about which views materially need coverage.
-          - If multiple materially distinct views changed, such as compact hand-hover and fuller deck-view tooltip states, capture each affected view when that is the clearest way to prove the change.
-          - Use judgment on how many screenshots to include, but do not exceed 10 screenshots for a single issue or pull request.
-          - If adequate proof would require more than 10 screenshots, split the work into smaller branches or pull requests instead of overloading one.
-          - If screenshot capture is impossible, stop and report the blocker instead of completing the issue without screenshot artifacts.
-          - The workflow stops STS2 after the job; you do not need to leave it running for the next issue-agent run.
-          - Comment on the issue with what you did, what you observed, and any PR/screenshot/artifact links or paths.
-          - In the issue comment and pull request summary, include the test-case summary and the screenshot or artifact links or paths.
-          - If you complete the issue, remove `issue-agent` and add `issue-agent-complete`.
-          - If you are blocked, comment with the blocker, remove `issue-agent`, and add `issue-agent-blocked`.
-          - If you make code changes, create a branch, commit, push, and open a PR.
-          - Do not wait for a human continuation unless the issue is genuinely blocked.
-
-          For this validation path, prefer a minimal live STS2 MCP proof over broad code changes.
-          If the issue cannot be completed through the current direct GitHub Actions + MCP surface, stop and report that blocker instead of inventing side infrastructure.
-          "@
-          $prompt | Set-Content -LiteralPath $promptPath -Encoding UTF8
-          $promptText = Get-Content -LiteralPath $promptPath -Raw
-
-          "Claude issue agent stream for $($env:REPO_SLUG)#$issueNumber" | Set-Content -LiteralPath $summaryLogPath -Encoding UTF8
-          "Sanitized event stream: $streamLogPath" | Add-Content -LiteralPath $summaryLogPath -Encoding UTF8
-          "Debug log: $debugLogPath" | Add-Content -LiteralPath $summaryLogPath -Encoding UTF8
-          "Screenshot dir: $screenshotDir" | Add-Content -LiteralPath $summaryLogPath -Encoding UTF8
-          "Validation artifact dir: $validationArtifactDir" | Add-Content -LiteralPath $summaryLogPath -Encoding UTF8
-
-          function Write-AgentEvent {
-            param(
-              [Parameter(Mandatory = $true)][string]$Kind,
-              [Parameter(Mandatory = $true)][string]$Message,
-              [object]$Data = $null
-            )
-
-            $record = [ordered]@{
-              timestamp = (Get-Date).ToString("o")
-              kind = $Kind
-              message = $Message
-            }
-            if ($null -ne $Data) {
-              $record.data = $Data
-            }
-
-            $json = $record | ConvertTo-Json -Compress -Depth 30
-            Add-Content -LiteralPath $streamLogPath -Value $json -Encoding UTF8
-            Write-Host "[$Kind] $Message"
+          $scriptPath = Join-Path $repoRoot ".github\scripts\run-issue-agent-phases.ps1"
+          if (-not (Test-Path -LiteralPath $scriptPath)) {
+            throw "Phased issue-agent script was not found at '$scriptPath'."
           }
 
-          Write-Host "::group::Claude issue agent live stream"
-          Write-Host "Launching Claude for $($env:REPO_SLUG)#$issueNumber with stream-json output."
-          Write-Host "Sanitized event stream will be saved to: $streamLogPath"
-          Write-Host "Debug log will be saved to: $debugLogPath"
-          Write-Host "Screenshot dir will be saved to: $screenshotDir"
-          Write-Host "Validation artifact dir will be saved to: $validationArtifactDir"
-          Write-AgentEvent "start" "Launching Claude for $($env:REPO_SLUG)#$issueNumber."
-
-          & $env:CLAUDE_CLI_PATH `
-            -p $promptText `
-            --bare `
-            --model sonnet `
-            --permission-mode bypassPermissions `
-            --output-format stream-json `
-            --verbose `
-            --debug-file $debugLogPath `
-            --strict-mcp-config `
-            "--mcp-config=$mcpConfig" `
-            --max-budget-usd "15.00" `
-            --add-dir $repoRoot 2>&1 |
-            ForEach-Object {
-              $line = [string]$_
-
-              try {
-                $event = $line | ConvertFrom-Json -ErrorAction Stop
-                if ($event.type -eq "assistant" -and $event.message.content) {
-                  foreach ($block in $event.message.content) {
-                    if ($block.type -eq "tool_use") {
-                      $inputJson = if ($null -ne $block.input) { $block.input | ConvertTo-Json -Compress -Depth 20 } else { "{}" }
-                      $message = "$($block.name) $inputJson"
-                      Write-AgentEvent "tool_use" $message
-                      Add-Content -LiteralPath $summaryLogPath -Value "tool_use: $message" -Encoding UTF8
-                    } elseif ($block.type -eq "text" -and -not [string]::IsNullOrWhiteSpace([string]$block.text)) {
-                      $text = [string]$block.text
-                      if ($text.Length -gt 1000) {
-                        $text = $text.Substring(0, 1000) + "... [truncated]"
-                      }
-                      Write-AgentEvent "assistant_text" $text
-                      Add-Content -LiteralPath $summaryLogPath -Value "assistant_text: $text" -Encoding UTF8
-                    }
-                  }
-                } elseif ($event.type -eq "user" -and $event.tool_use_result) {
-                  $result = [string]$event.tool_use_result
-                  if ($result.Length -gt 600) {
-                    $result = $result.Substring(0, 600) + "... [truncated]"
-                  }
-                  Write-AgentEvent "tool_result" $result
-                  Add-Content -LiteralPath $summaryLogPath -Value "tool_result: $result" -Encoding UTF8
-                } elseif ($event.type -eq "result") {
-                  $resultJson = $event | ConvertTo-Json -Compress -Depth 30
-                  Write-AgentEvent "result" $resultJson
-                  Add-Content -LiteralPath $summaryLogPath -Value "result: $resultJson" -Encoding UTF8
-                } elseif ($event.type -eq "system" -and $event.status) {
-                  Write-AgentEvent "status" ([string]$event.status)
-                }
-              } catch {
-                Write-AgentEvent "raw" $line
-              }
-            }
-
-          $claudeExitCode = $LASTEXITCODE
-          Write-Host "::endgroup::"
-          "Claude exit code: $claudeExitCode" | Add-Content -LiteralPath $summaryLogPath -Encoding UTF8
-          Write-AgentEvent "exit" "Claude exit code: $claudeExitCode"
-          if ($claudeExitCode -ne 0) {
-            throw "Claude issue agent failed with exit code $claudeExitCode. See $streamLogPath and $debugLogPath."
-          }
-
+          & $scriptPath `
+            -IssueNumber $issueNumber `
+            -RepoSlug $env:REPO_SLUG `
+            -RepoRoot $repoRoot `
+            -ClaudeCliPath $env:CLAUDE_CLI_PATH `
+            -McpConfigPath $mcpConfig `
+            -StreamLogPath (Join-Path $env:RUNNER_TEMP "claude-issue-agent-events.jsonl") `
+            -DebugLogPath (Join-Path $env:RUNNER_TEMP "claude-issue-agent-debug.log") `
+            -SummaryLogPath (Join-Path $env:RUNNER_TEMP "claude-issue-agent-summary.log") `
+            -ScreenshotDir (Join-Path $env:RUNNER_TEMP "sts2-screenshots") `
+            -ValidationArtifactDir (Join-Path $env:RUNNER_TEMP "sts2-artifacts")
       - name: Upload Claude agent logs and STS2 validation artifacts
         if: always()
         uses: actions/upload-artifact@v4
