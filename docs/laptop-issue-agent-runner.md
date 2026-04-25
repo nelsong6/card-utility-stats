@@ -14,7 +14,7 @@ Bring one Windows machine online as a self-hosted GitHub Actions runner with:
 - Claude Code installed locally
 - Slay the Spire 2 installed locally
 - STS2 Modding MCP installed locally
-- a local Anthropic API key file readable by the runner account
+- Azure CLI logged in locally as an account that can read the Key Vault secret
 
 ## Host Requirements
 
@@ -23,6 +23,7 @@ Install these once on the laptop:
 - GitHub Actions runner files
 - Git
 - GitHub CLI
+- Azure CLI
 - .NET 9 SDK
 - Python 3.12
 - Steam
@@ -39,29 +40,29 @@ Common Claude CLI locations supported by the workflow:
 If you want a different location, set repository variable
 `ISSUE_AGENT_CLAUDE_CLI_PATH`.
 
-## Anthropic Key File
+## Anthropic Key Loading
 
-The issue-agent workflow reads `ANTHROPIC_API_KEY` from a local file on the
-self-hosted runner. The default path is:
-
-```text
-C:\ProgramData\SpireLens\anthropic-api-key.txt
-```
-
-Create it once from an elevated PowerShell session on each runner machine:
+The issue-agent workflow loads `ANTHROPIC_API_KEY` by running Azure CLI on the
+self-hosted runner:
 
 ```powershell
-$secretDir = 'C:\ProgramData\SpireLens'
-$keyPath = Join-Path $secretDir 'anthropic-api-key.txt'
-New-Item -ItemType Directory -Force -Path $secretDir | Out-Null
-$key = Read-Host 'Anthropic API key'
-Set-Content -LiteralPath $keyPath -Value $key -NoNewline -Encoding ascii
-icacls $secretDir /inheritance:r | Out-Null
-icacls $secretDir /grant 'Administrators:(OI)(CI)F' 'SYSTEM:(OI)(CI)F' "$($env:USERNAME):(OI)(CI)R" | Out-Null
+az keyvault secret show --vault-name $env:KEY_VAULT_NAME --name spirelens --query value --output tsv
 ```
 
-If a machine needs a different path, set repository variable
-`ISSUE_AGENT_ANTHROPIC_KEY_PATH` to the full local path.
+Set up Azure CLI once in the same Windows user/session that starts the
+interactive runner:
+
+```powershell
+az login
+az account show
+az keyvault secret show --vault-name romaine-kv --name spirelens --query value --output tsv
+```
+
+The final command should print the secret value. Do not paste that value into
+logs, issues, or pull requests.
+
+The workflow reads the vault name from repository variable `KEY_VAULT_NAME` and
+expects the secret to be named `spirelens`.
 
 ## Register The Runner
 
@@ -108,11 +109,11 @@ The issue-agent workflow expects:
 - the repo checkout contains a working `.mcp.json`
 - Claude can list and connect to `spire-lens-mcp`
 - STS2 is available locally when the issue requires live validation
-- `ANTHROPIC_API_KEY` is available from the local runner key file
+- Azure CLI is logged in for the runner user and can read Key Vault secret `spirelens`
 
 The workflow itself still handles:
 
-- mapping the local key file to `ANTHROPIC_API_KEY`
+- mapping the Key Vault secret to `ANTHROPIC_API_KEY`
 - uploading logs, screenshots, and validation artifacts
 
 ## Sanity Check
