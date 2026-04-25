@@ -106,6 +106,15 @@ jobs:
           fetch-depth: 0
           path: ${{ env.ISSUE_AGENT_CHECKOUT_PATH }}
 
+      - name: Resolve issue-agent GitHub token
+        id: issue-agent-token
+        uses: ./.github/actions/issue-agent-github-token
+        with:
+          app-id: ${{ vars.ISSUE_AGENT_APP_ID }}
+          private-key: ${{ secrets.ISSUE_AGENT_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          fallback-token: ${{ github.token }}
+
       - name: Resolve issue-agent host paths
         env:
           CONFIGURED_CLAUDE_CLI_PATH: ${{ vars.ISSUE_AGENT_CLAUDE_CLI_PATH }}
@@ -145,7 +154,7 @@ jobs:
 
       - name: Comment issue-agent run link
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.issue-agent-token.outputs.token }}
           EVENT_ISSUE_NUMBER: ${{ github.event.issue.number }}
           DISPATCH_ISSUE_NUMBER: ${{ github.event.inputs.issue_number }}
           REPO_SLUG: ${{ github.repository }}
@@ -204,7 +213,8 @@ jobs:
       - name: Run Claude issue agent
         env:
           CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
-          GH_TOKEN: ${{ github.token }}
+          ISSUE_AGENT_GH_AUTH_MODE: ${{ steps.issue-agent-token.outputs.auth-mode }}
+          GH_TOKEN: ${{ steps.issue-agent-token.outputs.token }}
           EVENT_ISSUE_NUMBER: ${{ github.event.issue.number }}
           DISPATCH_ISSUE_NUMBER: ${{ github.event.inputs.issue_number }}
           REPO_SLUG: ${{ github.repository }}
@@ -439,7 +449,7 @@ jobs:
         if: always()
         continue-on-error: true
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.issue-agent-token.outputs.token }}
           EVENT_ISSUE_NUMBER: ${{ github.event.issue.number }}
           DISPATCH_ISSUE_NUMBER: ${{ github.event.inputs.issue_number }}
           REPO_SLUG: ${{ github.repository }}
