@@ -64,6 +64,46 @@ function Get-ExitCodeText {
     }
 }
 
+function Get-ClaudeCostSummary {
+    param([string]$Path)
+
+    $summary = [ordered]@{
+        TotalCostUsd = 0.0
+        InputTokens = 0
+        OutputTokens = 0
+        CacheCreationInputTokens = 0
+        CacheReadInputTokens = 0
+        Turns = 0
+        Results = 0
+    }
+
+    if ([string]::IsNullOrWhiteSpace($Path) -or -not (Test-Path -LiteralPath $Path)) { return $summary }
+
+    Get-Content -LiteralPath $Path -ErrorAction SilentlyContinue | ForEach-Object {
+        try {
+            $record = $_ | ConvertFrom-Json -ErrorAction Stop
+            if ($record.kind -ne 'result' -or [string]::IsNullOrWhiteSpace([string]$record.message)) { return }
+            $result = $record.message | ConvertFrom-Json -ErrorAction Stop
+            $summary.Results++
+            if ($null -ne $result.total_cost_usd) { $summary.TotalCostUsd += [double]$result.total_cost_usd }
+            if ($null -ne $result.num_turns) { $summary.Turns += [int]$result.num_turns }
+            if ($null -ne $result.usage) {
+                if ($null -ne $result.usage.input_tokens) { $summary.InputTokens += [int64]$result.usage.input_tokens }
+                if ($null -ne $result.usage.output_tokens) { $summary.OutputTokens += [int64]$result.usage.output_tokens }
+                if ($null -ne $result.usage.cache_creation_input_tokens) { $summary.CacheCreationInputTokens += [int64]$result.usage.cache_creation_input_tokens }
+                if ($null -ne $result.usage.cache_read_input_tokens) { $summary.CacheReadInputTokens += [int64]$result.usage.cache_read_input_tokens }
+            }
+        } catch {
+        }
+    }
+
+    return $summary
+}
+
+function Format-Usd {
+    param([double]$Value)
+    return ('$' + $Value.ToString('0.0000', [System.Globalization.CultureInfo]::InvariantCulture))
+}
 function Read-JsonOrNull {
     param([string]$Path)
     if ([string]::IsNullOrWhiteSpace($Path) -or -not (Test-Path -LiteralPath $Path)) { return $null }
@@ -136,6 +176,7 @@ $prNumber = if ($null -ne $resultPrNumber) { $resultPrNumber } else { $implement
 $screenshotCount = Count-Files -LiteralPath $ScreenshotDir -Filter '*.png'
 $validationArtifactCount = Count-Files -LiteralPath $ValidationArtifactDir
 $exitCodeText = Get-ExitCodeText -Path $EventLogPath
+$costSummary = Get-ClaudeCostSummary -Path $EventLogPath
 $runUrl = if (-not [string]::IsNullOrWhiteSpace($RepoSlug) -and -not [string]::IsNullOrWhiteSpace($RunId)) { "https://github.com/$RepoSlug/actions/runs/$RunId" } else { '_Unavailable_' }
 $artifactUrl = if ($runUrl -ne '_Unavailable_') { "$runUrl/artifacts" } else { '_Unavailable_' }
 $artifactText = if (-not [string]::IsNullOrWhiteSpace($ArtifactName)) { "[$ArtifactName]($artifactUrl)" } else { '_Unavailable_' }
@@ -155,6 +196,8 @@ $lines.Add("| Result status | $(Format-Cell (Get-PropertyValue -Object $result -
 $lines.Add("| Abort layer | $(Format-Cell (Get-PropertyValue -Object $result -Name 'abort_layer')) |")
 $lines.Add("| Abort reason | $(Format-Cell (Get-PropertyValue -Object $result -Name 'abort_reason')) |")
 $lines.Add("| Claude exit | $exitCodeText |")
+$lines.Add("| Claude cost | $(Format-Usd $costSummary.TotalCostUsd) |")
+$lines.Add("| Claude turns | $($costSummary.Turns) |")
 $lines.Add("| Head SHA | $HeadSha |")
 $lines.Add("| Ref | $RefName |")
 $lines.Add("| Persistent local logs | `$persistentRoot` |")
@@ -176,6 +219,11 @@ $lines.Add('| Metric | Value |')
 $lines.Add('| --- | ---: |')
 $lines.Add("| Screenshot artifacts | $screenshotCount |")
 $lines.Add("| Validation artifact files | $validationArtifactCount |")
+$lines.Add("| Claude result events | $($costSummary.Results) |")
+$lines.Add("| Input tokens | $($costSummary.InputTokens) |")
+$lines.Add("| Output tokens | $($costSummary.OutputTokens) |")
+$lines.Add("| Cache creation tokens | $($costSummary.CacheCreationInputTokens) |")
+$lines.Add("| Cache read tokens | $($costSummary.CacheReadInputTokens) |")
 $lines.Add("| Unit tests passed | $(Format-Cell (Get-NestedPropertyValue -Object $result -Path @('unit_tests', 'passed'))) |")
 $lines.Add("| Live MCP validation passed | $(Format-Cell (Get-NestedPropertyValue -Object $result -Path @('live_mcp_validation', 'passed'))) |")
 $lines.Add("| Screenshot validation passed | $(Format-Cell (Get-NestedPropertyValue -Object $result -Path @('screenshot_validation', 'passed'))) |")
