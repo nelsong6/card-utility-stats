@@ -15,6 +15,7 @@ Bring one Windows machine online as a self-hosted GitHub Actions runner with:
 - Slay the Spire 2 installed locally
 - STS2 Modding MCP installed locally
 - a local Anthropic API key file readable by the runner account
+- an interactive runner process started from the logged-in Steam user session
 
 ## Host Requirements
 
@@ -23,7 +24,7 @@ Install these once on the laptop:
 - GitHub Actions runner files
 - Git
 - GitHub CLI
-- Azure CLI
+- Azure CLI, used only for one-time Key Vault bootstrap if desired
 - .NET 9 SDK
 - Python 3.12
 - Steam
@@ -49,18 +50,37 @@ self-hosted runner. The default path is:
 C:\ProgramData\SpireLens\anthropic-api-key.txt
 ```
 
-Create or refresh it from Key Vault once from an elevated PowerShell session on
-each runner machine:
+The direct placement path is simplest when time matters:
+
+```powershell
+$secretDir = 'C:\ProgramData\SpireLens'
+$keyPath = Join-Path $secretDir 'anthropic-api-key.txt'
+$key = Get-Clipboard
+if ([string]::IsNullOrWhiteSpace($key)) {
+  throw 'Clipboard is empty. Copy the Anthropic API key first.'
+}
+New-Item -ItemType Directory -Force -Path $secretDir | Out-Null
+Set-Content -LiteralPath $keyPath -Value $key.Trim() -NoNewline -Encoding ascii
+Write-Host "Wrote Anthropic API key to $keyPath"
+```
+
+To refresh the file from Key Vault instead, run this from an elevated PowerShell
+session on each runner machine:
 
 ```powershell
 $vaultName = 'romaine-kv'
 $secretName = 'spirelens'
 $secretDir = 'C:\ProgramData\SpireLens'
 $keyPath = Join-Path $secretDir 'anthropic-api-key.txt'
+$azConfigDir = 'C:\ProgramData\SpireLens\az-bootstrap'
+
+New-Item -ItemType Directory -Force -Path $secretDir | Out-Null
+New-Item -ItemType Directory -Force -Path $azConfigDir | Out-Null
+$env:AZURE_CONFIG_DIR = $azConfigDir
 
 az account show --only-show-errors | Out-Null
 if ($LASTEXITCODE -ne 0) {
-  az login
+  az login --tenant 2236b5e4-81d2-4d82-bde5-17b1037999ea --use-device-code --allow-no-subscriptions
 }
 
 $key = az keyvault secret show `
@@ -74,10 +94,7 @@ if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($key)) {
   throw "Unable to read Key Vault secret '$secretName' from vault '$vaultName'."
 }
 
-New-Item -ItemType Directory -Force -Path $secretDir | Out-Null
 Set-Content -LiteralPath $keyPath -Value $key.Trim() -NoNewline -Encoding ascii
-icacls $secretDir /inheritance:r | Out-Null
-icacls $secretDir /grant 'Administrators:(OI)(CI)F' 'SYSTEM:(OI)(CI)F' "$($env:USERNAME):(OI)(CI)R" | Out-Null
 Write-Host "Wrote Anthropic API key to $keyPath"
 ```
 
@@ -110,16 +127,33 @@ The script will:
 If the runner files are not under one of those default paths, pass
 `-RunnerRoot`.
 
-For live STS2 validation, prefer running the runner interactively from the
-logged-in Steam user session instead of as a Windows service:
+## Running Live STS2 Jobs
+
+For live STS2 validation, run the runner interactively from the logged-in Steam
+user session instead of as a Windows service:
 
 ```powershell
+$svc = 'actions.runner.nelsong6-card-utility-stats.sts2-side-a'
+Stop-Service -Name $svc -Force -ErrorAction SilentlyContinue
 cd C:\actions-runner-card-utility-stats
 .\run.cmd
 ```
 
-A Windows service launches STS2 in session 0, which does not provide the same
-Steam client/session context as the logged-in user desktop.
+Leave that window open while issue-agent jobs run. The interactive runner must
+show as session 1, not session 0. A Windows service launches STS2 in session 0,
+which does not provide the same Steam client/session context as the logged-in
+user desktop.
+
+If dispatching workflow runs manually from the laptop, make sure GitHub CLI is
+authenticated:
+
+```powershell
+gh auth status
+gh auth login
+```
+
+`gh auth login` is only needed when `gh auth status` reports that the local token
+has expired or is missing.
 
 ## Workflow Expectations
 
