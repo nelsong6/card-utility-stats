@@ -163,55 +163,29 @@ jobs:
             -StartupTimeoutSeconds 60 `
             -ShutdownTimeoutSeconds 45
 
-      - name: Prepare isolated Azure CLI config
+      - name: Load Anthropic API key from local runner file
         env:
-          AZURE_CONFIG_DIR: ${{ runner.temp }}/azure-cli-${{ github.run_id }}-${{ github.run_attempt }}
+          CONFIGURED_ANTHROPIC_KEY_PATH: ${{ vars.ISSUE_AGENT_ANTHROPIC_KEY_PATH }}
         shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         run: |
-          if ([string]::IsNullOrWhiteSpace($env:AZURE_CONFIG_DIR)) {
-            throw "AZURE_CONFIG_DIR is not set."
+          $keyPath = $env:CONFIGURED_ANTHROPIC_KEY_PATH
+          if ([string]::IsNullOrWhiteSpace($keyPath)) {
+            $keyPath = 'C:\ProgramData\SpireLens\anthropic-api-key.txt'
           }
 
-          Remove-Item -LiteralPath $env:AZURE_CONFIG_DIR -Recurse -Force -ErrorAction SilentlyContinue
-          New-Item -ItemType Directory -Force -Path $env:AZURE_CONFIG_DIR | Out-Null
-          Write-Host "Using isolated Azure CLI config dir: $env:AZURE_CONFIG_DIR"
-
-      - name: Azure login
-        env:
-          AZURE_CONFIG_DIR: ${{ runner.temp }}/azure-cli-${{ github.run_id }}-${{ github.run_attempt }}
-        uses: azure/login@v3
-        with:
-          client-id: ${{ vars.ARM_CLIENT_ID }}
-          tenant-id: ${{ vars.ARM_TENANT_ID }}
-          subscription-id: ${{ vars.KEY_VAULT_SUBSCRIPTION_ID || vars.ARM_SUBSCRIPTION_ID }}
-
-      - name: Load Anthropic API key from Key Vault
-        env:
-          AZURE_CONFIG_DIR: ${{ runner.temp }}/azure-cli-${{ github.run_id }}-${{ github.run_attempt }}
-        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
-        run: |
-          $keyVaultName = '${{ vars.KEY_VAULT_NAME }}'
-          $secretName = 'spirelens'
-
-          if ([string]::IsNullOrWhiteSpace($keyVaultName)) {
-            throw "Missing repository variable KEY_VAULT_NAME."
+          if (-not (Test-Path -LiteralPath $keyPath)) {
+            throw "Anthropic API key file was not found at '$keyPath'. Create it on this runner or set repository variable ISSUE_AGENT_ANTHROPIC_KEY_PATH."
           }
 
-          $anthropicApiKey = az keyvault secret show `
-            --vault-name $keyVaultName `
-            --name $secretName `
-            --query value `
-            --output tsv
-
-          if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($anthropicApiKey)) {
-            throw "Unable to load Key Vault secret '$secretName' from vault '$keyVaultName'."
+          $anthropicApiKey = (Get-Content -LiteralPath $keyPath -Raw).Trim()
+          if ([string]::IsNullOrWhiteSpace($anthropicApiKey)) {
+            throw "Anthropic API key file '$keyPath' is empty."
           }
 
           Write-Host "::add-mask::$anthropicApiKey"
           "ANTHROPIC_API_KEY=$anthropicApiKey" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
-      - name: Run Claude issue agent
-        env:
+      - name: Run Claude issue agent        env:
           CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
           GH_TOKEN: ${{ github.token }}
           EVENT_ISSUE_NUMBER: ${{ github.event.issue.number }}
