@@ -184,6 +184,142 @@ function Format-Cell {
     return ([string]$Value).Replace('|', '\|')
 }
 
+function ConvertTo-CompactJson {
+    param([object]$Value, [int]$Depth = 30)
+    if ($null -eq $Value) { return 'null' }
+    try { return ($Value | ConvertTo-Json -Compress -Depth $Depth) }
+    catch { return [string]$Value }
+}
+
+function Add-TranscriptSection {
+    param(
+        [System.Collections.Generic.List[string]]$Lines,
+        [string]$Title,
+        [string[]]$Body
+    )
+    $Lines.Add("## $Title")
+    $Lines.Add('')
+    foreach ($line in $Body) { $Lines.Add($line) }
+    $Lines.Add('')
+}
+
+function New-ClaudeEventTranscript {
+    param([string]$EventLogPath, [string]$OutputPath)
+
+    $transcript = New-Object System.Collections.Generic.List[string]
+    $transcript.Add('# Claude Event Transcript')
+    $transcript.Add('')
+    $transcript.Add("Source: `$EventLogPath")
+    $transcript.Add('')
+
+    if ([string]::IsNullOrWhiteSpace($EventLogPath) -or -not (Test-Path -LiteralPath $EventLogPath)) {
+        Add-TranscriptSection -Lines $transcript -Title 'No Event Log' -Body @('The event log was not found.')
+        $transcript -join [Environment]::NewLine | Set-Content -LiteralPath $OutputPath -Encoding UTF8
+        return
+    }
+
+    $lineNumber = 0
+    Get-Content -LiteralPath $EventLogPath -ErrorAction SilentlyContinue | ForEach-Object {
+        $lineNumber++
+        if ([string]::IsNullOrWhiteSpace($_)) { return }
+
+        try { $event = $_ | ConvertFrom-Json -ErrorAction Stop }
+        catch {
+            Add-TranscriptSection -Lines $transcript -Title "Raw Line $lineNumber" -Body @('```text', $_, '```')
+            return
+        }
+
+        if ($null -ne $event.kind) {
+            $phase = [string](Get-NestedPropertyValue -Object $event -Path @('data', 'phase'))
+            $phasePrefix = if ([string]::IsNullOrWhiteSpace($phase)) { '' } else { "[$phase] " }
+            $message = [string]$event.message
+            switch ([string]$event.kind) {
+                'tool_use' { Add-TranscriptSection -Lines $transcript -Title ($phasePrefix + 'Tool Use') -Body @($message) }
+                'tool_result' { Add-TranscriptSection -Lines $transcript -Title ($phasePrefix + 'Tool Result') -Body @('```text', $message, '```') }
+                'assistant_text' { Add-TranscriptSection -Lines $transcript -Title ($phasePrefix + 'Assistant') -Body @($message) }
+                'result' {
+                    $body = New-Object System.Collections.Generic.List[string]
+                    try {
+                        $resultEvent = $message | ConvertFrom-Json -ErrorAction Stop
+                        $body.Add("- Error: `$($resultEvent.is_error)")
+                        $body.Add("- Turns: `$($resultEvent.num_turns)")
+                        $body.Add("- Cost: `$($resultEvent.total_cost_usd)")
+                        if ($resultEvent.permission_denials) {
+                            $body.Add('- Permission denials:')
+                            foreach ($denial in $resultEvent.permission_denials) {
+                                $body.Add("  - `$($denial.tool_name)` input: `$(ConvertTo-CompactJson $denial.tool_input)")
+                            }
+                        }
+                        if (-not [string]::IsNullOrWhiteSpace([string]$resultEvent.result)) {
+                            $body.Add('')
+                            $body.Add([string]$resultEvent.result)
+                        }
+                    } catch {
+                        $body.Add('```json')
+                        $body.Add($message)
+                        $body.Add('```')
+                    }
+                    Add-TranscriptSection -Lines $transcript -Title ($phasePrefix + 'Result') -Body $body.ToArray()
+                }
+                default { Add-TranscriptSection -Lines $transcript -Title ($phasePrefix + [string]$event.kind) -Body @($message) }
+            }
+            return
+        }
+
+        switch ([string]$event.type) {
+            'system' {
+                $servers = if ($event.mcp_servers) { (($event.mcp_servers | ForEach-Object { "$($_.name)=$($_.status)" }) -join ', ') } else { '_none reported_' }
+                Add-TranscriptSection -Lines $transcript -Title 'System' -Body @(
+                    "- Session: `$($event.session_id)",
+                    "- Model: `$($event.model)",
+                    "- CWD: `$($event.cwd)",
+                    "- MCP servers: `$servers"
+                )
+            }
+            'rate_limit_event' { Add-TranscriptSection -Lines $transcript -Title 'Rate Limit' -Body @('```json', (ConvertTo-CompactJson $event.rate_limit_info), '```') }
+            'assistant' {
+                foreach ($block in @($event.message.content)) {
+                    if ($block.type -eq 'text') {
+                        Add-TranscriptSection -Lines $transcript -Title 'Assistant' -Body @([string]$block.text)
+                    } elseif ($block.type -eq 'tool_use') {
+                        Add-TranscriptSection -Lines $transcript -Title 'Tool Use' -Body @(
+                            "- Tool: `$($block.name)",
+                            "- Input: `$(ConvertTo-CompactJson $block.input)"
+                        )
+                    }
+                }
+            }
+            'user' {
+                foreach ($block in @($event.message.content)) {
+                    if ($block.type -eq 'tool_result') {
+                        $body = if ($block.content -is [string]) { [string]$block.content } else { ConvertTo-CompactJson $block.content }
+                        Add-TranscriptSection -Lines $transcript -Title 'Tool Result' -Body @('```text', $body, '```')
+                    }
+                }
+            }
+            'result' {
+                $body = New-Object System.Collections.Generic.List[string]
+                $body.Add("- Error: `$($event.is_error)")
+                $body.Add("- Turns: `$($event.num_turns)")
+                $body.Add("- Cost: `$($event.total_cost_usd)")
+                if ($event.permission_denials) {
+                    $body.Add('- Permission denials:')
+                    foreach ($denial in $event.permission_denials) {
+                        $body.Add("  - `$($denial.tool_name)` input: `$(ConvertTo-CompactJson $denial.tool_input)")
+                    }
+                }
+                if (-not [string]::IsNullOrWhiteSpace([string]$event.result)) {
+                    $body.Add('')
+                    $body.Add([string]$event.result)
+                }
+                Add-TranscriptSection -Lines $transcript -Title 'Result' -Body $body.ToArray()
+            }
+            default { Add-TranscriptSection -Lines $transcript -Title ([string]$event.type) -Body @('```json', (ConvertTo-CompactJson $event), '```') }
+        }
+    }
+
+    $transcript -join [Environment]::NewLine | Set-Content -LiteralPath $OutputPath -Encoding UTF8
+}
 function Add-GhComment {
     param([string]$TargetKind, [string]$TargetNumber, [string]$Body)
     if ([string]::IsNullOrWhiteSpace($env:GH_TOKEN) -or [string]::IsNullOrWhiteSpace($RepoSlug) -or [string]::IsNullOrWhiteSpace($TargetNumber)) { return }
@@ -202,7 +338,12 @@ $runKey = if ([string]::IsNullOrWhiteSpace($RunId)) { (Get-Date).ToString('yyyyM
 $persistentRoot = Join-Path 'C:\ProgramData\SpireLens\issue-agent-runs' $runKey
 New-Item -ItemType Directory -Force -Path $persistentRoot | Out-Null
 
+$transcriptPath = Join-Path $ValidationArtifactDir 'claude-issue-agent-transcript.md'
+New-Item -ItemType Directory -Force -Path $ValidationArtifactDir | Out-Null
+New-ClaudeEventTranscript -EventLogPath $EventLogPath -OutputPath $transcriptPath
+
 Copy-IfExists -LiteralPath $EventLogPath -Destination $persistentRoot
+Copy-IfExists -LiteralPath $transcriptPath -Destination $persistentRoot
 Copy-IfExists -LiteralPath $SummaryLogPath -Destination $persistentRoot
 Copy-IfExists -LiteralPath $DebugLogPath -Destination $persistentRoot
 Copy-DirectoryIfExists -LiteralPath $ScreenshotDir -Destination $persistentRoot
