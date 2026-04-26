@@ -36,6 +36,7 @@ Common Claude CLI locations supported by the workflow:
 - `D:\automation\claude-code\node_modules\@anthropic-ai\claude-code\bin\claude.exe`
 - `C:\automation\claude-code\node_modules\@anthropic-ai\claude-code\bin\claude.exe`
 - `%USERPROFILE%\automation\claude-code\node_modules\@anthropic-ai\claude-code\bin\claude.exe`
+- `%APPDATA%\npm\node_modules\@anthropic-ai\claude-code\bin\claude.exe`
 
 If you want a different location, set repository variable
 `ISSUE_AGENT_CLAUDE_CLI_PATH`.
