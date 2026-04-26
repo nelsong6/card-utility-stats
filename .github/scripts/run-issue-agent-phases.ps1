@@ -20,18 +20,84 @@ $phaseDefinitions = @(
         Json = 'issue-agent-investigation.json'
         Markdown = 'issue-agent-investigation.md'
         AllowedAbortReasons = @('card_not_found', 'card_ambiguous', 'character_not_found', 'metadata_unavailable', 'mcp_capability_missing', 'game_state_unreachable', 'validation_plan_impossible', 'phase_timeout')
+        AllowedTools = @(
+            'Read',
+            'Glob',
+            'Grep',
+            'Bash(gh issue view *)',
+            'Bash(rg *)',
+            'Bash(git grep *)',
+            'mcp__spire-lens-mcp__lookup_card',
+            'mcp__spire-lens-mcp__lookup_character',
+            'mcp__spire-lens-mcp__list_characters',
+            'mcp__spire-lens-mcp__get_catalog_summary'
+        )
     },
     [ordered]@{
         Name = 'implementation'
         Json = 'issue-agent-implementation.json'
         Markdown = 'issue-agent-implementation.md'
         AllowedAbortReasons = @('change_too_large', 'requires_new_library', 'requires_architecture_change', 'unsafe_refactor', 'missing_code_context', 'conflicting_requirements', 'cannot_implement_without_guessing', 'phase_timeout')
+        AllowedTools = @(
+            'Read',
+            'Write',
+            'Edit',
+            'Glob',
+            'Grep',
+            'TodoWrite',
+            'Bash',
+            'PowerShell'
+        )
     },
     [ordered]@{
         Name = 'verification'
         Json = 'issue-agent-verification.json'
         Markdown = 'issue-agent-verification.md'
         AllowedAbortReasons = @('unit_tests_failed', 'live_validation_failed', 'screenshot_missing', 'screenshot_not_relevant', 'mcp_state_mismatch', 'claimed_result_not_observed', 'artifact_contract_missing', 'phase_timeout')
+        AllowedTools = @(
+            'Read',
+            'Glob',
+            'Grep',
+            'TodoWrite',
+            'Bash',
+            'PowerShell',
+            'mcp__spire-lens-mcp__capture_screenshot',
+            'mcp__spire-lens-mcp__get_game_state',
+            'mcp__spire-lens-mcp__lookup_card',
+            'mcp__spire-lens-mcp__lookup_character',
+            'mcp__spire-lens-mcp__list_characters',
+            'mcp__spire-lens-mcp__get_catalog_summary',
+            'mcp__spire-lens-mcp__reload_spirelens_core',
+            'mcp__spire-lens-mcp__start_singleplayer_run',
+            'mcp__spire-lens-mcp__enter_debug_room',
+            'mcp__spire-lens-mcp__combat_play_card',
+            'mcp__spire-lens-mcp__combat_end_turn',
+            'mcp__spire-lens-mcp__combat_select_card',
+            'mcp__spire-lens-mcp__combat_confirm_selection',
+            'mcp__spire-lens-mcp__use_potion',
+            'mcp__spire-lens-mcp__discard_potion',
+            'mcp__spire-lens-mcp__proceed_to_map',
+            'mcp__spire-lens-mcp__rewards_claim',
+            'mcp__spire-lens-mcp__rewards_pick_card',
+            'mcp__spire-lens-mcp__rewards_skip_card',
+            'mcp__spire-lens-mcp__map_choose_node',
+            'mcp__spire-lens-mcp__rest_choose_option',
+            'mcp__spire-lens-mcp__shop_purchase',
+            'mcp__spire-lens-mcp__event_choose_option',
+            'mcp__spire-lens-mcp__event_advance_dialogue',
+            'mcp__spire-lens-mcp__deck_select_card',
+            'mcp__spire-lens-mcp__deck_confirm_selection',
+            'mcp__spire-lens-mcp__deck_cancel_selection',
+            'mcp__spire-lens-mcp__bundle_select',
+            'mcp__spire-lens-mcp__bundle_confirm_selection',
+            'mcp__spire-lens-mcp__bundle_cancel_selection',
+            'mcp__spire-lens-mcp__relic_select',
+            'mcp__spire-lens-mcp__relic_skip',
+            'mcp__spire-lens-mcp__treasure_claim_relic',
+            'mcp__spire-lens-mcp__crystal_sphere_set_tool',
+            'mcp__spire-lens-mcp__crystal_sphere_click_cell',
+            'mcp__spire-lens-mcp__crystal_sphere_proceed'
+        )
     }
 )
 
@@ -270,6 +336,14 @@ function Assert-PhaseContract {
     return $status
 }
 
+function Get-PhaseAllowedToolsArgument {
+    param([hashtable]$Phase)
+
+    $tools = $Phase.AllowedTools
+    if ($null -eq $tools -or $tools.Count -eq 0) { return $null }
+    return ($tools | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }) -join ','
+}
+
 function Invoke-ClaudePhase {
     param(
         [hashtable]$Phase,
@@ -291,21 +365,29 @@ function Invoke-ClaudePhase {
     $stderrPath = Join-Path $env:RUNNER_TEMP "claude-issue-agent-$phaseName-stderr.log"
     Remove-Item -LiteralPath $stdoutPath, $stderrPath -ErrorAction SilentlyContinue
 
+    $claudeArguments = @(
+        '-p', $promptText,
+        '--model', 'sonnet',
+        '--permission-mode', 'bypassPermissions',
+        '--output-format', 'stream-json',
+        '--verbose',
+        '--debug-file', $DebugLogPath,
+        '--strict-mcp-config',
+        "--mcp-config=$McpConfigPath",
+        '--no-session-persistence',
+        '--max-budget-usd', '15.00',
+        '--add-dir', $RepoRoot
+    )
+
+    $allowedTools = Get-PhaseAllowedToolsArgument -Phase $Phase
+    if (-not [string]::IsNullOrWhiteSpace($allowedTools)) {
+        $claudeArguments += @('--allowedTools', $allowedTools)
+        Write-AgentEvent 'phase_allowed_tools' "${phaseName} allowed tools: $allowedTools" @{ phase = $phaseName; allowed_tools = $Phase.AllowedTools }
+    }
+
     $invokeResult = Invoke-ProcessWithTimeout `
         -FilePath $ClaudeCliPath `
-        -Arguments @(
-            '-p', $promptText,
-            '--bare',
-            '--model', 'sonnet',
-            '--permission-mode', 'bypassPermissions',
-            '--output-format', 'stream-json',
-            '--verbose',
-            '--debug-file', $DebugLogPath,
-            '--strict-mcp-config',
-            "--mcp-config=$McpConfigPath",
-            '--max-budget-usd', '15.00',
-            '--add-dir', $RepoRoot
-        ) `
+        -Arguments $claudeArguments `
         -WorkingDirectory $RepoRoot `
         -StdoutPath $stdoutPath `
         -StderrPath $stderrPath `
