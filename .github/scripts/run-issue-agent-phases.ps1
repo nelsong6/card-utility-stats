@@ -357,8 +357,11 @@ Read the issue with:
 gh issue view $IssueNumber --repo $RepoSlug --comments
 ``````
 
-All stateful Slay the Spire 2 work must go through MCP tools from the project MCP config at `$McpConfigPath`.
-All screenshot evidence must be captured through the `capture_screenshot` MCP tool. Do not use shell, PowerShell, `CopyFromScreen`, `PrimaryScreen`, `System.Drawing`, raw localhost bridge calls, filesystem queues, `LiveScenarios/`, `ops/live-worker/`, or `D:\automation\spirelens-live-bridge`.
+Use MCP tools from the project MCP config at `$McpConfigPath` for all STS2 surfaces.
+- Use `lookup_card`, `lookup_character`, `list_characters`, and `get_catalog_summary` for game metadata discovery. Do not rely on model memory for card ownership, character ownership, ids, or ambiguity checks.
+- Use live gameplay MCP tools for game state and in-game actions.
+- Use `capture_screenshot` for screenshot evidence.
+Do not use raw localhost bridge calls, filesystem queues, `LiveScenarios/`, `ops/live-worker/`, `D:\automation\spirelens-live-bridge`, shell/PowerShell desktop capture, `CopyFromScreen`, `PrimaryScreen`, or `System.Drawing` for STS2 surfaces.
 Write your JSON and Markdown artifacts to this exact validation artifact directory:
 
 ``````
@@ -394,11 +397,12 @@ $investigationPrompt = (Get-CommonPromptPrefix -PhaseName 'investigation') + @"
 INVESTIGATION RULES:
 - Do not edit files, commit, push, open PRs, run dotnet tests, or perform live gameplay validation.
 - Focus only on issue interpretation, card identity, character identity, MCP/game-state facts, and validation plan.
-- Keep searches targeted to the current checkout. Prefer `rg "Make It So|MakeItSo|MAKE_IT_SO" .` from the repository root over recursive PowerShell searches.
-- If a card is specified but ambiguous or cannot be found, abort.
-- If MCP or repo metadata cannot support the needed validation plan, abort.
+- For every issue-specified card, call `lookup_card` before writing the investigation result. If lookup returns `not_found`, abort with card_not_found. If lookup returns `ambiguous`, abort with card_ambiguous. Do not infer ownership from training data.
+- For every issue-specified character, call `lookup_character` before writing the investigation result. If lookup returns `not_found` or `ambiguous`, abort with character_not_found or card_ambiguous as appropriate.
+- Keep searches targeted to the current checkout for code context only. Prefer `rg "Make It So|MakeItSo|MAKE_IT_SO" .` from the repository root over recursive PowerShell searches.
+- If MCP catalog metadata or repo code context cannot support the needed validation plan, abort.
 - Write `issue-agent-investigation.json` with:
-  `{ "layer":"investigation", "status":"pass|abort", "abort_reason":null, "retryable":false, "human_action_required":false, "notes":"", "card":{}, "character":{}, "validation_plan":[] }`
+  `{ "layer":"investigation", "status":"pass|abort", "abort_reason":null, "retryable":false, "human_action_required":false, "notes":"", "card":{}, "character":{}, "card_metadata_discovery":{"passed":null,"status":"not_run","notes":""}, "validation_plan":[] }`
 - Allowed abort reasons: card_not_found, card_ambiguous, character_not_found, metadata_unavailable, mcp_capability_missing, game_state_unreachable, validation_plan_impossible.
 - Write `issue-agent-investigation.md` summarizing facts found, missing facts, and the validation plan.
 "@
@@ -432,7 +436,7 @@ dotnet test "Tests\SpireLens.Core.Tests\SpireLens.Core.Tests.csproj" -c Debug --
 
 - Capture screenshots only through the `capture_screenshot` MCP tool.
 - Use the full STS2 game window/client area returned by `capture_screenshot` as canonical screenshot evidence. Crops or tighter views may be additional evidence only, not replacements.
-- Do not use shell, PowerShell, `CopyFromScreen`, `PrimaryScreen`, `System.Drawing`, or arbitrary desktop capture for screenshot evidence. If `capture_screenshot` is unavailable or does not return a saved PNG path plus dimensions, abort with screenshot_missing.
+- If `capture_screenshot` is unavailable or does not return a saved PNG path plus dimensions, abort with screenshot_missing.
 - If the saved screenshot is not meaningful evidence for the validation claim, abort with screenshot_not_relevant.
 - Write `issue-agent-verification.json` with:
   `{ "layer":"verification", "status":"pass|abort", "abort_reason":null, "retryable":false, "human_action_required":false, "notes":"", "unit_tests":{"passed":null,"status":"not_run","notes":""}, "live_mcp_validation":{"passed":null,"status":"not_run","notes":""}, "screenshot_validation":{"passed":null,"status":"not_run","count":0,"notes":""}, "used_mcp":null, "used_raw_bridge_or_queue":false }`
