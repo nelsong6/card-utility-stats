@@ -14,7 +14,7 @@ Bring one Windows machine online as a self-hosted GitHub Actions runner with:
 - Claude Code installed locally
 - Slay the Spire 2 installed locally
 - STS2 Modding MCP installed locally
-- a local Anthropic API key file readable by the runner account
+- Claude Code authenticated once as the interactive runner account
 - an interactive runner process started from the logged-in Steam user session
 
 ## Host Requirements
@@ -24,7 +24,6 @@ Install these once on the laptop:
 - GitHub Actions runner files
 - Git
 - GitHub CLI
-- Azure CLI, used only for one-time Key Vault bootstrap if desired
 - .NET 9 SDK
 - Python 3.12
 - Steam
@@ -41,65 +40,21 @@ Common Claude CLI locations supported by the workflow:
 If you want a different location, set repository variable
 `ISSUE_AGENT_CLAUDE_CLI_PATH`.
 
-## Anthropic Key File
+## Claude Subscription Auth
 
-The issue-agent workflow reads `ANTHROPIC_API_KEY` from a local file on the
-self-hosted runner. The default path is:
-
-```text
-C:\ProgramData\SpireLens\anthropic-api-key.txt
-```
-
-The direct placement path is simplest when time matters:
+The issue-agent workflow uses the local Claude Code login for the Windows account
+running the interactive runner. Log in once from that same account before
+dispatching jobs:
 
 ```powershell
-$secretDir = 'C:\ProgramData\SpireLens'
-$keyPath = Join-Path $secretDir 'anthropic-api-key.txt'
-$key = Get-Clipboard
-if ([string]::IsNullOrWhiteSpace($key)) {
-  throw 'Clipboard is empty. Copy the Anthropic API key first.'
-}
-New-Item -ItemType Directory -Force -Path $secretDir | Out-Null
-Set-Content -LiteralPath $keyPath -Value $key.Trim() -NoNewline -Encoding ascii
-Write-Host "Wrote Anthropic API key to $keyPath"
+claude auth status
+claude
 ```
 
-To refresh the file from Key Vault instead, run this from an elevated PowerShell
-session on each runner machine:
-
-```powershell
-$vaultName = 'romaine-kv'
-$secretName = 'spirelens'
-$secretDir = 'C:\ProgramData\SpireLens'
-$keyPath = Join-Path $secretDir 'anthropic-api-key.txt'
-$azConfigDir = 'C:\ProgramData\SpireLens\az-bootstrap'
-
-New-Item -ItemType Directory -Force -Path $secretDir | Out-Null
-New-Item -ItemType Directory -Force -Path $azConfigDir | Out-Null
-$env:AZURE_CONFIG_DIR = $azConfigDir
-
-az account show --only-show-errors | Out-Null
-if ($LASTEXITCODE -ne 0) {
-  az login --tenant 2236b5e4-81d2-4d82-bde5-17b1037999ea --use-device-code --allow-no-subscriptions
-}
-
-$key = az keyvault secret show `
-  --vault-name $vaultName `
-  --name $secretName `
-  --query value `
-  --output tsv `
-  --only-show-errors
-
-if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($key)) {
-  throw "Unable to read Key Vault secret '$secretName' from vault '$vaultName'."
-}
-
-Set-Content -LiteralPath $keyPath -Value $key.Trim() -NoNewline -Encoding ascii
-Write-Host "Wrote Anthropic API key to $keyPath"
-```
-
-If a machine needs a different path, set repository variable
-`ISSUE_AGENT_ANTHROPIC_KEY_PATH` to the full local path.
+If `claude auth status` does not report a logged-in Claude.ai account, launch
+`claude` interactively and complete the browser login. The workflow runs
+`claude auth status` as a preflight and fails early if the runner account is not
+authenticated.
 
 ## Register The Runner
 
@@ -163,11 +118,10 @@ The issue-agent workflow expects:
 - the repo checkout contains a working `.mcp.json`
 - Claude can list and connect to `spire-lens-mcp`
 - STS2 is available locally when the issue requires live validation
-- `ANTHROPIC_API_KEY` is available from the local runner key file
+- Claude Code is authenticated for the interactive runner account
 
 The workflow itself still handles:
 
-- mapping the local key file to `ANTHROPIC_API_KEY`
 - uploading logs, screenshots, and validation artifacts
 
 ## Sanity Check
