@@ -14,6 +14,83 @@ param(
 $ErrorActionPreference = 'Stop'
 $PhaseTimeoutSeconds = 360
 
+$CatalogMcpTools = @(
+    'mcp__spire-lens-mcp__lookup_card',
+    'mcp__spire-lens-mcp__lookup_character',
+    'mcp__spire-lens-mcp__list_characters',
+    'mcp__spire-lens-mcp__get_catalog_summary'
+)
+
+$SingleplayerMcpTools = @(
+    'mcp__spire-lens-mcp__capture_screenshot',
+    'mcp__spire-lens-mcp__get_game_state',
+    'mcp__spire-lens-mcp__reload_spirelens_core',
+    'mcp__spire-lens-mcp__start_singleplayer_run',
+    'mcp__spire-lens-mcp__enter_debug_room',
+    'mcp__spire-lens-mcp__combat_play_card',
+    'mcp__spire-lens-mcp__combat_end_turn',
+    'mcp__spire-lens-mcp__combat_select_card',
+    'mcp__spire-lens-mcp__combat_confirm_selection',
+    'mcp__spire-lens-mcp__use_potion',
+    'mcp__spire-lens-mcp__discard_potion',
+    'mcp__spire-lens-mcp__proceed_to_map',
+    'mcp__spire-lens-mcp__rewards_claim',
+    'mcp__spire-lens-mcp__rewards_pick_card',
+    'mcp__spire-lens-mcp__rewards_skip_card',
+    'mcp__spire-lens-mcp__map_choose_node',
+    'mcp__spire-lens-mcp__rest_choose_option',
+    'mcp__spire-lens-mcp__shop_purchase',
+    'mcp__spire-lens-mcp__event_choose_option',
+    'mcp__spire-lens-mcp__event_advance_dialogue',
+    'mcp__spire-lens-mcp__deck_select_card',
+    'mcp__spire-lens-mcp__deck_confirm_selection',
+    'mcp__spire-lens-mcp__deck_cancel_selection',
+    'mcp__spire-lens-mcp__bundle_select',
+    'mcp__spire-lens-mcp__bundle_confirm_selection',
+    'mcp__spire-lens-mcp__bundle_cancel_selection',
+    'mcp__spire-lens-mcp__relic_select',
+    'mcp__spire-lens-mcp__relic_skip',
+    'mcp__spire-lens-mcp__treasure_claim_relic',
+    'mcp__spire-lens-mcp__crystal_sphere_set_tool',
+    'mcp__spire-lens-mcp__crystal_sphere_click_cell',
+    'mcp__spire-lens-mcp__crystal_sphere_proceed'
+)
+
+$MultiplayerMcpTools = @(
+    'mcp__spire-lens-mcp__mp_get_game_state',
+    'mcp__spire-lens-mcp__mp_combat_play_card',
+    'mcp__spire-lens-mcp__mp_combat_end_turn',
+    'mcp__spire-lens-mcp__mp_combat_undo_end_turn',
+    'mcp__spire-lens-mcp__mp_combat_select_card',
+    'mcp__spire-lens-mcp__mp_combat_confirm_selection',
+    'mcp__spire-lens-mcp__mp_use_potion',
+    'mcp__spire-lens-mcp__mp_discard_potion',
+    'mcp__spire-lens-mcp__mp_proceed_to_map',
+    'mcp__spire-lens-mcp__mp_rewards_claim',
+    'mcp__spire-lens-mcp__mp_rewards_pick_card',
+    'mcp__spire-lens-mcp__mp_rewards_skip_card',
+    'mcp__spire-lens-mcp__mp_map_vote',
+    'mcp__spire-lens-mcp__mp_rest_choose_option',
+    'mcp__spire-lens-mcp__mp_shop_purchase',
+    'mcp__spire-lens-mcp__mp_event_choose_option',
+    'mcp__spire-lens-mcp__mp_event_advance_dialogue',
+    'mcp__spire-lens-mcp__mp_deck_select_card',
+    'mcp__spire-lens-mcp__mp_deck_confirm_selection',
+    'mcp__spire-lens-mcp__mp_deck_cancel_selection',
+    'mcp__spire-lens-mcp__mp_bundle_select',
+    'mcp__spire-lens-mcp__mp_bundle_confirm_selection',
+    'mcp__spire-lens-mcp__mp_bundle_cancel_selection',
+    'mcp__spire-lens-mcp__mp_relic_select',
+    'mcp__spire-lens-mcp__mp_relic_skip',
+    'mcp__spire-lens-mcp__mp_treasure_claim_relic',
+    'mcp__spire-lens-mcp__mp_crystal_sphere_set_tool',
+    'mcp__spire-lens-mcp__mp_crystal_sphere_click_cell',
+    'mcp__spire-lens-mcp__mp_crystal_sphere_proceed'
+)
+
+$AllSpireLensMcpTools = $CatalogMcpTools + $SingleplayerMcpTools + $MultiplayerMcpTools
+
+
 $phaseDefinitions = @(
     [ordered]@{
         Name = 'investigation'
@@ -22,15 +99,17 @@ $phaseDefinitions = @(
         AllowedAbortReasons = @('card_not_found', 'card_ambiguous', 'character_not_found', 'metadata_unavailable', 'mcp_capability_missing', 'game_state_unreachable', 'validation_plan_impossible', 'phase_timeout')
         AllowedTools = @(
             'Read',
+            'Write',
             'Glob',
             'Grep',
+            'ToolSearch',
             'Bash(gh issue view *)',
             'Bash(rg *)',
-            'Bash(git grep *)',
-            'mcp__spire-lens-mcp__lookup_card',
-            'mcp__spire-lens-mcp__lookup_character',
-            'mcp__spire-lens-mcp__list_characters',
-            'mcp__spire-lens-mcp__get_catalog_summary'
+            'Bash(git grep *)'
+        ) + $CatalogMcpTools
+        DisallowedTools = $SingleplayerMcpTools + $MultiplayerMcpTools + @(
+            'Edit',
+            'NotebookEdit'
         )
     },
     [ordered]@{
@@ -48,6 +127,7 @@ $phaseDefinitions = @(
             'Bash',
             'PowerShell'
         )
+        DisallowedTools = $AllSpireLensMcpTools
     },
     [ordered]@{
         Name = 'verification'
@@ -56,47 +136,17 @@ $phaseDefinitions = @(
         AllowedAbortReasons = @('unit_tests_failed', 'live_validation_failed', 'screenshot_missing', 'screenshot_not_relevant', 'mcp_state_mismatch', 'claimed_result_not_observed', 'artifact_contract_missing', 'phase_timeout')
         AllowedTools = @(
             'Read',
+            'Write',
             'Glob',
             'Grep',
+            'ToolSearch',
             'TodoWrite',
             'Bash',
-            'PowerShell',
-            'mcp__spire-lens-mcp__capture_screenshot',
-            'mcp__spire-lens-mcp__get_game_state',
-            'mcp__spire-lens-mcp__lookup_card',
-            'mcp__spire-lens-mcp__lookup_character',
-            'mcp__spire-lens-mcp__list_characters',
-            'mcp__spire-lens-mcp__get_catalog_summary',
-            'mcp__spire-lens-mcp__reload_spirelens_core',
-            'mcp__spire-lens-mcp__start_singleplayer_run',
-            'mcp__spire-lens-mcp__enter_debug_room',
-            'mcp__spire-lens-mcp__combat_play_card',
-            'mcp__spire-lens-mcp__combat_end_turn',
-            'mcp__spire-lens-mcp__combat_select_card',
-            'mcp__spire-lens-mcp__combat_confirm_selection',
-            'mcp__spire-lens-mcp__use_potion',
-            'mcp__spire-lens-mcp__discard_potion',
-            'mcp__spire-lens-mcp__proceed_to_map',
-            'mcp__spire-lens-mcp__rewards_claim',
-            'mcp__spire-lens-mcp__rewards_pick_card',
-            'mcp__spire-lens-mcp__rewards_skip_card',
-            'mcp__spire-lens-mcp__map_choose_node',
-            'mcp__spire-lens-mcp__rest_choose_option',
-            'mcp__spire-lens-mcp__shop_purchase',
-            'mcp__spire-lens-mcp__event_choose_option',
-            'mcp__spire-lens-mcp__event_advance_dialogue',
-            'mcp__spire-lens-mcp__deck_select_card',
-            'mcp__spire-lens-mcp__deck_confirm_selection',
-            'mcp__spire-lens-mcp__deck_cancel_selection',
-            'mcp__spire-lens-mcp__bundle_select',
-            'mcp__spire-lens-mcp__bundle_confirm_selection',
-            'mcp__spire-lens-mcp__bundle_cancel_selection',
-            'mcp__spire-lens-mcp__relic_select',
-            'mcp__spire-lens-mcp__relic_skip',
-            'mcp__spire-lens-mcp__treasure_claim_relic',
-            'mcp__spire-lens-mcp__crystal_sphere_set_tool',
-            'mcp__spire-lens-mcp__crystal_sphere_click_cell',
-            'mcp__spire-lens-mcp__crystal_sphere_proceed'
+            'PowerShell'
+        ) + $CatalogMcpTools + $SingleplayerMcpTools
+        DisallowedTools = $MultiplayerMcpTools + @(
+            'Edit',
+            'NotebookEdit'
         )
     }
 )
@@ -344,6 +394,14 @@ function Get-PhaseAllowedToolsArgument {
     return ($tools | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }) -join ','
 }
 
+function Get-PhaseDisallowedToolsArgument {
+    param([hashtable]$Phase)
+
+    $tools = $Phase.DisallowedTools
+    if ($null -eq $tools -or $tools.Count -eq 0) { return $null }
+    return ($tools | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }) -join ','
+}
+
 function Invoke-ClaudePhase {
     param(
         [hashtable]$Phase,
@@ -383,6 +441,12 @@ function Invoke-ClaudePhase {
     if (-not [string]::IsNullOrWhiteSpace($allowedTools)) {
         $claudeArguments += @('--allowedTools', $allowedTools)
         Write-AgentEvent 'phase_allowed_tools' "${phaseName} allowed tools: $allowedTools" @{ phase = $phaseName; allowed_tools = $Phase.AllowedTools }
+    }
+
+    $disallowedTools = Get-PhaseDisallowedToolsArgument -Phase $Phase
+    if (-not [string]::IsNullOrWhiteSpace($disallowedTools)) {
+        $claudeArguments += @('--disallowedTools', $disallowedTools)
+        Write-AgentEvent 'phase_disallowed_tools' "${phaseName} disallowed tools: $disallowedTools" @{ phase = $phaseName; disallowed_tools = $Phase.DisallowedTools }
     }
 
     $invokeResult = Invoke-ProcessWithTimeout `
@@ -477,7 +541,7 @@ Set-Location -LiteralPath $RepoRoot
 $investigationPrompt = (Get-CommonPromptPrefix -PhaseName 'investigation') + @"
 
 INVESTIGATION RULES:
-- Do not edit files, commit, push, open PRs, run dotnet tests, or perform live gameplay validation.
+- Do not edit files, commit, push, open PRs, run dotnet tests, capture screenshots, or perform live gameplay validation.
 - Focus only on issue interpretation, card identity, character identity, MCP/game-state facts, and validation plan.
 - For every issue-specified card, call `lookup_card` before writing the investigation result. If lookup returns `not_found`, abort with card_not_found. If lookup returns `ambiguous`, abort with card_ambiguous. Do not infer ownership from training data.
 - For every issue-specified character, call `lookup_character` before writing the investigation result. If lookup returns `not_found` or `ambiguous`, abort with character_not_found or card_ambiguous as appropriate.
