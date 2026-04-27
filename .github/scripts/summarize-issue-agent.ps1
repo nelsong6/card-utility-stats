@@ -117,93 +117,21 @@ function Get-ToolFailureCategory {
     param([string]$Text)
 
     if ([string]::IsNullOrWhiteSpace($Text)) { return $null }
+
+    # Successful test summaries often contain the word "Failed" as a zero count.
+    # Count only actual failures, not lines like "Passed! - Failed: 0".
+    if ($Text -match '(?i)\bPassed!\s*-\s*Failed:\s*0\b') { return $null }
+    if ($Text -match '(?i)\bFailed:\s*0\b' -and
+        $Text -notmatch '(?im)^\s*(error|exception|traceback):' -and
+        $Text -notmatch '(?i)\b(exit code [1-9]\d*|unauthorized|forbidden)\b') { return $null }
+
     if ($Text -match '(?i)permission to use .* has been denied|permission_denied|permission denied|not allowed to use tool|disallowed') { return 'permission_denied' }
     if ($Text -match '(?i)\b(500|internal server error)\b') { return 'server_error' }
     if ($Text -match '(?i)\b(timed out|timeout)\b') { return 'timeout' }
     if ($Text -match '(?im)^\s*(error|exception|traceback):') { return 'tool_error' }
-    if ($Text -match '(?i)\b(exit code [1-9]\d*|failed|exception|traceback|unauthorized|forbidden|not found)\b') { return 'tool_error' }
+    if ($Text -match '(?i)\bFailed:\s*[1-9]\d*\b|\bfailures?:\s*[1-9]\d*\b') { return 'tool_error' }
+    if ($Text -match '(?i)\b(exit code [1-9]\d*|exception|traceback|unauthorized|forbidden|not found)\b') { return 'tool_error' }
     return $null
-}
-
-function New-ToolMetricBucket {
-    return [ordered]@{
-        tool_uses = 0
-        tool_results = 0
-        failed_tool_results = 0
-        permission_denials = 0
-        failure_categories = [ordered]@{}
-    }
-}
-
-function Add-ToolMetricFailure {
-    param([object]$Bucket, [string]$Category)
-    if ([string]::IsNullOrWhiteSpace($Category)) { return }
-    $Bucket.failed_tool_results++
-    if ($null -eq $Bucket.failure_categories[$Category]) { $Bucket.failure_categories[$Category] = 0 }
-    $Bucket.failure_categories[$Category]++
-}
-
-function Get-ClaudeToolCallSummary {
-    param([string]$Path, [string[]]$PhaseNames)
-
-    $summary = [ordered]@{
-        total = New-ToolMetricBucket
-        phases = [ordered]@{}
-    }
-    foreach ($phaseName in $PhaseNames) { $summary.phases[$phaseName] = New-ToolMetricBucket }
-    if ([string]::IsNullOrWhiteSpace($Path) -or -not (Test-Path -LiteralPath $Path)) { return $summary }
-
-    Get-Content -LiteralPath $Path -ErrorAction SilentlyContinue | ForEach-Object {
-        try {
-            $record = $_ | ConvertFrom-Json -ErrorAction Stop
-            $phaseName = [string](Get-NestedPropertyValue -Object $record -Path @('data', 'phase'))
-            if ([string]::IsNullOrWhiteSpace($phaseName)) { $phaseName = 'unknown' }
-            if ($null -eq $summary.phases[$phaseName]) { $summary.phases[$phaseName] = New-ToolMetricBucket }
-            $phaseBucket = $summary.phases[$phaseName]
-            if ($record.kind -eq 'tool_use') {
-                $summary.total.tool_uses++
-                $phaseBucket.tool_uses++
-                return
-            }
-            if ($record.kind -eq 'tool_result') {
-                $summary.total.tool_results++
-                $phaseBucket.tool_results++
-                $category = [string](Get-NestedPropertyValue -Object $record -Path @('data', 'failure_category'))
-                $failed = Get-NestedPropertyValue -Object $record -Path @('data', 'failed')
-                if ([string]::IsNullOrWhiteSpace($category)) { $category = Get-ToolFailureCategory -Text ([string]$record.message) }
-                if (($failed -is [bool] -and $failed) -or -not [string]::IsNullOrWhiteSpace($category)) {
-                    Add-ToolMetricFailure -Bucket $summary.total -Category $category
-                    Add-ToolMetricFailure -Bucket $phaseBucket -Category $category
-                }
-                return
-            }
-            if ($record.kind -eq 'result' -and -not [string]::IsNullOrWhiteSpace([string]$record.message)) {
-                $resultEvent = $record.message | ConvertFrom-Json -ErrorAction Stop
-                $denials = @($resultEvent.permission_denials)
-                if ($denials.Count -gt 0) {
-                    $summary.total.permission_denials += $denials.Count
-                    $phaseBucket.permission_denials += $denials.Count
-                    foreach ($denial in $denials) {
-                        Add-ToolMetricFailure -Bucket $summary.total -Category 'permission_denied'
-                        Add-ToolMetricFailure -Bucket $phaseBucket -Category 'permission_denied'
-                    }
-                }
-            }
-        } catch {
-        }
-    }
-    return $summary
-}
-
-function Format-FailureCategories {
-    param([object]$Categories)
-    if ($null -eq $Categories) { return '' }
-    $items = @()
-    foreach ($property in $Categories.PSObject.Properties) {
-        if ($null -ne $property.Value -and [int]$property.Value -gt 0) { $items += "$($property.Name): $($property.Value)" }
-    }
-    if ($items.Count -eq 0) { return '' }
-    return ($items -join ', ')
 }
 function Get-ClaudeCostSummary {
     param([string]$Path)
