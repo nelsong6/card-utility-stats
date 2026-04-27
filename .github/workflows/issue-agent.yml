@@ -61,55 +61,174 @@ jobs:
             throw "Claude Code is not authenticated for the runner user."
           }
 
-      - name: Run phased issue agent
-        timeout-minutes: 42
+      - name: Resolve issue number
+        id: issue
         env:
-          CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
-          GH_TOKEN: ${{ github.token }}
           EVENT_ISSUE_NUMBER: ${{ github.event.issue.number }}
           DISPATCH_ISSUE_NUMBER: ${{ github.event.inputs.issue_number }}
-          REPO_SLUG: ${{ github.repository }}
         shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         run: |
           $issueNumber = $env:EVENT_ISSUE_NUMBER
           if ([string]::IsNullOrWhiteSpace($issueNumber)) { $issueNumber = $env:DISPATCH_ISSUE_NUMBER }
           if ([string]::IsNullOrWhiteSpace($issueNumber)) { throw "No issue number was provided." }
+          "number=$issueNumber" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
+      - name: Investigate test primitives
+        timeout-minutes: 10
+        env:
+          CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
+          GH_TOKEN: ${{ github.token }}
+          REPO_SLUG: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ steps.issue.outputs.number }}
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
           & (Join-Path $env:ISSUE_AGENT_REPO_ROOT ".github\scripts\run-issue-agent-phases.ps1") `
-            -IssueNumber $issueNumber `
+            -IssueNumber $env:ISSUE_NUMBER `
             -RepoSlug $env:REPO_SLUG `
             -RepoRoot $env:ISSUE_AGENT_REPO_ROOT `
             -ClaudeCliPath $env:CLAUDE_CLI_PATH `
             -McpConfigPath (Join-Path $env:ISSUE_AGENT_REPO_ROOT ".mcp.json") `
-            -StreamLogPath (Join-Path $env:RUNNER_TEMP "claude-issue-agent-events.jsonl") `
-            -DebugLogPath (Join-Path $env:RUNNER_TEMP "claude-issue-agent-debug.log") `
-            -SummaryLogPath (Join-Path $env:RUNNER_TEMP "claude-issue-agent-summary.log") `
+            -StreamLogPath (Join-Path $env:RUNNER_TEMP "claude-issue-agent-investigation-events.jsonl") `
+            -DebugLogPath (Join-Path $env:RUNNER_TEMP "claude-issue-agent-investigation-debug.log") `
+            -SummaryLogPath (Join-Path $env:RUNNER_TEMP "claude-issue-agent-investigation-summary.log") `
             -ScreenshotDir (Join-Path $env:RUNNER_TEMP "sts2-screenshots") `
             -ValidationArtifactDir (Join-Path $env:RUNNER_TEMP "sts2-artifacts") `
-            -PhaseName all
+            -PhaseName investigation
+
+      - name: Read investigation result
+        id: investigation
+        if: always()
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $path = Join-Path $env:RUNNER_TEMP "sts2-artifacts\issue-agent-investigation.json"
+          $status = "missing"
+          $abortReason = ""
+          if (Test-Path -LiteralPath $path) {
+            $json = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
+            $status = [string]$json.status
+            $abortReason = [string]$json.abort_reason
+          }
+          "phase_status=$status" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "abort_reason=$abortReason" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Implement code change
+        if: steps.investigation.outputs.phase_status == 'pass'
+        timeout-minutes: 12
+        env:
+          CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
+          GH_TOKEN: ${{ github.token }}
+          REPO_SLUG: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ steps.issue.outputs.number }}
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          & (Join-Path $env:ISSUE_AGENT_REPO_ROOT ".github\scripts\run-issue-agent-phases.ps1") `
+            -IssueNumber $env:ISSUE_NUMBER `
+            -RepoSlug $env:REPO_SLUG `
+            -RepoRoot $env:ISSUE_AGENT_REPO_ROOT `
+            -ClaudeCliPath $env:CLAUDE_CLI_PATH `
+            -McpConfigPath (Join-Path $env:ISSUE_AGENT_REPO_ROOT ".mcp.json") `
+            -StreamLogPath (Join-Path $env:RUNNER_TEMP "claude-issue-agent-implementation-events.jsonl") `
+            -DebugLogPath (Join-Path $env:RUNNER_TEMP "claude-issue-agent-implementation-debug.log") `
+            -SummaryLogPath (Join-Path $env:RUNNER_TEMP "claude-issue-agent-implementation-summary.log") `
+            -ScreenshotDir (Join-Path $env:RUNNER_TEMP "sts2-screenshots") `
+            -ValidationArtifactDir (Join-Path $env:RUNNER_TEMP "sts2-artifacts") `
+            -PhaseName implementation
+
+      - name: Read implementation result
+        id: implementation
+        if: always()
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $path = Join-Path $env:RUNNER_TEMP "sts2-artifacts\issue-agent-implementation.json"
+          $status = "skipped"
+          $abortReason = ""
+          if (Test-Path -LiteralPath $path) {
+            $json = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
+            $status = [string]$json.status
+            $abortReason = [string]$json.abort_reason
+          } elseif ('${{ steps.investigation.outputs.phase_status }}' -ne 'pass') {
+            $status = "skipped"
+            $abortReason = "investigation_${{ steps.investigation.outputs.phase_status }}"
+          }
+          "phase_status=$status" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "abort_reason=$abortReason" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Verify in STS2
+        if: steps.implementation.outputs.phase_status == 'pass'
+        timeout-minutes: 18
+        env:
+          CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
+          GH_TOKEN: ${{ github.token }}
+          REPO_SLUG: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ steps.issue.outputs.number }}
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          & (Join-Path $env:ISSUE_AGENT_REPO_ROOT ".github\scripts\run-issue-agent-phases.ps1") `
+            -IssueNumber $env:ISSUE_NUMBER `
+            -RepoSlug $env:REPO_SLUG `
+            -RepoRoot $env:ISSUE_AGENT_REPO_ROOT `
+            -ClaudeCliPath $env:CLAUDE_CLI_PATH `
+            -McpConfigPath (Join-Path $env:ISSUE_AGENT_REPO_ROOT ".mcp.json") `
+            -StreamLogPath (Join-Path $env:RUNNER_TEMP "claude-issue-agent-verification-events.jsonl") `
+            -DebugLogPath (Join-Path $env:RUNNER_TEMP "claude-issue-agent-verification-debug.log") `
+            -SummaryLogPath (Join-Path $env:RUNNER_TEMP "claude-issue-agent-verification-summary.log") `
+            -ScreenshotDir (Join-Path $env:RUNNER_TEMP "sts2-screenshots") `
+            -ValidationArtifactDir (Join-Path $env:RUNNER_TEMP "sts2-artifacts") `
+            -PhaseName verification
+
+      - name: Read verification result
+        id: verification
+        if: always()
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $path = Join-Path $env:RUNNER_TEMP "sts2-artifacts\issue-agent-verification.json"
+          $status = "skipped"
+          $abortReason = ""
+          if (Test-Path -LiteralPath $path) {
+            $json = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
+            $status = [string]$json.status
+            $abortReason = [string]$json.abort_reason
+          } elseif ('${{ steps.implementation.outputs.phase_status }}' -ne 'pass') {
+            $status = "skipped"
+            $abortReason = "implementation_${{ steps.implementation.outputs.phase_status }}"
+          }
+          "phase_status=$status" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "abort_reason=$abortReason" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
       - name: Summarize issue-agent run
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
-          EVENT_ISSUE_NUMBER: ${{ github.event.issue.number }}
-          DISPATCH_ISSUE_NUMBER: ${{ github.event.inputs.issue_number }}
           REPO_SLUG: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ steps.issue.outputs.number }}
         shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         run: |
-          $issueNumber = $env:EVENT_ISSUE_NUMBER
-          if ([string]::IsNullOrWhiteSpace($issueNumber)) { $issueNumber = $env:DISPATCH_ISSUE_NUMBER }
+          New-Item -ItemType Directory -Force -Path (Join-Path $env:RUNNER_TEMP "sts2-artifacts") | Out-Null
+          $combinedEvents = Join-Path $env:RUNNER_TEMP "claude-issue-agent-events.jsonl"
+          $combinedSummary = Join-Path $env:RUNNER_TEMP "claude-issue-agent-summary.log"
+          $combinedDebug = Join-Path $env:RUNNER_TEMP "claude-issue-agent-debug.log"
+          Remove-Item -LiteralPath $combinedEvents, $combinedSummary, $combinedDebug -ErrorAction SilentlyContinue
+
+          Get-ChildItem -LiteralPath $env:RUNNER_TEMP -Filter "claude-issue-agent-*-events.jsonl" -File -ErrorAction SilentlyContinue |
+            Sort-Object Name |
+            ForEach-Object { Get-Content -LiteralPath $_.FullName -ErrorAction SilentlyContinue | Add-Content -LiteralPath $combinedEvents -Encoding UTF8 }
+          Get-ChildItem -LiteralPath $env:RUNNER_TEMP -Filter "claude-issue-agent-*-summary.log" -File -ErrorAction SilentlyContinue |
+            Sort-Object Name |
+            ForEach-Object { Get-Content -LiteralPath $_.FullName -ErrorAction SilentlyContinue | Add-Content -LiteralPath $combinedSummary -Encoding UTF8 }
+          Get-ChildItem -LiteralPath $env:RUNNER_TEMP -Filter "claude-issue-agent-*-debug.log" -File -ErrorAction SilentlyContinue |
+            Sort-Object Name |
+            ForEach-Object { Get-Content -LiteralPath $_.FullName -ErrorAction SilentlyContinue | Add-Content -LiteralPath $combinedDebug -Encoding UTF8 }
 
           & (Join-Path $env:ISSUE_AGENT_REPO_ROOT ".github\scripts\summarize-issue-agent.ps1") `
-            -EventLogPath (Join-Path $env:RUNNER_TEMP "claude-issue-agent-events.jsonl") `
-            -SummaryLogPath (Join-Path $env:RUNNER_TEMP "claude-issue-agent-summary.log") `
-            -DebugLogPath (Join-Path $env:RUNNER_TEMP "claude-issue-agent-debug.log") `
+            -EventLogPath $combinedEvents `
+            -SummaryLogPath $combinedSummary `
+            -DebugLogPath $combinedDebug `
             -ScreenshotDir (Join-Path $env:RUNNER_TEMP "sts2-screenshots") `
             -ValidationArtifactDir (Join-Path $env:RUNNER_TEMP "sts2-artifacts") `
             -ArtifactName "issue-agent artifacts for run $($env:GITHUB_RUN_ID)" `
             -RepoSlug $env:REPO_SLUG `
             -RunId $env:GITHUB_RUN_ID `
-            -IssueNumber $issueNumber `
+            -IssueNumber $env:ISSUE_NUMBER `
             -HeadSha $env:GITHUB_SHA `
             -RefName $env:GITHUB_REF_NAME
 
