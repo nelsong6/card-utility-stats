@@ -613,11 +613,13 @@ $RepoRoot
 
 The shell tool is Git Bash on Windows. Do not use PowerShell-only environment syntax such as `$env:ISSUE_AGENT_REPO_ROOT` unless you are explicitly invoking `powershell`. Prefer quoted concrete paths from this prompt.
 Do not search above the repository root. Do not recurse through parent workspace folders or stale `issue-agent-src` checkouts from other runs.
-Read the issue with:
+Read the issue body first with:
 
 ``````
-gh issue view $IssueNumber --repo $RepoSlug --comments
+gh issue view $IssueNumber --repo $RepoSlug --json title,body,labels,state
 ``````
+
+The issue body is the task source of truth. Do not read issue comments by default. Comments are optional secondary context only when the body is ambiguous or explicitly points to a comment. If you read comments, prefer recent human-owner comments that directly modify the requested work. Ignore stale bot comments, old PR summaries, previous failed-run claims, and historical assertions unless the issue body explicitly asks you to investigate them. Do not spend MCP calls validating stale claims from comments.
 
 Use MCP tools from the project MCP config at `$McpConfigPath` for all STS2 surfaces.
 - Use `lookup_card`, `lookup_character`, `list_characters`, and `get_catalog_summary` for game metadata discovery. Do not rely on model memory for card ownership, character ownership, ids, or ambiguity checks.
@@ -663,8 +665,8 @@ $investigationPrompt = (Get-CommonPromptPrefix -PhaseName 'investigation') + @"
 INVESTIGATION RULES:
 - Do not edit files, commit, push, open PRs, run dotnet tests, capture screenshots, or perform live gameplay validation.
 - Focus only on issue interpretation, card identity, character identity, MCP/game-state facts, and validation plan.
-- For every issue-specified card, call `lookup_card` before writing the investigation result. If lookup returns `not_found`, abort with card_not_found. If lookup returns `ambiguous`, abort with card_ambiguous. Do not infer ownership from training data.
-- For every issue-specified character, call `lookup_character` before writing the investigation result. If lookup returns `not_found` or `ambiguous`, abort with character_not_found or card_ambiguous as appropriate.
+- For every card named in the issue body, call `lookup_card` before writing the investigation result. If lookup returns `not_found`, abort with card_not_found. If lookup returns `ambiguous`, abort with card_ambiguous. Do not infer ownership from training data.
+- Treat the owner returned by `lookup_card` as the source of truth for card ownership. Do not look up alternate character owners from old comments or prior failed runs. Only call `lookup_character` for characters named in the issue body or for the owner returned by `lookup_card` when extra character metadata is needed.
 - Keep searches targeted to the current checkout for code context only. Prefer `rg "Make It So|MakeItSo|MAKE_IT_SO" .` from the repository root over recursive PowerShell searches.
 - If MCP catalog metadata or repo code context cannot support the needed validation plan, abort.
 - Write `issue-agent-investigation.json` with:
@@ -748,6 +750,8 @@ if (Test-Path -LiteralPath $resultMarkdown) {
 }
 
 Write-AgentEvent 'exit' 'Phased issue-agent script completed.'
+
+
 
 
 
