@@ -246,7 +246,7 @@ jobs:
     needs:
       - test-plan
       - implementation
-    if: always()
+    if: needs.test-plan.result == 'success' && needs.implementation.result == 'success'
     runs-on:
       - self-hosted
       - windows
@@ -286,11 +286,6 @@ jobs:
           Get-ChildItem -Path (Join-Path $env:RUNNER_TEMP "downloaded-implementation") -Recurse -File -Filter "issue-agent-implementation.*" -ErrorAction SilentlyContinue |
             Copy-Item -Destination (Join-Path $env:RUNNER_TEMP "sts2-artifacts") -Force
 
-      - name: Fail if prerequisite phases failed
-        if: needs.test-plan.outputs.phase_status != 'pass' || needs.implementation.outputs.phase_status != 'pass'
-        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
-        run: |
-          throw "Prerequisite phase failed. test_plan=${{ needs.test-plan.outputs.phase_status }} test_plan_reason=${{ needs.test-plan.outputs.abort_reason }} implementation=${{ needs.implementation.outputs.phase_status }} implementation_reason=${{ needs.implementation.outputs.abort_reason }}"
 
       - name: Prepare issue-agent host
         env:
