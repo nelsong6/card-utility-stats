@@ -207,9 +207,9 @@ jobs:
         run: |
           Set-Location -LiteralPath $env:ISSUE_AGENT_REPO_ROOT
           $sts2DataDir = "D:\SteamLibrary\steamapps\common\Slay the Spire 2\data_sts2_windows_x86_64"
-          dotnet build "SpireLens.csproj" -c Debug "-p:Sts2DataDir=$sts2DataDir"
+          dotnet build "SpireLens.csproj" -c Debug "-p:Sts2DataDir=$sts2DataDir" -p:SkipModsDeploy=true
           if ($LASTEXITCODE -ne 0) { throw "Implementation checkout loader build failed." }
-          dotnet build "Core\SpireLens.Core.csproj" -c Debug "-p:Sts2DataDir=$sts2DataDir"
+          dotnet build "Core\SpireLens.Core.csproj" -c Debug "-p:Sts2DataDir=$sts2DataDir" -p:SkipModsDeploy=true
           if ($LASTEXITCODE -ne 0) { throw "Implementation checkout core build failed." }
 
       - name: Package implementation patch
