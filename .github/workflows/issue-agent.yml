@@ -73,7 +73,7 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($issueNumber)) { throw "No issue number was provided." }
           "number=$issueNumber" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
-      - name: Investigate test primitives
+      - name: LLM: Investigate test primitives
         timeout-minutes: 10
         env:
           CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
@@ -111,7 +111,7 @@ jobs:
           "phase_status=$status" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           "abort_reason=$abortReason" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
-      - name: Implement code change
+      - name: LLM: Implement code change
         if: steps.investigation.outputs.phase_status == 'pass'
         timeout-minutes: 12
         env:
@@ -152,7 +152,7 @@ jobs:
           "phase_status=$status" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           "abort_reason=$abortReason" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
-      - name: Verify in STS2
+      - name: LLM: Verify in STS2
         if: steps.implementation.outputs.phase_status == 'pass'
         timeout-minutes: 18
         env:
