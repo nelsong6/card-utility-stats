@@ -27,6 +27,7 @@ $SingleplayerMcpTools = @(
     'mcp__spire-lens-mcp__reload_spirelens_core',
     'mcp__spire-lens-mcp__start_singleplayer_run',
     'mcp__spire-lens-mcp__enter_debug_room',
+    'mcp__spire-lens-mcp__configure_test_combat',
     'mcp__spire-lens-mcp__combat_play_card',
     'mcp__spire-lens-mcp__combat_end_turn',
     'mcp__spire-lens-mcp__combat_select_card',
