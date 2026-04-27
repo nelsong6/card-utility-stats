@@ -218,7 +218,7 @@ jobs:
         run: |
           Set-Location -LiteralPath $env:ISSUE_AGENT_REPO_ROOT
           $patchPath = Join-Path $env:RUNNER_TEMP "issue-agent-implementation.patch"
-          git diff --binary -- . ':!.github/workflows/issue-agent.yml' > $patchPath
+          git diff --binary --output="$patchPath" -- . ':!.github/workflows/issue-agent.yml'
           if (-not (Test-Path -LiteralPath $patchPath)) { New-Item -ItemType File -Path $patchPath | Out-Null }
           $bytes = (Get-Item -LiteralPath $patchPath).Length
           Write-Host "Packaged implementation patch: $patchPath ($bytes bytes)"
