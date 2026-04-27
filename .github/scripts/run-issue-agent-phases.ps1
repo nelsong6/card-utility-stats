@@ -126,6 +126,8 @@ $phaseDefinitions = @(
         DisallowedTools = $SingleplayerMcpTools + $MultiplayerMcpTools + @(
             'Edit',
             'NotebookEdit',
+            'WebFetch',
+            'WebSearch',
             'Agent',
             'Task',
             'TaskOutput',
@@ -148,13 +150,23 @@ $phaseDefinitions = @(
             'ToolSearch',
             'TodoWrite',
             'Bash',
-            'PowerShell'
+            'PowerShell',
+            'Bash(gh issue view *)',
+            'PowerShell(gh issue view *)'
         ) + $CatalogMcpTools
         DisallowedTools = $SingleplayerMcpTools + $MultiplayerMcpTools + @(
             'Bash(dotnet test *)',
             'PowerShell(dotnet test *)',
-            'Bash(gh *)',
-            'PowerShell(gh *)',
+            'Bash(gh issue view *--comments*)',
+            'PowerShell(gh issue view *--comments*)',
+            'Bash(gh api *)',
+            'PowerShell(gh api *)',
+            'Bash(gh issue comment *)',
+            'PowerShell(gh issue comment *)',
+            'Bash(gh issue edit *)',
+            'PowerShell(gh issue edit *)',
+            'Bash(gh pr *)',
+            'PowerShell(gh pr *)',
             'Bash(git add *)',
             'PowerShell(git add *)',
             'Bash(git branch *)',
@@ -167,6 +179,8 @@ $phaseDefinitions = @(
             'PowerShell(git push *)',
             'Bash(git switch *)',
             'PowerShell(git switch *)',
+            'WebFetch',
+            'WebSearch',
             'Agent',
             'Task',
             'TaskOutput',
@@ -207,6 +221,8 @@ $phaseDefinitions = @(
             'PowerShell(git push *)',
             'Bash(git switch *)',
             'PowerShell(git switch *)',
+            'WebFetch',
+            'WebSearch',
             'Agent',
             'Task',
             'TaskOutput',
@@ -779,11 +795,13 @@ function Get-CommonPromptPrefix {
 
     $issueReadInstruction = if ($IncludeIssueRead) {
 @"
-Read the issue and its comments with:
+Read the issue title and body only with:
 
 ``````
-gh issue view $IssueNumber --repo $RepoSlug --comments
+gh issue view $IssueNumber --repo $RepoSlug
 ``````
+
+Do not read issue comments, issue timeline entries, prior issue-agent summaries, PR discussions, or GitHub API comment endpoints in this phase unless a future prompt explicitly says to do so.
 "@
     } else {
 @"
@@ -865,7 +883,7 @@ TEST PLANNING RULES:
 $implementationPrompt = (Get-CommonPromptPrefix -PhaseName 'implementation' -IncludeIssueRead $true) + @"
 
 IMPLEMENTATION RULES:
-- Read the issue directly with `gh issue view $IssueNumber --repo $RepoSlug`. Implement the user-facing claim only; do not read or depend on the test-plan artifact.
+- Read the issue title/body directly with `gh issue view $IssueNumber --repo $RepoSlug`. Implement the user-facing claim only; do not read issue comments, prior run summaries, PR discussions, or GitHub API comment endpoints. Do not read or depend on the test-plan artifact because this phase runs in parallel with test planning.
 - Own code changes only. Do not claim verification success.
 - For every issue-specified card or character, call MCP catalog lookup tools before editing. Abort rather than guessing card ids, ownership, or ambiguity.
 - Do not run unit tests, integration tests, live validation, or screenshot validation. Verification owns every `dotnet test`, live MCP action, and screenshot.
