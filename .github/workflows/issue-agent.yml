@@ -292,6 +292,15 @@ jobs:
             ${{ runner.temp }}/claude-issue-agent-*.log
             ${{ runner.temp }}/sts2-screenshots/**/*.png
             ${{ runner.temp }}/sts2-artifacts/**/*
+      - name: Fail blocked issue-agent run
+        if: always() && steps.verification.outputs.phase_status != 'pass'
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $investigation = '${{ steps.investigation.outputs.phase_status }}'
+          $implementation = '${{ steps.implementation.outputs.phase_status }}'
+          $verification = '${{ steps.verification.outputs.phase_status }}'
+          $verificationReason = '${{ steps.verification.outputs.abort_reason }}'
+          throw "Issue-agent did not reach verified pass. investigation=$investigation implementation=$implementation verification=$verification verification_reason=$verificationReason"
 
 
 
