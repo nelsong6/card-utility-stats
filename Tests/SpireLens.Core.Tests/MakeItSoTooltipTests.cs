@@ -18,19 +18,19 @@ public class MakeItSoTooltipTests
         ?? throw new InvalidOperationException("AppendMakeItSoStats overload not found.");
 
     [Fact]
-    public void AppendMakeItSoStats_RendersLiveSkillCounter()
+    public void AppendMakeItSoStats_RendersTriggerProgress()
     {
         var sb = new StringBuilder();
 
         _ = AppendMakeItSoStatsMethod.Invoke(null, new object?[] { sb, new CardAggregate(), false, 2, 3 });
         var text = sb.ToString();
 
-        Assert.Contains("Skill counter", text);
+        Assert.Contains("Trigger progress", text);
         Assert.Contains("[b]2/3[/b]", text);
     }
 
     [Fact]
-    public void AppendMakeItSoStats_FullViewRendersSummonedCount()
+    public void AppendMakeItSoStats_FullViewRendersTriggeredCount()
     {
         var sb = new StringBuilder();
         var agg = new CardAggregate
@@ -41,12 +41,12 @@ public class MakeItSoTooltipTests
         _ = AppendMakeItSoStatsMethod.Invoke(null, new object?[] { sb, agg, false, null, 0 });
         var text = sb.ToString();
 
-        Assert.Contains("Summoned to hand", text);
+        Assert.Contains("Triggered", text);
         Assert.Contains("[b]2[/b]", text);
     }
 
     [Fact]
-    public void AppendMakeItSoStats_CompactViewSkipsSummonedCount()
+    public void AppendMakeItSoStats_CompactViewSkipsTriggeredCount()
     {
         var sb = new StringBuilder();
         var agg = new CardAggregate
@@ -57,6 +57,6 @@ public class MakeItSoTooltipTests
         _ = AppendMakeItSoStatsMethod.Invoke(null, new object?[] { sb, agg, true, null, 0 });
         var text = sb.ToString();
 
-        Assert.DoesNotContain("Summoned to hand", text);
+        Assert.DoesNotContain("Triggered", text);
     }
 }
