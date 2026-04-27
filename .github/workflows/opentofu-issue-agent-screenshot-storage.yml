@@ -12,8 +12,9 @@ on:
           - plan
           - apply
       backend_resource_group_name:
-        description: Resource group containing the OpenTofu state storage account
-        required: true
+        description: Optional resource group containing the OpenTofu state storage account. Leave blank to discover it.
+        required: false
+        default: ""
       backend_container_name:
         description: Blob container containing OpenTofu state
         required: true
@@ -74,18 +75,37 @@ jobs:
         working-directory: ${{ env.TOFU_DIR }}
         run: tofu fmt -check -recursive
 
+      - name: Resolve backend resource group
+        id: backend
+        shell: bash
+        run: |
+          if [ -n "${{ inputs.backend_resource_group_name }}" ]; then
+            echo "resource_group_name=${{ inputs.backend_resource_group_name }}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          rg=$(az storage account list \
+            --subscription "${{ vars.TFSTATE_SUBSCRIPTION_ID }}" \
+            --query "[?name=='${{ vars.TFSTATE_STORAGE_ACCOUNT }}'].resourceGroup | [0]" \
+            -o tsv)
+          if [ -z "$rg" ]; then
+            echo "Unable to resolve resource group for storage account ${{ vars.TFSTATE_STORAGE_ACCOUNT }}" >&2
+            exit 1
+          fi
+          echo "resource_group_name=$rg" >> "$GITHUB_OUTPUT"
+
       - name: OpenTofu init
         working-directory: ${{ env.TOFU_DIR }}
         run: |
           tofu init \
-            -backend-config="resource_group_name=${{ inputs.backend_resource_group_name }}" \
+            -backend-config="resource_group_name=${{ steps.backend.outputs.resource_group_name }}" \
             -backend-config="storage_account_name=${{ vars.TFSTATE_STORAGE_ACCOUNT }}" \
             -backend-config="container_name=${{ inputs.backend_container_name }}" \
             -backend-config="key=${{ inputs.state_key }}" \
             -backend-config="subscription_id=${{ vars.TFSTATE_SUBSCRIPTION_ID }}" \
             -backend-config="tenant_id=${{ vars.ARM_TENANT_ID }}" \
             -backend-config="client_id=${{ vars.ARM_CLIENT_ID }}" \
-            -backend-config="use_oidc=true"
+            -backend-config="use_oidc=true" \
+            -backend-config="use_azuread_auth=true"
 
       - name: OpenTofu validate
         working-directory: ${{ env.TOFU_DIR }}
