@@ -28,6 +28,8 @@ $SingleplayerMcpTools = @(
     'mcp__spire-lens-mcp__capture_screenshot',
     'mcp__spire-lens-mcp__get_game_state',
     'mcp__spire-lens-mcp__reload_spirelens_core',
+    'mcp__spire-lens-mcp__set_spirelens_view_stats_enabled',
+    'mcp__spire-lens-mcp__show_card_tooltip',
     'mcp__spire-lens-mcp__start_singleplayer_run',
     'mcp__spire-lens-mcp__enter_debug_room',
     'mcp__spire-lens-mcp__configure_test_combat',
@@ -873,6 +875,7 @@ dotnet test "Tests\SpireLens.Core.Tests\SpireLens.Core.Tests.csproj" -c Debug --
 ``````
 
 - Default live validation fixture: use the save-backed route. Materialize a scenario from the correct character base save, install it as current, validate/load that save, inspect state, then use `configure_test_combat` only after the save-backed run has reached the intended combat. If the game is at Neow, menu, the wrong character, or any unexpected state after loading, abort with `mcp_state_mismatch` or `game_state_unreachable`; do not choose Neow options, start ad hoc runs, or enter random debug rooms.
+- For SpireLens card-stat tooltip evidence, use `set_spirelens_view_stats_enabled(true)` first, then `show_card_tooltip(surface, card_index)` on the target visible card, then `capture_screenshot`. Prefer this route over ad hoc mouse/hover attempts.
 - Capture screenshots only through the `capture_screenshot` MCP tool.
 - Use the full STS2 game window/client area returned by `capture_screenshot` as canonical screenshot evidence. Crops or tighter views may be additional evidence only, not replacements.
 - If `capture_screenshot` is unavailable or does not return a saved PNG path plus dimensions, abort with screenshot_missing.
