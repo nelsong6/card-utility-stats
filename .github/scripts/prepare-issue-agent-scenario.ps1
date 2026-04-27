@@ -119,10 +119,10 @@ async def validate_load():
     validate = parse_tool_json(await server.validate_current_run_save(), "validate_current_run_save")
     loaded = parse_tool_json(await server.load_current_run_save(), "load_current_run_save")
     state = None
-    for _ in range(20):
+    for _ in range(40):
         state = parse_tool_json(await server.get_game_state("json"), "get_game_state")
         state_type = state.get("state_type")
-        if state_type not in (None, "menu", "unknown"):
+        if state_type not in (None, "menu", "unknown", "loading"):
             if state_type != "monster":
                 break
             battle = state.get("battle") or {}
@@ -194,7 +194,7 @@ try {
 
     $result = Get-Content -LiteralPath $outputPath -Raw | ConvertFrom-Json
     if ([string]$result.status -ne 'pass') { throw "Scenario setup did not pass." }
-    if ([string]::IsNullOrWhiteSpace([string]$result.state_type) -or [string]$result.state_type -in @('menu', 'unknown')) {
+    if ([string]::IsNullOrWhiteSpace([string]$result.state_type) -or [string]$result.state_type -in @('menu', 'unknown', 'loading')) {
         throw "Scenario loaded into unexpected state_type='$($result.state_type)'."
     }
     if ([string]$result.state_type -eq 'monster') {
