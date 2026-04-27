@@ -32,6 +32,12 @@ The processing model is intentionally simple:
 
 There is no second script that chooses issues, reads structured result files, or drains a local queue.
 
+## Issue Context
+
+The issue body is the task source of truth. The agent should read the body first and avoid reading comments by default.
+
+Comments are secondary context only when the body is ambiguous or explicitly points to a comment. If comments are needed, the agent should prefer recent human-owner comments that directly modify the requested work, and ignore stale bot comments, old PR summaries, previous failed-run claims, and historical assertions. In particular, the investigation phase should not spend MCP calls validating stale claims from previous failed runs.
+
 ## Runner Contract
 
 Each Windows issue-agent host should provide:
@@ -167,3 +173,5 @@ The issue-agent path should not use:
 - `D:\automation\spirelens-live-bridge`
 
 If the current MCP surface is insufficient for an issue, Claude should report the blocker on the issue instead of reviving side infrastructure.
+
+
