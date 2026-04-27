@@ -315,7 +315,15 @@ function ConvertTo-WindowsCommandLineArgument {
 }
 
 function Invoke-ProcessWithTimeout {
-    param([string]$FilePath, [string[]]$Arguments, [string]$WorkingDirectory, [string]$StdoutPath, [string]$StderrPath, [int]$TimeoutSeconds)
+    param(
+        [string]$FilePath,
+        [string[]]$Arguments,
+        [string]$WorkingDirectory,
+        [string]$StdoutPath,
+        [string]$StderrPath,
+        [int]$TimeoutSeconds,
+        [string]$PhaseName
+    )
 
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = $FilePath
@@ -328,23 +336,88 @@ function Invoke-ProcessWithTimeout {
     $process = New-Object System.Diagnostics.Process
     $process.StartInfo = $psi
     $null = $process.Start()
-    $stdoutTask = $process.StandardOutput.ReadToEndAsync()
-    $stderrTask = $process.StandardError.ReadToEndAsync()
-    $completed = $process.WaitForExit($TimeoutSeconds * 1000)
-    if (-not $completed) {
-        try { $process.Kill() } catch {}
-        try { $process.WaitForExit(5000) | Out-Null } catch {}
-        $stdoutTask.Wait(5000) | Out-Null
-        $stderrTask.Wait(5000) | Out-Null
-        $stdoutTask.Result | Set-Content -LiteralPath $StdoutPath -Encoding UTF8
-        $stderrTask.Result | Set-Content -LiteralPath $StderrPath -Encoding UTF8
-        return [ordered]@{ TimedOut = $true; ExitCode = $null }
+
+    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    $stdoutDone = $false
+    $stderrDone = $false
+    $stdoutTask = $process.StandardOutput.ReadLineAsync()
+    $stderrTask = $process.StandardError.ReadLineAsync()
+
+    while (-not ($process.HasExited -and $stdoutDone -and $stderrDone)) {
+        $madeProgress = $false
+
+        if (-not $stdoutDone -and $stdoutTask.Wait(25)) {
+            $line = $stdoutTask.Result
+            if ($null -eq $line) {
+                $stdoutDone = $true
+            } else {
+                Add-Content -LiteralPath $StdoutPath -Value $line -Encoding UTF8
+                Write-ClaudeOutputLine -Line $line -PhaseName $PhaseName
+                $stdoutTask = $process.StandardOutput.ReadLineAsync()
+            }
+            $madeProgress = $true
+        }
+
+        if (-not $stderrDone -and $stderrTask.Wait(25)) {
+            $line = $stderrTask.Result
+            if ($null -eq $line) {
+                $stderrDone = $true
+            } else {
+                Add-Content -LiteralPath $StderrPath -Value $line -Encoding UTF8
+                Write-ClaudeOutputLine -Line $line -PhaseName $PhaseName
+                $stderrTask = $process.StandardError.ReadLineAsync()
+            }
+            $madeProgress = $true
+        }
+
+        if ([DateTime]::UtcNow -ge $deadline) {
+            try { $process.Kill() } catch {}
+            try { $process.WaitForExit(5000) | Out-Null } catch {}
+            return [ordered]@{ TimedOut = $true; ExitCode = $null }
+        }
+
+        if (-not $madeProgress) { Start-Sleep -Milliseconds 50 }
     }
-    $stdoutTask.Wait() | Out-Null
-    $stderrTask.Wait() | Out-Null
-    $stdoutTask.Result | Set-Content -LiteralPath $StdoutPath -Encoding UTF8
-    $stderrTask.Result | Set-Content -LiteralPath $StderrPath -Encoding UTF8
+
+    try { $process.WaitForExit(5000) | Out-Null } catch {}
     return [ordered]@{ TimedOut = $false; ExitCode = $process.ExitCode }
+}
+
+function Write-ClaudeOutputLine {
+    param([string]$Line, [string]$PhaseName)
+
+    if ([string]::IsNullOrWhiteSpace($Line)) { return }
+    try {
+        $event = $Line | ConvertFrom-Json -ErrorAction Stop
+        if ($event.type -eq 'assistant' -and $event.message.content) {
+            foreach ($block in $event.message.content) {
+                if ($block.type -eq 'tool_use') {
+                    $inputJson = if ($null -ne $block.input) { $block.input | ConvertTo-Json -Compress -Depth 20 } else { '{}' }
+                    $message = "$($block.name) $inputJson"
+                    Write-AgentEvent 'tool_use' $message @{ phase = $PhaseName }
+                    Add-Content -LiteralPath $SummaryLogPath -Value "${PhaseName} tool_use: $message" -Encoding UTF8
+                } elseif ($block.type -eq 'text' -and -not [string]::IsNullOrWhiteSpace([string]$block.text)) {
+                    $text = [string]$block.text
+                    if ($text.Length -gt 1000) { $text = $text.Substring(0, 1000) + '... [truncated]' }
+                    Write-AgentEvent 'assistant_text' $text @{ phase = $PhaseName }
+                    Add-Content -LiteralPath $SummaryLogPath -Value "${PhaseName} assistant_text: $text" -Encoding UTF8
+                }
+            }
+        } elseif ($event.type -eq 'user' -and $event.tool_use_result) {
+            $result = [string]$event.tool_use_result
+            if ($result.Length -gt 600) { $result = $result.Substring(0, 600) + '... [truncated]' }
+            Write-AgentEvent 'tool_result' $result @{ phase = $PhaseName }
+            Add-Content -LiteralPath $SummaryLogPath -Value "${PhaseName} tool_result: $result" -Encoding UTF8
+        } elseif ($event.type -eq 'result') {
+            $resultJson = $event | ConvertTo-Json -Compress -Depth 30
+            Write-AgentEvent 'result' $resultJson @{ phase = $PhaseName }
+            Add-Content -LiteralPath $SummaryLogPath -Value "${PhaseName} result: $resultJson" -Encoding UTF8
+        } else {
+            Write-AgentEvent 'raw' $Line @{ phase = $PhaseName }
+        }
+    } catch {
+        Write-AgentEvent 'raw' $Line @{ phase = $PhaseName }
+    }
 }
 
 function Write-ClaudeOutputLines {
@@ -352,39 +425,7 @@ function Write-ClaudeOutputLines {
 
     if (-not (Test-Path -LiteralPath $Path)) { return }
     Get-Content -LiteralPath $Path | ForEach-Object {
-        $line = [string]$_
-        if ([string]::IsNullOrWhiteSpace($line)) { return }
-        try {
-            $event = $line | ConvertFrom-Json -ErrorAction Stop
-            if ($event.type -eq 'assistant' -and $event.message.content) {
-                foreach ($block in $event.message.content) {
-                    if ($block.type -eq 'tool_use') {
-                        $inputJson = if ($null -ne $block.input) { $block.input | ConvertTo-Json -Compress -Depth 20 } else { '{}' }
-                        $message = "$($block.name) $inputJson"
-                        Write-AgentEvent 'tool_use' $message @{ phase = $PhaseName }
-                        Add-Content -LiteralPath $SummaryLogPath -Value "${PhaseName} tool_use: $message" -Encoding UTF8
-                    } elseif ($block.type -eq 'text' -and -not [string]::IsNullOrWhiteSpace([string]$block.text)) {
-                        $text = [string]$block.text
-                        if ($text.Length -gt 1000) { $text = $text.Substring(0, 1000) + '... [truncated]' }
-                        Write-AgentEvent 'assistant_text' $text @{ phase = $PhaseName }
-                        Add-Content -LiteralPath $SummaryLogPath -Value "${PhaseName} assistant_text: $text" -Encoding UTF8
-                    }
-                }
-            } elseif ($event.type -eq 'user' -and $event.tool_use_result) {
-                $result = [string]$event.tool_use_result
-                if ($result.Length -gt 600) { $result = $result.Substring(0, 600) + '... [truncated]' }
-                Write-AgentEvent 'tool_result' $result @{ phase = $PhaseName }
-                Add-Content -LiteralPath $SummaryLogPath -Value "${PhaseName} tool_result: $result" -Encoding UTF8
-            } elseif ($event.type -eq 'result') {
-                $resultJson = $event | ConvertTo-Json -Compress -Depth 30
-                Write-AgentEvent 'result' $resultJson @{ phase = $PhaseName }
-                Add-Content -LiteralPath $SummaryLogPath -Value "${PhaseName} result: $resultJson" -Encoding UTF8
-            } else {
-                Write-AgentEvent 'raw' $line @{ phase = $PhaseName }
-            }
-        } catch {
-            Write-AgentEvent 'raw' $line @{ phase = $PhaseName }
-        }
+        Write-ClaudeOutputLine -Line ([string]$_) -PhaseName $PhaseName
     }
 }
 function Apply-VerificationEvidenceGuard {
@@ -529,10 +570,8 @@ function Invoke-ClaudePhase {
         -WorkingDirectory $RepoRoot `
         -StdoutPath $stdoutPath `
         -StderrPath $stderrPath `
-        -TimeoutSeconds $phaseTimeoutSeconds
-
-    Write-ClaudeOutputLines -Path $stdoutPath -PhaseName $phaseName
-    Write-ClaudeOutputLines -Path $stderrPath -PhaseName $phaseName
+        -TimeoutSeconds $phaseTimeoutSeconds `
+        -PhaseName $phaseName
 
     if ($invokeResult.TimedOut) {
         $notes = "Claude phase '$phaseName' exceeded the $phaseTimeoutSeconds second script timeout before writing a required phase result."
@@ -709,3 +748,8 @@ if (Test-Path -LiteralPath $resultMarkdown) {
 }
 
 Write-AgentEvent 'exit' 'Phased issue-agent script completed.'
+
+
+
+
+
