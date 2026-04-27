@@ -19,6 +19,10 @@ permissions:
 env:
   ISSUE_AGENT_ARTIFACT_NAME: issue-agent-artifacts
 
+concurrency:
+  group: spirelens-issue-agent
+  cancel-in-progress: false
+
 jobs:
   test-plan:
     name: "LLM: Plan validation evidence"
@@ -31,7 +35,7 @@ jobs:
     runs-on:
       - self-hosted
       - windows
-      - issue-agent
+      - issue-agent-test-plan
     env:
       ISSUE_AGENT_CHECKOUT_PATH: issue-agent-src/${{ github.run_id }}-${{ github.run_attempt }}-test-plan
       ISSUE_NUMBER: ${{ github.event.issue.number || github.event.inputs.issue_number }}
@@ -246,7 +250,7 @@ jobs:
     runs-on:
       - self-hosted
       - windows
-      - issue-agent
+      - issue-agent-verification
     env:
       ISSUE_AGENT_CHECKOUT_PATH: issue-agent-src/${{ github.run_id }}-${{ github.run_attempt }}-verification
       ISSUE_NUMBER: ${{ github.event.issue.number || github.event.inputs.issue_number }}
