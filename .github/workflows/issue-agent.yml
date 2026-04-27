@@ -50,6 +50,11 @@ jobs:
           fetch-depth: 0
           path: ${{ env.ISSUE_AGENT_CHECKOUT_PATH }}
 
+      - name: Audit issue-agent prompts
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          & (Join-Path (Join-Path $env:GITHUB_WORKSPACE $env:ISSUE_AGENT_CHECKOUT_PATH) ".github\scripts\assert-issue-agent-prompts.ps1")
+
       - name: Prepare issue-agent host
         env:
           CONFIGURED_CLAUDE_CLI_PATH: ${{ vars.ISSUE_AGENT_CLAUDE_CLI_PATH }}
@@ -147,6 +152,11 @@ jobs:
         with:
           fetch-depth: 0
           path: ${{ env.ISSUE_AGENT_CHECKOUT_PATH }}
+
+      - name: Audit issue-agent prompts
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          & (Join-Path (Join-Path $env:GITHUB_WORKSPACE $env:ISSUE_AGENT_CHECKOUT_PATH) ".github\scripts\assert-issue-agent-prompts.ps1")
 
       - name: Prepare issue-agent host
         env:
@@ -261,6 +271,11 @@ jobs:
         with:
           fetch-depth: 0
           path: ${{ env.ISSUE_AGENT_CHECKOUT_PATH }}
+
+      - name: Audit issue-agent prompts
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          & (Join-Path (Join-Path $env:GITHUB_WORKSPACE $env:ISSUE_AGENT_CHECKOUT_PATH) ".github\scripts\assert-issue-agent-prompts.ps1")
 
       - name: Download test plan artifacts
         if: always()
