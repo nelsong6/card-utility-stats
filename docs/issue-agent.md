@@ -135,6 +135,26 @@ Allowed verification abort reasons:
 
 Each phase Markdown is appended to the job summary as soon as the phase finishes. The final summary step posts a compact rollup with phase statuses, per-phase costs, grand total cost, artifact links, screenshot counts, and any PR link created by the wrapper and written back into the result JSON.
 
+## Relic Stat Prompting
+
+Relic-stat implementation issues should keep the same issue-agent workflow as card-stat issues, but their prompts should include an explicit reference-code boundary.
+
+When assigning an agent relic-stat work:
+
+- Point the agent at existing relic stats mods only for hook discovery, StS2 class/method names, relic IDs, behavior mapping, and likely validation scenarios.
+- For unlicensed reference repos, including `rmac-silva/RelicTracker`, do not copy code, file structure, tooltip strings, formatting, or implementation organization.
+- For MIT reference repos, including `ForgottenArbiter/StsRelicStats`, preserve attribution if any concrete design is reused, but still prefer a SpireLens-native implementation over transliterating Java/BaseMod patterns.
+- Implement through SpireLens's existing `RunTracker`, `RunData`, schema fixtures, tests, runtime options, and tooltip conventions.
+- Prefer observed outcomes over intended relic text or generic trigger animation counts. A generic `RelicModel.Flash()` count can be useful as a fallback or debugging clue, but user-facing stats should use richer observed outcomes when available.
+- Classify each relic issue as `relic-only`, `card-modifier`, `shared-outcome`, or `economy/map` so overlap with card stats is handled deliberately instead of by accident.
+
+Useful per-relic issue prompt language:
+
+```md
+Reference-code boundary:
+You may inspect existing relic stats mods to identify StS2 relic class names, method names, hook candidates, and behavioral clues. Do not copy code, structure, tooltip strings, or formatting from unlicensed repositories. Implement original SpireLens-native code using the existing tracker, schema, tests, and tooltip style. Prefer observed outcomes over listed intent or generic trigger counts.
+```
+
 ## Visibility
 
 The issue-agent workflow writes and uploads validation artifacts:
@@ -176,9 +196,3 @@ The issue-agent path should not use:
 - `D:\automation\spirelens-live-bridge`
 
 If the current MCP surface is insufficient for an issue, Claude should report the blocker on the issue instead of reviving side infrastructure.
-
-
-
-
-
-
