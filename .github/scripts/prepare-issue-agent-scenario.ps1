@@ -17,7 +17,7 @@ function Write-SetupArtifact {
     param([hashtable]$Data)
     New-Item -ItemType Directory -Force -Path $ValidationArtifactDir | Out-Null
     $path = Join-Path $ValidationArtifactDir 'issue-agent-scenario-setup.json'
-    $Data | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $path -Encoding UTF8
+    [System.IO.File]::WriteAllText($path, ($Data | ConvertTo-Json -Depth 30), (New-Object System.Text.UTF8Encoding($false)))
     return $path
 }
 
@@ -64,7 +64,7 @@ spec.loader.exec_module(server)
 
 
 def read_json(path):
-    return json.loads(path.read_text(encoding="utf-8"))
+    return json.loads(path.read_text(encoding="utf-8-sig"))
 
 
 def write_json(data):
@@ -132,7 +132,7 @@ else:
 
     $scriptPath = Join-Path $env:TEMP ('prepare-issue-agent-scenario-' + [guid]::NewGuid().ToString() + '.py')
     try {
-        $python | Set-Content -LiteralPath $scriptPath -Encoding UTF8
+        [System.IO.File]::WriteAllText($scriptPath, $python, (New-Object System.Text.UTF8Encoding($false)))
         & uv run --directory $McpDirectory python $scriptPath $Mode $SetupPath $OutputPath
         if ($LASTEXITCODE -ne 0) { throw "MCP Python helper failed in mode '$Mode'." }
     } finally {
@@ -165,7 +165,7 @@ try {
 
     $setupPath = Join-Path $ValidationArtifactDir 'issue-agent-scenario-setup-input.json'
     New-Item -ItemType Directory -Force -Path $ValidationArtifactDir | Out-Null
-    $setup | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $setupPath -Encoding UTF8
+    [System.IO.File]::WriteAllText($setupPath, ($setup | ConvertTo-Json -Depth 30), (New-Object System.Text.UTF8Encoding($false)))
 
     $server = Get-McpServerConfig -Path $McpConfigPath
     $mcpDirectory = Get-McpDirectory -Server $server
