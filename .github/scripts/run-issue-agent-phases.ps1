@@ -136,7 +136,7 @@ $phaseDefinitions = @(
         Name = 'verification'
         Json = 'issue-agent-verification.json'
         Markdown = 'issue-agent-verification.md'
-        AllowedAbortReasons = @('unit_tests_failed', 'live_validation_failed', 'screenshot_missing', 'screenshot_not_relevant', 'mcp_state_mismatch', 'claimed_result_not_observed', 'artifact_contract_missing', 'phase_timeout')
+        AllowedAbortReasons = @('unit_tests_failed', 'live_validation_failed', 'screenshot_missing', 'screenshot_not_relevant', 'target_evidence_missing', 'mcp_state_mismatch', 'claimed_result_not_observed', 'artifact_contract_missing', 'phase_timeout')
         AllowedTools = @(
             'Read',
             'Write',
@@ -207,6 +207,17 @@ function Get-PropertyValue {
     $property = $Object.PSObject.Properties[$Name]
     if ($null -eq $property) { return $null }
     return $property.Value
+}
+
+function Set-PropertyValue {
+    param([object]$Object, [string]$Name, [object]$Value)
+    if ($null -eq $Object) { return }
+    $property = $Object.PSObject.Properties[$Name]
+    if ($null -eq $property) {
+        $Object | Add-Member -NotePropertyName $Name -NotePropertyValue $Value -Force
+    } else {
+        $property.Value = $Value
+    }
 }
 
 function Write-SyntheticRollup {
@@ -365,6 +376,43 @@ function Write-ClaudeOutputLines {
         }
     }
 }
+function Apply-VerificationEvidenceGuard {
+    param([object]$Result, [string]$JsonPath, [string]$MarkdownPath)
+
+    $status = [string](Get-PropertyValue -Object $Result -Name 'status')
+    if ($status -ne 'pass') { return $Result }
+
+    $screenshotValidation = Get-PropertyValue -Object $Result -Name 'screenshot_validation'
+    $targetVisible = Get-PropertyValue -Object $screenshotValidation -Name 'target_visible'
+    if ($targetVisible -eq $true) { return $Result }
+
+    $guardNote = 'Verification claimed pass without explicit target-visible screenshot evidence. For card/UI issues, screenshots must show the target card, tooltip, or changed UI state; otherwise the result is blocked.'
+    Set-PropertyValue -Object $Result -Name 'status' -Value 'abort'
+    Set-PropertyValue -Object $Result -Name 'abort_reason' -Value 'screenshot_not_relevant'
+    Set-PropertyValue -Object $Result -Name 'retryable' -Value $true
+    Set-PropertyValue -Object $Result -Name 'human_action_required' -Value $false
+    $existingNotes = [string](Get-PropertyValue -Object $Result -Name 'notes')
+    Set-PropertyValue -Object $Result -Name 'notes' -Value (($existingNotes, $guardNote | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join ' ')
+
+    if ($null -ne $screenshotValidation) {
+        Set-PropertyValue -Object $screenshotValidation -Name 'passed' -Value $false
+        Set-PropertyValue -Object $screenshotValidation -Name 'status' -Value 'abort'
+        $existingScreenshotNotes = [string](Get-PropertyValue -Object $screenshotValidation -Name 'notes')
+        Set-PropertyValue -Object $screenshotValidation -Name 'notes' -Value (($existingScreenshotNotes, $guardNote | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join ' ')
+        Set-PropertyValue -Object $screenshotValidation -Name 'target_visible' -Value $false
+    }
+
+    $Result | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $JsonPath -Encoding UTF8
+    @"
+Status: abort
+
+Abort reason: screenshot_not_relevant
+
+$guardNote
+"@ | Set-Content -LiteralPath $MarkdownPath -Encoding UTF8
+    return (Read-JsonFile -Path $JsonPath)
+}
+
 function Assert-PhaseContract {
     param(
         [hashtable]$Phase,
@@ -485,6 +533,9 @@ function Invoke-ClaudePhase {
     if ((-not $invokeResult.TimedOut) -and $exitCode -ne 0) { throw "Claude phase '$phaseName' failed with exit code $exitCode." }
 
     $result = Read-JsonFile -Path $phaseJsonPath
+    if ($Phase.Name -eq 'verification') {
+        $result = Apply-VerificationEvidenceGuard -Result $result -JsonPath $phaseJsonPath -MarkdownPath $phaseMarkdownPath
+    }
     $status = Assert-PhaseContract -Phase $Phase -Result $result
     Add-JobSummaryMarkdown -Title "Issue Agent $phaseName" -MarkdownPath $phaseMarkdownPath
 
@@ -599,10 +650,10 @@ dotnet test "Tests\SpireLens.Core.Tests\SpireLens.Core.Tests.csproj" -c Debug --
 - Capture screenshots only through the `capture_screenshot` MCP tool.
 - Use the full STS2 game window/client area returned by `capture_screenshot` as canonical screenshot evidence. Crops or tighter views may be additional evidence only, not replacements.
 - If `capture_screenshot` is unavailable or does not return a saved PNG path plus dimensions, abort with screenshot_missing.
-- If the saved screenshot is not meaningful evidence for the validation claim, abort with screenshot_not_relevant.
+- If the saved screenshot is not meaningful evidence for the validation claim, abort with screenshot_not_relevant. For a named card, tooltip, or UI issue, the screenshots must show the target card, tooltip, or changed UI state. If the target cannot be made visible through the MCP surface, abort with screenshot_not_relevant instead of passing on unit tests or adjacent state.
 - Write `issue-agent-verification.json` with:
-  `{ "layer":"verification", "status":"pass|abort", "abort_reason":null, "retryable":false, "human_action_required":false, "notes":"", "unit_tests":{"passed":null,"status":"not_run","notes":""}, "live_mcp_validation":{"passed":null,"status":"not_run","notes":""}, "screenshot_validation":{"passed":null,"status":"not_run","count":0,"notes":""}, "used_mcp":null, "used_raw_bridge_or_queue":false }`
-- Allowed abort reasons: unit_tests_failed, live_validation_failed, screenshot_missing, screenshot_not_relevant, mcp_state_mismatch, claimed_result_not_observed, artifact_contract_missing.
+  `{ "layer":"verification", "status":"pass|abort", "abort_reason":null, "retryable":false, "human_action_required":false, "notes":"", "unit_tests":{"passed":null,"status":"not_run","notes":""}, "live_mcp_validation":{"passed":null,"status":"not_run","notes":""}, "screenshot_validation":{"passed":null,"status":"not_run","count":0,"target_visible":false,"notes":""}, "used_mcp":null, "used_raw_bridge_or_queue":false }`
+- Allowed abort reasons: unit_tests_failed, live_validation_failed, screenshot_missing, screenshot_not_relevant, target_evidence_missing, mcp_state_mismatch, claimed_result_not_observed, artifact_contract_missing.
 - Also write rollup `issue-agent-result.json` with issue_number, status, abort_layer, abort_reason, retryable, human_action_required, layers, unit_tests, live_mcp_validation, screenshot_validation, card_metadata_discovery, used_mcp, used_raw_bridge_or_queue, opened_pr, opened_pr_url, should_close_issue, and evidence_summary.
 - Write `issue-agent-verification.md` summarizing pass/fail evidence.
 - Write `issue-agent-result.md` as a compact final rollup including any PR URL from implementation.
