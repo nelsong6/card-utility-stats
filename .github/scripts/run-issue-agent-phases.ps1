@@ -649,6 +649,7 @@ dotnet build "Tests\SpireLens.Core.Tests\SpireLens.Core.Tests.csproj" -c Debug "
 dotnet test "Tests\SpireLens.Core.Tests\SpireLens.Core.Tests.csproj" -c Debug --no-build "-p:Sts2DataDir=`$sts2DataDir"
 ``````
 
+- Default live validation fixture: use `prepare_test_combat` to start/enter/configure in one call, or after manually reaching combat use `configure_test_combat` to create a deterministic combat with target/setup cards in hand, target cards in the permanent deck/draw/discard/exhaust piles as needed, exact energy/stars, optional player/enemy powers, and a high-HP simple enemy. Deviate only when investigation explains why the issue needs kills, multiple enemies, a specific enemy behavior, or another non-default state.
 - Capture screenshots only through the `capture_screenshot` MCP tool.
 - Use the full STS2 game window/client area returned by `capture_screenshot` as canonical screenshot evidence. Crops or tighter views may be additional evidence only, not replacements.
 - If `capture_screenshot` is unavailable or does not return a saved PNG path plus dimensions, abort with screenshot_missing.
