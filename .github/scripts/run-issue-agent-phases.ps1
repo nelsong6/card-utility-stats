@@ -460,41 +460,148 @@ function Write-ClaudeOutputLines {
         Write-ClaudeOutputLine -Line ([string]$_) -PhaseName $PhaseName
     }
 }
+function ConvertTo-Array {
+    param([object]$Value)
+
+    if ($null -eq $Value) { return @() }
+    if ($Value -is [System.Array]) { return @($Value) }
+    return @($Value)
+}
+
+function Get-TextBlob {
+    param([object[]]$Values)
+
+    return (($Values | ForEach-Object { if ($null -ne $_) { [string]$_ } } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join "`n")
+}
+
+function Test-TextMentionsUnavailableEvidence {
+    param([string]$Text)
+
+    if ([string]::IsNullOrWhiteSpace($Text)) { return $false }
+    return $Text -match '(?i)(not achievable|not available|unavailable|not renderable|cannot render|cannot be made visible|without mouse hover|no hover support|unit tests? (directly |exclusively |fully )?verif|verified exclusively through unit tests)'
+}
+
+function Set-VerificationGuardAbort {
+    param(
+        [object]$Result,
+        [string]$JsonPath,
+        [string]$MarkdownPath,
+        [string]$AbortReason,
+        [string]$GuardNote
+    )
+
+    Set-PropertyValue -Object $Result -Name 'status' -Value 'abort'
+    Set-PropertyValue -Object $Result -Name 'abort_reason' -Value $AbortReason
+    Set-PropertyValue -Object $Result -Name 'retryable' -Value $true
+    Set-PropertyValue -Object $Result -Name 'human_action_required' -Value $false
+    $existingNotes = [string](Get-PropertyValue -Object $Result -Name 'notes')
+    Set-PropertyValue -Object $Result -Name 'notes' -Value (($existingNotes, $GuardNote | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join ' ')
+
+    $screenshotValidation = Get-PropertyValue -Object $Result -Name 'screenshot_validation'
+    if ($null -ne $screenshotValidation -and $AbortReason -in @('screenshot_not_relevant', 'target_evidence_missing', 'artifact_contract_missing')) {
+        Set-PropertyValue -Object $screenshotValidation -Name 'passed' -Value $false
+        Set-PropertyValue -Object $screenshotValidation -Name 'status' -Value 'abort'
+        $existingScreenshotNotes = [string](Get-PropertyValue -Object $screenshotValidation -Name 'notes')
+        Set-PropertyValue -Object $screenshotValidation -Name 'notes' -Value (($existingScreenshotNotes, $GuardNote | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join ' ')
+        if ($AbortReason -ne 'artifact_contract_missing') {
+            Set-PropertyValue -Object $screenshotValidation -Name 'target_visible' -Value $false
+        }
+    }
+
+    $Result | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $JsonPath -Encoding UTF8
+    @"
+Status: abort
+
+Abort reason: $AbortReason
+
+$GuardNote
+"@ | Set-Content -LiteralPath $MarkdownPath -Encoding UTF8
+    return (Read-JsonFile -Path $JsonPath)
+}
+
 function Apply-VerificationEvidenceGuard {
     param([object]$Result, [string]$JsonPath, [string]$MarkdownPath)
 
     $status = [string](Get-PropertyValue -Object $Result -Name 'status')
     if ($status -ne 'pass') { return $Result }
 
-    $screenshotValidation = Get-PropertyValue -Object $Result -Name 'screenshot_validation'
-    $targetVisible = Get-PropertyValue -Object $screenshotValidation -Name 'target_visible'
-    if ($targetVisible -eq $true) { return $Result }
-
-    $guardNote = 'Verification claimed pass without explicit target-visible screenshot evidence. For card/UI issues, screenshots must show the target card, tooltip, or changed UI state; otherwise the result is blocked.'
-    Set-PropertyValue -Object $Result -Name 'status' -Value 'abort'
-    Set-PropertyValue -Object $Result -Name 'abort_reason' -Value 'screenshot_not_relevant'
-    Set-PropertyValue -Object $Result -Name 'retryable' -Value $true
-    Set-PropertyValue -Object $Result -Name 'human_action_required' -Value $false
-    $existingNotes = [string](Get-PropertyValue -Object $Result -Name 'notes')
-    Set-PropertyValue -Object $Result -Name 'notes' -Value (($existingNotes, $guardNote | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join ' ')
-
-    if ($null -ne $screenshotValidation) {
-        Set-PropertyValue -Object $screenshotValidation -Name 'passed' -Value $false
-        Set-PropertyValue -Object $screenshotValidation -Name 'status' -Value 'abort'
-        $existingScreenshotNotes = [string](Get-PropertyValue -Object $screenshotValidation -Name 'notes')
-        Set-PropertyValue -Object $screenshotValidation -Name 'notes' -Value (($existingScreenshotNotes, $guardNote | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join ' ')
-        Set-PropertyValue -Object $screenshotValidation -Name 'target_visible' -Value $false
+    $investigationPath = Join-Path $ValidationArtifactDir 'issue-agent-investigation.json'
+    if (-not (Test-Path -LiteralPath $investigationPath)) {
+        return Set-VerificationGuardAbort -Result $Result -JsonPath $JsonPath -MarkdownPath $MarkdownPath -AbortReason 'artifact_contract_missing' -GuardNote 'Verification cannot pass because the investigation evidence contract is missing.'
     }
 
-    $Result | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $JsonPath -Encoding UTF8
-    @"
-Status: abort
+    $investigation = Read-JsonFile -Path $investigationPath
+    $requiredEvidence = ConvertTo-Array (Get-PropertyValue -Object $investigation -Name 'required_evidence') | Where-Object { (Get-PropertyValue -Object $_ -Name 'required') -ne $false }
+    if ($requiredEvidence.Count -eq 0) {
+        return Set-VerificationGuardAbort -Result $Result -JsonPath $JsonPath -MarkdownPath $MarkdownPath -AbortReason 'artifact_contract_missing' -GuardNote 'Verification cannot pass because investigation did not declare required_evidence. The verifier needs an explicit evidence contract before it can pass.'
+    }
 
-Abort reason: screenshot_not_relevant
+    $evidenceResults = ConvertTo-Array (Get-PropertyValue -Object $Result -Name 'evidence_results')
+    if ($evidenceResults.Count -eq 0) {
+        return Set-VerificationGuardAbort -Result $Result -JsonPath $JsonPath -MarkdownPath $MarkdownPath -AbortReason 'artifact_contract_missing' -GuardNote 'Verification cannot pass because it did not write evidence_results for the investigation evidence contract.'
+    }
 
-$guardNote
-"@ | Set-Content -LiteralPath $MarkdownPath -Encoding UTF8
-    return (Read-JsonFile -Path $JsonPath)
+    $screenshotValidation = Get-PropertyValue -Object $Result -Name 'screenshot_validation'
+    $screenshotNotes = [string](Get-PropertyValue -Object $screenshotValidation -Name 'notes')
+    $overallNotes = [string](Get-PropertyValue -Object $Result -Name 'notes')
+    $allNotes = Get-TextBlob @($overallNotes, $screenshotNotes)
+
+    foreach ($required in $requiredEvidence) {
+        $id = [string](Get-PropertyValue -Object $required -Name 'id')
+        if ([string]::IsNullOrWhiteSpace($id)) {
+            return Set-VerificationGuardAbort -Result $Result -JsonPath $JsonPath -MarkdownPath $MarkdownPath -AbortReason 'artifact_contract_missing' -GuardNote 'Verification cannot pass because a required_evidence item has no id.'
+        }
+
+        $match = @($evidenceResults | Where-Object { [string](Get-PropertyValue -Object $_ -Name 'evidence_id') -eq $id })
+        if ($match.Count -eq 0) {
+            return Set-VerificationGuardAbort -Result $Result -JsonPath $JsonPath -MarkdownPath $MarkdownPath -AbortReason 'artifact_contract_missing' -GuardNote "Verification cannot pass because evidence_results does not include required evidence '$id'."
+        }
+
+        $evidenceResult = $match[0]
+        if ((Get-PropertyValue -Object $evidenceResult -Name 'passed') -ne $true) {
+            return Set-VerificationGuardAbort -Result $Result -JsonPath $JsonPath -MarkdownPath $MarkdownPath -AbortReason 'claimed_result_not_observed' -GuardNote "Verification cannot pass because required evidence '$id' was not marked passed."
+        }
+
+        $kind = [string](Get-PropertyValue -Object $required -Name 'kind')
+        if ($kind -eq 'screenshot') {
+            $artifactPaths = ConvertTo-Array (Get-PropertyValue -Object $evidenceResult -Name 'artifact_paths')
+            $targetVisible = Get-PropertyValue -Object $evidenceResult -Name 'target_visible'
+            if ($artifactPaths.Count -eq 0) {
+                return Set-VerificationGuardAbort -Result $Result -JsonPath $JsonPath -MarkdownPath $MarkdownPath -AbortReason 'screenshot_missing' -GuardNote "Verification cannot pass because screenshot evidence '$id' has no artifact_paths."
+            }
+            if ($targetVisible -ne $true) {
+                return Set-VerificationGuardAbort -Result $Result -JsonPath $JsonPath -MarkdownPath $MarkdownPath -AbortReason 'screenshot_not_relevant' -GuardNote "Verification cannot pass because screenshot evidence '$id' does not explicitly mark target_visible=true."
+            }
+
+            $mustShow = [string](Get-PropertyValue -Object $required -Name 'must_show')
+            $requiresText = (Get-PropertyValue -Object $required -Name 'text_visible_required') -eq $true -or $mustShow -match '(?i)tooltip|text|label|wording|string'
+            if ($requiresText) {
+                $textVisible = Get-PropertyValue -Object $evidenceResult -Name 'text_visible'
+                if ($textVisible -ne $true) {
+                    return Set-VerificationGuardAbort -Result $Result -JsonPath $JsonPath -MarkdownPath $MarkdownPath -AbortReason 'target_evidence_missing' -GuardNote "Verification cannot pass because screenshot evidence '$id' must show text/tooltip content, but evidence_results did not mark text_visible=true."
+                }
+                $observedText = [string](Get-PropertyValue -Object $evidenceResult -Name 'observed_text')
+                if ([string]::IsNullOrWhiteSpace($observedText)) {
+                    return Set-VerificationGuardAbort -Result $Result -JsonPath $JsonPath -MarkdownPath $MarkdownPath -AbortReason 'target_evidence_missing' -GuardNote "Verification cannot pass because screenshot evidence '$id' must show text/tooltip content, but observed_text is empty."
+                }
+            }
+        }
+    }
+
+    $screenshotRequired = @($requiredEvidence | Where-Object { [string](Get-PropertyValue -Object $_ -Name 'kind') -eq 'screenshot' })
+    if ($screenshotRequired.Count -gt 0) {
+        $targetVisible = Get-PropertyValue -Object $screenshotValidation -Name 'target_visible'
+        $screenshotPassed = Get-PropertyValue -Object $screenshotValidation -Name 'passed'
+        $screenshotCount = Get-PropertyValue -Object $screenshotValidation -Name 'count'
+        if ($screenshotPassed -ne $true -or $targetVisible -ne $true -or [int]$screenshotCount -lt 1) {
+            return Set-VerificationGuardAbort -Result $Result -JsonPath $JsonPath -MarkdownPath $MarkdownPath -AbortReason 'screenshot_not_relevant' -GuardNote 'Verification cannot pass because screenshot_validation does not show passed=true, target_visible=true, and count >= 1 for required screenshot evidence.'
+        }
+        if (Test-TextMentionsUnavailableEvidence -Text $allNotes) {
+            return Set-VerificationGuardAbort -Result $Result -JsonPath $JsonPath -MarkdownPath $MarkdownPath -AbortReason 'target_evidence_missing' -GuardNote 'Verification cannot pass because its notes say required visual evidence was unavailable or only covered by unit tests.'
+        }
+    }
+
+    return $Result
 }
 
 function Assert-PhaseContract {
@@ -515,6 +622,21 @@ function Assert-PhaseContract {
         }
         if ([string]$abortReason -notin $Phase.AllowedAbortReasons) {
             throw "Phase '$($Phase.Name)' used abort_reason '$abortReason', outside allowed enum."
+        }
+    }
+
+    if ($Phase.Name -eq 'investigation' -and $status -eq 'pass') {
+        $requiredEvidence = ConvertTo-Array (Get-PropertyValue -Object $Result -Name 'required_evidence') | Where-Object { (Get-PropertyValue -Object $_ -Name 'required') -ne $false }
+        if ($requiredEvidence.Count -eq 0) {
+            throw "Investigation phase pass result must include non-empty required_evidence."
+        }
+        foreach ($item in $requiredEvidence) {
+            $id = [string](Get-PropertyValue -Object $item -Name 'id')
+            $kind = [string](Get-PropertyValue -Object $item -Name 'kind')
+            $mustShow = [string](Get-PropertyValue -Object $item -Name 'must_show')
+            if ([string]::IsNullOrWhiteSpace($id) -or [string]::IsNullOrWhiteSpace($kind) -or [string]::IsNullOrWhiteSpace($mustShow)) {
+                throw "Investigation required_evidence items must include id, kind, and must_show."
+            }
         }
     }
 
@@ -714,7 +836,8 @@ INVESTIGATION RULES:
 - Keep searches targeted to the current checkout for code context only. Prefer `rg "Make It So|MakeItSo|MAKE_IT_SO" .` from the repository root over recursive PowerShell searches.
 - If MCP catalog metadata or repo code context cannot support the needed validation plan, abort.
 - Write `issue-agent-investigation.json` with:
-  `{ "layer":"investigation", "status":"pass|abort", "abort_reason":null, "retryable":false, "human_action_required":false, "notes":"", "card":{}, "character":{}, "card_metadata_discovery":{"passed":null,"status":"not_run","notes":""}, "validation_plan":[] }`
+  `{ "layer":"investigation", "status":"pass|abort", "abort_reason":null, "retryable":false, "human_action_required":false, "notes":"", "card":{}, "character":{}, "card_metadata_discovery":{"passed":null,"status":"not_run","notes":""}, "validation_plan":[], "required_evidence":[{"id":"unit-tests","kind":"unit_test","required":true,"must_show":"specific tests that prove the changed behavior"},{"id":"live-target-visible","kind":"screenshot","required":true,"must_show":"target card/UI/tooltip state visibly proving the issue claim","target_visible_required":true,"text_visible_required":false,"allowed_fallback":null}] }`
+- `required_evidence` is the acceptance contract for verification. Include every proof required before a PR may open. For tooltip, label, wording, or text/UI issues, include a screenshot evidence item with `text_visible_required:true` and `must_show` naming the exact text or tooltip state. Unit tests may be required too, but they are not a substitute for required visual evidence unless the issue is explicitly non-visual and you set `allowed_fallback` with a concrete reason.
 - Allowed abort reasons: card_not_found, card_ambiguous, character_not_found, metadata_unavailable, mcp_capability_missing, game_state_unreachable, validation_plan_impossible.
 - Write `issue-agent-investigation.md` summarizing facts found, missing facts, and the validation plan.
 "@
@@ -739,7 +862,7 @@ IMPLEMENTATION RULES:
 $verificationPrompt = (Get-CommonPromptPrefix -PhaseName 'verification') + @"
 
 VERIFICATION RULES:
-- Read `issue-agent-investigation.json` and `issue-agent-implementation.json` first.
+- Read `issue-agent-investigation.json` and `issue-agent-implementation.json` first. Treat `issue-agent-investigation.json.required_evidence` as a hard acceptance contract. Do not pass unless every required evidence item is satisfied in `evidence_results`.
 - Own tests, live MCP validation, screenshot capture, and final evidence only. This phase is sealed from GitHub mutation: no issue comments, labels, branches, commits, pushes, or PRs.
 - Use this Windows validation sequence unless investigation says it is not applicable:
 
@@ -755,7 +878,8 @@ dotnet test "Tests\SpireLens.Core.Tests\SpireLens.Core.Tests.csproj" -c Debug --
 - If `capture_screenshot` is unavailable or does not return a saved PNG path plus dimensions, abort with screenshot_missing.
 - If the saved screenshot is not meaningful evidence for the validation claim, abort with screenshot_not_relevant. For a named card, tooltip, or UI issue, screenshots must show the target card, tooltip, or changed UI state. If the relevant evidence lives in draw pile, discard pile, exhaust pile, deck view, card selection, rewards, or another non-hand surface, navigate to that surface through MCP when available and capture the target-visible screenshot there. If MCP cannot make the required card text/tooltip visible, abort with target_evidence_missing and say which view or pile was unreachable; do not pass on hand screenshots, unit tests, or adjacent state.
 - Write `issue-agent-verification.json` with:
-  `{ "layer":"verification", "status":"pass|abort", "abort_reason":null, "retryable":false, "human_action_required":false, "notes":"", "unit_tests":{"passed":null,"status":"not_run","notes":""}, "live_mcp_validation":{"passed":null,"status":"not_run","notes":""}, "screenshot_validation":{"passed":null,"status":"not_run","count":0,"target_visible":false,"notes":""}, "used_mcp":null, "used_raw_bridge_or_queue":false }`
+  `{ "layer":"verification", "status":"pass|abort", "abort_reason":null, "retryable":false, "human_action_required":false, "notes":"", "unit_tests":{"passed":null,"status":"not_run","notes":""}, "live_mcp_validation":{"passed":null,"status":"not_run","notes":""}, "screenshot_validation":{"passed":null,"status":"not_run","count":0,"target_visible":false,"notes":""}, "evidence_results":[{"evidence_id":"","kind":"unit_test|screenshot|live_mcp|manual_blocker","passed":false,"artifact_paths":[],"target_visible":false,"text_visible":false,"observed_text":"","notes":""}], "used_mcp":null, "used_raw_bridge_or_queue":false }`
+- For each `required_evidence` item from investigation, write exactly one matching `evidence_results` item. Screenshot evidence must include artifact_paths. If the contract requires tooltip/text evidence, set `text_visible:true` only when the screenshot itself shows the required text and copy the visible words into `observed_text`. If the text/tooltip cannot be made visible, abort with target_evidence_missing; do not pass by saying unit tests cover it.
 - Allowed abort reasons: unit_tests_failed, live_validation_failed, screenshot_missing, screenshot_not_relevant, target_evidence_missing, mcp_state_mismatch, game_state_unreachable, claimed_result_not_observed, artifact_contract_missing.
 - Also write rollup `issue-agent-result.json` with issue_number, status, abort_layer, abort_reason, retryable, human_action_required, layers, unit_tests, live_mcp_validation, screenshot_validation, card_metadata_discovery, used_mcp, used_raw_bridge_or_queue, opened_pr, opened_pr_url, should_close_issue, and evidence_summary.
 - Write `issue-agent-verification.md` summarizing pass/fail evidence.

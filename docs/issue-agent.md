@@ -90,6 +90,8 @@ Claude runs in three separate invocations:
 
 Verification should default to the save-backed route: materialize a scenario from the correct character base save, install it as current, validate/load it, inspect the live state, and only then configure the already-loaded combat. Quick helpers that start ad hoc runs or choose Neow options are intentionally out of the default path.
 
+Investigation also writes a machine-checkable `required_evidence` contract. Each item has an `id`, `kind`, `required`, and `must_show`; screenshot evidence can also require `target_visible_required` and `text_visible_required`. Verification must answer every required item in `evidence_results` before it can pass. The wrapper blocks contradictory passes, including tooltip/text evidence that says the tooltip was unavailable, visible evidence that has no screenshot path, or screenshot evidence that relies on unit tests instead of visible UI proof.
+
 Each phase writes both machine-readable JSON and human-readable Markdown:
 
 - `issue-agent-investigation.json` / `issue-agent-investigation.md`
@@ -97,7 +99,7 @@ Each phase writes both machine-readable JSON and human-readable Markdown:
 - `issue-agent-verification.json` / `issue-agent-verification.md`
 - `issue-agent-result.json` / `issue-agent-result.md`
 
-The workflow reads each phase JSON before continuing. If investigation or implementation reports `status: abort`, later phase steps are skipped and the final summary reports the abort layer and reason. If verification aborts, no PR is created; the summary still publishes screenshots gathered so far and the specific verifier failure.
+The workflow reads each phase JSON before continuing. If investigation or implementation reports `status: abort`, later phase steps are skipped and the final summary reports the abort layer and reason. If verification aborts, no PR is created; the summary still publishes screenshots gathered so far and the specific verifier failure. A verifier `status: pass` is rechecked by the wrapper against the investigation `required_evidence` contract before the workflow can proceed to PR creation.
 
 Allowed investigation abort reasons:
 
@@ -153,7 +155,7 @@ For STS2 issue-agent work:
 - if the issue is about a specific card, include at least one screenshot showing that card's stats working in a representative in-run test case
 - document the test case used for the screenshot artifacts: what was set up, what was exercised, and what each screenshot is intended to prove
 - capture screenshots after the behavior is working, not just during setup
-- for tooltip-related changes, capture the affected tooltip states in the relevant hand, deck, draw pile, discard pile, exhaust pile, rewards, selection, or other card surface; use judgment about which views materially need coverage
+- for tooltip-related changes, capture the affected tooltip states in the relevant hand, deck, draw pile, discard pile, exhaust pile, rewards, selection, or other card surface; the screenshot evidence item should set `text_visible_required:true`, and verification must copy the visible text into `observed_text`
 - if multiple materially distinct views changed, such as compact hand-hover and fuller deck-view tooltip states, capture each affected view when that is the clearest way to prove the change
 - use judgment on how many screenshots to include, but do not exceed 10 screenshots for a single issue or pull request
 - if adequate proof would require more than 10 screenshots, split the work into smaller branches or pull requests instead of overloading one
