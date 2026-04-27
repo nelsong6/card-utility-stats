@@ -126,7 +126,10 @@ async def validate_load():
             if state_type != "monster":
                 break
             battle = state.get("battle") or {}
-            if battle.get("enemies"):
+            player = state.get("player") or {}
+            expected_deck = setup.get("deck") or []
+            hand_ready = bool(player.get("hand")) or not expected_deck
+            if battle.get("enemies") and hand_ready:
                 break
         await asyncio.sleep(0.5)
     existing["live_installed"] = live_installed
@@ -201,6 +204,11 @@ try {
         $battle = $result.game_state.battle
         if ($null -eq $battle -or $null -eq $battle.enemies -or @($battle.enemies).Count -eq 0) {
             throw "Scenario reached monster state before active battle details were available."
+        }
+        $expectedDeck = @($result.scenario_setup.deck)
+        $hand = @($result.game_state.player.hand)
+        if ($expectedDeck.Count -gt 0 -and $hand.Count -eq 0) {
+            throw "Scenario reached monster state before the initial hand was available."
         }
     }
 
