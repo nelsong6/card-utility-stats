@@ -26,8 +26,9 @@ The processing model is intentionally simple:
 
 1. GitHub issue event fires, or a human manually dispatches the workflow for one issue number.
 2. GitHub Actions starts one workflow job on a self-hosted runner labeled `issue-agent`.
-3. The job launches fresh Claude Code invocations for the issue-agent phases.
-4. Claude owns the issue work through the phase contract: investigation, implementation, verification, comments, labels, tests, screenshots, and PR creation.
+3. That one job exposes investigation, implementation, and verification as separate visible Actions steps.
+4. Each phase step launches a fresh Claude Code invocation with its own prompt, tool permissions, timeout, budget, logs, and handoff artifacts.
+5. Claude owns the issue work through the phase contract: investigation, implementation, verification, comments, labels, tests, screenshots, and PR creation.
 
 There is no second script that chooses issues, reads structured result files, or drains a local queue.
 
@@ -68,15 +69,16 @@ For STS2 issue-agent work, `spire-lens-mcp` is a hard prerequisite.
 
 In this environment, stateful STS2 work should go through approved MCP tools rather than improvised side paths.
 
-## Phased Script Workflow
+## Phased Step Workflow
 
-The issue-agent workflow is one visible GitHub Actions job. Inside that job, the runner script launches separate Claude Code processes for each phase:
+The issue-agent workflow is one GitHub Actions job with separate visible phase steps:
 
-1. Investigation
-2. Implementation
-3. Verification
+1. `Investigate test primitives`
+2. `Implement code change`
+3. `Verify in STS2`
+4. `Summarize issue-agent run`
 
-This keeps the Actions page easy to follow while still preserving the important split: each phase has a fresh context, narrower tool permissions, its own timeout, its own budget, and explicit JSON/Markdown handoff artifacts.
+This keeps the Actions page easy to follow without turning the flow into several independent CI jobs. It also preserves the important split: each phase has a fresh context, narrower tool permissions, its own timeout, its own budget, and explicit JSON/Markdown handoff artifacts.
 
 Claude runs in three separate invocations:
 
@@ -91,7 +93,7 @@ Each phase writes both machine-readable JSON and human-readable Markdown:
 - `issue-agent-verification.json` / `issue-agent-verification.md`
 - `issue-agent-result.json` / `issue-agent-result.md`
 
-The runner reads each phase JSON before continuing. If investigation or implementation reports `status: abort`, later phases are skipped and the final summary reports the abort layer and reason. If verification aborts, the summary still publishes the PR link, screenshots gathered so far, and the specific verifier failure.
+The workflow reads each phase JSON before continuing. If investigation or implementation reports `status: abort`, later phase steps are skipped and the final summary reports the abort layer and reason. If verification aborts, the summary still publishes the PR link, screenshots gathered so far, and the specific verifier failure.
 
 Allowed investigation abort reasons:
 
