@@ -1,6 +1,6 @@
 # Issue-Agent Screenshot Storage
 
-This OpenTofu stack provisions public-read Azure Blob Storage for issue-agent screenshot previews.
+This OpenTofu stack provisions SpireLens-owned public-read Azure Blob Storage for issue-agent screenshot previews.
 
 It creates:
 
@@ -12,11 +12,28 @@ It creates:
 - `Storage Blob Data Contributor` on the storage account for the upload identity
 - an optional lifecycle rule to delete old screenshots
 
+## Pipeline
+
+This stack is applied from GitHub Actions through the shared reusable workflow in `nelsong6/pipeline-templates`:
+
+```yaml
+uses: nelsong6/pipeline-templates/.github/workflows/tofu-plan-apply-template.yml@main
+```
+
+State uses the same backend convention as `nelsong6/infra-bootstrap`:
+
+- resource group: `infra`
+- storage account: `${{ vars.TFSTATE_STORAGE_ACCOUNT }}`
+- container: `tfstate`
+- key: `spirelens/issue-agent-screenshot-storage.tfstate`
+
+Do not apply this stack locally. Dispatch or push through `.github/workflows/opentofu-issue-agent-screenshot-storage.yml`.
+
 ## Authentication Model
 
 GitHub Actions should use OIDC through `azure/login` with the `github_uploader_client_id` output.
 
-Example workflow shape:
+Example upload shape:
 
 ```yaml
 permissions:
@@ -27,8 +44,8 @@ steps:
   - uses: azure/login@v2
     with:
       client-id: ${{ vars.AZURE_SCREENSHOT_UPLOADER_CLIENT_ID }}
-      tenant-id: ${{ vars.AZURE_TENANT_ID }}
-      subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      tenant-id: ${{ vars.ARM_TENANT_ID }}
+      subscription-id: ${{ vars.ARM_SUBSCRIPTION_ID }}
 
   - name: Upload screenshots
     shell: powershell
@@ -49,25 +66,13 @@ The public preview URL for a screenshot is:
 https://<storage-account>.blob.core.windows.net/<container>/<run-id>/<filename>.png
 ```
 
-## Applying
+## Outputs To Consume
 
-```powershell
-cd infra/opentofu/issue-agent-screenshot-storage
-tofu init
-tofu plan `
-  -var "location=eastus" `
-  -var "resource_group_name=rg-spirelens-issue-agent-evidence"
-tofu apply
-```
+After apply, the upload workflow needs these stack outputs:
 
-The provider can authenticate with Azure CLI locally or OIDC in CI. Backend configuration is intentionally not committed yet; add backend config once we decide where OpenTofu state should live.
+- `github_uploader_client_id`
+- `storage_account_name`
+- `container_name`
+- `container_url`
 
-## Variables To Export Back To GitHub
-
-After apply, set these repository variables/secrets for the upload workflow:
-
-- `AZURE_SCREENSHOT_UPLOADER_CLIENT_ID` = `github_uploader_client_id`
-- `AZURE_SCREENSHOT_STORAGE_ACCOUNT` = `storage_account_name`
-- `AZURE_SCREENSHOT_CONTAINER` = `container_name`
-- `AZURE_TENANT_ID`
-- `AZURE_SUBSCRIPTION_ID`
+Those can be read from state with `nelsong6/pipeline-templates/.github/workflows/tofu-outputs-template.yml@main`.
