@@ -127,6 +127,7 @@ Allowed verification abort reasons:
 - `live_validation_failed`
 - `screenshot_missing`
 - `screenshot_not_relevant`
+- `target_evidence_missing`
 - `mcp_state_mismatch`
 - `game_state_unreachable`
 - `claimed_result_not_observed`
