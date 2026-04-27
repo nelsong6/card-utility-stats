@@ -125,7 +125,9 @@ $phaseDefinitions = @(
         ) + $CatalogMcpTools
         DisallowedTools = $SingleplayerMcpTools + $MultiplayerMcpTools + @(
             'Edit',
-            'NotebookEdit'
+            'NotebookEdit',
+            'Agent',
+            'Task'
         )
     },
     [ordered]@{
@@ -161,7 +163,9 @@ $phaseDefinitions = @(
             'Bash(git push *)',
             'PowerShell(git push *)',
             'Bash(git switch *)',
-            'PowerShell(git switch *)'
+            'PowerShell(git switch *)',
+            'Agent',
+            'Task'
         )
     },
     [ordered]@{
@@ -197,7 +201,9 @@ $phaseDefinitions = @(
             'Bash(git push *)',
             'PowerShell(git push *)',
             'Bash(git switch *)',
-            'PowerShell(git switch *)'
+            'PowerShell(git switch *)',
+            'Agent',
+            'Task'
         )
     }
 )
