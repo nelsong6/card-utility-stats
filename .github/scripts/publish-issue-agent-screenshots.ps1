@@ -38,6 +38,18 @@ function Add-PublishWarning {
     Write-Warning $Message
 }
 
+function Write-PreviewMarkdown {
+    $previewLines = New-Object System.Collections.Generic.List[string]
+    foreach ($imageMarkdown in $published) { $previewLines.Add($imageMarkdown) | Out-Null }
+    if ($warnings.Count -gt 0) {
+        if ($previewLines.Count -gt 0) { $previewLines.Add('') | Out-Null }
+        $previewLines.Add('> Screenshot publish warning: one or more screenshot previews could not be published. Use the uploaded artifacts as fallback evidence.') | Out-Null
+        foreach ($warning in $warnings) { $previewLines.Add("> $warning") | Out-Null }
+    }
+
+    $previewLines | Set-Content -LiteralPath $PreviewMarkdownPath -Encoding UTF8
+}
+
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $PreviewMarkdownPath) | Out-Null
 Remove-Item -LiteralPath $PreviewMarkdownPath -Force -ErrorAction SilentlyContinue
 
@@ -46,7 +58,7 @@ $warnings = New-Object System.Collections.Generic.List[string]
 
 if ([string]::IsNullOrWhiteSpace($ScreenshotDir) -or -not (Test-Path -LiteralPath $ScreenshotDir)) {
     Add-PublishWarning "Screenshot directory not found: $ScreenshotDir"
-    $warnings | Set-Content -LiteralPath $PreviewMarkdownPath -Encoding UTF8
+    Write-PreviewMarkdown
     return
 }
 
@@ -86,12 +98,4 @@ foreach ($file in $files) {
     }
 }
 
-$previewLines = New-Object System.Collections.Generic.List[string]
-foreach ($imageMarkdown in $published) { $previewLines.Add($imageMarkdown) | Out-Null }
-if ($warnings.Count -gt 0) {
-    if ($previewLines.Count -gt 0) { $previewLines.Add('') | Out-Null }
-    $previewLines.Add('> Screenshot publish warning: one or more screenshot previews could not be published. Use the uploaded artifacts as fallback evidence.') | Out-Null
-    foreach ($warning in $warnings) { $previewLines.Add("> $warning") | Out-Null }
-}
-
-$previewLines | Set-Content -LiteralPath $PreviewMarkdownPath -Encoding UTF8
+Write-PreviewMarkdown
