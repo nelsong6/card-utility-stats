@@ -117,6 +117,23 @@ async def validate_load():
     # the in-game saved-run loader and validator see the same current_run.save.
     live_installed = parse_tool_json(await server.install_save_as_current(setup["scenario_name"], "scenario"), "install_save_as_current")
     validate = parse_tool_json(await server.validate_current_run_save(), "validate_current_run_save")
+    menu_state = None
+    stable_menu_polls = 0
+    for _ in range(30):
+        menu_state = parse_tool_json(await server.get_game_state("json"), "get_game_state")
+        if menu_state.get("state_type") == "menu":
+            stable_menu_polls += 1
+            if stable_menu_polls >= 3:
+                break
+        else:
+            stable_menu_polls = 0
+        await asyncio.sleep(1.0)
+    if stable_menu_polls < 3:
+        raise RuntimeError(f"Game did not reach a stable menu state before loading scenario save: {menu_state}")
+    # The MCP bridge comes up before STS2 has fully settled its startup/menu
+    # coroutines. Loading immediately can cancel LaunchMainMenu/logo startup and
+    # make STS2 show its generic startup-error popup even though combat loads.
+    await asyncio.sleep(3.0)
     loaded = parse_tool_json(await server.load_current_run_save(), "load_current_run_save")
     state = None
     for _ in range(40):
@@ -131,6 +148,7 @@ async def validate_load():
         await asyncio.sleep(0.5)
     existing["live_installed"] = live_installed
     existing["validated"] = validate
+    existing["pre_load_menu_state"] = menu_state
     existing["loaded"] = loaded
     existing["game_state"] = state
     existing["state_type"] = state.get("state_type") if state else None
