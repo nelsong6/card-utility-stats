@@ -114,7 +114,7 @@ $phaseDefinitions = @(
         Name = 'test_plan'
         Json = 'issue-agent-test-plan.json'
         Markdown = 'issue-agent-test-plan.md'
-        TimeoutSeconds = 240
+        TimeoutSeconds = 480
         MaxBudgetUsd = '3.00'
         AllowedAbortReasons = @('card_not_found', 'card_ambiguous', 'character_not_found', 'metadata_unavailable', 'mcp_capability_missing', 'game_state_unreachable', 'validation_plan_impossible', 'phase_timeout')
         AllowedTools = @(
@@ -914,6 +914,7 @@ TEST PLANNING RULES:
 - When you need support cards for a scenario deck, use `list_cards` with exact arguments `owner`, `type`, `query`, and/or `limit`; for example use the resolved character owner and needed card type rather than guessing support card names one by one with repeated `lookup_card` calls. If `list_cards` cannot return enough real cards for the recipe, abort with `validation_plan_impossible` or `metadata_unavailable`.
 - Do not inspect implementation files unless needed to identify an existing test command or fixture name; scenario/evidence planning must remain independent of code edits.
 - Do not use an Explore/subagent/Task. If the issue, MCP catalog metadata, and existing test command hints are not enough to produce a validation plan quickly, abort with `validation_plan_impossible` instead of delegating.
+- After the required issue read and MCP lookups are complete, write the JSON and Markdown artifacts immediately. Keep the plan concise; do not spend additional turns narrating or re-checking unless a required field is genuinely missing.
 - Before writing screenshot or live-validation evidence, call `get_validation_capabilities` and use its returned `card_surfaces`, `runtime_options`, `recommended_tooltip_evidence_flow`, and `tools[]` manifest as the source of truth for what verification can open, tooltip, screenshot, and mutate. Each referenced tool plan should respect the manifest fields `safe_for_test_planning`, `mutates_state`, `requires_game_running`, `requires_combat`, `output_contract`, `common_failures`, and `examples`. Do not assume an unavailable view exists, and do not omit an available view such as deck, draw_pile, discard_pile, exhaust_pile, or verbose hand stats when it is the right evidence surface.
 - If MCP catalog metadata or validation capabilities cannot support the needed validation plan, abort.
 - Write `issue-agent-test-plan.json` with:
