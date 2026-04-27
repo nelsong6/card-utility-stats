@@ -245,11 +245,20 @@ function Get-ToolFailureCategory {
     param([string]$Text)
 
     if ([string]::IsNullOrWhiteSpace($Text)) { return $null }
+
+    # Successful test summaries often contain the word "Failed" as a zero count.
+    # Count only actual failures, not lines like "Passed! - Failed: 0".
+    if ($Text -match '(?i)\bPassed!\s*-\s*Failed:\s*0\b') { return $null }
+    if ($Text -match '(?i)\bFailed:\s*0\b' -and
+        $Text -notmatch '(?im)^\s*(error|exception|traceback):' -and
+        $Text -notmatch '(?i)\b(exit code [1-9]\d*|unauthorized|forbidden)\b') { return $null }
+
     if ($Text -match '(?i)permission to use .* has been denied|permission_denied|permission denied|not allowed to use tool|disallowed') { return 'permission_denied' }
     if ($Text -match '(?i)\b(500|internal server error)\b') { return 'server_error' }
     if ($Text -match '(?i)\b(timed out|timeout)\b') { return 'timeout' }
     if ($Text -match '(?im)^\s*(error|exception|traceback):') { return 'tool_error' }
-    if ($Text -match '(?i)\b(exit code [1-9]\d*|failed|exception|traceback|unauthorized|forbidden|not found)\b') { return 'tool_error' }
+    if ($Text -match '(?i)\bFailed:\s*[1-9]\d*\b|\bfailures?:\s*[1-9]\d*\b') { return 'tool_error' }
+    if ($Text -match '(?i)\b(exit code [1-9]\d*|exception|traceback|unauthorized|forbidden|not found)\b') { return 'tool_error' }
     return $null
 }
 function Write-AgentEvent {
