@@ -8,11 +8,14 @@ param(
     [Parameter(Mandatory = $true)][string]$DebugLogPath,
     [Parameter(Mandatory = $true)][string]$SummaryLogPath,
     [Parameter(Mandatory = $true)][string]$ScreenshotDir,
-    [Parameter(Mandatory = $true)][string]$ValidationArtifactDir
+    [Parameter(Mandatory = $true)][string]$ValidationArtifactDir,
+    [ValidateSet('all', 'investigation', 'implementation', 'verification')]
+    [string]$PhaseName = 'all'
 )
 
 $ErrorActionPreference = 'Stop'
-$PhaseTimeoutSeconds = 360
+$DefaultPhaseTimeoutSeconds = 360
+$DefaultPhaseBudgetUsd = '15.00'
 
 $CatalogMcpTools = @(
     'mcp__spire-lens-mcp__lookup_card',
@@ -98,6 +101,8 @@ $phaseDefinitions = @(
         Name = 'investigation'
         Json = 'issue-agent-investigation.json'
         Markdown = 'issue-agent-investigation.md'
+        TimeoutSeconds = 240
+        MaxBudgetUsd = '3.00'
         AllowedAbortReasons = @('card_not_found', 'card_ambiguous', 'character_not_found', 'metadata_unavailable', 'mcp_capability_missing', 'game_state_unreachable', 'validation_plan_impossible', 'phase_timeout')
         AllowedTools = @(
             'Read',
@@ -118,6 +123,8 @@ $phaseDefinitions = @(
         Name = 'implementation'
         Json = 'issue-agent-implementation.json'
         Markdown = 'issue-agent-implementation.md'
+        TimeoutSeconds = 480
+        MaxBudgetUsd = '8.00'
         AllowedAbortReasons = @('change_too_large', 'requires_new_library', 'requires_architecture_change', 'unsafe_refactor', 'missing_code_context', 'conflicting_requirements', 'cannot_implement_without_guessing', 'phase_timeout')
         AllowedTools = @(
             'Read',
@@ -138,6 +145,8 @@ $phaseDefinitions = @(
         Name = 'verification'
         Json = 'issue-agent-verification.json'
         Markdown = 'issue-agent-verification.md'
+        TimeoutSeconds = 600
+        MaxBudgetUsd = '6.00'
         AllowedAbortReasons = @('unit_tests_failed', 'live_validation_failed', 'screenshot_missing', 'screenshot_not_relevant', 'target_evidence_missing', 'mcp_state_mismatch', 'claimed_result_not_observed', 'artifact_contract_missing', 'phase_timeout')
         AllowedTools = @(
             'Read',
@@ -472,6 +481,8 @@ function Invoke-ClaudePhase {
     )
 
     $phaseName = $Phase.Name
+    $phaseTimeoutSeconds = if ($Phase.Contains('TimeoutSeconds')) { [int]$Phase.TimeoutSeconds } else { $DefaultPhaseTimeoutSeconds }
+    $phaseBudgetUsd = if ($Phase.Contains('MaxBudgetUsd')) { [string]$Phase.MaxBudgetUsd } else { $DefaultPhaseBudgetUsd }
     $promptPath = Join-Path $env:RUNNER_TEMP "claude-issue-agent-$phaseName-prompt.md"
     $phaseJsonPath = Join-Path $ValidationArtifactDir $Phase.Json
     $phaseMarkdownPath = Join-Path $ValidationArtifactDir $Phase.Markdown
@@ -480,7 +491,7 @@ function Invoke-ClaudePhase {
     $promptText = Get-Content -LiteralPath $promptPath -Raw
 
     Write-Host "::group::Claude issue-agent phase: $phaseName"
-    Write-AgentEvent 'phase_start' "Starting $phaseName phase." @{ phase = $phaseName }
+    Write-AgentEvent 'phase_start' "Starting $phaseName phase." @{ phase = $phaseName; timeout_seconds = $phaseTimeoutSeconds; max_budget_usd = $phaseBudgetUsd }
 
     $stdoutPath = Join-Path $env:RUNNER_TEMP "claude-issue-agent-$phaseName-stdout.jsonl"
     $stderrPath = Join-Path $env:RUNNER_TEMP "claude-issue-agent-$phaseName-stderr.log"
@@ -496,7 +507,7 @@ function Invoke-ClaudePhase {
         '--strict-mcp-config',
         "--mcp-config=$McpConfigPath",
         '--no-session-persistence',
-        '--max-budget-usd', '15.00',
+        '--max-budget-usd', $phaseBudgetUsd,
         '--add-dir', $RepoRoot
     )
 
@@ -518,14 +529,14 @@ function Invoke-ClaudePhase {
         -WorkingDirectory $RepoRoot `
         -StdoutPath $stdoutPath `
         -StderrPath $stderrPath `
-        -TimeoutSeconds $PhaseTimeoutSeconds
+        -TimeoutSeconds $phaseTimeoutSeconds
 
     Write-ClaudeOutputLines -Path $stdoutPath -PhaseName $phaseName
     Write-ClaudeOutputLines -Path $stderrPath -PhaseName $phaseName
 
     if ($invokeResult.TimedOut) {
-        $notes = "Claude phase '$phaseName' exceeded the $PhaseTimeoutSeconds second script timeout before writing a required phase result."
-        Write-AgentEvent 'phase_timeout' $notes @{ phase = $phaseName; timeout_seconds = $PhaseTimeoutSeconds }
+        $notes = "Claude phase '$phaseName' exceeded the $phaseTimeoutSeconds second script timeout before writing a required phase result."
+        Write-AgentEvent 'phase_timeout' $notes @{ phase = $phaseName; timeout_seconds = $phaseTimeoutSeconds }
         Write-SyntheticPhaseAbort -Phase $Phase -AbortReason 'phase_timeout' -Notes $notes
     }
 
@@ -591,7 +602,11 @@ Keep Markdown concise and human-readable; it will be appended to the GitHub job 
 }
 
 Remove-Item -LiteralPath $StreamLogPath, $DebugLogPath, $SummaryLogPath -ErrorAction SilentlyContinue
-Remove-Item -LiteralPath $ScreenshotDir, $ValidationArtifactDir -Recurse -Force -ErrorAction SilentlyContinue
+if ($PhaseName -eq 'all') {
+    Remove-Item -LiteralPath $ScreenshotDir, $ValidationArtifactDir -Recurse -Force -ErrorAction SilentlyContinue
+} elseif ($PhaseName -eq 'verification') {
+    Remove-Item -LiteralPath $ScreenshotDir -Recurse -Force -ErrorAction SilentlyContinue
+}
 New-Item -ItemType Directory -Force -Path $ScreenshotDir, $ValidationArtifactDir | Out-Null
 
 $env:SCREENSHOT_DIR = $ScreenshotDir
@@ -664,7 +679,13 @@ dotnet test "Tests\SpireLens.Core.Tests\SpireLens.Core.Tests.csproj" -c Debug --
 "@
 
 $phaseResults = @{}
-foreach ($phase in $phaseDefinitions) {
+$phasesToRun = if ($PhaseName -eq 'all') {
+    $phaseDefinitions
+} else {
+    @($phaseDefinitions | Where-Object { $_.Name -eq $PhaseName })
+}
+
+foreach ($phase in $phasesToRun) {
     $prompt = switch ($phase.Name) {
         'investigation' { $investigationPrompt }
         'implementation' { $implementationPrompt }
