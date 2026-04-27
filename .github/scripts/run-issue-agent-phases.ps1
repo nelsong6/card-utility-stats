@@ -9,7 +9,7 @@ param(
     [Parameter(Mandatory = $true)][string]$SummaryLogPath,
     [Parameter(Mandatory = $true)][string]$ScreenshotDir,
     [Parameter(Mandatory = $true)][string]$ValidationArtifactDir,
-    [ValidateSet('all', 'investigation', 'implementation', 'verification')]
+    [ValidateSet('all', 'test_plan', 'implementation', 'verification')]
     [string]$PhaseName = 'all'
 )
 
@@ -107,9 +107,9 @@ $AllSpireLensMcpTools = $CatalogMcpTools + $SingleplayerMcpTools + $MultiplayerM
 
 $phaseDefinitions = @(
     [ordered]@{
-        Name = 'investigation'
-        Json = 'issue-agent-investigation.json'
-        Markdown = 'issue-agent-investigation.md'
+        Name = 'test_plan'
+        Json = 'issue-agent-test-plan.json'
+        Markdown = 'issue-agent-test-plan.md'
         TimeoutSeconds = 240
         MaxBudgetUsd = '3.00'
         AllowedAbortReasons = @('card_not_found', 'card_ambiguous', 'character_not_found', 'metadata_unavailable', 'mcp_capability_missing', 'game_state_unreachable', 'validation_plan_impossible', 'phase_timeout')
@@ -296,7 +296,7 @@ function Write-SyntheticRollup {
         retryable = $false
         human_action_required = $true
         layers = [ordered]@{
-            investigation = [ordered]@{ status = 'not_run'; abort_reason = $null }
+            test_plan = [ordered]@{ status = 'not_run'; abort_reason = $null }
             implementation = [ordered]@{ status = 'not_run'; abort_reason = $null }
             verification = [ordered]@{ status = 'not_run'; abort_reason = $null }
         }
@@ -542,20 +542,20 @@ function Apply-VerificationEvidenceGuard {
     $status = [string](Get-PropertyValue -Object $Result -Name 'status')
     if ($status -ne 'pass') { return $Result }
 
-    $investigationPath = Join-Path $ValidationArtifactDir 'issue-agent-investigation.json'
+    $investigationPath = Join-Path $ValidationArtifactDir 'issue-agent-test-plan.json'
     if (-not (Test-Path -LiteralPath $investigationPath)) {
-        return Set-VerificationGuardAbort -Result $Result -JsonPath $JsonPath -MarkdownPath $MarkdownPath -AbortReason 'artifact_contract_missing' -GuardNote 'Verification cannot pass because the investigation evidence contract is missing.'
+        return Set-VerificationGuardAbort -Result $Result -JsonPath $JsonPath -MarkdownPath $MarkdownPath -AbortReason 'artifact_contract_missing' -GuardNote 'Verification cannot pass because the test-plan evidence contract is missing.'
     }
 
     $investigation = Read-JsonFile -Path $investigationPath
     $requiredEvidence = ConvertTo-Array (Get-PropertyValue -Object $investigation -Name 'required_evidence') | Where-Object { (Get-PropertyValue -Object $_ -Name 'required') -ne $false }
     if ($requiredEvidence.Count -eq 0) {
-        return Set-VerificationGuardAbort -Result $Result -JsonPath $JsonPath -MarkdownPath $MarkdownPath -AbortReason 'artifact_contract_missing' -GuardNote 'Verification cannot pass because investigation did not declare required_evidence. The verifier needs an explicit evidence contract before it can pass.'
+        return Set-VerificationGuardAbort -Result $Result -JsonPath $JsonPath -MarkdownPath $MarkdownPath -AbortReason 'artifact_contract_missing' -GuardNote 'Verification cannot pass because test planning did not declare required_evidence. The verifier needs an explicit evidence contract before it can pass.'
     }
 
     $evidenceResults = ConvertTo-Array (Get-PropertyValue -Object $Result -Name 'evidence_results')
     if ($evidenceResults.Count -eq 0) {
-        return Set-VerificationGuardAbort -Result $Result -JsonPath $JsonPath -MarkdownPath $MarkdownPath -AbortReason 'artifact_contract_missing' -GuardNote 'Verification cannot pass because it did not write evidence_results for the investigation evidence contract.'
+        return Set-VerificationGuardAbort -Result $Result -JsonPath $JsonPath -MarkdownPath $MarkdownPath -AbortReason 'artifact_contract_missing' -GuardNote 'Verification cannot pass because it did not write evidence_results for the test-plan evidence contract.'
     }
 
     $screenshotValidation = Get-PropertyValue -Object $Result -Name 'screenshot_validation'
@@ -642,17 +642,17 @@ function Assert-PhaseContract {
         }
     }
 
-    if ($Phase.Name -eq 'investigation' -and $status -eq 'pass') {
+    if ($Phase.Name -eq 'test_plan' -and $status -eq 'pass') {
         $requiredEvidence = ConvertTo-Array (Get-PropertyValue -Object $Result -Name 'required_evidence') | Where-Object { (Get-PropertyValue -Object $_ -Name 'required') -ne $false }
         if ($requiredEvidence.Count -eq 0) {
-            throw "Investigation phase pass result must include non-empty required_evidence."
+            throw "Test planning phase pass result must include non-empty required_evidence."
         }
         foreach ($item in $requiredEvidence) {
             $id = [string](Get-PropertyValue -Object $item -Name 'id')
             $kind = [string](Get-PropertyValue -Object $item -Name 'kind')
             $mustShow = [string](Get-PropertyValue -Object $item -Name 'must_show')
             if ([string]::IsNullOrWhiteSpace($id) -or [string]::IsNullOrWhiteSpace($kind) -or [string]::IsNullOrWhiteSpace($mustShow)) {
-                throw "Investigation required_evidence items must include id, kind, and must_show."
+                throw "Test planning required_evidence items must include id, kind, and must_show."
             }
         }
     }
@@ -844,28 +844,29 @@ Set-Location -LiteralPath $RepoRoot
 "Screenshot dir: $ScreenshotDir" | Add-Content -LiteralPath $SummaryLogPath -Encoding UTF8
 "Validation artifact dir: $ValidationArtifactDir" | Add-Content -LiteralPath $SummaryLogPath -Encoding UTF8
 
-$investigationPrompt = (Get-CommonPromptPrefix -PhaseName 'investigation' -IncludeIssueRead $true) + @"
+$testPlanPrompt = (Get-CommonPromptPrefix -PhaseName 'test_plan' -IncludeIssueRead $true) + @"
 
-INVESTIGATION RULES:
+TEST PLANNING RULES:
 - Do not edit files, commit, push, open PRs, run dotnet tests, capture screenshots, or perform live gameplay validation.
-- Focus only on issue interpretation, card identity, character identity, MCP/game-state facts, and validation plan.
-- For every issue-specified card, call `lookup_card` before writing the investigation result. If lookup returns `not_found`, abort with card_not_found. If lookup returns `ambiguous`, abort with card_ambiguous. Do not infer ownership from training data.
-- For every issue-specified character, call `lookup_character` before writing the investigation result. If lookup returns `not_found` or `ambiguous`, abort with character_not_found or card_ambiguous as appropriate.
+- Focus only on issue interpretation, card identity, character identity, scenario recipe, and evidence contract. Do not inspect proposed code edits; test planning must be independent of implementation.
+- For every issue-specified card, call `lookup_card` before writing the test plan result. If lookup returns `not_found`, abort with card_not_found. If lookup returns `ambiguous`, abort with card_ambiguous. Do not infer ownership from training data.
+- For every issue-specified character, call `lookup_character` before writing the test plan result. If lookup returns `not_found` or `ambiguous`, abort with character_not_found or card_ambiguous as appropriate.
 - Keep searches targeted to the current checkout for code context only. Prefer `rg "Make It So|MakeItSo|MAKE_IT_SO" .` from the repository root over recursive PowerShell searches.
 - Do not use an Explore/subagent/Task to find code context. If targeted `rg`/`Grep`/`Read` cannot identify the surface quickly, abort with `validation_plan_impossible` instead of delegating.
 - If MCP catalog metadata or repo code context cannot support the needed validation plan, abort.
-- Write `issue-agent-investigation.json` with:
-  `{ "layer":"investigation", "status":"pass|abort", "abort_reason":null, "retryable":false, "human_action_required":false, "notes":"", "card":{}, "character":{}, "card_metadata_discovery":{"passed":null,"status":"not_run","notes":""}, "validation_plan":[], "required_evidence":[{"id":"unit-tests","kind":"unit_test","required":true,"must_show":"specific tests that prove the changed behavior"},{"id":"live-target-visible","kind":"screenshot","required":true,"must_show":"target card/UI/tooltip state visibly proving the issue claim","target_visible_required":true,"text_visible_required":false,"allowed_fallback":null}] }`
+- Write `issue-agent-test-plan.json` with:
+  `{ "layer":"test_plan", "status":"pass|abort", "abort_reason":null, "retryable":false, "human_action_required":false, "notes":"", "card":{}, "character":{}, "card_metadata_discovery":{"passed":null,"status":"not_run","notes":""}, "validation_plan":[], "required_evidence":[{"id":"unit-tests","kind":"unit_test","required":true,"must_show":"specific tests that prove the changed behavior"},{"id":"live-target-visible","kind":"screenshot","required":true,"must_show":"target card/UI/tooltip state visibly proving the issue claim","target_visible_required":true,"text_visible_required":false,"allowed_fallback":null}] }`
 - `required_evidence` is the acceptance contract for verification. Include every proof required before a PR may open. If the issue asks for multiple visible UI claims, the required screenshot evidence must name all of them; do not collapse a two-part request into proof for only one row. For Make It So trigger progress/count wording, the screenshot must show both the trigger-progress row text and the trigger-count row text, unless the investigation aborts as validation_plan_impossible with a concrete reason. For tooltip, label, wording, or text/UI issues, include a screenshot evidence item with `text_visible_required:true` and `must_show` naming the exact text or tooltip state. When more than one label/row is requested, put all requested labels/rows in `must_show`. Unit tests may be required too, but they are not a substitute for required visual evidence unless the issue is explicitly non-visual and you set `allowed_fallback` with a concrete reason.
 - Allowed abort reasons: card_not_found, card_ambiguous, character_not_found, metadata_unavailable, mcp_capability_missing, game_state_unreachable, validation_plan_impossible.
-- Write `issue-agent-investigation.md` summarizing facts found, missing facts, and the validation plan.
+- Write `issue-agent-test-plan.md` summarizing facts found, scenario recipe, missing facts, and the validation plan.
 "@
 
-$implementationPrompt = (Get-CommonPromptPrefix -PhaseName 'implementation') + @"
+$implementationPrompt = (Get-CommonPromptPrefix -PhaseName 'implementation' -IncludeIssueRead $true) + @"
 
 IMPLEMENTATION RULES:
-- Read `$ValidationArtifactDir\issue-agent-investigation.json` first and implement only that plan.
+- Read the issue directly with `gh issue view $IssueNumber --repo $RepoSlug`. Implement the user-facing claim only; do not read or depend on the test-plan artifact.
 - Own code changes only. Do not claim verification success.
+- For every issue-specified card or character, call MCP catalog lookup tools before editing. Abort rather than guessing card ids, ownership, or ambiguity.
 - Do not run unit tests, integration tests, live validation, or screenshot validation. Verification owns every `dotnet test`, live MCP action, and screenshot.
 - You may inspect code, edit code, and run focused builds for compile sanity only. The workflow wrapper owns branch, commit, push, and PR creation after verification passes.
 - If no code change is needed, write a pass result with `changed_files: []`, `opened_pr: null`, and `verification_required: true`; do not run tests to prove that claim.
@@ -881,7 +882,7 @@ IMPLEMENTATION RULES:
 $verificationPrompt = (Get-CommonPromptPrefix -PhaseName 'verification') + @"
 
 VERIFICATION RULES:
-- Read `issue-agent-investigation.json` and `issue-agent-implementation.json` first. Treat `issue-agent-investigation.json.required_evidence` as a hard acceptance contract. Do not pass unless every required evidence item is satisfied in `evidence_results`.
+- Read `issue-agent-test-plan.json` and `issue-agent-implementation.json` first. Treat `issue-agent-test-plan.json.required_evidence` as a hard acceptance contract. Do not pass unless every required evidence item is satisfied in `evidence_results`.
 - Own tests, live MCP validation, screenshot capture, and final evidence only. This phase is sealed from GitHub mutation: no issue comments, labels, branches, commits, pushes, or PRs.
 - Use this Windows validation sequence unless investigation says it is not applicable:
 
@@ -916,7 +917,7 @@ $phasesToRun = if ($PhaseName -eq 'all') {
 
 foreach ($phase in $phasesToRun) {
     $prompt = switch ($phase.Name) {
-        'investigation' { $investigationPrompt }
+        'test_plan' { $testPlanPrompt }
         'implementation' { $implementationPrompt }
         'verification' { $verificationPrompt }
     }
