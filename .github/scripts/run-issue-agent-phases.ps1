@@ -31,8 +31,12 @@ $SingleplayerMcpTools = @(
     'mcp__spire-lens-mcp__start_singleplayer_run',
     'mcp__spire-lens-mcp__enter_debug_room',
     'mcp__spire-lens-mcp__configure_test_combat',
-    'mcp__spire-lens-mcp__prepare_test_combat',
-    'mcp__spire-lens-mcp__combat_play_card',
+    'mcp__spire-lens-mcp__list_save_files',
+    'mcp__spire-lens-mcp__inspect_save',
+    'mcp__spire-lens-mcp__materialize_scenario_save',
+    'mcp__spire-lens-mcp__install_save_as_current',
+    'mcp__spire-lens-mcp__validate_current_run_save',
+    'mcp__spire-lens-mcp__load_current_run_save',    'mcp__spire-lens-mcp__combat_play_card',
     'mcp__spire-lens-mcp__combat_end_turn',
     'mcp__spire-lens-mcp__combat_select_card',
     'mcp__spire-lens-mcp__combat_confirm_selection',
@@ -161,7 +165,7 @@ $phaseDefinitions = @(
         Markdown = 'issue-agent-verification.md'
         TimeoutSeconds = 600
         MaxBudgetUsd = '6.00'
-        AllowedAbortReasons = @('unit_tests_failed', 'live_validation_failed', 'screenshot_missing', 'screenshot_not_relevant', 'target_evidence_missing', 'mcp_state_mismatch', 'claimed_result_not_observed', 'artifact_contract_missing', 'phase_timeout')
+        AllowedAbortReasons = @('unit_tests_failed', 'live_validation_failed', 'screenshot_missing', 'screenshot_not_relevant', 'target_evidence_missing', 'mcp_state_mismatch', 'game_state_unreachable', 'claimed_result_not_observed', 'artifact_contract_missing', 'phase_timeout')
         AllowedTools = @(
             'Read',
             'Write',
@@ -628,7 +632,25 @@ function Invoke-ClaudePhase {
 }
 
 function Get-CommonPromptPrefix {
-    param([string]$PhaseName)
+    param(
+        [string]$PhaseName,
+        [bool]$IncludeIssueRead = $false
+    )
+
+    $issueReadInstruction = if ($IncludeIssueRead) {
+@"
+Read the issue and its comments with:
+
+``````
+gh issue view $IssueNumber --repo $RepoSlug --comments
+``````
+"@
+    } else {
+@"
+Do not read the GitHub issue or issue comments in this phase. Use the JSON/Markdown handoff artifacts written by earlier phases as the source of issue context.
+"@
+    }
+
 @"
 You are Claude Code running the $PhaseName phase for $RepoSlug issue #$IssueNumber.
 
@@ -641,11 +663,7 @@ $RepoRoot
 
 The shell tool is Git Bash on Windows. Do not use PowerShell-only environment syntax such as `$env:ISSUE_AGENT_REPO_ROOT` unless you are explicitly invoking `powershell`. Prefer quoted concrete paths from this prompt.
 Do not search above the repository root. Do not recurse through parent workspace folders or stale `issue-agent-src` checkouts from other runs.
-Read the issue with:
-
-``````
-gh issue view $IssueNumber --repo $RepoSlug --comments
-``````
+$issueReadInstruction
 
 Use MCP tools from the project MCP config at `$McpConfigPath` for all STS2 surfaces.
 - Use `lookup_card`, `lookup_character`, `list_characters`, and `get_catalog_summary` for game metadata discovery. Do not rely on model memory for card ownership, character ownership, ids, or ambiguity checks.
@@ -686,7 +704,7 @@ Set-Location -LiteralPath $RepoRoot
 "Screenshot dir: $ScreenshotDir" | Add-Content -LiteralPath $SummaryLogPath -Encoding UTF8
 "Validation artifact dir: $ValidationArtifactDir" | Add-Content -LiteralPath $SummaryLogPath -Encoding UTF8
 
-$investigationPrompt = (Get-CommonPromptPrefix -PhaseName 'investigation') + @"
+$investigationPrompt = (Get-CommonPromptPrefix -PhaseName 'investigation' -IncludeIssueRead $true) + @"
 
 INVESTIGATION RULES:
 - Do not edit files, commit, push, open PRs, run dotnet tests, capture screenshots, or perform live gameplay validation.
@@ -731,14 +749,14 @@ dotnet build "Tests\SpireLens.Core.Tests\SpireLens.Core.Tests.csproj" -c Debug "
 dotnet test "Tests\SpireLens.Core.Tests\SpireLens.Core.Tests.csproj" -c Debug --no-build "-p:Sts2DataDir=`$sts2DataDir"
 ``````
 
-- Default live validation fixture: use `prepare_test_combat` to start/enter/configure in one call, or after manually reaching combat use `configure_test_combat` to create a deterministic combat with target/setup cards in hand, target cards in the permanent deck/draw/discard/exhaust piles as needed, exact energy/stars, optional player/enemy powers, and a high-HP simple enemy. Deviate only when investigation explains why the issue needs kills, multiple enemies, a specific enemy behavior, or another non-default state.
+- Default live validation fixture: use the save-backed route. Materialize a scenario from the correct character base save, install it as current, validate/load that save, inspect state, then use `configure_test_combat` only after the save-backed run has reached the intended combat. If the game is at Neow, menu, the wrong character, or any unexpected state after loading, abort with `mcp_state_mismatch` or `game_state_unreachable`; do not choose Neow options, start ad hoc runs, or enter random debug rooms.
 - Capture screenshots only through the `capture_screenshot` MCP tool.
 - Use the full STS2 game window/client area returned by `capture_screenshot` as canonical screenshot evidence. Crops or tighter views may be additional evidence only, not replacements.
 - If `capture_screenshot` is unavailable or does not return a saved PNG path plus dimensions, abort with screenshot_missing.
 - If the saved screenshot is not meaningful evidence for the validation claim, abort with screenshot_not_relevant. For a named card, tooltip, or UI issue, the screenshots must show the target card, tooltip, or changed UI state. If the target cannot be made visible through the MCP surface, abort with screenshot_not_relevant instead of passing on unit tests or adjacent state.
 - Write `issue-agent-verification.json` with:
   `{ "layer":"verification", "status":"pass|abort", "abort_reason":null, "retryable":false, "human_action_required":false, "notes":"", "unit_tests":{"passed":null,"status":"not_run","notes":""}, "live_mcp_validation":{"passed":null,"status":"not_run","notes":""}, "screenshot_validation":{"passed":null,"status":"not_run","count":0,"target_visible":false,"notes":""}, "used_mcp":null, "used_raw_bridge_or_queue":false }`
-- Allowed abort reasons: unit_tests_failed, live_validation_failed, screenshot_missing, screenshot_not_relevant, target_evidence_missing, mcp_state_mismatch, claimed_result_not_observed, artifact_contract_missing.
+- Allowed abort reasons: unit_tests_failed, live_validation_failed, screenshot_missing, screenshot_not_relevant, target_evidence_missing, mcp_state_mismatch, game_state_unreachable, claimed_result_not_observed, artifact_contract_missing.
 - Also write rollup `issue-agent-result.json` with issue_number, status, abort_layer, abort_reason, retryable, human_action_required, layers, unit_tests, live_mcp_validation, screenshot_validation, card_metadata_discovery, used_mcp, used_raw_bridge_or_queue, opened_pr, opened_pr_url, should_close_issue, and evidence_summary.
 - Write `issue-agent-verification.md` summarizing pass/fail evidence.
 - Write `issue-agent-result.md` as a compact final rollup including any PR URL from implementation.

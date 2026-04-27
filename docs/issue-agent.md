@@ -83,10 +83,12 @@ This keeps the Actions page easy to follow without turning the flow into several
 
 Claude runs in three separate invocations:
 
-1. Investigation: identifies the issue target, card/character facts, MCP/game-state needs, and validation plan. It cannot edit code.
-2. Implementation: applies code changes only if the investigation plan is viable and appropriately scoped. It cannot mutate GitHub.
-3. Verification: runs tests, live MCP validation, screenshots, and final evidence checks. It has no GitHub token and cannot mutate GitHub.
+1. Investigation: reads the issue/comments, identifies the issue target, card/character facts, MCP/game-state needs, and validation plan. It cannot edit code.
+2. Implementation: consumes the investigation handoff artifacts and applies code changes only if the investigation plan is viable and appropriately scoped. It cannot read or mutate GitHub.
+3. Verification: consumes the investigation and implementation handoff artifacts, runs tests, save-backed live MCP validation, screenshots, and final evidence checks. It has no GitHub token and cannot read or mutate GitHub.
 4. The workflow wrapper creates the branch, commit, push, and PR only after verification reports `status: pass`.
+
+Verification should default to the save-backed route: materialize a scenario from the correct character base save, install it as current, validate/load it, inspect the live state, and only then configure the already-loaded combat. Quick helpers that start ad hoc runs or choose Neow options are intentionally out of the default path.
 
 Each phase writes both machine-readable JSON and human-readable Markdown:
 
@@ -124,6 +126,7 @@ Allowed verification abort reasons:
 - `screenshot_missing`
 - `screenshot_not_relevant`
 - `mcp_state_mismatch`
+- `game_state_unreachable`
 - `claimed_result_not_observed`
 - `artifact_contract_missing`
 
