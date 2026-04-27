@@ -70,7 +70,9 @@ function Get-ToolFailureCategory {
     if ($Text -match '(?i)\b(500|internal server error)\b') { return 'server_error' }
     if ($Text -match '(?i)\b(timed out|timeout)\b') { return 'timeout' }
     if ($Text -match '(?im)^\s*(error|exception|traceback):') { return 'tool_error' }
-    if ($Text -match '(?i)\b(exit code [1-9]\d*|failed|exception|traceback|unauthorized|forbidden|not found)\b') { return 'tool_error' }
+    if ($Text -match '(?i)\b(exit code [1-9]\d*|unauthorized|forbidden)\b') { return 'tool_error' }
+    if ($Text -match '(?im)^\s*Build FAILED\.?\s*$') { return 'tool_error' }
+    if ($Text -match '(?i)\berror\s+[A-Z]+\d{3,}\b') { return 'tool_error' }
     return $null
 }
 
@@ -120,6 +122,7 @@ function Get-ClaudeToolCallSummary {
                 $category = [string](Get-NestedPropertyValue -Object $record -Path @('data', 'failure_category'))
                 $failed = Get-NestedPropertyValue -Object $record -Path @('data', 'failed')
                 if ([string]::IsNullOrWhiteSpace($category)) { $category = Get-ToolFailureCategory -Text ([string]$record.message) }
+                if (($failed -is [bool] -and $failed) -and [string]::IsNullOrWhiteSpace($category)) { $category = 'tool_error' }
                 if (($failed -is [bool] -and $failed) -or -not [string]::IsNullOrWhiteSpace($category)) {
                     Add-ToolMetricFailure -Bucket $summary.total -Category $category
                     Add-ToolMetricFailure -Bucket $phaseBucket -Category $category
