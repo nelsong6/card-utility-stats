@@ -34,7 +34,7 @@ $SingleplayerMcpTools = @(
     'mcp__spire-lens-mcp__show_card_tooltip',
     'mcp__spire-lens-mcp__start_singleplayer_run',
     'mcp__spire-lens-mcp__enter_debug_room',
-    'mcp__spire-lens-mcp__configure_test_combat',
+    'mcp__spire-lens-mcp__configure_live_combat',
     'mcp__spire-lens-mcp__list_save_files',
     'mcp__spire-lens-mcp__inspect_save',
     'mcp__spire-lens-mcp__materialize_scenario_save',
@@ -891,7 +891,7 @@ dotnet build "Tests\SpireLens.Core.Tests\SpireLens.Core.Tests.csproj" -c Debug "
 dotnet test "Tests\SpireLens.Core.Tests\SpireLens.Core.Tests.csproj" -c Debug --no-build "-p:Sts2DataDir=`$sts2DataDir"
 ``````
 
-- Default live validation fixture: use the save-backed route. Materialize a scenario from the correct character base save, install it as current, validate/load that save, inspect state, then wait until the Battle Start transition is gone and `get_game_state` reports a stable player turn before using `configure_test_combat`. After `configure_test_combat`, call both `get_game_state` and `list_visible_cards`; if the model hand and visible hand disagree, wait briefly and retry `configure_test_combat` once. If the target card still is not visible, abort with `target_evidence_missing`. If the game is at Neow, menu, the wrong character, transition-only state, or any unexpected state after loading, abort with `mcp_state_mismatch` or `game_state_unreachable`; do not choose Neow options, start ad hoc runs, or enter random debug rooms.
+- Default live validation fixture: use the save-backed route. Materialize a scenario from the correct character base save with the smallest deterministic deck that can exercise the issue, install it as current, validate/load that save, inspect state, then wait until the Battle Start transition is gone and `get_game_state` reports a stable player turn. Do not use live MCP tools to arrange hand/draw/discard/exhaust piles. If needed after combat loads, `configure_live_combat` may set only sparse live properties such as enemy HP, current energy/stars, player powers, or enemy powers; card availability must come from the scenario save/deck and normal gameplay. If the game is at Neow, menu, the wrong character, transition-only state, or any unexpected state after loading, abort with `mcp_state_mismatch` or `game_state_unreachable`; do not choose Neow options, start ad hoc runs, or enter random debug rooms.
 - For SpireLens card-stat tooltip evidence, use `bridge_health`, `set_spirelens_view_stats_enabled(true)`, `list_visible_cards(surface)`, then `show_card_tooltip(surface, card_index, card_id)` on the target visible card, then `capture_screenshot`. Prefer `card_id` (for example `MAKE_IT_SO`) over card_index alone when validating a named card. If `list_visible_cards` cannot find the target, `show_card_tooltip` returns an error, the bridge health check fails, or the captured screenshot still shows the wrong/stale tooltip after one retry, abort with `target_evidence_missing` or `game_state_unreachable`; do not keep trying arbitrary indices. Prefer this route over ad hoc mouse/hover attempts.
 - Capture screenshots only through the `capture_screenshot` MCP tool.
 - Use the full STS2 game window/client area returned by `capture_screenshot` as canonical screenshot evidence. Crops or tighter views may be additional evidence only, not replacements.
