@@ -39,6 +39,41 @@ function Get-McpDirectory {
     throw "Unable to find '--directory' in spire-lens-mcp args."
 }
 
+
+function Test-ScenarioPlayabilityContract {
+    param([object]$Setup, [object]$TestPlan)
+
+    $errors = New-Object System.Collections.Generic.List[string]
+    $warnings = New-Object System.Collections.Generic.List[string]
+    $deck = @($Setup.deck)
+
+    if ($deck.Count -eq 0) { $errors.Add('scenario_setup.deck must contain at least one card id.') | Out-Null }
+    $blankCards = @($deck | Where-Object { [string]::IsNullOrWhiteSpace([string]$_) })
+    if ($blankCards.Count -gt 0) { $errors.Add('scenario_setup.deck contains blank card ids.') | Out-Null }
+
+    $maxEnergy = $Setup.max_energy
+    if ($null -ne $maxEnergy) {
+        try {
+            if ([int]$maxEnergy -lt 0) { $errors.Add('scenario_setup.max_energy cannot be negative.') | Out-Null }
+        } catch {
+            $errors.Add('scenario_setup.max_energy must be an integer when provided.') | Out-Null
+        }
+    }
+
+    $planText = (($TestPlan | ConvertTo-Json -Depth 50 -Compress) -as [string])
+    if ($planText -match '(?i)play\s+3|3rd Skill|three .*Skill') {
+        $notes = [string]$Setup.notes
+        $skillLikeCount = @($deck | Where-Object { $_ -match '(?i)SKILL|DEFEND|GATHER|GLOW|ALIGNMENT|COSMIC' }).Count
+        if ($skillLikeCount -lt 3 -and $notes -notmatch '(?i)3 .*skill|three .*skill') {
+            $warnings.Add('Plan appears to require playing 3 Skills, but the scenario deck/notes do not clearly demonstrate three playable Skill cards.') | Out-Null
+        }
+        if ($null -eq $maxEnergy) {
+            $warnings.Add('Plan appears to require playing multiple cards, but scenario_setup.max_energy is not set.') | Out-Null
+        }
+    }
+
+    return [ordered]@{ errors = @($errors); warnings = @($warnings) }
+}
 function Invoke-McpPython {
     param(
         [string]$McpDirectory,
@@ -195,6 +230,18 @@ try {
         if ($null -eq $setup.PSObject.Properties[$required] -or [string]::IsNullOrWhiteSpace([string]$setup.$required)) {
             throw "scenario_setup.$required is required."
         }
+    }
+
+    $playability = Test-ScenarioPlayabilityContract -Setup $setup -TestPlan $testPlan
+    $playabilityPath = Join-Path $ValidationArtifactDir 'issue-agent-scenario-playability.json'
+    $playability | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $playabilityPath -Encoding UTF8
+    if (@($playability.errors).Count -gt 0) {
+        throw ('Scenario playability contract failed: ' + (($playability.errors) -join '; '))
+    }
+    if (@($playability.warnings).Count -gt 0 -and -not [string]::IsNullOrWhiteSpace($env:GITHUB_STEP_SUMMARY)) {
+        '## Scenario Playability Warnings' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
+        foreach ($warning in @($playability.warnings)) { "- $warning" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append }
+        '' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
     }
 
     $setupPath = Join-Path $ValidationArtifactDir 'issue-agent-scenario-setup-input.json'
