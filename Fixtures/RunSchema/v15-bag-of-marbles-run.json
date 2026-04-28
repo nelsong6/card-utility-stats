@@ -1,0 +1,61 @@
+{
+  "schema_version": 15,
+  "run_id": "fixture-v15-bag-of-marbles",
+  "started_at": "2026-04-27T10:00:00Z",
+  "updated_at": "2026-04-27T10:12:00Z",
+  "ended_at": "2026-04-27T10:15:00Z",
+  "character": "KIN",
+  "ascension": 5,
+  "floor_reached": 8,
+  "outcome": "win",
+  "game_start_time": 1745748000,
+  "aggregates": {
+    "CARD.STRIKE_KIN#1": {
+      "plays": 3,
+      "total_intended": 18,
+      "total_blocked": 0,
+      "total_overkill": 2,
+      "total_effective": 16,
+      "kills": 1,
+      "total_energy_spent": 3,
+      "total_energy_generated": 0,
+      "total_stars_spent": 0,
+      "total_stars_generated": 0,
+      "total_forge_generated": 0,
+      "total_block_gained": 0,
+      "total_block_effective": 0,
+      "total_block_wasted": 0,
+      "times_drawn": 3,
+      "times_discarded": 0,
+      "times_placed_on_top_from_hand": 0,
+      "times_placed_on_top_from_discard": 0,
+      "times_exhausted_other_cards": 0,
+      "times_exhausted": 0,
+      "total_hp_lost": 0,
+      "times_cards_drawn": 0,
+      "times_cards_draw_attempted": 0,
+      "times_cards_draw_blocked": 0,
+      "blocked_draw_reasons": {},
+      "times_summoned_to_hand": 0,
+      "applied_effects": {},
+      "floor_added": 1,
+      "initial_upgrade_level": 0,
+      "removed": false
+    }
+  },
+  "relic_aggregates": {
+    "RELIC.BAG_OF_MARBLES": {
+      "enemies_affected": 5,
+      "vulnerable_applied": 5
+    }
+  },
+  "events": [],
+  "instance_numbers_by_def": {
+    "CARD.STRIKE_KIN": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.STRIKE_KIN": 1
+  }
+}

@@ -230,9 +230,25 @@ public class SchemaLoadingTests
     }
 
     [Fact]
-    public void HistoricalLoad_AcceptsCurrentV14Fixture()
+    public void HistoricalLoad_AcceptsLegacyResumableV14Fixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("v14-per-instance-make-it-so-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.Equal(14, loaded!.SourceSchemaVersion);
+        Assert.True(loaded.IsLegacy);
+        Assert.True(loaded.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Contains("resumable", loaded.CompatibilityNote!, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(9m, loaded.Data.Aggregates["CARD.REFINE_BLADE#1"].TotalForgeGenerated);
+        Assert.Equal(2, loaded.Data.Aggregates["CARD.MAKE_IT_SO#1"].TimesSummonedToHand);
+        Assert.Equal(4m, loaded.Data.Events[2].ForgeGained);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsCurrentV15Fixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("v15-bag-of-marbles-run.json"));
 
         Assert.NotNull(loaded);
         Assert.Equal(RunData.CurrentSchemaVersion, loaded!.SourceSchemaVersion);
@@ -240,9 +256,9 @@ public class SchemaLoadingTests
         Assert.True(loaded.SupportsResume);
         Assert.True(loaded.HasPerInstanceIdentity);
         Assert.Null(loaded.CompatibilityNote);
-        Assert.Equal(9m, loaded.Data.Aggregates["CARD.REFINE_BLADE#1"].TotalForgeGenerated);
-        Assert.Equal(2, loaded.Data.Aggregates["CARD.MAKE_IT_SO#1"].TimesSummonedToHand);
-        Assert.Equal(4m, loaded.Data.Events[2].ForgeGained);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.BAG_OF_MARBLES"];
+        Assert.Equal(5, relicAgg.EnemiesAffected);
+        Assert.Equal(5, relicAgg.VulnerableApplied);
     }
 
     [Fact]
@@ -414,15 +430,27 @@ public class SchemaLoadingTests
     }
 
     [Fact]
-    public void ResumableLoad_AcceptsCurrentV14Fixture()
+    public void ResumableLoad_AcceptsLegacyResumableV14Fixture()
     {
         var resumed = RunStorage.LoadResumable(FixturePath("v14-per-instance-make-it-so-run.json"));
 
         Assert.NotNull(resumed);
-        Assert.Equal(RunData.CurrentSchemaVersion, resumed!.SchemaVersion);
+        Assert.Equal(14, resumed!.SchemaVersion);
         Assert.Equal(9m, resumed.Aggregates["CARD.REFINE_BLADE#1"].TotalForgeGenerated);
         Assert.Equal(2, resumed.Aggregates["CARD.MAKE_IT_SO#1"].TimesSummonedToHand);
         Assert.Equal(3, resumed.Aggregates["CARD.MAKE_IT_SO#1"].TimesDrawn);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsCurrentV15Fixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v15-bag-of-marbles-run.json"));
+
+        Assert.NotNull(resumed);
+        Assert.Equal(RunData.CurrentSchemaVersion, resumed!.SchemaVersion);
+        var relicAgg = resumed.RelicAggregates["RELIC.BAG_OF_MARBLES"];
+        Assert.Equal(5, relicAgg.EnemiesAffected);
+        Assert.Equal(5, relicAgg.VulnerableApplied);
     }
 
     [Fact]

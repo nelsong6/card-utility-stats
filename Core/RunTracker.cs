@@ -933,6 +933,17 @@ public static class RunTracker
             }
             _currentRun.Events.AddRange(_pendingCombat.CombatEvents);
 
+            foreach (var (relicId, pendingRelicAgg) in _pendingCombat.RelicAggregates)
+            {
+                if (!_currentRun.RelicAggregates.TryGetValue(relicId, out var runRelicAgg))
+                {
+                    runRelicAgg = new RelicAggregate();
+                    _currentRun.RelicAggregates[relicId] = runRelicAgg;
+                }
+                runRelicAgg.EnemiesAffected += pendingRelicAgg.EnemiesAffected;
+                runRelicAgg.VulnerableApplied += pendingRelicAgg.VulnerableApplied;
+            }
+
             // Refresh run-level metadata from the current game state (floor may have advanced).
             var runState = RunManager.Instance.State;
             if (runState != null)
@@ -1252,6 +1263,70 @@ public static class RunTracker
             {
                 CoreMain.LogDebug($"RecordForgeGranted failed: {e.Message}");
             }
+        }
+    }
+
+    // -------- Relic stat recording --------
+
+    private const string BagOfMarblesRelicId = "RELIC.BAG_OF_MARBLES";
+
+    /// <summary>
+    /// Record a Bag of Marbles combat-start Vulnerable application.
+    /// <paramref name="enemyCount"/> is the number of live enemies that
+    /// received 1 Vulnerable stack. Called from
+    /// <see cref="Patches.BagOfMarblesBeforeSideTurnStartPatch"/>.
+    /// </summary>
+    public static void RecordBagOfMarblesApplication(int enemyCount)
+    {
+        if (enemyCount <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                _pendingCombat ??= new PendingCombat();
+                if (!_pendingCombat.RelicAggregates.TryGetValue(BagOfMarblesRelicId, out var agg))
+                {
+                    agg = new RelicAggregate();
+                    _pendingCombat.RelicAggregates[BagOfMarblesRelicId] = agg;
+                }
+                agg.EnemiesAffected += enemyCount;
+                agg.VulnerableApplied += enemyCount;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordBagOfMarblesApplication failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Return the committed relic aggregate for a relic id, merged with any
+    /// pending combat data. Used by the relic tooltip to show current-run stats.
+    /// </summary>
+    public static RelicAggregate? GetRelicAggregate(string relicId)
+    {
+        lock (_lock)
+        {
+            RelicAggregate? result = null;
+
+            if (_currentRun != null && _currentRun.RelicAggregates.TryGetValue(relicId, out var committed))
+            {
+                result = new RelicAggregate
+                {
+                    EnemiesAffected = committed.EnemiesAffected,
+                    VulnerableApplied = committed.VulnerableApplied,
+                };
+            }
+
+            if (_pendingCombat != null && _pendingCombat.RelicAggregates.TryGetValue(relicId, out var pending))
+            {
+                result ??= new RelicAggregate();
+                result.EnemiesAffected += pending.EnemiesAffected;
+                result.VulnerableApplied += pending.VulnerableApplied;
+            }
+
+            return result;
         }
     }
 
@@ -3592,6 +3667,7 @@ internal class PendingCombat
 {
     public Dictionary<string, CardAggregate> CombatAggregates { get; } = new();
     public List<CardEvent> CombatEvents { get; } = new();
+    public Dictionary<string, RelicAggregate> RelicAggregates { get; } = new();
     public List<BlockChunk> PlayerBlockLedger { get; } = new();
     public Dictionary<AbstractModel, PlayerPowerOwnershipShare> PlayerPowerOwnershipByModifier { get; }
         = new(ReferenceEqualityComparer.Instance);
