@@ -115,10 +115,8 @@ jobs:
 
   test-plan:
     name: "Plan validation evidence"
-    needs:
-      - route
-      - claim-issue
-    if: needs.route.result == 'success' && needs.claim-issue.result == 'success'
+    needs: route
+    if: needs.route.result == 'success'
     runs-on: ${{ fromJson(needs.route.outputs.test_plan_runs_on) }}
     env:
       ISSUE_AGENT_CHECKOUT_PATH: issue-agent-src/${{ github.run_id }}-${{ github.run_attempt }}-test-plan
@@ -208,10 +206,8 @@ jobs:
 
   implementation:
     name: "Implement code change"
-    needs:
-      - route
-      - claim-issue
-    if: needs.route.result == 'success' && needs.claim-issue.result == 'success'
+    needs: route
+    if: needs.route.result == 'success'
     runs-on: ${{ fromJson(needs.route.outputs.implementation_runs_on) }}
     env:
       ISSUE_AGENT_CHECKOUT_PATH: issue-agent-src/${{ github.run_id }}-${{ github.run_attempt }}-implementation
@@ -322,10 +318,8 @@ jobs:
 
   screenshot-storage-outputs:
     name: "Read screenshot storage outputs"
-    needs:
-      - route
-      - claim-issue
-    if: needs.route.result == 'success' && needs.claim-issue.result == 'success'
+    needs: route
+    if: needs.route.result == 'success'
     uses: nelsong6/pipeline-templates/.github/workflows/tofu-outputs-template.yml@main
     permissions:
       contents: read
