@@ -36,7 +36,7 @@ The processing model is intentionally simple:
 2. Add `issue-agent` to queue the issue.
 3. GitHub Actions starts phase jobs on self-hosted Windows runners matching that route label.
 4. Each LLM phase launches a fresh Claude Code invocation with its own prompt, tool permissions, timeout, budget, logs, and handoff artifacts.
-5. Claude owns the issue work through the phase contract: investigation, implementation, verification, tests, screenshots, and evidence. GitHub mutations are wrapper-owned after phase artifacts are written.
+5. Claude owns the issue work through the phase contract: test plan, implementation, verification, tests, screenshots, and evidence. GitHub mutations are wrapper-owned after phase artifacts are written.
 
 There is no second script that chooses issues, reads structured result files, or drains a local queue.
 
@@ -44,7 +44,8 @@ There is no second script that chooses issues, reads structured result files, or
 
 Each Windows issue-agent host should provide:
 
-- self-hosted GitHub Actions runner labeled `issue-agent`
+- at least one self-hosted GitHub Actions runner with the host route label
+  `issue-agent-runner-<host>`
 - Claude Code installed locally and discoverable either through repository
   variable `ISSUE_AGENT_CLAUDE_CLI_PATH` or one of the documented default
   locations
@@ -57,10 +58,22 @@ The workflow verifies `claude auth status` before launching the phased agent. It
 
 Routed hosts use issue labels shaped like `issue-agent-runner-<host>`. The
 workflow requires exactly one such route label and applies it to all Windows
-phase jobs. It also routes live STS2 verification through
+phase jobs. It also routes live STS2 test-plan and verification work through
 `issue-agent-sts2-<host>`. Apply the `issue-agent-sts2-<host>` label to exactly
-one runner per physical STS2 game session so verification jobs queue on that
-runner instead of running against the same game instance in parallel.
+one runner per physical STS2 game session so live-game jobs queue on that runner
+instead of running against the same game instance in parallel.
+
+Recommended two-runner host layout:
+
+| Runner role | Required custom labels |
+| --- | --- |
+| Live STS2 runner | `issue-agent-runner-<host>`, `issue-agent-sts2-<host>`, `issue-agent-test-plan`, `issue-agent-verification` |
+| Code implementation runner | `issue-agent-runner-<host>`, `issue-agent-implementation` |
+
+If a host has only one runner, put all labels on that runner:
+`issue-agent-runner-<host>`, `issue-agent-sts2-<host>`,
+`issue-agent-test-plan`, `issue-agent-implementation`, and
+`issue-agent-verification`.
 
 ## Local Host Bring-Up
 
@@ -84,39 +97,43 @@ For STS2 issue-agent work, `spire-lens-mcp` is a hard prerequisite.
 
 In this environment, stateful STS2 work should go through approved MCP tools rather than improvised side paths.
 
-## Phased Step Workflow
+## Phased Job Workflow
 
-The issue-agent workflow is one GitHub Actions job with separate visible phase steps:
+The issue-agent workflow uses separate GitHub Actions jobs for each phase:
 
-1. `Investigate test primitives`
-2. `Implement code change`
-3. `Verify in STS2`
+1. `LLM: Plan validation evidence`
+2. `LLM: Implement code change`
+3. `LLM: Verify in STS2`
 4. `Create pull request`
 5. `Summarize issue-agent run`
 
-This keeps the Actions page easy to follow without turning the flow into several independent CI jobs. It also preserves the important split: each phase has a fresh context, narrower tool permissions, its own timeout, its own budget, and explicit JSON/Markdown handoff artifacts.
+Each phase has a fresh context, narrower tool permissions, its own timeout, its
+own budget, and explicit JSON/Markdown handoff artifacts. Because these are
+separate Actions jobs, every Windows job must include both a phase label and the
+same `issue-agent-runner-<host>` route label. Live-game jobs also include
+`issue-agent-sts2-<host>`.
 
 Claude runs in three separate invocations:
 
-1. Investigation: reads the issue/comments, identifies the issue target, card/character facts, MCP/game-state needs, and validation plan. It cannot edit code.
-2. Implementation: consumes the investigation handoff artifacts and applies code changes only if the investigation plan is viable and appropriately scoped. It cannot read or mutate GitHub.
-3. Verification: consumes the investigation and implementation handoff artifacts, runs tests, save-backed live MCP validation, screenshots, and final evidence checks. It has no GitHub token and cannot read or mutate GitHub.
+1. Test plan: reads the issue, identifies the target, current game facts, MCP/game-state needs, and validation plan. It cannot edit code.
+2. Implementation: consumes the test-plan handoff artifacts and applies code changes only if the plan is viable and appropriately scoped. It cannot read or mutate GitHub.
+3. Verification: consumes the test-plan and implementation handoff artifacts, runs tests, save-backed live MCP validation, screenshots, and final evidence checks. It has no GitHub token and cannot read or mutate GitHub.
 4. The workflow wrapper creates the branch, commit, push, and PR only after verification reports `status: pass`.
 
 Verification should default to the save-backed route: materialize a scenario from the correct character base save, install it as current, validate/load it, inspect the live state, and only then configure the already-loaded combat. Quick helpers that start ad hoc runs or choose Neow options are intentionally out of the default path.
 
-Investigation also writes a machine-checkable `required_evidence` contract. Each item has an `id`, `kind`, `required`, and `must_show`; screenshot evidence can also require `target_visible_required` and `text_visible_required`. Verification must answer every required item in `evidence_results` before it can pass. The wrapper blocks contradictory passes, including tooltip/text evidence that says the tooltip was unavailable, visible evidence that has no screenshot path, or screenshot evidence that relies on unit tests instead of visible UI proof.
+The test-plan phase also writes a machine-checkable `required_evidence` contract. Each item has an `id`, `kind`, `required`, and `must_show`; screenshot evidence can also require `target_visible_required` and `text_visible_required`. Verification must answer every required item in `evidence_results` before it can pass. The wrapper blocks contradictory passes, including tooltip/text evidence that says the tooltip was unavailable, visible evidence that has no screenshot path, or screenshot evidence that relies on unit tests instead of visible UI proof.
 
 Each phase writes both machine-readable JSON and human-readable Markdown:
 
-- `issue-agent-investigation.json` / `issue-agent-investigation.md`
+- `issue-agent-test-plan.json` / `issue-agent-test-plan.md`
 - `issue-agent-implementation.json` / `issue-agent-implementation.md`
 - `issue-agent-verification.json` / `issue-agent-verification.md`
 - `issue-agent-result.json` / `issue-agent-result.md`
 
-The workflow reads each phase JSON before continuing. If investigation or implementation reports `status: abort`, later phase steps are skipped and the final summary reports the abort layer and reason. If verification aborts, no PR is created; the summary still publishes screenshots gathered so far and the specific verifier failure. A verifier `status: pass` is rechecked by the wrapper against the investigation `required_evidence` contract before the workflow can proceed to PR creation.
+The workflow reads each phase JSON before continuing. If test plan or implementation reports `status: abort`, later phase steps are skipped and the final summary reports the abort layer and reason. If verification aborts, no PR is created; the summary still publishes screenshots gathered so far and the specific verifier failure. A verifier `status: pass` is rechecked by the wrapper against the test-plan `required_evidence` contract before the workflow can proceed to PR creation.
 
-Allowed investigation abort reasons:
+Allowed test-plan abort reasons:
 
 - `card_not_found`
 - `card_ambiguous`

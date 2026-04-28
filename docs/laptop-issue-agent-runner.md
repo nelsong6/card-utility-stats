@@ -10,7 +10,10 @@ machine, typically the work laptop.
 
 Bring one Windows machine online as a self-hosted GitHub Actions runner with:
 
-- runner label `issue-agent`
+- a host route label such as `issue-agent-runner-nelsonlaptop`
+- one live-game runner label such as `issue-agent-sts2-nelsonlaptop`
+- phase labels for the runner role: `issue-agent-test-plan`,
+  `issue-agent-implementation`, and/or `issue-agent-verification`
 - Claude Code installed locally
 - Slay the Spire 2 installed locally
 - STS2 Modding MCP installed locally
@@ -220,7 +223,7 @@ authenticated.
 ```powershell
 pwsh -NoProfile -File .\ops\windows-worker\Register-LocalIssueAgentRunner.ps1 `
   -RepositorySlug nelsong6/spirelens `
-  -RunnerLabels issue-agent
+  -RunnerLabels issue-agent-runner-nelsonlaptop,issue-agent-sts2-nelsonlaptop,issue-agent-test-plan,issue-agent-verification
 ```
 
 The script will:
@@ -253,33 +256,48 @@ user desktop.
 
 If there is no administrator password available, use a second interactive runner
 instead of stopping the existing service. Configure it in a separate directory
-and give it a unique label such as `issue-agent-runner-nelsonpc-user`:
+and give it a unique route label such as `issue-agent-runner-nelsonpc-user`.
+For a single-runner host, put every phase and live-game label on that runner:
 
 ```powershell
 $token = gh api -X POST repos/nelsong6/spirelens/actions/runners/registration-token --jq .token
 New-Item -ItemType Directory -Force D:\actions-runner-user | Out-Null
 Set-Location D:\actions-runner-user
 # install or copy the GitHub Actions runner files here before configuring
-.\config.cmd --url https://github.com/nelsong6/spirelens --token $token --name issue-agent-NELSONPC-user --labels issue-agent,issue-agent-test-plan,issue-agent-implementation,issue-agent-verification,issue-agent-runner-nelsonpc-user,issue-agent-sts2-nelsonpc-user --work _work
+.\config.cmd --url https://github.com/nelsong6/spirelens --token $token --name issue-agent-NELSONPC-user --labels issue-agent-runner-nelsonpc-user,issue-agent-sts2-nelsonpc-user,issue-agent-test-plan,issue-agent-implementation,issue-agent-verification --work _work
 .\run.cmd
 ```
 
 Then queue issue-agent work by applying `issue-agent-runner-nelsonpc-user` to
 the issue before applying `issue-agent`.
 
-The workflow derives the live STS2 verification label from the route label:
+The workflow derives the live STS2 label from the route label:
 `issue-agent-runner-nelsonpc-user` requires
-`issue-agent-sts2-nelsonpc-user` for the verification job. Put the
+`issue-agent-sts2-nelsonpc-user` for test-plan and verification jobs. Put the
 `issue-agent-sts2-*` label on exactly one runner for each physical STS2 game
-session so GitHub's runner queue serializes live-game verification without
+session so GitHub's runner queue serializes live-game work without
 canceling pending issue-agent runs.
+
+For a two-runner host, split labels by role:
+
+| Runner role | Labels |
+| --- | --- |
+| Live STS2 runner | `issue-agent-runner-<host>`, `issue-agent-sts2-<host>`, `issue-agent-test-plan`, `issue-agent-verification` |
+| Code implementation runner | `issue-agent-runner-<host>`, `issue-agent-implementation` |
+
+The laptop is currently configured this way:
+
+| Runner | Role | Labels |
+| --- | --- | --- |
+| `sts2-side-a` | Live STS2 runner | `issue-agent-runner-nelsonlaptop`, `issue-agent-sts2-nelsonlaptop`, `issue-agent-test-plan`, `issue-agent-verification` |
+| `sts2-side-b` | Code implementation runner | `issue-agent-runner-nelsonlaptop`, `issue-agent-implementation` |
 
 NELSONPC currently has this non-admin runner registered and online:
 
 - Runner root: `D:\actions-runner-user`
 - Runner name: `issue-agent-NELSONPC-user`
 - Routing label: `issue-agent-runner-nelsonpc-user`
-- STS2 verification label: `issue-agent-sts2-nelsonpc-user`
+- STS2 live-game label: `issue-agent-sts2-nelsonpc-user`
 - Runner log: `D:\actions-runner-user\_codex-logs\runner.out.log`
 
 Because `D:\repos\spire-lens-mcp` was originally created by the old
@@ -314,7 +332,10 @@ has expired or is missing.
 
 The issue-agent workflow expects:
 
-- the runner has labels `self-hosted`, `windows`, and `issue-agent`
+- every runner used for an issue has the issue's `issue-agent-runner-<host>` route label
+- exactly one live-game runner per host has `issue-agent-sts2-<host>`
+- live-game runners have `issue-agent-test-plan` and `issue-agent-verification`
+- code runners have `issue-agent-implementation`
 - the repo checkout contains a working `.mcp.json`
 - Claude can list and connect to `spire-lens-mcp`
 - STS2 is available locally when the issue requires live validation
@@ -329,7 +350,7 @@ The workflow itself still handles:
 Once the runner is online in GitHub:
 
 1. Confirm the machine appears under repository runners with label
-   `issue-agent`.
+   `issue-agent-runner-<host>`.
 2. Add the machine route label to a low-risk issue, then add `issue-agent`.
 3. Confirm the run:
    - starts on the laptop
@@ -339,5 +360,18 @@ Once the runner is online in GitHub:
 
 ## Secondary Machines
 
-If you want a second machine later, use the same script and keep the same
-`issue-agent` label unless you deliberately want to split hosts by capability.
+For a second machine, use the same route/phase/live label pattern with a unique
+host suffix:
+
+- `issue-agent-runner-<host>` goes on every runner for that machine.
+- `issue-agent-sts2-<host>` goes on exactly one live-game runner.
+- `issue-agent-test-plan` and `issue-agent-verification` go on the live-game
+  runner.
+- `issue-agent-implementation` goes on the implementation runner.
+
+For example, a two-runner `nelsonpc-user` setup would be:
+
+| Runner role | Labels |
+| --- | --- |
+| Live STS2 runner | `issue-agent-runner-nelsonpc-user`, `issue-agent-sts2-nelsonpc-user`, `issue-agent-test-plan`, `issue-agent-verification` |
+| Code implementation runner | `issue-agent-runner-nelsonpc-user`, `issue-agent-implementation` |

@@ -75,7 +75,9 @@ jobs:
           Write-Host "route_label=$routeLabel"
           Write-Host "verification_resource_label=$verificationResourceLabel"
 
-          Write-RunsOnOutput -Name 'test_plan_runs_on' -Labels @('self-hosted', 'windows', 'issue-agent-test-plan')
+          $testPlanLabels = @('self-hosted', 'windows', 'issue-agent-test-plan')
+          if (-not [string]::IsNullOrWhiteSpace($verificationResourceLabel)) { $testPlanLabels += $verificationResourceLabel }
+          Write-RunsOnOutput -Name 'test_plan_runs_on' -Labels $testPlanLabels
           Write-RunsOnOutput -Name 'implementation_runs_on' -Labels @('self-hosted', 'windows', 'issue-agent-implementation')
           $verificationLabels = @('self-hosted', 'windows', 'issue-agent-verification')
           if (-not [string]::IsNullOrWhiteSpace($verificationResourceLabel)) { $verificationLabels += $verificationResourceLabel }
