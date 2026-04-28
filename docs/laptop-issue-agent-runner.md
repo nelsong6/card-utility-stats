@@ -44,6 +44,7 @@ Install these once on the laptop:
 - PowerShell `7.6.1`
 - .NET SDK `9.0.313`
 - Godot .NET `4.5.1.stable.mono`
+- Claude Code CLI `2.1.121`, installed, on user `PATH`, and authenticated
 - ripgrep `15.1.0`
 
 Local workspace folders:
@@ -66,6 +67,59 @@ Godot .NET 4.5.1 is installed at:
 
 ```text
 D:\automation\godot\Godot_v4.5.1-stable_mono_win64
+```
+
+Claude Code CLI is available as:
+
+```text
+C:\Users\Nelson\AppData\Roaming\npm\claude.ps1
+```
+
+The earlier install path also exists at:
+
+```text
+D:\automation\claude-code\node_modules\@anthropic-ai\claude-code\bin\claude.exe
+```
+
+New interactive terminals should resolve `claude`.
+
+Claude setup has three separate gates:
+
+1. Get Claude Code installed and resolvable as `claude`.
+2. Authenticate Claude for the same Windows account that runs the GitHub Actions runner service.
+3. Run Claude with permission bypass enabled for issue-agent jobs.
+
+Current Claude status on this machine:
+
+```text
+Version: 2.1.121
+Auth: logged in via claude.ai
+Subscription: max
+```
+
+The issue-agent workflow runs `claude auth status` before each LLM phase. This
+passes for the interactive `Nelson` user, but the current Windows service
+`actions.runner.nelsong6-card-utility-stats.issue-agent-NELSONPC` runs as
+`NT AUTHORITY\NETWORK SERVICE`. Before relying on this runner, either run the
+service as the authenticated user or authenticate Claude in the service account
+context.
+
+After auth, bypass Claude's interactive permission prompts for issue-agent jobs.
+The workflow script currently invokes Claude with:
+
+```text
+--permission-mode bypassPermissions
+```
+
+That is the intended runner mode. Do not queue issue-agent work with default
+interactive permissions, because the job can stall or fail waiting for approval.
+If a run still reports `permission_denied`, treat it as a workflow phase policy
+or tool allow/deny configuration issue, not as a missing interactive approval.
+
+Runner readiness order:
+
+```text
+get claude -> auth claude -> bypass permissions -> queue issue
 ```
 
 The local CardUtilityStats checkout uses an ignored `Directory.Build.props`
