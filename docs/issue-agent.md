@@ -181,6 +181,10 @@ When publishing an implementation branch, the wrapper stages the agent's code
 diff, reapplies that diff onto the current default branch, and pushes only that
 resulting commit. This keeps branch publication from reintroducing workflow-file
 history through the GitHub App token, which does not have workflow write scope.
+Issue-agent runs are not allowed to publish changes under `.github/workflows`;
+those must be made by the normal maintainer path. The wrapper also checks every
+git command explicitly so a rejected push cannot be reported as a usable branch
+handoff.
 
 Verification should default to the save-backed route: materialize a scenario from the correct character base save, install it as current, validate/load it, inspect the live state, and only then configure the already-loaded combat. Quick helpers that start ad hoc runs or choose Neow options are intentionally out of the default path.
 
