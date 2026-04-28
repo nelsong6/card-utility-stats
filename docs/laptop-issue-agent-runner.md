@@ -86,7 +86,7 @@ New interactive terminals should resolve `claude`.
 Claude setup has three separate gates:
 
 1. Get Claude Code installed and resolvable as `claude`.
-2. Authenticate Claude for the same Windows account that runs the GitHub Actions runner service.
+2. Authenticate Claude for the same Windows account that runs the GitHub Actions runner.
 3. Run Claude with permission bypass enabled for issue-agent jobs.
 
 Current Claude status on this machine:
@@ -100,9 +100,27 @@ Subscription: max
 The issue-agent workflow runs `claude auth status` before each LLM phase. This
 passes for the interactive `Nelson` user, but the current Windows service
 `actions.runner.nelsong6-card-utility-stats.issue-agent-NELSONPC` runs as
-`NT AUTHORITY\NETWORK SERVICE`. Before relying on this runner, either run the
-service as the authenticated user or authenticate Claude in the service account
-context.
+`NT AUTHORITY\NETWORK SERVICE`. Do not rely on that service mode for this
+machine: it does not have the interactive user's Claude auth or tool PATH.
+
+For NELSONPC, prefer the same pattern used on the other working PC: stop the
+Windows service and run the runner interactively from the logged-in `Nelson`
+desktop session. The service account does not inherit the interactive user's
+Claude auth, Steam session, user `PATH`, or `uv` setup.
+
+Observed NELSONPC test runs:
+
+- Dispatching issue #105 with `runner_label=issue-agent-runner-nelsonpc`
+  successfully routed jobs to `issue-agent-NELSONPC`.
+- The first run failed because the service could not find Claude. Repository
+  variable `ISSUE_AGENT_CLAUDE_CLI_PATH` is now set to
+  `D:\automation\claude-code\node_modules\@anthropic-ai\claude-code\bin\claude.exe`.
+- The second run found Claude, but implementation failed because Claude was not
+  authenticated for the runner user (`NETWORK SERVICE`).
+- The test-plan setup also failed because the service account could not resolve
+  `uv`.
+- Under the interactive `Nelson` user, both `claude auth status` and
+  `uv --version` pass.
 
 After auth, bypass Claude's interactive permission prompts for issue-agent jobs.
 The workflow script currently invokes Claude with:
@@ -212,13 +230,14 @@ For live STS2 validation, run the runner interactively from the logged-in Steam
 user session instead of as a Windows service:
 
 ```powershell
-$svc = 'actions.runner.nelsong6-card-utility-stats.sts2-side-a'
+$svc = 'actions.runner.nelsong6-card-utility-stats.issue-agent-NELSONPC'
 Stop-Service -Name $svc -Force -ErrorAction SilentlyContinue
-cd C:\actions-runner-card-utility-stats
+Set-Location D:\actions-runner
 .\run.cmd
 ```
 
-Leave that window open while issue-agent jobs run. The interactive runner must
+Stopping the service may require an elevated PowerShell session. Leave the
+`run.cmd` window open while issue-agent jobs run. The interactive runner must
 show as session 1, not session 0. A Windows service launches STS2 in session 0,
 which does not provide the same Steam client/session context as the logged-in
 user desktop.
