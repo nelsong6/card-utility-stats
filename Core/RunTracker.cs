@@ -1271,6 +1271,7 @@ public static class RunTracker
 
     private const string BagOfMarblesRelicId = "RELIC.BAG_OF_MARBLES";
     private const string RedMaskRelicId = "RELIC.RED_MASK";
+    private const string AnchorRelicId = "RELIC.ANCHOR";
 
     /// <summary>
     /// Record a Bag of Marbles combat-start Vulnerable application.
@@ -1333,6 +1334,34 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Record an Anchor combat-start Block application.
+    /// <paramref name="blockAmount"/> is the Block gained by the player.
+    /// Called from <see cref="Patches.AnchorBeforeSideTurnStartPatch"/>.
+    /// </summary>
+    public static void RecordAnchorApplication(int blockAmount)
+    {
+        if (blockAmount <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                _pendingCombat ??= new PendingCombat();
+                if (!_pendingCombat.RelicAggregates.TryGetValue(AnchorRelicId, out var agg))
+                {
+                    agg = new RelicAggregate();
+                    _pendingCombat.RelicAggregates[AnchorRelicId] = agg;
+                }
+                agg.BlockGained += blockAmount;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordAnchorApplication failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Return the committed relic aggregate for a relic id, merged with any
     /// pending combat data. Used by the relic tooltip to show current-run stats.
     /// </summary>
@@ -1349,6 +1378,7 @@ public static class RunTracker
                     EnemiesAffected = committed.EnemiesAffected,
                     VulnerableApplied = committed.VulnerableApplied,
                     WeakApplied = committed.WeakApplied,
+                    BlockGained = committed.BlockGained,
                 };
             }
 
@@ -1358,6 +1388,7 @@ public static class RunTracker
                 result.EnemiesAffected += pending.EnemiesAffected;
                 result.VulnerableApplied += pending.VulnerableApplied;
                 result.WeakApplied += pending.WeakApplied;
+                result.BlockGained += pending.BlockGained;
             }
 
             return result;

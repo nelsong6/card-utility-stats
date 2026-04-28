@@ -10,7 +10,7 @@ namespace SpireLens.Core;
 /// </summary>
 public class RunData
 {
-    public const int CurrentSchemaVersion = 16;
+    public const int CurrentSchemaVersion = 17;
 
     // v1: aggregates keyed by card definition id (pooled across instances)
     // v2: aggregates keyed by per-instance id ("CARD.STRIKE_SILENT#1") —
@@ -62,6 +62,9 @@ public class RunData
     // v16: add WeakApplied to RelicAggregate for Red Mask combat-start Weak
     //      application. Also additive; older v15 files remain resumable with
     //      the new field defaulting to 0.
+    // v17: add BlockGained to RelicAggregate for Anchor combat-start Block
+    //      gain. Also additive; older v16 files remain resumable with the
+    //      new field defaulting to 0.
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
     public string RunId { get; set; } = "";
     public string StartedAt { get; set; } = "";  // ISO-8601 UTC
@@ -333,6 +336,10 @@ public class RelicAggregate
     // Total Weak stacks applied by this relic across all combats.
     // Used by Red Mask (1 Weak per enemy at combat start).
     public int WeakApplied { get; set; }
+
+    // Total Block gained by the player at combat start from this relic.
+    // Used by Anchor (10 Block per combat).
+    public int BlockGained { get; set; }
 }
 
 /// <summary>

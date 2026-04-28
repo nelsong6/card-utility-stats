@@ -16,6 +16,7 @@ public static class RelicHoverShowPatch
 {
     private const string VulnerableIconPath = "res://images/atlases/power_atlas.sprites/vulnerable_power.tres";
     private const string WeakIconPath = "res://images/atlases/power_atlas.sprites/weak_power.tres";
+    private const string BlockIconPath = "res://images/ui/combat/block.png";
     private const int InlineIconSize = 16;
 
     [HarmonyPostfix]
@@ -54,6 +55,17 @@ public static class RelicHoverShowPatch
                 StatsTooltip.Show(tree, __instance, "Red Mask", "SpireLens", body);
                 return;
             }
+
+            if (relicNode.Model is Anchor)
+            {
+                const string relicId = "RELIC.ANCHOR";
+                var agg = RunTracker.GetRelicAggregate(relicId);
+                if (agg == null || agg.BlockGained == 0) return;
+
+                var body = BuildAnchorBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Anchor", "SpireLens", body);
+                return;
+            }
         }
         catch (Exception e)
         {
@@ -76,6 +88,13 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
+    private static string BuildAnchorBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, BlockLabel("block gained"), agg.BlockGained.ToString(), "");
+        return sb.ToString();
+    }
+
     private static string VulnerableLabel(string suffix)
     {
         var path = NormalizeResourcePath(VulnerableIconPath);
@@ -85,6 +104,12 @@ public static class RelicHoverShowPatch
     private static string WeakLabel(string suffix)
     {
         var path = NormalizeResourcePath(WeakIconPath);
+        return $"[img={InlineIconSize}x{InlineIconSize}]{path}[/img] {suffix}";
+    }
+
+    private static string BlockLabel(string suffix)
+    {
+        var path = NormalizeResourcePath(BlockIconPath);
         return $"[img={InlineIconSize}x{InlineIconSize}]{path}[/img] {suffix}";
     }
 
