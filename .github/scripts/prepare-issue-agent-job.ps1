@@ -11,6 +11,84 @@ if (-not (Test-Path -LiteralPath $repoRoot)) {
     throw "Issue-agent checkout was not found at '$repoRoot'."
 }
 
+function Add-PathCandidate {
+    param(
+        [System.Collections.Generic.List[string]]$Candidates,
+        [string]$Path
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Path)) { return }
+    $trimmed = $Path.Trim().Trim('"')
+    if ([string]::IsNullOrWhiteSpace($trimmed)) { return }
+    if (-not $Candidates.Contains($trimmed)) {
+        $Candidates.Add($trimmed)
+    }
+}
+
+function Resolve-Sts2GameDir {
+    param([string]$RepoRoot)
+
+    $gameDirCandidates = [System.Collections.Generic.List[string]]::new()
+    Add-PathCandidate $gameDirCandidates $env:ISSUE_AGENT_STS2_GAME_DIR
+    Add-PathCandidate $gameDirCandidates $env:CONFIGURED_STS2_GAME_DIR
+
+    $mcpConfigPath = Join-Path $RepoRoot '.mcp.json'
+    if (Test-Path -LiteralPath $mcpConfigPath) {
+        try {
+            $mcpConfig = Get-Content -LiteralPath $mcpConfigPath -Raw | ConvertFrom-Json
+            $configuredGameDir = [string]$mcpConfig.mcpServers.'spire-lens-mcp'.env.STS2_GAME_DIR
+            Add-PathCandidate $gameDirCandidates $configuredGameDir
+        } catch {
+            Write-Warning "Unable to read STS2_GAME_DIR from '$mcpConfigPath': $_"
+        }
+    }
+
+    Add-PathCandidate $gameDirCandidates 'D:\Programs\SteamLibrary\steamapps\common\Slay the Spire 2'
+    Add-PathCandidate $gameDirCandidates 'D:\SteamLibrary\steamapps\common\Slay the Spire 2'
+    Add-PathCandidate $gameDirCandidates 'C:\Program Files (x86)\Steam\steamapps\common\Slay the Spire 2'
+    Add-PathCandidate $gameDirCandidates 'C:\Program Files\Steam\steamapps\common\Slay the Spire 2'
+
+    foreach ($candidate in $gameDirCandidates) {
+        $sts2Dll = Join-Path $candidate 'data_sts2_windows_x86_64\sts2.dll'
+        if (Test-Path -LiteralPath $sts2Dll) {
+            $item = Get-Item -LiteralPath $sts2Dll
+            Write-Host "Using STS2 game directory: $candidate"
+            Write-Host "Using STS2 assembly: $sts2Dll"
+            Write-Host "STS2 product version: $($item.VersionInfo.ProductVersion)"
+            return $candidate
+        }
+
+        Write-Host "Skipping STS2 candidate without sts2.dll: $candidate"
+    }
+
+    throw "Unable to find sts2.dll in any configured STS2 game directory candidate: $($gameDirCandidates -join '; ')"
+}
+
+function Update-McpGameDir {
+    param(
+        [string]$RepoRoot,
+        [string]$GameDir
+    )
+
+    $mcpConfigPath = Join-Path $RepoRoot '.mcp.json'
+    if (-not (Test-Path -LiteralPath $mcpConfigPath)) { return }
+
+    $mcpConfig = Get-Content -LiteralPath $mcpConfigPath -Raw | ConvertFrom-Json
+    $server = $mcpConfig.mcpServers.'spire-lens-mcp'
+    if ($null -eq $server) { return }
+    if ($null -eq $server.env) {
+        $server | Add-Member -NotePropertyName env -NotePropertyValue ([pscustomobject]@{})
+    }
+    if ($server.env.PSObject.Properties.Name -contains 'STS2_GAME_DIR') {
+        $server.env.STS2_GAME_DIR = $GameDir
+    } else {
+        $server.env | Add-Member -NotePropertyName STS2_GAME_DIR -NotePropertyValue $GameDir
+    }
+
+    $mcpConfig | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $mcpConfigPath -Encoding utf8
+    Write-Host "Updated MCP config STS2_GAME_DIR for this job: $GameDir"
+}
+
 $candidates = @()
 if (-not [string]::IsNullOrWhiteSpace($env:CONFIGURED_CLAUDE_CLI_PATH)) {
     $candidates += $env:CONFIGURED_CLAUDE_CLI_PATH
@@ -38,6 +116,13 @@ New-Item -ItemType Directory -Force -Path $buildRoot | Out-Null
 "ISSUE_AGENT_REPO_ROOT=$repoRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 "ISSUE_AGENT_BUILD_ROOT=$buildRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
+$gameDir = Resolve-Sts2GameDir -RepoRoot $repoRoot
+$sts2DataDir = Join-Path $gameDir 'data_sts2_windows_x86_64'
+Update-McpGameDir -RepoRoot $repoRoot -GameDir $gameDir
+
+"ISSUE_AGENT_STS2_GAME_DIR=$gameDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+"ISSUE_AGENT_STS2_DATA_DIR=$sts2DataDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
 if (-not $InstallMcp) { return }
 
 $mcpRoot = 'D:\repos\spire-lens-mcp'
@@ -59,7 +144,6 @@ if ($LASTEXITCODE -ne 0) {
 
 uv run --directory (Join-Path $mcpRoot 'mcp') python -m py_compile server.py
 
-$gameDir = 'D:\Programs\SteamLibrary\steamapps\common\Slay the Spire 2'
 $buildScript = Join-Path $mcpRoot 'build.ps1'
 if (-not (Test-Path -LiteralPath $buildScript)) {
     throw "SpireLens MCP build script was not found at '$buildScript'."
