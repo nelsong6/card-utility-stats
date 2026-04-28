@@ -54,6 +54,17 @@ public static class RelicHoverShowPatch
                 StatsTooltip.Show(tree, __instance, "Red Mask", "SpireLens", body);
                 return;
             }
+
+            if (relicNode.Model is BloodVial)
+            {
+                const string relicId = "RELIC.BLOOD_VIAL";
+                var agg = RunTracker.GetRelicAggregate(relicId);
+                if (agg == null || agg.HpHealed == 0) return;
+
+                var body = BuildBloodVialBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Blood Vial", "SpireLens", body);
+                return;
+            }
         }
         catch (Exception e)
         {
@@ -73,6 +84,13 @@ public static class RelicHoverShowPatch
         var sb = new StringBuilder();
         Row3(sb, WeakLabel("enemies affected"), agg.EnemiesAffected.ToString(), "");
         Row3(sb, WeakLabel("weak applied"), agg.WeakApplied.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildBloodVialBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "HP healed", agg.HpHealed.ToString(), "");
         return sb.ToString();
     }
 

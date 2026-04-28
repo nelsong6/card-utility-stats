@@ -943,6 +943,7 @@ public static class RunTracker
                 runRelicAgg.EnemiesAffected += pendingRelicAgg.EnemiesAffected;
                 runRelicAgg.VulnerableApplied += pendingRelicAgg.VulnerableApplied;
                 runRelicAgg.WeakApplied += pendingRelicAgg.WeakApplied;
+                runRelicAgg.HpHealed += pendingRelicAgg.HpHealed;
             }
 
             // Refresh run-level metadata from the current game state (floor may have advanced).
@@ -1271,6 +1272,7 @@ public static class RunTracker
 
     private const string BagOfMarblesRelicId = "RELIC.BAG_OF_MARBLES";
     private const string RedMaskRelicId = "RELIC.RED_MASK";
+    private const string BloodVialRelicId = "RELIC.BLOOD_VIAL";
 
     /// <summary>
     /// Record a Bag of Marbles combat-start Vulnerable application.
@@ -1333,6 +1335,34 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Record Blood Vial's combat-start HP heal.
+    /// <paramref name="hpHealed"/> is the actual HP recovered (post-cap).
+    /// Called from <see cref="Patches.BloodVialAfterPlayerTurnStartLatePatch"/>.
+    /// </summary>
+    public static void RecordBloodVialHeal(int hpHealed)
+    {
+        if (hpHealed <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                _pendingCombat ??= new PendingCombat();
+                if (!_pendingCombat.RelicAggregates.TryGetValue(BloodVialRelicId, out var agg))
+                {
+                    agg = new RelicAggregate();
+                    _pendingCombat.RelicAggregates[BloodVialRelicId] = agg;
+                }
+                agg.HpHealed += hpHealed;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordBloodVialHeal failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Return the committed relic aggregate for a relic id, merged with any
     /// pending combat data. Used by the relic tooltip to show current-run stats.
     /// </summary>
@@ -1349,6 +1379,7 @@ public static class RunTracker
                     EnemiesAffected = committed.EnemiesAffected,
                     VulnerableApplied = committed.VulnerableApplied,
                     WeakApplied = committed.WeakApplied,
+                    HpHealed = committed.HpHealed,
                 };
             }
 
@@ -1358,6 +1389,7 @@ public static class RunTracker
                 result.EnemiesAffected += pending.EnemiesAffected;
                 result.VulnerableApplied += pending.VulnerableApplied;
                 result.WeakApplied += pending.WeakApplied;
+                result.HpHealed += pending.HpHealed;
             }
 
             return result;
