@@ -38,7 +38,7 @@ jobs:
           REPO_SLUG: ${{ github.repository }}
           ROUTE_LABEL_PREFIX: issue-agent-runner-
           STS2_RESOURCE_LABEL_PREFIX: issue-agent-sts2-
-          ROUTE_LABEL_POOL: ${{ vars.ISSUE_AGENT_ROUTE_LABEL_POOL || 'issue-agent-runner-nelsonlaptop,issue-agent-runner-nelsonpc-user' }}
+          ROUTE_LABEL_POOL: ${{ vars.ISSUE_AGENT_ROUTE_LABEL_POOL || 'issue-agent-runner-nelsonlaptop' }}
           TEST_PLAN_RUNNER_GROUP: ${{ vars.ISSUE_AGENT_TEST_PLAN_RUNNER_GROUP || vars.ISSUE_AGENT_RUNNER_GROUP || '' }}
           IMPLEMENTATION_RUNNER_GROUP: ${{ vars.ISSUE_AGENT_IMPLEMENTATION_RUNNER_GROUP || vars.ISSUE_AGENT_RUNNER_GROUP || '' }}
           VERIFICATION_RUNNER_GROUP: ${{ vars.ISSUE_AGENT_VERIFICATION_RUNNER_GROUP || vars.ISSUE_AGENT_RUNNER_GROUP || '' }}

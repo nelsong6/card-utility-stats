@@ -1,0 +1,75 @@
+name: STS2 Host Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      runs_on_json:
+        description: JSON array of runner labels to target
+        required: true
+        default: '["self-hosted","Windows","X64","issue-agent-sts2-nelsonlaptop"]'
+      game_dir:
+        description: Steam Slay the Spire 2 install directory on that host
+        required: true
+        default: 'D:\SteamLibrary\steamapps\common\Slay the Spire 2'
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Probe STS2 host
+    runs-on: ${{ fromJSON(inputs.runs_on_json) }}
+    steps:
+      - name: Probe Steam install and STS2 assembly
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $gameDir = '${{ inputs.game_dir }}'
+          $steamAppsDir = Split-Path (Split-Path $gameDir -Parent) -Parent
+          $manifest = Join-Path $steamAppsDir 'appmanifest_2868840.acf'
+          $sts2Dll = Join-Path $gameDir 'data_sts2_windows_x86_64\sts2.dll'
+
+          if (!(Test-Path -LiteralPath $gameDir)) {
+              throw "STS2 game directory does not exist: $gameDir"
+          }
+          if (!(Test-Path -LiteralPath $manifest)) {
+              throw "Steam appmanifest not found: $manifest"
+          }
+          if (!(Test-Path -LiteralPath $sts2Dll)) {
+              throw "STS2 assembly not found: $sts2Dll"
+          }
+
+          $manifestMatches = Select-String -Path $manifest -Pattern 'buildid|TargetBuildID|manifest|BetaKey'
+          $assembly = [Reflection.Assembly]::LoadFrom($sts2Dll)
+          $hasICombatState = $assembly.GetType('MegaCrit.Sts2.Core.Combat.ICombatState', $false) -ne $null
+          $dllItem = Get-Item -LiteralPath $sts2Dll
+
+          $result = [pscustomobject]@{
+              computerName = $env:COMPUTERNAME
+              runnerName = $env:RUNNER_NAME
+              runnerOS = $env:RUNNER_OS
+              gameDir = $gameDir
+              manifest = $manifest
+              manifestLines = @($manifestMatches | ForEach-Object { $_.Line.Trim() })
+              sts2Dll = $sts2Dll
+              sts2DllLastWriteTime = $dllItem.LastWriteTime.ToString('o')
+              sts2DllLength = $dllItem.Length
+              sts2ProductVersion = $dllItem.VersionInfo.ProductVersion
+              hasICombatState = $hasICombatState
+          }
+
+          $json = $result | ConvertTo-Json -Depth 5
+          $json | Set-Content -LiteralPath sts2-host-smoke.json -Encoding utf8
+          $json
+
+          if (!$hasICombatState) {
+              throw 'MegaCrit.Sts2.Core.Combat.ICombatState was not found in sts2.dll.'
+          }
+
+      - name: Upload host smoke result
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sts2-host-smoke
+          path: sts2-host-smoke.json

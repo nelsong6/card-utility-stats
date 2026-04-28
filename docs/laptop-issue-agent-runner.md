@@ -66,9 +66,15 @@ D:\Programs\SteamLibrary\steamapps\common\Slay the Spire 2
 
 This must be the Steam-registered install from
 `D:\Programs\SteamLibrary\steamapps\appmanifest_2868840.acf`, not the older
-unregistered `D:\SteamLibrary` copy. On NELSONPC the aligned Steam build is
-`22823976`, and `sts2.dll` reports product version
-`0.1.0+89765e1e54a888b031c826143eb77005b353f75d`.
+unregistered `D:\SteamLibrary` copy. As of 2026-04-27, NELSONPC is on Steam
+branch `public-beta`, build `22931561`, depot manifest `9066164797111423434`,
+and `sts2.dll` reports product version
+`0.1.0+dc286199d0203e9dc5bcbef57d373870c5c0e996`.
+
+Do not treat a local MCP build as a substitute for STS2 version alignment. A
+new host stays out of `ISSUE_AGENT_ROUTE_LABEL_POOL` until its Steam branch,
+build id, depot manifest, and `sts2.dll` product version match the known-good
+STS2 host.
 
 Because the runner launches STS2 directly during validation, the game folder
 must contain `steam_appid.txt` with:
@@ -341,39 +347,51 @@ Observed validation for the user runner:
 - The run later failed in project build/test logic, not in runner registration,
   Claude lookup, Claude auth, or Windows permissions.
 - A later STS2/MCP prep run failed because `spire-lens-mcp` could not compile
-  against the machine's current STS2/publicized assembly context:
-  `ICombatState` was missing. The MCP compatibility fix was pushed in
-  `nelsong6/spire-lens-mcp` commit `e3cf4b0`, and the local MCP build now
-  passes against the Steam-registered install above.
+  against the machine's current STS2/publicized assembly context. Do not paper
+  over that class of failure with compatibility edits alone: first prove the
+  machine is on the same Steam branch/build/product hash as the known-good
+  host, then prove `MegaCrit.Sts2.Core.Combat.ICombatState` resolves from the
+  raw game assembly, then build MCP from a clean checkout.
+- After switching NELSONPC to Steam `public-beta`, the raw assembly check
+  reports `ICombatState=True` and `spire-lens-mcp` builds cleanly against that
+  install with commit `4b03b0d`.
 
 Before adding any host to `ISSUE_AGENT_ROUTE_LABEL_POOL`, use that runner as a
 host smoke test and confirm:
 
 - Steam resolves Slay the Spire 2 to the intended current install, not an older
   checkout, copied install, or stale publicized assembly directory.
+- The Steam branch, build id, depot manifest, and `sts2.dll` product version
+  match the known-good STS2 host.
 - The resolved game assembly is the current raw STS2 assembly under that
   Steam-registered install, for example
   `D:\Programs\SteamLibrary\steamapps\common\Slay the Spire 2\data_sts2_windows_x86_64\sts2.dll`
   on NELSONPC.
+- That `sts2.dll` exposes
+  `MegaCrit.Sts2.Core.Combat.ICombatState`.
 - `spire-lens-mcp` builds cleanly from a clean checkout against the resolved
   STS2 data directory.
 - The runner process is the same logged-in interactive Windows account that has
   Claude auth, Steam access, `uv`, and the expected user `PATH`.
 
-A quick local Steam path and MCP build smoke check:
+A quick local Steam path, assembly, and MCP build smoke check:
 
 ```powershell
 $gameDir = 'D:\Programs\SteamLibrary\steamapps\common\Slay the Spire 2'
+$manifest = 'D:\Programs\SteamLibrary\steamapps\appmanifest_2868840.acf'
 $sts2Dll = Join-Path $gameDir 'data_sts2_windows_x86_64\sts2.dll'
+Select-String -Path $manifest -Pattern 'buildid|TargetBuildID|manifest|BetaKey'
 Get-Item $sts2Dll | Select-Object FullName, LastWriteTime, @{Name='ProductVersion'; Expression={$_.VersionInfo.ProductVersion}}
+$asm = [Reflection.Assembly]::LoadFrom($sts2Dll)
+$asm.GetType('MegaCrit.Sts2.Core.Combat.ICombatState', $false) -ne $null
 git -C D:\repos\spire-lens-mcp status --short --branch
 D:\repos\spire-lens-mcp\build.ps1 -GameDir $gameDir -Configuration Release
 ```
 
-The build must pass from the clean checkout. `ICombatState` is not a required
-type on every current STS2 build; the durable smoke signal is that the MCP
-checkout builds against the same Steam-resolved assembly directory that the
-runner will launch.
+The type check must print `True`, and the branch/build/product fields must
+match the known-good host. If either check fails, keep the runner out of the
+auto-route pool until the STS2 install is aligned. Only after those checks pass
+should the MCP build and live issue-agent smoke run be treated as meaningful.
 
 If queueing issue-agent runs from the laptop with GitHub CLI labels, make sure
 GitHub CLI is authenticated:
@@ -440,12 +458,16 @@ For example, a two-runner `nelsonpc-user` setup would be:
 The default auto-route pool is:
 
 ```text
-issue-agent-runner-nelsonlaptop,issue-agent-runner-nelsonpc-user
+issue-agent-runner-nelsonlaptop
 ```
 
 Set repository variable `ISSUE_AGENT_ROUTE_LABEL_POOL` if a machine should be
 temporarily removed from or added to automatic issue assignment. Explicit route
 labels on an issue always override the pool.
+
+As of 2026-04-27, the repository variable is also set to
+`issue-agent-runner-nelsonlaptop` while NELSONPC's STS2 version alignment is
+being verified.
 
 Set repository variable `ISSUE_AGENT_RUNNER_GROUP` if the runner labels live
 inside a non-default GitHub Actions runner group. The workflow still requires
@@ -459,5 +481,6 @@ issue-agent-runner-nelsonlaptop
 ```
 
 Add the new host back only after its live STS2 runner and implementation runner
-both pass host prep, Claude auth, `spire-lens-mcp` build, and a low-risk
-issue-agent smoke run.
+both pass host prep, Claude auth, STS2 branch/build/product-hash alignment,
+`ICombatState` presence, `spire-lens-mcp` build, and a low-risk issue-agent
+smoke run.
