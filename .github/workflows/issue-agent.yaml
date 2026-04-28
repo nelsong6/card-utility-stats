@@ -171,17 +171,17 @@ jobs:
 
     steps:
       - name: Heartbeat glimmung lease
-        shell: bash
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         run: |
-          curl -fsS -X POST "${{ env.GLIMMUNG_BASE }}/v1/lease/${{ inputs.lease_id }}/heartbeat?project=${{ env.GLIMMUNG_PROJECT }}" >/dev/null
+          Invoke-RestMethod -Method Post -Uri "${{ env.GLIMMUNG_BASE }}/v1/lease/${{ inputs.lease_id }}/heartbeat?project=${{ env.GLIMMUNG_PROJECT }}" | Out-Null
 
       - name: Start background heartbeat
-        shell: pwsh
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         run: |
           $script = @"
           while (`$true) {
             try {
-              curl -fsS -X POST '${{ env.GLIMMUNG_BASE }}/v1/lease/${{ inputs.lease_id }}/heartbeat?project=${{ env.GLIMMUNG_PROJECT }}' | Out-Null
+              Invoke-RestMethod -Method Post -Uri '${{ env.GLIMMUNG_BASE }}/v1/lease/${{ inputs.lease_id }}/heartbeat?project=${{ env.GLIMMUNG_PROJECT }}' | Out-Null
             } catch {}
             Start-Sleep -Seconds 60
           }
@@ -319,20 +319,20 @@ jobs:
 
     steps:
       - name: Heartbeat glimmung lease
-        shell: bash
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         run: |
-          curl -fsS -X POST "${{ env.GLIMMUNG_BASE }}/v1/lease/${{ inputs.lease_id }}/heartbeat?project=${{ env.GLIMMUNG_PROJECT }}" >/dev/null
+          Invoke-RestMethod -Method Post -Uri "${{ env.GLIMMUNG_BASE }}/v1/lease/${{ inputs.lease_id }}/heartbeat?project=${{ env.GLIMMUNG_PROJECT }}" | Out-Null
 
       - name: Start background heartbeat
         # Implementation is the longest phase (30-min timeout) and can
         # outrun the lease TTL if it stalls. Background loop keeps the
         # heartbeat fresh; killed automatically when the runner cleans up.
-        shell: pwsh
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         run: |
           $script = @"
           while (`$true) {
             try {
-              curl -fsS -X POST '${{ env.GLIMMUNG_BASE }}/v1/lease/${{ inputs.lease_id }}/heartbeat?project=${{ env.GLIMMUNG_PROJECT }}' | Out-Null
+              Invoke-RestMethod -Method Post -Uri '${{ env.GLIMMUNG_BASE }}/v1/lease/${{ inputs.lease_id }}/heartbeat?project=${{ env.GLIMMUNG_PROJECT }}' | Out-Null
             } catch {}
             Start-Sleep -Seconds 60
           }
@@ -577,17 +577,17 @@ jobs:
 
     steps:
       - name: Heartbeat glimmung lease
-        shell: bash
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         run: |
-          curl -fsS -X POST "${{ env.GLIMMUNG_BASE }}/v1/lease/${{ inputs.lease_id }}/heartbeat?project=${{ env.GLIMMUNG_PROJECT }}" >/dev/null
+          Invoke-RestMethod -Method Post -Uri "${{ env.GLIMMUNG_BASE }}/v1/lease/${{ inputs.lease_id }}/heartbeat?project=${{ env.GLIMMUNG_PROJECT }}" | Out-Null
 
       - name: Start background heartbeat
-        shell: pwsh
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         run: |
           $script = @"
           while (`$true) {
             try {
-              curl -fsS -X POST '${{ env.GLIMMUNG_BASE }}/v1/lease/${{ inputs.lease_id }}/heartbeat?project=${{ env.GLIMMUNG_PROJECT }}' | Out-Null
+              Invoke-RestMethod -Method Post -Uri '${{ env.GLIMMUNG_BASE }}/v1/lease/${{ inputs.lease_id }}/heartbeat?project=${{ env.GLIMMUNG_PROJECT }}' | Out-Null
             } catch {}
             Start-Sleep -Seconds 60
           }
