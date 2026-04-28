@@ -266,6 +266,30 @@ Set-Location D:\actions-runner-user
 Then dispatch issue-agent runs with
 `runner_label=issue-agent-runner-nelsonpc-user`.
 
+NELSONPC currently has this non-admin runner registered and online:
+
+- Runner root: `D:\actions-runner-user`
+- Runner name: `issue-agent-NELSONPC-user`
+- Routing label: `issue-agent-runner-nelsonpc-user`
+- Runner log: `D:\actions-runner-user\_codex-logs\runner.out.log`
+
+Because `D:\repos\spire-lens-mcp` was originally created by the old
+`NETWORK SERVICE` runner, the interactive user also needs the Git safe-directory
+exception:
+
+```powershell
+git config --global --add safe.directory D:/repos/spire-lens-mcp
+```
+
+Observed validation for the user runner:
+
+- Issue #105 routed to `issue-agent-NELSONPC-user`.
+- The implementation job passed host preparation and Claude subscription auth.
+- Claude ran successfully under the interactive `Nelson` account with
+  `--permission-mode bypassPermissions`.
+- The run later failed in project build/test logic, not in runner registration,
+  Claude lookup, Claude auth, or Windows permissions.
+
 If dispatching workflow runs manually from the laptop, make sure GitHub CLI is
 authenticated:
 
