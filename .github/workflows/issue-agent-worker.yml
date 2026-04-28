@@ -892,4 +892,3 @@ jobs:
             echo "Issue #${ISSUE_NUMBER} does not have issue-agent-running; nothing to release."
           fi
 
-
