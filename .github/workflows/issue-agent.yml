@@ -114,7 +114,7 @@ jobs:
           gh api --method DELETE "repos/${REPO_SLUG}/issues/${ISSUE_NUMBER}/labels/issue-agent" >/dev/null 2>&1 || true
 
   test-plan:
-    name: "Plan validation evidence"
+    name: "LLM: Plan validation evidence"
     needs: route
     if: needs.route.result == 'success'
     runs-on: ${{ fromJson(needs.route.outputs.test_plan_runs_on) }}
@@ -205,7 +205,7 @@ jobs:
           throw "Test plan did not pass. status=${{ steps.test_plan_result.outputs.phase_status }} abort_reason=${{ steps.test_plan_result.outputs.abort_reason }}"
 
   implementation:
-    name: "Implement code change"
+    name: "LLM: Implement code change"
     needs: route
     if: needs.route.result == 'success'
     runs-on: ${{ fromJson(needs.route.outputs.implementation_runs_on) }}
@@ -329,7 +329,7 @@ jobs:
       storage_container: tfstate
       state_key: spirelens/issue-agent-screenshot-storage.tfstate
   verification:
-    name: "Verify in STS2"
+    name: "LLM: Verify in STS2"
     needs:
       - route
       - test-plan
