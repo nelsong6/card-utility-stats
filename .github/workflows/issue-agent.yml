@@ -118,15 +118,29 @@ jobs:
             gh api --method POST "repos/${REPO_SLUG}/labels" \
               -f name='issue-agent-running' \
               -f color='1d76db' \
-              -f description='Issue-agent run in progress' >/dev/null
+              -f description='Issue-agent run in progress' >/dev/null || \
+              gh api "repos/${REPO_SLUG}/labels/issue-agent-running" >/dev/null
           fi
+
+          issue_labels="$(gh api "repos/${REPO_SLUG}/issues/${ISSUE_NUMBER}/labels" --jq '.[].name')"
+          has_issue_label() {
+            printf '%s\n' "${issue_labels}" | grep -Fxq "$1"
+          }
 
           run_url="https://github.com/${REPO_SLUG}/actions/runs/${GITHUB_RUN_ID}"
           gh api --method POST "repos/${REPO_SLUG}/issues/${ISSUE_NUMBER}/comments" \
             -f body="Issue-agent run started: ${run_url}" >/dev/null
-          gh api --method POST "repos/${REPO_SLUG}/issues/${ISSUE_NUMBER}/labels" \
-            -f labels[]='issue-agent-running' >/dev/null
-          gh api --method DELETE "repos/${REPO_SLUG}/issues/${ISSUE_NUMBER}/labels/issue-agent" >/dev/null 2>&1 || true
+          if has_issue_label 'issue-agent-running'; then
+            echo "Issue #${ISSUE_NUMBER} already has issue-agent-running; leaving it in place."
+          else
+            gh api --method POST "repos/${REPO_SLUG}/issues/${ISSUE_NUMBER}/labels" \
+              -f labels[]='issue-agent-running' >/dev/null
+          fi
+          if has_issue_label 'issue-agent'; then
+            gh api --method DELETE "repos/${REPO_SLUG}/issues/${ISSUE_NUMBER}/labels/issue-agent" >/dev/null
+          else
+            echo "Issue #${ISSUE_NUMBER} does not have issue-agent; nothing to remove."
+          fi
 
   test-plan:
     name: "LLM: Plan validation evidence"
@@ -644,3 +658,36 @@ jobs:
         shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         run: |
           throw "Issue-agent did not reach verified pass. test_plan=${{ needs.test-plan.outputs.phase_status }} implementation=${{ needs.implementation.outputs.phase_status }} verification=${{ steps.verification_result.outputs.phase_status }} verification_reason=${{ steps.verification_result.outputs.abort_reason }}"
+
+  release-issue:
+    name: "Release issue-agent running label"
+    needs:
+      - route
+      - claim-issue
+      - test-plan
+      - implementation
+      - screenshot-storage-outputs
+      - verification
+    if: always() && needs.route.result == 'success'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ISSUE_NUMBER: ${{ github.event.issue.number || github.event.inputs.issue_number }}
+      REPO_SLUG: ${{ github.repository }}
+    steps:
+      - name: Remove running label
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${ISSUE_NUMBER}" ]; then
+            echo "No issue number provided; skipping label release."
+            exit 0
+          fi
+
+          issue_labels="$(gh api "repos/${REPO_SLUG}/issues/${ISSUE_NUMBER}/labels" --jq '.[].name')"
+          if printf '%s\n' "${issue_labels}" | grep -Fxq 'issue-agent-running'; then
+            gh api --method DELETE "repos/${REPO_SLUG}/issues/${ISSUE_NUMBER}/labels/issue-agent-running" >/dev/null || true
+            echo "Removed issue-agent-running from #${ISSUE_NUMBER}."
+          else
+            echo "Issue #${ISSUE_NUMBER} does not have issue-agent-running; nothing to release."
+          fi
