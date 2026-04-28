@@ -1,28 +1,5 @@
 # AGENTS
 
-This repo is a hot-reloadable Slay the Spire 2 mod focused on per-card attribution: not just what a card says it should do, but what it actually caused in the run.
-
-## GitHub Source Of Truth
-
-This repo now uses a **pull-only** workflow with GitHub as the source of truth. The policy is documented in [docs/pull-only-workflow.md](docs/pull-only-workflow.md).
-
-- Do not read from the local filesystem for repository state.
-- Do not write to the local filesystem for repository changes.
-- Do not use local `git` or local `gh` as the normal mutation path.
-- Read and write repo state through GitHub-backed tools only.
-- If a remote branch, commit, or PR cannot be produced, stop and report blocked.
-
-## Scratch Workspace Guard Rails
-
-When local filesystem access is helpful for drafting, validation, or temporary analysis:
-
-- Treat `D:\repos\...` checkouts as read-only reference context.
-- Do not edit tracked files in place under `D:\repos\...` unless the user explicitly approves that exact exception.
-- Prefer a disposable workspace outside the repo tree, such as `D:\automation\scratch\...`.
-- Publish the final repository change through GitHub-backed tools only.
-- Delete or discard the scratch workspace after the remote change is published.
-- Avoid local `git` commands entirely for repo work unless the user explicitly approves that exact exception.
-
 ## Current Truths
 
 - Runtime is split into a stable loader and a hot-reloaded core.
@@ -39,8 +16,6 @@ When local filesystem access is helpful for drafting, validation, or temporary a
 - Card identity is per physical card when the card has stable deck identity.
   - Instance numbers never get reused within a run.
   - Combat-generated cards that do not meaningfully exist in the deck may use pooled summaries instead of fake deck-instance identities.
-- Attribution prefers observed outcomes over listed card text whenever the game can diverge from the card face.
-  - Examples already in tree: actual energy gained, Regent stars spent/gained, forge granted, observed cards drawn, blocked draw attempts/reasons, successful self-summons to hand, Artifact-blocked debuffs, and downstream poison damage.
 - Tooltip style is intentionally quiet.
   - Hand view stays compact.
   - Rows should be self-describing without noisy section headers.
@@ -50,7 +25,6 @@ When local filesystem access is helpful for drafting, validation, or temporary a
 ## Start Here
 
 - Read [README.md](README.md) for the product-level overview.
-- Read [docs/pull-only-workflow.md](docs/pull-only-workflow.md) for the repo's GitHub-native workflow policy.
 - Read [docs/architecture.md](docs/architecture.md) for subsystem layout and data flow.
 - For tracking behavior, start in [Core/RunTracker.cs](Core/RunTracker.cs).
 - For tooltip/UI behavior, start in:
@@ -68,7 +42,6 @@ When local filesystem access is helpful for drafting, validation, or temporary a
   - keep labels self-describing
   - avoid adding loud headers unless they clearly earn their space
 - If you add new attribution:
-  - prefer empirical results over intent text
   - be explicit when attribution is heuristic, pooled, contributor-ledger based, or case-specific
 
 ## Useful Commands
