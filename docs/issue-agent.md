@@ -72,7 +72,7 @@ instead of running against the same game instance in parallel.
 Default auto-route pool:
 
 ```text
-issue-agent-runner-nelsonlaptop
+issue-agent-runner-nelsonlaptop,issue-agent-runner-nelsonpc-user
 ```
 
 Set repository variable `ISSUE_AGENT_ROUTE_LABEL_POOL` to change the pool. The

@@ -76,6 +76,14 @@ new host stays out of `ISSUE_AGENT_ROUTE_LABEL_POOL` until its Steam branch,
 build id, depot manifest, and `sts2.dll` product version match the known-good
 STS2 host.
 
+Host smoke runs on 2026-04-27 verified that NELSONLAPTOP and NELSONPC are now
+aligned on those fields:
+
+| Host | Run | Branch | Build | Manifest | Product version | `ICombatState` |
+| --- | --- | --- | --- | --- | --- | --- |
+| NELSONLAPTOP / `sts2-side-a` | `25038679174` | `public-beta` | `22931561` | `9066164797111423434` | `0.1.0+dc286199d0203e9dc5bcbef57d373870c5c0e996` | `true` |
+| NELSONPC / `issue-agent-NELSONPC-user` | `25038680101` | `public-beta` | `22931561` | `9066164797111423434` | `0.1.0+dc286199d0203e9dc5bcbef57d373870c5c0e996` | `true` |
+
 Because the runner launches STS2 directly during validation, the game folder
 must contain `steam_appid.txt` with:
 
@@ -458,7 +466,7 @@ For example, a two-runner `nelsonpc-user` setup would be:
 The default auto-route pool is:
 
 ```text
-issue-agent-runner-nelsonlaptop
+issue-agent-runner-nelsonlaptop,issue-agent-runner-nelsonpc-user
 ```
 
 Set repository variable `ISSUE_AGENT_ROUTE_LABEL_POOL` if a machine should be
@@ -466,8 +474,8 @@ temporarily removed from or added to automatic issue assignment. Explicit route
 labels on an issue always override the pool.
 
 As of 2026-04-27, the repository variable is also set to
-`issue-agent-runner-nelsonlaptop` while NELSONPC's STS2 version alignment is
-being verified.
+`issue-agent-runner-nelsonlaptop,issue-agent-runner-nelsonpc-user` after the
+host smoke checks above verified STS2 version alignment.
 
 Set repository variable `ISSUE_AGENT_RUNNER_GROUP` if the runner labels live
 inside a non-default GitHub Actions runner group. The workflow still requires
