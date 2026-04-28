@@ -108,6 +108,14 @@ Windows service and run the runner interactively from the logged-in `Nelson`
 desktop session. The service account does not inherit the interactive user's
 Claude auth, Steam session, user `PATH`, or `uv` setup.
 
+If the Windows account does not have an administrator password, stopping or
+reconfiguring the existing service is blocked. In that case, do not spend time
+trying to make `NETWORK SERVICE` behave like the desktop user. Register a
+separate interactive runner under the logged-in `Nelson` account with its own
+runner name and label, then dispatch jobs to that label. This avoids needing
+admin rights to stop the existing service and keeps the interactive runner
+attached to the user account that already has Claude, Steam, and `uv` ready.
+
 Observed NELSONPC test runs:
 
 - Dispatching issue #105 with `runner_label=issue-agent-runner-nelsonpc`
@@ -241,6 +249,22 @@ Stopping the service may require an elevated PowerShell session. Leave the
 show as session 1, not session 0. A Windows service launches STS2 in session 0,
 which does not provide the same Steam client/session context as the logged-in
 user desktop.
+
+If there is no administrator password available, use a second interactive runner
+instead of stopping the existing service. Configure it in a separate directory
+and give it a unique label such as `issue-agent-runner-nelsonpc-user`:
+
+```powershell
+$token = gh api -X POST repos/nelsong6/spirelens/actions/runners/registration-token --jq .token
+New-Item -ItemType Directory -Force D:\actions-runner-user | Out-Null
+Set-Location D:\actions-runner-user
+# install or copy the GitHub Actions runner files here before configuring
+.\config.cmd --url https://github.com/nelsong6/spirelens --token $token --name issue-agent-NELSONPC-user --labels issue-agent,issue-agent-test-plan,issue-agent-implementation,issue-agent-verification,issue-agent-runner-nelsonpc-user --work _work
+.\run.cmd
+```
+
+Then dispatch issue-agent runs with
+`runner_label=issue-agent-runner-nelsonpc-user`.
 
 If dispatching workflow runs manually from the laptop, make sure GitHub CLI is
 authenticated:
