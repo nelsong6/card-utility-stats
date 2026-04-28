@@ -106,6 +106,9 @@ jobs:
               -f description='Issue-agent run in progress' >/dev/null
           fi
 
+          run_url="https://github.com/${REPO_SLUG}/actions/runs/${GITHUB_RUN_ID}"
+          gh api --method POST "repos/${REPO_SLUG}/issues/${ISSUE_NUMBER}/comments" \
+            -f body="Issue-agent run started: ${run_url}" >/dev/null
           gh api --method POST "repos/${REPO_SLUG}/issues/${ISSUE_NUMBER}/labels" \
             -f labels[]='issue-agent-running' >/dev/null
           gh api --method DELETE "repos/${REPO_SLUG}/issues/${ISSUE_NUMBER}/labels/issue-agent" >/dev/null 2>&1 || true
