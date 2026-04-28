@@ -21,7 +21,7 @@ jobs:
     runs-on: ${{ fromJSON(inputs.runs_on_json) }}
     steps:
       - name: Probe Steam install and STS2 assembly
-        shell: powershell
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         run: |
           $ErrorActionPreference = 'Stop'
 
@@ -41,14 +41,41 @@ jobs:
           }
 
           $manifestMatches = Select-String -Path $manifest -Pattern 'buildid|TargetBuildID|manifest|BetaKey'
-          $assembly = [Reflection.Assembly]::LoadFrom($sts2Dll)
-          $hasICombatState = $assembly.GetType('MegaCrit.Sts2.Core.Combat.ICombatState', $false) -ne $null
           $dllItem = Get-Item -LiteralPath $sts2Dll
+          $dotnetVersion = (& dotnet --version).Trim()
+
+          $probeRoot = Join-Path $env:RUNNER_TEMP 'sts2-type-probe'
+          New-Item -ItemType Directory -Force -Path $probeRoot | Out-Null
+          @'
+          <Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup>
+              <OutputType>Exe</OutputType>
+              <TargetFramework>net9.0</TargetFramework>
+              <ImplicitUsings>enable</ImplicitUsings>
+              <Nullable>enable</Nullable>
+            </PropertyGroup>
+          </Project>
+          '@ | Set-Content -LiteralPath (Join-Path $probeRoot 'Sts2TypeProbe.csproj') -Encoding utf8
+          @'
+          using System.Reflection;
+
+          var assemblyPath = args[0];
+          var typeName = args[1];
+          var assembly = Assembly.LoadFrom(assemblyPath);
+          Console.WriteLine(assembly.GetType(typeName, throwOnError: false) is null ? "False" : "True");
+          '@ | Set-Content -LiteralPath (Join-Path $probeRoot 'Program.cs') -Encoding utf8
+
+          $probeOutput = & dotnet run --project $probeRoot --configuration Release -- $sts2Dll 'MegaCrit.Sts2.Core.Combat.ICombatState'
+          if ($LASTEXITCODE -ne 0) {
+              throw "STS2 type probe failed with exit code $LASTEXITCODE"
+          }
+          $hasICombatState = (($probeOutput | Select-Object -Last 1).Trim() -eq 'True')
 
           $result = [pscustomobject]@{
               computerName = $env:COMPUTERNAME
               runnerName = $env:RUNNER_NAME
               runnerOS = $env:RUNNER_OS
+              dotnetVersion = $dotnetVersion
               gameDir = $gameDir
               manifest = $manifest
               manifestLines = @($manifestMatches | ForEach-Object { $_.Line.Trim() })
