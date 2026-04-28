@@ -10,7 +10,7 @@ namespace SpireLens.Core;
 /// </summary>
 public class RunData
 {
-    public const int CurrentSchemaVersion = 14;
+    public const int CurrentSchemaVersion = 15;
 
     // v1: aggregates keyed by card definition id (pooled across instances)
     // v2: aggregates keyed by per-instance id ("CARD.STRIKE_SILENT#1") —
@@ -55,6 +55,10 @@ public class RunData
     //      own runtime behavior can recur them to hand (starting with
     //      Make It So). Also additive; older v13 files remain resumable
     //      with the new field defaulting to 0.
+    // v15: add per-relic stat aggregates (starting with Bag of Marbles —
+    //      enemies affected and Vulnerable stacks applied at combat start).
+    //      Also additive; older v14 files remain resumable with the new
+    //      field defaulting to empty.
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
     public string RunId { get; set; } = "";
     public string StartedAt { get; set; } = "";  // ISO-8601 UTC
@@ -83,6 +87,9 @@ public class RunData
 
     /// <summary>Full per-event log for later deep analysis. One entry per card play + one entry per damage-received-from-card.</summary>
     public List<CardEvent> Events { get; set; } = new();
+
+    /// <summary>Per-relic stat aggregates. Keyed by relic id (e.g. "RELIC.BAG_OF_MARBLES").</summary>
+    public Dictionary<string, RelicAggregate> RelicAggregates { get; set; } = new();
 
     /// <summary>
     /// Snapshot of per-instance number assignments, serialized so that hot
@@ -304,6 +311,21 @@ public class BlockedDrawReasonAggregate
     public string ReasonId { get; set; } = "";
     public string DisplayName { get; set; } = "";
     public int Count { get; set; }
+}
+
+/// <summary>
+/// Aggregated stats for a single relic across this run.
+/// First pass: Bag of Marbles combat-start Vulnerable application.
+/// </summary>
+public class RelicAggregate
+{
+    // Total enemies across all combats this run that had Vulnerable applied
+    // by this relic at combat start.
+    public int EnemiesAffected { get; set; }
+
+    // Total Vulnerable stacks applied by this relic across all combats.
+    // For Bag of Marbles (1 Vulnerable per enemy) this equals EnemiesAffected.
+    public int VulnerableApplied { get; set; }
 }
 
 /// <summary>
