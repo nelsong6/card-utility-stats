@@ -318,6 +318,11 @@ Observed validation for the user runner:
   `--permission-mode bypassPermissions`.
 - The run later failed in project build/test logic, not in runner registration,
   Claude lookup, Claude auth, or Windows permissions.
+- A later STS2/MCP prep run failed because `spire-lens-mcp` could not compile
+  against the machine's current STS2/publicized assembly context:
+  `ICombatState` was missing. Before adding `issue-agent-runner-nelsonpc-user`
+  back to `ISSUE_AGENT_ROUTE_LABEL_POOL`, confirm `spire-lens-mcp` builds on
+  that machine against the installed STS2 data directory.
 
 If queueing issue-agent runs from the laptop with GitHub CLI labels, make sure
 GitHub CLI is authenticated:
@@ -390,3 +395,14 @@ issue-agent-runner-nelsonlaptop,issue-agent-runner-nelsonpc-user
 Set repository variable `ISSUE_AGENT_ROUTE_LABEL_POOL` if a machine should be
 temporarily removed from or added to automatic issue assignment. Explicit route
 labels on an issue always override the pool.
+
+While bringing up a new machine, set `ISSUE_AGENT_ROUTE_LABEL_POOL` to only the
+known-good host, for example:
+
+```text
+issue-agent-runner-nelsonlaptop
+```
+
+Add the new host back only after its live STS2 runner and implementation runner
+both pass host prep, Claude auth, `spire-lens-mcp` build, and a low-risk
+issue-agent smoke run.
