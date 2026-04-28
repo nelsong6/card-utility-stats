@@ -199,6 +199,19 @@ jobs:
         run: |
           curl -fsS -X POST "${{ env.GLIMMUNG_BASE }}/v1/lease/${{ inputs.lease_id }}/heartbeat?project=${{ env.GLIMMUNG_PROJECT }}" >/dev/null
 
+      - name: Start background heartbeat
+        shell: pwsh
+        run: |
+          $script = @"
+          while (`$true) {
+            try {
+              curl -fsS -X POST '${{ env.GLIMMUNG_BASE }}/v1/lease/${{ inputs.lease_id }}/heartbeat?project=${{ env.GLIMMUNG_PROJECT }}' | Out-Null
+            } catch {}
+            Start-Sleep -Seconds 60
+          }
+          "@
+          Start-Process -FilePath powershell.exe -ArgumentList '-NoProfile','-Command',$script -WindowStyle Hidden
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -335,8 +348,8 @@ jobs:
           curl -fsS -X POST "${{ env.GLIMMUNG_BASE }}/v1/lease/${{ inputs.lease_id }}/heartbeat?project=${{ env.GLIMMUNG_PROJECT }}" >/dev/null
 
       - name: Start background heartbeat
-        # Implementation is the longest phase (30-min timeout) and might
-        # outrun the lease TTL (1h) if it stalls. Background loop keeps the
+        # Implementation is the longest phase (30-min timeout) and can
+        # outrun the lease TTL if it stalls. Background loop keeps the
         # heartbeat fresh; killed automatically when the runner cleans up.
         shell: pwsh
         run: |
@@ -591,6 +604,19 @@ jobs:
         shell: bash
         run: |
           curl -fsS -X POST "${{ env.GLIMMUNG_BASE }}/v1/lease/${{ inputs.lease_id }}/heartbeat?project=${{ env.GLIMMUNG_PROJECT }}" >/dev/null
+
+      - name: Start background heartbeat
+        shell: pwsh
+        run: |
+          $script = @"
+          while (`$true) {
+            try {
+              curl -fsS -X POST '${{ env.GLIMMUNG_BASE }}/v1/lease/${{ inputs.lease_id }}/heartbeat?project=${{ env.GLIMMUNG_PROJECT }}' | Out-Null
+            } catch {}
+            Start-Sleep -Seconds 60
+          }
+          "@
+          Start-Process -FilePath powershell.exe -ArgumentList '-NoProfile','-Command',$script -WindowStyle Hidden
 
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -906,3 +932,21 @@ jobs:
             echo "Issue #${ISSUE_NUMBER} does not have issue-agent-running; nothing to release."
           fi
 
+  release-glimmung-lease:
+    name: "Release glimmung lease"
+    needs:
+      - route
+      - claim-issue
+      - test-plan
+      - implementation
+      - screenshot-storage-outputs
+      - verification
+      - release-issue
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Release lease
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsS -X POST "${{ env.GLIMMUNG_BASE }}/v1/lease/${{ inputs.lease_id }}/release?project=${{ env.GLIMMUNG_PROJECT }}" >/dev/null
