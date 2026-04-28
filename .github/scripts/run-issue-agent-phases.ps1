@@ -148,8 +148,8 @@ $phaseDefinitions = @(
         Name = 'implementation'
         Json = 'issue-agent-implementation.json'
         Markdown = 'issue-agent-implementation.md'
-        TimeoutSeconds = 480
-        MaxBudgetUsd = '8.00'
+        TimeoutSeconds = 1200
+        MaxBudgetUsd = '12.00'
         AllowedAbortReasons = @('change_too_large', 'requires_new_library', 'requires_architecture_change', 'unsafe_refactor', 'missing_code_context', 'conflicting_requirements', 'cannot_implement_without_guessing', 'phase_timeout')
         AllowedTools = @(
             'Read',
