@@ -13,6 +13,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot 'RunnerEnvironment.ps1')
 
 function Write-Step {
     param([Parameter(Mandatory = $true)][string]$Message)
@@ -150,6 +151,8 @@ Write-Step "Runner root: $resolvedRunnerRoot"
 if (-not $KeepRunnerServices) {
     Stop-ServiceBackedRunners -ServiceNamePrefix $RunnerServiceNamePrefix
 }
+
+Update-IssueAgentRunnerEnvironmentFile -RunnerRootPath $resolvedRunnerRoot
 
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 $launcherPath = Join-Path $LogDir 'Start-InteractiveIssueAgentRunner.ps1'

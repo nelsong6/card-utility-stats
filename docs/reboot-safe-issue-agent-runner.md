@@ -45,9 +45,16 @@ The script:
 
 - finds the local runner root containing `run.cmd`
 - disables matching service-backed `actions.runner.nelsong6-spirelens.*` services by default
+- updates the runner root `.env` so `Path=` includes the normal machine/user
+  PATH plus the runner user's `%LOCALAPPDATA%\Microsoft\WindowsApps`
 - writes `Start-InteractiveIssueAgentRunner.ps1` under the selected `-LogDir`
 - registers the requested scheduled task
 - starts that task immediately unless `-NoStart` is supplied
+
+The runner root `.env` is generated local runner state, not source-controlled
+repo content. It still matters because `run.cmd` inherits it. If `.env` has a
+stale `Path=` line, GitHub jobs can lose tools that are available to the
+interactive user, including `pwsh`.
 
 The scheduled task runs only at logon, because STS2/Steam need the real user desktop session. For fully unattended reboot recovery, Windows must be configured to sign in the Steam user automatically or the machine must otherwise return to that user's session after reboot.
 
@@ -83,6 +90,9 @@ Get-ScheduledTask -TaskName 'SpireLens Issue Agent Interactive Runner*'
 Get-ScheduledTaskInfo -TaskName 'SpireLens Issue Agent Interactive Runner A'
 Get-Content C:\ProgramData\SpireLens\issue-agent-runner-a\interactive-runner.log -Tail 80
 Get-Content C:\ProgramData\SpireLens\issue-agent-runner-b\interactive-runner.log -Tail 80
+Get-Command pwsh
+Select-String -Path C:\actions-runner-card-utility-stats\.env -Pattern '^Path='
+Select-String -Path C:\actions-runner-card-utility-stats-implementation\.env -Pattern '^Path='
 ```
 
 The log should show the user identity and a non-service session before `run.cmd` starts. If it shows `NETWORK SERVICE`, the machine is still using the service path and live STS2 validation will not be reliable.

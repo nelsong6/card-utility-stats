@@ -13,6 +13,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot 'RunnerEnvironment.ps1')
 
 function Write-Step {
     param([Parameter(Mandatory = $true)][string]$Message)
@@ -247,6 +248,8 @@ if (-not (Test-Path -LiteralPath $configCmdPath)) {
 }
 
 if ((Test-Path -LiteralPath $runnerConfigPath) -and $null -ne $existingService) {
+    Update-IssueAgentRunnerEnvironmentFile -RunnerRootPath $RunnerRoot
+
     if ($RunAsService) {
         if ($existingService.Status -eq "Running") {
             Write-Step "Runner is already configured and service '$($existingService.Name)' is already running."
@@ -331,6 +334,8 @@ try {
 } finally {
     Pop-Location
 }
+
+Update-IssueAgentRunnerEnvironmentFile -RunnerRootPath $RunnerRoot
 
 if ($RunAsService) {
     $runnerService = Invoke-WithRetry -Description "runner service discovery" -MaxAttempts 10 -DelaySeconds 6 -ScriptBlock {

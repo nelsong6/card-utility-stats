@@ -232,6 +232,13 @@ delete the stale runner in GitHub, back up local `.runner` and `.credentials*`
 files, and re-register. Do not delete runner work directories unless you are
 intentionally clearing local Actions workspaces.
 
+Each runner directory may contain a generated `.env` file. That file is local
+runner state, not repo content, but it can override the PATH inherited by
+GitHub jobs. The registration and interactive scheduled-task scripts repair
+`.env` so `Path=` includes the normal machine/user PATH and the runner user's
+`%LOCALAPPDATA%\Microsoft\WindowsApps`, which is where `pwsh.exe` commonly
+resolves for Store-installed PowerShell 7.
+
 ## Run Interactively
 
 Live STS2 validation must run from the logged-in Steam user's desktop session.
@@ -262,6 +269,14 @@ Get-CimInstance Win32_Process |
 
 The runner should belong to the logged-in user session. If it runs as
 `NETWORK SERVICE`, live STS2 validation is not reliable.
+
+Also confirm the runner process can see PowerShell 7:
+
+```powershell
+Get-Command pwsh
+Select-String -Path C:\actions-runner-card-utility-stats\.env -Pattern '^Path='
+Select-String -Path C:\actions-runner-card-utility-stats-implementation\.env -Pattern '^Path='
+```
 
 ## Reboot Persistence
 
