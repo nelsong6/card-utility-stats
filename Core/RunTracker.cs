@@ -57,6 +57,7 @@ public static class RunTracker
     private static int _pendingPlayerBlockClearAmount;
     private static bool _pendingPlayerBlockClearArmed;
     private static bool _pendingOrichalcumBlockAttribution;
+    private static bool _pendingAkabekoVigorAttribution;
     private static bool _shivAvailableThisRun;
     private static CardModel? _shivDeckViewCard;
     private const decimal PoisonOwnershipEpsilon = 0.0001m;
@@ -621,6 +622,7 @@ public static class RunTracker
         _pendingPlayerBlockClearAmount = 0;
         _pendingPlayerBlockClearArmed = false;
         _pendingOrichalcumBlockAttribution = false;
+        _pendingAkabekoVigorAttribution = false;
         _pendingMakeItSoSummons.Clear();
     }
 
@@ -1277,6 +1279,7 @@ public static class RunTracker
     private const string RedMaskRelicId = "RELIC.RED_MASK";
     private const string PocketwatchRelicId = "RELIC.POCKETWATCH";
     private const string OrichalcumRelicId = "RELIC.ORICHALCUM";
+    private const string AkabekoRelicId = "RELIC.AKABEKO";
 
     /// <summary>
     /// Record a Bag of Marbles combat-start Vulnerable application.
@@ -1423,6 +1426,63 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Arm the one-shot flag that attributes the next player Vigor gain to
+    /// Akabeko. Called from <see cref="Patches.AkabekoAfterSideTurnStartPatch"/>
+    /// when Akabeko's <c>AfterSideTurnStart</c> fires on the player's side.
+    /// </summary>
+    public static void ArmAkabekoVigorAttribution()
+    {
+        lock (_lock)
+        {
+            _pendingAkabekoVigorAttribution = true;
+        }
+    }
+
+    /// <summary>
+    /// Clear the Akabeko attribution flag without recording. Called in the
+    /// postfix as a safety cleanup after Akabeko's method returns.
+    /// </summary>
+    public static void DisarmAkabekoVigorAttribution()
+    {
+        lock (_lock)
+        {
+            _pendingAkabekoVigorAttribution = false;
+        }
+    }
+
+    /// <summary>
+    /// Record Vigor gained from Akabeko's turn-start effect. Called from
+    /// <see cref="Patches.HookBeforePowerAmountChangedPatch"/> when the
+    /// attribution flag is armed and VigorPower is applied to the player.
+    /// </summary>
+    public static void RecordAkabekoVigorGained(PowerModel power, int amount, Creature target)
+    {
+        if (power is not VigorPower) return;
+        if (!target.IsPlayer) return;
+        if (amount <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_pendingAkabekoVigorAttribution) return;
+
+                _pendingCombat ??= new PendingCombat();
+                if (!_pendingCombat.RelicAggregates.TryGetValue(AkabekoRelicId, out var agg))
+                {
+                    agg = new RelicAggregate();
+                    _pendingCombat.RelicAggregates[AkabekoRelicId] = agg;
+                }
+                agg.VigorGained += amount;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordAkabekoVigorGained failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Return the committed relic aggregate for a relic id, merged with any
     /// pending combat data. Used by the relic tooltip to show current-run stats.
     /// </summary>
@@ -1441,6 +1501,7 @@ public static class RunTracker
                     WeakApplied = committed.WeakApplied,
                     AdditionalCardsDrawn = committed.AdditionalCardsDrawn,
                     AdditionalBlockGained = committed.AdditionalBlockGained,
+                    VigorGained = committed.VigorGained,
                 };
             }
 
@@ -1452,6 +1513,7 @@ public static class RunTracker
                 result.WeakApplied += pending.WeakApplied;
                 result.AdditionalCardsDrawn += pending.AdditionalCardsDrawn;
                 result.AdditionalBlockGained += pending.AdditionalBlockGained;
+                result.VigorGained += pending.VigorGained;
             }
 
             return result;

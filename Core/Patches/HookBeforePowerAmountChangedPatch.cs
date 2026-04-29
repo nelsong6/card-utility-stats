@@ -28,6 +28,7 @@ public static class HookBeforePowerAmountChangedPatch
         {
             if (power == null || target == null) return;
             RunTracker.NotePowerAmountChangeAttempt(power, amount, target, applier, cardSource);
+            RunTracker.RecordAkabekoVigorGained(power, (int)amount, target);
         }
         catch (Exception e)
         {
