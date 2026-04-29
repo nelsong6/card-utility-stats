@@ -293,9 +293,24 @@ public class SchemaLoadingTests
     }
 
     [Fact]
-    public void HistoricalLoad_AcceptsCurrentV18Fixture()
+    public void HistoricalLoad_AcceptsLegacyV18Fixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("v18-pocketwatch-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.Equal(18, loaded!.SourceSchemaVersion);
+        Assert.False(loaded.IsLegacy);
+        Assert.True(loaded.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.NotNull(loaded.CompatibilityNote);
+        Assert.Equal(12, loaded.Data.RelicAggregates["RELIC.ORICHALCUM"].AdditionalBlockGained);
+        Assert.Equal(6, loaded.Data.RelicAggregates["RELIC.POCKETWATCH"].AdditionalCardsDrawn);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsCurrentV19Fixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("v19-happy-flower-run.json"));
 
         Assert.NotNull(loaded);
         Assert.Equal(RunData.CurrentSchemaVersion, loaded!.SourceSchemaVersion);
@@ -305,6 +320,7 @@ public class SchemaLoadingTests
         Assert.Null(loaded.CompatibilityNote);
         Assert.Equal(12, loaded.Data.RelicAggregates["RELIC.ORICHALCUM"].AdditionalBlockGained);
         Assert.Equal(6, loaded.Data.RelicAggregates["RELIC.POCKETWATCH"].AdditionalCardsDrawn);
+        Assert.Equal(4, loaded.Data.RelicAggregates["RELIC.HAPPY_FLOWER"].EnergyGenerated);
     }
 
     [Fact]
@@ -523,14 +539,26 @@ public class SchemaLoadingTests
     }
 
     [Fact]
-    public void ResumableLoad_AcceptsCurrentV18Fixture()
+    public void ResumableLoad_AcceptsLegacyV18Fixture()
     {
         var resumed = RunStorage.LoadResumable(FixturePath("v18-pocketwatch-run.json"));
+
+        Assert.NotNull(resumed);
+        Assert.Equal(18, resumed!.SchemaVersion);
+        Assert.Equal(12, resumed.RelicAggregates["RELIC.ORICHALCUM"].AdditionalBlockGained);
+        Assert.Equal(6, resumed.RelicAggregates["RELIC.POCKETWATCH"].AdditionalCardsDrawn);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsCurrentV19Fixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v19-happy-flower-run.json"));
 
         Assert.NotNull(resumed);
         Assert.Equal(RunData.CurrentSchemaVersion, resumed!.SchemaVersion);
         Assert.Equal(12, resumed.RelicAggregates["RELIC.ORICHALCUM"].AdditionalBlockGained);
         Assert.Equal(6, resumed.RelicAggregates["RELIC.POCKETWATCH"].AdditionalCardsDrawn);
+        Assert.Equal(4, resumed.RelicAggregates["RELIC.HAPPY_FLOWER"].EnergyGenerated);
     }
 
     [Fact]

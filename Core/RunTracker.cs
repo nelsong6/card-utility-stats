@@ -57,6 +57,7 @@ public static class RunTracker
     private static int _pendingPlayerBlockClearAmount;
     private static bool _pendingPlayerBlockClearArmed;
     private static bool _pendingOrichalcumBlockAttribution;
+    private static bool _pendingHappyFlowerEnergyAttribution;
     private static bool _shivAvailableThisRun;
     private static CardModel? _shivDeckViewCard;
     private const decimal PoisonOwnershipEpsilon = 0.0001m;
@@ -621,6 +622,7 @@ public static class RunTracker
         _pendingPlayerBlockClearAmount = 0;
         _pendingPlayerBlockClearArmed = false;
         _pendingOrichalcumBlockAttribution = false;
+        _pendingHappyFlowerEnergyAttribution = false;
         _pendingMakeItSoSummons.Clear();
     }
 
@@ -947,6 +949,7 @@ public static class RunTracker
                 runRelicAgg.WeakApplied += pendingRelicAgg.WeakApplied;
                 runRelicAgg.AdditionalCardsDrawn += pendingRelicAgg.AdditionalCardsDrawn;
                 runRelicAgg.AdditionalBlockGained += pendingRelicAgg.AdditionalBlockGained;
+                runRelicAgg.EnergyGenerated += pendingRelicAgg.EnergyGenerated;
             }
 
             // Refresh run-level metadata from the current game state (floor may have advanced).
@@ -1277,6 +1280,7 @@ public static class RunTracker
     private const string RedMaskRelicId = "RELIC.RED_MASK";
     private const string PocketwatchRelicId = "RELIC.POCKETWATCH";
     private const string OrichalcumRelicId = "RELIC.ORICHALCUM";
+    private const string HappyFlowerRelicId = "RELIC.HAPPY_FLOWER";
 
     /// <summary>
     /// Record a Bag of Marbles combat-start Vulnerable application.
@@ -1423,6 +1427,62 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Arm the one-shot flag that attributes the next player energy gain to
+    /// Happy Flower. Called from <see cref="Patches.HappyFlowerAtTurnStartPatch"/>
+    /// when Happy Flower's <c>AtTurnStart</c> fires on the player's side.
+    /// </summary>
+    public static void ArmHappyFlowerEnergyAttribution()
+    {
+        lock (_lock)
+        {
+            _pendingHappyFlowerEnergyAttribution = true;
+        }
+    }
+
+    /// <summary>
+    /// Clear the Happy Flower attribution flag without recording. Safety reset
+    /// for turns where the relic's every-3-turns condition was not met.
+    /// </summary>
+    public static void DisarmHappyFlowerEnergyAttribution()
+    {
+        lock (_lock)
+        {
+            _pendingHappyFlowerEnergyAttribution = false;
+        }
+    }
+
+    /// <summary>
+    /// Record energy gained from Happy Flower's every-3-turns bonus. Called from
+    /// <see cref="Patches.PlayerGainEnergyPatch"/> when the attribution flag is
+    /// armed and the player gains energy.
+    /// </summary>
+    public static void RecordHappyFlowerEnergyGained(int amount)
+    {
+        if (amount <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_pendingHappyFlowerEnergyAttribution) return;
+                _pendingHappyFlowerEnergyAttribution = false;
+
+                _pendingCombat ??= new PendingCombat();
+                if (!_pendingCombat.RelicAggregates.TryGetValue(HappyFlowerRelicId, out var agg))
+                {
+                    agg = new RelicAggregate();
+                    _pendingCombat.RelicAggregates[HappyFlowerRelicId] = agg;
+                }
+                agg.EnergyGenerated += amount;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordHappyFlowerEnergyGained failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Return the committed relic aggregate for a relic id, merged with any
     /// pending combat data. Used by the relic tooltip to show current-run stats.
     /// </summary>
@@ -1441,6 +1501,7 @@ public static class RunTracker
                     WeakApplied = committed.WeakApplied,
                     AdditionalCardsDrawn = committed.AdditionalCardsDrawn,
                     AdditionalBlockGained = committed.AdditionalBlockGained,
+                    EnergyGenerated = committed.EnergyGenerated,
                 };
             }
 
@@ -1452,6 +1513,7 @@ public static class RunTracker
                 result.WeakApplied += pending.WeakApplied;
                 result.AdditionalCardsDrawn += pending.AdditionalCardsDrawn;
                 result.AdditionalBlockGained += pending.AdditionalBlockGained;
+                result.EnergyGenerated += pending.EnergyGenerated;
             }
 
             return result;

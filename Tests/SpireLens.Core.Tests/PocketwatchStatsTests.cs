@@ -96,6 +96,6 @@ public class PocketwatchStatsTests
     [Fact]
     public void RunData_SchemaVersion_IsBumpedTo18()
     {
-        Assert.Equal(18, RunData.CurrentSchemaVersion);
+        Assert.Equal(19, RunData.CurrentSchemaVersion);
     }
 }
