@@ -56,6 +56,7 @@ public static class RunTracker
     private static readonly List<PendingPowerChangeAttempt> _pendingPowerChangeAttempts = new();
     private static int _pendingPlayerBlockClearAmount;
     private static bool _pendingPlayerBlockClearArmed;
+    private static bool _pendingOrichalcumBlockAttribution;
     private static bool _shivAvailableThisRun;
     private static CardModel? _shivDeckViewCard;
     private const decimal PoisonOwnershipEpsilon = 0.0001m;
@@ -619,6 +620,7 @@ public static class RunTracker
         _pendingPowerChangeAttempts.Clear();
         _pendingPlayerBlockClearAmount = 0;
         _pendingPlayerBlockClearArmed = false;
+        _pendingOrichalcumBlockAttribution = false;
         _pendingMakeItSoSummons.Clear();
     }
 
@@ -943,6 +945,7 @@ public static class RunTracker
                 runRelicAgg.EnemiesAffected += pendingRelicAgg.EnemiesAffected;
                 runRelicAgg.VulnerableApplied += pendingRelicAgg.VulnerableApplied;
                 runRelicAgg.WeakApplied += pendingRelicAgg.WeakApplied;
+                runRelicAgg.AdditionalBlockGained += pendingRelicAgg.AdditionalBlockGained;
             }
 
             // Refresh run-level metadata from the current game state (floor may have advanced).
@@ -1271,6 +1274,7 @@ public static class RunTracker
 
     private const string BagOfMarblesRelicId = "RELIC.BAG_OF_MARBLES";
     private const string RedMaskRelicId = "RELIC.RED_MASK";
+    private const string OrichalcumRelicId = "RELIC.ORICHALCUM";
 
     /// <summary>
     /// Record a Bag of Marbles combat-start Vulnerable application.
@@ -1333,6 +1337,62 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Arm the one-shot flag that attributes the next player block gain to
+    /// Orichalcum. Called from <see cref="Patches.OrichalcumBeforeTurnEndPatch"/>
+    /// when Orichalcum's <c>BeforeTurnEnd</c> fires on the player's side.
+    /// </summary>
+    public static void ArmOrichalcumBlockAttribution()
+    {
+        lock (_lock)
+        {
+            _pendingOrichalcumBlockAttribution = true;
+        }
+    }
+
+    /// <summary>
+    /// Clear the Orichalcum attribution flag without recording. Used as a
+    /// safety reset if Orichalcum's condition was not met.
+    /// </summary>
+    public static void DisarmOrichalcumBlockAttribution()
+    {
+        lock (_lock)
+        {
+            _pendingOrichalcumBlockAttribution = false;
+        }
+    }
+
+    /// <summary>
+    /// Record block gained from Orichalcum's end-of-turn effect. Called from
+    /// <see cref="Patches.HookAfterBlockGainedPatch"/> when the attribution
+    /// flag is armed and the player gains block.
+    /// </summary>
+    public static void RecordOrichalcumBlockGained(int amount)
+    {
+        if (amount <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_pendingOrichalcumBlockAttribution) return;
+                _pendingOrichalcumBlockAttribution = false;
+
+                _pendingCombat ??= new PendingCombat();
+                if (!_pendingCombat.RelicAggregates.TryGetValue(OrichalcumRelicId, out var agg))
+                {
+                    agg = new RelicAggregate();
+                    _pendingCombat.RelicAggregates[OrichalcumRelicId] = agg;
+                }
+                agg.AdditionalBlockGained += amount;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordOrichalcumBlockGained failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Return the committed relic aggregate for a relic id, merged with any
     /// pending combat data. Used by the relic tooltip to show current-run stats.
     /// </summary>
@@ -1349,6 +1409,7 @@ public static class RunTracker
                     EnemiesAffected = committed.EnemiesAffected,
                     VulnerableApplied = committed.VulnerableApplied,
                     WeakApplied = committed.WeakApplied,
+                    AdditionalBlockGained = committed.AdditionalBlockGained,
                 };
             }
 
@@ -1358,6 +1419,7 @@ public static class RunTracker
                 result.EnemiesAffected += pending.EnemiesAffected;
                 result.VulnerableApplied += pending.VulnerableApplied;
                 result.WeakApplied += pending.WeakApplied;
+                result.AdditionalBlockGained += pending.AdditionalBlockGained;
             }
 
             return result;
