@@ -943,6 +943,7 @@ public static class RunTracker
                 runRelicAgg.EnemiesAffected += pendingRelicAgg.EnemiesAffected;
                 runRelicAgg.VulnerableApplied += pendingRelicAgg.VulnerableApplied;
                 runRelicAgg.WeakApplied += pendingRelicAgg.WeakApplied;
+                runRelicAgg.AdditionalCardsDrawn += pendingRelicAgg.AdditionalCardsDrawn;
             }
 
             // Refresh run-level metadata from the current game state (floor may have advanced).
@@ -1271,6 +1272,7 @@ public static class RunTracker
 
     private const string BagOfMarblesRelicId = "RELIC.BAG_OF_MARBLES";
     private const string RedMaskRelicId = "RELIC.RED_MASK";
+    private const string PocketwatchRelicId = "RELIC.POCKETWATCH";
 
     /// <summary>
     /// Record a Bag of Marbles combat-start Vulnerable application.
@@ -1333,6 +1335,34 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Record additional cards drawn by Pocketwatch's turn-start bonus.
+    /// <paramref name="cardsDrawn"/> is the number of extra cards drawn (normally 3).
+    /// Called from <see cref="Patches.PocketwatchModifyHandDrawPatch"/>.
+    /// </summary>
+    public static void RecordPocketwatchDraw(int cardsDrawn)
+    {
+        if (cardsDrawn <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                _pendingCombat ??= new PendingCombat();
+                if (!_pendingCombat.RelicAggregates.TryGetValue(PocketwatchRelicId, out var agg))
+                {
+                    agg = new RelicAggregate();
+                    _pendingCombat.RelicAggregates[PocketwatchRelicId] = agg;
+                }
+                agg.AdditionalCardsDrawn += cardsDrawn;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPocketwatchDraw failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Return the committed relic aggregate for a relic id, merged with any
     /// pending combat data. Used by the relic tooltip to show current-run stats.
     /// </summary>
@@ -1349,6 +1379,7 @@ public static class RunTracker
                     EnemiesAffected = committed.EnemiesAffected,
                     VulnerableApplied = committed.VulnerableApplied,
                     WeakApplied = committed.WeakApplied,
+                    AdditionalCardsDrawn = committed.AdditionalCardsDrawn,
                 };
             }
 
@@ -1358,6 +1389,7 @@ public static class RunTracker
                 result.EnemiesAffected += pending.EnemiesAffected;
                 result.VulnerableApplied += pending.VulnerableApplied;
                 result.WeakApplied += pending.WeakApplied;
+                result.AdditionalCardsDrawn += pending.AdditionalCardsDrawn;
             }
 
             return result;
