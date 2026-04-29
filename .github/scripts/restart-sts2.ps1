@@ -36,12 +36,34 @@ function Get-Sts2GameDir {
 function Get-Sts2Processes {
     param([string]$GameDir)
 
-    $gameDirWithSlash = $GameDir.TrimEnd('\') + '\'
-    Get-CimInstance Win32_Process | Where-Object {
-        $_.Name -in @('SlayTheSpire2.exe', 'crashpad_handler.exe') -and
-        -not [string]::IsNullOrWhiteSpace([string]$_.ExecutablePath) -and
-        ([string]$_.ExecutablePath).StartsWith($gameDirWithSlash, [System.StringComparison]::OrdinalIgnoreCase)
-    }
+    # Was: Get-CimInstance Win32_Process | Where-Object { ... }.
+    # Get-CimInstance wedges in the GH Actions runner context (likely Session 0
+    # / service-context WMI/DCOM quirk; see spirelens#162). Get-Process avoids
+    # WMI/DCOM entirely. Returns wrapped objects preserving the Name (with .exe
+    # suffix) and ProcessId fields the existing callers consume; the underlying
+    # System.Diagnostics.Process is exposed as .Process so Stop-Sts2 can
+    # WaitForExit on it.
+    $prefix = $GameDir.TrimEnd('\') + '\'
+    Get-Process -Name 'SlayTheSpire2','crashpad_handler' -ErrorAction SilentlyContinue |
+        Where-Object {
+            try {
+                $path = $_.MainModule.FileName
+                -not [string]::IsNullOrWhiteSpace($path) -and
+                $path.StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase)
+            } catch {
+                $false
+            }
+        } |
+        ForEach-Object {
+            $execPath = try { $_.MainModule.FileName } catch { $null }
+            [pscustomobject]@{
+                Name           = "$($_.ProcessName).exe"
+                ProcessId      = $_.Id
+                ExecutablePath = $execPath
+                SessionId      = $_.SessionId
+                Process        = $_
+            }
+        }
 }
 
 function Invoke-BridgePing {
@@ -102,11 +124,16 @@ function Stop-Sts2 {
     }
 
     foreach ($process in $processes) {
+        Write-Host "Stopping $($process.Name) pid=$($process.ProcessId)."
         try {
-            Write-Host "Stopping $($process.Name) pid=$($process.ProcessId)."
             Stop-Process -Id ([int]$process.ProcessId) -Force -ErrorAction Stop
+            if ($process.Process) { $process.Process.WaitForExit(5000) | Out-Null }
         } catch {
-            Write-Warning "Unable to stop $($process.Name) pid=$($process.ProcessId): $($_.Exception.Message)"
+            Write-Warning "Stop-Process failed for $($process.Name) pid=$($process.ProcessId): $($_.Exception.Message)"
+        }
+        if ($process.Process -and -not $process.Process.HasExited) {
+            Write-Warning "Stop-Process didn't terminate $($process.Name) pid=$($process.ProcessId) within 5s; escalating to taskkill /F /T"
+            & taskkill.exe /F /T /PID ([int]$process.ProcessId) 2>$null
         }
     }
 
@@ -193,9 +220,15 @@ function Copy-Sts2DiagnosticArtifacts {
     $lines.Add("RUNNER_TEMP=$env:RUNNER_TEMP")
     $lines.Add('')
     $lines.Add('STS2 processes:')
-    Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
-        Where-Object { $_.Name -in @('SlayTheSpire2.exe', 'crashpad_handler.exe') } |
-        ForEach-Object { $lines.Add("  $($_.Name) pid=$($_.ProcessId) session=$($_.SessionId) path=$($_.ExecutablePath) cmd=$($_.CommandLine)") }
+    # Was: Get-CimInstance Win32_Process — drops CommandLine here, but
+    # Get-CimInstance is the call that wedges in this runner's context (see
+    # spirelens#162) and this diagnostic block runs in failure paths where we
+    # most need it not to also hang.
+    Get-Process -Name 'SlayTheSpire2','crashpad_handler' -ErrorAction SilentlyContinue |
+        ForEach-Object {
+            $execPath = try { $_.MainModule.FileName } catch { '<unavailable>' }
+            $lines.Add("  $($_.ProcessName).exe pid=$($_.Id) session=$($_.SessionId) path=$execPath")
+        }
 
     $lines.Add('')
     $lines.Add('Installed mods:')
@@ -256,9 +289,11 @@ function Show-Sts2BridgeDiagnostics {
     }
 
     Write-Host 'STS2 processes visible to runner:'
-    Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
-        Where-Object { $_.Name -in @('SlayTheSpire2.exe', 'crashpad_handler.exe') } |
-        ForEach-Object { Write-Host "  $($_.Name) pid=$($_.ProcessId) session=$($_.SessionId) path=$($_.ExecutablePath)" }
+    Get-Process -Name 'SlayTheSpire2','crashpad_handler' -ErrorAction SilentlyContinue |
+        ForEach-Object {
+            $execPath = try { $_.MainModule.FileName } catch { '<unavailable>' }
+            Write-Host "  $($_.ProcessName).exe pid=$($_.Id) session=$($_.SessionId) path=$execPath"
+        }
 
     foreach ($logDir in Get-Sts2LogDirs) {
         Write-Host "Checking log dir: $logDir"
