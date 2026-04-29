@@ -211,13 +211,35 @@ if (Test-Path -LiteralPath $staleMcpFolder) {
 }
 
 Invoke-LoggedStep -Name 'Stop existing STS2 processes' -Body {
-    $gameDirWithSlash = $gameDir.TrimEnd('\') + '\'
-    Get-CimInstance Win32_Process | Where-Object {
-        $_.Name -in @('SlayTheSpire2.exe', 'crashpad_handler.exe') -and
-        -not [string]::IsNullOrWhiteSpace([string]$_.ExecutablePath) -and
-        ([string]$_.ExecutablePath).StartsWith($gameDirWithSlash, [System.StringComparison]::OrdinalIgnoreCase)
-    } | ForEach-Object {
-        Stop-Process -Id ([int]$_.ProcessId) -Force -ErrorAction SilentlyContinue
+    # Was: Get-CimInstance Win32_Process | Where-Object { ... } | Stop-Process.
+    # Get-CimInstance wedges in the GH Actions runner context (likely Session 0
+    # / service-context WMI/DCOM quirk; see spirelens#162). Get-Process calls
+    # NtQuerySystemInformation directly — no WMI / DCOM / impersonation, runs
+    # in <50ms regardless of shell. Filter to game-directory-resident processes
+    # by MainModule path; skip entries whose MainModule we can't read.
+    $prefix = $gameDir.TrimEnd('\') + '\'
+    $procs = Get-Process -Name 'SlayTheSpire2','crashpad_handler' -ErrorAction SilentlyContinue |
+        Where-Object {
+            try {
+                $path = $_.MainModule.FileName
+                -not [string]::IsNullOrWhiteSpace($path) -and
+                $path.StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase)
+            } catch {
+                $false
+            }
+        }
+    foreach ($p in $procs) {
+        Write-Host "Stopping $($p.ProcessName).exe pid=$($p.Id)"
+        try {
+            Stop-Process -Id $p.Id -Force -ErrorAction Stop
+            $p.WaitForExit(5000) | Out-Null
+        } catch {
+            Write-Warning "Stop-Process failed for $($p.ProcessName).exe pid=$($p.Id): $($_.Exception.Message)"
+        }
+        if (-not $p.HasExited) {
+            Write-Warning "Stop-Process didn't terminate $($p.ProcessName).exe pid=$($p.Id) within 5s; escalating to taskkill /F /T"
+            & taskkill.exe /F /T /PID $p.Id 2>$null
+        }
     }
     Start-Sleep -Seconds 2
 }
