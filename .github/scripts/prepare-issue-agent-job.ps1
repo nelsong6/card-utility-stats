@@ -5,7 +5,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-Set-StrictMode -Version 2.0  # uninitialized vars + method-syntax misuse; kept off v3 because optional JSON access patterns (e.g. $result.usage.input_tokens) would throw
+Set-StrictMode -Version 3.0  # V2 already catches missing PSCustomObject/hashtable properties; V3 adds out-of-bounds array indexing (verified empirically on PS 7.4)
 
 function Invoke-LoggedStep {
     param(
@@ -184,7 +184,7 @@ if (Test-Path -LiteralPath (Join-Path $mcpRoot '.git')) {
 }
 
 if ($LASTEXITCODE -ne 0) {
-    throw "Unable to refresh SpireLens MCP checkout at '$mcpRoot'."
+    throw "Unable to refresh spire-lens-mcp checkout at '$mcpRoot'."
 }
 
 Invoke-LoggedStep -Name 'uv run python py_compile server.py' -Body {
@@ -193,22 +193,32 @@ Invoke-LoggedStep -Name 'uv run python py_compile server.py' -Body {
 
 $buildScript = Join-Path $mcpRoot 'build.ps1'
 if (-not (Test-Path -LiteralPath $buildScript)) {
-    throw "SpireLens MCP build script was not found at '$buildScript'."
+    throw "SpireLensMcpBridge build script was not found at '$buildScript'."
 }
 
-Invoke-LoggedStep -Name 'Build SpireLensMcp DLL' -Body {
+Invoke-LoggedStep -Name 'Build SpireLensMcpBridge DLL' -Body {
     & $buildScript -GameDir $gameDir -Configuration Release
     if ($LASTEXITCODE -ne 0) {
-        throw 'SpireLens MCP build failed.'
+        throw 'SpireLensMcpBridge build failed.'
     }
 }
 
 $modsDir = Join-Path $gameDir 'mods'
 New-Item -ItemType Directory -Force -Path $modsDir | Out-Null
 
+# Clean up any artifacts left by older naming conventions before deploying the
+# current files. The order matters: a runner that has both an old SpireLensMcp
+# folder AND old flat SpireLensMcp.{dll,json} files needs both removed before
+# the new deploy lands, or STS2 may load two copies of the bridge mod.
 $staleMcpFolder = Join-Path $modsDir 'SpireLensMcp'
 if (Test-Path -LiteralPath $staleMcpFolder) {
     Remove-Item -LiteralPath $staleMcpFolder -Recurse -Force -ErrorAction Stop
+}
+foreach ($staleFile in @('SpireLensMcp.dll', 'SpireLensMcp.json')) {
+    $stalePath = Join-Path $modsDir $staleFile
+    if (Test-Path -LiteralPath $stalePath) {
+        Remove-Item -LiteralPath $stalePath -Force -ErrorAction Stop
+    }
 }
 
 Invoke-LoggedStep -Name 'Stop existing STS2 processes' -Body {
@@ -245,9 +255,11 @@ Invoke-LoggedStep -Name 'Stop existing STS2 processes' -Body {
     Start-Sleep -Seconds 2
 }
 
-Invoke-LoggedStep -Name 'Deploy SpireLensMcp into mods/' -Body {
-    Copy-Item -LiteralPath (Join-Path $mcpRoot 'out\SpireLensMcp\SpireLensMcp.dll') -Destination (Join-Path $modsDir 'SpireLensMcp.dll') -Force
-    Copy-Item -LiteralPath (Join-Path $mcpRoot 'mod_manifest.json') -Destination (Join-Path $modsDir 'SpireLensMcp.json') -Force
+Invoke-LoggedStep -Name 'Deploy SpireLensMcpBridge into mods/' -Body {
+    # The mod loader pairs <id>.dll with <id>.json by basename; basename must
+    # match mod_manifest.json's id field, currently SpireLensMcpBridge.
+    Copy-Item -LiteralPath (Join-Path $mcpRoot 'out\SpireLensMcpBridge\SpireLensMcpBridge.dll') -Destination (Join-Path $modsDir 'SpireLensMcpBridge.dll') -Force
+    Copy-Item -LiteralPath (Join-Path $mcpRoot 'mod_manifest.json') -Destination (Join-Path $modsDir 'SpireLensMcpBridge.json') -Force
 }
 
 if (-not $StartSts2) { return }

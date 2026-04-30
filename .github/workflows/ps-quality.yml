@@ -1,0 +1,107 @@
+name: PowerShell Quality
+
+# Catches the bug classes that bit on issue #142 before they hit a real run:
+#   - PSScriptAnalyzer flags uninitialized vars / wrong cmdlet usage / stale APIs
+#   - Pester runs the JSONL-parser unit tests against the actual script source
+#     (extracted via AST), so a regression in Get-ClaudeToolCallSummary,
+#     Format-FailureCategories, ConvertTo-Array, etc. surfaces in dev instead
+#     of three jobs deep into a 15-minute issue-agent run.
+#
+# Triggers on any PR touching the script or test surface, plus this workflow
+# itself. Manual dispatch supported for ad-hoc reruns.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/scripts/**'
+      - '.github/workflows/ps-quality.yml'
+  push:
+    branches: [main]
+    paths:
+      - '.github/scripts/**'
+      - '.github/workflows/ps-quality.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: PSScriptAnalyzer
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module -Name PSScriptAnalyzer -Scope CurrentUser -Force -ErrorAction Stop
+
+      - name: Invoke-ScriptAnalyzer
+        shell: pwsh
+        run: |
+          Set-StrictMode -Version 3.0
+          $ErrorActionPreference = 'Stop'
+
+          $issues = Invoke-ScriptAnalyzer -Path .github/scripts -Recurse -Severity @('Error', 'Warning')
+          if (-not $issues) {
+            Write-Host "No PSScriptAnalyzer findings."
+            return
+          }
+
+          $issues | Group-Object Severity | ForEach-Object {
+            Write-Host "=== $($_.Name): $($_.Count) ==="
+            $_.Group | ForEach-Object {
+              Write-Host ("  {0}:{1} [{2}] {3}" -f $_.ScriptName, $_.Line, $_.RuleName, $_.Message)
+            }
+          }
+
+          # Errors fail the job. Warnings annotate but don't fail (yet) — the
+          # scripts predate this workflow and the warning floor isn't
+          # well-tuned. Tighten to fail-on-warning once the existing surface
+          # is clean.
+          $errors = @($issues | Where-Object { $_.Severity -eq 'Error' })
+          if ($errors.Count -gt 0) {
+            Write-Error "PSScriptAnalyzer found $($errors.Count) error-severity issue(s)."
+            exit 1
+          }
+
+  test:
+    name: Pester
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Pester 5
+        shell: pwsh
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module -Name Pester -MinimumVersion 5.0.0 -Scope CurrentUser -Force -SkipPublisherCheck -ErrorAction Stop
+
+      - name: Invoke-Pester
+        shell: pwsh
+        run: |
+          Set-StrictMode -Version 3.0
+          $ErrorActionPreference = 'Stop'
+
+          $config = New-PesterConfiguration
+          $config.Run.Path        = '.github/scripts/tests'
+          $config.Run.Exit        = $true
+          $config.Output.Verbosity = 'Detailed'
+          $config.TestResult.Enabled  = $true
+          $config.TestResult.OutputFormat = 'JUnitXml'
+          $config.TestResult.OutputPath   = 'pester-results.xml'
+
+          Invoke-Pester -Configuration $config
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pester-results
+          path: pester-results.xml
+          if-no-files-found: warn
