@@ -77,6 +77,17 @@ public static class RelicHoverShowPatch
                 StatsTooltip.Show(tree, __instance, "Orichalcum", "SpireLens", body);
                 return;
             }
+
+            if (relicNode.Model is Akabeko)
+            {
+                const string relicId = "RELIC.AKABEKO";
+                var agg = RunTracker.GetRelicAggregate(relicId);
+                if (agg == null || agg.VigorGained == 0) return;
+
+                var body = BuildAkabekoBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Akabeko", "SpireLens", body);
+                return;
+            }
         }
         catch (Exception e)
         {
@@ -110,6 +121,13 @@ public static class RelicHoverShowPatch
     {
         var sb = new StringBuilder();
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildAkabekoBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "vigor gained", agg.VigorGained.ToString(), "");
         return sb.ToString();
     }
 
