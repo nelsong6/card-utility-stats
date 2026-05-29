@@ -13,19 +13,22 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib.sh"
 
 native_init
-native_require_env GLIMMUNG_RUN_ID GLIMMUNG_RUN_REF GLIMMUNG_LEASE_REF GLIMMUNG_CALLBACK_TOKEN GLIMMUNG_ISSUE_NUMBER
+native_require_env GLIMMUNG_RUN_ID GLIMMUNG_RUN_REF GLIMMUNG_ISSUE_NUMBER
 
 HOST_IP="$(<"${GLIMMUNG_WORKING_DIR}/host_ip")"
 
 mint_github_token() {
   # Glimmung's existing native-runner GitHub token endpoint mints a
-  # per-run installation token scoped to the consuming project.
-  # Caches it under the working dir; subsequent steps reuse it.
+  # per-run installation token scoped to the consuming project. URL
+  # is pre-baked by the native launcher; auth rides as
+  # X-Glimmung-Attempt-Token. Caches the token under the working dir;
+  # subsequent steps reuse it.
   local token_file="${GLIMMUNG_WORKING_DIR}/gh_token"
   if [ -s "$token_file" ]; then return 0; fi
-  local url
-  url="$(native_glimmung_base)/v1/run-callbacks/${GLIMMUNG_CALLBACK_TOKEN}/native/github-token"
-  curl -fsS -X POST "$url" | jq -r .token >"$token_file"
+  native_require_env GLIMMUNG_GITHUB_TOKEN_URL GLIMMUNG_ATTEMPT_TOKEN
+  curl -fsS -X POST \
+    -H "X-Glimmung-Attempt-Token: ${GLIMMUNG_ATTEMPT_TOKEN}" \
+    "${GLIMMUNG_GITHUB_TOKEN_URL}" | jq -r .token >"$token_file"
   chmod 600 "$token_file"
 }
 

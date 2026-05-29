@@ -9,8 +9,12 @@
 #
 #   - Per-step dispatch matching ambience's pattern.
 #   - Minting per-run credentials (SSH user certificate + Tailscale
-#     auth key) via glimmung's /v1/lease-callbacks/* primitives,
-#     documented in nelsong6/glimmung's docs/remote-host-execution.md.
+#     auth key) via glimmung's /v1/run-callbacks/{token}/native/*
+#     primitives, documented in nelsong6/glimmung's
+#     docs/remote-host-execution.md. URLs are pre-baked into
+#     $GLIMMUNG_SSH_CERT_URL and $GLIMMUNG_TAILSCALE_AUTHKEY_URL by
+#     the native launcher; auth rides as the
+#     X-Glimmung-Attempt-Token header.
 #   - Bringing up tailscaled in userspace networking mode so the
 #     orchestrator pod can dial the warm gaming-laptop host.
 #   - Wrapping ssh/scp invocations against the laptop with the right
@@ -87,37 +91,34 @@ native_emit_abort() {
 }
 
 # ---------------------------------------------------------------------
-# Glimmung lease-callback primitives
+# Glimmung run-callback primitives
 # ---------------------------------------------------------------------
 
 # Both primitives are documented in
 # nelsong6/glimmung/docs/remote-host-execution.md. They're scoped by
-# possession of the callback token + lease.state=claimed, so we don't
-# need an additional auth header.
-
-native_glimmung_base() {
-  # Default is the in-cluster service address. Override via
-  # SPIRELENS_GLIMMUNG_BASE when smoke-testing against the public URL.
-  printf '%s' "${SPIRELENS_GLIMMUNG_BASE:-http://glimmung.glimmung.svc.cluster.local}"
-}
+# possession of the run callback token (baked into the URL by
+# glimmung's native launcher) plus the X-Glimmung-Attempt-Token header.
+# Same shape as $GLIMMUNG_GITHUB_TOKEN_URL — pre-baked URLs land on
+# the pod as env vars; we never construct one ourselves.
 
 # native_mint_ssh_cert <user-pubkey-file> <cert-out-file>
 # Returns: writes the OpenSSH user certificate to cert-out-file.
 native_mint_ssh_cert() {
   local pubkey_file="$1"
   local cert_out="$2"
-  native_require_env GLIMMUNG_CALLBACK_TOKEN
+  native_require_env GLIMMUNG_SSH_CERT_URL GLIMMUNG_ATTEMPT_TOKEN
 
   local pubkey
   pubkey="$(<"$pubkey_file")"
   local body
   body="$(jq -nc --arg pk "$pubkey" '{public_key:$pk}')"
 
-  local url
-  url="$(native_glimmung_base)/v1/lease-callbacks/${GLIMMUNG_CALLBACK_TOKEN}/ssh-cert"
-
   local response
-  response="$(curl -fsS -X POST -H 'Content-Type: application/json' -d "$body" "$url")"
+  response="$(curl -fsS -X POST \
+    -H 'Content-Type: application/json' \
+    -H "X-Glimmung-Attempt-Token: ${GLIMMUNG_ATTEMPT_TOKEN}" \
+    -d "$body" \
+    "${GLIMMUNG_SSH_CERT_URL}")"
 
   # Response: { certificate, principals, key_id, valid_after, valid_before }
   jq -r .certificate <<<"$response" >"$cert_out"
@@ -127,12 +128,13 @@ native_mint_ssh_cert() {
 # Echoes the auth key on stdout. Caller redirects to a file or
 # captures in a variable.
 native_mint_tailscale_authkey() {
-  native_require_env GLIMMUNG_CALLBACK_TOKEN
+  native_require_env GLIMMUNG_TAILSCALE_AUTHKEY_URL GLIMMUNG_ATTEMPT_TOKEN
 
-  local url
-  url="$(native_glimmung_base)/v1/lease-callbacks/${GLIMMUNG_CALLBACK_TOKEN}/tailscale-authkey"
-
-  curl -fsS -X POST -H 'Content-Type: application/json' -d '{}' "$url" | jq -r .authkey
+  curl -fsS -X POST \
+    -H 'Content-Type: application/json' \
+    -H "X-Glimmung-Attempt-Token: ${GLIMMUNG_ATTEMPT_TOKEN}" \
+    -d '{}' \
+    "${GLIMMUNG_TAILSCALE_AUTHKEY_URL}" | jq -r .authkey
 }
 
 # ---------------------------------------------------------------------
@@ -243,7 +245,7 @@ native_scp_pull() {
 native_generate_user_keypair() {
   local id="${GLIMMUNG_WORKING_DIR}/id_ed25519"
   if [ ! -f "$id" ]; then
-    ssh-keygen -t ed25519 -N "" -f "$id" -C "lease=${GLIMMUNG_LEASE_REF:-unknown}" >/dev/null
+    ssh-keygen -t ed25519 -N "" -f "$id" -C "run=${GLIMMUNG_RUN_REF:-unknown}" >/dev/null
   fi
   printf '%s.pub\n' "$id"
 }
