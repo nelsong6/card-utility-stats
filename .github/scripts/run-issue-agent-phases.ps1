@@ -951,7 +951,7 @@ function Invoke-ClaudePhase {
     $phaseName = $Phase.Name
     $phaseTimeoutSeconds = if ($Phase.Contains('TimeoutSeconds')) { [int]$Phase.TimeoutSeconds } else { $DefaultPhaseTimeoutSeconds }
     $phaseBudgetUsd = if ($Phase.Contains('MaxBudgetUsd')) { [string]$Phase.MaxBudgetUsd } else { $DefaultPhaseBudgetUsd }
-    $promptPath = Join-Path $env:RUNNER_TEMP "claude-issue-agent-$phaseName-prompt.md"
+    $promptPath = Join-Path $env:GLIMMUNG_WORKING_DIR "claude-issue-agent-$phaseName-prompt.md"
     $phaseJsonPath = Join-Path $ValidationArtifactDir $Phase.Json
     $phaseMarkdownPath = Join-Path $ValidationArtifactDir $Phase.Markdown
 
@@ -961,8 +961,8 @@ function Invoke-ClaudePhase {
     Write-Host "::group::Claude issue-agent phase: $phaseName"
     Write-AgentEvent 'phase_start' "Starting $phaseName phase." @{ phase = $phaseName; timeout_seconds = $phaseTimeoutSeconds; max_budget_usd = $phaseBudgetUsd }
 
-    $stdoutPath = Join-Path $env:RUNNER_TEMP "claude-issue-agent-$phaseName-stdout.jsonl"
-    $stderrPath = Join-Path $env:RUNNER_TEMP "claude-issue-agent-$phaseName-stderr.log"
+    $stdoutPath = Join-Path $env:GLIMMUNG_WORKING_DIR "claude-issue-agent-$phaseName-stdout.jsonl"
+    $stderrPath = Join-Path $env:GLIMMUNG_WORKING_DIR "claude-issue-agent-$phaseName-stderr.log"
     Remove-Item -LiteralPath $stdoutPath, $stderrPath -ErrorAction SilentlyContinue
 
     $claudeArguments = @(

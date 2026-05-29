@@ -26,7 +26,7 @@ function Invoke-LoggedStep {
     }
 }
 
-$repoRoot = Join-Path $env:GITHUB_WORKSPACE $CheckoutPath
+$repoRoot = Join-Path $env:GLIMMUNG_REPO_ROOT $CheckoutPath
 if (-not (Test-Path -LiteralPath $repoRoot)) {
     throw "Issue-agent checkout was not found at '$repoRoot'."
 }
@@ -110,10 +110,10 @@ function New-JobMcpConfig {
         $server.env | Add-Member -NotePropertyName STS2_GAME_DIR -NotePropertyValue $GameDir
     }
 
-    $mcpConfigRoot = Join-Path $env:RUNNER_TEMP "issue-agent-mcp"
+    $mcpConfigRoot = Join-Path $env:GLIMMUNG_WORKING_DIR "issue-agent-mcp"
     New-Item -ItemType Directory -Force -Path $mcpConfigRoot | Out-Null
     $safeCheckoutName = ([IO.Path]::GetFileName($CheckoutPath) -replace '[^A-Za-z0-9._-]', '-')
-    $jobMcpConfigPath = Join-Path $mcpConfigRoot "$($env:GITHUB_RUN_ID)-$($env:GITHUB_RUN_ATTEMPT)-$safeCheckoutName.mcp.json"
+    $jobMcpConfigPath = Join-Path $mcpConfigRoot "$($env:GLIMMUNG_RUN_ID)-$($env:GLIMMUNG_ATTEMPT_INDEX)-$safeCheckoutName.mcp.json"
     [System.IO.File]::WriteAllText(
         $jobMcpConfigPath,
         ($mcpConfig | ConvertTo-Json -Depth 20),
@@ -145,7 +145,7 @@ if (-not $claudePath) {
     throw "Claude Code CLI was not found. Set ISSUE_AGENT_CLAUDE_CLI_PATH or install Claude under a documented default location."
 }
 
-$buildRoot = Join-Path $env:RUNNER_TEMP ("issue-agent-build\$($env:GITHUB_RUN_ID)-$($env:GITHUB_RUN_ATTEMPT)-$([IO.Path]::GetFileName($CheckoutPath))")
+$buildRoot = Join-Path $env:GLIMMUNG_WORKING_DIR ("issue-agent-build\$($env:GLIMMUNG_RUN_ID)-$($env:GLIMMUNG_ATTEMPT_INDEX)-$([IO.Path]::GetFileName($CheckoutPath))")
 New-Item -ItemType Directory -Force -Path $buildRoot | Out-Null
 
 "CLAUDE_CLI_PATH=$claudePath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8NoBOM -Append

@@ -200,8 +200,8 @@ function Copy-Sts2DiagnosticArtifacts {
     param([string]$GameDir)
 
     $artifactRoot = $env:VALIDATION_ARTIFACT_DIR
-    if ([string]::IsNullOrWhiteSpace($artifactRoot) -and -not [string]::IsNullOrWhiteSpace($env:RUNNER_TEMP)) {
-        $artifactRoot = Join-Path $env:RUNNER_TEMP 'sts2-artifacts'
+    if ([string]::IsNullOrWhiteSpace($artifactRoot) -and -not [string]::IsNullOrWhiteSpace($env:GLIMMUNG_WORKING_DIR)) {
+        $artifactRoot = Join-Path $env:GLIMMUNG_WORKING_DIR 'sts2-artifacts'
     }
     if ([string]::IsNullOrWhiteSpace($artifactRoot)) {
         return
@@ -218,7 +218,7 @@ function Copy-Sts2DiagnosticArtifacts {
     $lines.Add("gameDir=$GameDir")
     $lines.Add("APPDATA=$env:APPDATA")
     $lines.Add("LOCALAPPDATA=$env:LOCALAPPDATA")
-    $lines.Add("RUNNER_TEMP=$env:RUNNER_TEMP")
+    $lines.Add("GLIMMUNG_WORKING_DIR=$env:GLIMMUNG_WORKING_DIR")
     $lines.Add('')
     $lines.Add('STS2 processes:')
     # Was: Get-CimInstance Win32_Process — drops CommandLine here, but

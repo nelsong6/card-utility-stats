@@ -10,7 +10,7 @@ Allowed entries:
 
 1. The user's own mods — currently **SpireLens**.
 2. Required prereqs for (1) — currently **BaseLib** (Alchyr), which SpireLens depends on for Harmony patching and node factories.
-3. Tooling prereqs required to validate (1) via the agentic issue-agent flow — currently **`SpireLensMcp`** (in-house fork at [`nelsong6/spire-lens-mcp`](https://github.com/nelsong6/spire-lens-mcp), source at `D:\repos\spire-lens-mcp\`, vendored from `Gennadiyev/STS2MCP` under MIT). Listens on `localhost:15526` exposing `/api/v1/singleplayer` and `/api/v1/multiplayer`; the Python MCP server in the same repo's `mcp/` directory connects to that endpoint and exposes ~50 game-control tools to Claude. Without it the issue-agent workflow's bridge-readiness probe fails before Claude launches. The original `kunology/STS2MCP` (mod ID `STS2_MCP`, at `D:\repos\STS2MCP\`) is on disk for reference but no longer the active install.
+3. Tooling prereqs required to validate (1) via the issue-agent flow — currently **`SpireLensMcp`** (in-house fork at [`nelsong6/spire-lens-mcp`](https://github.com/nelsong6/spire-lens-mcp), source at `D:\repos\spire-lens-mcp\`, vendored from `Gennadiyev/STS2MCP` under MIT). Listens on `localhost:15526` exposing `/api/v1/singleplayer` and `/api/v1/multiplayer`; the Python MCP server in the same repo's `mcp/` directory connects to that endpoint and exposes ~50 game-control tools to Claude. Without it the issue-agent workflow's bridge-readiness probe fails before Claude launches.
 
 When inspecting `mods/`, treat any non-(SpireLens|BaseLib|SpireLensMcp) entry as a removal candidate. Don't recommend installing third-party mods even for diagnostics — prefer adding the diagnostic to SpireLens itself. Orphaned appdata under `%APPDATA%\SlayTheSpire2\` from removed third-party mods is also fair game to clean up, after inspecting contents (some folders, e.g. save-game backups, may have user value). Expected `Loaded N mods` line in the game log: **3** when SpireLensMcp is installed (BaseLib + SpireLens + SpireLensMcp), **2** otherwise.
 
@@ -63,6 +63,36 @@ When inspecting `mods/`, treat any non-(SpireLens|BaseLib|SpireLensMcp) entry as
   - read [docs/sts2-runtime-primer.md](docs/sts2-runtime-primer.md) first
   - prefer empirical results over intent text
   - be explicit when attribution is heuristic, pooled, contributor-ledger based, or case-specific
+
+## Issue-agent execution model
+
+Issue-agent runs are dispatched by `nelsong6/glimmung` against this repo's
+registered workflow. Each phase runs as a Glimmung-managed `k8s_job` in the
+cluster, but the load-bearing work (Claude invocation, build, deploy, scenario
+prep, verification) executes on this gaming laptop because the warm Slay the
+Spire 2 install and the SpireLensMcp bridge only exist here.
+
+The cluster-side phase pods open a per-run SSH session to this host over an
+ephemeral Tailscale tailnet:
+
+- The SSH user certificate is signed by Glimmung's CA per-run (10-minute TTL,
+  `KeyId=glimmung-lease:<project>/<lease_id>`).
+- The Tailscale auth key is minted per-run via Glimmung's federation flow
+  against `auth.romaine.life`; the resulting tailnet node is `ephemeral` and
+  dies when the orchestrator pod disconnects.
+
+The cluster-side scripts live at `scripts/glimmung-native/` and the laptop-side
+pwsh scripts at `.github/scripts/`. The pwsh contract is glimmung-shaped:
+`GLIMMUNG_RUN_ID`, `GLIMMUNG_ATTEMPT_INDEX`, `GLIMMUNG_PROJECT_REPO`,
+`GLIMMUNG_WORKING_DIR`, `GLIMMUNG_REPO_ROOT` — no GHA env vars.
+
+There is no GitHub Actions self-hosted runner on this host. There is no
+`issue-agent.yaml` workflow. Sign-in remains manual (no AutoAdminLogon) — if
+the laptop is asleep or pre-logon, the orchestrator's `env-prep` phase aborts
+with `host_unavailable` and the run requeues until next manual sign-in.
+
+See `nelsong6/glimmung/docs/remote-host-execution.md` for the orchestrator-side
+protocol and `docs/glimmung-workflow.md` here for the registered phase shape.
 
 ## Useful Commands
 
