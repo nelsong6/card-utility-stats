@@ -164,9 +164,12 @@ native_tailscale_up() {
       sleep 0.5
     done
   fi
+  # Ephemerality is a property of the minted authkey (the run-callback
+  # primitive issues a single-use, pre-authorized, ephemeral key), not a
+  # flag on `tailscale up`. The CLI has no --ephemeral flag, so passing it
+  # aborts bring-up with "flag provided but not defined: -ephemeral".
   tailscale --socket="$sock" up \
     --authkey="$authkey" \
-    --ephemeral=true \
     --hostname="glimmung-${GLIMMUNG_RUN_REF}" \
     --accept-routes=false \
     --accept-dns=false
