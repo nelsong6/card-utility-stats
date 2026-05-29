@@ -39,7 +39,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib.sh"
 
 native_init
-native_require_env GLIMMUNG_RUN_ID GLIMMUNG_RUN_REF GLIMMUNG_CALLBACK_TOKEN GLIMMUNG_LEASE_REF
+native_require_env GLIMMUNG_RUN_ID GLIMMUNG_RUN_REF
 
 mint_credentials() {
   # Generates a per-run ed25519 keypair on the pod, asks glimmung to

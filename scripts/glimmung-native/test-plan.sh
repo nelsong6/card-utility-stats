@@ -13,7 +13,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib.sh"
 
 native_init
-native_require_env GLIMMUNG_RUN_ID GLIMMUNG_RUN_REF GLIMMUNG_LEASE_REF
+native_require_env GLIMMUNG_RUN_ID GLIMMUNG_RUN_REF
 
 # env-prep wrote the laptop's tailnet IP to host_ip; reuse it.
 HOST_IP="$(<"${GLIMMUNG_WORKING_DIR}/host_ip")"
