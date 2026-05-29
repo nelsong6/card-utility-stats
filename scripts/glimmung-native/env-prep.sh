@@ -81,7 +81,7 @@ probe_ssh() {
   # reasons we want surfaced cleanly).
   local ip
   ip="$(<"${GLIMMUNG_WORKING_DIR}/host_ip")"
-  if ! timeout 30 native_ssh_run "$ip" <<'PROBE'
+  if ! NATIVE_SSH_TIMEOUT=30 native_ssh_run "$ip" <<'PROBE'
 $PSVersionTable.PSVersion | Out-Null
 Write-Output 'ok'
 PROBE

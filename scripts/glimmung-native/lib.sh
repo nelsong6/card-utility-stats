@@ -230,11 +230,18 @@ native_ssh_args() {
 # native_ssh_run <host-ip> <pwsh script body>
 # Runs a chunk of pwsh on the laptop via SSH. The script body is fed
 # on stdin so we don't have to worry about argv-quoting nightmares.
+#
+# Set NATIVE_SSH_TIMEOUT=<seconds> to bound the call. The bound is
+# applied here, wrapping the real `ssh` binary — `timeout` execs a
+# program, so it cannot wrap native_ssh_run itself (a shell function);
+# doing so fails with "failed to run command 'native_ssh_run'".
 native_ssh_run() {
   local host_ip="$1"
   shift
+  local -a timeout_cmd=()
+  [ -n "${NATIVE_SSH_TIMEOUT:-}" ] && timeout_cmd=(timeout "$NATIVE_SSH_TIMEOUT")
   # shellcheck disable=SC2046
-  ssh $(native_ssh_args) "$(native_ssh_user)@${host_ip}" pwsh -NoProfile -Command -
+  "${timeout_cmd[@]}" ssh $(native_ssh_args) "$(native_ssh_user)@${host_ip}" pwsh -NoProfile -Command -
 }
 
 # native_scp_pull <host-ip> <remote-path> <local-path>
