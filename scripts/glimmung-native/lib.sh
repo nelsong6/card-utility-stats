@@ -217,14 +217,36 @@ native_ssh_user() {
 native_ssh_args() {
   local id="${GLIMMUNG_WORKING_DIR}/id_ed25519"
   local cert="${GLIMMUNG_WORKING_DIR}/id_ed25519-cert.pub"
+  local sock="${GLIMMUNG_WORKING_DIR}/ts.sock"
+  local cfg="${GLIMMUNG_WORKING_DIR}/ssh_config"
 
+  # tailscaled runs in --tun=userspace-networking (the pod has no
+  # NET_ADMIN / /dev/net/tun), so there is NO kernel route onto the
+  # tailnet: a bare `ssh 100.x.y.z` is not routed and hangs until it
+  # times out. Dial through Tailscale's userspace proxy by using
+  # `tailscale nc` as an ssh ProxyCommand, pointed at the same socket
+  # native_tailscale_up brought up.
+  #
+  # This is emitted as an ssh_config (referenced with -F) rather than
+  # inline -o flags because the ProxyCommand value contains spaces and
+  # callers expand `$(native_ssh_args)` unquoted (word-split) — a
+  # ProxyCommand flag with embedded spaces cannot survive that.
+  #
   # StrictHostKeyChecking=accept-new is safe here because the only
   # reachable host on this orchestrator's tailnet is the
   # tag:spirelens-host device, and Tailscale's ACL pins that. A
   # man-in-the-middle would have to first compromise the tailnet,
   # which has its own trust model.
-  printf -- '-i %s -o IdentityFile=%s -o CertificateFile=%s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=accept-new -o LogLevel=ERROR' \
-    "$id" "$id" "$cert"
+  cat >"$cfg" <<EOF
+Host *
+  IdentityFile ${id}
+  CertificateFile ${cert}
+  UserKnownHostsFile /dev/null
+  StrictHostKeyChecking accept-new
+  LogLevel ERROR
+  ProxyCommand tailscale --socket=${sock} nc %h %p
+EOF
+  printf -- '-F %s' "$cfg"
 }
 
 # native_ssh_run <host-ip> <pwsh script body>
