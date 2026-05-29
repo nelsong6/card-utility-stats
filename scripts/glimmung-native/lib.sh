@@ -147,7 +147,7 @@ native_mint_tailscale_authkey() {
 # under this working dir, returns immediately.
 native_tailscale_up() {
   local authkey="$1"
-  native_require_env GLIMMUNG_WORKING_DIR GLIMMUNG_RUN_REF
+  native_require_env GLIMMUNG_WORKING_DIR GLIMMUNG_RUN_ID
 
   local statedir="${GLIMMUNG_WORKING_DIR}/ts"
   local sock="${GLIMMUNG_WORKING_DIR}/ts.sock"
@@ -168,9 +168,14 @@ native_tailscale_up() {
   # primitive issues a single-use, pre-authorized, ephemeral key), not a
   # flag on `tailscale up`. The CLI has no --ephemeral flag, so passing it
   # aborts bring-up with "flag provided but not defined: -ephemeral".
+  #
+  # The hostname must be a valid DNS label. GLIMMUNG_RUN_REF
+  # (e.g. "spirelens#177/runs/3") contains '#' and '/', which Tailscale
+  # rejects. GLIMMUNG_RUN_ID is a UUID — a valid label, run-unique, and
+  # already the basis for the work branch (glimmung/<run_id>).
   tailscale --socket="$sock" up \
     --authkey="$authkey" \
-    --hostname="glimmung-${GLIMMUNG_RUN_REF}" \
+    --hostname="glimmung-${GLIMMUNG_RUN_ID}" \
     --accept-routes=false \
     --accept-dns=false
 }
