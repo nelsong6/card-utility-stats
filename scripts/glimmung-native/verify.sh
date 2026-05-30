@@ -30,9 +30,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib.sh"
 
 native_init
-native_require_env GLIMMUNG_RUN_ID GLIMMUNG_RUN_REF GLIMMUNG_ISSUE_NUMBER GLIMMUNG_INPUT_BRANCH_NAME
+native_require_env GLIMMUNG_RUN_ID GLIMMUNG_RUN_REF GLIMMUNG_ISSUE_NUMBER GLIMMUNG_INPUT_BRANCH_NAME GLIMMUNG_INPUT_TAILNET_IP
 
-HOST_IP="$(<"${GLIMMUNG_WORKING_DIR}/host_ip")"
+# Tailnet IP comes from env-prep's `tailnet_ip` phase output, projected in
+# as GLIMMUNG_INPUT_TAILNET_IP. The host_ip file env-prep writes is
+# env-prep-pod-local and is gone by the time this fresh pod runs.
+HOST_IP="${GLIMMUNG_INPUT_TAILNET_IP}"
 
 build_and_deploy_mod() {
   native_ssh_run "$HOST_IP" <<PWSH

@@ -13,10 +13,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib.sh"
 
 native_init
-native_require_env GLIMMUNG_RUN_ID GLIMMUNG_RUN_REF
+native_require_env GLIMMUNG_RUN_ID GLIMMUNG_RUN_REF GLIMMUNG_INPUT_TAILNET_IP
 
-# env-prep wrote the laptop's tailnet IP to host_ip; reuse it.
-HOST_IP="$(<"${GLIMMUNG_WORKING_DIR}/host_ip")"
+# env-prep resolved the laptop's tailnet IP and emitted it as the
+# `tailnet_ip` phase output; glimmung projects it into this phase as
+# GLIMMUNG_INPUT_TAILNET_IP. (env-prep also writes a host_ip file, but
+# that lives on env-prep's pod and does NOT survive into this phase's
+# fresh pod — reading it here failed with "No such file or directory".)
+HOST_IP="${GLIMMUNG_INPUT_TAILNET_IP}"
 
 run_test_plan() {
   native_ssh_run "$HOST_IP" <<PWSH
