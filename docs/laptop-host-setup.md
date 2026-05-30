@@ -52,7 +52,10 @@ The pwsh contract is Glimmung-shaped — `GLIMMUNG_RUN_ID`,
 - **.NET SDK** (`dotnet`) and **uv** on `PATH`, for building the loader/core and
   running the SpireLensMcp Python helpers.
 - **Repo checkouts** under `D:\repos`:
-  - `D:\repos\SpireLens` — this repo (the persistent run checkout).
+  - `D:\repos\SpireLens` — this repo. The checkout is **auto-synced per run**:
+    `env-prep` hard-resets it to the run's commit before any `.ps1` runs (see
+    "How the checkout stays current" below). It still needs a one-time initial
+    clone with working `git fetch` credentials for `origin`.
   - `D:\repos\spire-lens-mcp` — the bridge repo. `prepare-host.ps1` clones it on
     first run and `git pull --ff-only origin main` on subsequent runs.
 
@@ -72,19 +75,35 @@ signed in for a run to proceed. If the host is asleep or pre-logon, `env-prep`
 aborts with `host_unavailable` and the run requeues until the next manual
 sign-in.
 
-## Keeping the checkout current (cutover step)
+## How the checkout stays current
 
-Because `D:\repos\SpireLens` is a **persistent, manually managed** checkout —
-not a fresh clone per run — it does not update itself. After any change to the
-`.github/scripts/*.ps1` phase scripts lands on `main`, pull it on the laptop
-before the next run:
+The run **owns** `D:\repos\SpireLens`. There is no manual pull step. At the
+start of `env-prep`'s `install-mcp-start-sts2`, the always-fresh cluster-side
+script `scripts/glimmung-native/env-prep.sh` calls `native_sync_host_checkout`
+(in `lib.sh`), which over SSH:
 
 ```powershell
-git -C D:\repos\SpireLens checkout main
-git -C D:\repos\SpireLens pull --ff-only origin main
+git -C D:\repos\SpireLens fetch --prune origin
+git -C D:\repos\SpireLens checkout --force --detach <run-commit>
+git -C D:\repos\SpireLens reset --hard <run-commit>
 ```
 
-The cluster-side `.sh` scripts are re-cloned fresh each run, so a rename or edit
-to the pwsh scripts only takes effect once both sides are at the same commit.
-Skipping the pull leaves the laptop invoking script names/paths that the
-cluster side no longer expects.
+`<run-commit>` is the exact SHA the orchestrator pod resolved `main` to when
+the run started (read from the pod's own fresh checkout; falls back to
+`origin/main` if that read fails). Pinning to the SHA — not a floating
+`git pull` — keeps the laptop on the same source the cluster-side `.sh` scripts
+were cut from, even if `main` advances mid-run. Because the sync lives in the
+re-cloned-every-run `.sh` layer and uses **plain git** (no dependency on any
+`.ps1` path or name), a rename or move of a phase script takes effect
+automatically on the next run — the cutover footgun is gone.
+
+Two consequences worth knowing:
+
+- **`git clean` is intentionally NOT run.** The sync hard-resets *tracked*
+  files but leaves host-local *untracked* files (Steam/STS2 state, logs) in
+  place.
+- **Tracked files are restored to the run's commit.** `.mcp.json` is tracked,
+  so the `reset --hard` overwrites it every run. A host-local edit to a tracked
+  file (e.g. setting `STS2_GAME_DIR` directly in `.mcp.json`) will **not**
+  survive. Configure host-specific overrides via environment / untracked means,
+  or land the change on `main`.

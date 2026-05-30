@@ -266,6 +266,52 @@ native_ssh_run() {
   "${timeout_cmd[@]}" ssh $(native_ssh_args) "$(native_ssh_user)@${host_ip}" pwsh -NoProfile -Command -
 }
 
+# native_sync_host_checkout <host-ip>
+# Force the laptop's persistent SpireLens checkout (D:\repos\SpireLens) to
+# the exact commit this run is executing against, so the run OWNS the working
+# directory instead of depending on a human having remembered to
+# `git pull` after the last script change landed on main.
+#
+# The run's commit is read from the orchestrator pod's own checkout — it's a
+# fresh `checkout.ref: main` clone per run, so `git rev-parse HEAD` is the SHA
+# glimmung resolved main to when the run started. We pin the laptop to that
+# exact SHA (not a floating `git pull`) so the laptop runs the same source the
+# cluster-side `.sh` scripts were cut from, even if main advanced mid-run.
+# origin/main is the fallback when the pod checkout isn't a git repo (local
+# dev / unexpected runner image).
+#
+# This is deliberately implemented in the always-fresh cluster-side `.sh`
+# layer using plain `git` — it has NO dependency on any `.ps1` path or name,
+# so it keeps working even when a phase script on the laptop side has been
+# renamed or moved on main. That's the chicken-and-egg the old manual cutover
+# couldn't escape.
+#
+# No `git clean`: we hard-reset tracked files (so tracked files like
+# .mcp.json are restored to the run's commit) but leave host-local untracked
+# files (Steam/STS2 state, logs) in place.
+native_sync_host_checkout() {
+  local host_ip="$1"
+  local cluster_root sha
+  # lib.sh lives at <repo>/scripts/glimmung-native/lib.sh; the repo root is
+  # two levels up. That's the orchestrator pod's per-run checkout.
+  cluster_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+  sha="$(git -C "$cluster_root" rev-parse HEAD 2>/dev/null || true)"
+
+  native_ssh_run "$host_ip" <<PWSH
+\$ErrorActionPreference = 'Stop'
+\$repo = 'D:\\repos\\SpireLens'
+\$target = '${sha}'
+if ([string]::IsNullOrWhiteSpace(\$target)) { \$target = 'origin/main' }
+git -C \$repo fetch --prune origin
+if (\$LASTEXITCODE -ne 0) { throw "git fetch failed for \$repo" }
+git -C \$repo checkout --force --detach \$target
+if (\$LASTEXITCODE -ne 0) { throw "git checkout \$target failed" }
+git -C \$repo reset --hard \$target
+if (\$LASTEXITCODE -ne 0) { throw "git reset \$target failed" }
+Write-Output ("synced {0} to {1}" -f \$repo, \$target)
+PWSH
+}
+
 # native_scp_pull <host-ip> <remote-path> <local-path>
 native_scp_pull() {
   local host_ip="$1"

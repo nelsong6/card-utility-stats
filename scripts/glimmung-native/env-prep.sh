@@ -126,6 +126,13 @@ install_mcp_and_start_sts2() {
   # env-prep step.
   local ip
   ip="$(<"${GLIMMUNG_WORKING_DIR}/host_ip")"
+
+  # Own the working directory: force the laptop's persistent checkout to this
+  # run's commit BEFORE invoking any .ps1, so we never run stale phase scripts.
+  # This replaces the old manual `git pull` cutover step that humans had to
+  # remember after every .ps1 change landed on main.
+  native_sync_host_checkout "$ip"
+
   native_ssh_run "$ip" <<PWSH
 \$env:GLIMMUNG_RUN_ID = '${GLIMMUNG_RUN_ID}'
 \$env:GLIMMUNG_ATTEMPT_INDEX = '${GLIMMUNG_ATTEMPT_INDEX:-0}'
