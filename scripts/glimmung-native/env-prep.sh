@@ -19,7 +19,8 @@
 #   7. Check the mods/ directory contents against the spirelens
 #      AGENTS.md mod policy (BaseLib + SpireLens + SpireLensMcp only)
 #      — emit `unexpected_mod:<name>` and fail-closed on anything
-#      else (spirelens#179 Q3).
+#      else (spirelens#179 Q3) — and enforce the BaseLib >= v3.1.8
+#      version floor (emit `baselib_too_old:<ver>`).
 #   8. Run the existing prepare-host pwsh script on the
 #      laptop with -InstallMcp -StartSts2, so SpireLensMcp is
 #      installed and STS2 is launched with the bridge accessible.
@@ -40,6 +41,15 @@ source "${SCRIPT_DIR}/lib.sh"
 
 native_init
 native_require_env GLIMMUNG_RUN_ID GLIMMUNG_RUN_REF
+
+# Minimum BaseLib mod version. BaseLib < 3.1.8 hard-references
+# Creature.ShowsInfiniteHp, which the current STS2 build renamed to
+# Creature.HpDisplay; its combat HP-display patch then throws
+# MissingMethodException on every HP-bar refresh, freezing the combat HUD
+# at placeholder values on debug-loaded saves (spire-lens-mcp#10). v3.1.8
+# added the graceful HpDisplay reflection fallback. See
+# docs/laptop-host-setup.md "BaseLib version floor".
+BASELIB_MIN_VERSION="3.1.8"
 
 mint_credentials() {
   # Generates a per-run ed25519 keypair on the pod, asks glimmung to
@@ -116,6 +126,32 @@ PROBE
   if [ "${#unexpected[@]}" -gt 0 ]; then
     native_emit_abort "unexpected_mod:${unexpected[*]}"
   fi
+
+  # BaseLib version floor. The name check above is necessary but not
+  # sufficient: a stale BaseLib (< 3.1.8, pre-HpDisplay rename) keeps
+  # the correct *name* and so passes silently, but freezes the combat
+  # HUD at placeholder values on debug-loaded saves, corrupting the
+  # screenshot evidence the verify loop depends on. Read the deployed
+  # version and fail closed below the floor. BaseLib/SpireLens are
+  # host-local persistent state (not installed per run), so this gate is
+  # the enforcement point — see docs/laptop-host-setup.md.
+  local baselib_ver
+  baselib_ver="$(native_ssh_run "$ip" <<'PROBE'
+$p = 'D:\SteamLibrary\steamapps\common\Slay the Spire 2\mods\BaseLib\BaseLib.json'
+if (Test-Path $p) {
+  try { (Get-Content -LiteralPath $p -Raw | ConvertFrom-Json).version }
+  catch {}
+}
+PROBE
+  )"
+  baselib_ver="$(printf '%s' "$baselib_ver" | tr -d '\r\n ')"
+  if [ -z "$baselib_ver" ]; then
+    native_emit_abort "baselib_missing_or_unversioned"
+  fi
+  if ! native_semver_ge "$baselib_ver" "$BASELIB_MIN_VERSION"; then
+    native_emit_abort "baselib_too_old:${baselib_ver}"
+  fi
+  native_emit_output baselib_version "$baselib_ver"
 }
 
 install_mcp_and_start_sts2() {
