@@ -119,8 +119,8 @@ $AllSpireLensMcpTools = $CatalogMcpTools + $SingleplayerMcpTools + $MultiplayerM
 $phaseDefinitions = @(
     [ordered]@{
         Name = 'test_plan'
-        Json = 'issue-agent-test-plan.json'
-        Markdown = 'issue-agent-test-plan.md'
+        Json = 'test-plan.json'
+        Markdown = 'test-plan.md'
         TimeoutSeconds = 480
         MaxBudgetUsd = '3.00'
         AllowedAbortReasons = @('card_not_found', 'card_ambiguous', 'character_not_found', 'metadata_unavailable', 'mcp_capability_missing', 'game_state_unreachable', 'validation_plan_impossible', 'phase_timeout')
@@ -149,8 +149,8 @@ $phaseDefinitions = @(
     },
     [ordered]@{
         Name = 'implementation'
-        Json = 'issue-agent-implementation.json'
-        Markdown = 'issue-agent-implementation.md'
+        Json = 'implementation.json'
+        Markdown = 'implementation.md'
         TimeoutSeconds = 1800
         MaxBudgetUsd = '12.00'
         AllowedAbortReasons = @('change_too_large', 'requires_new_library', 'requires_architecture_change', 'unsafe_refactor', 'missing_code_context', 'conflicting_requirements', 'cannot_implement_without_guessing', 'phase_timeout')
@@ -212,8 +212,8 @@ $phaseDefinitions = @(
     },
     [ordered]@{
         Name = 'verification'
-        Json = 'issue-agent-verification.json'
-        Markdown = 'issue-agent-verification.md'
+        Json = 'verification.json'
+        Markdown = 'verification.md'
         TimeoutSeconds = 600
         MaxBudgetUsd = '6.00'
         AllowedAbortReasons = @('unit_tests_failed', 'live_validation_failed', 'screenshot_missing', 'screenshot_not_relevant', 'target_evidence_missing', 'mcp_state_mismatch', 'game_state_unreachable', 'claimed_result_not_observed', 'artifact_contract_missing', 'phase_timeout')
@@ -357,7 +357,7 @@ function Write-SyntheticRollup {
         [string]$Notes
     )
 
-    $rollupPath = Join-Path $ValidationArtifactDir 'issue-agent-result.json'
+    $rollupPath = Join-Path $ValidationArtifactDir 'result.json'
     $rollup = [ordered]@{
         issue_number = [int]$IssueNumber
         status = 'blocked'
@@ -635,7 +635,7 @@ function Apply-VerificationEvidenceGuard {
     $status = [string](Get-PropertyValue -Object $Result -Name 'status')
     if ($status -ne 'pass') { return $Result }
 
-    $testPlanPath = Join-Path $ValidationArtifactDir 'issue-agent-test-plan.json'
+    $testPlanPath = Join-Path $ValidationArtifactDir 'test-plan.json'
     if (-not (Test-Path -LiteralPath $testPlanPath)) {
         return Set-VerificationGuardAbort -Result $Result -JsonPath $JsonPath -MarkdownPath $MarkdownPath -AbortReason 'artifact_contract_missing' -GuardNote 'Verification cannot pass because the test-plan evidence contract is missing.'
     }
@@ -951,18 +951,18 @@ function Invoke-ClaudePhase {
     $phaseName = $Phase.Name
     $phaseTimeoutSeconds = if ($Phase.Contains('TimeoutSeconds')) { [int]$Phase.TimeoutSeconds } else { $DefaultPhaseTimeoutSeconds }
     $phaseBudgetUsd = if ($Phase.Contains('MaxBudgetUsd')) { [string]$Phase.MaxBudgetUsd } else { $DefaultPhaseBudgetUsd }
-    $promptPath = Join-Path $env:GLIMMUNG_WORKING_DIR "claude-issue-agent-$phaseName-prompt.md"
+    $promptPath = Join-Path $env:GLIMMUNG_WORKING_DIR "claude-$phaseName-prompt.md"
     $phaseJsonPath = Join-Path $ValidationArtifactDir $Phase.Json
     $phaseMarkdownPath = Join-Path $ValidationArtifactDir $Phase.Markdown
 
     $Prompt | Set-Content -LiteralPath $promptPath -Encoding UTF8
     $promptText = Get-Content -LiteralPath $promptPath -Raw
 
-    Write-Host "::group::Claude issue-agent phase: $phaseName"
+    Write-Host "::group::Claude phase: $phaseName"
     Write-AgentEvent 'phase_start' "Starting $phaseName phase." @{ phase = $phaseName; timeout_seconds = $phaseTimeoutSeconds; max_budget_usd = $phaseBudgetUsd }
 
-    $stdoutPath = Join-Path $env:GLIMMUNG_WORKING_DIR "claude-issue-agent-$phaseName-stdout.jsonl"
-    $stderrPath = Join-Path $env:GLIMMUNG_WORKING_DIR "claude-issue-agent-$phaseName-stderr.log"
+    $stdoutPath = Join-Path $env:GLIMMUNG_WORKING_DIR "claude-$phaseName-stdout.jsonl"
+    $stderrPath = Join-Path $env:GLIMMUNG_WORKING_DIR "claude-$phaseName-stderr.log"
     Remove-Item -LiteralPath $stdoutPath, $stderrPath -ErrorAction SilentlyContinue
 
     $claudeArguments = @(
@@ -1016,7 +1016,7 @@ function Invoke-ClaudePhase {
         $result = Apply-VerificationEvidenceGuard -Result $result -JsonPath $phaseJsonPath -MarkdownPath $phaseMarkdownPath
     }
     $status = Assert-PhaseContract -Phase $Phase -Result $result
-    Add-JobSummaryMarkdown -Title "Issue Agent $phaseName" -MarkdownPath $phaseMarkdownPath
+    Add-JobSummaryMarkdown -Title "Run phase: $phaseName" -MarkdownPath $phaseMarkdownPath
 
     return [ordered]@{
         Status = $status
@@ -1040,7 +1040,7 @@ Read the issue title and body only with:
 gh issue view $IssueNumber --repo $RepoSlug
 ``````
 
-Do not read issue comments, issue timeline entries, prior issue-agent summaries, PR discussions, or GitHub API comment endpoints in this phase unless a future prompt explicitly says to do so.
+Do not read issue comments, issue timeline entries, prior run summaries, PR discussions, or GitHub API comment endpoints in this phase unless a future prompt explicitly says to do so.
 "@
     } else {
 @"
@@ -1060,8 +1060,8 @@ Use this exact local checkout path as the repository root:
 $RepoRoot
 ``````
 
-The shell tool is Git Bash on Windows. Do not use PowerShell-only environment syntax such as `$env:ISSUE_AGENT_REPO_ROOT` unless you are explicitly invoking `powershell`. Prefer quoted concrete paths from this prompt.
-Do not search above the repository root. Do not recurse through parent workspace folders or stale `issue-agent-src` checkouts from other runs.
+The shell tool is Git Bash on Windows. Do not use PowerShell-only environment syntax such as `$env:SPIRELENS_HOST_REPO_ROOT` unless you are explicitly invoking `powershell`. Prefer quoted concrete paths from this prompt.
+Do not search above the repository root. Do not recurse through parent workspace folders or stale `src` checkouts from other runs.
 $issueReadInstruction
 
 Use only the MCP tools allowed for this phase from the project MCP config at `$McpConfigPath`.
@@ -1097,7 +1097,7 @@ $env:SCREENSHOT_DIR = $ScreenshotDir
 $env:VALIDATION_ARTIFACT_DIR = $ValidationArtifactDir
 Set-Location -LiteralPath $RepoRoot
 
-"Claude phased issue-agent stream for $RepoSlug#$IssueNumber" | Set-Content -LiteralPath $SummaryLogPath -Encoding UTF8
+"Claude phased run stream for $RepoSlug#$IssueNumber" | Set-Content -LiteralPath $SummaryLogPath -Encoding UTF8
 "Sanitized event stream: $StreamLogPath" | Add-Content -LiteralPath $SummaryLogPath -Encoding UTF8
 "Debug log: $DebugLogPath" | Add-Content -LiteralPath $SummaryLogPath -Encoding UTF8
 "Screenshot dir: $ScreenshotDir" | Add-Content -LiteralPath $SummaryLogPath -Encoding UTF8
@@ -1113,7 +1113,7 @@ TEST PLANNING RULES:
 - When you need support cards for a scenario deck, use `list_cards` with exact arguments `owner`, `type`, `query`, and/or `limit`; for example use the resolved character owner and needed card type rather than guessing support card names one by one with repeated `lookup_card` calls. If `list_cards` cannot return enough real cards for the recipe, abort with `validation_plan_impossible` or `metadata_unavailable`.
 - When you need support relics for a scenario, use `lookup_relic` or `list_relics` rather than guessing relic ids. Scenario saves may use `relics`, `add_relics`, and `remove_relics` with the resolved relic ids.
 - Every id in `scenario_setup` must be validated through MCP catalog tools, even when it is only supporting test setup rather than the issue target. Validate `deck`, `add_cards`, and `remove_cards` entries with `lookup_card` or `list_cards`; validate `relics`, `add_relics`, and `remove_relics` entries with `lookup_relic` or `list_relics`. Do not write ids from memory. `scenario_setup` values must be the exact resolved catalog ids, not display names, shorthand aliases, or fuzzy lookup queries.
-- `scenario_id_validation.cards` MUST contain one entry for every id in `scenario_setup.deck`, `scenario_setup.add_cards`, and `scenario_setup.remove_cards` — including support cards that are not the issue target. Each entry has shape `{"field":"deck|add_cards|remove_cards","input":"<exact id>","id":"<exact id>","name":"<display name>","source":"lookup_card|list_cards"}`. The same per-id rule applies to `scenario_id_validation.relics` against `relics`, `add_relics`, and `remove_relics`. The wrapper validator throws and aborts the whole run when a `scenario_setup.<field>` value has no matching `scenario_id_validation.<kind>` entry, so a missed entry burns the entire issue-agent run on a contract violation rather than on a real failure.
+- `scenario_id_validation.cards` MUST contain one entry for every id in `scenario_setup.deck`, `scenario_setup.add_cards`, and `scenario_setup.remove_cards` — including support cards that are not the issue target. Each entry has shape `{"field":"deck|add_cards|remove_cards","input":"<exact id>","id":"<exact id>","name":"<display name>","source":"lookup_card|list_cards"}`. The same per-id rule applies to `scenario_id_validation.relics` against `relics`, `add_relics`, and `remove_relics`. The wrapper validator throws and aborts the whole run when a `scenario_setup.<field>` value has no matching `scenario_id_validation.<kind>` entry, so a missed entry burns the entire run on a contract violation rather than on a real failure.
 - Before writing the test-plan JSON, walk every id in `scenario_setup` and confirm `scenario_id_validation` has the matching entry with the same `input` value. If `list_cards` returned five cards, all five must appear in `scenario_id_validation.cards` with `field` set to whichever scenario_setup field referenced them. The validator rejects partial coverage even if the missing card was already lookup-resolved during reasoning — the evidence has to be in the artifact, not just in your head.
 - `scenario_setup.next_normal_encounter` is OPTIONAL. Default to `null` and omit the corresponding `scenario_id_validation.encounters` entry. Only specify an encounter id when the relic/card behavior under test depends on which encounter is fought first (e.g. damage-on-combat-start interactions, encounter-type-conditional triggers). For encounter-agnostic behaviors — start-of-combat triggers like Akabeko's Vigor gain, end-of-combat hooks, persistent passives — leave it null; the base save's existing encounter slot is fine. When you do specify it, validate the id with `list_encounters` (preferred — pick a real id from the returned list) or `lookup_encounter`, never from memory or any "default" advertised in capabilities. The validator rejects ids not present in the live encounter catalog, so a hallucinated or stale id aborts the entire run.
 - Do not inspect implementation files unless needed to identify an existing test command or fixture name; scenario/evidence planning must remain independent of code edits.
@@ -1121,7 +1121,7 @@ TEST PLANNING RULES:
 - After the required issue read and MCP lookups are complete, write the JSON and Markdown artifacts immediately. Keep the plan concise; do not spend additional turns narrating or re-checking unless a required field is genuinely missing.
 - Before writing screenshot or live-validation evidence, call `get_validation_capabilities` and use its returned `card_surfaces`, `relic_surfaces`, `runtime_options`, `recommended_tooltip_evidence_flow`, `recommended_relic_tooltip_evidence_flow`, and `tools[]` manifest as the source of truth for what verification can open, tooltip, screenshot, and mutate. Each referenced tool plan should respect the manifest fields `safe_for_test_planning`, `mutates_state`, `requires_game_running`, `requires_combat`, `output_contract`, `common_failures`, and `examples`. Do not assume an unavailable view exists, and do not omit an available view such as deck, draw_pile, discard_pile, exhaust_pile, player_relic_bar, relic_select, treasure, or verbose hand stats when it is the right evidence surface.
 - If MCP catalog metadata or validation capabilities cannot support the needed validation plan, abort.
-- Write `issue-agent-test-plan.json` with:
+- Write `test-plan.json` with:
   `{ "layer":"test_plan", "status":"pass|abort", "abort_reason":null, "retryable":false, "human_action_required":false, "notes":"", "target_kind":"card|relic|mixed|unknown", "card":{}, "relic":{}, "character":{}, "card_metadata_discovery":{"passed":true,"status":"pass","notes":"scenario card ids resolved from MCP catalog tools"}, "relic_metadata_discovery":{"passed":true,"status":"pass","notes":"scenario relic ids resolved from MCP catalog tools"}, "scenario_id_validation":{"passed":true,"cards":[{"field":"deck","input":"TARGET_CARD_ID","id":"TARGET_CARD_ID","name":"Target Card","source":"lookup_card|list_cards"}],"relics":[{"field":"add_relics","input":"REAL_RELIC_ID","id":"REAL_RELIC_ID","name":"Relic Name","source":"lookup_relic|list_relics"}],"encounters":[],"notes":"every id in scenario_setup was resolved from MCP catalog tools"}, "validation_plan":[], "scenario_setup":{"base_save_name":"base_<character>","scenario_name":"issue_<issue>_<short_target>","deck":["TARGET_CARD_ID","REAL_SUPPORT_CARD_ID"],"add_cards":null,"remove_cards":null,"relics":null,"add_relics":null,"remove_relics":null,"gold":null,"current_hp":null,"max_hp":null,"max_energy":null,"next_normal_encounter":null,"notes":"small deterministic setup that satisfies the evidence plan"}, "required_evidence":[{"id":"unit-tests","kind":"unit_test","required":true,"must_show":"specific tests that prove the changed behavior"},{"id":"live-target-visible","kind":"screenshot","required":true,"must_show":"target card/relic/UI/tooltip state visibly proving the issue claim, including the exact text/value that should appear","target_visible_required":true,"text_visible_required":true,"expected_text":"<exact substring that must appear in observed_text — derived from scenario_setup × validation_plan, e.g. 'vigor gained: 8' for one combat-start of Akabeko>","allowed_fallback":null}] }`
 - `scenario_setup` is the deterministic pre-verification save recipe. Choose the correct `base_save_name` from the verified character identity, such as `base_regent`, `base_ironclad`, `base_silent`, `base_defect`, or `base_necrobinder`. Use a complete small `deck` of real card ids that lets normal gameplay reach the evidence state quickly. When a card needs support cards, use `list_cards` with the resolved owner/type/query constraints to select real support card ids from MCP metadata, and set enough energy/max_energy for the planned validation actions. Do not tell verification to use dev-console `fight`/`card` commands for card availability; card availability must come from this save recipe.
 - Never write `card_metadata_discovery.status="not_run"` merely because the issue target is not a card when `scenario_setup` contains cards. If the scenario has any card id, card metadata discovery for those scenario cards must pass or the phase must abort.
@@ -1131,7 +1131,7 @@ TEST PLANNING RULES:
 - For card-stat tooltip issues, default visual evidence is the in-hand card tooltip unless the issue explicitly names a non-hand surface or the validation capabilities show that another surface is required to expose the relevant state. If the issue requests multiple tooltip rows or states, require the screenshot evidence to show all requested rows or states together when possible, and otherwise explain the exact surface split in the evidence contract.
 - For relic-stat issues, prefer a deterministic scenario save with the target relic in `relics` or `add_relics`, then require evidence from `get_game_state` showing the resolved relic id/name in the player's relic list plus the best visible relic tooltip surface supported by validation capabilities. For relic tooltip/text claims, require `text_visible_required:true` and plan `list_visible_relics(surface)` -> `show_relic_tooltip(surface, relic_id=...)` -> `capture_screenshot` when those tools are available. If the capabilities do not expose forced relic-hover support, require the strongest available relic-visible screenshot and describe the missing hover capability instead of pretending card tooltip tools can prove relic text.
 - Allowed abort reasons: card_not_found, card_ambiguous, character_not_found, metadata_unavailable, mcp_capability_missing, game_state_unreachable, validation_plan_impossible.
-- Write `issue-agent-test-plan.md` summarizing facts found, scenario recipe, missing facts, and the validation plan.
+- Write `test-plan.md` summarizing facts found, scenario recipe, missing facts, and the validation plan.
 "@
 
 $implementationPrompt = (Get-CommonPromptPrefix -PhaseName 'implementation' -IncludeIssueRead $true) + @"
@@ -1142,33 +1142,33 @@ IMPLEMENTATION RULES:
 - For every issue-specified card, relic, or character, call MCP catalog lookup tools before editing. Use `lookup_card` for cards, `lookup_relic` for relics, and `lookup_character` for characters; if the target type is unclear, try both card and relic lookup before aborting. Abort rather than guessing ids, ownership, or ambiguity.
 - Do not run unit tests, integration tests, live validation, or screenshot validation. Verification owns every `dotnet test`, live MCP action, and screenshot.
 - You may inspect code, edit code, and run focused builds for compile sanity only. For this repo, compile sanity means `dotnet build "Core/SpireLens.Core.csproj" -c Debug` and, when tests were edited or referenced, `dotnet build "Tests/SpireLens.Core.Tests/SpireLens.Core.Tests.csproj" -c Debug`. Do not build the root `SpireLens.csproj` as a compile sanity check, and do not use `--no-restore`; the root Godot project can require generated `.godot/mono/temp` assets that are not present yet. The workflow wrapper owns the broader build, branch, commit, push, and PR creation after verification passes.
-- Keep repository and dependency discovery scoped to this run. Do not search above `$RepoRoot`, under sibling or parent runner workspaces, or inside stale `issue-agent-src` directories from older runs. On the Windows issue-agent runner, the workflow exposes the resolved STS2 install as `ISSUE_AGENT_STS2_GAME_DIR` and the resolved STS2 data directory as `ISSUE_AGENT_STS2_DATA_DIR`; use those first for game assembly metadata. If those are unavailable, use `Sts2PathDiscovery.props`, the configured `Sts2DataDir`, or a focused build in the current checkout to materialize publicized assemblies under the current `$RepoRoot`. Do not start by probing whole drives, registry Steam locations, or old runner artifacts. If those scoped paths are unavailable, abort with `missing_code_context` instead of scanning outside the run.
+- Keep repository and dependency discovery scoped to this run. Do not search above `$RepoRoot`, under sibling or parent runner workspaces, or inside stale `src` directories from older runs. On the Windows game host, the workflow exposes the resolved STS2 install as `SPIRELENS_HOST_STS2_GAME_DIR` and the resolved STS2 data directory as `SPIRELENS_HOST_STS2_DATA_DIR`; use those first for game assembly metadata. If those are unavailable, use `Sts2PathDiscovery.props`, the configured `Sts2DataDir`, or a focused build in the current checkout to materialize publicized assemblies under the current `$RepoRoot`. Do not start by probing whole drives, registry Steam locations, or old runner artifacts. If those scoped paths are unavailable, abort with `missing_code_context` instead of scanning outside the run.
 - If no code change is needed, write a pass result with `changed_files: []`, `opened_pr: null`, and `verification_required: true`; do not run tests to prove that claim.
 - Do not start gameplay, enter rooms, play cards, capture screenshots, or perform live MCP validation; leave all live MCP validation to verification.
 - If the viable solve requires dramatic changes, a new library, architecture changes, or unsafe refactors, abort.
 - Do not create branches, commit, push, open PRs, comment on issues, edit labels, or perform any other GitHub mutation.
-- Write `issue-agent-implementation.json` with:
+- Write `implementation.json` with:
   `{ \"layer\":\"implementation\", \"status\":\"pass|abort\", \"abort_reason\":null, \"retryable\":false, \"human_action_required\":false, \"notes\":\"\", \"changed_files\":[], \"opened_pr\":null, \"opened_pr_url\":null, \"pr_title\":null, \"pr_body\":null, \"verification_required\":true }`
 - Allowed abort reasons: change_too_large, requires_new_library, requires_architecture_change, unsafe_refactor, missing_code_context, conflicting_requirements, cannot_implement_without_guessing.
-- Write `issue-agent-implementation.md` summarizing changes, suggested PR title/body if useful, no-change decision, or abort reason. Do not mention a created branch, commit, or PR because this phase must not create them.
+- Write `implementation.md` summarizing changes, suggested PR title/body if useful, no-change decision, or abort reason. Do not mention a created branch, commit, or PR because this phase must not create them.
 "@
 
 $verificationPrompt = (Get-CommonPromptPrefix -PhaseName 'verification') + @"
 
 VERIFICATION RULES:
-- Read `issue-agent-test-plan.json`, `issue-agent-implementation.json`, and `issue-agent-scenario-setup.json` first. Treat `issue-agent-test-plan.json.required_evidence` as a hard acceptance contract. Do not pass unless every required evidence item is satisfied in `evidence_results`.
+- Read `test-plan.json`, `implementation.json`, and `scenario-setup.json` first. Treat `test-plan.json.required_evidence` as a hard acceptance contract. Do not pass unless every required evidence item is satisfied in `evidence_results`.
 - Own tests, live MCP validation, screenshot capture, and final evidence only. This phase is sealed from GitHub mutation: no issue comments, labels, branches, commits, pushes, or PRs.
 - Use this Windows validation sequence unless the test plan says it is not applicable:
 
 ``````powershell
-`$sts2DataDir = `$env:ISSUE_AGENT_STS2_DATA_DIR
-if ([string]::IsNullOrWhiteSpace(`$sts2DataDir)) { throw "ISSUE_AGENT_STS2_DATA_DIR was not set." }
+`$sts2DataDir = `$env:SPIRELENS_HOST_STS2_DATA_DIR
+if ([string]::IsNullOrWhiteSpace(`$sts2DataDir)) { throw "SPIRELENS_HOST_STS2_DATA_DIR was not set." }
 dotnet build "Tests\SpireLens.Core.Tests\SpireLens.Core.Tests.csproj" -c Debug "-p:Sts2DataDir=`$sts2DataDir"
 dotnet test "Tests\SpireLens.Core.Tests\SpireLens.Core.Tests.csproj" -c Debug --no-build "-p:Sts2DataDir=`$sts2DataDir"
 ``````
 
 - The full test command above is a hard gate. If any test fails after the implementation checkout is deployed, verification must abort with unit_tests_failed; do not call failures "pre-existing", "outside the contract", "partial", or "follow-up" when baseline main passed earlier in this workflow.
-- Default live validation fixture: the workflow has already materialized, installed, validated, and loaded the scenario save before this LLM phase starts. Read `issue-agent-scenario-setup.json` first, then inspect the live state with `get_game_state`. Do not call save materialization, save installation, current-run validation, current-run loading, save listing, save inspection, or scenario-command discovery tools. Do not use live MCP tools to arrange hand/draw/discard/exhaust piles. If needed after combat loads, `configure_live_combat` may set only sparse live properties such as enemy HP, current energy/stars, player powers, or enemy powers; card availability must come from the scenario save/deck and normal gameplay. If the game is at Neow, menu, the wrong character, transition-only state, or any unexpected state after loading, abort with `mcp_state_mismatch` or `game_state_unreachable`; do not choose Neow options, start ad hoc runs, or enter random debug rooms.
+- Default live validation fixture: the workflow has already materialized, installed, validated, and loaded the scenario save before this LLM phase starts. Read `scenario-setup.json` first, then inspect the live state with `get_game_state`. Do not call save materialization, save installation, current-run validation, current-run loading, save listing, save inspection, or scenario-command discovery tools. Do not use live MCP tools to arrange hand/draw/discard/exhaust piles. If needed after combat loads, `configure_live_combat` may set only sparse live properties such as enemy HP, current energy/stars, player powers, or enemy powers; card availability must come from the scenario save/deck and normal gameplay. If the game is at Neow, menu, the wrong character, transition-only state, or any unexpected state after loading, abort with `mcp_state_mismatch` or `game_state_unreachable`; do not choose Neow options, start ad hoc runs, or enter random debug rooms.
 - For SpireLens card-stat tooltip evidence, use `bridge_health`, `set_spirelens_view_stats_enabled(true)`, `list_visible_cards(surface)`, then `show_card_tooltip(surface, card_index, card_id)` on the target visible card, then `capture_screenshot`. Prefer `card_id` over card_index alone when validating a named card. For deck, draw pile, discard pile, or exhaust pile evidence, call `open_card_pile(pile)` first, use the matching surface name with `list_visible_cards`/`show_card_tooltip`, capture the screenshot, then call `close_card_pile()`. If `list_visible_cards` cannot find the target, `show_card_tooltip` returns an error, the bridge health check fails, or the captured screenshot still shows the wrong/stale tooltip after one retry, abort with `target_evidence_missing` or `game_state_unreachable`; do not keep trying arbitrary indices. Prefer this route over ad hoc mouse/hover attempts.
 - For SpireLens relic-stat tooltip evidence, use `bridge_health`, `set_spirelens_view_stats_enabled(true)`, `list_visible_relics(surface)`, then `show_relic_tooltip(surface, relic_id=...)` on the target visible relic, then `capture_screenshot`. Prefer `player_relic_bar` for owned relic stats unless the test plan explicitly names `relic_select` or `treasure`. Prefer `relic_id` over relic_index alone. If `list_visible_relics` cannot find the target, `show_relic_tooltip` returns an error, the bridge health check fails, or the captured screenshot still shows the wrong/stale tooltip after one retry, abort with `target_evidence_missing` or `game_state_unreachable`; do not use card tooltip tools or arbitrary mouse hover attempts as substitutes.
 - Capture screenshots only through the `capture_screenshot` MCP tool.
@@ -1176,16 +1176,16 @@ dotnet test "Tests\SpireLens.Core.Tests\SpireLens.Core.Tests.csproj" -c Debug --
 - If `capture_screenshot` is unavailable or does not return a saved PNG path plus dimensions, abort with screenshot_missing.
 - If the saved screenshot is not meaningful evidence for the validation claim, abort with screenshot_not_relevant. For a named card, tooltip, or UI issue, screenshots must show the target card, tooltip, or changed UI state. If the relevant evidence lives in draw pile, discard pile, exhaust pile, deck view, card selection, rewards, or another non-hand surface, navigate to that surface through MCP when available and capture the target-visible screenshot there. If MCP cannot make the required card text/tooltip visible, abort with target_evidence_missing and say which view or pile was unreachable; do not pass on hand screenshots, unit tests, repeated tooltip attempts, or adjacent state.
 - Keep verification bounded: capture the planned screenshot once, and at most one retry per required screenshot if the tooltip or text is stale. If the evidence is still not legible or not causally valid after that, immediately write an abort result with 	arget_evidence_missing, screenshot_not_relevant, or claimed_result_not_observed; do not improvise a new multi-turn scenario until timeout.
-- Write `issue-agent-verification.json` with:
+- Write `verification.json` with:
   `{ "layer":"verification", "status":"pass|abort", "abort_reason":null, "retryable":false, "human_action_required":false, "notes":"", "unit_tests":{"passed":null,"status":"not_run","notes":""}, "live_mcp_validation":{"passed":null,"status":"not_run","notes":""}, "screenshot_validation":{"passed":null,"status":"not_run","count":0,"target_visible":false,"notes":""}, "evidence_results":[{"evidence_id":"","kind":"unit_test|screenshot|live_mcp|manual_blocker","passed":false,"artifact_paths":[],"target_visible":false,"text_visible":false,"observed_text":"","notes":""}], "used_mcp":null, "used_raw_bridge_or_queue":false }`
 - For each `required_evidence` item from the test plan, write exactly one matching `evidence_results` item. Screenshot evidence must include artifact_paths. If the contract requires tooltip/text evidence, set `text_visible:true` only when the screenshot itself shows the required text and copy the visible words into `observed_text`. If the text/tooltip cannot be made visible, abort with target_evidence_missing; do not pass by saying unit tests cover it.
 - When the matching `required_evidence` item carries an `expected_text` field, copy the **literal characters from the screenshot** into `observed_text` — do not paraphrase, summarize, or "clean up" what the screenshot shows. The wrapper compares `observed_text` against `expected_text` (case-insensitive substring match) and aborts with `claimed_result_not_observed` on mismatch. If the screenshot shows `vigor gained: 88` and the contract said `expected_text: vigor gained: 8`, you must write `observed_text: "vigor gained: 88"` so the mismatch is caught — never write what the contract *should* show; write what the pixels actually show. If you can't read the value confidently, abort with `target_evidence_missing` rather than guess.
 - For card-stat tooltip issues, prefer `show_card_tooltip(surface="hand", card_id=...)` and require the in-hand screenshot to satisfy the text contract unless the test plan explicitly names a non-hand surface.
 - For relic-stat tooltip issues, prefer `show_relic_tooltip(surface="player_relic_bar", relic_id=...)` and require the relic tooltip screenshot to satisfy the text contract unless the test plan explicitly names a non-owned relic surface.
 - Allowed abort reasons: unit_tests_failed, live_validation_failed, screenshot_missing, screenshot_not_relevant, target_evidence_missing, mcp_state_mismatch, game_state_unreachable, claimed_result_not_observed, artifact_contract_missing.
-- Also write rollup `issue-agent-result.json` with issue_number, status, abort_layer, abort_reason, retryable, human_action_required, layers, unit_tests, live_mcp_validation, screenshot_validation, card_metadata_discovery, used_mcp, used_raw_bridge_or_queue, opened_pr, opened_pr_url, should_close_issue, and evidence_summary.
-- Write `issue-agent-verification.md` summarizing pass/fail evidence. It MUST include a `## Test Process` section that walks through what the verification phase actually did, in plain English, step by step. For every step in the validation plan that ran, include three lines: (1) **What was done** — the action in plain language; (2) **What it was supposed to prove** — the observation that step was meant to produce, naming expected numeric values where the test scenario implies one (e.g. "Akabeko's start-of-combat trigger should fire exactly once per combat and grant 8 Vigor — `VIGOR_POWER` status amount=8 and the SpireLens `vigor gained` accumulator at 8"); (3) **What was actually observed** — the concrete value or state read back from the game, copied verbatim from the relevant `get_game_state` field or screenshot OCR. If the observed value differs from the expected, abort with `claimed_result_not_observed`; do not pass and bury the discrepancy. The Test Process section is required even when the run passes — its purpose is to let a reviewer comparing the produced PR/screenshot against the test scenario quickly tell whether an unexpected number is a real bug or an expected accumulator behavior.
-- Write `issue-agent-result.md` as a compact final rollup including any PR URL from implementation.
+- Also write rollup `result.json` with issue_number, status, abort_layer, abort_reason, retryable, human_action_required, layers, unit_tests, live_mcp_validation, screenshot_validation, card_metadata_discovery, used_mcp, used_raw_bridge_or_queue, opened_pr, opened_pr_url, should_close_issue, and evidence_summary.
+- Write `verification.md` summarizing pass/fail evidence. It MUST include a `## Test Process` section that walks through what the verification phase actually did, in plain English, step by step. For every step in the validation plan that ran, include three lines: (1) **What was done** — the action in plain language; (2) **What it was supposed to prove** — the observation that step was meant to produce, naming expected numeric values where the test scenario implies one (e.g. "Akabeko's start-of-combat trigger should fire exactly once per combat and grant 8 Vigor — `VIGOR_POWER` status amount=8 and the SpireLens `vigor gained` accumulator at 8"); (3) **What was actually observed** — the concrete value or state read back from the game, copied verbatim from the relevant `get_game_state` field or screenshot OCR. If the observed value differs from the expected, abort with `claimed_result_not_observed`; do not pass and bury the discrepancy. The Test Process section is required even when the run passes — its purpose is to let a reviewer comparing the produced PR/screenshot against the test scenario quickly tell whether an unexpected number is a real bug or an expected accumulator behavior.
+- Write `result.md` as a compact final rollup including any PR URL from implementation.
 - Do not remove or add labels, post comments, create branches, commit, push, or open PRs. The workflow wrapper handles GitHub updates after this phase writes evidence.
 "@
 
@@ -1214,12 +1214,12 @@ foreach ($phase in $phasesToRun) {
     }
 }
 
-$resultMarkdown = Join-Path $ValidationArtifactDir 'issue-agent-result.md'
+$resultMarkdown = Join-Path $ValidationArtifactDir 'result.md'
 if (Test-Path -LiteralPath $resultMarkdown) {
-    Add-JobSummaryMarkdown -Title 'Issue Agent final result' -MarkdownPath $resultMarkdown
+    Add-JobSummaryMarkdown -Title 'Run final result' -MarkdownPath $resultMarkdown
 }
 
-Write-AgentEvent 'exit' 'Phased issue-agent script completed.'
+Write-AgentEvent 'exit' 'Phased run script completed.'
 
 
 

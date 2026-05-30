@@ -28,7 +28,7 @@ function Invoke-LoggedStep {
 
 $repoRoot = Join-Path $env:GLIMMUNG_REPO_ROOT $CheckoutPath
 if (-not (Test-Path -LiteralPath $repoRoot)) {
-    throw "Issue-agent checkout was not found at '$repoRoot'."
+    throw "Repository checkout was not found at '$repoRoot'."
 }
 
 function Add-PathCandidate {
@@ -49,7 +49,7 @@ function Resolve-Sts2GameDir {
     param([string]$RepoRoot)
 
     $gameDirCandidates = [System.Collections.Generic.List[string]]::new()
-    Add-PathCandidate $gameDirCandidates $env:ISSUE_AGENT_STS2_GAME_DIR
+    Add-PathCandidate $gameDirCandidates $env:SPIRELENS_HOST_STS2_GAME_DIR
     Add-PathCandidate $gameDirCandidates $env:CONFIGURED_STS2_GAME_DIR
 
     $mcpConfigPath = Join-Path $RepoRoot '.mcp.json'
@@ -110,7 +110,7 @@ function New-JobMcpConfig {
         $server.env | Add-Member -NotePropertyName STS2_GAME_DIR -NotePropertyValue $GameDir
     }
 
-    $mcpConfigRoot = Join-Path $env:GLIMMUNG_WORKING_DIR "issue-agent-mcp"
+    $mcpConfigRoot = Join-Path $env:GLIMMUNG_WORKING_DIR "mcp"
     New-Item -ItemType Directory -Force -Path $mcpConfigRoot | Out-Null
     $safeCheckoutName = ([IO.Path]::GetFileName($CheckoutPath) -replace '[^A-Za-z0-9._-]', '-')
     $jobMcpConfigPath = Join-Path $mcpConfigRoot "$($env:GLIMMUNG_RUN_ID)-$($env:GLIMMUNG_ATTEMPT_INDEX)-$safeCheckoutName.mcp.json"
@@ -142,23 +142,23 @@ $claudePath = $candidates |
     Select-Object -First 1
 
 if (-not $claudePath) {
-    throw "Claude Code CLI was not found. Set ISSUE_AGENT_CLAUDE_CLI_PATH or install Claude under a documented default location."
+    throw "Claude Code CLI was not found. Set CONFIGURED_CLAUDE_CLI_PATH or install Claude under a documented default location."
 }
 
-$buildRoot = Join-Path $env:GLIMMUNG_WORKING_DIR ("issue-agent-build\$($env:GLIMMUNG_RUN_ID)-$($env:GLIMMUNG_ATTEMPT_INDEX)-$([IO.Path]::GetFileName($CheckoutPath))")
+$buildRoot = Join-Path $env:GLIMMUNG_WORKING_DIR ("build\$($env:GLIMMUNG_RUN_ID)-$($env:GLIMMUNG_ATTEMPT_INDEX)-$([IO.Path]::GetFileName($CheckoutPath))")
 New-Item -ItemType Directory -Force -Path $buildRoot | Out-Null
 
 "CLAUDE_CLI_PATH=$claudePath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8NoBOM -Append
-"ISSUE_AGENT_REPO_ROOT=$repoRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8NoBOM -Append
-"ISSUE_AGENT_BUILD_ROOT=$buildRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8NoBOM -Append
+"SPIRELENS_HOST_REPO_ROOT=$repoRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8NoBOM -Append
+"SPIRELENS_HOST_BUILD_ROOT=$buildRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8NoBOM -Append
 
 $gameDir = Resolve-Sts2GameDir -RepoRoot $repoRoot
 $sts2DataDir = Join-Path $gameDir 'data_sts2_windows_x86_64'
 $jobMcpConfigPath = New-JobMcpConfig -RepoRoot $repoRoot -GameDir $gameDir
 
-"ISSUE_AGENT_STS2_GAME_DIR=$gameDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8NoBOM -Append
-"ISSUE_AGENT_STS2_DATA_DIR=$sts2DataDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8NoBOM -Append
-"ISSUE_AGENT_MCP_CONFIG_PATH=$jobMcpConfigPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8NoBOM -Append
+"SPIRELENS_HOST_STS2_GAME_DIR=$gameDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8NoBOM -Append
+"SPIRELENS_HOST_STS2_DATA_DIR=$sts2DataDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8NoBOM -Append
+"SPIRELENS_HOST_MCP_CONFIG_PATH=$jobMcpConfigPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8NoBOM -Append
 
 if (-not $InstallMcp) { return }
 

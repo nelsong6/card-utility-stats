@@ -10,7 +10,7 @@ Allowed entries:
 
 1. The user's own mods — currently **SpireLens**.
 2. Required prereqs for (1) — currently **BaseLib** (Alchyr), which SpireLens depends on for Harmony patching and node factories.
-3. Tooling prereqs required to validate (1) via the issue-agent flow — currently **`SpireLensMcp`** (in-house fork at [`nelsong6/spire-lens-mcp`](https://github.com/nelsong6/spire-lens-mcp), source at `D:\repos\spire-lens-mcp\`, vendored from `Gennadiyev/STS2MCP` under MIT). Listens on `localhost:15526` exposing `/api/v1/singleplayer` and `/api/v1/multiplayer`; the Python MCP server in the same repo's `mcp/` directory connects to that endpoint and exposes ~50 game-control tools to Claude. Without it the issue-agent workflow's bridge-readiness probe fails before Claude launches.
+3. Tooling prereqs required to validate (1) via the automated verify run — currently **`SpireLensMcp`** (in-house fork at [`nelsong6/spire-lens-mcp`](https://github.com/nelsong6/spire-lens-mcp), source at `D:\repos\spire-lens-mcp\`, vendored from `Gennadiyev/STS2MCP` under MIT). Listens on `localhost:15526` exposing `/api/v1/singleplayer` and `/api/v1/multiplayer`; the Python MCP server in the same repo's `mcp/` directory connects to that endpoint and exposes ~50 game-control tools to Claude. Without it the run's bridge-readiness probe fails before Claude launches.
 
 When inspecting `mods/`, treat any non-(SpireLens|BaseLib|SpireLensMcp) entry as a removal candidate. Don't recommend installing third-party mods even for diagnostics — prefer adding the diagnostic to SpireLens itself. Orphaned appdata under `%APPDATA%\SlayTheSpire2\` from removed third-party mods is also fair game to clean up, after inspecting contents (some folders, e.g. save-game backups, may have user value). Expected `Loaded N mods` line in the game log: **3** when SpireLensMcp is installed (BaseLib + SpireLens + SpireLensMcp), **2** otherwise.
 
@@ -64,9 +64,9 @@ When inspecting `mods/`, treat any non-(SpireLens|BaseLib|SpireLensMcp) entry as
   - prefer empirical results over intent text
   - be explicit when attribution is heuristic, pooled, contributor-ledger based, or case-specific
 
-## Issue-agent execution model
+## Run execution model
 
-Issue-agent runs are dispatched by `nelsong6/glimmung` against this repo's
+Runs are dispatched by `nelsong6/glimmung` against this repo's
 registered workflow. Each phase runs as a Glimmung-managed `k8s_job` in the
 cluster, but the load-bearing work (Claude invocation, build, deploy, scenario
 prep, verification) executes on this gaming laptop because the warm Slay the
@@ -86,8 +86,9 @@ pwsh scripts at `.github/scripts/`. The pwsh contract is glimmung-shaped:
 `GLIMMUNG_RUN_ID`, `GLIMMUNG_ATTEMPT_INDEX`, `GLIMMUNG_PROJECT_REPO`,
 `GLIMMUNG_WORKING_DIR`, `GLIMMUNG_REPO_ROOT` — no GHA env vars.
 
-There is no GitHub Actions self-hosted runner on this host. There is no
-`issue-agent.yaml` workflow. Sign-in remains manual (no AutoAdminLogon) — if
+There is no GitHub Actions self-hosted runner on this host, and no GitHub
+Actions workflow file drives these runs. Sign-in remains manual (no
+AutoAdminLogon) — if
 the laptop is asleep or pre-logon, the orchestrator's `env-prep` phase aborts
 with `host_unavailable` and the run requeues until next manual sign-in.
 

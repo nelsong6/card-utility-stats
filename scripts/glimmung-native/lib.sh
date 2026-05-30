@@ -236,7 +236,7 @@ native_tailscale_host_ip() {
 
 # native_ssh_user returns the Windows local account on the laptop the
 # SSH cert authenticates as. Pinned per project decision (Q5 from
-# spirelens#179 — single-user, no dedicated issue-agent account).
+# spirelens#179 — single-user, no dedicated automation account).
 native_ssh_user() {
   printf '%s' "${SPIRELENS_SSH_USER:-nelsonlaptopuser}"
 }

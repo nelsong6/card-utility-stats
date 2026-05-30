@@ -79,9 +79,9 @@ push_branch() {
 }
 
 collect_implementation() {
-  local local_path="${GLIMMUNG_WORKING_DIR}/issue-agent-implementation.json"
+  local local_path="${GLIMMUNG_WORKING_DIR}/implementation.json"
   native_scp_pull "$HOST_IP" \
-    "C:/glimmung-runs/${GLIMMUNG_RUN_REF}/sts2-artifacts/issue-agent-implementation.json" \
+    "C:/glimmung-runs/${GLIMMUNG_RUN_REF}/sts2-artifacts/implementation.json" \
     "$local_path"
   native_emit_output implementation "$(<"$local_path")"
 }
