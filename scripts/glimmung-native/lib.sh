@@ -91,6 +91,35 @@ native_emit_abort() {
 }
 
 # ---------------------------------------------------------------------
+# Version comparison
+# ---------------------------------------------------------------------
+
+# native_semver_ge <a> <b>
+# Returns 0 (true) if version a >= version b, else 1. Accepts an
+# optional leading 'v' and MAJOR.MINOR.PATCH (missing components are
+# treated as 0; a trailing pre-release suffix like -beta is stripped
+# per component). Comparison is numeric per component, NOT lexical, so
+# v3.1.10 >= v3.1.8 holds. An empty or non-numeric `a` is treated as
+# below any `b` (returns 1) — fail-closed for the version-floor gate.
+native_semver_ge() {
+  local a="${1#v}" b="${2#v}"
+  local IFS=.
+  local -a av=() bv=()
+  read -ra av <<<"$a"
+  read -ra bv <<<"$b"
+  local i ai bi
+  for i in 0 1 2; do
+    ai="${av[i]:-0}"; bi="${bv[i]:-0}"
+    ai="${ai%%-*}"; bi="${bi%%-*}"
+    [[ "$ai" =~ ^[0-9]+$ ]] || return 1
+    [[ "$bi" =~ ^[0-9]+$ ]] || return 1
+    if ((10#$ai > 10#$bi)); then return 0; fi
+    if ((10#$ai < 10#$bi)); then return 1; fi
+  done
+  return 0
+}
+
+# ---------------------------------------------------------------------
 # Glimmung run-callback primitives
 # ---------------------------------------------------------------------
 
