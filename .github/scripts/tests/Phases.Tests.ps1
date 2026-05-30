@@ -1,6 +1,6 @@
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '5.0.0' }
 
-# Tests for the helpers defined in run-issue-agent-phases.ps1. We extract
+# Tests for the helpers defined in run-phases.ps1. We extract
 # function definitions via AST so the tests run against the live source.
 
 BeforeAll {
@@ -9,7 +9,7 @@ BeforeAll {
 
     Import-Module (Join-Path $PSScriptRoot 'Helpers.psm1') -Force
 
-    $scriptPath = Join-Path $PSScriptRoot '..' 'run-issue-agent-phases.ps1'
+    $scriptPath = Join-Path $PSScriptRoot '..' 'run-phases.ps1'
     $source = Import-ScriptFunctions -ScriptPath $scriptPath -FunctionNames @(
         'Get-PropertyValue', 'Set-PropertyValue', 'ConvertTo-Array',
         'Get-TextBlob', 'Test-TextMentionsUnavailableEvidence',

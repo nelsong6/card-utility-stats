@@ -1,8 +1,8 @@
-# Test-helper module for the issue-agent Pester suite.
+# Test-helper module for the native phase Pester suite.
 #
-# Both production scripts (run-issue-agent-phases.ps1, summarize-issue-agent.ps1)
-# define their helpers inline alongside a script-level main flow. Importing the
-# scripts directly would fail because the main flow needs param values + an
+# The production script (run-phases.ps1) defines its helpers inline alongside a
+# script-level main flow. Importing the
+# script directly would fail because the main flow needs param values + an
 # STS2 host. Instead we extract the function definitions out of the script
 # source via the PowerShell AST and load them into a fresh module scope. This
 # keeps the test file in lockstep with the latest source — there is no copied

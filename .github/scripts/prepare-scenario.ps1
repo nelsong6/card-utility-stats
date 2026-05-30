@@ -285,7 +285,7 @@ else:
     raise SystemExit(f"unknown mode: {mode}")
 '@
 
-    $scriptPath = Join-Path $env:TEMP ('prepare-issue-agent-scenario-' + [guid]::NewGuid().ToString() + '.py')
+    $scriptPath = Join-Path $env:TEMP ('prepare-scenario-' + [guid]::NewGuid().ToString() + '.py')
     try {
         [System.IO.File]::WriteAllText($scriptPath, $python, (New-Object System.Text.UTF8Encoding($false)))
         & uv run --directory $McpDirectory python $scriptPath $Mode $SetupPath $OutputPath

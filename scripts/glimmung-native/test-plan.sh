@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # test-plan phase for spirelens. Runs the existing
-# run-issue-agent-phases.ps1 script on the laptop with
+# run-phases.ps1 script on the laptop with
 # -PhaseName test_plan; pulls the resulting JSON artifact back to
 # the orchestrator pod and emits it as a phase output for the
 # verify-loop's later evidence-gate to read.
@@ -25,7 +25,7 @@ run_test_plan() {
 \$env:GLIMMUNG_PROJECT_REPO = '${GLIMMUNG_PROJECT_REPO:-nelsong6/spirelens}'
 \$env:GLIMMUNG_WORKING_DIR = "C:\\glimmung-runs\\${GLIMMUNG_RUN_REF}"
 \$env:GLIMMUNG_REPO_ROOT = 'D:\\repos\\SpireLens'
-& 'D:\\repos\\SpireLens\\.github\\scripts\\run-issue-agent-phases.ps1' \`
+& 'D:\\repos\\SpireLens\\.github\\scripts\\run-phases.ps1' \`
     -PhaseName test_plan \`
     -IssueNumber '${GLIMMUNG_ISSUE_NUMBER}' \`
     -RepoSlug '${GLIMMUNG_PROJECT_REPO:-nelsong6/spirelens}' \`

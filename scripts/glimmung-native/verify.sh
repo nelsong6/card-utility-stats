@@ -6,9 +6,9 @@
 #   - Checks out the implementation branch produced by the implement
 #     phase.
 #   - Builds + deploys the SpireLens .dll into the live mods/ folder.
-#   - Runs prepare-issue-agent-scenario.ps1 to rig the STS2 save the
+#   - Runs prepare-scenario.ps1 to rig the STS2 save the
 #     verification scenario expects.
-#   - Runs run-issue-agent-phases.ps1 -PhaseName verification, which
+#   - Runs run-phases.ps1 -PhaseName verification, which
 #     drives Claude through SpireLensMcp's game-control surface and
 #     writes verification.json + a screenshot directory.
 #
@@ -55,7 +55,7 @@ prepare_scenario() {
 \$env:GLIMMUNG_RUN_ID = '${GLIMMUNG_RUN_ID}'
 \$env:GLIMMUNG_WORKING_DIR = "C:\\glimmung-runs\\${GLIMMUNG_RUN_REF}"
 \$env:GLIMMUNG_REPO_ROOT = 'D:\\repos\\SpireLens'
-& 'D:\\repos\\SpireLens\\.github\\scripts\\prepare-issue-agent-scenario.ps1' \`
+& 'D:\\repos\\SpireLens\\.github\\scripts\\prepare-scenario.ps1' \`
     -TestPlanPath "\$env:GLIMMUNG_WORKING_DIR\\sts2-artifacts\\issue-agent-test-plan.json" \`
     -RepoRoot \$env:GLIMMUNG_REPO_ROOT \`
     -ValidationArtifactDir "\$env:GLIMMUNG_WORKING_DIR\\sts2-artifacts" \`
@@ -70,7 +70,7 @@ run_verification() {
 \$env:GLIMMUNG_PROJECT_REPO = '${GLIMMUNG_PROJECT_REPO:-nelsong6/spirelens}'
 \$env:GLIMMUNG_WORKING_DIR = "C:\\glimmung-runs\\${GLIMMUNG_RUN_REF}"
 \$env:GLIMMUNG_REPO_ROOT = 'D:\\repos\\SpireLens'
-& 'D:\\repos\\SpireLens\\.github\\scripts\\run-issue-agent-phases.ps1' \`
+& 'D:\\repos\\SpireLens\\.github\\scripts\\run-phases.ps1' \`
     -PhaseName verification \`
     -IssueNumber '${GLIMMUNG_ISSUE_NUMBER}' \`
     -RepoSlug '${GLIMMUNG_PROJECT_REPO:-nelsong6/spirelens}' \`
