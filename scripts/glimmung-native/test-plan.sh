@@ -39,9 +39,9 @@ collect_test_plan() {
   # The pwsh script writes the artifact at a known sub-path under
   # the laptop's per-run working dir. We pull it back and emit as
   # `test_plan` for the llm-work phase outputs.
-  local local_path="${GLIMMUNG_WORKING_DIR}/issue-agent-test-plan.json"
+  local local_path="${GLIMMUNG_WORKING_DIR}/test-plan.json"
   native_scp_pull "$HOST_IP" \
-    "C:/glimmung-runs/${GLIMMUNG_RUN_REF}/sts2-artifacts/issue-agent-test-plan.json" \
+    "C:/glimmung-runs/${GLIMMUNG_RUN_REF}/sts2-artifacts/test-plan.json" \
     "$local_path"
   native_emit_output test_plan "$(<"$local_path")"
 }

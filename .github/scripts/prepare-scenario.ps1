@@ -36,7 +36,7 @@ function Invoke-LoggedStep {
 function Write-SetupArtifact {
     param([hashtable]$Data)
     New-Item -ItemType Directory -Force -Path $ValidationArtifactDir | Out-Null
-    $path = Join-Path $ValidationArtifactDir 'issue-agent-scenario-setup.json'
+    $path = Join-Path $ValidationArtifactDir 'scenario-setup.json'
     [System.IO.File]::WriteAllText($path, ($Data | ConvertTo-Json -Depth 30), (New-Object System.Text.UTF8Encoding($false)))
     return $path
 }
@@ -318,13 +318,13 @@ try {
         }
     }
 
-    $setupPath = Join-Path $ValidationArtifactDir 'issue-agent-scenario-setup-input.json'
+    $setupPath = Join-Path $ValidationArtifactDir 'scenario-setup-input.json'
     New-Item -ItemType Directory -Force -Path $ValidationArtifactDir | Out-Null
     [System.IO.File]::WriteAllText($setupPath, ($setup | ConvertTo-Json -Depth 30), (New-Object System.Text.UTF8Encoding($false)))
 
     $server = Get-McpServerConfig -Path $McpConfigPath
     $mcpDirectory = Get-McpDirectory -Server $server
-    $outputPath = Join-Path $ValidationArtifactDir 'issue-agent-scenario-setup.json'
+    $outputPath = Join-Path $ValidationArtifactDir 'scenario-setup.json'
 
     Invoke-LoggedStep -Name 'Restart STS2 (materialize phase)' -Body {
         & (Join-Path $RepoRoot '.github\scripts\restart-sts2.ps1') -Mode Restart -McpConfigPath $McpConfigPath -StartupTimeoutSeconds 90 -ShutdownTimeoutSeconds 45
@@ -363,5 +363,5 @@ try {
     $artifact.abort_reason = 'scenario_setup_failed'
     $artifact.notes = $_.Exception.Message
     $path = Write-SetupArtifact -Data $artifact
-    Write-Error "Issue-agent scenario setup failed. Wrote $path. $($_.Exception.Message)"
+    Write-Error "Scenario setup failed. Wrote $path. $($_.Exception.Message)"
 }

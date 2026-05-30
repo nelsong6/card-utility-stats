@@ -7,7 +7,7 @@ deploy, scenario prep, verification) executes here even though each run is
 orchestrated by `nelsong6/glimmung` from the cluster.
 
 There is **no** GitHub Actions self-hosted runner on this host. The previous
-self-hosted-runner / `issue-agent.yaml` model has been retired end to end. Runs
+GitHub Actions self-hosted-runner model has been retired end to end. Runs
 now reach the laptop over SSH-on-Tailscale, dispatched by Glimmung's
 `k8s_job` native phases. See
 [docs/glimmung-workflow.md](./glimmung-workflow.md) for the registered phase
@@ -48,7 +48,7 @@ The pwsh contract is Glimmung-shaped — `GLIMMUNG_RUN_ID`,
   elsewhere, set `STS2_GAME_DIR` in `.mcp.json` (read by `prepare-host.ps1`).
 - **Claude Code CLI** installed. `prepare-host.ps1` searches the documented
   default locations (e.g. `D:\automation\claude-code\...\claude.exe`); set
-  `ISSUE_AGENT_CLAUDE_CLI_PATH` if it lives elsewhere.
+  `CONFIGURED_CLAUDE_CLI_PATH` if it lives elsewhere.
 - **.NET SDK** (`dotnet`) and **uv** on `PATH`, for building the loader/core and
   running the SpireLensMcp Python helpers.
 - **Repo checkouts** under `D:\repos`:

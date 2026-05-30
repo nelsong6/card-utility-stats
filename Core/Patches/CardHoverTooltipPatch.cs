@@ -91,7 +91,7 @@ public static class CardHoverShowPatch
             // key. If they match → dict lookup must succeed.
             CoreMain.LogDebug($"hover: id={cardModel.Id} rawTitle='{rawTitle}' instance={instanceNum} displayName='{displayName}' hash={cardModel.GetHashCode()} deckVersionNull={cardModel.DeckVersion == null}");
 
-            // Hand hovers stay compact by default. Issue-agent validation and
+            // Hand hovers stay compact by default. Automated verify runs and
             // power users can opt into the full breakdown for hand tooltips.
             bool compact = __instance is NHandCardHolder
                 && !RuntimeOptionsProvider.Current.UseVerboseHandStats;

@@ -158,7 +158,7 @@ function Start-Sts2 {
         [string]$Arguments
     )
 
-    $launchTask = [string]$env:ISSUE_AGENT_STS2_LAUNCH_TASK
+    $launchTask = [string]$env:SPIRELENS_HOST_STS2_LAUNCH_TASK
     if (-not [string]::IsNullOrWhiteSpace($launchTask)) {
         Write-Host "Launching STS2 through scheduled task '$launchTask'."
         & schtasks.exe /Run /TN $launchTask | Write-Host

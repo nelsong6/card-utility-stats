@@ -17,7 +17,7 @@
 # romaineglimmungartifacts storage account via the pod's federated
 # workload identity (no per-project blob storage — that's been
 # retired alongside this migration; see the deleted
-# opentofu-issue-agent-screenshot-storage workflow).
+# opentofu-screenshot-storage workflow).
 #
 # This is the verify-loop's verdict-emitting phase; the
 # evidence-gate phase that follows reads `verification` from this
@@ -57,7 +57,7 @@ prepare_scenario() {
 \$env:GLIMMUNG_WORKING_DIR = "C:\\glimmung-runs\\${GLIMMUNG_RUN_REF}"
 \$env:GLIMMUNG_REPO_ROOT = 'D:\\repos\\SpireLens'
 & 'D:\\repos\\SpireLens\\.github\\scripts\\prepare-scenario.ps1' \`
-    -TestPlanPath "\$env:GLIMMUNG_WORKING_DIR\\sts2-artifacts\\issue-agent-test-plan.json" \`
+    -TestPlanPath "\$env:GLIMMUNG_WORKING_DIR\\sts2-artifacts\\test-plan.json" \`
     -RepoRoot \$env:GLIMMUNG_REPO_ROOT \`
     -ValidationArtifactDir "\$env:GLIMMUNG_WORKING_DIR\\sts2-artifacts" \`
     -IssueNumber '${GLIMMUNG_ISSUE_NUMBER}'
@@ -83,8 +83,8 @@ collect_evidence() {
   local artifacts="${GLIMMUNG_WORKING_DIR}/artifacts"
   mkdir -p "$artifacts"
   native_scp_pull "$HOST_IP" \
-    "C:/glimmung-runs/${GLIMMUNG_RUN_REF}/sts2-artifacts/issue-agent-verification.json" \
-    "${artifacts}/issue-agent-verification.json"
+    "C:/glimmung-runs/${GLIMMUNG_RUN_REF}/sts2-artifacts/verification.json" \
+    "${artifacts}/verification.json"
   # Mirror the screenshots directory back. -r so the directory
   # tree comes with it.
   # shellcheck disable=SC2046
@@ -117,7 +117,7 @@ upload_screenshots() {
 }
 
 emit_verification() {
-  native_emit_output verification "$(<"${GLIMMUNG_WORKING_DIR}/artifacts/issue-agent-verification.json")"
+  native_emit_output verification "$(<"${GLIMMUNG_WORKING_DIR}/artifacts/verification.json")"
 }
 
 native_run_selected_step \
