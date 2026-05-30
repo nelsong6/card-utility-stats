@@ -67,6 +67,28 @@ folder limited to those three (`SpireLensMcp` is deployed per-run by
 `prepare-host.ps1 -InstallMcp`). A clean run shows `Loaded 3 mods` in the game
 log; `Loaded 2 mods` means the bridge is not installed yet.
 
+`BaseLib` and `SpireLens` are **host-local persistent state** — they are not
+re-installed per run (only `SpireLensMcp` is), and the per-run checkout sync
+deliberately does not `git clean` the game's `mods/` directory. Whatever is
+deployed under `mods\BaseLib\` stays until a human changes it.
+
+### BaseLib version floor: **>= v3.1.8**
+
+`BaseLib` must be **v3.1.8 or newer**. The current STS2 build renamed
+`Creature.ShowsInfiniteHp` to `Creature.HpDisplay`. BaseLib < 3.1.8
+hard-references the old getter, and its combat HP-display patch throws
+`MissingMethodException: Creature.get_ShowsInfiniteHp()` on every HP-bar
+refresh. On debug-loaded mid-combat saves this freezes the combat HUD at
+placeholder values (e.g. `88/88` HP, `0/4` energy), so screenshots no longer
+reflect true game state. BaseLib v3.1.8 ("main branch compatibility") added a
+graceful `HpDisplay` reflection fallback that resolves the freeze.
+
+`probe-mod-set` currently validates mod **names** only, not versions, so a
+downgraded or stale BaseLib will pass the gate silently. When re-provisioning a
+host, fetch the current Alchyr/BaseLib-StS2 release and confirm
+`mods\BaseLib\BaseLib.json` reports `"version": "v3.1.8"` or newer. (A
+version-floor check in `probe-mod-set` is a tracked follow-up.)
+
 ## Sign-in expectation
 
 Sign-in is **manual** — there is no AutoAdminLogon. STS2 must run in the
