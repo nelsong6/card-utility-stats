@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# implement phase for spirelens. Runs run-issue-agent-phases.ps1 with
+# implement phase for spirelens. Runs run-phases.ps1 with
 # -PhaseName implementation on the laptop, then pushes the resulting
 # branch under glimmung/<run_id> to nelsong6/spirelens using the
 # per-run GitHub token glimmung mints via the existing native-runner
@@ -43,7 +43,7 @@ run_implementation() {
 \$env:GLIMMUNG_WORKING_DIR = "C:\\glimmung-runs\\${GLIMMUNG_RUN_REF}"
 \$env:GLIMMUNG_REPO_ROOT = 'D:\\repos\\SpireLens'
 \$env:GH_TOKEN = '${gh_token}'
-& 'D:\\repos\\SpireLens\\.github\\scripts\\run-issue-agent-phases.ps1' \`
+& 'D:\\repos\\SpireLens\\.github\\scripts\\run-phases.ps1' \`
     -PhaseName implementation \`
     -IssueNumber '${GLIMMUNG_ISSUE_NUMBER}' \`
     -RepoSlug '${GLIMMUNG_PROJECT_REPO:-nelsong6/spirelens}' \`

@@ -20,7 +20,7 @@
 #      AGENTS.md mod policy (BaseLib + SpireLens + SpireLensMcp only)
 #      — emit `unexpected_mod:<name>` and fail-closed on anything
 #      else (spirelens#179 Q3).
-#   8. Run the existing prepare-issue-agent-job pwsh script on the
+#   8. Run the existing prepare-host pwsh script on the
 #      laptop with -InstallMcp -StartSts2, so SpireLensMcp is
 #      installed and STS2 is launched with the bridge accessible.
 #   9. Poll the bridge on localhost:15526 until it returns 2xx, with
@@ -132,7 +132,7 @@ install_mcp_and_start_sts2() {
 \$env:GLIMMUNG_PROJECT_REPO = '${GLIMMUNG_PROJECT_REPO:-nelsong6/spirelens}'
 \$env:GLIMMUNG_WORKING_DIR = "C:\\glimmung-runs\\${GLIMMUNG_RUN_REF}"
 \$env:GLIMMUNG_REPO_ROOT = 'D:\\repos\\SpireLens'
-& 'D:\\repos\\SpireLens\\.github\\scripts\\prepare-issue-agent-job.ps1' \`
+& 'D:\\repos\\SpireLens\\.github\\scripts\\prepare-host.ps1' \`
     -CheckoutPath \$env:GLIMMUNG_REPO_ROOT \`
     -InstallMcp \`
     -StartSts2

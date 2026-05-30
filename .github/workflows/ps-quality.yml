@@ -2,10 +2,10 @@ name: PowerShell Quality
 
 # Catches the bug classes that bit on issue #142 before they hit a real run:
 #   - PSScriptAnalyzer flags uninitialized vars / wrong cmdlet usage / stale APIs
-#   - Pester runs the JSONL-parser unit tests against the actual script source
-#     (extracted via AST), so a regression in Get-ClaudeToolCallSummary,
-#     Format-FailureCategories, ConvertTo-Array, etc. surfaces in dev instead
-#     of three jobs deep into a 15-minute issue-agent run.
+#   - Pester runs the helper unit tests against the actual script source
+#     (extracted via AST), so a regression in ConvertTo-Array,
+#     Get-PropertyValue, the evidence-guard comparison, etc. surfaces in dev
+#     instead of several phases deep into a long verify run.
 #
 # Triggers on any PR touching the script or test surface, plus this workflow
 # itself. Manual dispatch supported for ad-hoc reruns.

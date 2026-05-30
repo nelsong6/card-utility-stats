@@ -44,7 +44,7 @@ phase script's `native_run_selected_step` dispatcher accepts exactly these.
 - `resolve-host-ip` — looks up the laptop's tailnet IPv4 by `tag:spirelens-host`.
 - `probe-ssh` — 30-second SSH reachability deadline.
 - `probe-mod-set` — fails closed on any mod outside `{BaseLib, SpireLens, SpireLensMcp}`.
-- `install-mcp-start-sts2` — calls `prepare-issue-agent-job.ps1 -InstallMcp -StartSts2`.
+- `install-mcp-start-sts2` — calls `prepare-host.ps1 -InstallMcp -StartSts2`.
 - `probe-bridge-ready` — polls `localhost:15526/api/v1/singleplayer` for ≤90s.
 - `emit-env-outputs` — writes `ssh_endpoint`, `working_dir`.
 
@@ -55,8 +55,8 @@ phase script's `native_run_selected_step` dispatcher accepts exactly these.
 ### llm-verify
 - `build-and-deploy` — checks out the implementation branch, `dotnet build` the
   loader and core into the live `mods/` folder.
-- `prepare-scenario` — runs `prepare-issue-agent-scenario.ps1`.
-- `run-verification` — runs `run-issue-agent-phases.ps1 -PhaseName verification`.
+- `prepare-scenario` — runs `prepare-scenario.ps1`.
+- `run-verification` — runs `run-phases.ps1 -PhaseName verification`.
 - `collect-evidence` — scp `verification.json` + screenshots back to the pod.
 - `upload-screenshots` — pushes screenshots to `romaineglimmungartifacts`.
 - `emit-verification` — emits the `verification` phase output the

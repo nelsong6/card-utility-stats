@@ -4,7 +4,7 @@
 # The guard is too entangled with the surrounding script (closure over $IssueNumber,
 # $ValidationArtifactDir, etc.) to dot-source standalone, so these tests exercise
 # the comparison logic directly with a tiny re-implementation that mirrors the
-# production check at run-issue-agent-phases.ps1 (Apply-VerificationEvidenceGuard's
+# production check at run-phases.ps1 (Apply-VerificationEvidenceGuard's
 # expected_text branch). If the production check changes, this re-implementation
 # must change in lockstep.
 
