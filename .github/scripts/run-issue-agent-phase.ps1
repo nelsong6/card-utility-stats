@@ -18,9 +18,10 @@ this wrapper, which resolves everything from the run's persistent working dir
 (C:\glimmung-runs\<ref>, which survives across phases on the laptop) and the
 checked-out repo, then invokes run-phases.ps1 with the full parameter set.
 
-The Claude-CLI and STS2-game-dir candidate lists intentionally mirror
-prepare-host.ps1's lists. Keep them in sync; if this duplication grows, extract
-a shared module imported by both.
+The STS2-game-dir candidate list and MCP-config substitution now live in the
+shared Sts2HostPaths.ps1 module, which prepare-host.ps1 and verify.sh's
+prepare_scenario step also dot-source. The Claude-CLI candidate list still
+mirrors prepare-host.ps1's; keep those two in sync.
 #>
 param(
     [Parameter(Mandatory = $true)][ValidateSet('test_plan', 'implementation', 'verification')][string]$PhaseName,
@@ -60,66 +61,15 @@ if (-not $claudeCliPath) {
     throw 'Claude Code CLI was not found in any known location. Set CONFIGURED_CLAUDE_CLI_PATH or install it under a documented default path.'
 }
 
-# --- Resolve the STS2 game dir (mirror prepare-host.ps1's candidate list) ---
-$templateMcpPath = Join-Path $RepoRoot '.mcp.json'
-if (-not (Test-Path -LiteralPath $templateMcpPath)) {
-    throw "MCP config template was not found at '$templateMcpPath'."
-}
-$mcpConfig = Get-Content -LiteralPath $templateMcpPath -Raw | ConvertFrom-Json
-$server = $mcpConfig.mcpServers.'spire-lens-mcp'
-if ($null -eq $server) {
-    throw "MCP config template '$templateMcpPath' does not define mcpServers.spire-lens-mcp."
-}
-
-# Best-effort read of the template's configured game dir (StrictMode-safe).
-$templateGameDir = $null
-if ($null -ne $server.env -and ($server.env.PSObject.Properties.Name -contains 'STS2_GAME_DIR')) {
-    $templateGameDir = [string]$server.env.STS2_GAME_DIR
-}
-
-$gameDirCandidates = [System.Collections.Generic.List[string]]::new()
-foreach ($c in @(
-        $env:ISSUE_AGENT_STS2_GAME_DIR,
-        $env:CONFIGURED_STS2_GAME_DIR,
-        $templateGameDir,
-        'D:\Programs\SteamLibrary\steamapps\common\Slay the Spire 2',
-        'D:\SteamLibrary\steamapps\common\Slay the Spire 2',
-        'C:\Program Files (x86)\Steam\steamapps\common\Slay the Spire 2',
-        'C:\Program Files\Steam\steamapps\common\Slay the Spire 2'
-    )) {
-    if ([string]::IsNullOrWhiteSpace($c)) { continue }
-    $trimmed = $c.Trim().Trim('"')
-    if (-not $gameDirCandidates.Contains($trimmed)) { $gameDirCandidates.Add($trimmed) }
-}
-$gameDir = $null
-foreach ($candidate in $gameDirCandidates) {
-    if (Test-Path -LiteralPath (Join-Path $candidate 'data_sts2_windows_x86_64\sts2.dll')) {
-        $gameDir = $candidate
-        break
-    }
-}
-if (-not $gameDir) {
-    throw "Unable to find sts2.dll under any STS2 game-dir candidate: $($gameDirCandidates -join '; ')"
-}
+# --- Resolve the STS2 game dir + write a per-phase MCP config (shared module) ---
+# Sts2HostPaths.ps1 owns the candidate list and the template-substitution step;
+# prepare-host.ps1 and verify.sh's prepare_scenario use the same module so the
+# game dir is discovered identically across every laptop phase.
+. (Join-Path $PSScriptRoot 'Sts2HostPaths.ps1')
+$gameDir = Resolve-Sts2GameDir -RepoRoot $RepoRoot
 $sts2DataDir = Join-Path $gameDir 'data_sts2_windows_x86_64'
-
-# --- Write a per-phase MCP config with the resolved game dir substituted in ---
-if ($null -eq $server.env) {
-    $server | Add-Member -NotePropertyName env -NotePropertyValue ([pscustomobject]@{})
-}
-if ($server.env.PSObject.Properties.Name -contains 'STS2_GAME_DIR') {
-    $server.env.STS2_GAME_DIR = $gameDir
-} else {
-    $server.env | Add-Member -NotePropertyName STS2_GAME_DIR -NotePropertyValue $gameDir
-}
-$mcpConfigRoot = Join-Path $workingDir 'issue-agent-mcp'
-New-Item -ItemType Directory -Force -Path $mcpConfigRoot | Out-Null
-$mcpConfigPath = Join-Path $mcpConfigRoot "$PhaseName.mcp.json"
-[System.IO.File]::WriteAllText(
-    $mcpConfigPath,
-    ($mcpConfig | ConvertTo-Json -Depth 20),
-    (New-Object System.Text.UTF8Encoding($false))
-)
+$mcpConfigPath = Join-Path (Join-Path $workingDir 'issue-agent-mcp') "$PhaseName.mcp.json"
+$mcpConfigPath = Write-ResolvedMcpConfig -RepoRoot $RepoRoot -GameDir $gameDir -OutPath $mcpConfigPath
 
 # Surface the resolved STS2 paths the implementation/verification prompts read.
 $env:ISSUE_AGENT_STS2_GAME_DIR = $gameDir

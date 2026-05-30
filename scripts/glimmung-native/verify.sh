@@ -43,10 +43,16 @@ build_and_deploy_mod() {
 Set-Location -LiteralPath \$env:GLIMMUNG_REPO_ROOT
 git fetch origin '${GLIMMUNG_INPUT_BRANCH_NAME}'
 git checkout '${GLIMMUNG_INPUT_BRANCH_NAME}'
-\$sts2DataDir = 'D:\\SteamLibrary\\steamapps\\common\\Slay the Spire 2'
-dotnet build 'SpireLens.csproj' -c Debug "-p:Sts2DataDir=\$sts2DataDir"
+# Resolve the laptop's STS2 install and pass it as Sts2Path so the props derive
+# BOTH Sts2DataDir (=<gamedir>\data_sts2_windows_x86_64, where sts2.dll lives and
+# the csproj HintPaths resolve) AND ModsPath (=<gamedir>\mods\, the deploy
+# target). Overriding Sts2DataDir alone would fix the .dll references but leave
+# the post-build deploy pointing at the auto-discovered (wrong) mods folder.
+. 'D:\\repos\\SpireLens\\.github\\scripts\\Sts2HostPaths.ps1'
+\$sts2Path = Resolve-Sts2GameDir -RepoRoot \$env:GLIMMUNG_REPO_ROOT
+dotnet build 'SpireLens.csproj' -c Debug "-p:Sts2Path=\$sts2Path"
 if (\$LASTEXITCODE -ne 0) { throw 'SpireLens loader build/deploy failed.' }
-dotnet build 'Core\\SpireLens.Core.csproj' -c Debug "-p:Sts2DataDir=\$sts2DataDir"
+dotnet build 'Core\\SpireLens.Core.csproj' -c Debug "-p:Sts2Path=\$sts2Path"
 if (\$LASTEXITCODE -ne 0) { throw 'SpireLens core build/deploy failed.' }
 PWSH
 }
@@ -56,8 +62,17 @@ prepare_scenario() {
 \$env:GLIMMUNG_RUN_ID = '${GLIMMUNG_RUN_ID}'
 \$env:GLIMMUNG_WORKING_DIR = "C:\\glimmung-runs\\${GLIMMUNG_RUN_REF}"
 \$env:GLIMMUNG_REPO_ROOT = 'D:\\repos\\SpireLens'
+# prepare-scenario.ps1 (and the restart-sts2.ps1 it calls) read STS2_GAME_DIR
+# out of the MCP config, so resolve the laptop's real game dir and write a
+# substituted config first. The committed .mcp.json template ships a placeholder
+# game dir; passing it unresolved makes restart-sts2.ps1 throw on a missing path.
+. 'D:\\repos\\SpireLens\\.github\\scripts\\Sts2HostPaths.ps1'
+\$gameDir = Resolve-Sts2GameDir -RepoRoot \$env:GLIMMUNG_REPO_ROOT
+\$mcpConfigPath = Join-Path \$env:GLIMMUNG_WORKING_DIR 'issue-agent-mcp\\scenario.mcp.json'
+\$mcpConfigPath = Write-ResolvedMcpConfig -RepoRoot \$env:GLIMMUNG_REPO_ROOT -GameDir \$gameDir -OutPath \$mcpConfigPath
 & 'D:\\repos\\SpireLens\\.github\\scripts\\prepare-scenario.ps1' \`
     -TestPlanPath "\$env:GLIMMUNG_WORKING_DIR\\sts2-artifacts\\issue-agent-test-plan.json" \`
+    -McpConfigPath \$mcpConfigPath \`
     -RepoRoot \$env:GLIMMUNG_REPO_ROOT \`
     -ValidationArtifactDir "\$env:GLIMMUNG_WORKING_DIR\\sts2-artifacts" \`
     -IssueNumber '${GLIMMUNG_ISSUE_NUMBER}'

@@ -7,6 +7,10 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 3.0  # V2 already catches missing PSCustomObject/hashtable properties; V3 adds out-of-bounds array indexing (verified empirically on PS 7.4)
 
+# Shared STS2 game-dir + MCP-config resolution (also used by the phase wrapper
+# and verify.sh's prepare_scenario step). Keep discovery identical everywhere.
+. (Join-Path $PSScriptRoot 'Sts2HostPaths.ps1')
+
 function Invoke-LoggedStep {
     param(
         [Parameter(Mandatory = $true)][string]$Name,
@@ -29,100 +33,6 @@ function Invoke-LoggedStep {
 $repoRoot = Join-Path $env:GLIMMUNG_REPO_ROOT $CheckoutPath
 if (-not (Test-Path -LiteralPath $repoRoot)) {
     throw "Issue-agent checkout was not found at '$repoRoot'."
-}
-
-function Add-PathCandidate {
-    param(
-        [System.Collections.Generic.List[string]]$Candidates,
-        [string]$Path
-    )
-
-    if ([string]::IsNullOrWhiteSpace($Path)) { return }
-    $trimmed = $Path.Trim().Trim('"')
-    if ([string]::IsNullOrWhiteSpace($trimmed)) { return }
-    if (-not $Candidates.Contains($trimmed)) {
-        $Candidates.Add($trimmed)
-    }
-}
-
-function Resolve-Sts2GameDir {
-    param([string]$RepoRoot)
-
-    $gameDirCandidates = [System.Collections.Generic.List[string]]::new()
-    Add-PathCandidate $gameDirCandidates $env:ISSUE_AGENT_STS2_GAME_DIR
-    Add-PathCandidate $gameDirCandidates $env:CONFIGURED_STS2_GAME_DIR
-
-    $mcpConfigPath = Join-Path $RepoRoot '.mcp.json'
-    if (Test-Path -LiteralPath $mcpConfigPath) {
-        try {
-            $mcpConfig = Get-Content -LiteralPath $mcpConfigPath -Raw | ConvertFrom-Json
-            $configuredGameDir = [string]$mcpConfig.mcpServers.'spire-lens-mcp'.env.STS2_GAME_DIR
-            Add-PathCandidate $gameDirCandidates $configuredGameDir
-        } catch {
-            Write-Warning "Unable to read STS2_GAME_DIR from '$mcpConfigPath': $_"
-        }
-    }
-
-    Add-PathCandidate $gameDirCandidates 'D:\Programs\SteamLibrary\steamapps\common\Slay the Spire 2'
-    Add-PathCandidate $gameDirCandidates 'D:\SteamLibrary\steamapps\common\Slay the Spire 2'
-    Add-PathCandidate $gameDirCandidates 'C:\Program Files (x86)\Steam\steamapps\common\Slay the Spire 2'
-    Add-PathCandidate $gameDirCandidates 'C:\Program Files\Steam\steamapps\common\Slay the Spire 2'
-
-    foreach ($candidate in $gameDirCandidates) {
-        $sts2Dll = Join-Path $candidate 'data_sts2_windows_x86_64\sts2.dll'
-        if (Test-Path -LiteralPath $sts2Dll) {
-            $item = Get-Item -LiteralPath $sts2Dll
-            Write-Host "Using STS2 game directory: $candidate"
-            Write-Host "Using STS2 assembly: $sts2Dll"
-            Write-Host "STS2 product version: $($item.VersionInfo.ProductVersion)"
-            return $candidate
-        }
-
-        Write-Host "Skipping STS2 candidate without sts2.dll: $candidate"
-    }
-
-    throw "Unable to find sts2.dll in any configured STS2 game directory candidate: $($gameDirCandidates -join '; ')"
-}
-
-function New-JobMcpConfig {
-    param(
-        [string]$RepoRoot,
-        [string]$GameDir
-    )
-
-    $sourceMcpConfigPath = Join-Path $RepoRoot '.mcp.json'
-    if (-not (Test-Path -LiteralPath $sourceMcpConfigPath)) {
-        throw "MCP config template was not found at '$sourceMcpConfigPath'."
-    }
-
-    $mcpConfig = Get-Content -LiteralPath $sourceMcpConfigPath -Raw | ConvertFrom-Json
-
-    $server = $mcpConfig.mcpServers.'spire-lens-mcp'
-    if ($null -eq $server) {
-        throw "MCP config template '$sourceMcpConfigPath' does not define mcpServers.spire-lens-mcp."
-    }
-    if ($null -eq $server.env) {
-        $server | Add-Member -NotePropertyName env -NotePropertyValue ([pscustomobject]@{})
-    }
-    if ($server.env.PSObject.Properties.Name -contains 'STS2_GAME_DIR') {
-        $server.env.STS2_GAME_DIR = $GameDir
-    } else {
-        $server.env | Add-Member -NotePropertyName STS2_GAME_DIR -NotePropertyValue $GameDir
-    }
-
-    $mcpConfigRoot = Join-Path $env:GLIMMUNG_WORKING_DIR "issue-agent-mcp"
-    New-Item -ItemType Directory -Force -Path $mcpConfigRoot | Out-Null
-    $safeCheckoutName = ([IO.Path]::GetFileName($CheckoutPath) -replace '[^A-Za-z0-9._-]', '-')
-    $jobMcpConfigPath = Join-Path $mcpConfigRoot "$($env:GLIMMUNG_RUN_ID)-$($env:GLIMMUNG_ATTEMPT_INDEX)-$safeCheckoutName.mcp.json"
-    [System.IO.File]::WriteAllText(
-        $jobMcpConfigPath,
-        ($mcpConfig | ConvertTo-Json -Depth 20),
-        (New-Object System.Text.UTF8Encoding($false))
-    )
-
-    Write-Host "Generated per-job MCP config: $jobMcpConfigPath"
-    Write-Host "Per-job MCP config STS2_GAME_DIR: $GameDir"
-    return $jobMcpConfigPath
 }
 
 $candidates = @()
@@ -154,7 +64,10 @@ New-Item -ItemType Directory -Force -Path $buildRoot | Out-Null
 
 $gameDir = Resolve-Sts2GameDir -RepoRoot $repoRoot
 $sts2DataDir = Join-Path $gameDir 'data_sts2_windows_x86_64'
-$jobMcpConfigPath = New-JobMcpConfig -RepoRoot $repoRoot -GameDir $gameDir
+$mcpConfigRoot = Join-Path $env:GLIMMUNG_WORKING_DIR 'issue-agent-mcp'
+$safeCheckoutName = ([IO.Path]::GetFileName($CheckoutPath) -replace '[^A-Za-z0-9._-]', '-')
+$jobMcpConfigPath = Join-Path $mcpConfigRoot "$($env:GLIMMUNG_RUN_ID)-$($env:GLIMMUNG_ATTEMPT_INDEX)-$safeCheckoutName.mcp.json"
+$jobMcpConfigPath = Write-ResolvedMcpConfig -RepoRoot $repoRoot -GameDir $gameDir -OutPath $jobMcpConfigPath
 
 "ISSUE_AGENT_STS2_GAME_DIR=$gameDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8NoBOM -Append
 "ISSUE_AGENT_STS2_DATA_DIR=$sts2DataDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8NoBOM -Append
