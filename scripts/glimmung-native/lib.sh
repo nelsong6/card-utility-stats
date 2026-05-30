@@ -312,6 +312,45 @@ Write-Output ("synced {0} to {1}" -f \$repo, \$target)
 PWSH
 }
 
+# native_connect_host [host-tag]
+# Stand up THIS pod's own connection to the remote laptop and echo its tailnet
+# IPv4 on stdout. Every phase runs in a separate ephemeral Job pod, so the
+# keypair, signed SSH cert, and Tailscale node env-prep created DO NOT exist in
+# any later phase's pod (per nelsong6/glimmung docs/remote-host-execution.md:
+# the per-run working dir, including Tailscale state, is discarded with the
+# pod). Each laptop-touching phase must therefore establish its own connection
+# rather than assume env-prep's survives — the lift-and-shift from a single
+# GitHub Actions runner (where it DID survive) is what broke this.
+#
+# Idempotent within a pod across steps: native_run_selected_step re-invokes the
+# phase script once per step, so this runs per step. tailscaled is brought up
+# only if it is not already running on this pod's socket (env-prep proves the
+# backgrounded daemon persists across step invocations within one pod). The
+# short-TTL SSH cert (~10 min) is RE-minted every call so a later step never
+# inherits an expired cert from an earlier long-running step (e.g. implement's
+# multi-minute LLM step preceding the collect step's scp).
+#
+# Only the resolved IP is written to stdout; all other chatter is routed to
+# stderr so callers can do HOST_IP="$(native_connect_host)".
+native_connect_host() {
+  local tag="${1:-tag:spirelens-host}"
+  local sock="${GLIMMUNG_WORKING_DIR}/ts.sock"
+  local cert="${GLIMMUNG_WORKING_DIR}/id_ed25519-cert.pub"
+  local pubkey_file authkey ip
+
+  pubkey_file="$(native_generate_user_keypair)"
+  native_mint_ssh_cert "$pubkey_file" "$cert"
+
+  if ! pgrep -f "tailscaled.*${sock}" >/dev/null 2>&1; then
+    authkey="$(native_mint_tailscale_authkey)"
+    native_tailscale_up "$authkey" >&2
+  fi
+
+  ip="$(native_tailscale_host_ip "$tag")" || return 1
+  printf '%s' "$ip" >"${GLIMMUNG_WORKING_DIR}/host_ip"
+  printf '%s\n' "$ip"
+}
+
 # native_scp_pull <host-ip> <remote-path> <local-path>
 native_scp_pull() {
   local host_ip="$1"

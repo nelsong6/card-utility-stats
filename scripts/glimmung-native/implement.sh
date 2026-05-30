@@ -13,12 +13,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib.sh"
 
 native_init
-native_require_env GLIMMUNG_RUN_ID GLIMMUNG_RUN_REF GLIMMUNG_ISSUE_NUMBER GLIMMUNG_INPUT_TAILNET_IP
+native_require_env GLIMMUNG_RUN_ID GLIMMUNG_RUN_REF GLIMMUNG_ISSUE_NUMBER
 
-# Tailnet IP comes from env-prep's `tailnet_ip` phase output, projected in
-# as GLIMMUNG_INPUT_TAILNET_IP. The host_ip file env-prep writes is
-# env-prep-pod-local and is gone by the time this fresh pod runs.
-HOST_IP="${GLIMMUNG_INPUT_TAILNET_IP}"
+# This phase's pod has none of env-prep's connection state; establish our own.
+HOST_IP="$(native_connect_host)" || native_emit_abort "host_unavailable"
 
 mint_github_token() {
   # Glimmung's existing native-runner GitHub token endpoint mints a
@@ -29,9 +27,19 @@ mint_github_token() {
   local token_file="${GLIMMUNG_WORKING_DIR}/gh_token"
   if [ -s "$token_file" ]; then return 0; fi
   native_require_env GLIMMUNG_GITHUB_TOKEN_URL GLIMMUNG_ATTEMPT_TOKEN
-  curl -fsS -X POST \
+  # Capture + validate before writing: a non-2xx response or a body without a
+  # `.token` field must NOT leave a file containing "null"/empty, because the
+  # `[ -s "$token_file" ]` cache check above would then treat that garbage as a
+  # valid cached token on every subsequent step (GH_TOKEN='null').
+  local token
+  token="$(curl -fsS -X POST \
     -H "X-Glimmung-Attempt-Token: ${GLIMMUNG_ATTEMPT_TOKEN}" \
-    "${GLIMMUNG_GITHUB_TOKEN_URL}" | jq -r .token >"$token_file"
+    "${GLIMMUNG_GITHUB_TOKEN_URL}" | jq -r '.token // empty')" || true
+  if [ -z "$token" ]; then
+    echo "mint_github_token: token endpoint returned no usable .token" >&2
+    return 1
+  fi
+  printf '%s' "$token" >"$token_file"
   chmod 600 "$token_file"
 }
 

@@ -14,7 +14,11 @@ source "${SCRIPT_DIR}/lib.sh"
 native_init
 native_require_env GLIMMUNG_RUN_ID GLIMMUNG_RUN_REF
 
-HOST_IP="$(<"${GLIMMUNG_WORKING_DIR}/host_ip" 2>/dev/null || true)"
+# Teardown is best-effort (run_on: always). Like the work phases, this cleanup
+# pod has none of env-prep's connection state, so re-establish our own to reach
+# the laptop. If the host is unreachable, skip laptop-side teardown rather than
+# failing the run.
+HOST_IP="$(native_connect_host 2>/dev/null)" || HOST_IP=""
 
 stop_laptop_processes() {
   if [ -z "${HOST_IP:-}" ]; then
