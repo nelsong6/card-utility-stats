@@ -54,7 +54,7 @@ run_implementation() {
 \$env:GLIMMUNG_WORKING_DIR = "C:\\glimmung-runs\\${GLIMMUNG_RUN_REF}"
 \$env:GLIMMUNG_REPO_ROOT = 'D:\\repos\\SpireLens'
 \$env:GH_TOKEN = '${gh_token}'
-& 'D:\\repos\\SpireLens\\.github\\scripts\\run-phases.ps1' \`
+& 'D:\\repos\\SpireLens\\.github\\scripts\\run-issue-agent-phase.ps1' \`
     -PhaseName implementation \`
     -IssueNumber '${GLIMMUNG_ISSUE_NUMBER}' \`
     -RepoSlug '${GLIMMUNG_PROJECT_REPO:-nelsong6/spirelens}' \`
@@ -63,15 +63,41 @@ PWSH
 }
 
 push_branch() {
-  # The implementation pwsh script does the actual git push to
-  # glimmung/<run_id> from the laptop. Here we just verify the
-  # branch exists on the remote and surface its name as a phase
-  # output for the verify phase to check out.
+  # The implementation PHASE is sealed from every git mutation — the
+  # run-phases.ps1 implementation prompt forbids branches/commits/pushes,
+  # and Claude has no push credential. The bash glue, which holds the
+  # per-run minted GitHub token, owns the publish: commit the
+  # implementation phase's working-tree edits in the laptop checkout to
+  # glimmung/<run_id> and push, then verify the branch landed on the
+  # remote and surface its name for the verify phase to check out.
+  mint_github_token
   local gh_token
   gh_token="$(<"${GLIMMUNG_WORKING_DIR}/gh_token")"
+  local repo="${GLIMMUNG_PROJECT_REPO:-nelsong6/spirelens}"
   local branch="glimmung/${GLIMMUNG_RUN_ID}"
+
+  # The branch name is run-id-scoped (a UUID), so force-push is safe — no
+  # other run can target it. --allow-empty so a legitimately no-op
+  # implementation (no code change required) still publishes a branch the
+  # verify phase can build against base. The remote URL carries the token
+  # inline; same exposure profile as GH_TOKEN in run-implementation above.
+  native_ssh_run "$HOST_IP" <<PWSH
+\$ErrorActionPreference = 'Stop'
+\$repo = 'D:\\repos\\SpireLens'
+git -C \$repo config user.email 'glimmung-issue-agent@romaine.life'
+git -C \$repo config user.name 'glimmung issue-agent'
+git -C \$repo checkout -B '${branch}'
+if (\$LASTEXITCODE -ne 0) { throw 'git checkout -B ${branch} failed' }
+git -C \$repo add -A
+if (\$LASTEXITCODE -ne 0) { throw 'git add failed' }
+git -C \$repo commit --allow-empty -m 'glimmung issue-agent: ${repo}#${GLIMMUNG_ISSUE_NUMBER} (run ${GLIMMUNG_RUN_ID})'
+if (\$LASTEXITCODE -ne 0) { throw 'git commit failed' }
+git -C \$repo push --force 'https://x-access-token:${gh_token}@github.com/${repo}.git' 'HEAD:refs/heads/${branch}'
+if (\$LASTEXITCODE -ne 0) { throw 'git push failed' }
+PWSH
+
   if ! curl -fsS -H "Authorization: token ${gh_token}" \
-      "https://api.github.com/repos/${GLIMMUNG_PROJECT_REPO:-nelsong6/spirelens}/branches/${branch}" \
+      "https://api.github.com/repos/${repo}/branches/${branch}" \
       >/dev/null; then
     native_emit_abort "implementation_branch_missing:${branch}"
   fi

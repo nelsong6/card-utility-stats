@@ -48,15 +48,25 @@ phase script's `native_run_selected_step` dispatcher accepts exactly these.
 - `probe-bridge-ready` — polls `localhost:15526/api/v1/singleplayer` for ≤90s.
 - `emit-env-outputs` — writes `ssh_endpoint`, `working_dir`.
 
+The LLM phases all invoke `run-phases.ps1` through the
+`run-issue-agent-phase.ps1` wrapper, which resolves the Claude CLI path,
+generates a per-phase MCP config, and derives the artifact/screenshot/log paths
+under the run's persistent `C:\glimmung-runs\<ref>` working dir before passing
+`run-phases.ps1` its full (eleven-parameter) argument set.
+
 ### llm-work (two jobs)
 **test-plan**: `run-test-plan`, `collect-test-plan`.
 **implement**: `run-implementation`, `push-branch`, `collect-implementation`.
+The implementation phase itself makes no git mutations; `push-branch` commits
+its working-tree edits in the laptop checkout to `glimmung/<run_id>` and pushes
+with the per-run minted token.
 
 ### llm-verify
 - `build-and-deploy` — checks out the implementation branch, `dotnet build` the
   loader and core into the live `mods/` folder.
 - `prepare-scenario` — runs `prepare-scenario.ps1`.
-- `run-verification` — runs `run-phases.ps1 -PhaseName verification`.
+- `run-verification` — runs `run-phases.ps1 -PhaseName verification` (via the
+  `run-issue-agent-phase.ps1` wrapper).
 - `collect-evidence` — scp `verification.json` + screenshots back to the pod.
 - `upload-screenshots` — pushes screenshots to `romaineglimmungartifacts`.
 - `emit-verification` — emits the `verification` phase output the
