@@ -32,7 +32,8 @@ source "${SCRIPT_DIR}/lib.sh"
 native_init
 native_require_env GLIMMUNG_RUN_ID GLIMMUNG_RUN_REF GLIMMUNG_ISSUE_NUMBER GLIMMUNG_INPUT_BRANCH_NAME
 
-HOST_IP="$(<"${GLIMMUNG_WORKING_DIR}/host_ip")"
+# This phase's pod has none of env-prep's connection state; establish our own.
+HOST_IP="$(native_connect_host)" || native_emit_abort "host_unavailable"
 
 build_and_deploy_mod() {
   native_ssh_run "$HOST_IP" <<PWSH
