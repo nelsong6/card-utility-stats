@@ -4,8 +4,14 @@
   "author": "Nelson",
   "description": "Per-card attribution stats — tracks effective damage, overkill, blocked damage, block usage, and utility closure on every card you play.",
   "version": "v0.0.0",
+  "min_game_version": "v0.106.1",
   "has_pck": false,
   "has_dll": true,
-  "dependencies": ["BaseLib"],
+  "dependencies": [
+    {
+      "id": "BaseLib",
+      "min_version": "3.1.8"
+    }
+  ],
   "affects_gameplay": false
 }
