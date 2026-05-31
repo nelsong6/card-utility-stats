@@ -1,0 +1,75 @@
+name: Build and Release SpireLens Mod
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build & Package Mod
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore SpireLens.csproj
+
+      - name: Build Core (Release)
+        run: dotnet build Core/SpireLens.Core.csproj -c Release -p:SkipModsDeploy=true
+
+      - name: Build Loader (Release)
+        run: dotnet build SpireLens.csproj -c Release -p:SkipModsDeploy=true
+
+      - name: Build Tests (Release)
+        run: dotnet build Tests/SpireLens.Core.Tests/SpireLens.Core.Tests.csproj -c Release -p:SkipModsDeploy=true
+
+      - name: Package Mod files
+        shell: pwsh
+        run: |
+          # Create staging folder structure
+          $stagingDir = New-Item -ItemType Directory -Path "build_staging/SpireLens" -Force
+
+          # Copy Loader DLL and mod manifest
+          Copy-Item -Path ".godot/mono/temp/bin/Release/SpireLens.dll" -Destination $stagingDir -Force
+          Copy-Item -Path "SpireLens.json" -Destination $stagingDir -Force
+
+          # Copy Core DLL
+          Copy-Item -Path "Core/bin/Release/net9.0/SpireLens.Core.dll" -Destination $stagingDir -Force
+
+          # Copy Mono.Cecil dependencies
+          Copy-Item -Path ".godot/mono/temp/bin/Release/Mono.Cecil*.dll" -Destination $stagingDir -Force
+
+          # Package staging folder into Zip archive
+          Compress-Archive -Path "build_staging/SpireLens" -DestinationPath "SpireLens.zip" -Force
+          Write-Host "Mod successfully packaged into SpireLens.zip"
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpireLens-Package
+          path: SpireLens.zip
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: SpireLens.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

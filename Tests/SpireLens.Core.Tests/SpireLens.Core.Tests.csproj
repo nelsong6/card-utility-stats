@@ -12,17 +12,22 @@
         <ProjectReference Include="..\..\Core\SpireLens.Core.csproj" />
     </ItemGroup>
 
-    <ItemGroup Condition="Exists('$(Sts2DataDir)')">
+    <PropertyGroup>
+        <Sts2LibDir Condition="'$(Sts2DataDir)' != '' and Exists('$(Sts2DataDir)')">$(Sts2DataDir)</Sts2LibDir>
+        <Sts2LibDir Condition="'$(Sts2LibDir)' == ''">$(MSBuildThisFileDirectory)../../lib</Sts2LibDir>
+    </PropertyGroup>
+
+    <ItemGroup>
         <Reference Include="0Harmony">
-            <HintPath>$(Sts2DataDir)/0Harmony.dll</HintPath>
+            <HintPath>$(Sts2LibDir)/0Harmony.dll</HintPath>
             <Private>true</Private>
         </Reference>
         <Reference Include="sts2">
-            <HintPath>$(Sts2DataDir)/sts2.dll</HintPath>
+            <HintPath>$(Sts2LibDir)/sts2.dll</HintPath>
             <Private>true</Private>
         </Reference>
         <Reference Include="GodotSharp">
-            <HintPath>$(Sts2DataDir)/GodotSharp.dll</HintPath>
+            <HintPath>$(Sts2LibDir)/GodotSharp.dll</HintPath>
             <Private>true</Private>
         </Reference>
     </ItemGroup>

@@ -19,13 +19,18 @@
         <NoWarn>$(NoWarn);MSB3270</NoWarn> 
     </PropertyGroup>
 
-    <ItemGroup Condition="Exists('$(Sts2DataDir)')" >
+    <PropertyGroup>
+        <Sts2LibDir Condition="'$(Sts2DataDir)' != '' and Exists('$(Sts2DataDir)')">$(Sts2DataDir)</Sts2LibDir>
+        <Sts2LibDir Condition="'$(Sts2LibDir)' == ''">$(MSBuildThisFileDirectory)lib</Sts2LibDir>
+    </PropertyGroup>
+
+    <ItemGroup>
         <Reference Include="0Harmony">
-            <HintPath>$(Sts2DataDir)/0Harmony.dll</HintPath>
+            <HintPath>$(Sts2LibDir)/0Harmony.dll</HintPath>
             <Private>false</Private>
         </Reference>
         <Reference Include="sts2">
-            <HintPath>$(Sts2DataDir)/sts2.dll</HintPath>
+            <HintPath>$(Sts2LibDir)/sts2.dll</HintPath>
             <Private>false</Private>
         </Reference>
     </ItemGroup>
@@ -77,8 +82,8 @@
     
     <Target Name="CheckDependencyPaths" >
         <Error
-                Text=" Slay the Spire 2 data not found at path '$(Sts2DataDir)'"
-                Condition="'$(Sts2DataDir)' == '' or !Exists('$(Sts2DataDir)')" />
+                Text=" Slay the Spire 2 data not found at path '$(Sts2DataDir)' and reference stubs not found at '$(Sts2LibDir)'"
+                Condition="('$(Sts2DataDir)' == '' or !Exists('$(Sts2DataDir)')) and !Exists('$(Sts2LibDir)/sts2.dll')" />
     </Target>
 
     <Target Name="CopyToModsFolderOnBuild" AfterTargets="PostBuildEvent" Condition="'$(SkipModsDeploy)' != 'true'">
