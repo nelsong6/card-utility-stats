@@ -15,7 +15,7 @@ permissions:
 jobs:
   build:
     name: Build & Package Mod
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -29,10 +29,13 @@ jobs:
         run: dotnet restore SpireLens.csproj
 
       - name: Build Core (Release)
-        run: dotnet build Core/SpireLens.Core.csproj -c Release
+        run: dotnet build Core/SpireLens.Core.csproj -c Release -p:SkipModsDeploy=true
 
       - name: Build Loader (Release)
-        run: dotnet build SpireLens.csproj -c Release
+        run: dotnet build SpireLens.csproj -c Release -p:SkipModsDeploy=true
+
+      - name: Build Tests (Release)
+        run: dotnet build Tests/SpireLens.Core.Tests/SpireLens.Core.Tests.csproj -c Release -p:SkipModsDeploy=true
 
       - name: Package Mod files
         shell: pwsh
