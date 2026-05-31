@@ -10,25 +10,25 @@ applied by merging this repo.
 Mirrors `nelsong6/ambience`'s registered workflow exactly, with the per-phase
 shell scripts swapped for spirelens's SSH-over-Tailscale variants. Phase
 ordering and recycle policy are identical because spirelens's verify loop
-is the same shape: prep → work → verify → gate → cleanup → touchpoint →
+is the same shape: prepare → work → verify → gate → cleanup → touchpoint →
 merge → cleanup.
 
 ```
-env-prep        depends_on: []                outputs: ssh_endpoint, tailnet_ip,
+prepare         depends_on: []                outputs: ssh_endpoint, tailnet_ip,
                                                        working_dir, bridge_ready
-llm-work        depends_on: env-prep          jobs: test-plan + implement
+llm-work        depends_on: prepare           jobs: test-plan + implement
                                               outputs: test_plan, implementation,
                                                        branch_name
 llm-verify      depends_on: llm-work          verify: true
                                               outputs: verification
 evidence-gate   depends_on: llm-verify        recycle_policy: 3 attempts on
                                               [verify_fail, verify_malformed],
-                                              lands_at=env-prep
+                                              lands_at=prepare
 cleanup_early   depends_on: evidence-gate     always, skip_when_preserve_test_env
 touchpoint      depends_on: cleanup_early     always, primitive=pr_touchpoint
 touchpoint_gate depends_on: touchpoint        primitive=pr_merge
 cleanup_final   depends_on: touchpoint_gate   always
-pr.recycle_policy: 3 attempts on [pr_review_changes_requested], lands_at=env-prep
+pr.recycle_policy: 3 attempts on [pr_review_changes_requested], lands_at=prepare
 budget.total: 25
 ```
 
@@ -38,7 +38,7 @@ Each phase script branches on `$GLIMMUNG_STEP_SLUG`. The slugs below are what
 the registration's `phases[].jobs[].steps[].slug` field must contain — the
 phase script's `native_run_selected_step` dispatcher accepts exactly these.
 
-### env-prep
+### prepare / env-prep job
 - `mint-credentials` — generates ed25519 keypair, mints SSH cert + Tailscale auth key.
 - `bring-up-tailnet` — tailscaled in userspace networking mode + `tailscale up`.
 - `resolve-host-ip` — looks up the laptop's tailnet IPv4 by `tag:spirelens-host`.
@@ -82,7 +82,7 @@ The spirelens-specific delta is the env-prep / llm-work / llm-verify shells.
   "name": "default",
   "phases": [
     {
-      "name": "env-prep",
+      "name": "prepare",
       "kind": "k8s_job",
       "depends_on": [],
       "outputs": ["ssh_endpoint", "tailnet_ip", "working_dir", "bridge_ready"],
@@ -110,11 +110,11 @@ The spirelens-specific delta is the env-prep / llm-work / llm-verify shells.
     {
       "name": "llm-work",
       "kind": "k8s_job",
-      "depends_on": ["env-prep"],
+      "depends_on": ["prepare"],
       "inputs": {
-        "ssh_endpoint": "${{ phases.env-prep.outputs.ssh_endpoint }}",
-        "tailnet_ip":   "${{ phases.env-prep.outputs.tailnet_ip }}",
-        "working_dir":  "${{ phases.env-prep.outputs.working_dir }}"
+        "ssh_endpoint": "${{ phases.prepare.outputs.ssh_endpoint }}",
+        "tailnet_ip":   "${{ phases.prepare.outputs.tailnet_ip }}",
+        "working_dir":  "${{ phases.prepare.outputs.working_dir }}"
       },
       "outputs": ["test_plan", "implementation", "branch_name"],
       "jobs": [
@@ -151,9 +151,9 @@ The spirelens-specific delta is the env-prep / llm-work / llm-verify shells.
       "depends_on": ["llm-work"],
       "verify": true,
       "inputs": {
-        "ssh_endpoint":   "${{ phases.env-prep.outputs.ssh_endpoint }}",
-        "tailnet_ip":     "${{ phases.env-prep.outputs.tailnet_ip }}",
-        "working_dir":    "${{ phases.env-prep.outputs.working_dir }}",
+        "ssh_endpoint":   "${{ phases.prepare.outputs.ssh_endpoint }}",
+        "tailnet_ip":     "${{ phases.prepare.outputs.tailnet_ip }}",
+        "working_dir":    "${{ phases.prepare.outputs.working_dir }}",
         "branch_name":    "${{ phases.llm-work.outputs.branch_name }}",
         "implementation": "${{ phases.llm-work.outputs.implementation }}",
         "test_plan":      "${{ phases.llm-work.outputs.test_plan }}"
@@ -208,7 +208,7 @@ The spirelens-specific delta is the env-prep / llm-work / llm-verify shells.
     },
     "abridged: touchpoint (primitive=pr_touchpoint), touchpoint_gate (primitive=pr_merge), cleanup_final (always, same env-destroy.sh shape)"
   ],
-  "pr": { "recycle_policy": { "max_attempts": 3, "on": ["pr_review_changes_requested"], "lands_at": "env-prep" } },
+  "pr": { "recycle_policy": { "max_attempts": 3, "on": ["pr_review_changes_requested"], "lands_at": "prepare" } },
   "budget": { "total": 25 }
 }
 ```
