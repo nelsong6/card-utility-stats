@@ -17,7 +17,8 @@ public static class OrichalcumBeforeTurnEndPatch
     private static MethodBase? TargetMethod()
     {
         var t = AccessTools.TypeByName("MegaCrit.Sts2.Core.Models.Relics.Orichalcum");
-        return t == null ? null : AccessTools.Method(t, "BeforeTurnEnd");
+        if (t == null) return null;
+        return AccessTools.Method(t, "BeforeSideTurnEnd") ?? AccessTools.Method(t, "BeforeTurnEnd");
     }
 
     [HarmonyPrefix]
