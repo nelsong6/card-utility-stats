@@ -1,9 +1,8 @@
 # Glimmung workflow registration
 
 This document captures the phase shape spirelens registers with Glimmung. The
-authored desired-state file is `.glimmung/workflows/default.yaml`; after edits
-land on `main`, sync `spirelens.default` through Glimmung's admin API/MCP
-surface so the live database row matches the repo.
+live workflow shape is the Postgres-backed `spirelens.default` row in Glimmung;
+dispatch does not read a workflow file from this repo.
 
 ## Phase shape
 
@@ -72,10 +71,10 @@ verdict-checker).
 ## Historical Registration JSON
 
 The JSON below is retained as historical shape documentation. Do not copy it
-into the live API by hand for ordinary changes; edit
-`.glimmung/workflows/default.yaml`, merge it, then run the Glimmung workflow
-sync. The `abridged...` placeholders elide the evidence-gate / pr_touchpoint /
-pr_merge / cleanup snippets.
+into the live API by hand for ordinary changes; update the Glimmung workflow
+registration through the admin/control-plane path. The `abridged...`
+placeholders elide the evidence-gate / pr_touchpoint / pr_merge / cleanup
+snippets.
 
 ```jsonc
 {
