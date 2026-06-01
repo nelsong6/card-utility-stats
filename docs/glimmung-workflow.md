@@ -1,9 +1,9 @@
 # Glimmung workflow registration
 
 This document captures the phase shape spirelens registers with Glimmung. The
-registration itself is an admin/operator action — `POST /v1/workflows` against
-`glimmung.romaine.life` with the JSON at the end of this doc — it is **not**
-applied by merging this repo.
+authored desired-state file is `.glimmung/workflows/default.yaml`; after edits
+land on `main`, sync `spirelens.default` through Glimmung's admin API/MCP
+surface so the live database row matches the repo.
 
 ## Phase shape
 
@@ -69,12 +69,13 @@ and `primitive: pr_merge` resolve to Glimmung-supplied handlers; the
 evidence-gate's `evidence_verification_gate=true` resolves to the canonical
 verdict-checker).
 
-## Registration JSON
+## Historical Registration JSON
 
-This is the body to `POST /v1/workflows` against the live Glimmung API. The
-`abridged…` placeholders elide the evidence-gate / pr_touchpoint / pr_merge /
-cleanup snippets — copy those from ambience's registered workflow exactly.
-The spirelens-specific delta is the env-prep / llm-work / llm-verify shells.
+The JSON below is retained as historical shape documentation. Do not copy it
+into the live API by hand for ordinary changes; edit
+`.glimmung/workflows/default.yaml`, merge it, then run the Glimmung workflow
+sync. The `abridged...` placeholders elide the evidence-gate / pr_touchpoint /
+pr_merge / cleanup snippets.
 
 ```jsonc
 {
