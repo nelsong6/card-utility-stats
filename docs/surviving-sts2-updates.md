@@ -109,8 +109,11 @@ pinning the bars at their placeholder. **This is third-party code**
    `scripts/glimmung-native/env-prep.sh`. `env-prep`'s `probe-mod-set` reads the
    host's `BaseLib.json` over SSH and fails closed with
    `baselib_too_old:found=<ver>:expected>=<floor>` below the floor (or
-   `baselib_missing_or_unversioned:expected>=<floor>`), so the floor is the thing
-   that stops this regressing silently. See
+   `baselib_missing_or_unversioned:found=<ver-or-empty>:manifest_exists=<bool>:expected>=<floor>`).
+   The step logs the checked mods directory, observed mods, manifest path, raw
+   BaseLib version, normalized BaseLib version, and any parse error before it
+   aborts, so the next run should show exactly what host state it evaluated.
+   The floor is the thing that stops this regressing silently. See
    [docs/laptop-host-setup.md](./laptop-host-setup.md#baselib-version-floor--v318).
 
 ## Failure mode 3: HUD desync on debug-loaded saves
