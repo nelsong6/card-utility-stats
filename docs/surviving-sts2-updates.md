@@ -18,7 +18,7 @@ recur every cycle.
 |---|---|---|
 | `build.ps1` fails: *"X does not contain a definition for Y"* | game API drift | [Failure mode 1](#failure-mode-1-bridge--core-build-drift) |
 | Run passes, model JSON is correct, but **screenshots show a frozen/placeholder HUD** (e.g. `88/88` HP, `0/4` energy) | BaseLib too old for the new game build | [Failure mode 2](#failure-mode-2-baselib-version-desync-frozen-hud) |
-| `env-prep` aborts `baselib_too_old:<ver>` or `baselib_missing_or_unversioned` | host BaseLib below the enforced floor | [Failure mode 2](#failure-mode-2-baselib-version-desync-frozen-hud) |
+| `env-prep` aborts `baselib_too_old:found=<ver>:expected>=<floor>` or `baselib_missing_or_unversioned:expected>=<floor>` | host BaseLib below the enforced floor | [Failure mode 2](#failure-mode-2-baselib-version-desync-frozen-hud) |
 | HUD stale only on **debug-loaded** combat saves, BaseLib is current | `CombatStateChanged` not raised on debug load | [Failure mode 3](#failure-mode-3-hud-desync-on-debug-loaded-saves) |
 
 **Golden rule:** after a game update, **look at the screenshots, not just the
@@ -107,9 +107,10 @@ pinning the bars at their placeholder. **This is third-party code**
 3. Confirm `BaseLib.json` reports the new version.
 4. **Bump the enforced floor** if needed: `BASELIB_MIN_VERSION` at the top of
    `scripts/glimmung-native/env-prep.sh`. `env-prep`'s `probe-mod-set` reads the
-   host's `BaseLib.json` over SSH and fails closed with `baselib_too_old:<ver>`
-   below the floor (or `baselib_missing_or_unversioned`), so the floor is the
-   thing that stops this regressing silently. See
+   host's `BaseLib.json` over SSH and fails closed with
+   `baselib_too_old:found=<ver>:expected>=<floor>` below the floor (or
+   `baselib_missing_or_unversioned:expected>=<floor>`), so the floor is the thing
+   that stops this regressing silently. See
    [docs/laptop-host-setup.md](./laptop-host-setup.md#baselib-version-floor--v318).
 
 ## Failure mode 3: HUD desync on debug-loaded saves
