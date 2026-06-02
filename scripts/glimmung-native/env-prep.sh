@@ -153,7 +153,7 @@ PROBE
   printf '%s\n' "$mod_state"
 
   local mods
-  mods="$(printf '%s\n' "$mod_state" | sed -n 's/^mods_found=//p' | tail -n 1 | tr ',' '\n')"
+  mods="$(printf '%s\n' "$mod_state" | sed -n 's/^mods_found=//p' | tail -n 1 | tr -d '\r' | tr ',' '\n')"
   local allowed=("BaseLib" "SpireLens" "SpireLensMcp")
   local unexpected=()
   local m a found
