@@ -206,15 +206,18 @@ install_mcp_and_start_sts2() {
   native_sync_host_checkout "$ip"
 
   native_ssh_run "$ip" <<PWSH
+\$ErrorActionPreference = 'Stop'
 \$env:GLIMMUNG_RUN_ID = '${GLIMMUNG_RUN_ID}'
 \$env:GLIMMUNG_ATTEMPT_INDEX = '${GLIMMUNG_ATTEMPT_INDEX:-0}'
 \$env:GLIMMUNG_PROJECT_REPO = '${GLIMMUNG_PROJECT_REPO:-nelsong6/spirelens}'
 \$env:GLIMMUNG_WORKING_DIR = "C:\\glimmung-runs\\${GLIMMUNG_RUN_REF}"
 \$env:GLIMMUNG_REPO_ROOT = 'D:\\repos\\SpireLens'
-& 'D:\\repos\\SpireLens\\.github\\scripts\\prepare-host.ps1' \`
+& pwsh -NoProfile -File 'D:\\repos\\SpireLens\\.github\\scripts\\prepare-host.ps1' \`
     -CheckoutPath \$env:GLIMMUNG_REPO_ROOT \`
     -InstallMcp \`
     -StartSts2
+\$exitCode = if (\$null -eq \$LASTEXITCODE) { 0 } else { [int]\$LASTEXITCODE }
+if (\$exitCode -ne 0) { exit \$exitCode }
 PWSH
 }
 

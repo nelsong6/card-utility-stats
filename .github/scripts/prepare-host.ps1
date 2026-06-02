@@ -26,9 +26,25 @@ function Invoke-LoggedStep {
     }
 }
 
-$repoRoot = Join-Path $env:GLIMMUNG_REPO_ROOT $CheckoutPath
+if ([System.IO.Path]::IsPathRooted($CheckoutPath)) {
+    $repoRoot = $CheckoutPath
+} else {
+    $repoRoot = Join-Path $env:GLIMMUNG_REPO_ROOT $CheckoutPath
+}
 if (-not (Test-Path -LiteralPath $repoRoot)) {
     throw "Repository checkout was not found at '$repoRoot'."
+}
+
+function Set-NativeEnvironmentValue {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][string]$Value
+    )
+
+    Set-Item -Path "Env:$Name" -Value $Value
+    if (-not [string]::IsNullOrWhiteSpace($env:GITHUB_ENV)) {
+        "$Name=$Value" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8NoBOM -Append
+    }
 }
 
 function Add-PathCandidate {
@@ -148,17 +164,17 @@ if (-not $claudePath) {
 $buildRoot = Join-Path $env:GLIMMUNG_WORKING_DIR ("build\$($env:GLIMMUNG_RUN_ID)-$($env:GLIMMUNG_ATTEMPT_INDEX)-$([IO.Path]::GetFileName($CheckoutPath))")
 New-Item -ItemType Directory -Force -Path $buildRoot | Out-Null
 
-"CLAUDE_CLI_PATH=$claudePath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8NoBOM -Append
-"SPIRELENS_HOST_REPO_ROOT=$repoRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8NoBOM -Append
-"SPIRELENS_HOST_BUILD_ROOT=$buildRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8NoBOM -Append
+Set-NativeEnvironmentValue -Name 'CLAUDE_CLI_PATH' -Value $claudePath
+Set-NativeEnvironmentValue -Name 'SPIRELENS_HOST_REPO_ROOT' -Value $repoRoot
+Set-NativeEnvironmentValue -Name 'SPIRELENS_HOST_BUILD_ROOT' -Value $buildRoot
 
 $gameDir = Resolve-Sts2GameDir -RepoRoot $repoRoot
 $sts2DataDir = Join-Path $gameDir 'data_sts2_windows_x86_64'
 $jobMcpConfigPath = New-JobMcpConfig -RepoRoot $repoRoot -GameDir $gameDir
 
-"SPIRELENS_HOST_STS2_GAME_DIR=$gameDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8NoBOM -Append
-"SPIRELENS_HOST_STS2_DATA_DIR=$sts2DataDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8NoBOM -Append
-"SPIRELENS_HOST_MCP_CONFIG_PATH=$jobMcpConfigPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8NoBOM -Append
+Set-NativeEnvironmentValue -Name 'SPIRELENS_HOST_STS2_GAME_DIR' -Value $gameDir
+Set-NativeEnvironmentValue -Name 'SPIRELENS_HOST_STS2_DATA_DIR' -Value $sts2DataDir
+Set-NativeEnvironmentValue -Name 'SPIRELENS_HOST_MCP_CONFIG_PATH' -Value $jobMcpConfigPath
 
 if (-not $InstallMcp) { return }
 

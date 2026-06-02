@@ -22,16 +22,20 @@ HOST_IP="$(native_connect_host)" || native_emit_abort "host_unavailable"
 
 run_test_plan() {
   native_ssh_run "$HOST_IP" <<PWSH
+\$ErrorActionPreference = 'Stop'
 \$env:GLIMMUNG_RUN_ID = '${GLIMMUNG_RUN_ID}'
 \$env:GLIMMUNG_ATTEMPT_INDEX = '${GLIMMUNG_ATTEMPT_INDEX:-0}'
 \$env:GLIMMUNG_PROJECT_REPO = '${GLIMMUNG_PROJECT_REPO:-nelsong6/spirelens}'
 \$env:GLIMMUNG_WORKING_DIR = "C:\\glimmung-runs\\${GLIMMUNG_RUN_REF}"
 \$env:GLIMMUNG_REPO_ROOT = 'D:\\repos\\SpireLens'
-& 'D:\\repos\\SpireLens\\.github\\scripts\\run-phases.ps1' \`
+& pwsh -NoProfile -File 'D:\\repos\\SpireLens\\.github\\scripts\\native-runtime.ps1' \`
+    -Mode run_phase \`
     -PhaseName test_plan \`
     -IssueNumber '${GLIMMUNG_ISSUE_NUMBER}' \`
     -RepoSlug '${GLIMMUNG_PROJECT_REPO:-nelsong6/spirelens}' \`
     -RepoRoot \$env:GLIMMUNG_REPO_ROOT
+\$exitCode = if (\$null -eq \$LASTEXITCODE) { 0 } else { [int]\$LASTEXITCODE }
+if (\$exitCode -ne 0) { exit \$exitCode }
 PWSH
 }
 
