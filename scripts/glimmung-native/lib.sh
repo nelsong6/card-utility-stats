@@ -74,10 +74,38 @@ native_run_selected_step() {
 
 native_emit_output() {
   # Append a `key=value` line to the file glimmung reads phase outputs
-  # from. Quoting / multi-line values are the caller's problem.
+  # from. The value MUST be single-line: the runner parses GLIMMUNG_OUTPUT_FILE
+  # line by line, so a multi-line value leaves orphaned continuation lines the
+  # parser rejects ("invalid output line"). For JSON artifacts use
+  # native_emit_json_output instead.
   local key="$1"
   local value="$2"
   printf '%s=%s\n' "$key" "$value" >>"${GLIMMUNG_OUTPUT_FILE}"
+}
+
+native_emit_json_output() {
+  # Emit a phase output whose value is the JSON contents of <file>, as a single
+  # JSON-object line — the form glimmung's output parser accepts for complex
+  # values (the issue-contract phase emits its contract exactly this way).
+  #
+  # native_emit_output's `key=value` form breaks on pretty-printed JSON: the
+  # agent writes multi-line artifacts, and the runner rejects the orphaned
+  # `  "field": ...,` continuation lines. We compact to one line and wrap the
+  # JSON as an escaped string value, so the emitted line is valid regardless of
+  # the artifact's contents. Fails loudly (rather than emitting a broken/empty
+  # output) if the artifact is missing or not valid JSON.
+  local key="$1"
+  local file="$2"
+  if [ ! -s "$file" ]; then
+    echo "native_emit_json_output: artifact '$file' is missing or empty" >&2
+    return 1
+  fi
+  local compact
+  if ! compact="$(jq -c . "$file")"; then
+    echo "native_emit_json_output: artifact '$file' is not valid JSON" >&2
+    return 1
+  fi
+  jq -nc --arg k "$key" --arg v "$compact" '{($k): $v}' >>"${GLIMMUNG_OUTPUT_FILE}"
 }
 
 native_emit_abort() {

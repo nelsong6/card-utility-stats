@@ -126,7 +126,7 @@ upload_screenshots() {
 }
 
 emit_verification() {
-  native_emit_output verification "$(<"${GLIMMUNG_WORKING_DIR}/artifacts/verification.json")"
+  native_emit_json_output verification "${GLIMMUNG_WORKING_DIR}/artifacts/verification.json"
 }
 
 native_run_selected_step \

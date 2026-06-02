@@ -47,7 +47,7 @@ collect_test_plan() {
   native_scp_pull "$HOST_IP" \
     "C:/glimmung-runs/${GLIMMUNG_RUN_REF}/sts2-artifacts/test-plan.json" \
     "$local_path"
-  native_emit_output test_plan "$(<"$local_path")"
+  native_emit_json_output test_plan "$local_path"
 }
 
 native_run_selected_step \
