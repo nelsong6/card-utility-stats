@@ -29,6 +29,7 @@ stop_laptop_processes() {
 Stop-Process -Name 'SpireLensMcp' -ErrorAction SilentlyContinue
 Stop-Process -Name 'sts2' -ErrorAction SilentlyContinue
 Stop-Process -Name 'STS2' -ErrorAction SilentlyContinue
+Write-Output 'stop-laptop-processes: done'
 PWSH
 }
 
@@ -37,7 +38,9 @@ remove_laptop_working_dir() {
     return 0
   fi
   native_ssh_run "$HOST_IP" <<PWSH || true
-Remove-Item -Recurse -Force -LiteralPath "C:\\glimmung-runs\\${GLIMMUNG_RUN_REF}" -ErrorAction SilentlyContinue
+\$dir = "C:\\glimmung-runs\\${GLIMMUNG_RUN_REF}"
+Remove-Item -Recurse -Force -LiteralPath \$dir -ErrorAction SilentlyContinue
+Write-Output ("remove-laptop-working-dir: " + \$dir + " exists=" + (Test-Path -LiteralPath \$dir).ToString().ToLowerInvariant())
 PWSH
 }
 
