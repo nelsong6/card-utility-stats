@@ -20,7 +20,7 @@
 #      AGENTS.md mod policy (BaseLib + SpireLens + SpireLensMcp only)
 #      — emit `unexpected_mod:<name>` and fail-closed on anything
 #      else (spirelens#179 Q3) — and enforce the BaseLib >= v3.1.8
-#      version floor (emit `baselib_too_old:<ver>`).
+#      version floor (emit found/expected detail on failure).
 #   8. Run the existing prepare-host pwsh script on the
 #      laptop with -InstallMcp -StartSts2, so SpireLensMcp is
 #      installed and STS2 is launched with the bridge accessible.
@@ -146,10 +146,10 @@ PROBE
   )"
   baselib_ver="$(printf '%s' "$baselib_ver" | tr -d '\r\n ')"
   if [ -z "$baselib_ver" ]; then
-    native_emit_abort "baselib_missing_or_unversioned"
+    native_emit_abort "baselib_missing_or_unversioned:expected>=${BASELIB_MIN_VERSION}"
   fi
   if ! native_semver_ge "$baselib_ver" "$BASELIB_MIN_VERSION"; then
-    native_emit_abort "baselib_too_old:${baselib_ver}"
+    native_emit_abort "baselib_too_old:found=${baselib_ver}:expected>=${BASELIB_MIN_VERSION}"
   fi
   native_emit_output baselib_version "$baselib_ver"
 }

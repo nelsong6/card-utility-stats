@@ -84,8 +84,9 @@ reflect true game state. BaseLib v3.1.8 ("main branch compatibility") added a
 graceful `HpDisplay` reflection fallback that resolves the freeze.
 
 `probe-mod-set` **enforces** this floor: after the name check it reads
-`mods\BaseLib\BaseLib.json` over SSH and fails closed with `baselib_too_old:<ver>`
-below the floor (or `baselib_missing_or_unversioned` if BaseLib is absent or its
+`mods\BaseLib\BaseLib.json` over SSH and fails closed with
+`baselib_too_old:found=<ver>:expected>=<floor>` below the floor (or
+`baselib_missing_or_unversioned:expected>=<floor>` if BaseLib is absent or its
 version is unparseable), and emits `baselib_version` as a phase output on pass.
 The floor itself is the `BASELIB_MIN_VERSION` constant near the top of
 `scripts/glimmung-native/env-prep.sh`; the numeric comparison is
