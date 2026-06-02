@@ -106,12 +106,54 @@ probe_mod_set() {
   # install_mcp runs. We tolerate that and reject anything ELSE.
   local ip
   ip="$(<"${GLIMMUNG_WORKING_DIR}/host_ip")"
-  local mods
-  mods="$(native_ssh_run "$ip" <<'PROBE'
-Get-ChildItem 'D:\SteamLibrary\steamapps\common\Slay the Spire 2\mods' -Directory |
-  Select-Object -ExpandProperty Name
+  local mod_state
+  if ! mod_state="$(native_ssh_run "$ip" <<'PROBE'
+$modsPath = 'D:\SteamLibrary\steamapps\common\Slay the Spire 2\mods'
+$manifestPath = Join-Path $modsPath 'BaseLib\BaseLib.json'
+$allowed = @('BaseLib', 'SpireLens', 'SpireLensMcp')
+$modNames = @()
+if (Test-Path -LiteralPath $modsPath) {
+  $names = [System.Collections.Generic.List[string]]::new()
+  foreach ($dir in [System.IO.Directory]::GetDirectories($modsPath)) {
+    $names.Add([System.IO.Path]::GetFileName($dir))
+  }
+  $modNames = [string[]]$names.ToArray()
+  [Array]::Sort($modNames, [System.StringComparer]::OrdinalIgnoreCase)
+}
+$manifestExists = Test-Path -LiteralPath $manifestPath
+$baselibVersion = ''
+$parseError = ''
+if ($manifestExists) {
+  try {
+    $manifestRaw = [System.IO.File]::ReadAllText($manifestPath)
+    $manifest = ConvertFrom-Json -InputObject $manifestRaw
+    if ($null -ne $manifest.version) {
+      $baselibVersion = [string]$manifest.version
+    }
+  } catch {
+    $parseError = ($_.Exception.Message -replace '[\r\n\t]+', ' ')
+  }
+}
+
+Write-Output "mods_dir=$modsPath"
+Write-Output ("mods_dir_exists=" + (Test-Path -LiteralPath $modsPath).ToString().ToLowerInvariant())
+Write-Output ("allowed_mods=" + ($allowed -join ','))
+Write-Output ("mods_found=" + ($modNames -join ','))
+Write-Output "baselib_manifest=$manifestPath"
+Write-Output ("baselib_manifest_exists=" + $manifestExists.ToString().ToLowerInvariant())
+Write-Output "baselib_version_raw=$baselibVersion"
+Write-Output ("baselib_version_normalized=" + $baselibVersion.Trim())
+if ($parseError -ne '') {
+  Write-Output "baselib_parse_error=$parseError"
+}
 PROBE
-  )"
+  )"; then
+    native_emit_abort "host_unavailable"
+  fi
+  printf '%s\n' "$mod_state"
+
+  local mods
+  mods="$(printf '%s\n' "$mod_state" | sed -n 's/^mods_found=//p' | tail -n 1 | tr ',' '\n')"
   local allowed=("BaseLib" "SpireLens" "SpireLensMcp")
   local unexpected=()
   local m a found
@@ -135,18 +177,12 @@ PROBE
   # version and fail closed below the floor. BaseLib/SpireLens are
   # host-local persistent state (not installed per run), so this gate is
   # the enforcement point — see docs/laptop-host-setup.md.
-  local baselib_ver
-  baselib_ver="$(native_ssh_run "$ip" <<'PROBE'
-$p = 'D:\SteamLibrary\steamapps\common\Slay the Spire 2\mods\BaseLib\BaseLib.json'
-if (Test-Path $p) {
-  try { (Get-Content -LiteralPath $p -Raw | ConvertFrom-Json).version }
-  catch {}
-}
-PROBE
-  )"
-  baselib_ver="$(printf '%s' "$baselib_ver" | tr -d '\r\n ')"
+  local baselib_raw baselib_ver manifest_exists
+  baselib_raw="$(printf '%s\n' "$mod_state" | sed -n 's/^baselib_version_raw=//p' | tail -n 1)"
+  baselib_ver="$(printf '%s' "$baselib_raw" | tr -d '\r\n ')"
+  manifest_exists="$(printf '%s\n' "$mod_state" | sed -n 's/^baselib_manifest_exists=//p' | tail -n 1)"
   if [ -z "$baselib_ver" ]; then
-    native_emit_abort "baselib_missing_or_unversioned:expected>=${BASELIB_MIN_VERSION}"
+    native_emit_abort "baselib_missing_or_unversioned:found=<empty>:manifest_exists=${manifest_exists:-unknown}:expected>=${BASELIB_MIN_VERSION}"
   fi
   if ! native_semver_ge "$baselib_ver" "$BASELIB_MIN_VERSION"; then
     native_emit_abort "baselib_too_old:found=${baselib_ver}:expected>=${BASELIB_MIN_VERSION}"
