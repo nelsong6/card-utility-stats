@@ -278,9 +278,38 @@ EOF
   printf -- '-F %s' "$cfg"
 }
 
+# native_ps_encode
+# Reads a UTF-8 PowerShell script on stdin and writes its PowerShell
+# `-EncodedCommand` form on stdout: base64 of the script's UTF-16LE bytes, no
+# BOM, on a single line. Verified byte-for-byte against
+# `[Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($s))`.
+#
+# iconv is the normal path. The awk fallback covers runner images that ship
+# without iconv (e.g. musl-based); it is ASCII-only, which every phase script
+# here is — these bodies are generated shell/pwsh, never localized text.
+native_ps_encode() {
+  if command -v iconv >/dev/null 2>&1; then
+    iconv -f UTF-8 -t UTF-16LE | base64 | tr -d '\n'
+  else
+    LC_ALL=C awk 'BEGIN{ORS=""}{n=length($0);for(i=1;i<=n;i++){printf "%s%c",substr($0,i,1),0};printf "%c%c",10,0}' | base64 | tr -d '\n'
+  fi
+}
+
 # native_ssh_run <host-ip> <pwsh script body>
-# Runs a chunk of pwsh on the laptop via SSH. The script body is fed
-# on stdin so we don't have to worry about argv-quoting nightmares.
+# Runs a chunk of pwsh on the laptop via SSH. The caller pipes the script body
+# on this function's stdin (a heredoc); we read it HERE in the pod and hand it
+# to the remote pwsh as a base64 argument via -EncodedCommand.
+#
+# We deliberately do NOT use `pwsh -Command -` (read the script from the SSH
+# *session* stdin). The per-phase tailnet SSH session that native_connect_host
+# stands up in a fresh work/cleanup pod does not reliably forward session stdin
+# to the remote process: pwsh then reads an EMPTY command, runs nothing, and
+# exits 0 — so the step "succeeds" having done no work (no test-plan.json
+# written, no branch pushed; the missing output only surfaces later as the
+# collect/scp + push-branch failures). -EncodedCommand carries the whole script
+# in argv, which the transport delivers reliably regardless of session-stdin
+# behaviour. argv-quoting — the original reason for the stdin channel — is a
+# non-issue precisely because a base64 token has no shell-special characters.
 #
 # Set NATIVE_SSH_TIMEOUT=<seconds> to bound the call. The bound is
 # applied here, wrapping the real `ssh` binary — `timeout` execs a
@@ -291,8 +320,14 @@ native_ssh_run() {
   shift
   local -a timeout_cmd=()
   [ -n "${NATIVE_SSH_TIMEOUT:-}" ] && timeout_cmd=(timeout "$NATIVE_SSH_TIMEOUT")
+
+  local encoded
+  encoded="$(native_ps_encode)"
+
+  # -n: the script rides entirely in argv now, so the SSH session carries no
+  # stdin to forward; point it at /dev/null and make that explicit.
   # shellcheck disable=SC2046
-  "${timeout_cmd[@]}" ssh $(native_ssh_args) "$(native_ssh_user)@${host_ip}" pwsh -NoProfile -Command -
+  "${timeout_cmd[@]}" ssh -n $(native_ssh_args) "$(native_ssh_user)@${host_ip}" pwsh -NoProfile -EncodedCommand "$encoded"
 }
 
 # native_sync_host_checkout <host-ip>
