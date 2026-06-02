@@ -53,29 +53,38 @@ PWSH
 
 prepare_scenario() {
   native_ssh_run "$HOST_IP" <<PWSH
-\$env:GLIMMUNG_RUN_ID = '${GLIMMUNG_RUN_ID}'
-\$env:GLIMMUNG_WORKING_DIR = "C:\\glimmung-runs\\${GLIMMUNG_RUN_REF}"
-\$env:GLIMMUNG_REPO_ROOT = 'D:\\repos\\SpireLens'
-& 'D:\\repos\\SpireLens\\.github\\scripts\\prepare-scenario.ps1' \`
-    -TestPlanPath "\$env:GLIMMUNG_WORKING_DIR\\sts2-artifacts\\test-plan.json" \`
-    -RepoRoot \$env:GLIMMUNG_REPO_ROOT \`
-    -ValidationArtifactDir "\$env:GLIMMUNG_WORKING_DIR\\sts2-artifacts" \`
-    -IssueNumber '${GLIMMUNG_ISSUE_NUMBER}'
-PWSH
-}
-
-run_verification() {
-  native_ssh_run "$HOST_IP" <<PWSH
+\$ErrorActionPreference = 'Stop'
 \$env:GLIMMUNG_RUN_ID = '${GLIMMUNG_RUN_ID}'
 \$env:GLIMMUNG_ATTEMPT_INDEX = '${GLIMMUNG_ATTEMPT_INDEX:-0}'
 \$env:GLIMMUNG_PROJECT_REPO = '${GLIMMUNG_PROJECT_REPO:-nelsong6/spirelens}'
 \$env:GLIMMUNG_WORKING_DIR = "C:\\glimmung-runs\\${GLIMMUNG_RUN_REF}"
 \$env:GLIMMUNG_REPO_ROOT = 'D:\\repos\\SpireLens'
-& 'D:\\repos\\SpireLens\\.github\\scripts\\run-phases.ps1' \`
+& pwsh -NoProfile -File 'D:\\repos\\SpireLens\\.github\\scripts\\native-runtime.ps1' \`
+    -Mode prepare_scenario \`
+    -IssueNumber '${GLIMMUNG_ISSUE_NUMBER}' \`
+    -RepoSlug '${GLIMMUNG_PROJECT_REPO:-nelsong6/spirelens}' \`
+    -RepoRoot \$env:GLIMMUNG_REPO_ROOT
+\$exitCode = if (\$null -eq \$LASTEXITCODE) { 0 } else { [int]\$LASTEXITCODE }
+if (\$exitCode -ne 0) { exit \$exitCode }
+PWSH
+}
+
+run_verification() {
+  native_ssh_run "$HOST_IP" <<PWSH
+\$ErrorActionPreference = 'Stop'
+\$env:GLIMMUNG_RUN_ID = '${GLIMMUNG_RUN_ID}'
+\$env:GLIMMUNG_ATTEMPT_INDEX = '${GLIMMUNG_ATTEMPT_INDEX:-0}'
+\$env:GLIMMUNG_PROJECT_REPO = '${GLIMMUNG_PROJECT_REPO:-nelsong6/spirelens}'
+\$env:GLIMMUNG_WORKING_DIR = "C:\\glimmung-runs\\${GLIMMUNG_RUN_REF}"
+\$env:GLIMMUNG_REPO_ROOT = 'D:\\repos\\SpireLens'
+& pwsh -NoProfile -File 'D:\\repos\\SpireLens\\.github\\scripts\\native-runtime.ps1' \`
+    -Mode run_phase \`
     -PhaseName verification \`
     -IssueNumber '${GLIMMUNG_ISSUE_NUMBER}' \`
     -RepoSlug '${GLIMMUNG_PROJECT_REPO:-nelsong6/spirelens}' \`
     -RepoRoot \$env:GLIMMUNG_REPO_ROOT
+\$exitCode = if (\$null -eq \$LASTEXITCODE) { 0 } else { [int]\$LASTEXITCODE }
+if (\$exitCode -ne 0) { exit \$exitCode }
 PWSH
 }
 
