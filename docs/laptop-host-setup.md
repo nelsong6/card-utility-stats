@@ -54,8 +54,8 @@ The pwsh contract is Glimmung-shaped — `GLIMMUNG_RUN_ID`,
 - **Repo checkouts** under `D:\repos`:
   - `D:\repos\SpireLens` — this repo. The checkout is **auto-synced per run**:
     `env-prep` hard-resets it to the run's commit before any `.ps1` runs (see
-    "How the checkout stays current" below). If the checkout is absent, the
-    sync creates it from the canonical upstream.
+    "How the checkout stays current" below). It still needs a one-time initial
+    clone with working `git fetch` credentials for `origin`.
   - `D:\repos\spire-lens-mcp` — the bridge repo. `prepare-host.ps1` clones it on
     first run and `git pull --ff-only origin main` on subsequent runs.
 
@@ -120,28 +120,19 @@ script `scripts/glimmung-native/env-prep.sh` calls `native_sync_host_checkout`
 (in `lib.sh`), which over SSH:
 
 ```powershell
-git -C D:\repos\SpireLens remote set-url origin https://github.com/romaine-life/spirelens.git
-git -C D:\repos\SpireLens fetch --prune origin '+refs/heads/*:refs/remotes/origin/*'
-git -C D:\repos\SpireLens cat-file -e '<run-commit>^{commit}'
+git -C D:\repos\SpireLens fetch --prune origin
 git -C D:\repos\SpireLens checkout --force --detach <run-commit>
 git -C D:\repos\SpireLens reset --hard <run-commit>
 ```
 
 `<run-commit>` is the exact SHA the orchestrator pod resolved `main` to when
-the run started, read from the pod's own fresh checkout. Pinning to the SHA —
-not a floating `git pull` — keeps the laptop on the same source the
-cluster-side `.sh` scripts were cut from, even if `main` advances mid-run.
-Because the sync lives in the re-cloned-every-run `.sh` layer and uses
-**plain git** (no dependency on any `.ps1` path or name), a rename or move of a
-phase script takes effect automatically on the next run — the cutover footgun
-is gone.
-
-The canonical upstream is enforced by the sync itself:
-`https://github.com/romaine-life/spirelens.git`. The laptop's previous
-`origin` value is not trusted. During sync, host-global Git config is ignored so
-old URL rewrite rules cannot silently redirect the fetch to a retired repo. If
-the pinned commit is not present after fetching from the canonical upstream, the
-step fails before any host-side PowerShell script runs.
+the run started (read from the pod's own fresh checkout; falls back to
+`origin/main` if that read fails). Pinning to the SHA — not a floating
+`git pull` — keeps the laptop on the same source the cluster-side `.sh` scripts
+were cut from, even if `main` advances mid-run. Because the sync lives in the
+re-cloned-every-run `.sh` layer and uses **plain git** (no dependency on any
+`.ps1` path or name), a rename or move of a phase script takes effect
+automatically on the next run — the cutover footgun is gone.
 
 Two consequences worth knowing:
 
