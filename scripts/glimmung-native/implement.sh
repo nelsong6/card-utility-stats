@@ -2,7 +2,7 @@
 
 # implement phase for spirelens. Runs run-phases.ps1 with
 # -PhaseName implementation on the laptop, then pushes the resulting
-# branch under glimmung/<run_id> to nelsong6/spirelens using the
+# branch under glimmung/<run_id> to romaine-life/spirelens using the
 # per-run GitHub token glimmung mints via the existing native-runner
 # github-token callback.
 
@@ -51,7 +51,7 @@ run_implementation() {
 \$ErrorActionPreference = 'Stop'
 \$env:GLIMMUNG_RUN_ID = '${GLIMMUNG_RUN_ID}'
 \$env:GLIMMUNG_ATTEMPT_INDEX = '${GLIMMUNG_ATTEMPT_INDEX:-0}'
-\$env:GLIMMUNG_PROJECT_REPO = '${GLIMMUNG_PROJECT_REPO:-nelsong6/spirelens}'
+\$env:GLIMMUNG_PROJECT_REPO = '${GLIMMUNG_PROJECT_REPO:-romaine-life/spirelens}'
 \$env:GLIMMUNG_WORKING_DIR = "C:\\glimmung-runs\\${GLIMMUNG_RUN_REF}"
 \$env:GLIMMUNG_REPO_ROOT = 'D:\\repos\\SpireLens'
 \$env:GH_TOKEN = '${gh_token}'
@@ -59,7 +59,7 @@ run_implementation() {
     -Mode run_phase \`
     -PhaseName implementation \`
     -IssueNumber '${GLIMMUNG_ISSUE_NUMBER}' \`
-    -RepoSlug '${GLIMMUNG_PROJECT_REPO:-nelsong6/spirelens}' \`
+    -RepoSlug '${GLIMMUNG_PROJECT_REPO:-romaine-life/spirelens}' \`
     -RepoRoot \$env:GLIMMUNG_REPO_ROOT
 \$exitCode = if (\$null -eq \$LASTEXITCODE) { 0 } else { [int]\$LASTEXITCODE }
 if (\$exitCode -ne 0) { exit \$exitCode }
@@ -75,7 +75,7 @@ push_branch() {
   gh_token="$(<"${GLIMMUNG_WORKING_DIR}/gh_token")"
   local branch="glimmung/${GLIMMUNG_RUN_ID}"
   if ! curl -fsS -H "Authorization: token ${gh_token}" \
-      "https://api.github.com/repos/${GLIMMUNG_PROJECT_REPO:-nelsong6/spirelens}/branches/${branch}" \
+      "https://api.github.com/repos/${GLIMMUNG_PROJECT_REPO:-romaine-life/spirelens}/branches/${branch}" \
       >/dev/null; then
     native_emit_abort "implementation_branch_missing:${branch}"
   fi

@@ -6,7 +6,7 @@ dispatch does not read a workflow file from this repo.
 
 ## Phase shape
 
-Mirrors `nelsong6/ambience`'s registered workflow exactly, with the per-phase
+Mirrors `romaine-life/ambience`'s registered workflow exactly, with the per-phase
 shell scripts swapped for spirelens's SSH-over-Tailscale variants. Phase
 ordering and recycle policy are identical because spirelens's verify loop
 is the same shape: prepare → work → verify → gate → cleanup → touchpoint →
@@ -90,7 +90,7 @@ snippets.
         {
           "id": "env-prep",
           "name": "Environment prep",
-          "checkout": { "repo": "nelsong6/spirelens", "ref": "main", "path": "/workspace/spirelens" },
+          "checkout": { "repo": "romaine-life/spirelens", "ref": "main", "path": "/workspace/spirelens" },
           "working_directory": "/workspace",
           "managed": true,
           "timeout_seconds": 1200,
@@ -121,7 +121,7 @@ snippets.
         {
           "id": "llm-test-plan",
           "name": "LLM: author test plan",
-          "checkout": { "repo": "nelsong6/spirelens", "ref": "main", "path": "/workspace/spirelens" },
+          "checkout": { "repo": "romaine-life/spirelens", "ref": "main", "path": "/workspace/spirelens" },
           "working_directory": "/workspace",
           "managed": true,
           "timeout_seconds": 900,
@@ -133,7 +133,7 @@ snippets.
         {
           "id": "llm-implement",
           "name": "LLM: implement",
-          "checkout": { "repo": "nelsong6/spirelens", "ref": "main", "path": "/workspace/spirelens" },
+          "checkout": { "repo": "romaine-life/spirelens", "ref": "main", "path": "/workspace/spirelens" },
           "working_directory": "/workspace",
           "managed": true,
           "timeout_seconds": 1800,
@@ -163,7 +163,7 @@ snippets.
         {
           "id": "llm-verify",
           "name": "LLM: verify in STS2",
-          "checkout": { "repo": "nelsong6/spirelens", "ref": "main", "path": "/workspace/spirelens" },
+          "checkout": { "repo": "romaine-life/spirelens", "ref": "main", "path": "/workspace/spirelens" },
           "working_directory": "/workspace",
           "managed": true,
           "timeout_seconds": 2400,
@@ -193,7 +193,7 @@ snippets.
         {
           "id": "env-destroy",
           "name": "Cleanup",
-          "checkout": { "repo": "nelsong6/spirelens", "ref": "main", "path": "/workspace/spirelens" },
+          "checkout": { "repo": "romaine-life/spirelens", "ref": "main", "path": "/workspace/spirelens" },
           "working_directory": "/workspace",
           "managed": true,
           "timeout_seconds": 600,

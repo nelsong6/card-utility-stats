@@ -10,7 +10,7 @@
 #   - Per-step dispatch matching ambience's pattern.
 #   - Minting per-run credentials (SSH user certificate + Tailscale
 #     auth key) via glimmung's /v1/run-callbacks/{token}/native/*
-#     primitives, documented in nelsong6/glimmung's
+#     primitives, documented in romaine-life/glimmung's
 #     docs/remote-host-execution.md. URLs are pre-baked into
 #     $GLIMMUNG_SSH_CERT_URL and $GLIMMUNG_TAILSCALE_AUTHKEY_URL by
 #     the native launcher; auth rides as the
@@ -152,7 +152,7 @@ native_semver_ge() {
 # ---------------------------------------------------------------------
 
 # Both primitives are documented in
-# nelsong6/glimmung/docs/remote-host-execution.md. They're scoped by
+# romaine-life/glimmung/docs/remote-host-execution.md. They're scoped by
 # possession of the run callback token (baked into the URL by
 # glimmung's native launcher) plus the X-Glimmung-Attempt-Token header.
 # Same shape as $GLIMMUNG_GITHUB_TOKEN_URL — pre-baked URLs land on
@@ -408,7 +408,7 @@ PWSH
 # Stand up THIS pod's own connection to the remote laptop and echo its tailnet
 # IPv4 on stdout. Every phase runs in a separate ephemeral Job pod, so the
 # keypair, signed SSH cert, and Tailscale node env-prep created DO NOT exist in
-# any later phase's pod (per nelsong6/glimmung docs/remote-host-execution.md:
+# any later phase's pod (per romaine-life/glimmung docs/remote-host-execution.md:
 # the per-run working dir, including Tailscale state, is discarded with the
 # pod). Each laptop-touching phase must therefore establish its own connection
 # rather than assume env-prep's survives — the lift-and-shift from a single

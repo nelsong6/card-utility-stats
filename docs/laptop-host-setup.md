@@ -4,14 +4,14 @@ This is the setup guide for the Windows gaming laptop that runs SpireLens's
 live verify loop. The laptop hosts the warm Slay the Spire 2 (STS2) install and
 the SpireLensMcp bridge, so the load-bearing work (Claude invocation, build,
 deploy, scenario prep, verification) executes here even though each run is
-orchestrated by `nelsong6/glimmung` from the cluster.
+orchestrated by `romaine-life/glimmung` from the cluster.
 
 There is **no** GitHub Actions self-hosted runner on this host. The previous
 GitHub Actions self-hosted-runner model has been retired end to end. Runs
 now reach the laptop over SSH-on-Tailscale, dispatched by Glimmung's
 `k8s_job` native phases. See
 [docs/glimmung-workflow.md](./glimmung-workflow.md) for the registered phase
-shape and `nelsong6/glimmung/docs/remote-host-execution.md` for the
+shape and `romaine-life/glimmung/docs/remote-host-execution.md` for the
 orchestrator-side protocol.
 
 ## How a run reaches the laptop
@@ -35,7 +35,7 @@ The pwsh contract is Glimmung-shaped — `GLIMMUNG_RUN_ID`,
 - **OpenSSH Server** running and reachable on the tailnet. Configure
   `sshd_config` to trust Glimmung's SSH CA via `TrustedUserCAKeys` (the CA is
   issued by `auth.romaine.life`; see
-  `nelsong6/glimmung/docs/remote-host-execution.md` for the current CA public
+  `romaine-life/glimmung/docs/remote-host-execution.md` for the current CA public
   key and the exact `sshd_config` stanza). Per-run user certificates are signed
   by that CA, so no static authorized key is stored on the host.
 - **Tailscale** installed and signed in, with this device tagged

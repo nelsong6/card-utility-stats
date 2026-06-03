@@ -66,7 +66,7 @@ When inspecting `mods/`, treat any non-(SpireLens|BaseLib|SpireLensMcp) entry as
 
 ## Run execution model
 
-Runs are dispatched by `nelsong6/glimmung` against this repo's
+Runs are dispatched by `romaine-life/glimmung` against this repo's
 registered workflow. Each phase runs as a Glimmung-managed `k8s_job` in the
 cluster, but the load-bearing work (Claude invocation, build, deploy, scenario
 prep, verification) executes on this gaming laptop because the warm Slay the
@@ -92,7 +92,7 @@ AutoAdminLogon) — if
 the laptop is asleep or pre-logon, the orchestrator's `env-prep` phase aborts
 with `host_unavailable` and the run requeues until next manual sign-in.
 
-See `nelsong6/glimmung/docs/remote-host-execution.md` for the orchestrator-side
+See `romaine-life/glimmung/docs/remote-host-execution.md` for the orchestrator-side
 protocol and `docs/glimmung-workflow.md` here for the registered phase shape.
 
 ## Useful Commands

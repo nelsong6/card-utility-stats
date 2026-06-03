@@ -30,7 +30,7 @@ while the rendered HUD lies. Pixels are the only signal that catches them.
 | Concern | Repo | Key paths |
 |---|---|---|
 | Bridge mod build + deploy | `nelsong6/spire-lens-mcp` | `build.ps1`, `McpMod*.cs`, `mod_manifest.json` |
-| Core mod + verify-loop harness | `nelsong6/spirelens` | `.github/scripts/*.ps1` (`Sts2HostPaths.ps1`, `prepare-scenario.ps1`, `prepare-host.ps1`), `scripts/glimmung-native/*.sh` |
+| Core mod + verify-loop harness | `romaine-life/spirelens` | `.github/scripts/*.ps1` (`Sts2HostPaths.ps1`, `prepare-scenario.ps1`, `prepare-host.ps1`), `scripts/glimmung-native/*.sh` |
 | Third-party utility lib | `Alchyr/BaseLib-StS2` (vendored on host) | host `mods\BaseLib\` only |
 
 The harness scripts (`Sts2HostPaths.ps1`, `prepare-scenario.ps1`) live **only in
