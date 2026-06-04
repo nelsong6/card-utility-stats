@@ -18,16 +18,17 @@ native_require_env GLIMMUNG_RUN_ID GLIMMUNG_RUN_REF GLIMMUNG_ISSUE_NUMBER
 HOST_IP="$(native_connect_host)" || native_emit_abort "host_unavailable"
 
 run_implementation() {
-  local gh_token
-  gh_token="$(native_github_token)"
+  local gh_token_b64
+  gh_token_b64="$(native_github_token_b64)"
   native_ssh_run "$HOST_IP" <<PWSH
 \$ErrorActionPreference = 'Stop'
+\$ghToken = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${gh_token_b64}'))
 \$env:GLIMMUNG_RUN_ID = '${GLIMMUNG_RUN_ID}'
 \$env:GLIMMUNG_ATTEMPT_INDEX = '${GLIMMUNG_ATTEMPT_INDEX:-0}'
 \$env:GLIMMUNG_PROJECT_REPO = '${GLIMMUNG_PROJECT_REPO:-romaine-life/spirelens}'
 \$env:GLIMMUNG_WORKING_DIR = "C:\\glimmung-runs\\${GLIMMUNG_RUN_REF}"
 \$env:GLIMMUNG_REPO_ROOT = 'D:\\repos\\SpireLens'
-\$env:GH_TOKEN = '${gh_token}'
+\$env:GH_TOKEN = \$ghToken
 & pwsh -NoProfile -File 'D:\\repos\\SpireLens\\.github\\scripts\\native-runtime.ps1' \`
     -Mode run_phase \`
     -PhaseName implementation \`
@@ -44,16 +45,18 @@ push_branch() {
   # publishing: commit whatever the implementation phase changed in the
   # laptop checkout, push it to the run-scoped branch, then verify the
   # branch exists and surface its name for verification.
-  local gh_token
+  local gh_token gh_token_b64
   gh_token="$(native_github_token)"
+  gh_token_b64="$(printf '%s' "$gh_token" | base64 | tr -d '\n')"
   local repo="${GLIMMUNG_PROJECT_REPO:-romaine-life/spirelens}"
   local branch="glimmung/${GLIMMUNG_RUN_ID}"
 
   native_ssh_run "$HOST_IP" <<PWSH
 \$ErrorActionPreference = 'Stop'
+\$ghToken = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${gh_token_b64}'))
 \$repo = 'D:\\repos\\SpireLens'
 \$branch = '${branch}'
-\$remote = 'https://x-access-token:${gh_token}@github.com/${repo}.git'
+\$remote = "https://x-access-token:\$ghToken@github.com/${repo}.git"
 Set-Location -LiteralPath \$repo
 git config user.email 'glimmung-native@romaine.life'
 if (\$LASTEXITCODE -ne 0) { throw 'git config user.email failed' }

@@ -126,26 +126,50 @@ native_mint_github_token() {
   # managed steps in the same k8s Job can reuse the exact token.
   local token_file="${GLIMMUNG_WORKING_DIR}/gh_token"
   if [ -s "$token_file" ]; then
-    return 0
+    local cached
+    cached="$(tr -d '\r\n' <"$token_file")"
+    if [[ "$cached" =~ [^[:space:]] ]]; then
+      return 0
+    fi
+    rm -f "$token_file"
   fi
   native_require_env GLIMMUNG_GITHUB_TOKEN_URL GLIMMUNG_ATTEMPT_TOKEN
 
-  local token
-  token="$(curl -fsS -X POST \
-    -H "X-Glimmung-Attempt-Token: ${GLIMMUNG_ATTEMPT_TOKEN}" \
-    "${GLIMMUNG_GITHUB_TOKEN_URL}" | jq -r '.token // empty')" || true
-  if [ -z "$token" ]; then
+  local response token
+  if ! response="$(curl -fsS -X POST \
+      -H "X-Glimmung-Attempt-Token: ${GLIMMUNG_ATTEMPT_TOKEN}" \
+      "${GLIMMUNG_GITHUB_TOKEN_URL}")"; then
+    echo "native_mint_github_token: token endpoint request failed" >&2
+    return 1
+  fi
+  if ! token="$(jq -r '.token // empty' <<<"$response" | tr -d '\r\n')"; then
+    echo "native_mint_github_token: token endpoint returned invalid JSON" >&2
+    return 1
+  fi
+  if ! [[ "$token" =~ [^[:space:]] ]]; then
     echo "native_mint_github_token: token endpoint returned no usable .token" >&2
     return 1
   fi
 
-  printf '%s' "$token" >"$token_file"
+  printf '%s\n' "$token" >"$token_file"
   chmod 600 "$token_file"
 }
 
 native_github_token() {
   native_mint_github_token
-  <"${GLIMMUNG_WORKING_DIR}/gh_token"
+  local token
+  token="$(tr -d '\r\n' <"${GLIMMUNG_WORKING_DIR}/gh_token")"
+  if ! [[ "$token" =~ [^[:space:]] ]]; then
+    echo "native_github_token: cached token is blank" >&2
+    return 1
+  fi
+  printf '%s' "$token"
+}
+
+native_github_token_b64() {
+  local token
+  token="$(native_github_token)"
+  printf '%s' "$token" | base64 | tr -d '\n'
 }
 
 # ---------------------------------------------------------------------
@@ -416,19 +440,19 @@ native_ssh_run() {
 # not allow old source/test files from prior runs to bleed into the next branch.
 native_sync_host_checkout() {
   local host_ip="$1"
-  local cluster_root sha gh_token
+  local cluster_root sha gh_token_b64
   # lib.sh lives at <repo>/scripts/glimmung-native/lib.sh; the repo root is
   # two levels up. That's the orchestrator pod's per-run checkout.
   cluster_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
   sha="$(git -C "$cluster_root" rev-parse HEAD 2>/dev/null)"
-  gh_token="$(native_github_token)"
+  gh_token_b64="$(native_github_token_b64)"
 
   native_ssh_run "$host_ip" <<PWSH
 \$ErrorActionPreference = 'Stop'
 \$repo = 'D:\\repos\\SpireLens'
 \$remoteUrl = '${SPIRELENS_CANONICAL_REPO_URL}'
 \$target = '${sha}'
-\$token = '${gh_token}'
+\$token = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${gh_token_b64}'))
 if ([string]::IsNullOrWhiteSpace(\$target)) { throw 'native sync target commit is empty' }
 if ([string]::IsNullOrWhiteSpace(\$token)) { throw 'native sync GitHub token is empty' }
 \$authHeader = 'AUTHORIZATION: basic ' + [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("x-access-token:\$token"))
