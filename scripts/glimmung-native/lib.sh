@@ -53,23 +53,21 @@ native_require_env() {
   fi
 }
 
-native_project_repo() {
+native_issue_repo() {
   # Glimmung derives the primary checkout repo from the project's github_repo
-  # and carries it on the run as issue_repo. The native launcher exposes that
-  # as GLIMMUNG_ISSUE_REPO.
+  # and carries that canonical owner/repo slug on the run as issue_repo. The
+  # native launcher exposes it as GLIMMUNG_ISSUE_REPO; do not rederive it here.
   local repo="${GLIMMUNG_ISSUE_REPO:-}"
-  repo="${repo#https://github.com/}"
-  repo="${repo%.git}"
   if [ -z "$repo" ]; then
-    echo "native_project_repo: GLIMMUNG_ISSUE_REPO is required" >&2
+    echo "native_issue_repo: GLIMMUNG_ISSUE_REPO is required" >&2
     return 1
   fi
   printf '%s' "$repo"
 }
 
-native_project_repo_url() {
+native_issue_repo_url() {
   local repo
-  repo="$(native_project_repo)"
+  repo="$(native_issue_repo)"
   printf 'https://github.com/%s.git' "$repo"
 }
 
@@ -478,7 +476,7 @@ native_sync_host_checkout() {
   cluster_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
   sha="$(git -C "$cluster_root" rev-parse HEAD 2>/dev/null)"
   gh_token_b64="$(native_github_token_b64)"
-  remote_url="$(native_project_repo_url)"
+  remote_url="$(native_issue_repo_url)"
 
   native_ssh_run "$host_ip" <<PWSH
 \$ErrorActionPreference = 'Stop'

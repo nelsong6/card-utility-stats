@@ -137,8 +137,9 @@ Because the sync lives in the re-cloned-every-run `.sh` layer and uses
 phase script takes effect automatically on the next run — the cutover footgun
 is gone.
 
-The canonical upstream is enforced by the sync itself from the run's
-`GLIMMUNG_ISSUE_REPO`, which Glimmung derives from the project's `github_repo`.
+The canonical upstream is enforced by the sync itself from `GLIMMUNG_ISSUE_REPO`.
+Glimmung has already copied the project's `github_repo` onto the run as that
+owner/repo slug; the script uses it directly and only formats the GitHub URL.
 The laptop's previous `origin` value is not trusted. Clone/fetch authenticate
 with the per-run Glimmung GitHub token, while the local `origin` remains the
 canonical URL without an embedded credential. During sync, host-global Git config
