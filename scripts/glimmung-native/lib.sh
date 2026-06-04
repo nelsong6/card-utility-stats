@@ -120,6 +120,34 @@ native_emit_abort() {
   exit 0
 }
 
+native_mint_github_token() {
+  # Glimmung's native launcher bakes a per-attempt callback URL into the pod.
+  # Mint once per job pod and cache it under GLIMMUNG_WORKING_DIR so later
+  # managed steps in the same k8s Job can reuse the exact token.
+  local token_file="${GLIMMUNG_WORKING_DIR}/gh_token"
+  if [ -s "$token_file" ]; then
+    return 0
+  fi
+  native_require_env GLIMMUNG_GITHUB_TOKEN_URL GLIMMUNG_ATTEMPT_TOKEN
+
+  local token
+  token="$(curl -fsS -X POST \
+    -H "X-Glimmung-Attempt-Token: ${GLIMMUNG_ATTEMPT_TOKEN}" \
+    "${GLIMMUNG_GITHUB_TOKEN_URL}" | jq -r '.token // empty')" || true
+  if [ -z "$token" ]; then
+    echo "native_mint_github_token: token endpoint returned no usable .token" >&2
+    return 1
+  fi
+
+  printf '%s' "$token" >"$token_file"
+  chmod 600 "$token_file"
+}
+
+native_github_token() {
+  native_mint_github_token
+  <"${GLIMMUNG_WORKING_DIR}/gh_token"
+}
+
 # ---------------------------------------------------------------------
 # Version comparison
 # ---------------------------------------------------------------------
@@ -383,23 +411,27 @@ native_ssh_run() {
 # fetching and ignores host-global Git config while doing so. A stale URL rewrite
 # or old origin must fail here instead of silently fetching a different repo.
 #
-# No `git clean`: we hard-reset tracked files (so tracked files like
-# .mcp.json are restored to the run's commit) but leave host-local untracked
-# files (Steam/STS2 state, logs) in place.
+# After resetting tracked files, remove stale untracked files from the checkout.
+# Preserve local cache/build directories that the laptop may keep warm, but do
+# not allow old source/test files from prior runs to bleed into the next branch.
 native_sync_host_checkout() {
   local host_ip="$1"
-  local cluster_root sha
+  local cluster_root sha gh_token
   # lib.sh lives at <repo>/scripts/glimmung-native/lib.sh; the repo root is
   # two levels up. That's the orchestrator pod's per-run checkout.
   cluster_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
   sha="$(git -C "$cluster_root" rev-parse HEAD 2>/dev/null)"
+  gh_token="$(native_github_token)"
 
   native_ssh_run "$host_ip" <<PWSH
 \$ErrorActionPreference = 'Stop'
 \$repo = 'D:\\repos\\SpireLens'
 \$remoteUrl = '${SPIRELENS_CANONICAL_REPO_URL}'
 \$target = '${sha}'
+\$token = '${gh_token}'
 if ([string]::IsNullOrWhiteSpace(\$target)) { throw 'native sync target commit is empty' }
+if ([string]::IsNullOrWhiteSpace(\$token)) { throw 'native sync GitHub token is empty' }
+\$authHeader = 'AUTHORIZATION: basic ' + [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("x-access-token:\$token"))
 
 \$emptyGitConfig = Join-Path ([System.IO.Path]::GetTempPath()) 'glimmung-empty-gitconfig'
 if (-not (Test-Path -LiteralPath \$emptyGitConfig)) {
@@ -421,7 +453,7 @@ if (-not (Test-Path -LiteralPath \$gitDir)) {
       throw "refusing to sync \$repo because it exists but is not a git checkout"
     }
   }
-  git clone \$remoteUrl \$repo
+  git -c "http.https://github.com/.extraheader=\$authHeader" clone \$remoteUrl \$repo
   if (\$LASTEXITCODE -ne 0) { throw "git clone \$remoteUrl failed for \$repo" }
 }
 
@@ -444,7 +476,7 @@ if (\$urlRewriteRules.Count -gt 0) {
   throw "refusing to sync \$repo with local git url rewrite rules: \$([string]::Join('; ', \$urlRewriteRules))"
 }
 
-git -C \$repo fetch --prune origin '+refs/heads/*:refs/remotes/origin/*'
+git -C \$repo -c "http.https://github.com/.extraheader=\$authHeader" fetch --prune origin '+refs/heads/*:refs/remotes/origin/*'
 if (\$LASTEXITCODE -ne 0) { throw "git fetch from \$remoteUrl failed for \$repo" }
 git -C \$repo cat-file -e "\$target^{commit}"
 if (\$LASTEXITCODE -ne 0) { throw "target commit \$target missing after fetch from \$remoteUrl" }
@@ -452,6 +484,8 @@ git -C \$repo checkout --force --detach \$target
 if (\$LASTEXITCODE -ne 0) { throw "git checkout \$target failed" }
 git -C \$repo reset --hard \$target
 if (\$LASTEXITCODE -ne 0) { throw "git reset \$target failed" }
+git -C \$repo clean -ffdx -e .godot/ -e bin/ -e obj/ -e .vs/ -e packages/ -e publish/
+if (\$LASTEXITCODE -ne 0) { throw "git clean failed for \$repo" }
 Write-Output ("synced {0} to {1} from {2}" -f \$repo, \$target, \$remoteUrl)
 PWSH
 }

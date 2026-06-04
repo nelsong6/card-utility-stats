@@ -21,6 +21,8 @@ native_require_env GLIMMUNG_RUN_ID GLIMMUNG_RUN_REF GLIMMUNG_ISSUE_NUMBER
 HOST_IP="$(native_connect_host)" || native_emit_abort "host_unavailable"
 
 run_test_plan() {
+  local gh_token
+  gh_token="$(native_github_token)"
   native_ssh_run "$HOST_IP" <<PWSH
 \$ErrorActionPreference = 'Stop'
 \$env:GLIMMUNG_RUN_ID = '${GLIMMUNG_RUN_ID}'
@@ -28,12 +30,14 @@ run_test_plan() {
 \$env:GLIMMUNG_PROJECT_REPO = '${GLIMMUNG_PROJECT_REPO:-romaine-life/spirelens}'
 \$env:GLIMMUNG_WORKING_DIR = "C:\\glimmung-runs\\${GLIMMUNG_RUN_REF}"
 \$env:GLIMMUNG_REPO_ROOT = 'D:\\repos\\SpireLens'
+\$env:GH_TOKEN = '${gh_token}'
 & pwsh -NoProfile -File 'D:\\repos\\SpireLens\\.github\\scripts\\native-runtime.ps1' \`
     -Mode run_phase \`
     -PhaseName test_plan \`
     -IssueNumber '${GLIMMUNG_ISSUE_NUMBER}' \`
     -RepoSlug '${GLIMMUNG_PROJECT_REPO:-romaine-life/spirelens}' \`
-    -RepoRoot \$env:GLIMMUNG_REPO_ROOT
+    -RepoRoot \$env:GLIMMUNG_REPO_ROOT \`
+    -GitHubToken '${gh_token}'
 \$exitCode = if (\$null -eq \$LASTEXITCODE) { 0 } else { [int]\$LASTEXITCODE }
 if (\$exitCode -ne 0) { exit \$exitCode }
 PWSH

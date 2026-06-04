@@ -121,10 +121,11 @@ script `scripts/glimmung-native/env-prep.sh` calls `native_sync_host_checkout`
 
 ```powershell
 git -C D:\repos\SpireLens remote set-url origin https://github.com/romaine-life/spirelens.git
-git -C D:\repos\SpireLens fetch --prune origin '+refs/heads/*:refs/remotes/origin/*'
+git -C D:\repos\SpireLens -c http.https://github.com/.extraheader=<run-token> fetch --prune origin '+refs/heads/*:refs/remotes/origin/*'
 git -C D:\repos\SpireLens cat-file -e '<run-commit>^{commit}'
 git -C D:\repos\SpireLens checkout --force --detach <run-commit>
 git -C D:\repos\SpireLens reset --hard <run-commit>
+git -C D:\repos\SpireLens clean -ffdx -e .godot/ -e bin/ -e obj/ -e .vs/ -e packages/ -e publish/
 ```
 
 `<run-commit>` is the exact SHA the orchestrator pod resolved `main` to when
@@ -138,16 +139,20 @@ is gone.
 
 The canonical upstream is enforced by the sync itself:
 `https://github.com/romaine-life/spirelens.git`. The laptop's previous
-`origin` value is not trusted. During sync, host-global Git config is ignored so
+`origin` value is not trusted. Clone/fetch authenticate with the per-run
+Glimmung GitHub token, while the local `origin` remains the canonical URL
+without an embedded credential. During sync, host-global Git config is ignored so
 old URL rewrite rules cannot silently redirect the fetch to a retired repo. If
 the pinned commit is not present after fetching from the canonical upstream, the
 step fails before any host-side PowerShell script runs.
 
 Two consequences worth knowing:
 
-- **`git clean` is intentionally NOT run.** The sync hard-resets *tracked*
-  files but leaves host-local *untracked* files (Steam/STS2 state, logs) in
-  place.
+- **Stale untracked source files are removed.** The sync runs `git clean` inside
+  `D:\repos\SpireLens` after reset so a prior run's untracked patch/test files
+  cannot bleed into the next implementation branch. Common local cache/build
+  directories (`.godot/`, `bin/`, `obj/`, `.vs/`, `packages/`, `publish/`) are
+  excluded.
 - **Tracked files are restored to the run's commit.** `.mcp.json` is tracked,
   so the `reset --hard` overwrites it every run. A host-local edit to a tracked
   file (e.g. setting `STS2_GAME_DIR` directly in `.mcp.json`) will **not**
