@@ -196,8 +196,9 @@ install_mcp_and_start_sts2() {
   # just hand it the new GLIMMUNG_* env contract and the
   # -InstallMcp -StartSts2 switches that were on the GHA workflow's
   # env-prep step.
-  local ip
+  local ip repo_slug
   ip="$(<"${GLIMMUNG_WORKING_DIR}/host_ip")"
+  repo_slug="$(native_project_repo)"
 
   # Own the working directory: force the laptop's persistent checkout to this
   # run's commit BEFORE invoking any .ps1, so we never run stale phase scripts.
@@ -209,7 +210,7 @@ install_mcp_and_start_sts2() {
 \$ErrorActionPreference = 'Stop'
 \$env:GLIMMUNG_RUN_ID = '${GLIMMUNG_RUN_ID}'
 \$env:GLIMMUNG_ATTEMPT_INDEX = '${GLIMMUNG_ATTEMPT_INDEX:-0}'
-\$env:GLIMMUNG_PROJECT_REPO = '${GLIMMUNG_PROJECT_REPO:-romaine-life/spirelens}'
+\$env:GLIMMUNG_PROJECT_REPO = '${repo_slug}'
 \$env:GLIMMUNG_WORKING_DIR = "C:\\glimmung-runs\\${GLIMMUNG_RUN_REF}"
 \$env:GLIMMUNG_REPO_ROOT = 'D:\\repos\\SpireLens'
 & pwsh -NoProfile -File 'D:\\repos\\SpireLens\\.github\\scripts\\prepare-host.ps1' \`
