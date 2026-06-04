@@ -49,7 +49,13 @@ jobs:
             exit 1
           fi
 
-          grep -Fq 'SPIRELENS_CANONICAL_REPO_URL="https://github.com/romaine-life/spirelens.git"' "$lib"
+          grep -Fq 'native_project_repo()' "$lib"
+          grep -Fq 'GLIMMUNG_ISSUE_REPO' "$lib"
+          grep -Fq 'native_project_repo_url()' "$lib"
+          if grep -nF 'SPIRELENS_CANONICAL_REPO_URL' "$lib"; then
+            echo "host checkout sync must derive the primary repo from GLIMMUNG_ISSUE_REPO" >&2
+            exit 1
+          fi
           grep -Fq 'native_mint_github_token()' "$lib"
           grep -Fq 'native_github_token_b64()' "$lib"
           grep -Fq 'native_github_token: cached token is blank' "$lib"
@@ -68,5 +74,9 @@ jobs:
 
           if grep -nF "origin/main" "$lib"; then
             echo "host checkout sync must not fall back to origin/main" >&2
+            exit 1
+          fi
+          if grep -RInF 'GLIMMUNG_PROJECT_REPO:-romaine-life/spirelens' scripts/glimmung-native; then
+            echo "native scripts must not hard-code the project repo fallback" >&2
             exit 1
           fi

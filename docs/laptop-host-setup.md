@@ -120,7 +120,7 @@ script `scripts/glimmung-native/env-prep.sh` calls `native_sync_host_checkout`
 (in `lib.sh`), which over SSH:
 
 ```powershell
-git -C D:\repos\SpireLens remote set-url origin https://github.com/romaine-life/spirelens.git
+git -C D:\repos\SpireLens remote set-url origin https://github.com/<project-github-repo>.git
 git -C D:\repos\SpireLens -c http.https://github.com/.extraheader=<run-token> fetch --prune origin '+refs/heads/*:refs/remotes/origin/*'
 git -C D:\repos\SpireLens cat-file -e '<run-commit>^{commit}'
 git -C D:\repos\SpireLens checkout --force --detach <run-commit>
@@ -137,14 +137,14 @@ Because the sync lives in the re-cloned-every-run `.sh` layer and uses
 phase script takes effect automatically on the next run — the cutover footgun
 is gone.
 
-The canonical upstream is enforced by the sync itself:
-`https://github.com/romaine-life/spirelens.git`. The laptop's previous
-`origin` value is not trusted. Clone/fetch authenticate with the per-run
-Glimmung GitHub token, while the local `origin` remains the canonical URL
-without an embedded credential. During sync, host-global Git config is ignored so
-old URL rewrite rules cannot silently redirect the fetch to a retired repo. If
-the pinned commit is not present after fetching from the canonical upstream, the
-step fails before any host-side PowerShell script runs.
+The canonical upstream is enforced by the sync itself from the run's
+`GLIMMUNG_ISSUE_REPO`, which Glimmung derives from the project's `github_repo`.
+The laptop's previous `origin` value is not trusted. Clone/fetch authenticate
+with the per-run Glimmung GitHub token, while the local `origin` remains the
+canonical URL without an embedded credential. During sync, host-global Git config
+is ignored so old URL rewrite rules cannot silently redirect the fetch to a
+retired repo. If the pinned commit is not present after fetching from the
+canonical upstream, the step fails before any host-side PowerShell script runs.
 
 Two consequences worth knowing:
 

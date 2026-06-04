@@ -28,8 +28,6 @@
 
 set -Eeuo pipefail
 
-SPIRELENS_CANONICAL_REPO_URL="https://github.com/romaine-life/spirelens.git"
-
 # ---------------------------------------------------------------------
 # Step dispatch
 # ---------------------------------------------------------------------
@@ -53,6 +51,26 @@ native_require_env() {
     printf 'missing required env: %s\n' "${missing[*]}" >&2
     exit 2
   fi
+}
+
+native_project_repo() {
+  # Glimmung derives the primary checkout repo from the project's github_repo
+  # and carries it on the run as issue_repo. The native launcher exposes that
+  # as GLIMMUNG_ISSUE_REPO.
+  local repo="${GLIMMUNG_ISSUE_REPO:-}"
+  repo="${repo#https://github.com/}"
+  repo="${repo%.git}"
+  if [ -z "$repo" ]; then
+    echo "native_project_repo: GLIMMUNG_ISSUE_REPO is required" >&2
+    return 1
+  fi
+  printf '%s' "$repo"
+}
+
+native_project_repo_url() {
+  local repo
+  repo="$(native_project_repo)"
+  printf 'https://github.com/%s.git' "$repo"
 }
 
 native_run_selected_step() {
@@ -454,17 +472,18 @@ native_ssh_run() {
 # not allow old source/test files from prior runs to bleed into the next branch.
 native_sync_host_checkout() {
   local host_ip="$1"
-  local cluster_root sha gh_token_b64
+  local cluster_root sha gh_token_b64 remote_url
   # lib.sh lives at <repo>/scripts/glimmung-native/lib.sh; the repo root is
   # two levels up. That's the orchestrator pod's per-run checkout.
   cluster_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
   sha="$(git -C "$cluster_root" rev-parse HEAD 2>/dev/null)"
   gh_token_b64="$(native_github_token_b64)"
+  remote_url="$(native_project_repo_url)"
 
   native_ssh_run "$host_ip" <<PWSH
 \$ErrorActionPreference = 'Stop'
 \$repo = 'D:\\repos\\SpireLens'
-\$remoteUrl = '${SPIRELENS_CANONICAL_REPO_URL}'
+\$remoteUrl = '${remote_url}'
 \$target = '${sha}'
 \$token = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${gh_token_b64}'))
 if ([string]::IsNullOrWhiteSpace(\$target)) { throw 'native sync target commit is empty' }

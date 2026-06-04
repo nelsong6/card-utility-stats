@@ -92,7 +92,7 @@ snippets.
         {
           "id": "env-prep",
           "name": "Environment prep",
-          "checkout": { "repo": "romaine-life/spirelens", "ref": "main", "path": "/workspace/spirelens" },
+          "checkout": { "ref": "main", "path": "/workspace/spirelens" },
           "working_directory": "/workspace",
           "managed": true,
           "timeout_seconds": 1200,
@@ -123,7 +123,7 @@ snippets.
         {
           "id": "llm-test-plan",
           "name": "LLM: author test plan",
-          "checkout": { "repo": "romaine-life/spirelens", "ref": "main", "path": "/workspace/spirelens" },
+          "checkout": { "ref": "main", "path": "/workspace/spirelens" },
           "working_directory": "/workspace",
           "managed": true,
           "timeout_seconds": 900,
@@ -135,7 +135,7 @@ snippets.
         {
           "id": "llm-implement",
           "name": "LLM: implement",
-          "checkout": { "repo": "romaine-life/spirelens", "ref": "main", "path": "/workspace/spirelens" },
+          "checkout": { "ref": "main", "path": "/workspace/spirelens" },
           "working_directory": "/workspace",
           "managed": true,
           "timeout_seconds": 1800,
@@ -165,7 +165,7 @@ snippets.
         {
           "id": "llm-verify",
           "name": "LLM: verify in STS2",
-          "checkout": { "repo": "romaine-life/spirelens", "ref": "main", "path": "/workspace/spirelens" },
+          "checkout": { "ref": "main", "path": "/workspace/spirelens" },
           "working_directory": "/workspace",
           "managed": true,
           "timeout_seconds": 2400,
@@ -195,7 +195,7 @@ snippets.
         {
           "id": "env-destroy",
           "name": "Cleanup",
-          "checkout": { "repo": "romaine-life/spirelens", "ref": "main", "path": "/workspace/spirelens" },
+          "checkout": { "ref": "main", "path": "/workspace/spirelens" },
           "working_directory": "/workspace",
           "managed": true,
           "timeout_seconds": 600,

@@ -59,17 +59,19 @@ PWSH
 }
 
 prepare_scenario() {
+  local repo_slug
+  repo_slug="$(native_project_repo)"
   native_ssh_run "$HOST_IP" <<PWSH
 \$ErrorActionPreference = 'Stop'
 \$env:GLIMMUNG_RUN_ID = '${GLIMMUNG_RUN_ID}'
 \$env:GLIMMUNG_ATTEMPT_INDEX = '${GLIMMUNG_ATTEMPT_INDEX:-0}'
-\$env:GLIMMUNG_PROJECT_REPO = '${GLIMMUNG_PROJECT_REPO:-romaine-life/spirelens}'
+\$env:GLIMMUNG_PROJECT_REPO = '${repo_slug}'
 \$env:GLIMMUNG_WORKING_DIR = "C:\\glimmung-runs\\${GLIMMUNG_RUN_REF}"
 \$env:GLIMMUNG_REPO_ROOT = 'D:\\repos\\SpireLens'
 & pwsh -NoProfile -File 'D:\\repos\\SpireLens\\.github\\scripts\\native-runtime.ps1' \`
     -Mode prepare_scenario \`
     -IssueNumber '${GLIMMUNG_ISSUE_NUMBER}' \`
-    -RepoSlug '${GLIMMUNG_PROJECT_REPO:-romaine-life/spirelens}' \`
+    -RepoSlug '${repo_slug}' \`
     -RepoRoot \$env:GLIMMUNG_REPO_ROOT
 \$exitCode = if (\$null -eq \$LASTEXITCODE) { 0 } else { [int]\$LASTEXITCODE }
 if (\$exitCode -ne 0) { exit \$exitCode }
@@ -77,14 +79,15 @@ PWSH
 }
 
 run_verification() {
-  local gh_token_b64
+  local gh_token_b64 repo_slug
   gh_token_b64="$(native_github_token_b64)"
+  repo_slug="$(native_project_repo)"
   native_ssh_run "$HOST_IP" <<PWSH
 \$ErrorActionPreference = 'Stop'
 \$ghToken = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${gh_token_b64}'))
 \$env:GLIMMUNG_RUN_ID = '${GLIMMUNG_RUN_ID}'
 \$env:GLIMMUNG_ATTEMPT_INDEX = '${GLIMMUNG_ATTEMPT_INDEX:-0}'
-\$env:GLIMMUNG_PROJECT_REPO = '${GLIMMUNG_PROJECT_REPO:-romaine-life/spirelens}'
+\$env:GLIMMUNG_PROJECT_REPO = '${repo_slug}'
 \$env:GLIMMUNG_WORKING_DIR = "C:\\glimmung-runs\\${GLIMMUNG_RUN_REF}"
 \$env:GLIMMUNG_REPO_ROOT = 'D:\\repos\\SpireLens'
 \$env:GH_TOKEN = \$ghToken
@@ -92,7 +95,7 @@ run_verification() {
     -Mode run_phase \`
     -PhaseName verification \`
     -IssueNumber '${GLIMMUNG_ISSUE_NUMBER}' \`
-    -RepoSlug '${GLIMMUNG_PROJECT_REPO:-romaine-life/spirelens}' \`
+    -RepoSlug '${repo_slug}' \`
     -RepoRoot \$env:GLIMMUNG_REPO_ROOT \`
     -GitHubToken \$ghToken
 \$exitCode = if (\$null -eq \$LASTEXITCODE) { 0 } else { [int]\$LASTEXITCODE }
