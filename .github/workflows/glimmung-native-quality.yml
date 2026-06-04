@@ -51,11 +51,15 @@ jobs:
 
           grep -Fq 'SPIRELENS_CANONICAL_REPO_URL="https://github.com/romaine-life/spirelens.git"' "$lib"
           grep -Fq 'native_mint_github_token()' "$lib"
+          grep -Fq 'native_github_token_b64()' "$lib"
+          grep -Fq 'native_github_token: cached token is blank' "$lib"
+          grep -Fq 'FromBase64String' "$lib"
           grep -Fq 'http.https://github.com/.extraheader=\$authHeader' "$lib"
           grep -Fq 'git -C \$repo remote set-url origin \$remoteUrl' "$lib"
           grep -Fq 'git -C \$repo cat-file -e "\$target^{commit}"' "$lib"
           grep -Fq 'git -C \$repo clean -ffdx' "$lib"
-          grep -Fq 'gh_token="$(native_github_token)"' scripts/glimmung-native/test-plan.sh
+          grep -Fq 'gh_token_b64="$(native_github_token_b64)"' scripts/glimmung-native/test-plan.sh
+          grep -Fq -- '-GitHubToken \$ghToken' scripts/glimmung-native/test-plan.sh
           grep -Fq 'git push --force \$remote "HEAD:refs/heads/\$branch"' scripts/glimmung-native/implement.sh
           grep -Fq "fetch origin '\${GLIMMUNG_INPUT_BRANCH_NAME}'" scripts/glimmung-native/verify.sh
 
