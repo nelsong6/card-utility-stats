@@ -60,7 +60,7 @@ PWSH
 
 prepare_scenario() {
   local repo_slug
-  repo_slug="$(native_project_repo)"
+  repo_slug="$(native_issue_repo)"
   native_ssh_run "$HOST_IP" <<PWSH
 \$ErrorActionPreference = 'Stop'
 \$env:GLIMMUNG_RUN_ID = '${GLIMMUNG_RUN_ID}'
@@ -81,7 +81,7 @@ PWSH
 run_verification() {
   local gh_token_b64 repo_slug
   gh_token_b64="$(native_github_token_b64)"
-  repo_slug="$(native_project_repo)"
+  repo_slug="$(native_issue_repo)"
   native_ssh_run "$HOST_IP" <<PWSH
 \$ErrorActionPreference = 'Stop'
 \$ghToken = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${gh_token_b64}'))

@@ -198,7 +198,7 @@ install_mcp_and_start_sts2() {
   # env-prep step.
   local ip repo_slug
   ip="$(<"${GLIMMUNG_WORKING_DIR}/host_ip")"
-  repo_slug="$(native_project_repo)"
+  repo_slug="$(native_issue_repo)"
 
   # Own the working directory: force the laptop's persistent checkout to this
   # run's commit BEFORE invoking any .ps1, so we never run stale phase scripts.

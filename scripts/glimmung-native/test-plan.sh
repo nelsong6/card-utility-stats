@@ -23,7 +23,7 @@ HOST_IP="$(native_connect_host)" || native_emit_abort "host_unavailable"
 run_test_plan() {
   local gh_token_b64 repo_slug
   gh_token_b64="$(native_github_token_b64)"
-  repo_slug="$(native_project_repo)"
+  repo_slug="$(native_issue_repo)"
   native_ssh_run "$HOST_IP" <<PWSH
 \$ErrorActionPreference = 'Stop'
 \$ghToken = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${gh_token_b64}'))

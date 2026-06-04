@@ -49,9 +49,13 @@ jobs:
             exit 1
           fi
 
-          grep -Fq 'native_project_repo()' "$lib"
+          grep -Fq 'native_issue_repo()' "$lib"
           grep -Fq 'GLIMMUNG_ISSUE_REPO' "$lib"
-          grep -Fq 'native_project_repo_url()' "$lib"
+          grep -Fq 'native_issue_repo_url()' "$lib"
+          if sed -n '/native_issue_repo()/,/^}/p' "$lib" | grep -Eq 'repo=.*#https://github.com|repo=.*%.git'; then
+            echo "native_issue_repo must use GLIMMUNG_ISSUE_REPO directly, not normalize it" >&2
+            exit 1
+          fi
           if grep -nF 'SPIRELENS_CANONICAL_REPO_URL' "$lib"; then
             echo "host checkout sync must derive the primary repo from GLIMMUNG_ISSUE_REPO" >&2
             exit 1
