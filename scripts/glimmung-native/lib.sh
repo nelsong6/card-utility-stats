@@ -379,8 +379,8 @@ native_ps_encode() {
 
 # native_ssh_run <host-ip> <pwsh script body>
 # Runs a chunk of pwsh on the laptop via SSH. The caller pipes the script body
-# on this function's stdin (a heredoc); we read it HERE in the pod and hand it
-# to the remote pwsh as a base64 argument via -EncodedCommand.
+# on this function's stdin (a heredoc); we write it to a temporary .ps1, copy
+# that file to the laptop, and execute it with pwsh -File.
 #
 # We deliberately do NOT use `pwsh -Command -` (read the script from the SSH
 # *session* stdin). The per-phase tailnet SSH session that native_connect_host
@@ -388,10 +388,9 @@ native_ps_encode() {
 # to the remote process: pwsh then reads an EMPTY command, runs nothing, and
 # exits 0 — so the step "succeeds" having done no work (no test-plan.json
 # written, no branch pushed; the missing output only surfaces later as the
-# collect/scp + push-branch failures). -EncodedCommand carries the whole script
-# in argv, which the transport delivers reliably regardless of session-stdin
-# behaviour. argv-quoting — the original reason for the stdin channel — is a
-# non-issue precisely because a base64 token has no shell-special characters.
+# collect/scp + push-branch failures). We also do NOT use -EncodedCommand for
+# the full script: the checkout bootstrap is large enough that the base64
+# UTF-16 argv can exceed Windows/OpenSSH command-line limits.
 #
 # Set NATIVE_SSH_TIMEOUT=<seconds> to bound the call. The bound is
 # applied here, wrapping the real `ssh` binary — `timeout` execs a
@@ -403,13 +402,28 @@ native_ssh_run() {
   local -a timeout_cmd=()
   [ -n "${NATIVE_SSH_TIMEOUT:-}" ] && timeout_cmd=(timeout "$NATIVE_SSH_TIMEOUT")
 
-  local encoded
-  encoded="$(native_ps_encode)"
+  local local_script remote_script status
+  local_script="$(mktemp "${GLIMMUNG_WORKING_DIR}/native-pwsh.XXXXXX.ps1")"
+  cat >"$local_script"
+  remote_script="C:/Windows/Temp/glimmung-${GLIMMUNG_RUN_ID:-local}-${GLIMMUNG_JOB_ID:-job}-${GLIMMUNG_STEP_SLUG:-step}-$$-${RANDOM}.ps1"
 
-  # -n: the script rides entirely in argv now, so the SSH session carries no
+  # shellcheck disable=SC2046
+  if ! "${timeout_cmd[@]}" scp $(native_ssh_args) "$local_script" "$(native_ssh_user)@${host_ip}:${remote_script}"; then
+    rm -f "$local_script"
+    return 1
+  fi
+  rm -f "$local_script"
+
+  # -n: the script body is staged as a file, so the SSH session carries no
   # stdin to forward; point it at /dev/null and make that explicit.
   # shellcheck disable=SC2046
-  "${timeout_cmd[@]}" ssh -n $(native_ssh_args) "$(native_ssh_user)@${host_ip}" pwsh -NoProfile -EncodedCommand "$encoded"
+  "${timeout_cmd[@]}" ssh -n $(native_ssh_args) "$(native_ssh_user)@${host_ip}" pwsh -NoProfile -ExecutionPolicy Bypass -File "$remote_script"
+  status=$?
+
+  # Best-effort cleanup. Preserve the real command status.
+  # shellcheck disable=SC2046
+  ssh -n $(native_ssh_args) "$(native_ssh_user)@${host_ip}" pwsh -NoProfile -Command "Remove-Item -LiteralPath '${remote_script}' -Force -ErrorAction SilentlyContinue" >/dev/null 2>&1 || true
+  return "$status"
 }
 
 # native_sync_host_checkout <host-ip>
