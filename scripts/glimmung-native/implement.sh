@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 
 # implement phase for spirelens. Runs run-phases.ps1 with
-# -PhaseName implementation on the laptop, then pushes the resulting
-# branch under glimmung/<run_id> to romaine-life/spirelens using the
-# per-run GitHub token glimmung mints via the existing native-runner
-# github-token callback.
+# -PhaseName implementation on the laptop, then publishes the resulting
+# working-tree changes to glimmung/<run_id> using the per-run GitHub token
+# glimmung mints via the native-runner github-token callback.
 
 set -Eeuo pipefail
 
@@ -18,35 +17,9 @@ native_require_env GLIMMUNG_RUN_ID GLIMMUNG_RUN_REF GLIMMUNG_ISSUE_NUMBER
 # This phase's pod has none of env-prep's connection state; establish our own.
 HOST_IP="$(native_connect_host)" || native_emit_abort "host_unavailable"
 
-mint_github_token() {
-  # Glimmung's existing native-runner GitHub token endpoint mints a
-  # per-run installation token scoped to the consuming project. URL
-  # is pre-baked by the native launcher; auth rides as
-  # X-Glimmung-Attempt-Token. Caches the token under the working dir;
-  # subsequent steps reuse it.
-  local token_file="${GLIMMUNG_WORKING_DIR}/gh_token"
-  if [ -s "$token_file" ]; then return 0; fi
-  native_require_env GLIMMUNG_GITHUB_TOKEN_URL GLIMMUNG_ATTEMPT_TOKEN
-  # Capture + validate before writing: a non-2xx response or a body without a
-  # `.token` field must NOT leave a file containing "null"/empty, because the
-  # `[ -s "$token_file" ]` cache check above would then treat that garbage as a
-  # valid cached token on every subsequent step (GH_TOKEN='null').
-  local token
-  token="$(curl -fsS -X POST \
-    -H "X-Glimmung-Attempt-Token: ${GLIMMUNG_ATTEMPT_TOKEN}" \
-    "${GLIMMUNG_GITHUB_TOKEN_URL}" | jq -r '.token // empty')" || true
-  if [ -z "$token" ]; then
-    echo "mint_github_token: token endpoint returned no usable .token" >&2
-    return 1
-  fi
-  printf '%s' "$token" >"$token_file"
-  chmod 600 "$token_file"
-}
-
 run_implementation() {
-  mint_github_token
   local gh_token
-  gh_token="$(<"${GLIMMUNG_WORKING_DIR}/gh_token")"
+  gh_token="$(native_github_token)"
   native_ssh_run "$HOST_IP" <<PWSH
 \$ErrorActionPreference = 'Stop'
 \$env:GLIMMUNG_RUN_ID = '${GLIMMUNG_RUN_ID}'
@@ -67,15 +40,37 @@ PWSH
 }
 
 push_branch() {
-  # The implementation pwsh script does the actual git push to
-  # glimmung/<run_id> from the laptop. Here we just verify the
-  # branch exists on the remote and surface its name as a phase
-  # output for the verify phase to check out.
+  # The implementation LLM is sealed from git mutation. This step owns
+  # publishing: commit whatever the implementation phase changed in the
+  # laptop checkout, push it to the run-scoped branch, then verify the
+  # branch exists and surface its name for verification.
   local gh_token
-  gh_token="$(<"${GLIMMUNG_WORKING_DIR}/gh_token")"
+  gh_token="$(native_github_token)"
+  local repo="${GLIMMUNG_PROJECT_REPO:-romaine-life/spirelens}"
   local branch="glimmung/${GLIMMUNG_RUN_ID}"
+
+  native_ssh_run "$HOST_IP" <<PWSH
+\$ErrorActionPreference = 'Stop'
+\$repo = 'D:\\repos\\SpireLens'
+\$branch = '${branch}'
+\$remote = 'https://x-access-token:${gh_token}@github.com/${repo}.git'
+Set-Location -LiteralPath \$repo
+git config user.email 'glimmung-native@romaine.life'
+if (\$LASTEXITCODE -ne 0) { throw 'git config user.email failed' }
+git config user.name 'Glimmung Native Runner'
+if (\$LASTEXITCODE -ne 0) { throw 'git config user.name failed' }
+git checkout -B \$branch
+if (\$LASTEXITCODE -ne 0) { throw "git checkout -B \$branch failed" }
+git add -A
+if (\$LASTEXITCODE -ne 0) { throw 'git add failed' }
+git commit --allow-empty -m "glimmung: implement ${repo}#${GLIMMUNG_ISSUE_NUMBER} (${GLIMMUNG_RUN_ID})"
+if (\$LASTEXITCODE -ne 0) { throw 'git commit failed' }
+git push --force \$remote "HEAD:refs/heads/\$branch"
+if (\$LASTEXITCODE -ne 0) { throw "git push \$branch failed" }
+PWSH
+
   if ! curl -fsS -H "Authorization: token ${gh_token}" \
-      "https://api.github.com/repos/${GLIMMUNG_PROJECT_REPO:-romaine-life/spirelens}/branches/${branch}" \
+      "https://api.github.com/repos/${repo}/branches/${branch}" \
       >/dev/null; then
     native_emit_abort "implementation_branch_missing:${branch}"
   fi

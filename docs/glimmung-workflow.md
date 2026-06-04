@@ -50,6 +50,8 @@ phase script's `native_run_selected_step` dispatcher accepts exactly these.
 ### llm-work (two jobs)
 **test-plan**: `run-test-plan`, `collect-test-plan`.
 **implement**: `run-implementation`, `push-branch`, `collect-implementation`.
+`push-branch` commits the laptop checkout after the implementation LLM exits and
+pushes the run-scoped `glimmung/<run_id>` branch with the per-run GitHub token.
 
 ### llm-verify
 - `build-and-deploy` — checks out the implementation branch, `dotnet build` the
@@ -139,7 +141,7 @@ snippets.
           "timeout_seconds": 1800,
           "steps": [
             { "slug": "run-implementation",     "title": "Run implementation",   "type": "run", "run": "/bin/bash /workspace/spirelens/scripts/glimmung-native/implement.sh" },
-            { "slug": "push-branch",            "title": "Confirm branch push",  "type": "run", "run": "/bin/bash /workspace/spirelens/scripts/glimmung-native/implement.sh" },
+            { "slug": "push-branch",            "title": "Publish branch",       "type": "run", "run": "/bin/bash /workspace/spirelens/scripts/glimmung-native/implement.sh" },
             { "slug": "collect-implementation", "title": "Collect implementation","type": "run", "run": "/bin/bash /workspace/spirelens/scripts/glimmung-native/implement.sh" }
           ]
         }

@@ -36,13 +36,20 @@ native_require_env GLIMMUNG_RUN_ID GLIMMUNG_RUN_REF GLIMMUNG_ISSUE_NUMBER GLIMMU
 HOST_IP="$(native_connect_host)" || native_emit_abort "host_unavailable"
 
 build_and_deploy_mod() {
+  local gh_token
+  gh_token="$(native_github_token)"
   native_ssh_run "$HOST_IP" <<PWSH
+\$ErrorActionPreference = 'Stop'
 \$env:GLIMMUNG_RUN_ID = '${GLIMMUNG_RUN_ID}'
 \$env:GLIMMUNG_WORKING_DIR = "C:\\glimmung-runs\\${GLIMMUNG_RUN_REF}"
 \$env:GLIMMUNG_REPO_ROOT = 'D:\\repos\\SpireLens'
+\$token = '${gh_token}'
+\$authHeader = 'AUTHORIZATION: basic ' + [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("x-access-token:\$token"))
 Set-Location -LiteralPath \$env:GLIMMUNG_REPO_ROOT
-git fetch origin '${GLIMMUNG_INPUT_BRANCH_NAME}'
-git checkout '${GLIMMUNG_INPUT_BRANCH_NAME}'
+git -c "http.https://github.com/.extraheader=\$authHeader" fetch origin '${GLIMMUNG_INPUT_BRANCH_NAME}'
+if (\$LASTEXITCODE -ne 0) { throw 'git fetch implementation branch failed' }
+git checkout --force FETCH_HEAD
+if (\$LASTEXITCODE -ne 0) { throw 'git checkout implementation branch failed' }
 \$sts2DataDir = 'D:\\SteamLibrary\\steamapps\\common\\Slay the Spire 2'
 dotnet build 'SpireLens.csproj' -c Debug "-p:Sts2DataDir=\$sts2DataDir"
 if (\$LASTEXITCODE -ne 0) { throw 'SpireLens loader build/deploy failed.' }
@@ -70,6 +77,8 @@ PWSH
 }
 
 run_verification() {
+  local gh_token
+  gh_token="$(native_github_token)"
   native_ssh_run "$HOST_IP" <<PWSH
 \$ErrorActionPreference = 'Stop'
 \$env:GLIMMUNG_RUN_ID = '${GLIMMUNG_RUN_ID}'
@@ -77,12 +86,14 @@ run_verification() {
 \$env:GLIMMUNG_PROJECT_REPO = '${GLIMMUNG_PROJECT_REPO:-romaine-life/spirelens}'
 \$env:GLIMMUNG_WORKING_DIR = "C:\\glimmung-runs\\${GLIMMUNG_RUN_REF}"
 \$env:GLIMMUNG_REPO_ROOT = 'D:\\repos\\SpireLens'
+\$env:GH_TOKEN = '${gh_token}'
 & pwsh -NoProfile -File 'D:\\repos\\SpireLens\\.github\\scripts\\native-runtime.ps1' \`
     -Mode run_phase \`
     -PhaseName verification \`
     -IssueNumber '${GLIMMUNG_ISSUE_NUMBER}' \`
     -RepoSlug '${GLIMMUNG_PROJECT_REPO:-romaine-life/spirelens}' \`
-    -RepoRoot \$env:GLIMMUNG_REPO_ROOT
+    -RepoRoot \$env:GLIMMUNG_REPO_ROOT \`
+    -GitHubToken '${gh_token}'
 \$exitCode = if (\$null -eq \$LASTEXITCODE) { 0 } else { [int]\$LASTEXITCODE }
 if (\$exitCode -ne 0) { exit \$exitCode }
 PWSH
