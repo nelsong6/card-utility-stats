@@ -52,10 +52,15 @@ git -c "http.https://github.com/.extraheader=\$authHeader" fetch origin '${GLIMM
 if (\$LASTEXITCODE -ne 0) { throw 'git fetch implementation branch failed' }
 git checkout --force FETCH_HEAD
 if (\$LASTEXITCODE -ne 0) { throw 'git checkout implementation branch failed' }
-\$sts2DataDir = 'D:\\SteamLibrary\\steamapps\\common\\Slay the Spire 2'
-dotnet build 'SpireLens.csproj' -c Debug "-p:Sts2DataDir=\$sts2DataDir"
+# Pass the STS2 install ROOT as Sts2Path. Sts2PathDiscovery.props then derives
+# Sts2DataDir = \$(Sts2Path)/data_sts2_windows_x86_64 (where sts2.dll actually
+# lives) and ModsPath = \$(Sts2Path)/mods/. Passing the root as Sts2DataDir
+# instead points the sts2.dll HintPath at <root>/sts2.dll, which does not exist,
+# so the reference fails to resolve (MSB3245 -> CS0246) and the build aborts.
+\$sts2Path = 'D:\\SteamLibrary\\steamapps\\common\\Slay the Spire 2'
+dotnet build 'SpireLens.csproj' -c Debug "-p:Sts2Path=\$sts2Path"
 if (\$LASTEXITCODE -ne 0) { throw 'SpireLens loader build/deploy failed.' }
-dotnet build 'Core\\SpireLens.Core.csproj' -c Debug "-p:Sts2DataDir=\$sts2DataDir"
+dotnet build 'Core\\SpireLens.Core.csproj' -c Debug "-p:Sts2Path=\$sts2Path"
 if (\$LASTEXITCODE -ne 0) { throw 'SpireLens core build/deploy failed.' }
 PWSH
 }
