@@ -58,8 +58,14 @@ if (\$LASTEXITCODE -ne 0) { throw 'git checkout implementation branch failed' }
 # instead points the sts2.dll HintPath at <root>/sts2.dll, which does not exist,
 # so the reference fails to resolve (MSB3245 -> CS0246) and the build aborts.
 \$sts2Path = 'D:\\SteamLibrary\\steamapps\\common\\Slay the Spire 2'
-dotnet build 'SpireLens.csproj' -c Debug "-p:Sts2Path=\$sts2Path"
-if (\$LASTEXITCODE -ne 0) { throw 'SpireLens loader build/deploy failed.' }
+# Build the Loader (SpireLens.csproj) compile-only with SkipModsDeploy=true. The
+# Loader mod is host-persistent (already deployed) and STS2 holds an exclusive
+# lock on the loaded SpireLens.dll while running, so the per-run mods/ deploy
+# (CopyToModsFolderOnBuild) fails with MSB3027 "file in use". Core is hot-reloaded
+# from an unlocked temp copy, so its deploy below lands the run's changes while
+# the game keeps running.
+dotnet build 'SpireLens.csproj' -c Debug "-p:Sts2Path=\$sts2Path" "-p:SkipModsDeploy=true"
+if (\$LASTEXITCODE -ne 0) { throw 'SpireLens loader build failed.' }
 dotnet build 'Core\\SpireLens.Core.csproj' -c Debug "-p:Sts2Path=\$sts2Path"
 if (\$LASTEXITCODE -ne 0) { throw 'SpireLens core build/deploy failed.' }
 PWSH
