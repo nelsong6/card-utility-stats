@@ -144,6 +144,18 @@ upload_screenshots() {
     echo "no screenshots to upload"
     return 0
   fi
+  # TEMPORARY scaffolding — retired by glimmung's evidence_upload managed
+  # primitive (docs/design/evidence-upload-primitive.md). The pod carries a
+  # projected workload-identity token, but the az CLI does not consume it the
+  # way the SDK credential chain does; --auth-mode login needs an explicit
+  # federated login first. Unguarded on purpose: the token is a platform
+  # invariant (the runner pod is always labeled azure.workload.identity/use),
+  # so a missing AZURE_* here is a broken platform and this fails loudly.
+  az login --service-principal \
+    --username "$AZURE_CLIENT_ID" \
+    --tenant "$AZURE_TENANT_ID" \
+    --federated-token "$(cat "$AZURE_FEDERATED_TOKEN_FILE")" \
+    --allow-no-subscriptions >/dev/null
   az storage blob upload-batch \
     --account-name "$AGENT_SCREENSHOT_STORAGE_ACCOUNT" \
     --destination "$AGENT_SCREENSHOT_CONTAINER" \
