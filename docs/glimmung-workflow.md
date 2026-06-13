@@ -2,15 +2,20 @@
 
 This document captures the phase shape spirelens registers with Glimmung. The
 live workflow shape is the Postgres-backed `spirelens.default` row in Glimmung;
-dispatch does not read a workflow file from this repo.
+dispatch does not read a workflow file from this repo. Treat the live
+registration as the source of truth — this document is the human-readable map of
+it.
 
 ## Phase shape
 
-Mirrors `romaine-life/ambience`'s registered workflow exactly, with the per-phase
-shell scripts swapped for spirelens's SSH-over-Tailscale variants. Phase
-ordering and recycle policy are identical because spirelens's verify loop
-is the same shape: prepare → work → verify → gate → cleanup → touchpoint →
-merge → cleanup.
+Mirrors `romaine-life/ambience`'s registered workflow, with the per-phase shell
+scripts swapped for spirelens's SSH-over-Tailscale variants. spirelens is a
+`stats-display` feature type: the world (the game) exists before the feature, so
+generated test plans are honest and `llm-test-plan` always runs. That is the
+spirelens-vs-ambience difference — ambience is `effect`/greenfield, where the
+surface does not exist at plan time, so it when-skips the plan leg and sources a
+standing case. The verification phase owns its own verdict and recycle policy;
+there is no separate evidence-gate phase.
 
 ```
 prepare         depends_on: []                outputs: ssh_endpoint, tailnet_ip,
@@ -20,16 +25,31 @@ llm-work        depends_on: prepare           jobs: test-plan + implement
                                                        branch_name
 llm-verify      depends_on: llm-work          verify: true
                                               outputs: verification
-evidence-gate   depends_on: llm-verify        recycle_policy: 3 attempts on
+                                              recycle_policy: 1 attempt on
                                               [verify_fail, verify_malformed],
                                               lands_at=prepare
-cleanup_early   depends_on: evidence-gate     always, skip_when_preserve_test_env
-touchpoint      depends_on: cleanup_early     always, primitive=pr_touchpoint
+cleanup_early   depends_on: llm-verify        teardown,
+                                              when: run.preserve_test_env == 'false'
+touchpoint      depends_on: cleanup_early     primitive=pr_touchpoint
 touchpoint_gate depends_on: touchpoint        primitive=pr_merge
 cleanup_final   depends_on: touchpoint_gate   always
-pr.recycle_policy: 3 attempts on [pr_review_changes_requested], lands_at=prepare
+vars.feature_type: stats-display
+pr.recycle_policy: 1 attempt on [pr_review_changes_requested], lands_at=prepare
 budget.total: 25
 ```
+
+`llm-verify` carries the recycle policy directly: Glimmung verification phases
+own their verdicts, so the standalone evidence-gate phase (retired platform-wide)
+is gone. `cleanup_early`'s `when` is the modern replacement for the retired
+`skip_when_preserve_test_env` field — with `preserve_test_env=true` the condition
+resolves false at dispatch, the early teardown is skipped (zero compute, a
+synthesized skipped leg), and the STS2 environment is left up through the
+touchpoint review window. `cleanup_final` always tears the environment down.
+
+There is no pre-implementation issue-contract stage. Public names settle by
+declaration: the implementation declares its surface and the verify phase checks
+that what was declared actually serves. The test-plan and verify phases derive
+their context from the issue and the live game directly.
 
 ## Step slugs (per phase)
 
@@ -60,157 +80,20 @@ pushes the run-scoped `glimmung/<run_id>` branch with the per-run GitHub token.
 - `run-verification` — runs `run-phases.ps1 -PhaseName verification`.
 - `collect-evidence` — scp `verification.json` + screenshots back to the pod.
 - `upload-screenshots` — pushes screenshots to `romaineglimmungartifacts`.
-- `emit-verification` — emits the `verification` phase output the
-  evidence-gate reads.
+- `emit-verification` — emits the `verification` phase output that the llm-verify
+  phase's own recycle policy evaluates (ADVANCE / RETRY / ABORT).
 
-### evidence-gate, cleanup_early, touchpoint, touchpoint_gate, cleanup_final
+### cleanup_early, touchpoint, touchpoint_gate, cleanup_final
 These reuse Glimmung's native primitives directly. See ambience's registered
-workflow for the canonical inline shell snippets (`primitive: pr_touchpoint`
-and `primitive: pr_merge` resolve to Glimmung-supplied handlers; the
-evidence-gate's `evidence_verification_gate=true` resolves to the canonical
-verdict-checker).
+workflow for the canonical inline shell snippets: `primitive: pr_touchpoint` and
+`primitive: pr_merge` resolve to Glimmung-supplied handlers. `cleanup_early`
+carries `when: "${{ run.preserve_test_env }} == 'false'"`, so it is skipped (zero
+compute, a synthesized skipped leg) when the run preserves its test env.
 
-## Historical Registration JSON
+## Source of truth
 
-The JSON below is retained as historical shape documentation. Do not copy it
-into the live API by hand for ordinary changes; update the Glimmung workflow
-registration through the admin/control-plane path. The `abridged...`
-placeholders elide the evidence-gate / pr_touchpoint / pr_merge / cleanup
-snippets.
-
-```jsonc
-{
-  "project": "spirelens",
-  "name": "default",
-  "phases": [
-    {
-      "name": "prepare",
-      "kind": "k8s_job",
-      "depends_on": [],
-      "outputs": ["ssh_endpoint", "tailnet_ip", "working_dir", "bridge_ready"],
-      "jobs": [
-        {
-          "id": "env-prep",
-          "name": "Environment prep",
-          "checkout": { "ref": "main", "path": "/workspace/spirelens" },
-          "working_directory": "/workspace",
-          "managed": true,
-          "timeout_seconds": 1200,
-          "steps": [
-            { "slug": "mint-credentials",       "title": "Mint SSH cert + Tailscale auth key", "type": "run", "run": "/bin/bash /workspace/spirelens/scripts/glimmung-native/env-prep.sh" },
-            { "slug": "bring-up-tailnet",       "title": "Bring up Tailscale",                  "type": "run", "run": "/bin/bash /workspace/spirelens/scripts/glimmung-native/env-prep.sh" },
-            { "slug": "resolve-host-ip",        "title": "Resolve laptop tailnet IP",            "type": "run", "run": "/bin/bash /workspace/spirelens/scripts/glimmung-native/env-prep.sh" },
-            { "slug": "probe-ssh",              "title": "Probe SSH reachability",               "type": "run", "run": "/bin/bash /workspace/spirelens/scripts/glimmung-native/env-prep.sh" },
-            { "slug": "probe-mod-set",          "title": "Verify allowed mods",                  "type": "run", "run": "/bin/bash /workspace/spirelens/scripts/glimmung-native/env-prep.sh" },
-            { "slug": "install-mcp-start-sts2", "title": "Install MCP + start STS2",             "type": "run", "run": "/bin/bash /workspace/spirelens/scripts/glimmung-native/env-prep.sh" },
-            { "slug": "probe-bridge-ready",     "title": "Wait for SpireLensMcp bridge",         "type": "run", "run": "/bin/bash /workspace/spirelens/scripts/glimmung-native/env-prep.sh" },
-            { "slug": "emit-env-outputs",       "title": "Emit env outputs",                     "type": "run", "run": "/bin/bash /workspace/spirelens/scripts/glimmung-native/env-prep.sh" }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "llm-work",
-      "kind": "k8s_job",
-      "depends_on": ["prepare"],
-      "inputs": {
-        "ssh_endpoint": "${{ phases.prepare.outputs.ssh_endpoint }}",
-        "tailnet_ip":   "${{ phases.prepare.outputs.tailnet_ip }}",
-        "working_dir":  "${{ phases.prepare.outputs.working_dir }}"
-      },
-      "outputs": ["test_plan", "implementation", "branch_name"],
-      "jobs": [
-        {
-          "id": "llm-test-plan",
-          "name": "LLM: author test plan",
-          "checkout": { "ref": "main", "path": "/workspace/spirelens" },
-          "working_directory": "/workspace",
-          "managed": true,
-          "timeout_seconds": 900,
-          "steps": [
-            { "slug": "run-test-plan",     "title": "Run test plan",   "type": "run", "run": "/bin/bash /workspace/spirelens/scripts/glimmung-native/test-plan.sh" },
-            { "slug": "collect-test-plan", "title": "Collect artifact", "type": "run", "run": "/bin/bash /workspace/spirelens/scripts/glimmung-native/test-plan.sh" }
-          ]
-        },
-        {
-          "id": "llm-implement",
-          "name": "LLM: implement",
-          "checkout": { "ref": "main", "path": "/workspace/spirelens" },
-          "working_directory": "/workspace",
-          "managed": true,
-          "timeout_seconds": 1800,
-          "steps": [
-            { "slug": "run-implementation",     "title": "Run implementation",   "type": "run", "run": "/bin/bash /workspace/spirelens/scripts/glimmung-native/implement.sh" },
-            { "slug": "push-branch",            "title": "Publish branch",       "type": "run", "run": "/bin/bash /workspace/spirelens/scripts/glimmung-native/implement.sh" },
-            { "slug": "collect-implementation", "title": "Collect implementation","type": "run", "run": "/bin/bash /workspace/spirelens/scripts/glimmung-native/implement.sh" }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "llm-verify",
-      "kind": "k8s_job",
-      "depends_on": ["llm-work"],
-      "verify": true,
-      "inputs": {
-        "ssh_endpoint":   "${{ phases.prepare.outputs.ssh_endpoint }}",
-        "tailnet_ip":     "${{ phases.prepare.outputs.tailnet_ip }}",
-        "working_dir":    "${{ phases.prepare.outputs.working_dir }}",
-        "branch_name":    "${{ phases.llm-work.outputs.branch_name }}",
-        "implementation": "${{ phases.llm-work.outputs.implementation }}",
-        "test_plan":      "${{ phases.llm-work.outputs.test_plan }}"
-      },
-      "outputs": ["verification"],
-      "jobs": [
-        {
-          "id": "llm-verify",
-          "name": "LLM: verify in STS2",
-          "checkout": { "ref": "main", "path": "/workspace/spirelens" },
-          "working_directory": "/workspace",
-          "managed": true,
-          "timeout_seconds": 2400,
-          "env": {
-            "AGENT_SCREENSHOT_STORAGE_ACCOUNT": "romaineglimmungartifacts",
-            "AGENT_SCREENSHOT_CONTAINER": "artifacts"
-          },
-          "steps": [
-            { "slug": "build-and-deploy",   "title": "Build + deploy mod", "type": "run", "run": "/bin/bash /workspace/spirelens/scripts/glimmung-native/verify.sh" },
-            { "slug": "prepare-scenario",   "title": "Prepare scenario",   "type": "run", "run": "/bin/bash /workspace/spirelens/scripts/glimmung-native/verify.sh" },
-            { "slug": "run-verification",   "title": "Run verification",   "type": "run", "run": "/bin/bash /workspace/spirelens/scripts/glimmung-native/verify.sh" },
-            { "slug": "collect-evidence",   "title": "Collect evidence",   "type": "run", "run": "/bin/bash /workspace/spirelens/scripts/glimmung-native/verify.sh" },
-            { "slug": "upload-screenshots", "title": "Upload screenshots", "type": "run", "run": "/bin/bash /workspace/spirelens/scripts/glimmung-native/verify.sh" },
-            { "slug": "emit-verification",  "title": "Emit verification",  "type": "run", "run": "/bin/bash /workspace/spirelens/scripts/glimmung-native/verify.sh" }
-          ]
-        }
-      ]
-    },
-    "abridged: evidence-gate (copy from ambience, with input verification mapped to phases.llm-verify.outputs.verification)",
-    {
-      "name": "cleanup_early",
-      "kind": "k8s_job",
-      "depends_on": ["evidence-gate"],
-      "always": true,
-      "skip_when_preserve_test_env": true,
-      "jobs": [
-        {
-          "id": "env-destroy",
-          "name": "Cleanup",
-          "checkout": { "ref": "main", "path": "/workspace/spirelens" },
-          "working_directory": "/workspace",
-          "managed": true,
-          "timeout_seconds": 600,
-          "steps": [
-            { "slug": "stop-laptop-processes",     "title": "Stop STS2 + SpireLensMcp",  "type": "run", "run": "/bin/bash /workspace/spirelens/scripts/glimmung-native/env-destroy.sh" },
-            { "slug": "remove-laptop-working-dir", "title": "Remove per-run working dir","type": "run", "run": "/bin/bash /workspace/spirelens/scripts/glimmung-native/env-destroy.sh" },
-            { "slug": "tailscale-logout",          "title": "Tailscale logout",          "type": "run", "run": "/bin/bash /workspace/spirelens/scripts/glimmung-native/env-destroy.sh" },
-            { "slug": "emit",                      "title": "Emit cleanup",              "type": "run", "run": "/bin/bash /workspace/spirelens/scripts/glimmung-native/env-destroy.sh" }
-          ]
-        }
-      ]
-    },
-    "abridged: touchpoint (primitive=pr_touchpoint), touchpoint_gate (primitive=pr_merge), cleanup_final (always, same env-destroy.sh shape)"
-  ],
-  "pr": { "recycle_policy": { "max_attempts": 3, "on": ["pr_review_changes_requested"], "lands_at": "prepare" } },
-  "budget": { "total": 25 }
-}
-```
+The live shape is the `spirelens.default` registration in Glimmung — read it with
+the glimmung MCP `list_workflows project=spirelens`, replace it with
+`register_workflow`. It is not edited by hand from this repo. When the registered
+shape changes, update the phase-shape map above in the same change so this
+document keeps describing the final behavior.

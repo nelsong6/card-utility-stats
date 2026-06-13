@@ -104,7 +104,8 @@ native_emit_output() {
 native_emit_json_output() {
   # Emit a phase output whose value is the JSON contents of <file>, as a single
   # JSON-object line — the form glimmung's output parser accepts for complex
-  # values (the issue-contract phase emits its contract exactly this way).
+  # values (the test-plan and verification phases emit their JSON artifacts this
+  # way).
   #
   # native_emit_output's `key=value` form breaks on pretty-printed JSON: the
   # agent writes multi-line artifacts, and the runner rejects the orphaned

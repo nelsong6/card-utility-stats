@@ -3,8 +3,8 @@
 # test-plan phase for spirelens. Runs the existing
 # run-phases.ps1 script on the laptop with
 # -PhaseName test_plan; pulls the resulting JSON artifact back to
-# the orchestrator pod and emits it as a phase output for the
-# verify-loop's later evidence-gate to read.
+# the orchestrator pod and emits it as the `test_plan` phase output
+# for the llm-verify phase to consume as its case source.
 
 set -Eeuo pipefail
 
