@@ -84,3 +84,26 @@ jobs:
             echo "native scripts must not hard-code the project repo fallback" >&2
             exit 1
           fi
+
+      - name: Retired workflow shapes
+        run: |
+          set -Eeuo pipefail
+          # Migration policy: the pre-implementation issue-contract stage and the
+          # standalone evidence-gate phase are retired end to end. The llm-verify
+          # phase owns its verdict + recycle policy, and cleanup_early gates
+          # teardown with a `when` condition. Fail if any retired shape returns to
+          # the native scripts.
+          if [ -e scripts/glimmung-native/issue-contract.sh ]; then
+            echo "retired issue-contract stage script reintroduced" >&2
+            exit 1
+          fi
+          for tok in \
+            GLIMMUNG_INPUT_ISSUE_CONTRACT \
+            ISSUE_CONTRACT_REPO_PATH \
+            evidence_verification_gate \
+            skip_when_preserve_test_env; do
+            if grep -RInF "$tok" scripts/glimmung-native; then
+              echo "retired workflow token '$tok' reintroduced in native scripts" >&2
+              exit 1
+            fi
+          done

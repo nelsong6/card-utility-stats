@@ -19,9 +19,11 @@
 # retired alongside this migration; see the deleted
 # opentofu-screenshot-storage workflow).
 #
-# This is the verify-loop's verdict-emitting phase; the
-# evidence-gate phase that follows reads `verification` from this
-# phase's outputs and decides ADVANCE / RETRY / ABORT.
+# This is the verify-loop's verdict-emitting phase: it emits the
+# `verification` phase output, and the llm-verify phase's own recycle
+# policy (on [verify_fail, verify_malformed], lands_at=prepare) decides
+# ADVANCE / RETRY / ABORT. Verification phases own their verdict — there
+# is no separate downstream gate phase.
 
 set -Eeuo pipefail
 
