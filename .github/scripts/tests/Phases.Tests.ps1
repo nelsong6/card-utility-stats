@@ -13,7 +13,7 @@ BeforeAll {
     $source = Import-ScriptFunctions -ScriptPath $scriptPath -FunctionNames @(
         'Get-PropertyValue', 'Set-PropertyValue', 'ConvertTo-Array',
         'Get-TextBlob', 'Test-TextMentionsUnavailableEvidence',
-        'Test-TextMentionsFailedTests', 'Get-ToolFailureCategory'
+        'Get-ToolFailureCategory'
     )
     . ([scriptblock]::Create($source))
 }
@@ -104,15 +104,9 @@ Describe 'Test-TextMentionsUnavailableEvidence' {
     }
 }
 
-Describe 'Test-TextMentionsFailedTests' {
-    It 'detects failure phrasing' {
-        Test-TextMentionsFailedTests -Text 'partial pass' | Should -BeTrue
-        Test-TextMentionsFailedTests -Text '3 tests failed' | Should -BeTrue
-        Test-TextMentionsFailedTests -Text '2 regressions in legacy/parser' | Should -BeTrue
-    }
-    It 'ignores benign mentions' {
-        Test-TextMentionsFailedTests -Text 'all green' | Should -BeFalse
-        Test-TextMentionsFailedTests -Text $null      | Should -BeFalse
-        Test-TextMentionsFailedTests -Text ''         | Should -BeFalse
-    }
-}
+# Note: the prose-scan gate Test-TextMentionsFailedTests was deleted in the
+# deterministic-unit-test-gate migration. Unit-test pass/fail is now decided by
+# Get-ObservedUnitTestResult against the dotnet test exit code + TRX (see
+# UnitTestResult.Tests.ps1), and a reintroduction guard
+# (NoProseUnitTestGate.Tests.ps1) fails if any prose scan of test results
+# returns. There is intentionally no test here for the retired function.

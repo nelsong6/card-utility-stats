@@ -95,6 +95,18 @@ with `host_unavailable` and the run requeues until next manual sign-in.
 See `romaine-life/glimmung/docs/remote-host-execution.md` for the orchestrator-side
 protocol and `docs/glimmung-workflow.md` here for the registered phase shape.
 
+In the verification phase, the unit-test gate is harness-owned and deterministic
+(an observed-outcomes-over-claimed-intent application of the attribution
+principle above). `run-phases.ps1` runs `dotnet test` on
+`Tests/SpireLens.Core.Tests` with a `trx` logger before the verification agent
+starts and reads the observed exit code + TRX
+(`.github/scripts/lib/UnitTestResult.ps1`); `passed` is
+`exit_code == 0 && failed == 0`. A failing observed result aborts with
+`unit_tests_failed` (carrying the real failing test names) without invoking the
+agent; a passing result is stamped into `verification.json` authoritatively. The
+verification agent does live-MCP + screenshot evidence only — it does not run or
+judge unit tests, and its narration cannot move the unit-test verdict.
+
 ## Useful Commands
 
 - Build/tests:

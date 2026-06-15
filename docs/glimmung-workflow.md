@@ -77,7 +77,20 @@ pushes the run-scoped `glimmung/<run_id>` branch with the per-run GitHub token.
 - `build-and-deploy` — checks out the implementation branch, `dotnet build` the
   loader and core into the live `mods/` folder.
 - `prepare-scenario` — runs `prepare-scenario.ps1`.
-- `run-verification` — runs `run-phases.ps1 -PhaseName verification`.
+- `run-verification` — runs `run-phases.ps1 -PhaseName verification`. The
+  unit-test gate is harness-owned and deterministic: before invoking the
+  verification agent, the harness runs `dotnet test` on
+  `Tests/SpireLens.Core.Tests` with a `trx` logger and reads the **observed**
+  exit code + TRX (`Get-ObservedUnitTestResult`) — `passed` is
+  `exit_code == 0 && failed == 0`. If unit tests fail, it writes a determined
+  `unit_tests_failed` verdict carrying the actual failing test names/counts and
+  does NOT spend budget invoking the agent (tests are a hard gate). If they
+  pass, it invokes the agent for live-MCP + screenshot evidence only, then
+  stamps the observed `unit_tests` block into `verification.json`
+  authoritatively (the agent neither runs nor judges unit tests, and its
+  self-report cannot override the observed result). The earlier design — where
+  the agent ran `dotnet test` and the harness inferred pass/fail by
+  regex-scanning the agent's prose — is retired end to end.
 - `collect-evidence` — scp `verification.json` + screenshots back to the pod.
 - `upload-screenshots` — pushes screenshots to `romaineglimmungartifacts`.
 - `emit-verification` — emits the `verification` phase output that the llm-verify
