@@ -18,6 +18,12 @@ Set-StrictMode -Version 3.0  # V2 already catches missing PSCustomObject/hashtab
 $DefaultPhaseTimeoutSeconds = 360
 $DefaultPhaseBudgetUsd = '15.00'
 
+# Pure observed-unit-test-result parser (exit code + TRX -> verdict). Kept in a
+# standalone lib so its Pester suite can dot-source the real production code
+# instead of mirroring it. This is the structural ground-truth gate that
+# replaced the retired prose scan.
+. (Join-Path $PSScriptRoot 'lib' 'UnitTestResult.ps1')
+
 $CatalogMcpTools = @(
     'mcp__spire-lens-mcp__lookup_card',
     'mcp__spire-lens-mcp__lookup_character',
@@ -230,6 +236,12 @@ $phaseDefinitions = @(
         DisallowedTools = $MultiplayerMcpTools + @(
             'Edit',
             'NotebookEdit',
+            # Unit tests are harness-owned and run deterministically before this
+            # agent starts; the agent must not run or re-judge them.
+            'Bash(dotnet test *)',
+            'PowerShell(dotnet test *)',
+            'Bash(dotnet build *)',
+            'PowerShell(dotnet build *)',
             'Bash(gh *)',
             'PowerShell(gh *)',
             'Bash(git add *)',
@@ -354,10 +366,16 @@ function Write-SyntheticRollup {
     param(
         [string]$AbortLayer,
         [string]$AbortReason,
-        [string]$Notes
+        [string]$Notes,
+        # Optional authoritative unit_tests block to carry into the rollup (e.g.
+        # the determined unit-test failure verdict, which knows the failing test
+        # names/counts the blocked placeholder cannot). When null, the rollup
+        # keeps the blocked placeholder.
+        [object]$UnitTests = $null
     )
 
     $rollupPath = Join-Path $ValidationArtifactDir 'result.json'
+    $unitTestsBlock = if ($null -ne $UnitTests) { $UnitTests } else { [ordered]@{ passed = $null; status = 'blocked'; notes = '' } }
     $rollup = [ordered]@{
         issue_number = [int]$IssueNumber
         status = 'blocked'
@@ -370,7 +388,7 @@ function Write-SyntheticRollup {
             implementation = [ordered]@{ status = 'not_run'; abort_reason = $null }
             verification = [ordered]@{ status = 'not_run'; abort_reason = $null }
         }
-        unit_tests = [ordered]@{ passed = $null; status = 'blocked'; notes = '' }
+        unit_tests = $unitTestsBlock
         live_mcp_validation = [ordered]@{ passed = $null; status = 'blocked'; notes = '' }
         screenshot_validation = [ordered]@{ passed = $null; status = 'blocked'; count = 0; notes = '' }
         card_metadata_discovery = [ordered]@{ passed = $null; status = 'blocked'; notes = '' }
@@ -583,14 +601,6 @@ function Test-TextMentionsUnavailableEvidence {
     return $Text -match '(?i)(not achievable|not available|unavailable|not renderable|cannot render|cannot be made visible|without mouse hover|no hover support|unit tests? (directly |exclusively |fully )?verif|verified exclusively through unit tests)'
 }
 
-function Test-TextMentionsFailedTests {
-    param([string]$Text)
-
-    if ([string]::IsNullOrWhiteSpace($Text)) { return $false }
-    if ($Text -match '(?i)\b(partial|regressions?|failing)\b') { return $true }
-    return $Text -match '(?i)\b[1-9][0-9]*\s+(?:\S+\s+){0,4}(?:fail(?:ed|s|ures?)?|regressions?)\b'
-}
-
 function Set-VerificationGuardAbort {
     param(
         [object]$Result,
@@ -655,25 +665,15 @@ function Apply-VerificationEvidenceGuard {
         return Set-VerificationGuardAbort -Result $Result -JsonPath $JsonPath -MarkdownPath $MarkdownPath -AbortReason 'artifact_contract_missing' -GuardNote 'Verification cannot pass because it did not write evidence_results for the test-plan evidence contract.'
     }
 
-    $unitTests = Get-PropertyValue -Object $Result -Name 'unit_tests'
-    if ($null -ne $unitTests) {
-        $unitPassed = Get-PropertyValue -Object $unitTests -Name 'passed'
-        $unitStatus = [string](Get-PropertyValue -Object $unitTests -Name 'status')
-        $unitNotes = [string](Get-PropertyValue -Object $unitTests -Name 'notes')
-        $unitText = Get-TextBlob @($unitStatus, $unitNotes)
-        if ($unitPassed -eq $false -or (Test-TextMentionsFailedTests -Text $unitText)) {
-            return Set-VerificationGuardAbort -Result $Result -JsonPath $JsonPath -MarkdownPath $MarkdownPath -AbortReason 'unit_tests_failed' -GuardNote 'Verification cannot pass because unit test results mention failed, partial, or regressed tests. Fix the tests or abort with unit_tests_failed.'
-        }
-    }
-
-    $unitEvidenceText = Get-TextBlob @(
-        $evidenceResults |
-            Where-Object { [string](Get-PropertyValue -Object $_ -Name 'kind') -eq 'unit_test' } |
-            ForEach-Object { [string](Get-PropertyValue -Object $_ -Name 'notes') }
-    )
-    if (Test-TextMentionsFailedTests -Text $unitEvidenceText) {
-        return Set-VerificationGuardAbort -Result $Result -JsonPath $JsonPath -MarkdownPath $MarkdownPath -AbortReason 'unit_tests_failed' -GuardNote 'Verification cannot pass because unit-test evidence notes mention failed or regressed tests.'
-    }
+    # Unit-test pass/fail is NOT decided here. The harness runs the test project
+    # deterministically before this phase's agent is invoked (see
+    # Invoke-DeterministicUnitTests) and writes the observed exit-code/TRX
+    # verdict authoritatively into verification.json.unit_tests; a failing
+    # observed result short-circuits to an abort before the agent ever runs. By
+    # the time this guard executes, unit tests have already passed deterministically.
+    # The retired prose scan that regex-scanned the agent's narration for
+    # "failed/partial/regressed" is deleted end to end — the observed outcome is
+    # the ground truth, not the agent's wording.
 
     $screenshotValidation = Get-PropertyValue -Object $Result -Name 'screenshot_validation'
     $screenshotNotes = [string](Get-PropertyValue -Object $screenshotValidation -Name 'notes')
@@ -942,10 +942,221 @@ function Get-PhaseDisallowedToolsArgument {
     return ($tools | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }) -join ','
 }
 
+function Invoke-DeterministicUnitTests {
+    # Runs the SpireLens.Core test project deterministically and returns the
+    # observed verdict object from Get-ObservedUnitTestResult ({ passed, total,
+    # failed, failed_names, notes }). This is the verification phase's hard
+    # unit-test gate: the harness owns it, runs it BEFORE the agent, and reads
+    # the observed exit code + TRX rather than any English narration. The
+    # implementation branch has already been checked out and built into the live
+    # mods/ folder by the build-and-deploy step, so this exercises the deployed
+    # code.
+    $sts2DataDir = $env:SPIRELENS_HOST_STS2_DATA_DIR
+    if ([string]::IsNullOrWhiteSpace($sts2DataDir)) {
+        throw "SPIRELENS_HOST_STS2_DATA_DIR was not set; cannot run deterministic unit tests."
+    }
+
+    $trxFileName = 'unit-tests.trx'
+    $trxPath = Join-Path $ValidationArtifactDir $trxFileName
+    Remove-Item -LiteralPath $trxPath -ErrorAction SilentlyContinue
+
+    $testProject = Join-Path $RepoRoot 'Tests\SpireLens.Core.Tests\SpireLens.Core.Tests.csproj'
+
+    Write-Host "::group::Deterministic unit tests"
+    Write-AgentEvent 'unit_tests_start' 'Harness running deterministic unit tests before verification agent.' @{ phase = 'verification'; project = $testProject; trx = $trxPath }
+
+    & dotnet test $testProject `
+        -c Debug `
+        --logger "trx;LogFileName=$trxFileName" `
+        --results-directory $ValidationArtifactDir `
+        "-p:Sts2DataDir=$sts2DataDir"
+    $testExitCode = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
+
+    # --results-directory normally lands the TRX exactly at $trxPath, but be
+    # resilient to runner versions that nest it under a subfolder.
+    if (-not (Test-Path -LiteralPath $trxPath)) {
+        $found = Get-ChildItem -LiteralPath $ValidationArtifactDir -Filter $trxFileName -Recurse -File -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+        if ($null -ne $found) { $trxPath = $found.FullName }
+    }
+
+    $observed = Get-ObservedUnitTestResult -ExitCode $testExitCode -TrxPath $trxPath
+
+    Write-AgentEvent 'unit_tests_result' $observed.notes @{
+        phase = 'verification'
+        passed = $observed.passed
+        total = $observed.total
+        failed = $observed.failed
+        failed_names = $observed.failed_names
+        exit_code = $testExitCode
+        trx = $trxPath
+    }
+    Write-Host "::endgroup::"
+
+    return $observed
+}
+
+function Set-AuthoritativeUnitTestResult {
+    # Stamps the harness-observed unit-test verdict into a verification result
+    # object: the `unit_tests` block and the matching `unit_test` row in
+    # `evidence_results`. The agent no longer owns this data — the harness does.
+    param([object]$Result, [object]$Observed)
+
+    $passed = [bool]$Observed.passed
+    $status = if ($passed) { 'pass' } else { 'fail' }
+
+    $unitTests = [ordered]@{
+        passed = $passed
+        status = $status
+        total = [int]$Observed.total
+        failed = [int]$Observed.failed
+        failed_names = @($Observed.failed_names)
+        notes = [string]$Observed.notes
+    }
+    Set-PropertyValue -Object $Result -Name 'unit_tests' -Value $unitTests
+
+    # Keep the unit_test evidence_results row consistent with the observed
+    # verdict so the required-evidence contract is satisfied by the harness's
+    # ground truth rather than the agent's claim. The row's evidence_id must
+    # match whatever id the test plan declared for its unit_test required-evidence
+    # item (defaulting to 'unit-tests'), so the guard's required-evidence loop
+    # finds a passed match. Update the existing row if the agent wrote one;
+    # otherwise add it.
+    $unitEvidenceId = 'unit-tests'
+    $testPlanPath = Join-Path $ValidationArtifactDir 'test-plan.json'
+    if (Test-Path -LiteralPath $testPlanPath) {
+        try {
+            $testPlan = Read-JsonFile -Path $testPlanPath
+            $requiredEvidence = @(ConvertTo-Array (Get-PropertyValue -Object $testPlan -Name 'required_evidence'))
+            $unitRequired = $requiredEvidence | Where-Object { [string](Get-PropertyValue -Object $_ -Name 'kind') -eq 'unit_test' } | Select-Object -First 1
+            if ($null -ne $unitRequired) {
+                $declaredId = [string](Get-PropertyValue -Object $unitRequired -Name 'id')
+                if (-not [string]::IsNullOrWhiteSpace($declaredId)) { $unitEvidenceId = $declaredId }
+            }
+        } catch {
+            # Fall back to the default id; the guard will surface a real
+            # contract problem if the test plan is malformed.
+        }
+    }
+
+    $evidenceResults = @(ConvertTo-Array (Get-PropertyValue -Object $Result -Name 'evidence_results'))
+    $unitRow = $evidenceResults | Where-Object { [string](Get-PropertyValue -Object $_ -Name 'kind') -eq 'unit_test' } | Select-Object -First 1
+    if ($null -eq $unitRow) {
+        $unitRow = [ordered]@{
+            evidence_id = $unitEvidenceId
+            kind = 'unit_test'
+            passed = $passed
+            artifact_paths = @()
+            target_visible = $false
+            text_visible = $false
+            observed_text = ''
+            notes = [string]$Observed.notes
+        }
+        $evidenceResults += $unitRow
+        Set-PropertyValue -Object $Result -Name 'evidence_results' -Value @($evidenceResults)
+    } else {
+        Set-PropertyValue -Object $unitRow -Name 'evidence_id' -Value $unitEvidenceId
+        Set-PropertyValue -Object $unitRow -Name 'passed' -Value $passed
+        Set-PropertyValue -Object $unitRow -Name 'notes' -Value ([string]$Observed.notes)
+    }
+}
+
+function Write-DeterminedUnitTestFailure {
+    # Unit tests are a hard gate. When the harness observes a failing result
+    # there is no point spending budget on live MCP + screenshot evidence, so we
+    # write the determined failure verdict directly (in spirelens's existing
+    # verification.json contract shape) and DO NOT invoke the agent. The failing
+    # test names and counts come straight from the observed TRX.
+    param([hashtable]$Phase, [object]$Observed)
+
+    $phaseJsonPath = Join-Path $ValidationArtifactDir $Phase.Json
+    $phaseMarkdownPath = Join-Path $ValidationArtifactDir $Phase.Markdown
+
+    $failedNames = @($Observed.failed_names)
+    $notes = "Unit tests failed deterministically before live validation. $($Observed.notes)"
+
+    $result = [ordered]@{
+        layer = 'verification'
+        status = 'abort'
+        abort_reason = 'unit_tests_failed'
+        retryable = $true
+        human_action_required = $false
+        notes = $notes
+        unit_tests = [ordered]@{
+            passed = $false
+            status = 'fail'
+            total = [int]$Observed.total
+            failed = [int]$Observed.failed
+            failed_names = $failedNames
+            notes = [string]$Observed.notes
+        }
+        live_mcp_validation = [ordered]@{ passed = $null; status = 'not_run'; notes = 'Skipped: unit tests are a hard gate and failed first.' }
+        screenshot_validation = [ordered]@{ passed = $null; status = 'not_run'; count = 0; target_visible = $false; notes = 'Skipped: unit tests are a hard gate and failed first.' }
+        evidence_results = @(
+            [ordered]@{
+                evidence_id = 'unit-tests'
+                kind = 'unit_test'
+                passed = $false
+                artifact_paths = @()
+                target_visible = $false
+                text_visible = $false
+                observed_text = ''
+                notes = [string]$Observed.notes
+            }
+        )
+        used_mcp = $false
+        used_raw_bridge_or_queue = $false
+    }
+    $result | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $phaseJsonPath -Encoding UTF8
+
+    $failingList = if ($failedNames.Count -gt 0) {
+        "`nFailing tests:`n" + (($failedNames | ForEach-Object { "- $_" }) -join "`n")
+    } else { '' }
+    @"
+Status: abort
+
+Abort reason: unit_tests_failed
+
+$notes
+$failingList
+"@ | Set-Content -LiteralPath $phaseMarkdownPath -Encoding UTF8
+
+    Add-JobSummaryMarkdown -Title 'Run phase: verification' -MarkdownPath $phaseMarkdownPath
+
+    return [ordered]@{
+        Status = 'abort'
+        JsonPath = $phaseJsonPath
+        MarkdownPath = $phaseMarkdownPath
+        Result = (Read-JsonFile -Path $phaseJsonPath)
+    }
+}
+
+function Invoke-VerificationPhase {
+    # Orchestrates the verification phase around the harness-owned unit-test
+    # gate: run unit tests deterministically FIRST; if they fail, write the
+    # determined failure verdict and skip the agent entirely; if they pass,
+    # invoke the agent for live-MCP + screenshot evidence and stamp the observed
+    # unit-test verdict authoritatively into its result.
+    param([hashtable]$Phase, [string]$Prompt)
+
+    $observed = Invoke-DeterministicUnitTests
+    if (-not $observed.passed) {
+        Write-AgentEvent 'phase_skipped' 'Verification agent skipped: deterministic unit tests failed (hard gate).' @{ phase = 'verification'; abort_reason = 'unit_tests_failed' }
+        return (Write-DeterminedUnitTestFailure -Phase $Phase -Observed $observed)
+    }
+
+    return (Invoke-ClaudePhase -Phase $Phase -Prompt $Prompt -ObservedUnitTests $observed)
+}
+
 function Invoke-ClaudePhase {
     param(
         [hashtable]$Phase,
-        [string]$Prompt
+        [string]$Prompt,
+        # Verification only: the harness-observed unit-test result (from
+        # Invoke-DeterministicUnitTests). When supplied, it is stamped
+        # authoritatively into the agent's verification.json — overwriting
+        # whatever the agent self-reported — before the evidence guard runs.
+        [object]$ObservedUnitTests = $null
     )
 
     $phaseName = $Phase.Name
@@ -1013,6 +1224,30 @@ function Invoke-ClaudePhase {
 
     $result = Read-JsonFile -Path $phaseJsonPath
     if ($Phase.Name -eq 'verification') {
+        if ($null -ne $ObservedUnitTests) {
+            # The agent does not run or judge unit tests; the harness already
+            # did, deterministically. Stamp the observed exit-code/TRX verdict
+            # as the authoritative unit_tests block (and unit_test evidence row)
+            # so the agent's self-report can never contradict the ground truth.
+            Set-AuthoritativeUnitTestResult -Result $result -Observed $ObservedUnitTests
+            $result | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $phaseJsonPath -Encoding UTF8
+
+            # Keep the rollup's unit_tests honest too: it is the same verdict,
+            # owned by the harness, so overwrite whatever the agent summarized.
+            $rollupPath = Join-Path $ValidationArtifactDir 'result.json'
+            if (Test-Path -LiteralPath $rollupPath) {
+                $rollup = Read-JsonFile -Path $rollupPath
+                Set-PropertyValue -Object $rollup -Name 'unit_tests' -Value ([ordered]@{
+                    passed = [bool]$ObservedUnitTests.passed
+                    status = if ($ObservedUnitTests.passed) { 'pass' } else { 'fail' }
+                    total = [int]$ObservedUnitTests.total
+                    failed = [int]$ObservedUnitTests.failed
+                    failed_names = @($ObservedUnitTests.failed_names)
+                    notes = [string]$ObservedUnitTests.notes
+                })
+                $rollup | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $rollupPath -Encoding UTF8
+            }
+        }
         $result = Apply-VerificationEvidenceGuard -Result $result -JsonPath $phaseJsonPath -MarkdownPath $phaseMarkdownPath
     }
     $status = Assert-PhaseContract -Phase $Phase -Result $result
@@ -1157,17 +1392,8 @@ $verificationPrompt = (Get-CommonPromptPrefix -PhaseName 'verification') + @"
 
 VERIFICATION RULES:
 - Read `test-plan.json`, `implementation.json`, and `scenario-setup.json` first. Treat `test-plan.json.required_evidence` as a hard acceptance contract. Do not pass unless every required evidence item is satisfied in `evidence_results`.
-- Own tests, live MCP validation, screenshot capture, and final evidence only. This phase is sealed from GitHub mutation: no issue comments, labels, branches, commits, pushes, or PRs.
-- Use this Windows validation sequence unless the test plan says it is not applicable:
-
-``````powershell
-`$sts2DataDir = `$env:SPIRELENS_HOST_STS2_DATA_DIR
-if ([string]::IsNullOrWhiteSpace(`$sts2DataDir)) { throw "SPIRELENS_HOST_STS2_DATA_DIR was not set." }
-dotnet build "Tests\SpireLens.Core.Tests\SpireLens.Core.Tests.csproj" -c Debug "-p:Sts2DataDir=`$sts2DataDir"
-dotnet test "Tests\SpireLens.Core.Tests\SpireLens.Core.Tests.csproj" -c Debug --no-build "-p:Sts2DataDir=`$sts2DataDir"
-``````
-
-- The full test command above is a hard gate. If any test fails after the implementation checkout is deployed, verification must abort with unit_tests_failed; do not call failures "pre-existing", "outside the contract", "partial", or "follow-up" when baseline main passed earlier in this workflow.
+- Own live MCP validation, screenshot capture, and final evidence only. This phase is sealed from GitHub mutation: no issue comments, labels, branches, commits, pushes, or PRs.
+- Do NOT run `dotnet build` or `dotnet test`, and do not judge unit-test results. The harness runs the unit-test project deterministically before this agent starts, reads the observed `dotnet test` exit code plus the structured TRX, and writes the authoritative ``unit_tests` block (and the matching ``unit_test` evidence row) into `verification.json` itself. If those unit tests fail, the harness writes a determined ``unit_tests_failed` abort and this agent is never invoked — so by the time you run, unit tests have already passed. Your job is the live-MCP validation and screenshot evidence only. Leave ``unit_tests` and the ``unit_test` evidence row to the harness; do not populate, overwrite, or re-judge them.
 - Default live validation fixture: the workflow has already materialized, installed, validated, and loaded the scenario save before this LLM phase starts. Read `scenario-setup.json` first, then inspect the live state with `get_game_state`. Do not call save materialization, save installation, current-run validation, current-run loading, save listing, save inspection, or scenario-command discovery tools. Do not use live MCP tools to arrange hand/draw/discard/exhaust piles. If needed after combat loads, `configure_live_combat` may set only sparse live properties such as enemy HP, current energy/stars, player powers, or enemy powers; card availability must come from the scenario save/deck and normal gameplay. If the game is at Neow, menu, the wrong character, transition-only state, or any unexpected state after loading, abort with `mcp_state_mismatch` or `game_state_unreachable`; do not choose Neow options, start ad hoc runs, or enter random debug rooms.
 - For SpireLens card-stat tooltip evidence, use `bridge_health`, `set_spirelens_view_stats_enabled(true)`, `list_visible_cards(surface)`, then `show_card_tooltip(surface, card_index, card_id)` on the target visible card, then `capture_screenshot`. Prefer `card_id` over card_index alone when validating a named card. For deck, draw pile, discard pile, or exhaust pile evidence, call `open_card_pile(pile)` first, use the matching surface name with `list_visible_cards`/`show_card_tooltip`, capture the screenshot, then call `close_card_pile()`. If `list_visible_cards` cannot find the target, `show_card_tooltip` returns an error, the bridge health check fails, or the captured screenshot still shows the wrong/stale tooltip after one retry, abort with `target_evidence_missing` or `game_state_unreachable`; do not keep trying arbitrary indices. Prefer this route over ad hoc mouse/hover attempts.
 - For SpireLens relic-stat tooltip evidence, use `bridge_health`, `set_spirelens_view_stats_enabled(true)`, `list_visible_relics(surface)`, then `show_relic_tooltip(surface, relic_id=...)` on the target visible relic, then `capture_screenshot`. Prefer `player_relic_bar` for owned relic stats unless the test plan explicitly names `relic_select` or `treasure`. Prefer `relic_id` over relic_index alone. If `list_visible_relics` cannot find the target, `show_relic_tooltip` returns an error, the bridge health check fails, or the captured screenshot still shows the wrong/stale tooltip after one retry, abort with `target_evidence_missing` or `game_state_unreachable`; do not use card tooltip tools or arbitrary mouse hover attempts as substitutes.
@@ -1177,13 +1403,14 @@ dotnet test "Tests\SpireLens.Core.Tests\SpireLens.Core.Tests.csproj" -c Debug --
 - If the saved screenshot is not meaningful evidence for the validation claim, abort with screenshot_not_relevant. For a named card, tooltip, or UI issue, screenshots must show the target card, tooltip, or changed UI state. If the relevant evidence lives in draw pile, discard pile, exhaust pile, deck view, card selection, rewards, or another non-hand surface, navigate to that surface through MCP when available and capture the target-visible screenshot there. If MCP cannot make the required card text/tooltip visible, abort with target_evidence_missing and say which view or pile was unreachable; do not pass on hand screenshots, unit tests, repeated tooltip attempts, or adjacent state.
 - Keep verification bounded: capture the planned screenshot once, and at most one retry per required screenshot if the tooltip or text is stale. If the evidence is still not legible or not causally valid after that, immediately write an abort result with 	arget_evidence_missing, screenshot_not_relevant, or claimed_result_not_observed; do not improvise a new multi-turn scenario until timeout.
 - Write `verification.json` with:
-  `{ "layer":"verification", "status":"pass|abort", "abort_reason":null, "retryable":false, "human_action_required":false, "notes":"", "unit_tests":{"passed":null,"status":"not_run","notes":""}, "live_mcp_validation":{"passed":null,"status":"not_run","notes":""}, "screenshot_validation":{"passed":null,"status":"not_run","count":0,"target_visible":false,"notes":""}, "evidence_results":[{"evidence_id":"","kind":"unit_test|screenshot|live_mcp|manual_blocker","passed":false,"artifact_paths":[],"target_visible":false,"text_visible":false,"observed_text":"","notes":""}], "used_mcp":null, "used_raw_bridge_or_queue":false }`
-- For each `required_evidence` item from the test plan, write exactly one matching `evidence_results` item. Screenshot evidence must include artifact_paths. If the contract requires tooltip/text evidence, set `text_visible:true` only when the screenshot itself shows the required text and copy the visible words into `observed_text`. If the text/tooltip cannot be made visible, abort with target_evidence_missing; do not pass by saying unit tests cover it.
+  `{ "layer":"verification", "status":"pass|abort", "abort_reason":null, "retryable":false, "human_action_required":false, "notes":"", "live_mcp_validation":{"passed":null,"status":"not_run","notes":""}, "screenshot_validation":{"passed":null,"status":"not_run","count":0,"target_visible":false,"notes":""}, "evidence_results":[{"evidence_id":"","kind":"screenshot|live_mcp|manual_blocker","passed":false,"artifact_paths":[],"target_visible":false,"text_visible":false,"observed_text":"","notes":""}], "used_mcp":null, "used_raw_bridge_or_queue":false }`
+- ``unit_tests` is harness-owned: the harness stamps the observed ``unit_tests` block authoritatively after you exit, so omit it (or leave any value — it will be overwritten). Do not write a ``unit_test` `evidence_results` row either; the harness adds it from the observed result. Cover only the `screenshot` and `live_mcp` (and any `manual_blocker`) required-evidence items yourself.
+- For each non-unit-test `required_evidence` item from the test plan, write exactly one matching `evidence_results` item. Screenshot evidence must include artifact_paths. If the contract requires tooltip/text evidence, set `text_visible:true` only when the screenshot itself shows the required text and copy the visible words into `observed_text`. If the text/tooltip cannot be made visible, abort with target_evidence_missing; do not pass by saying unit tests cover it.
 - When the matching `required_evidence` item carries an `expected_text` field, copy the **literal characters from the screenshot** into `observed_text` — do not paraphrase, summarize, or "clean up" what the screenshot shows. The wrapper compares `observed_text` against `expected_text` (case-insensitive substring match) and aborts with `claimed_result_not_observed` on mismatch. If the screenshot shows `vigor gained: 88` and the contract said `expected_text: vigor gained: 8`, you must write `observed_text: "vigor gained: 88"` so the mismatch is caught — never write what the contract *should* show; write what the pixels actually show. If you can't read the value confidently, abort with `target_evidence_missing` rather than guess.
 - For card-stat tooltip issues, prefer `show_card_tooltip(surface="hand", card_id=...)` and require the in-hand screenshot to satisfy the text contract unless the test plan explicitly names a non-hand surface.
 - For relic-stat tooltip issues, prefer `show_relic_tooltip(surface="player_relic_bar", relic_id=...)` and require the relic tooltip screenshot to satisfy the text contract unless the test plan explicitly names a non-owned relic surface.
 - Allowed abort reasons: unit_tests_failed, live_validation_failed, screenshot_missing, screenshot_not_relevant, target_evidence_missing, mcp_state_mismatch, game_state_unreachable, claimed_result_not_observed, artifact_contract_missing.
-- Also write rollup `result.json` with issue_number, status, abort_layer, abort_reason, retryable, human_action_required, layers, unit_tests, live_mcp_validation, screenshot_validation, card_metadata_discovery, used_mcp, used_raw_bridge_or_queue, opened_pr, opened_pr_url, should_close_issue, and evidence_summary.
+- Also write rollup `result.json` with issue_number, status, abort_layer, abort_reason, retryable, human_action_required, layers, unit_tests, live_mcp_validation, screenshot_validation, card_metadata_discovery, used_mcp, used_raw_bridge_or_queue, opened_pr, opened_pr_url, should_close_issue, and evidence_summary. Leave ``unit_tests` as a placeholder (e.g. `{"passed":null,"status":"pending","notes":""}`); the harness overwrites it with the authoritative observed unit-test verdict after you exit.
 - Write `verification.md` summarizing pass/fail evidence. It MUST include a `## Test Process` section that walks through what the verification phase actually did, in plain English, step by step. For every step in the validation plan that ran, include three lines: (1) **What was done** — the action in plain language; (2) **What it was supposed to prove** — the observation that step was meant to produce, naming expected numeric values where the test scenario implies one (e.g. "Akabeko's start-of-combat trigger should fire exactly once per combat and grant 8 Vigor — `VIGOR_POWER` status amount=8 and the SpireLens `vigor gained` accumulator at 8"); (3) **What was actually observed** — the concrete value or state read back from the game, copied verbatim from the relevant `get_game_state` field or screenshot OCR. If the observed value differs from the expected, abort with `claimed_result_not_observed`; do not pass and bury the discrepancy. The Test Process section is required even when the run passes — its purpose is to let a reviewer comparing the produced PR/screenshot against the test scenario quickly tell whether an unexpected number is a real bug or an expected accumulator behavior.
 - Write `result.md` as a compact final rollup including any PR URL from implementation.
 - Do not remove or add labels, post comments, create branches, commit, push, or open PRs. The workflow wrapper handles GitHub updates after this phase writes evidence.
@@ -1203,13 +1430,23 @@ foreach ($phase in $phasesToRun) {
         'verification' { $verificationPrompt }
     }
 
-    $phaseResult = Invoke-ClaudePhase -Phase $phase -Prompt $prompt
+    $phaseResult = if ($phase.Name -eq 'verification') {
+        # The verification phase runs unit tests deterministically (harness-owned
+        # hard gate) before, and possibly instead of, the agent.
+        Invoke-VerificationPhase -Phase $phase -Prompt $prompt
+    } else {
+        Invoke-ClaudePhase -Phase $phase -Prompt $prompt
+    }
     $phaseResults[$phase.Name] = $phaseResult
 
     if ($phaseResult.Status -eq 'abort') {
         $abortReason = [string](Get-PropertyValue -Object $phaseResult.Result -Name 'abort_reason')
         $notes = [string](Get-PropertyValue -Object $phaseResult.Result -Name 'notes')
-        Write-SyntheticRollup -AbortLayer $phase.Name -AbortReason $abortReason -Notes $notes
+        # Carry the phase's authoritative unit_tests block (if it wrote one, e.g.
+        # the determined unit_tests_failed verdict with real failing names) into
+        # the rollup so result.json reflects the observed outcome, not a blank.
+        $phaseUnitTests = Get-PropertyValue -Object $phaseResult.Result -Name 'unit_tests'
+        Write-SyntheticRollup -AbortLayer $phase.Name -AbortReason $abortReason -Notes $notes -UnitTests $phaseUnitTests
         break
     }
 }
