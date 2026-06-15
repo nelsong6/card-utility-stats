@@ -37,6 +37,13 @@ native_require_env GLIMMUNG_RUN_ID GLIMMUNG_RUN_REF GLIMMUNG_ISSUE_NUMBER GLIMMU
 # This phase's pod has none of env-prep's connection state; establish our own.
 HOST_IP="$(native_connect_host)" || native_emit_abort "host_unavailable"
 
+# Stage the git_ref verification harness (.github/scripts/* + .mcp.json) onto
+# the laptop, distinct from D:\repos\SpireLens (the feature-branch code under
+# test). The laptop phases below run the harness from HERE so git_ref — not the
+# agent's branch — controls the grader. Each managed step runs in its own pod,
+# so this top-level staging runs per step (idempotent: it wipes + re-copies).
+HARNESS_ROOT="$(native_stage_harness "$HOST_IP")" || native_emit_abort "harness_stage_failed"
+
 build_and_deploy_mod() {
   local gh_token_b64
   gh_token_b64="$(native_github_token_b64)"
@@ -81,10 +88,12 @@ prepare_scenario() {
 \$env:GLIMMUNG_PROJECT_REPO = '${repo_slug}'
 \$env:GLIMMUNG_WORKING_DIR = "C:\\glimmung-runs\\${GLIMMUNG_RUN_REF}"
 \$env:GLIMMUNG_REPO_ROOT = 'D:\\repos\\SpireLens'
-& pwsh -NoProfile -File 'D:\\repos\\SpireLens\\.github\\scripts\\native-runtime.ps1' \`
+\$env:GLIMMUNG_HARNESS_ROOT = '${HARNESS_ROOT}'
+& pwsh -NoProfile -File "\$env:GLIMMUNG_HARNESS_ROOT\\.github\\scripts\\native-runtime.ps1" \`
     -Mode prepare_scenario \`
     -IssueNumber '${GLIMMUNG_ISSUE_NUMBER}' \`
     -RepoSlug '${repo_slug}' \`
+    -HarnessRoot \$env:GLIMMUNG_HARNESS_ROOT \`
     -RepoRoot \$env:GLIMMUNG_REPO_ROOT
 \$exitCode = if (\$null -eq \$LASTEXITCODE) { 0 } else { [int]\$LASTEXITCODE }
 if (\$exitCode -ne 0) { exit \$exitCode }
@@ -103,12 +112,14 @@ run_verification() {
 \$env:GLIMMUNG_PROJECT_REPO = '${repo_slug}'
 \$env:GLIMMUNG_WORKING_DIR = "C:\\glimmung-runs\\${GLIMMUNG_RUN_REF}"
 \$env:GLIMMUNG_REPO_ROOT = 'D:\\repos\\SpireLens'
+\$env:GLIMMUNG_HARNESS_ROOT = '${HARNESS_ROOT}'
 \$env:GH_TOKEN = \$ghToken
-& pwsh -NoProfile -File 'D:\\repos\\SpireLens\\.github\\scripts\\native-runtime.ps1' \`
+& pwsh -NoProfile -File "\$env:GLIMMUNG_HARNESS_ROOT\\.github\\scripts\\native-runtime.ps1" \`
     -Mode run_phase \`
     -PhaseName verification \`
     -IssueNumber '${GLIMMUNG_ISSUE_NUMBER}' \`
     -RepoSlug '${repo_slug}' \`
+    -HarnessRoot \$env:GLIMMUNG_HARNESS_ROOT \`
     -RepoRoot \$env:GLIMMUNG_REPO_ROOT \`
     -GitHubToken \$ghToken
 \$exitCode = if (\$null -eq \$LASTEXITCODE) { 0 } else { [int]\$LASTEXITCODE }

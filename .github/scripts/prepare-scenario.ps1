@@ -3,6 +3,10 @@ param(
     [string]$TestPlanPath,
     [Parameter(Mandatory = $true)]
     [string]$McpConfigPath,
+    # Staged git_ref harness root. The sibling restart-sts2.ps1 (HARNESS) is
+    # sourced from here, not from -RepoRoot (the code under test). Defaults to
+    # -RepoRoot for backward-compatible standalone invocation.
+    [string]$HarnessRoot,
     [Parameter(Mandatory = $true)]
     [string]$RepoRoot,
     [Parameter(Mandatory = $true)]
@@ -13,6 +17,13 @@ param(
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 3.0  # V2 already catches missing PSCustomObject/hashtable properties; V3 adds out-of-bounds array indexing (verified empirically on PS 7.4)
+
+# restart-sts2.ps1 is harness (a grader script), so it must come from the
+# staged git_ref harness, never the feature-branch checkout. Fall back to
+# -RepoRoot when -HarnessRoot is not supplied so this script still runs
+# standalone against a single checkout.
+if ([string]::IsNullOrWhiteSpace($HarnessRoot)) { $HarnessRoot = $RepoRoot }
+$restartSts2Path = Join-Path $HarnessRoot '.github\scripts\restart-sts2.ps1'
 
 function Invoke-LoggedStep {
     param(
@@ -327,19 +338,19 @@ try {
     $outputPath = Join-Path $ValidationArtifactDir 'scenario-setup.json'
 
     Invoke-LoggedStep -Name 'Restart STS2 (materialize phase)' -Body {
-        & (Join-Path $RepoRoot '.github\scripts\restart-sts2.ps1') -Mode Restart -McpConfigPath $McpConfigPath -StartupTimeoutSeconds 90 -ShutdownTimeoutSeconds 45
+        & $restartSts2Path -Mode Restart -McpConfigPath $McpConfigPath -StartupTimeoutSeconds 90 -ShutdownTimeoutSeconds 45
     }
     Invoke-LoggedStep -Name 'MCP materialize_only' -Body {
         Invoke-McpPython -McpDirectory $mcpDirectory -Mode 'materialize_only' -SetupPath $setupPath -OutputPath $outputPath
     }
     Invoke-LoggedStep -Name 'Stop STS2 before save install' -Body {
-        & (Join-Path $RepoRoot '.github\scripts\restart-sts2.ps1') -Mode Stop -McpConfigPath $McpConfigPath -ShutdownTimeoutSeconds 45
+        & $restartSts2Path -Mode Stop -McpConfigPath $McpConfigPath -ShutdownTimeoutSeconds 45
     }
     Invoke-LoggedStep -Name 'MCP install_only' -Body {
         Invoke-McpPython -McpDirectory $mcpDirectory -Mode 'install_only' -SetupPath $setupPath -OutputPath $outputPath
     }
     Invoke-LoggedStep -Name 'Restart STS2 (validate phase)' -Body {
-        & (Join-Path $RepoRoot '.github\scripts\restart-sts2.ps1') -Mode Restart -McpConfigPath $McpConfigPath -StartupTimeoutSeconds 90 -ShutdownTimeoutSeconds 45
+        & $restartSts2Path -Mode Restart -McpConfigPath $McpConfigPath -StartupTimeoutSeconds 90 -ShutdownTimeoutSeconds 45
     }
     Invoke-LoggedStep -Name 'MCP validate_load' -Body {
         Invoke-McpPython -McpDirectory $mcpDirectory -Mode 'validate_load' -SetupPath $setupPath -OutputPath $outputPath
