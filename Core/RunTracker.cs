@@ -57,6 +57,7 @@ public static class RunTracker
     private static int _pendingPlayerBlockClearAmount;
     private static bool _pendingPlayerBlockClearArmed;
     private static bool _pendingOrichalcumBlockAttribution;
+    private static bool _pendingTheAbacusBlockAttribution;
     private static bool _shivAvailableThisRun;
     private static CardModel? _shivDeckViewCard;
     private const decimal PoisonOwnershipEpsilon = 0.0001m;
@@ -621,6 +622,7 @@ public static class RunTracker
         _pendingPlayerBlockClearAmount = 0;
         _pendingPlayerBlockClearArmed = false;
         _pendingOrichalcumBlockAttribution = false;
+        _pendingTheAbacusBlockAttribution = false;
         _pendingMakeItSoSummons.Clear();
     }
 
@@ -1277,6 +1279,7 @@ public static class RunTracker
     private const string RedMaskRelicId = "RELIC.RED_MASK";
     private const string PocketwatchRelicId = "RELIC.POCKETWATCH";
     private const string OrichalcumRelicId = "RELIC.ORICHALCUM";
+    private const string TheAbacusRelicId = "RELIC.THE_ABACUS";
 
     /// <summary>
     /// Record a Bag of Marbles combat-start Vulnerable application.
@@ -1390,6 +1393,50 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordOrichalcumBlockGained failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Arm the one-shot flag that attributes the next player block gain to
+    /// The Abacus. Called from <see cref="Patches.TheAbacusAfterShufflePatch"/>
+    /// when The Abacus's <c>AfterShuffle</c> fires.
+    /// </summary>
+    public static void ArmTheAbacusBlockAttribution()
+    {
+        lock (_lock)
+        {
+            _pendingTheAbacusBlockAttribution = true;
+        }
+    }
+
+    /// <summary>
+    /// Record block gained from The Abacus's shuffle effect. Called from
+    /// <see cref="Patches.HookAfterBlockGainedPatch"/> when the attribution
+    /// flag is armed and the player gains block.
+    /// </summary>
+    public static void RecordTheAbacusBlockGained(int amount)
+    {
+        if (amount <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_pendingTheAbacusBlockAttribution) return;
+                _pendingTheAbacusBlockAttribution = false;
+
+                _pendingCombat ??= new PendingCombat();
+                if (!_pendingCombat.RelicAggregates.TryGetValue(TheAbacusRelicId, out var agg))
+                {
+                    agg = new RelicAggregate();
+                    _pendingCombat.RelicAggregates[TheAbacusRelicId] = agg;
+                }
+                agg.AdditionalBlockGained += amount;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordTheAbacusBlockGained failed: {e.Message}");
             }
         }
     }
