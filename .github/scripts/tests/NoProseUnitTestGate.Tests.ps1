@@ -97,6 +97,18 @@ Describe 'deterministic unit-test gate is present (the replacement path exists)'
             Should -BeTrue -Because 'a structured TRX is the ground truth the parser reads'
     }
 
+    It 'keeps dotnet stdout out of Invoke-DeterministicUnitTests return stream' {
+        $function = $script:Ast.FindAll(
+            { param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Invoke-DeterministicUnitTests' },
+            $true
+        ) | Select-Object -First 1
+        $function | Should -Not -BeNullOrEmpty
+        $functionText = $function.Extent.Text
+
+        ($functionText -match '(?s)&\s+dotnet\s+test.+?\|\s*ForEach-Object\s*\{\s*Write-Host\s+\$_\s*\}') |
+            Should -BeTrue -Because 'external-command stdout is otherwise captured alongside the verdict object when the caller assigns the function output'
+    }
+
     It 'stamps the observed unit-test verdict authoritatively into the result' {
         ($script:Source -match 'Set-AuthoritativeUnitTestResult') |
             Should -BeTrue -Because 'the agent self-report must not own the unit-test verdict'

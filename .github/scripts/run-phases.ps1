@@ -965,11 +965,17 @@ function Invoke-DeterministicUnitTests {
     Write-Host "::group::Deterministic unit tests"
     Write-AgentEvent 'unit_tests_start' 'Harness running deterministic unit tests before verification agent.' @{ phase = 'verification'; project = $testProject; trx = $trxPath }
 
+    # Native stdout is part of a PowerShell function's success output stream. If
+    # left there, callers assigning this function's return value capture the
+    # dotnet log lines plus the final verdict object, turning $observed into an
+    # array. Relay stdout through Write-Host so the function returns exactly the
+    # structured verdict object below.
     & dotnet test $testProject `
         -c Debug `
         --logger "trx;LogFileName=$trxFileName" `
         --results-directory $ValidationArtifactDir `
-        "-p:Sts2DataDir=$sts2DataDir"
+        "-p:Sts2DataDir=$sts2DataDir" |
+        ForEach-Object { Write-Host $_ }
     $testExitCode = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
 
     # --results-directory normally lands the TRX exactly at $trxPath, but be
@@ -1457,7 +1463,6 @@ if (Test-Path -LiteralPath $resultMarkdown) {
 }
 
 Write-AgentEvent 'exit' 'Phased run script completed.'
-
 
 
 
