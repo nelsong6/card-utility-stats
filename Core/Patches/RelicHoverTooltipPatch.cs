@@ -77,6 +77,17 @@ public static class RelicHoverShowPatch
                 StatsTooltip.Show(tree, __instance, "Orichalcum", "SpireLens", body);
                 return;
             }
+
+            if (relicNode.Model is TheAbacus)
+            {
+                const string relicId = "RELIC.THE_ABACUS";
+                var agg = RunTracker.GetRelicAggregate(relicId);
+                if (agg == null || agg.AdditionalBlockGained == 0) return;
+
+                var body = BuildTheAbacusBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "The Abacus", "SpireLens", body);
+                return;
+            }
         }
         catch (Exception e)
         {
@@ -107,6 +118,13 @@ public static class RelicHoverShowPatch
     }
 
     private static string BuildOrichalcumBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildTheAbacusBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
