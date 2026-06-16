@@ -8,6 +8,13 @@ param(
     [string]$IssueNumber,
     [Parameter(Mandatory = $true)]
     [string]$RepoSlug,
+    # Staged copy of the git_ref harness (.github\scripts\* + .mcp.json). The
+    # grader scripts and MCP template are read from HERE, never from RepoRoot,
+    # so git_ref controls the harness independently of the feature branch.
+    [Parameter(Mandatory = $true)]
+    [string]$HarnessRoot,
+    # Feature-branch checkout: the CODE UNDER TEST only (Core/, Tests/, ...).
+    # Passed onward to run-phases.ps1 / prepare-scenario.ps1 as their RepoRoot.
     [Parameter(Mandatory = $true)]
     [string]$RepoRoot,
     [string]$GitHubToken
@@ -15,6 +22,11 @@ param(
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 3.0
+
+# Pure resolver for the harness file layout (scripts + .mcp.json) under
+# HarnessRoot. Sourced as a sibling from $PSScriptRoot so the path logic has a
+# single, Pester-tested definition rather than being inlined here.
+. (Join-Path $PSScriptRoot 'lib' 'HarnessPaths.ps1')
 
 function Add-PathCandidate {
     param(
@@ -49,13 +61,15 @@ function Resolve-ClaudeCliPath {
 }
 
 function Resolve-Sts2GameDir {
-    param([string]$RepoRoot)
+    # .mcp.json is HARNESS content (git_ref), so the STS2_GAME_DIR default is
+    # read from the staged harness, not the feature-branch checkout.
+    param([string]$HarnessRoot)
 
     $gameDirCandidates = [System.Collections.Generic.List[string]]::new()
     Add-PathCandidate $gameDirCandidates $env:SPIRELENS_HOST_STS2_GAME_DIR
     Add-PathCandidate $gameDirCandidates $env:CONFIGURED_STS2_GAME_DIR
 
-    $mcpConfigPath = Join-Path $RepoRoot '.mcp.json'
+    $mcpConfigPath = (Resolve-HarnessPaths -HarnessRoot $HarnessRoot).McpConfigPath
     if (Test-Path -LiteralPath $mcpConfigPath) {
         try {
             $mcpConfig = Get-Content -LiteralPath $mcpConfigPath -Raw | ConvertFrom-Json
@@ -83,12 +97,13 @@ function Resolve-Sts2GameDir {
 
 function New-NativeMcpConfig {
     param(
-        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        # .mcp.json template is HARNESS content (git_ref), not feature-branch.
+        [Parameter(Mandatory = $true)][string]$HarnessRoot,
         [Parameter(Mandatory = $true)][string]$GameDir,
         [Parameter(Mandatory = $true)][string]$WorkingDir
     )
 
-    $sourceMcpConfigPath = Join-Path $RepoRoot '.mcp.json'
+    $sourceMcpConfigPath = (Resolve-HarnessPaths -HarnessRoot $HarnessRoot).McpConfigPath
     if (-not (Test-Path -LiteralPath $sourceMcpConfigPath)) {
         throw "MCP config template was not found at '$sourceMcpConfigPath'."
     }
@@ -134,9 +149,14 @@ function Invoke-CheckedPwshFile {
 if (-not (Test-Path -LiteralPath $RepoRoot)) {
     throw "Repository checkout was not found at '$RepoRoot'."
 }
+if (-not (Test-Path -LiteralPath $HarnessRoot)) {
+    throw "Staged harness was not found at '$HarnessRoot'."
+}
 if ([string]::IsNullOrWhiteSpace($env:GLIMMUNG_WORKING_DIR)) {
     throw 'GLIMMUNG_WORKING_DIR is not set.'
 }
+
+$harness = Resolve-HarnessPaths -HarnessRoot $HarnessRoot
 
 $workingDir = $env:GLIMMUNG_WORKING_DIR
 $artifactDir = Join-Path $workingDir 'sts2-artifacts'
@@ -144,10 +164,10 @@ $screenshotDir = Join-Path $workingDir 'sts2-screenshots'
 $logDir = Join-Path $workingDir 'logs'
 New-Item -ItemType Directory -Force -Path $artifactDir, $screenshotDir, $logDir | Out-Null
 
-$gameDir = Resolve-Sts2GameDir -RepoRoot $RepoRoot
+$gameDir = Resolve-Sts2GameDir -HarnessRoot $HarnessRoot
 $env:SPIRELENS_HOST_STS2_GAME_DIR = $gameDir
 $env:SPIRELENS_HOST_STS2_DATA_DIR = Join-Path $gameDir 'data_sts2_windows_x86_64'
-$mcpConfigPath = New-NativeMcpConfig -RepoRoot $RepoRoot -GameDir $gameDir -WorkingDir $workingDir
+$mcpConfigPath = New-NativeMcpConfig -HarnessRoot $HarnessRoot -GameDir $gameDir -WorkingDir $workingDir
 $env:SPIRELENS_HOST_MCP_CONFIG_PATH = $mcpConfigPath
 
 if (-not [string]::IsNullOrWhiteSpace($GitHubToken)) {
@@ -159,7 +179,10 @@ switch ($Mode) {
         if ([string]::IsNullOrWhiteSpace($PhaseName)) {
             throw 'PhaseName is required when Mode=run_phase.'
         }
-        $runPhasesPath = Join-Path $RepoRoot '.github\scripts\run-phases.ps1'
+        # run-phases.ps1 is HARNESS — run the git_ref-staged copy. It internally
+        # splits $PSScriptRoot (its own lib/, i.e. harness) from -RepoRoot (the
+        # code under test: Tests build, agent --add-dir / working dir).
+        $runPhasesPath = $harness.RunPhasesPath
         $claudePath = Resolve-ClaudeCliPath
         Invoke-CheckedPwshFile -ScriptPath $runPhasesPath -Arguments @(
             '-PhaseName', $PhaseName,
@@ -176,10 +199,14 @@ switch ($Mode) {
         )
     }
     'prepare_scenario' {
-        $prepareScenarioPath = Join-Path $RepoRoot '.github\scripts\prepare-scenario.ps1'
+        # prepare-scenario.ps1 is HARNESS — run the git_ref-staged copy, and pass
+        # it -HarnessRoot so it sources its sibling restart-sts2.ps1 from the
+        # harness too. -RepoRoot stays the code-under-test checkout.
+        $prepareScenarioPath = $harness.PrepareScenarioPath
         Invoke-CheckedPwshFile -ScriptPath $prepareScenarioPath -Arguments @(
             '-TestPlanPath', (Join-Path $artifactDir 'test-plan.json'),
             '-McpConfigPath', $mcpConfigPath,
+            '-HarnessRoot', $HarnessRoot,
             '-RepoRoot', $RepoRoot,
             '-ValidationArtifactDir', $artifactDir,
             '-IssueNumber', $IssueNumber

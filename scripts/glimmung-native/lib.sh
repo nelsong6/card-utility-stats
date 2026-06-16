@@ -594,6 +594,69 @@ native_scp_pull() {
   scp $(native_ssh_args) "$(native_ssh_user)@${host_ip}:${remote}" "$local_path"
 }
 
+# native_stage_harness <host-ip>
+# Stage THIS run's git_ref verification harness onto the laptop, under a clean
+# per-run dir, and echo its Windows path on stdout.
+#
+# The harness (the grader) is .github/scripts/* (all the .ps1 + lib/) plus the
+# repo-root .mcp.json. It MUST come from the workflow's git_ref (the pod's
+# /workspace/spirelens checkout), NOT from the feature-branch checkout the
+# laptop's D:\repos\SpireLens holds (that is the code under test). Staging from
+# the pod's checkout is what makes git_ref — not the agent's branch — control
+# which harness runs every laptop phase.
+#
+# The pod's repo root is <lib.sh dir>/../.. (same derivation as
+# native_sync_host_checkout's cluster_root). We mirror the repo layout into the
+# staged dir so native-runtime.ps1's -HarnessRoot resolves
+# <harness>\.mcp.json and <harness>\.github\scripts\... unchanged:
+#   C:\glimmung-runs\<run-ref>\harness\.mcp.json
+#   C:\glimmung-runs\<run-ref>\harness\.github\scripts\...
+#
+# The push direction mirrors native_scp_pull / native_ssh_args; -r carries the
+# scripts directory tree. The dir is wiped first so a prior run's harness can
+# never bleed into this one.
+native_stage_harness() {
+  local host_ip="$1"
+  local pod_root scripts_dir mcp_json
+  pod_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+  scripts_dir="${pod_root}/.github/scripts"
+  mcp_json="${pod_root}/.mcp.json"
+
+  if [ ! -d "$scripts_dir" ]; then
+    echo "native_stage_harness: harness scripts dir not found at ${scripts_dir}" >&2
+    return 1
+  fi
+  if [ ! -f "$mcp_json" ]; then
+    echo "native_stage_harness: harness .mcp.json not found at ${mcp_json}" >&2
+    return 1
+  fi
+
+  local harness_win="C:\\glimmung-runs\\${GLIMMUNG_RUN_REF}\\harness"
+  local harness_fwd="C:/glimmung-runs/${GLIMMUNG_RUN_REF}/harness"
+
+  # Only the resolved harness path goes to stdout (callers capture it with
+  # $(...)), so route the SSH/scp chatter to stderr — same discipline as
+  # native_connect_host.
+  #
+  # Reset the staged dir, then recreate the .github parent so `scp -r
+  # scripts_dir .../.github/` lands the tree as .github\scripts.
+  native_ssh_run "$host_ip" >&2 <<PWSH
+\$ErrorActionPreference = 'Stop'
+\$harness = '${harness_win}'
+if (Test-Path -LiteralPath \$harness) {
+  Remove-Item -LiteralPath \$harness -Recurse -Force
+}
+New-Item -ItemType Directory -Force -Path (Join-Path \$harness '.github') | Out-Null
+PWSH
+
+  # shellcheck disable=SC2046
+  scp $(native_ssh_args) "$mcp_json" "$(native_ssh_user)@${host_ip}:${harness_fwd}/.mcp.json" >&2
+  # shellcheck disable=SC2046
+  scp -r $(native_ssh_args) "$scripts_dir" "$(native_ssh_user)@${host_ip}:${harness_fwd}/.github/" >&2
+
+  printf '%s' "$harness_win"
+}
+
 # ---------------------------------------------------------------------
 # Convenience: SA-keypair generation (per-run, never cached)
 # ---------------------------------------------------------------------
