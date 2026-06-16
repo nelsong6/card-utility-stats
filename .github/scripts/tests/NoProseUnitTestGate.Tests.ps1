@@ -114,3 +114,24 @@ Describe 'deterministic unit-test gate is present (the replacement path exists)'
             Should -BeTrue -Because 'the agent self-report must not own the unit-test verdict'
     }
 }
+
+Describe 'implementation prompt protects live tooltip attribution' {
+    It 'requires the runtime primer before card or relic attribution hook changes' {
+        ($script:Source -match 'docs/sts2-runtime-primer\.md') |
+            Should -BeTrue -Because 'agents changing card/relic hooks need the documented STS2 async/runtime model'
+    }
+
+    It 'warns against same-method postfix cleanup for async attribution windows' {
+        ($script:Source -match 'do not arm an attribution flag in a prefix and clear it in the same method''s postfix') |
+            Should -BeTrue -Because 'async relic effects can mutate resources after the patched method returns'
+        ($script:Source -match 'Hook\.AfterTurnEnd') |
+            Should -BeTrue -Because 'the prompt should point agents at the existing later-boundary cleanup pattern'
+    }
+
+    It 'requires tooltip-visible stats to read live pending combat data and render literal label/value text' {
+        ($script:Source -match 'pending combat data') |
+            Should -BeTrue -Because 'verification screenshots happen mid-combat before CombatEnded promotion'
+        ($script:Source -match 'Energy generated: 1') |
+            Should -BeTrue -Because 'visible screenshot evidence needs a literal label/value string, not only a hidden aggregate'
+    }
+}
