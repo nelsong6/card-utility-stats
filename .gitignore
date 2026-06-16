@@ -11,6 +11,7 @@ packages/
 .editorconfig
 *.user
 Directory.Build.props
+.env.local
 .terraform/
 *.tfstate
 *.tfstate.*
