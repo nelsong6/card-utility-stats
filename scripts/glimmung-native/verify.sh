@@ -37,12 +37,12 @@ native_require_env GLIMMUNG_RUN_ID GLIMMUNG_RUN_REF GLIMMUNG_ISSUE_NUMBER GLIMMU
 # This phase's pod has none of env-prep's connection state; establish our own.
 HOST_IP="$(native_connect_host)" || native_emit_abort "host_unavailable"
 
-# Stage the git_ref verification harness (.github/scripts/* + .mcp.json) onto
-# the laptop, distinct from D:\repos\SpireLens (the feature-branch code under
-# test). The laptop phases below run the harness from HERE so git_ref — not the
-# agent's branch — controls the grader. Each managed step runs in its own pod,
-# so this top-level staging runs per step (idempotent: it wipes + re-copies).
-HARNESS_ROOT="$(native_stage_harness "$HOST_IP")" || native_emit_abort "harness_stage_failed"
+# The git_ref verification harness (.github/scripts/* + .mcp.json) is staged onto
+# the laptop only inside the steps that actually run it (prepare-scenario and
+# run-verification), distinct from D:\repos\SpireLens (the feature-branch code
+# under test). Staging it there rather than top-level keeps the steps that never
+# invoke the grader — build-and-deploy, collect-evidence, upload-screenshots,
+# emit-verification — from depending on it or failing on a stage error.
 
 build_and_deploy_mod() {
   local gh_token_b64
@@ -79,8 +79,9 @@ PWSH
 }
 
 prepare_scenario() {
-  local repo_slug
+  local repo_slug HARNESS_ROOT
   repo_slug="$(native_issue_repo)"
+  HARNESS_ROOT="$(native_stage_harness "$HOST_IP")" || native_emit_abort "harness_stage_failed"
   native_ssh_run "$HOST_IP" <<PWSH
 \$ErrorActionPreference = 'Stop'
 \$env:GLIMMUNG_RUN_ID = '${GLIMMUNG_RUN_ID}'
@@ -101,9 +102,10 @@ PWSH
 }
 
 run_verification() {
-  local gh_token_b64 repo_slug
+  local gh_token_b64 repo_slug HARNESS_ROOT
   gh_token_b64="$(native_github_token_b64)"
   repo_slug="$(native_issue_repo)"
+  HARNESS_ROOT="$(native_stage_harness "$HOST_IP")" || native_emit_abort "harness_stage_failed"
   native_ssh_run "$HOST_IP" <<PWSH
 \$ErrorActionPreference = 'Stop'
 \$ghToken = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${gh_token_b64}'))

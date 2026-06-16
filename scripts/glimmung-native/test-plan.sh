@@ -20,16 +20,16 @@ native_require_env GLIMMUNG_RUN_ID GLIMMUNG_RUN_REF GLIMMUNG_ISSUE_NUMBER
 # resolve the tagged host IP.
 HOST_IP="$(native_connect_host)" || native_emit_abort "host_unavailable"
 
-# Stage the git_ref verification harness (.github/scripts/* + .mcp.json) so the
-# laptop runs the grader from git_ref. test_plan does not check out a feature
-# branch, so the harness was only incidentally git_ref before; staging makes it
-# explicit and uniform with the other laptop phases.
-HARNESS_ROOT="$(native_stage_harness "$HOST_IP")" || native_emit_abort "harness_stage_failed"
+# The git_ref harness is staged inside run_test_plan (the only step that invokes
+# the grader), not top-level, so collect-test-plan never depends on it. test_plan
+# does not check out a feature branch, so the harness was only incidentally
+# git_ref before; staging makes it explicit and uniform with the other phases.
 
 run_test_plan() {
-  local gh_token_b64 repo_slug
+  local gh_token_b64 repo_slug HARNESS_ROOT
   gh_token_b64="$(native_github_token_b64)"
   repo_slug="$(native_issue_repo)"
+  HARNESS_ROOT="$(native_stage_harness "$HOST_IP")" || native_emit_abort "harness_stage_failed"
   native_ssh_run "$HOST_IP" <<PWSH
 \$ErrorActionPreference = 'Stop'
 \$ghToken = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${gh_token_b64}'))
