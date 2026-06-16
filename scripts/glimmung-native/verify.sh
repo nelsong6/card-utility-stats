@@ -151,10 +151,14 @@ upload_screenshots() {
   # rollout is symmetric.
   : "${AGENT_SCREENSHOT_STORAGE_ACCOUNT:?missing}"
   : "${AGENT_SCREENSHOT_CONTAINER:?missing}"
-  local prefix="spirelens/${GLIMMUNG_RUN_REF}/sts2-screenshots"
+  : "${GLIMMUNG_PROJECT:?missing}"
+  : "${GLIMMUNG_RUN_ID:?missing}"
+  local prefix="runs/${GLIMMUNG_PROJECT}/${GLIMMUNG_RUN_ID}/screenshots"
   local shots="${GLIMMUNG_WORKING_DIR}/artifacts/sts2-screenshots"
+  local refs_file="${GLIMMUNG_WORKING_DIR}/artifacts/uploaded-screenshot-refs.json"
   if [ ! -d "$shots" ]; then
     echo "no screenshots to upload"
+    printf '[]\n' >"$refs_file"
     return 0
   fi
   # TEMPORARY scaffolding — retired by glimmung's evidence_upload managed
@@ -176,10 +180,26 @@ upload_screenshots() {
     --source "$shots" \
     --auth-mode login \
     --overwrite true
+
+  find "$shots" -type f -print | sort | while IFS= read -r file; do
+    rel="${file#"$shots"/}"
+    printf '%s/%s\n' "$prefix" "$rel"
+  done | jq -R . | jq -s . >"$refs_file"
 }
 
 emit_verification() {
-  native_emit_json_output verification "${GLIMMUNG_WORKING_DIR}/artifacts/verification.json"
+  local verification="${GLIMMUNG_WORKING_DIR}/artifacts/verification.json"
+  local refs_file="${GLIMMUNG_WORKING_DIR}/artifacts/uploaded-screenshot-refs.json"
+  if [ -s "$refs_file" ]; then
+    local tmp
+    tmp="$(mktemp)"
+    jq --slurpfile refs "$refs_file" '
+      .evidence_refs = (((.evidence_refs // []) + $refs[0]) | unique)
+      | .evidence = (((.evidence // []) + ($refs[0] | map({kind:"screenshot", ref:.}))) | unique_by(.kind + "\u0000" + .ref))
+    ' "$verification" >"$tmp"
+    mv "$tmp" "$verification"
+  fi
+  native_emit_json_output verification "$verification"
 }
 
 native_run_selected_step \
