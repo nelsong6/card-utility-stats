@@ -5,6 +5,7 @@ using HarmonyLib;
 using MegaCrit.Sts2.Core.Models.Relics;
 using MegaCrit.Sts2.Core.Nodes.Relics;
 
+
 namespace SpireLens.Core.Patches;
 
 /// <summary>
@@ -17,6 +18,7 @@ public static class RelicHoverShowPatch
     private const string VulnerableIconPath = "res://images/atlases/power_atlas.sprites/vulnerable_power.tres";
     private const string WeakIconPath = "res://images/atlases/power_atlas.sprites/weak_power.tres";
     private const string BlockIconPath = "res://images/ui/combat/block.png";
+    private const string EnergyIconPath = "res://images/atlases/potion_atlas.sprites/energy_potion.tres";
     private const int InlineIconSize = 16;
 
     [HarmonyPostfix]
@@ -88,6 +90,17 @@ public static class RelicHoverShowPatch
                 StatsTooltip.Show(tree, __instance, "The Abacus", "SpireLens", body);
                 return;
             }
+
+            if (relicNode.Model is HappyFlower)
+            {
+                const string relicId = "RELIC.HAPPY_FLOWER";
+                var agg = RunTracker.GetRelicAggregate(relicId);
+                if (agg == null || agg.EnergyGenerated == 0) return;
+
+                var body = BuildHappyFlowerBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Happy Flower", "SpireLens", body);
+                return;
+            }
         }
         catch (Exception e)
         {
@@ -131,6 +144,13 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
+    private static string BuildHappyFlowerBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, EnergyLabel("Energy generated"), agg.EnergyGenerated.ToString(), "");
+        return sb.ToString();
+    }
+
     private static string VulnerableLabel(string suffix)
     {
         var path = NormalizeResourcePath(VulnerableIconPath);
@@ -146,6 +166,12 @@ public static class RelicHoverShowPatch
     private static string BlockLabel(string suffix)
     {
         var path = NormalizeResourcePath(BlockIconPath);
+        return $"[img={InlineIconSize}x{InlineIconSize}]{path}[/img] {suffix}";
+    }
+
+    private static string EnergyLabel(string suffix)
+    {
+        var path = NormalizeResourcePath(EnergyIconPath);
         return $"[img={InlineIconSize}x{InlineIconSize}]{path}[/img] {suffix}";
     }
 
