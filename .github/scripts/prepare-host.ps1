@@ -179,9 +179,15 @@ Set-NativeEnvironmentValue -Name 'SPIRELENS_HOST_MCP_CONFIG_PATH' -Value $jobMcp
 if (-not $InstallMcp) { return }
 
 $mcpRoot = 'D:\repos\spire-lens-mcp'
-$mcpRepo = 'https://github.com/nelsong6/spire-lens-mcp.git'
+$mcpRepo = 'https://github.com/romaine-life/spire-lens-mcp.git'
 
 if (Test-Path -LiteralPath (Join-Path $mcpRoot '.git')) {
+    # The repo was transferred nelsong6 -> romaine-life. Existing laptop
+    # checkouts still have origin pointed at the old slug (GitHub redirects it,
+    # but don't rely on that); re-point origin to the canonical URL first.
+    Invoke-LoggedStep -Name 'repoint origin (spire-lens-mcp)' -Body {
+        git -C $mcpRoot remote set-url origin $mcpRepo
+    }
     Invoke-LoggedStep -Name 'git fetch spire-lens-mcp' -Body {
         git -C $mcpRoot fetch --prune origin main
     }
