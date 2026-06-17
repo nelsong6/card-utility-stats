@@ -29,7 +29,11 @@ public static class PlayerGainEnergyPatch
         try
         {
             int gained = __instance.Energy - __state;
-            if (gained > 0) RunTracker.RecordEnergyGained(__instance, gained);
+            if (gained > 0)
+            {
+                RunTracker.RecordEnergyGained(__instance, gained);
+                RunTracker.RecordHappyFlowerEnergyGained(gained);
+            }
         }
         catch (Exception e)
         {

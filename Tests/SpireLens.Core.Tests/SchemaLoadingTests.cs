@@ -458,4 +458,26 @@ public class SchemaLoadingTests
         Assert.Equal(12, resumed!.RelicAggregates["RELIC.ORICHALCUM"].AdditionalBlockGained);
         Assert.Equal(6, resumed.RelicAggregates["RELIC.POCKETWATCH"].AdditionalCardsDrawn);
     }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsV19Fixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("v19-happy-flower-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.HAPPY_FLOWER"];
+        Assert.Equal(3, relicAgg.EnergyGenerated);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsV19Fixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v19-happy-flower-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.HAPPY_FLOWER"];
+        Assert.Equal(3, relicAgg.EnergyGenerated);
+    }
 }
