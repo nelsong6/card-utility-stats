@@ -24,7 +24,7 @@ llm-work        depends_on: prepare           jobs: test-plan + implement
                                               outputs: test_plan, implementation,
                                                        branch_name
 llm-verify      depends_on: llm-work          verify: true
-                                              outputs: verification
+                                              completion: verification
                                               recycle_policy: 1 attempt on
                                               [verify_fail, verify_malformed],
                                               lands_at=prepare
@@ -88,13 +88,15 @@ pushes the run-scoped `glimmung/<run_id>` branch with the per-run GitHub token.
   pass, it invokes the agent for live-MCP + screenshot evidence only, then
   stamps the observed `unit_tests` block into `verification.json`
   authoritatively (the agent neither runs nor judges unit tests, and its
-  self-report cannot override the observed result). The earlier design — where
+  self-report cannot override the observed result). The earlier design, where
   the agent ran `dotnet test` and the harness inferred pass/fail by
-  regex-scanning the agent's prose — is retired end to end.
-- `collect-evidence` — scp `verification.json` + screenshots back to the pod.
-- `upload-screenshots` — pushes screenshots to `romaineglimmungartifacts`.
-- `emit-verification` — emits the `verification` phase output that the llm-verify
-  phase's own recycle policy evaluates (ADVANCE / RETRY / ABORT).
+  regex-scanning the agent's prose, is retired end to end.
+- `collect-evidence` — scp `verification.json` + screenshots back to the pod
+  under `artifacts/verification.json` and `artifacts/screenshots/`.
+- `finalize-verification` — Glimmung-owned `verification_finalize` primitive
+  that uploads evidence to the run-owned artifact prefix and writes the typed
+  `verification` completion payload. The repo script must not emit
+  `verification` as a phase output.
 
 ### cleanup_early, touchpoint, touchpoint_gate, cleanup_final
 These reuse Glimmung's native primitives directly. See ambience's registered

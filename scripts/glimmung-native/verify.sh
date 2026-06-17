@@ -13,17 +13,10 @@
 #     writes verification.json + a screenshot directory.
 #
 # The screenshot directory and verification.json are scp'd back to
-# the orchestrator pod. Screenshots are then uploaded to the shared
-# romaineglimmungartifacts storage account via the pod's federated
-# workload identity (no per-project blob storage — that's been
-# retired alongside this migration; see the deleted
-# opentofu-screenshot-storage workflow).
-#
-# This is the verify-loop's verdict-emitting phase: it emits the
-# `verification` phase output, and the llm-verify phase's own recycle
-# policy (on [verify_fail, verify_malformed], lands_at=prepare) decides
-# ADVANCE / RETRY / ABORT. Verification phases own their verdict — there
-# is no separate downstream gate phase.
+# conventional artifact paths in the orchestrator pod. The Glimmung-owned
+# verification_finalize step uploads those artifacts and writes the typed
+# `verification` completion payload that the llm-verify recycle policy
+# evaluates.
 
 set -Eeuo pipefail
 
@@ -41,8 +34,8 @@ HOST_IP="$(native_connect_host)" || native_emit_abort "host_unavailable"
 # the laptop only inside the steps that actually run it (prepare-scenario and
 # run-verification), distinct from D:\repos\SpireLens (the feature-branch code
 # under test). Staging it there rather than top-level keeps the steps that never
-# invoke the grader — build-and-deploy, collect-evidence, upload-screenshots,
-# emit-verification — from depending on it or failing on a stage error.
+# invoke the grader, build-and-deploy and collect-evidence, from depending on
+# it or failing on a stage error.
 
 build_and_deploy_mod() {
   local gh_token_b64
@@ -131,81 +124,37 @@ PWSH
 
 collect_evidence() {
   local artifacts="${GLIMMUNG_WORKING_DIR}/artifacts"
+  local screenshots="${artifacts}/screenshots"
   mkdir -p "$artifacts"
   native_scp_pull "$HOST_IP" \
     "C:/glimmung-runs/${GLIMMUNG_RUN_REF}/sts2-artifacts/verification.json" \
     "${artifacts}/verification.json"
-  # Mirror the screenshots directory back. -r so the directory
-  # tree comes with it.
-  # shellcheck disable=SC2046
-  scp -r $(native_ssh_args) \
-    "$(native_ssh_user)@${HOST_IP}:C:/glimmung-runs/${GLIMMUNG_RUN_REF}/sts2-screenshots" \
-    "${artifacts}/" || true
-}
 
-upload_screenshots() {
-  # Uses the orchestrator pod's federated workload identity to push
-  # screenshots into the shared romaineglimmungartifacts blob
-  # container under a per-run prefix. ambience's verify.sh uses the
-  # same env contract — re-using it here so the operator-side
-  # rollout is symmetric.
-  : "${AGENT_SCREENSHOT_STORAGE_ACCOUNT:?missing}"
-  : "${AGENT_SCREENSHOT_CONTAINER:?missing}"
-  : "${GLIMMUNG_PROJECT:?missing}"
-  : "${GLIMMUNG_RUN_ID:?missing}"
-  local prefix="runs/${GLIMMUNG_PROJECT}/${GLIMMUNG_RUN_ID}/screenshots"
-  local shots="${GLIMMUNG_WORKING_DIR}/artifacts/sts2-screenshots"
-  local refs_file="${GLIMMUNG_WORKING_DIR}/artifacts/uploaded-screenshot-refs.json"
-  if [ ! -d "$shots" ]; then
-    echo "no screenshots to upload"
-    printf '[]\n' >"$refs_file"
-    return 0
+  rm -rf "$screenshots"
+  local screenshot_status=0
+  if native_ssh_run "$HOST_IP" <<PWSH
+if (Test-Path -LiteralPath 'C:/glimmung-runs/${GLIMMUNG_RUN_REF}/sts2-screenshots' -PathType Container) { exit 0 }
+exit 3
+PWSH
+  then
+    # Mirror the screenshots directory back under the finalizer's conventional
+    # local path. -r so the directory tree comes with it.
+    # shellcheck disable=SC2046
+    scp -r $(native_ssh_args) \
+      "$(native_ssh_user)@${HOST_IP}:C:/glimmung-runs/${GLIMMUNG_RUN_REF}/sts2-screenshots" \
+      "$screenshots"
+  else
+    screenshot_status=$?
+    if [ "$screenshot_status" -ne 3 ]; then
+      return "$screenshot_status"
+    fi
+    echo "no screenshot directory produced"
+    mkdir -p "$screenshots"
   fi
-  # TEMPORARY scaffolding — retired by glimmung's evidence_upload managed
-  # primitive (docs/design/evidence-upload-primitive.md). The pod carries a
-  # projected workload-identity token, but the az CLI does not consume it the
-  # way the SDK credential chain does; --auth-mode login needs an explicit
-  # federated login first. Unguarded on purpose: the token is a platform
-  # invariant (the runner pod is always labeled azure.workload.identity/use),
-  # so a missing AZURE_* here is a broken platform and this fails loudly.
-  az login --service-principal \
-    --username "$AZURE_CLIENT_ID" \
-    --tenant "$AZURE_TENANT_ID" \
-    --federated-token "$(cat "$AZURE_FEDERATED_TOKEN_FILE")" \
-    --allow-no-subscriptions >/dev/null
-  az storage blob upload-batch \
-    --account-name "$AGENT_SCREENSHOT_STORAGE_ACCOUNT" \
-    --destination "$AGENT_SCREENSHOT_CONTAINER" \
-    --destination-path "$prefix" \
-    --source "$shots" \
-    --auth-mode login \
-    --overwrite true
-
-  find "$shots" -type f -print | sort | while IFS= read -r file; do
-    rel="${file#"$shots"/}"
-    printf '%s/%s\n' "$prefix" "$rel"
-  done | jq -R . | jq -s . >"$refs_file"
-}
-
-emit_verification() {
-  local verification="${GLIMMUNG_WORKING_DIR}/artifacts/verification.json"
-  local refs_file="${GLIMMUNG_WORKING_DIR}/artifacts/uploaded-screenshot-refs.json"
-  if [ -s "$refs_file" ]; then
-    local tmp
-    tmp="$(mktemp)"
-    jq --slurpfile refs "$refs_file" '
-      .evidence_refs = (((.evidence_refs // []) + $refs[0]) | unique)
-      | .evidence = (((.evidence // []) + ($refs[0] | map({kind:"screenshot", ref:.}))) | unique_by(.kind + "\u0000" + .ref))
-    ' "$verification" >"$tmp"
-    mv "$tmp" "$verification"
-  fi
-  native_emit_json_output verification "$verification"
 }
 
 native_run_selected_step \
   build-and-deploy   build_and_deploy_mod \
   prepare-scenario   prepare_scenario \
   run-verification   run_verification \
-  collect-evidence   collect_evidence \
-  upload-screenshots upload_screenshots \
-  emit-verification  emit_verification
+  collect-evidence   collect_evidence
