@@ -137,6 +137,68 @@ native_emit_abort() {
   exit 0
 }
 
+native_managed_runner() {
+  # Glimmung's k8s_job runner sets GLIMMUNG_MANAGED_RUNNER=1 and provides a
+  # per-step GLIMMUNG_OUTPUT_FILE / GLIMMUNG_COMPLETION_FILE. Spirelens phases
+  # only ever run under that managed runner.
+  [ "${GLIMMUNG_MANAGED_RUNNER:-}" = "1" ]
+}
+
+native_completed() {
+  # Write a typed job completion to GLIMMUNG_COMPLETION_FILE. This is the
+  # contract the glimmung runner collects (collectCompletionMetadata): the
+  # top-level `verification` object becomes the run attempt's typed
+  # Verification — the source of truth the decision engine and review read,
+  # and from which glimmung synthesizes the verify phase's declared
+  # `verification` output.
+  #
+  # A verification verdict MUST flow through here. Glimmung rejects a verify
+  # phase that emits only a `verification` phase output and no typed completion
+  # (terminal observation verifier_contract_missing — see romaine-life/glimmung
+  # internal/store/store/postgres.go:terminalObservationForRun). Never route a
+  # verdict through native_emit_json_output.
+  #
+  # Mirrors ambience scripts/glimmung-native/lib.sh:native_completed (managed
+  # branch). Spirelens only runs under the managed runner, so the unmanaged
+  # callback POST path ambience also carries is intentionally absent here.
+  #
+  # Args (all optional):
+  #   1 outputs_json          phase-outputs object, appended to GLIMMUNG_OUTPUT_FILE
+  #   2 verification_json      typed verification object (status/reasons/evidence/...)
+  #   3 screenshots_markdown   review-report screenshots section
+  #   4 summary_markdown       review-report summary section
+  #   5 evidence_json          top-level evidence array
+  local outputs_json="${1:-null}"
+  local verification_json="${2:-null}"
+  local screenshots_markdown="${3:-}"
+  local summary_markdown="${4:-}"
+  local evidence_json="${5:-null}"
+  if ! native_managed_runner; then
+    echo "native_completed requires the glimmung managed runner (GLIMMUNG_MANAGED_RUNNER=1)" >&2
+    return 1
+  fi
+  if [ -z "${GLIMMUNG_COMPLETION_FILE:-}" ]; then
+    echo "native_completed: GLIMMUNG_COMPLETION_FILE is not set" >&2
+    return 1
+  fi
+  if [ "$outputs_json" != "null" ] && [ -n "${GLIMMUNG_OUTPUT_FILE:-}" ]; then
+    jq -c . <<<"$outputs_json" >>"$GLIMMUNG_OUTPUT_FILE"
+  fi
+  jq -nc \
+    --argjson verification "$verification_json" \
+    --arg screenshots "$screenshots_markdown" \
+    --arg summary "$summary_markdown" \
+    --argjson evidence "$evidence_json" \
+    '{
+      verification: $verification,
+      screenshots_markdown: $screenshots,
+      summary_markdown: $summary,
+      evidence: $evidence
+    }
+    | with_entries(select(.value != null and .value != ""))' \
+    >"$GLIMMUNG_COMPLETION_FILE"
+}
+
 native_mint_github_token() {
   # Glimmung's native launcher bakes a per-attempt callback URL into the pod.
   # Mint once per job pod and cache it under GLIMMUNG_WORKING_DIR so later

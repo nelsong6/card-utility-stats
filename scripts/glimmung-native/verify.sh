@@ -19,23 +19,19 @@
 # retired alongside this migration; see the deleted
 # opentofu-screenshot-storage workflow).
 #
-# This is the verify-loop's verdict-emitting phase: it emits the
-# `verification` phase output, and the llm-verify phase's own recycle
-# policy (on [verify_fail, verify_malformed], lands_at=prepare) decides
-# ADVANCE / RETRY / ABORT. Verification phases own their verdict — there
-# is no separate downstream gate phase.
+# This is the verify-loop's verdict-emitting phase: it writes the typed
+# `verification` job completion to GLIMMUNG_COMPLETION_FILE (the run
+# attempt's source-of-truth Verification, from which glimmung synthesizes
+# the declared `verification` phase output). The llm-verify phase's own
+# recycle policy (on [verify_fail, verify_malformed], lands_at=prepare)
+# decides ADVANCE / RETRY / ABORT. Verification phases own their verdict —
+# there is no separate downstream gate phase.
 
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib.sh
 source "${SCRIPT_DIR}/lib.sh"
-
-native_init
-native_require_env GLIMMUNG_RUN_ID GLIMMUNG_RUN_REF GLIMMUNG_ISSUE_NUMBER GLIMMUNG_INPUT_BRANCH_NAME
-
-# This phase's pod has none of env-prep's connection state; establish our own.
-HOST_IP="$(native_connect_host)" || native_emit_abort "host_unavailable"
 
 # The git_ref verification harness (.github/scripts/* + .mcp.json) is staged onto
 # the laptop only inside the steps that actually run it (prepare-scenario and
@@ -190,6 +186,19 @@ upload_screenshots() {
 emit_verification() {
   local verification="${GLIMMUNG_WORKING_DIR}/artifacts/verification.json"
   local refs_file="${GLIMMUNG_WORKING_DIR}/artifacts/uploaded-screenshot-refs.json"
+  if [ ! -s "$verification" ]; then
+    echo "emit_verification: verification artifact '$verification' is missing or empty" >&2
+    return 1
+  fi
+  if ! jq -e . "$verification" >/dev/null 2>&1; then
+    echo "emit_verification: verification artifact '$verification' is not valid JSON" >&2
+    return 1
+  fi
+  # Fold the uploaded STS2 screenshots into the verdict as durable evidence:
+  # evidence_refs + typed screenshot evidence entries live INSIDE the
+  # verification object so they ride the typed completion into the attempt's
+  # Verification.EvidenceRefs/Evidence, which review finalize persists as
+  # durable artifact evidence.
   if [ -s "$refs_file" ]; then
     local tmp
     tmp="$(mktemp)"
@@ -199,13 +208,30 @@ emit_verification() {
     ' "$verification" >"$tmp"
     mv "$tmp" "$verification"
   fi
-  native_emit_json_output verification "$verification"
+  # The verdict is the run's source of truth and MUST be a typed job completion,
+  # not a `verification` phase output. Glimmung rejects a verify phase that emits
+  # only the phase output (verifier_contract_missing) and synthesizes the
+  # declared `verification` output from this typed completion — so we write the
+  # completion and do not emit the phase output ourselves.
+  native_completed "null" "$(cat "$verification")" "" "" "null"
 }
 
-native_run_selected_step \
-  build-and-deploy   build_and_deploy_mod \
-  prepare-scenario   prepare_scenario \
-  run-verification   run_verification \
-  collect-evidence   collect_evidence \
-  upload-screenshots upload_screenshots \
-  emit-verification  emit_verification
+# Sourcing this file with SPIRELENS_VERIFY_SOURCE_ONLY=1 defines the step
+# functions without connecting to the laptop or dispatching a step, so the
+# native contract test can exercise emit_verification in isolation. Under the
+# managed runner (normal execution) this guard is a no-op.
+if [ "${SPIRELENS_VERIFY_SOURCE_ONLY:-}" != "1" ]; then
+  native_init
+  native_require_env GLIMMUNG_RUN_ID GLIMMUNG_RUN_REF GLIMMUNG_ISSUE_NUMBER GLIMMUNG_INPUT_BRANCH_NAME
+
+  # This phase's pod has none of env-prep's connection state; establish our own.
+  HOST_IP="$(native_connect_host)" || native_emit_abort "host_unavailable"
+
+  native_run_selected_step \
+    build-and-deploy   build_and_deploy_mod \
+    prepare-scenario   prepare_scenario \
+    run-verification   run_verification \
+    collect-evidence   collect_evidence \
+    upload-screenshots upload_screenshots \
+    emit-verification  emit_verification
+fi

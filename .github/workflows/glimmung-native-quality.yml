@@ -7,6 +7,7 @@ on:
       - 'scripts/glimmung-native/**'
       - 'docs/glimmung-workflow.md'
       - 'docs/laptop-host-setup.md'
+      - 'scripts/test-glimmung-native-contract.sh'
       - '.github/workflows/glimmung-native-quality.yml'
   push:
     branches: [main]
@@ -14,6 +15,7 @@ on:
       - 'scripts/glimmung-native/**'
       - 'docs/glimmung-workflow.md'
       - 'docs/laptop-host-setup.md'
+      - 'scripts/test-glimmung-native-contract.sh'
       - '.github/workflows/glimmung-native-quality.yml'
   workflow_dispatch:
 
@@ -34,6 +36,17 @@ jobs:
           while IFS= read -r script; do
             bash -n "$script"
           done < <(find scripts/glimmung-native -type f -name '*.sh' | sort)
+          bash -n scripts/test-glimmung-native-contract.sh
+
+      - name: Verify completion contract
+        run: |
+          set -Eeuo pipefail
+          # The verify phase must write a TYPED verification job completion to
+          # GLIMMUNG_COMPLETION_FILE (the run attempt's source-of-truth
+          # Verification). Glimmung rejects a verify phase that emits only a
+          # `verification` phase output (verifier_contract_missing); this guards
+          # against regressing to that retired path.
+          bash scripts/test-glimmung-native-contract.sh
 
       - name: Host checkout contract
         run: |
