@@ -480,4 +480,26 @@ public class SchemaLoadingTests
         var relicAgg = resumed!.RelicAggregates["RELIC.HAPPY_FLOWER"];
         Assert.Equal(3, relicAgg.EnergyGenerated);
     }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsV20Fixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("v20-cloak-clasp-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.CLOAK_CLASP"];
+        Assert.Equal(21, relicAgg.AdditionalBlockGained);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsV20Fixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v20-cloak-clasp-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.CLOAK_CLASP"];
+        Assert.Equal(21, relicAgg.AdditionalBlockGained);
+    }
 }

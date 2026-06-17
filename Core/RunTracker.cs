@@ -59,6 +59,7 @@ public static class RunTracker
     private static bool _pendingOrichalcumBlockAttribution;
     private static bool _pendingTheAbacusBlockAttribution;
     private static bool _pendingHappyFlowerEnergyAttribution;
+    private static bool _pendingCloakClaspBlockAttribution;
     private static bool _shivAvailableThisRun;
     private static CardModel? _shivDeckViewCard;
     private const decimal PoisonOwnershipEpsilon = 0.0001m;
@@ -625,6 +626,7 @@ public static class RunTracker
         _pendingOrichalcumBlockAttribution = false;
         _pendingTheAbacusBlockAttribution = false;
         _pendingHappyFlowerEnergyAttribution = false;
+        _pendingCloakClaspBlockAttribution = false;
         _pendingMakeItSoSummons.Clear();
     }
 
@@ -1284,6 +1286,7 @@ public static class RunTracker
     private const string OrichalcumRelicId = "RELIC.ORICHALCUM";
     private const string TheAbacusRelicId = "RELIC.THE_ABACUS";
     private const string HappyFlowerRelicId = "RELIC.HAPPY_FLOWER";
+    private const string CloakClaspRelicId = "RELIC.CLOAK_CLASP";
 
     /// <summary>
     /// Record a Bag of Marbles combat-start Vulnerable application.
@@ -1527,6 +1530,65 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordHappyFlowerEnergyGained failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Arm the flag that attributes player block gains to Cloak Clasp.
+    /// Called from <see cref="Patches.CloakClaspBeforeTurnEndPatch"/> when
+    /// Cloak Clasp's end-of-turn hook fires on the player's side.
+    /// The window stays open until <c>Hook.AfterTurnEnd</c> so that all
+    /// block grants from the relic (one per card in hand) are accumulated.
+    /// </summary>
+    public static void ArmCloakClaspBlockAttribution()
+    {
+        lock (_lock)
+        {
+            _pendingCloakClaspBlockAttribution = true;
+        }
+    }
+
+    /// <summary>
+    /// Clear the Cloak Clasp attribution window. Called at
+    /// <c>Hook.AfterTurnEnd</c> after the relic's block grants have resolved.
+    /// </summary>
+    public static void DisarmCloakClaspBlockAttribution()
+    {
+        lock (_lock)
+        {
+            _pendingCloakClaspBlockAttribution = false;
+        }
+    }
+
+    /// <summary>
+    /// Accumulate block gained from Cloak Clasp's end-of-turn effect. Called
+    /// from <see cref="Patches.HookAfterBlockGainedPatch"/> while the
+    /// attribution window is armed. Does NOT clear the flag so that multiple
+    /// <c>AfterBlockGained</c> calls (one per card in hand) are all captured.
+    /// The window is cleared at the <c>Hook.AfterTurnEnd</c> boundary.
+    /// </summary>
+    public static void RecordCloakClaspBlockGained(int amount)
+    {
+        if (amount <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_pendingCloakClaspBlockAttribution) return;
+
+                _pendingCombat ??= new PendingCombat();
+                if (!_pendingCombat.RelicAggregates.TryGetValue(CloakClaspRelicId, out var agg))
+                {
+                    agg = new RelicAggregate();
+                    _pendingCombat.RelicAggregates[CloakClaspRelicId] = agg;
+                }
+                agg.AdditionalBlockGained += amount;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordCloakClaspBlockGained failed: {e.Message}");
             }
         }
     }
