@@ -173,6 +173,7 @@ PWSH
 collect_evidence() {
   local artifacts="${GLIMMUNG_WORKING_DIR}/artifacts"
   local screenshots="${artifacts}/screenshots"
+  local evidence="${artifacts}/evidence"
   mkdir -p "$artifacts"
   native_scp_pull "$HOST_IP" \
     "C:/glimmung-runs/${GLIMMUNG_RUN_REF}/sts2-artifacts/verification.json" \
@@ -198,6 +199,43 @@ PWSH
     fi
     echo "no screenshot directory produced"
     mkdir -p "$screenshots"
+  fi
+
+  # Mirror the verifier's non-screenshot evidence into the finalizer's evidence/
+  # tree. The verification agent writes each live_mcp get_game_state proof to the
+  # artifact dir as live-mcp-<evidence_id>.json (run-phases.ps1). verification_finalize
+  # uploads screenshots/, videos/, and evidence/ to durable blob storage and folds
+  # the uploaded refs into the typed verification completion; without this, the
+  # live_mcp JSON survives only as a host path inside verification.json and is lost
+  # when the laptop goes away — it can never be replayed and is silently dropped at
+  # review. Stage the files into a host-side dir first (the SSH server's default
+  # shell does not reliably glob-expand an scp source pattern), then pull that tree
+  # exactly like the screenshots.
+  rm -rf "$evidence"
+  local evidence_status=0
+  if native_ssh_run "$HOST_IP" <<PWSH
+\$ErrorActionPreference = 'Stop'
+\$artifactDir = 'C:/glimmung-runs/${GLIMMUNG_RUN_REF}/sts2-artifacts'
+\$evidenceDir = 'C:/glimmung-runs/${GLIMMUNG_RUN_REF}/sts2-evidence'
+if (Test-Path -LiteralPath \$evidenceDir) { Remove-Item -LiteralPath \$evidenceDir -Recurse -Force }
+\$files = @(Get-ChildItem -LiteralPath \$artifactDir -Filter 'live-mcp-*.json' -File -ErrorAction SilentlyContinue)
+if (\$files.Count -eq 0) { exit 3 }
+New-Item -ItemType Directory -Force -Path \$evidenceDir | Out-Null
+foreach (\$f in \$files) { Copy-Item -LiteralPath \$f.FullName -Destination \$evidenceDir -Force }
+exit 0
+PWSH
+  then
+    # shellcheck disable=SC2046
+    scp -r $(native_ssh_args) \
+      "$(native_ssh_user)@${HOST_IP}:C:/glimmung-runs/${GLIMMUNG_RUN_REF}/sts2-evidence" \
+      "$evidence"
+  else
+    evidence_status=$?
+    if [ "$evidence_status" -ne 3 ]; then
+      return "$evidence_status"
+    fi
+    echo "no live_mcp evidence files produced"
+    mkdir -p "$evidence"
   fi
 }
 
