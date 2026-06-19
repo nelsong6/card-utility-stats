@@ -24,6 +24,13 @@ $DefaultPhaseBudgetUsd = '15.00'
 # replaced the retired prose scan.
 . (Join-Path $PSScriptRoot 'lib' 'UnitTestResult.ps1')
 
+# Pure evidence-contract binding rules (screenshot needle / live_mcp identity).
+# Same standalone-lib discipline as above: the verification guard and the
+# test-plan contract check both call these, and the Pester suite dot-sources the
+# real code. This is what removes the spirelens#147 free-text degree of freedom
+# (an internal id typed as a screenshot's expected_text) by construction.
+. (Join-Path $PSScriptRoot 'lib' 'EvidenceContract.ps1')
+
 $CatalogMcpTools = @(
     'mcp__spire-lens-mcp__lookup_card',
     'mcp__spire-lens-mcp__lookup_character',
@@ -639,6 +646,74 @@ $GuardNote
     return (Read-JsonFile -Path $JsonPath)
 }
 
+function New-ScenarioRefMaps {
+    # Flatten scenario_id_validation (cards + relics + encounters) into the
+    # case-insensitive lookup maps the pure evidence-binding rules need:
+    #   NameByRef : input/id -> catalog-resolved display name (for screenshot
+    #               entity-name needles via expected_text_ref)
+    #   IdByRef   : input/id -> resolved catalog id (for live_mcp identity via
+    #               target_id_ref)
+    #   CatalogIds: every resolved id as keys (to reject an id typed as a literal
+    #               screenshot expected_text)
+    # Each entry is keyed by BOTH its `input` and its resolved `id` so a ref can
+    # name either; in scenario_setup they are required to be equal anyway.
+    param([object]$ScenarioIdValidation)
+
+    $nameByRef = [System.Collections.Hashtable]::new([System.StringComparer]::OrdinalIgnoreCase)
+    $idByRef = [System.Collections.Hashtable]::new([System.StringComparer]::OrdinalIgnoreCase)
+    $catalogIds = [System.Collections.Hashtable]::new([System.StringComparer]::OrdinalIgnoreCase)
+
+    if ($null -eq $ScenarioIdValidation) {
+        return @{ NameByRef = $nameByRef; IdByRef = $idByRef; CatalogIds = $catalogIds }
+    }
+
+    foreach ($kind in @('cards', 'relics', 'encounters')) {
+        foreach ($entry in (ConvertTo-Array (Get-PropertyValue -Object $ScenarioIdValidation -Name $kind))) {
+            $inputRef = [string](Get-PropertyValue -Object $entry -Name 'input')
+            $id = [string](Get-PropertyValue -Object $entry -Name 'id')
+            $name = [string](Get-PropertyValue -Object $entry -Name 'name')
+            foreach ($key in @($inputRef, $id)) {
+                if ([string]::IsNullOrWhiteSpace($key)) { continue }
+                $k = $key.Trim()
+                if (-not [string]::IsNullOrWhiteSpace($name)) { $nameByRef[$k] = $name.Trim() }
+                if (-not [string]::IsNullOrWhiteSpace($id)) { $idByRef[$k] = $id.Trim() }
+            }
+            if (-not [string]::IsNullOrWhiteSpace($id)) { $catalogIds[$id.Trim()] = $true }
+        }
+    }
+
+    return @{ NameByRef = $nameByRef; IdByRef = $idByRef; CatalogIds = $catalogIds }
+}
+
+function Read-EvidenceArtifactText {
+    # Read the raw text of one or more evidence artifact files, resolving each
+    # path the way the verification agent might have written it: literal first,
+    # then relative to the validation-artifact dir, the screenshot dir, or the
+    # repo root. Returns the concatenated content of every file that resolved.
+    # Used by the live_mcp identity check to read the captured get_game_state
+    # JSON so id presence is confirmed against the actual artifact, not a
+    # self-asserted boolean.
+    param([string[]]$Paths)
+
+    $blobs = [System.Collections.Generic.List[string]]::new()
+    foreach ($path in @($Paths)) {
+        if ([string]::IsNullOrWhiteSpace($path)) { continue }
+        $candidates = @(
+            $path,
+            (Join-Path $ValidationArtifactDir $path),
+            (Join-Path $ScreenshotDir $path),
+            (Join-Path $RepoRoot $path)
+        )
+        foreach ($candidate in $candidates) {
+            if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+                $blobs.Add((Get-Content -LiteralPath $candidate -Raw))
+                break
+            }
+        }
+    }
+    return ($blobs -join "`n")
+}
+
 function Apply-VerificationEvidenceGuard {
     param([object]$Result, [string]$JsonPath, [string]$MarkdownPath)
 
@@ -651,6 +726,10 @@ function Apply-VerificationEvidenceGuard {
     }
 
     $testPlan = Read-JsonFile -Path $testPlanPath
+    # Authoritative binding source: the catalog ids/names the test plan resolved
+    # through MCP lookups. Screenshot entity-name needles and live_mcp identity
+    # ids are derived from these, never free-typed.
+    $refMaps = New-ScenarioRefMaps -ScenarioIdValidation (Get-PropertyValue -Object $testPlan -Name 'scenario_id_validation')
     # Wrap pipeline output in @(...) so .Count is safe under StrictMode when
     # Where-Object filters down to zero items (would otherwise return $null).
     $requiredEvidence = @(ConvertTo-Array (Get-PropertyValue -Object $testPlan -Name 'required_evidence') | Where-Object { (Get-PropertyValue -Object $_ -Name 'required') -ne $false })
@@ -708,7 +787,7 @@ function Apply-VerificationEvidenceGuard {
             }
 
             $mustShow = [string](Get-PropertyValue -Object $required -Name 'must_show')
-            $requiresText = (Get-PropertyValue -Object $required -Name 'text_visible_required') -eq $true -or $mustShow -match '(?i)tooltip|text|label|wording|string'
+            $requiresText = Test-EvidenceRequiresText -TextVisibleRequired (Get-PropertyValue -Object $required -Name 'text_visible_required') -MustShow $mustShow
             if ($requiresText) {
                 $textVisible = Get-PropertyValue -Object $evidenceResult -Name 'text_visible'
                 if ($textVisible -ne $true) {
@@ -718,23 +797,54 @@ function Apply-VerificationEvidenceGuard {
                 if ([string]::IsNullOrWhiteSpace($observedText)) {
                     return Set-VerificationGuardAbort -Result $Result -JsonPath $JsonPath -MarkdownPath $MarkdownPath -AbortReason 'target_evidence_missing' -GuardNote "Verification cannot pass because screenshot evidence '$id' must show text/tooltip content, but observed_text is empty."
                 }
-                # Hard equality check: when the test plan declares an
-                # expected_text, the observed_text the verification phase wrote
-                # must contain that string (case-insensitive) at an
-                # alphanumeric boundary so a needle ending in a digit can't
-                # accidentally match a longer number — `vigor gained: 8` must
-                # NOT match `vigor gained: 88` as a prefix substring (PR #170
-                # failure mode). Wrap the literal needle in non-alphanumeric
-                # boundaries: (?:^|non-alnum) before and (?:non-alnum|$) after.
+                # Bind the needle to an authoritative source before matching.
+                # The needle is the catalog-resolved display NAME (when the item
+                # uses expected_text_ref) or the literal computed VALUE (when it
+                # uses expected_text) — never an internal id. A malformed binding
+                # (both/neither, an id typed as a literal, or an unresolvable
+                # ref) is a contract violation, not a feature failure.
                 $expectedText = [string](Get-PropertyValue -Object $required -Name 'expected_text')
-                if (-not [string]::IsNullOrWhiteSpace($expectedText)) {
-                    $needle = $expectedText.Trim()
-                    $haystack = $observedText.Trim()
-                    $pattern = '(?:^|[^A-Za-z0-9])' + [regex]::Escape($needle) + '(?:[^A-Za-z0-9]|$)'
-                    if (-not [regex]::IsMatch($haystack, $pattern, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)) {
-                        return Set-VerificationGuardAbort -Result $Result -JsonPath $JsonPath -MarkdownPath $MarkdownPath -AbortReason 'claimed_result_not_observed' -GuardNote "Verification cannot pass because screenshot evidence '$id' has expected_text=`"$needle`" but observed_text=`"$haystack`" — the exact value the test plan said the test should produce was not present at an alphanumeric boundary in the screenshot the verifier captured."
-                    }
+                $expectedTextRef = [string](Get-PropertyValue -Object $required -Name 'expected_text_ref')
+                try {
+                    $needle = Resolve-ScreenshotNeedle -ExpectedText $expectedText -ExpectedTextRef $expectedTextRef -RefToName $refMaps.NameByRef -CatalogIds $refMaps.CatalogIds -ItemId $id
+                } catch {
+                    return Set-VerificationGuardAbort -Result $Result -JsonPath $JsonPath -MarkdownPath $MarkdownPath -AbortReason 'artifact_contract_missing' -GuardNote "Verification cannot pass because the test-plan evidence contract is malformed: $($_.Exception.Message)"
                 }
+                # Hard equality check: the observed_text the verification phase
+                # wrote must contain the resolved needle (case-insensitive) at an
+                # alphanumeric boundary so a needle ending in a digit can't
+                # accidentally match a longer number — `vigor gained: 8` must NOT
+                # match `vigor gained: 88` (PR #170 failure mode).
+                if (-not (Test-ExpectedTextMatch -ExpectedText $needle -ObservedText $observedText)) {
+                    $haystack = $observedText.Trim()
+                    return Set-VerificationGuardAbort -Result $Result -JsonPath $JsonPath -MarkdownPath $MarkdownPath -AbortReason 'claimed_result_not_observed' -GuardNote "Verification cannot pass because screenshot evidence '$id' requires on-screen text `"$needle`" but observed_text=`"$haystack`" — the exact value the test plan bound this screenshot to was not present at an alphanumeric boundary in the screenshot the verifier captured."
+                }
+            }
+        }
+        elseif ($kind -eq 'live_mcp') {
+            # Identity / presence is verified in the JSON channel: the resolved
+            # internal id must LITERALLY appear in the captured get_game_state
+            # JSON artifact. The agent's `passed=true` is not sufficient — that
+            # would just move the spirelens#147 free-text hole onto a
+            # self-asserted boolean. We resolve the id from scenario_id_validation
+            # (never free-typed), read the artifact the agent wrote, and confirm
+            # the id is there at id-token boundaries.
+            $targetIdRef = [string](Get-PropertyValue -Object $required -Name 'target_id_ref')
+            try {
+                $targetId = Resolve-LiveMcpTargetId -TargetIdRef $targetIdRef -RefToId $refMaps.IdByRef -ItemId $id
+            } catch {
+                return Set-VerificationGuardAbort -Result $Result -JsonPath $JsonPath -MarkdownPath $MarkdownPath -AbortReason 'artifact_contract_missing' -GuardNote "Verification cannot pass because the test-plan evidence contract is malformed: $($_.Exception.Message)"
+            }
+            $artifactPaths = @(ConvertTo-Array (Get-PropertyValue -Object $evidenceResult -Name 'artifact_paths'))
+            if ($artifactPaths.Count -eq 0) {
+                return Set-VerificationGuardAbort -Result $Result -JsonPath $JsonPath -MarkdownPath $MarkdownPath -AbortReason 'target_evidence_missing' -GuardNote "Verification cannot pass because live_mcp evidence '$id' has no artifact_paths; the captured get_game_state JSON proving id '$targetId' is present in the run is missing."
+            }
+            $gameStateJson = Read-EvidenceArtifactText -Paths $artifactPaths
+            if ([string]::IsNullOrWhiteSpace($gameStateJson)) {
+                return Set-VerificationGuardAbort -Result $Result -JsonPath $JsonPath -MarkdownPath $MarkdownPath -AbortReason 'target_evidence_missing' -GuardNote "Verification cannot pass because live_mcp evidence '$id' artifact_paths did not resolve to any readable get_game_state JSON file for id '$targetId'."
+            }
+            if (-not (Test-GameStateJsonContainsId -Json $gameStateJson -Id $targetId)) {
+                return Set-VerificationGuardAbort -Result $Result -JsonPath $JsonPath -MarkdownPath $MarkdownPath -AbortReason 'mcp_state_mismatch' -GuardNote "Verification cannot pass because the captured get_game_state JSON for live_mcp evidence '$id' does not contain the resolved id '$targetId' at an id-token boundary — identity/presence could not be confirmed in the live run state."
             }
         }
     }
@@ -903,12 +1013,38 @@ function Assert-PhaseContract {
         if ($requiredEvidence.Count -eq 0) {
             throw "Test planning phase pass result must include non-empty required_evidence."
         }
+        # Bind evidence needles to authoritative sources at authoring time, so a
+        # malformed contract burns on a contract violation here rather than
+        # false-denying real work several phases later (spirelens#147). Identical
+        # binding rules run again in the verification guard; this is fail-fast.
+        $refMaps = New-ScenarioRefMaps -ScenarioIdValidation $scenarioIdValidation
         foreach ($item in $requiredEvidence) {
             $id = [string](Get-PropertyValue -Object $item -Name 'id')
             $kind = [string](Get-PropertyValue -Object $item -Name 'kind')
             $mustShow = [string](Get-PropertyValue -Object $item -Name 'must_show')
             if ([string]::IsNullOrWhiteSpace($id) -or [string]::IsNullOrWhiteSpace($kind) -or [string]::IsNullOrWhiteSpace($mustShow)) {
                 throw "Test planning required_evidence items must include id, kind, and must_show."
+            }
+
+            if ($kind -eq 'screenshot') {
+                $requiresText = Test-EvidenceRequiresText -TextVisibleRequired (Get-PropertyValue -Object $item -Name 'text_visible_required') -MustShow $mustShow
+                if ($requiresText) {
+                    # Throws on a malformed binding (both/neither source, an id
+                    # typed as a literal expected_text, or an unresolvable ref).
+                    [void](Resolve-ScreenshotNeedle `
+                        -ExpectedText ([string](Get-PropertyValue -Object $item -Name 'expected_text')) `
+                        -ExpectedTextRef ([string](Get-PropertyValue -Object $item -Name 'expected_text_ref')) `
+                        -RefToName $refMaps.NameByRef `
+                        -CatalogIds $refMaps.CatalogIds `
+                        -ItemId $id)
+                }
+            }
+            elseif ($kind -eq 'live_mcp') {
+                # Throws unless target_id_ref resolves to a catalog id.
+                [void](Resolve-LiveMcpTargetId `
+                    -TargetIdRef ([string](Get-PropertyValue -Object $item -Name 'target_id_ref')) `
+                    -RefToId $refMaps.IdByRef `
+                    -ItemId $id)
             }
         }
     }
@@ -1363,14 +1499,18 @@ TEST PLANNING RULES:
 - Before writing screenshot or live-validation evidence, call `get_validation_capabilities` and use its returned `card_surfaces`, `relic_surfaces`, `runtime_options`, `recommended_tooltip_evidence_flow`, `recommended_relic_tooltip_evidence_flow`, and `tools[]` manifest as the source of truth for what verification can open, tooltip, screenshot, and mutate. Each referenced tool plan should respect the manifest fields `safe_for_test_planning`, `mutates_state`, `requires_game_running`, `requires_combat`, `output_contract`, `common_failures`, and `examples`. Do not assume an unavailable view exists, and do not omit an available view such as deck, draw_pile, discard_pile, exhaust_pile, player_relic_bar, relic_select, treasure, or verbose hand stats when it is the right evidence surface.
 - If MCP catalog metadata or validation capabilities cannot support the needed validation plan, abort.
 - Write `test-plan.json` with:
-  `{ "layer":"test_plan", "status":"pass|abort", "abort_reason":null, "retryable":false, "human_action_required":false, "notes":"", "target_kind":"card|relic|mixed|unknown", "card":{}, "relic":{}, "character":{}, "card_metadata_discovery":{"passed":true,"status":"pass","notes":"scenario card ids resolved from MCP catalog tools"}, "relic_metadata_discovery":{"passed":true,"status":"pass","notes":"scenario relic ids resolved from MCP catalog tools"}, "scenario_id_validation":{"passed":true,"cards":[{"field":"deck","input":"TARGET_CARD_ID","id":"TARGET_CARD_ID","name":"Target Card","source":"lookup_card|list_cards"}],"relics":[{"field":"add_relics","input":"REAL_RELIC_ID","id":"REAL_RELIC_ID","name":"Relic Name","source":"lookup_relic|list_relics"}],"encounters":[],"notes":"every id in scenario_setup was resolved from MCP catalog tools"}, "validation_plan":[], "scenario_setup":{"base_save_name":"base_<character>","scenario_name":"issue_<issue>_<short_target>","deck":["TARGET_CARD_ID","REAL_SUPPORT_CARD_ID"],"add_cards":null,"remove_cards":null,"relics":null,"add_relics":null,"remove_relics":null,"gold":null,"current_hp":null,"max_hp":null,"max_energy":null,"next_normal_encounter":null,"notes":"small deterministic setup that satisfies the evidence plan"}, "required_evidence":[{"id":"unit-tests","kind":"unit_test","required":true,"must_show":"specific tests that prove the changed behavior"},{"id":"live-target-visible","kind":"screenshot","required":true,"must_show":"target card/relic/UI/tooltip state visibly proving the issue claim, including the exact text/value that should appear","target_visible_required":true,"text_visible_required":true,"expected_text":"<exact substring that must appear in observed_text — derived from scenario_setup × validation_plan, e.g. 'vigor gained: 8' for one combat-start of Akabeko>","allowed_fallback":null}] }`
+  `{ "layer":"test_plan", "status":"pass|abort", "abort_reason":null, "retryable":false, "human_action_required":false, "notes":"", "target_kind":"card|relic|mixed|unknown", "card":{}, "relic":{}, "character":{}, "card_metadata_discovery":{"passed":true,"status":"pass","notes":"scenario card ids resolved from MCP catalog tools"}, "relic_metadata_discovery":{"passed":true,"status":"pass","notes":"scenario relic ids resolved from MCP catalog tools"}, "scenario_id_validation":{"passed":true,"cards":[{"field":"deck","input":"TARGET_CARD_ID","id":"TARGET_CARD_ID","name":"Target Card","source":"lookup_card|list_cards"}],"relics":[{"field":"add_relics","input":"REAL_RELIC_ID","id":"REAL_RELIC_ID","name":"Relic Name","source":"lookup_relic|list_relics"}],"encounters":[],"notes":"every id in scenario_setup was resolved from MCP catalog tools"}, "validation_plan":[], "scenario_setup":{"base_save_name":"base_<character>","scenario_name":"issue_<issue>_<short_target>","deck":["TARGET_CARD_ID","REAL_SUPPORT_CARD_ID"],"add_cards":null,"remove_cards":null,"relics":null,"add_relics":null,"remove_relics":null,"gold":null,"current_hp":null,"max_hp":null,"max_energy":null,"next_normal_encounter":null,"notes":"small deterministic setup that satisfies the evidence plan"}, "required_evidence":[{"id":"unit-tests","kind":"unit_test","required":true,"must_show":"specific tests that prove the changed behavior"},{"id":"target-present","kind":"live_mcp","required":true,"must_show":"get_game_state JSON shows the target entity present in the run (relic/card list)","target_id_ref":"REAL_RELIC_ID"},{"id":"value-visible","kind":"screenshot","required":true,"must_show":"the computed stat/value rendered on the target tooltip/UI","target_visible_required":true,"text_visible_required":true,"expected_text":"<exact computed VALUE that must appear in observed_text — derived from scenario_setup × validation_plan, e.g. 'vigor gained: 8' for one combat-start of Akabeko>","allowed_fallback":null},{"id":"name-visible","kind":"screenshot","required":false,"must_show":"the target entity's display NAME rendered on screen (only when the name rendering is itself under test)","target_visible_required":true,"text_visible_required":true,"expected_text_ref":"REAL_RELIC_ID","allowed_fallback":null}] }`
 - `scenario_setup` is the deterministic pre-verification save recipe. Choose the correct `base_save_name` from the verified character identity, such as `base_regent`, `base_ironclad`, `base_silent`, `base_defect`, or `base_necrobinder`. Use a complete small `deck` of real card ids that lets normal gameplay reach the evidence state quickly. When a card needs support cards, use `list_cards` with the resolved owner/type/query constraints to select real support card ids from MCP metadata, and set enough energy/max_energy for the planned validation actions. Do not tell verification to use dev-console `fight`/`card` commands for card availability; card availability must come from this save recipe.
 - Never write `card_metadata_discovery.status="not_run"` merely because the issue target is not a card when `scenario_setup` contains cards. If the scenario has any card id, card metadata discovery for those scenario cards must pass or the phase must abort.
 - When validating effects that move, summon, return, discard, exhaust, or draw a named card, the scenario must place the card in a source pile where that effect can actually operate before the evidence step. If a card says it puts "this" into hand, the triggering copy must be outside hand before the trigger. A valid Make It So route is: start with Make It So in hand, play Make It So first so it enters discard, play two Skills, inspect the Make It So tooltip from discard for 2/3 progress, play the third Skill, then inspect Make It So in hand for the trigger count. If the same card also needs an in-hand tooltip before the effect, use a duplicate copy or include a validation action that moves/plays the inspected copy out of hand before the trigger. Do not assume a card already in hand can be put into hand again. A 5-card deck that leaves Make It So in hand for the whole test is invalid for trigger-count evidence.
 - `required_evidence` is the acceptance contract for verification. Include every proof required before a PR may open. If the issue asks for multiple visible UI claims, the required screenshot evidence must name all of them; do not collapse a multi-part request into proof for only one row or one state. For tooltip, label, wording, or text/UI issues, include a screenshot evidence item with `text_visible_required:true` and `must_show` naming the exact text or tooltip state. When more than one label/row is requested, put all requested labels/rows in `must_show`. Unit tests may be required too, but they are not a substitute for required visual evidence unless the issue is explicitly non-visual and you set `allowed_fallback` with a concrete reason.
-- For every screenshot evidence item with `text_visible_required:true`, also write a literal `expected_text` field on the same item. `expected_text` is the exact substring that must appear in `observed_text` for the screenshot to count as proof — the wrapper does a case-insensitive substring check and aborts the run with `claimed_result_not_observed` on mismatch. Compute it from the scenario_setup × the validation_plan: e.g. for an Akabeko relic-stat scenario whose validation plan triggers exactly one combat-start, `expected_text` is `"vigor gained: 8"` (8 per fire × 1 combat). Do NOT use loose phrasings like "non-zero", "at minimum N", "≥ N", or "8 or cumulative" — those let a buggy implementation that fires the trigger 11× per combat ship a green pass with `vigor gained: 88`. If the test plan cannot pin a specific expected value because the implementation behavior is genuinely ambiguous, abort with `validation_plan_impossible` rather than declare a loose contract.
+- A screenshot evidence item's on-screen needle is bound to an authoritative source — it is never a free-typed entity id. Every `text_visible_required:true` screenshot item must declare EXACTLY ONE of these two fields, and the harness rejects the contract (it throws and burns the run on a contract violation) if it declares both, neither, or an unresolvable/ id-shaped binding:
+  - `expected_text` — a literal COMPUTED VALUE (a stat/number) derived from scenario_setup × validation_plan. The wrapper does a case-insensitive boundary match against `observed_text`. Compute it exactly: e.g. for an Akabeko relic-stat scenario whose validation plan triggers exactly one combat-start, `expected_text` is `"vigor gained: 8"` (8 per fire × 1 combat). Do NOT use loose phrasings like "non-zero", "at minimum N", "≥ N", or "8 or cumulative" — those let a buggy implementation that fires the trigger 11× per combat ship a green pass with `vigor gained: 88`. A literal `expected_text` that is itself a resolved catalog id (e.g. `CLOAK_CLASP`) is rejected — that is the spirelens#147 mistake; use `expected_text_ref` for an entity name instead.
+  - `expected_text_ref` — the `input`/`id` of a `scenario_id_validation` entry, used ONLY when the rendering of the entity's display NAME is itself the thing under test. The harness DERIVES the needle from that entry's catalog-resolved `name` (e.g. ref `CLOAK_CLASP` → needle `"Cloak Clasp"`), so the screenshot proves the rendered display name, never the internal id. Do not also write `expected_text` on the same item.
+- To prove an entity is PRESENT in the run (identity), do NOT use a screenshot text match — use a `live_mcp` evidence item (see below). Identity lives in the JSON channel where the internal id appears verbatim; the screenshot channel only ever carries a computed value or a derived display name.
+- For a `live_mcp` evidence item, set `kind:"live_mcp"` and `target_id_ref` to the `input`/`id` of the matching `scenario_id_validation` entry. The harness resolves it to the catalog id and confirms that id LITERALLY appears in the captured get_game_state JSON artifact the verification phase writes — a `passed:true` boolean alone is not accepted. If the test plan cannot pin a specific expected value because the implementation behavior is genuinely ambiguous, abort with `validation_plan_impossible` rather than declare a loose contract.
 - For card-stat tooltip issues, default visual evidence is the in-hand card tooltip unless the issue explicitly names a non-hand surface or the validation capabilities show that another surface is required to expose the relevant state. If the issue requests multiple tooltip rows or states, require the screenshot evidence to show all requested rows or states together when possible, and otherwise explain the exact surface split in the evidence contract.
-- For relic-stat issues, prefer a deterministic scenario save with the target relic in `relics` or `add_relics`, then require evidence from `get_game_state` showing the resolved relic id/name in the player's relic list plus the best visible relic tooltip surface supported by validation capabilities. For relic tooltip/text claims, require `text_visible_required:true` and plan `list_visible_relics(surface)` -> `show_relic_tooltip(surface, relic_id=...)` -> `capture_screenshot` when those tools are available. If the capabilities do not expose forced relic-hover support, require the strongest available relic-visible screenshot and describe the missing hover capability instead of pretending card tooltip tools can prove relic text.
+- For relic-stat issues, prefer a deterministic scenario save with the target relic in `relics` or `add_relics`. Prove relic IDENTITY with a `live_mcp` evidence item whose `target_id_ref` is the relic's `scenario_id_validation` id — the harness confirms that internal id is present in the captured get_game_state JSON. Prove the relic STAT/VALUE with a screenshot item carrying a computed `expected_text`. Only when the relic NAME rendering is itself under test, add a screenshot item with `expected_text_ref` bound to the relic's catalog name. For relic tooltip/text claims, require `text_visible_required:true` and plan `list_visible_relics(surface)` -> `show_relic_tooltip(surface, relic_id=...)` -> `capture_screenshot` when those tools are available. If the capabilities do not expose forced relic-hover support, require the strongest available relic-visible screenshot and describe the missing hover capability instead of pretending card tooltip tools can prove relic text.
 - Allowed abort reasons: card_not_found, card_ambiguous, character_not_found, metadata_unavailable, mcp_capability_missing, game_state_unreachable, validation_plan_impossible.
 - Write `test-plan.md` summarizing facts found, scenario recipe, missing facts, and the validation plan.
 "@
@@ -1416,7 +1556,8 @@ VERIFICATION RULES:
   `{ "layer":"verification", "status":"pass|abort", "abort_reason":null, "retryable":false, "human_action_required":false, "notes":"", "live_mcp_validation":{"passed":null,"status":"not_run","notes":""}, "screenshot_validation":{"passed":null,"status":"not_run","count":0,"target_visible":false,"notes":""}, "evidence_results":[{"evidence_id":"","kind":"screenshot|live_mcp|manual_blocker","passed":false,"artifact_paths":[],"target_visible":false,"text_visible":false,"observed_text":"","notes":""}], "used_mcp":null, "used_raw_bridge_or_queue":false }`
 - ``unit_tests` is harness-owned: the harness stamps the observed ``unit_tests` block authoritatively after you exit, so omit it (or leave any value — it will be overwritten). Do not write a ``unit_test` `evidence_results` row either; the harness adds it from the observed result. Cover only the `screenshot` and `live_mcp` (and any `manual_blocker`) required-evidence items yourself.
 - For each non-unit-test `required_evidence` item from the test plan, write exactly one matching `evidence_results` item. Screenshot evidence must include artifact_paths. If the contract requires tooltip/text evidence, set `text_visible:true` only when the screenshot itself shows the required text and copy the visible words into `observed_text`. If the text/tooltip cannot be made visible, abort with target_evidence_missing; do not pass by saying unit tests cover it.
-- When the matching `required_evidence` item carries an `expected_text` field, copy the **literal characters from the screenshot** into `observed_text` — do not paraphrase, summarize, or "clean up" what the screenshot shows. The wrapper compares `observed_text` against `expected_text` (case-insensitive substring match) and aborts with `claimed_result_not_observed` on mismatch. If the screenshot shows `vigor gained: 88` and the contract said `expected_text: vigor gained: 8`, you must write `observed_text: "vigor gained: 88"` so the mismatch is caught — never write what the contract *should* show; write what the pixels actually show. If you can't read the value confidently, abort with `target_evidence_missing` rather than guess.
+- For each `live_mcp` required_evidence item, call `get_game_state`, write its raw JSON response verbatim to a file under the validation artifact directory (e.g. `live-mcp-<evidence_id>.json`), and list that file in the matching `evidence_results` item's `artifact_paths`. The harness reads that file and confirms the test plan's resolved internal id (`target_id_ref`) appears literally in it — a `passed:true` boolean is NOT sufficient and will not be trusted. Do not paraphrase or trim the JSON; write what the tool returned.
+- The test plan binds each screenshot item's on-screen needle to a source: either a literal `expected_text` (a computed VALUE) or an `expected_text_ref` (the harness derives the entity's display NAME). You do NOT compute the needle — you copy the **literal characters from the screenshot** into `observed_text`. Do not paraphrase, summarize, or "clean up" what the screenshot shows. The wrapper compares `observed_text` against the bound needle (case-insensitive boundary match) and aborts with `claimed_result_not_observed` on mismatch. If the screenshot shows `vigor gained: 88` and the contract bound `vigor gained: 8`, you must write `observed_text: "vigor gained: 88"` so the mismatch is caught — never write what the contract *should* show; write what the pixels actually show. If you can't read the value confidently, abort with `target_evidence_missing` rather than guess.
 - For card-stat tooltip issues, prefer `show_card_tooltip(surface="hand", card_id=...)` and require the in-hand screenshot to satisfy the text contract unless the test plan explicitly names a non-hand surface.
 - For relic-stat tooltip issues, prefer `show_relic_tooltip(surface="player_relic_bar", relic_id=...)` and require the relic tooltip screenshot to satisfy the text contract unless the test plan explicitly names a non-owned relic surface.
 - Allowed abort reasons: unit_tests_failed, live_validation_failed, screenshot_missing, screenshot_not_relevant, target_evidence_missing, mcp_state_mismatch, game_state_unreachable, claimed_result_not_observed, artifact_contract_missing.

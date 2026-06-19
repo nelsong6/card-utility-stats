@@ -37,6 +37,42 @@ HOST_IP="$(native_connect_host)" || native_emit_abort "host_unavailable"
 # invoke the grader, build-and-deploy and collect-evidence, from depending on
 # it or failing on a stage error.
 
+# native_hydrate_input_artifact <host-ip> <artifact-filename> <input-env-var>
+# Materialize a declared phase input into the laptop's per-run artifact dir
+# (C:\glimmung-runs\<run-ref>\sts2-artifacts\<artifact-filename>).
+#
+# In a normal full run, the llm-work phase (test-plan + implement, running on the
+# laptop) writes test-plan.json and implementation.json into this dir as an
+# on-disk side effect, and the verify steps read them back from there. A
+# synthetic verify-only run (start_at_phase=llm-verify, llm-work skipped) never
+# produces those files on the laptop — even though the verify phase is handed
+# their content as declared inputs (GLIMMUNG_INPUT_TEST_PLAN /
+# GLIMMUNG_INPUT_IMPLEMENTATION, exactly the mechanism by which it already
+# receives GLIMMUNG_INPUT_BRANCH_NAME). This hydrates the verify steps from those
+# declared inputs so they no longer depend on a prior phase's disk residue.
+#
+# The supplied input IS the authoritative artifact, so writing it is correct
+# whether or not llm-work also ran; the on-disk overwrite lands identical content
+# on a full run. The content rides as base64 through SSH and is decoded host-side
+# (the same way native_github_token_b64 passes the GitHub token) so an arbitrary
+# JSON blob with quotes, newlines, or backslashes can never break the pwsh
+# here-doc by interpolation.
+native_hydrate_input_artifact() {
+  local host_ip="$1" filename="$2" var_name="$3"
+  native_require_env "$var_name"
+  local content_b64
+  content_b64="$(printf '%s' "${!var_name}" | base64 | tr -d '\n')"
+  local artifact_fwd="C:/glimmung-runs/${GLIMMUNG_RUN_REF}/sts2-artifacts"
+  native_ssh_run "$host_ip" <<PWSH
+\$ErrorActionPreference = 'Stop'
+\$artifactDir = '${artifact_fwd}'
+New-Item -ItemType Directory -Force -Path \$artifactDir | Out-Null
+\$content = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${content_b64}'))
+\$target = Join-Path \$artifactDir '${filename}'
+[System.IO.File]::WriteAllText(\$target, \$content, (New-Object System.Text.UTF8Encoding(\$false)))
+PWSH
+}
+
 build_and_deploy_mod() {
   local gh_token_b64
   gh_token_b64="$(native_github_token_b64)"
@@ -74,6 +110,10 @@ PWSH
 prepare_scenario() {
   local repo_slug HARNESS_ROOT
   repo_slug="$(native_issue_repo)"
+  # prepare-scenario.ps1 reads the run's test plan from the artifact dir. Hydrate
+  # it from the declared input first so a verify-only run (no llm-work on disk)
+  # reaches scenario rigging instead of dying on a missing test-plan.json.
+  native_hydrate_input_artifact "$HOST_IP" 'test-plan.json' GLIMMUNG_INPUT_TEST_PLAN
   HARNESS_ROOT="$(native_stage_harness "$HOST_IP")" || native_emit_abort "harness_stage_failed"
   native_ssh_run "$HOST_IP" <<PWSH
 \$ErrorActionPreference = 'Stop'
@@ -98,6 +138,14 @@ run_verification() {
   local gh_token_b64 repo_slug HARNESS_ROOT
   gh_token_b64="$(native_github_token_b64)"
   repo_slug="$(native_issue_repo)"
+  # The verification agent reads test-plan.json and implementation.json (prior
+  # llm-work artifacts) off the artifact dir, and the harness reads test-plan.json
+  # to bind the unit-test evidence id. Hydrate both from their declared inputs so
+  # a verify-only run has the same artifact set a full run leaves on disk. (This
+  # step persists the same per-run dir prepare-scenario used, but re-hydrating
+  # keeps run-verification self-sufficient if it is retried independently.)
+  native_hydrate_input_artifact "$HOST_IP" 'test-plan.json' GLIMMUNG_INPUT_TEST_PLAN
+  native_hydrate_input_artifact "$HOST_IP" 'implementation.json' GLIMMUNG_INPUT_IMPLEMENTATION
   HARNESS_ROOT="$(native_stage_harness "$HOST_IP")" || native_emit_abort "harness_stage_failed"
   native_ssh_run "$HOST_IP" <<PWSH
 \$ErrorActionPreference = 'Stop'
