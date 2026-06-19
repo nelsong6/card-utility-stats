@@ -101,6 +101,17 @@ public static class RelicHoverShowPatch
                 StatsTooltip.Show(tree, __instance, "Happy Flower", "SpireLens", body);
                 return;
             }
+
+            if (relicNode.Model is CloakClasp)
+            {
+                const string relicId = "RELIC.CLOAK_CLASP";
+                var agg = RunTracker.GetRelicAggregate(relicId);
+                if (agg == null || agg.AdditionalBlockGained == 0) return;
+
+                var body = BuildCloakClaspBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Cloak Clasp", "SpireLens", body);
+                return;
+            }
         }
         catch (Exception e)
         {
@@ -148,6 +159,13 @@ public static class RelicHoverShowPatch
     {
         var sb = new StringBuilder();
         Row3(sb, EnergyLabel("Energy generated"), agg.EnergyGenerated.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildCloakClaspBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, BlockLabel("Block gained"), agg.AdditionalBlockGained.ToString(), "");
         return sb.ToString();
     }
 
