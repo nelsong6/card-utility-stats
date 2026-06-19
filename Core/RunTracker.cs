@@ -1287,6 +1287,7 @@ public static class RunTracker
     private const string TheAbacusRelicId = "RELIC.THE_ABACUS";
     private const string HappyFlowerRelicId = "RELIC.HAPPY_FLOWER";
     private const string CloakClaspRelicId = "RELIC.CLOAK_CLASP";
+    private const string BoomingConchRelicId = "RELIC.BOOMING_CONCH";
 
     /// <summary>
     /// Record a Bag of Marbles combat-start Vulnerable application.
@@ -1472,6 +1473,34 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordPocketwatchDraw failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record the additional cards Booming Conch draws at the start of an Elite
+    /// combat. <paramref name="cardsDrawn"/> is the number of extra cards drawn.
+    /// Called from <see cref="Patches.BoomingConchModifyHandDrawPatch"/>.
+    /// </summary>
+    public static void RecordBoomingConchDraw(int cardsDrawn)
+    {
+        if (cardsDrawn <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                _pendingCombat ??= new PendingCombat();
+                if (!_pendingCombat.RelicAggregates.TryGetValue(BoomingConchRelicId, out var agg))
+                {
+                    agg = new RelicAggregate();
+                    _pendingCombat.RelicAggregates[BoomingConchRelicId] = agg;
+                }
+                agg.AdditionalCardsDrawn += cardsDrawn;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordBoomingConchDraw failed: {e.Message}");
             }
         }
     }
