@@ -136,7 +136,23 @@ def assert_loaded_state_matches_setup(setup, state):
         raise RuntimeError("Loaded game state was not a JSON object.")
 
     state_type = state.get("state_type")
-    if setup.get("next_normal_encounter") and state_type != "monster":
+    # state_type IS the live room type, lowercased (McpMod.StateBuilder:
+    # combatRoom.RoomType.ToString().ToLower() -> "monster" | "elite" | "boss").
+    # required_room_type is the deterministic gate for room-type-conditional
+    # behavior (e.g. a relic that only fires "at the start of Elite combats"):
+    # the harness enters that room and the scenario fails here unless the live
+    # combat actually is that type. next_normal_encounter only selects WHICH
+    # Monster encounter is fought and can never produce an Elite/Boss room, so
+    # it must not be used to stage one.
+    required_room_type = str(setup.get("required_room_type") or "").strip().lower()
+    if required_room_type:
+        if state_type != required_room_type:
+            raise RuntimeError(
+                f"Scenario declared required_room_type={setup.get('required_room_type')!r} "
+                f"but loaded state_type={state_type!r}. A room-type-gated effect cannot be "
+                f"proven in the wrong room type."
+            )
+    elif setup.get("next_normal_encounter") and state_type != "monster":
         raise RuntimeError(
             f"Scenario declared next_normal_encounter={setup.get('next_normal_encounter')!r} "
             f"but loaded state_type={state_type!r}, not monster."
@@ -272,6 +288,31 @@ async def validate_load():
             if battle.get("enemies"):
                 break
         await asyncio.sleep(0.5)
+    # Deterministic room-type staging. A loaded save settles into whatever room
+    # the run was on (often a map or a normal Monster combat). Room-type-gated
+    # behavior — e.g. Booming Conch's "at the start of Elite combats" — can only
+    # be exercised in that room type, and next_normal_encounter cannot create
+    # one (it only selects which Monster encounter is fought). So when the
+    # scenario declares required_room_type, the HARNESS enters that room via the
+    # already-exposed enter_debug_room tool and then re-settles the live combat.
+    # The post-load assertion fails the scenario unless the live state_type
+    # actually matches, so a room-type-gated test can never silently run in the
+    # wrong room and rationalize a verdict.
+    required_room_type = str(setup.get("required_room_type") or "").strip()
+    room_entry = None
+    if required_room_type:
+        room_entry = parse_tool_json(await server.enter_debug_room(required_room_type), "enter_debug_room")
+        want = required_room_type.lower()
+        state = None
+        for _ in range(40):
+            state = parse_tool_json(await server.get_game_state("json"), "get_game_state")
+            if state.get("state_type") == want:
+                battle = state.get("battle") or {}
+                if battle.get("enemies"):
+                    break
+            await asyncio.sleep(0.5)
+    existing["required_room_type"] = required_room_type or None
+    existing["required_room_entry"] = room_entry
     existing["live_installed"] = live_installed
     existing["validated"] = validate
     existing["pre_load_menu_state"] = menu_state
@@ -361,12 +402,22 @@ try {
     if ([string]::IsNullOrWhiteSpace([string]$result.state_type) -or [string]$result.state_type -in @('menu', 'unknown', 'loading')) {
         throw "Scenario loaded into unexpected state_type='$($result.state_type)'."
     }
-    if ([string]$result.state_type -eq 'monster') {
+    # state_type is the live room type (monster|elite|boss for combats). Any
+    # combat room must have active battle details before the verification agent
+    # is spent.
+    if ([string]$result.state_type -in @('monster', 'elite', 'boss')) {
         $battle = $result.game_state.battle
         if ($null -eq $battle -or $null -eq $battle.enemies -or @($battle.enemies).Count -eq 0) {
-            throw "Scenario reached monster state before active battle details were available."
+            throw "Scenario reached $($result.state_type) state before active battle details were available."
         }
 
+    }
+    # A room-type-gated scenario must land in exactly the requested room type;
+    # the python validator already throws on mismatch, this is the harness-side
+    # backstop so a missed assertion can never pass a wrong-room scenario.
+    $requiredRoomType = [string]$result.required_room_type
+    if (-not [string]::IsNullOrWhiteSpace($requiredRoomType) -and [string]$result.state_type -ne $requiredRoomType.ToLower()) {
+        throw "Scenario required_room_type='$requiredRoomType' but loaded state_type='$($result.state_type)'."
     }
 
     Write-Host "Scenario setup ready: $($setup.scenario_name), state_type=$($result.state_type)."
