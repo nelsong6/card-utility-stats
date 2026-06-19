@@ -112,6 +112,17 @@ public static class RelicHoverShowPatch
                 StatsTooltip.Show(tree, __instance, "Cloak Clasp", "SpireLens", body);
                 return;
             }
+
+            if (relicNode.Model is BoomingConch)
+            {
+                const string relicId = "RELIC.BOOMING_CONCH";
+                var agg = RunTracker.GetRelicAggregate(relicId);
+                if (agg == null || agg.AdditionalCardsDrawn == 0) return;
+
+                var body = BuildBoomingConchBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Booming Conch", "SpireLens", body);
+                return;
+            }
         }
         catch (Exception e)
         {
@@ -135,6 +146,13 @@ public static class RelicHoverShowPatch
     }
 
     private static string BuildPocketwatchBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "additional cards drawn", agg.AdditionalCardsDrawn.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildBoomingConchBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
         Row3(sb, "additional cards drawn", agg.AdditionalCardsDrawn.ToString(), "");
