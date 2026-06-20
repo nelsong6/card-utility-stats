@@ -25,7 +25,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib.sh"
 
 native_init
-native_require_env GLIMMUNG_RUN_ID GLIMMUNG_RUN_REF GLIMMUNG_ISSUE_NUMBER GLIMMUNG_INPUT_BRANCH_NAME
+native_require_env GLIMMUNG_RUN_ID GLIMMUNG_RUN_REF GLIMMUNG_ISSUE_NUMBER
+# When the implement job is when-skipped (skip_implement=true) the implementation
+# under test is provided via the git_ref checkout and branch_name arrives empty;
+# default it to git_ref so build-and-deploy fetches the provided code. Real runs
+# always supply branch_name, so this defaulting is a no-op for them.
+: "${GLIMMUNG_INPUT_BRANCH_NAME:=${GLIMMUNG_INPUT_GIT_REF:-}}"
+native_require_env GLIMMUNG_INPUT_BRANCH_NAME
 
 # This phase's pod has none of env-prep's connection state; establish our own.
 HOST_IP="$(native_connect_host)" || native_emit_abort "host_unavailable"
@@ -145,7 +151,11 @@ run_verification() {
   # step persists the same per-run dir prepare-scenario used, but re-hydrating
   # keeps run-verification self-sufficient if it is retried independently.)
   native_hydrate_input_artifact "$HOST_IP" 'test-plan.json' GLIMMUNG_INPUT_TEST_PLAN
-  native_hydrate_input_artifact "$HOST_IP" 'implementation.json' GLIMMUNG_INPUT_IMPLEMENTATION
+  # implementation.json is absent when the implement job is when-skipped
+  # (skip_implement=true); hydrate it only when the input was actually provided.
+  if [ -n "${GLIMMUNG_INPUT_IMPLEMENTATION:-}" ]; then
+    native_hydrate_input_artifact "$HOST_IP" 'implementation.json' GLIMMUNG_INPUT_IMPLEMENTATION
+  fi
   HARNESS_ROOT="$(native_stage_harness "$HOST_IP")" || native_emit_abort "harness_stage_failed"
   native_ssh_run "$HOST_IP" <<PWSH
 \$ErrorActionPreference = 'Stop'
