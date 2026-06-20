@@ -30,7 +30,7 @@ native_require_env GLIMMUNG_RUN_ID GLIMMUNG_RUN_REF GLIMMUNG_ISSUE_NUMBER
 # under test is provided via the git_ref checkout and branch_name arrives empty;
 # default it to git_ref so build-and-deploy fetches the provided code. Real runs
 # always supply branch_name, so this defaulting is a no-op for them.
-: "${GLIMMUNG_INPUT_BRANCH_NAME:=${GLIMMUNG_INPUT_GIT_REF:-}}"
+: "${GLIMMUNG_INPUT_BRANCH_NAME:=${GLIMMUNG_RUN_INPUT_GIT_REF:-}}"
 native_require_env GLIMMUNG_INPUT_BRANCH_NAME
 
 # This phase's pod has none of env-prep's connection state; establish our own.
