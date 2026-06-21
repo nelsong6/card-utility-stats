@@ -5,62 +5,78 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	sdkverify "github.com/romaine-life/glimmung/harness/verification"
 )
 
-// ValidateStatus checks the verdict status against the SDK's finalizer rules
-// (pass/fail/error/abort, abort requires abort_reason) — the same contract
-// harness/verification.Verification.Validate enforces, applied to spirelens's
-// richer document. Keeping the rule sourced from the SDK constants means a
-// finalizer change is a compile-time concern here, not silent drift.
-func ValidateStatus(doc Doc) error {
-	switch doc.Str("status") {
-	case sdkverify.StatusPass, sdkverify.StatusFail, sdkverify.StatusError:
-		return nil
-	case sdkverify.StatusAbort:
-		if strings.TrimSpace(doc.Str("abort_reason")) == "" {
-			return fmt.Errorf("verification status=abort requires abort_reason")
-		}
-		return nil
-	default:
-		return fmt.Errorf("invalid verification status %q (want pass, fail, error, or abort)", doc.Str("status"))
+// WriteVerdict serializes spirelens's rich verification verdict through the SDK's
+// harness/verification.WriteFinalizable — there is no spirelens-local writer fork
+// anymore. It maps the finalizer-read keys onto verification.Verification's typed
+// fields (status / reasons / failure / abort_reason / notes / evidence_refs /
+// evidence / evidence_results) and rides every other producer-domain key
+// (layer / unit_tests / live_mcp_validation / screenshot_validation / used_mcp /
+// used_raw_bridge_or_queue / retryable / human_action_required / …) through
+// Verification.Extra, which the glimmung finalizer preserves verbatim. The result
+// lands at the exact finalizer paths ${workingDir}/artifacts/{verification.json,
+// screenshots,evidence} and WriteVerdict returns that artifacts dir.
+//
+// NOTE [flagged for the hub]: verification.EvidenceResult is {kind, passed,
+// detail} and `evidence_results` is a reserved Extra key, so spirelens's richer
+// per-row evidence fields (evidence_id / artifact_paths / target_visible /
+// text_visible / observed_text) are reduced to the finalizer-read kind+passed
+// subset in the persisted document. Those rich rows are still fully present in
+// the in-memory verdict the deterministic evidence guard derives its decision
+// from (verify.Doc); only the on-disk evidence_results array is the SDK shape.
+// If the SDK grows a richer EvidenceResult (or admits evidence_results through
+// Extra), spirelens can carry the full rows again with no other change.
+func WriteVerdict(workingDir string, verdict Doc) (string, error) {
+	v := sdkverify.Verification{
+		Status:      verdict.Str("status"),
+		AbortReason: verdict.Str("abort_reason"),
+		Notes:       verdict.Str("notes"),
 	}
-}
-
-// WriteVerificationJSON validates doc and writes it as verification.json under
-// artifactDir, creating artifactDir if needed. It is the spirelens-local
-// equivalent of harness/verification.WriteFinalizable: the SDK's narrow
-// Verification struct cannot carry spirelens's rich domain fields (unit_tests,
-// live_mcp_validation, screenshot_validation, the rich evidence_results rows),
-// which the glimmung finalizer reads-the-known-fields-and-preserves-the-rest, so
-// the producer must write the document itself. This reuses the SDK's status
-// enum and validation rule (see ValidateStatus). [SDK GAP — flagged for the hub.]
-func WriteVerificationJSON(artifactDir string, doc Doc) error {
-	if err := ValidateStatus(doc); err != nil {
-		return err
+	if reasons := stringSlice(verdict, "reasons"); len(reasons) > 0 {
+		v.Reasons = reasons
 	}
-	if err := os.MkdirAll(artifactDir, 0o755); err != nil {
-		return fmt.Errorf("create artifact dir: %w", err)
-	}
-	return writeJSONIndent(filepath.Join(artifactDir, "verification.json"), doc)
-}
-
-// EnsureFinalizerArtifactTree creates the exact directory tree the glimmung
-// verification_finalize primitive scans under a working dir:
-// artifacts/{screenshots,evidence}. This mirrors the dir-creation half of
-// harness/verification.WriteFinalizable and returns the artifacts dir. Used by
-// the pod collect-evidence step that assembles the finalizer tree from the
-// host-pulled verdict + evidence.
-func EnsureFinalizerArtifactTree(workingDir string) (string, error) {
-	artifacts := sdkverify.ArtifactsDir(workingDir)
-	for _, dir := range []string{artifacts, filepath.Join(artifacts, "screenshots"), filepath.Join(artifacts, "evidence")} {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			return "", fmt.Errorf("create %s: %w", dir, err)
+	if f := verdict.Sub("failure"); f != nil {
+		v.Failure = &sdkverify.Failure{
+			Expected:       f.Str("expected"),
+			Observed:       f.Str("observed"),
+			Where:          f.Str("where"),
+			SuspectedCause: f.Str("suspected_cause"),
+			CauseDetail:    f.Str("cause_detail"),
 		}
 	}
-	return artifacts, nil
+	if refs := stringSlice(verdict, "evidence_refs"); len(refs) > 0 {
+		v.EvidenceRefs = refs
+	}
+	for _, e := range verdict.Rows("evidence") {
+		v.Evidence = append(v.Evidence, sdkverify.EvidenceRef{Kind: e.Str("kind"), Ref: e.Str("ref")})
+	}
+	for _, row := range verdict.Rows("evidence_results") {
+		v.EvidenceResults = append(v.EvidenceResults, sdkverify.EvidenceResult{
+			Kind:   row.Str("kind"),
+			Passed: row.Bool("passed"),
+		})
+	}
+
+	extra := map[string]json.RawMessage{}
+	for key, val := range verdict {
+		switch key {
+		case "status", "reasons", "failure", "abort_reason", "notes", "evidence_refs", "evidence", "evidence_results":
+			continue // owned by a typed finalizer field above
+		}
+		raw, err := json.Marshal(val)
+		if err != nil {
+			return "", fmt.Errorf("encode verification extra field %q: %w", key, err)
+		}
+		extra[key] = raw
+	}
+	if len(extra) > 0 {
+		v.Extra = extra
+	}
+
+	return sdkverify.WriteFinalizable(workingDir, v)
 }
 
 // WriteMarkdown writes a phase markdown body to artifactDir/<name>.
@@ -107,15 +123,4 @@ func SyntheticRollup(issueNumber int, abortLayer, abortReason, notes string, uni
 		"should_close_issue":       false,
 		"evidence_summary":         []any{notes},
 	}
-}
-
-func writeJSONIndent(path string, v any) error {
-	encoded, err := json.MarshalIndent(v, "", "  ")
-	if err != nil {
-		return fmt.Errorf("encode %s: %w", path, err)
-	}
-	if err := os.WriteFile(path, append(encoded, '\n'), 0o644); err != nil {
-		return fmt.Errorf("write %s: %w", path, err)
-	}
-	return nil
 }

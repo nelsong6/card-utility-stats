@@ -5,9 +5,9 @@
 //     and calls step.Main, which dispatches GLIMMUNG_STEP_SLUG.
 //     Cross-compiles for Linux (the k8s job pods).
 //   - host <subcmd>   the gaming-laptop face: run-phase / prepare-scenario /
-//     prepare-host / restart-sts2 / probe-* / build-deploy /
-//     pack-evidence, invoked over ssh by the pod via
-//     remotehost.Conn.RunSelf. Cross-compiles for Windows.
+//     prepare-host / restart-sts2 / probe-* / build-deploy,
+//     invoked over ssh by the pod via remotehost.Conn.RunSelf.
+//     Cross-compiles for Windows.
 //
 // Both `go build ./...` (Linux) and `GOOS=windows GOARCH=amd64 go build ./...`
 // must pass; the binary built from a run's git_ref IS the harness, so git_ref
@@ -61,7 +61,7 @@ func main() {
 func isHostSubcommand(s string) bool {
 	switch s {
 	case "run-phase", "prepare-scenario", "prepare-host", "restart-sts2",
-		"probe-mods", "probe-bridge", "build-deploy", "pack-evidence":
+		"probe-mods", "probe-bridge", "build-deploy":
 		return true
 	}
 	return false

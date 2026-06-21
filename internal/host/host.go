@@ -46,8 +46,6 @@ func Dispatch(ctx context.Context, args []string) int {
 		return probeBridgeCmd(ctx, rest)
 	case "build-deploy":
 		return buildDeployCmd(ctx, rest)
-	case "pack-evidence":
-		return packEvidenceCmd(ctx, rest)
 	default:
 		fmt.Fprintf(os.Stderr, "host: unknown subcommand %q\n", sub)
 		return 2
@@ -128,21 +126,6 @@ func buildDeployCmd(ctx context.Context, args []string) int {
 	p.GitHubToken = decodeB64(tokenB64)
 	if lerr := BuildDeploy(ctx, os.Stdout, p); lerr != nil {
 		fmt.Fprintln(os.Stderr, lerr.Error())
-		return 1
-	}
-	return 0
-}
-
-func packEvidenceCmd(_ context.Context, args []string) int {
-	fs := flag.NewFlagSet("pack-evidence", flag.ContinueOnError)
-	workingDir := fs.String("working-dir", "", "per-run working dir")
-	out := fs.String("out", "", "output zip path")
-	if err := fs.Parse(args); err != nil || *workingDir == "" || *out == "" {
-		fmt.Fprintln(os.Stderr, "pack-evidence: --working-dir and --out are required")
-		return 2
-	}
-	if err := PackEvidence(*workingDir, *out); err != nil {
-		fmt.Fprintln(os.Stderr, err.Error())
 		return 1
 	}
 	return 0
