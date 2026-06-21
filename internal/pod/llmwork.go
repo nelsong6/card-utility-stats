@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/romaine-life/glimmung/harness/runcallbacks"
 	"github.com/romaine-life/glimmung/harness/step"
 )
 
@@ -43,7 +44,7 @@ func runPhaseOnHost(c *step.Context, phase string, extra ...string) (step.Result
 	if lerr := stageHostBinary(ctx, conn, c); lerr != nil {
 		return step.Result{}, lerr
 	}
-	token, lerr := mintGitHubToken(ctx, c)
+	token, lerr := runcallbacks.FromContext(c).MintGitHubToken(ctx)
 	if lerr != nil {
 		return step.Result{}, lerr
 	}
@@ -106,7 +107,7 @@ func pushBranch(c *step.Context) (step.Result, error) {
 	if lerr != nil {
 		return abortOrFail(c, lerr)
 	}
-	token, lerr := mintGitHubToken(ctx, c)
+	token, lerr := runcallbacks.FromContext(c).MintGitHubToken(ctx)
 	if lerr != nil {
 		return step.Result{}, lerr
 	}

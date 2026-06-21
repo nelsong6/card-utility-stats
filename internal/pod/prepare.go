@@ -1,9 +1,8 @@
 package pod
 
 import (
+	"bytes"
 	"encoding/json"
-	"os"
-	"path/filepath"
 
 	"github.com/romaine-life/glimmung/harness/step"
 )
@@ -70,35 +69,27 @@ func probeSSH(c *step.Context) (step.Result, error) {
 }
 
 // probeModSet enforces the AGENTS.md mod allowlist + the BaseLib version floor.
-// The host probe-mods subcommand writes the verdict to a file the pod pulls
-// (RunSelf returns no stdout).
+// The host probe-mods subcommand prints its verdict JSON to stdout, which RunSelf
+// streams back into the buffer here (SDK v0.2.0) — no write-to-file-then-scp-pull.
 func probeModSet(c *step.Context) (step.Result, error) {
 	ctx := c.RunContext()
-	conn, lerr := connect(ctx, c)
+	var verdict bytes.Buffer
+	conn, lerr := connectCapturing(ctx, c, &verdict)
 	if lerr != nil {
 		return abortOrFail(c, lerr)
 	}
 	if lerr := stageHostBinary(ctx, conn, c); lerr != nil {
 		return step.Result{}, lerr
 	}
-	remoteOut := hostWorkingDir(c) + `\mod-probe.json`
-	if lerr := conn.RunSelf(ctx, "probe-mods", "--out", remoteOut); lerr != nil {
-		return step.Result{}, lerr
-	}
-	local := filepath.Join(c.WorkingDir(), "mod-probe.json")
-	if lerr := conn.ScpPull(ctx, remoteOut, local); lerr != nil {
+	if lerr := conn.RunSelf(ctx, "probe-mods"); lerr != nil {
 		return step.Result{}, lerr
 	}
 	var res struct {
 		BaseLibVersion string `json:"baselib_version"`
 		AbortReason    string `json:"abort_reason"`
 	}
-	b, err := os.ReadFile(local)
-	if err != nil {
-		return step.Result{}, step.HarnessError("mod_probe_unreadable", "read mod-probe.json", err)
-	}
-	if err := json.Unmarshal(b, &res); err != nil {
-		return step.Result{}, step.HarnessError("mod_probe_invalid", "parse mod-probe.json", err)
+	if err := json.Unmarshal(verdict.Bytes(), &res); err != nil {
+		return step.Result{}, step.HarnessError("mod_probe_invalid", "parse streamed probe-mods verdict", err)
 	}
 	if res.AbortReason != "" {
 		return step.Result{}, c.Abort(res.AbortReason)
@@ -140,9 +131,9 @@ func probeBridgeReady(c *step.Context) (step.Result, error) {
 	if lerr := stageHostBinary(ctx, conn, c); lerr != nil {
 		return step.Result{}, lerr
 	}
-	remoteOut := hostWorkingDir(c) + `\bridge-probe.json`
-	if lerr := conn.RunSelf(ctx, "probe-bridge", "--out", remoteOut); lerr != nil {
-		// Non-zero exit means the bridge never came up.
+	if lerr := conn.RunSelf(ctx, "probe-bridge"); lerr != nil {
+		// Non-zero remote exit (streamed through RunSelf) means the bridge never
+		// came up.
 		return step.Result{}, c.Abort("bridge_not_ready")
 	}
 	if err := c.EmitOutput("bridge_ready", "true"); err != nil {

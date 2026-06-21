@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/romaine-life/glimmung/harness/runcallbacks"
 	"github.com/romaine-life/glimmung/harness/step"
 	"github.com/romaine-life/spirelens/internal/verify"
 )
@@ -37,7 +38,7 @@ func buildAndDeploy(c *step.Context) (step.Result, error) {
 	if lerr := stageHostBinary(ctx, conn, c); lerr != nil {
 		return step.Result{}, lerr
 	}
-	token, lerr := mintGitHubToken(ctx, c)
+	token, lerr := runcallbacks.FromContext(c).MintGitHubToken(ctx)
 	if lerr != nil {
 		return step.Result{}, lerr
 	}
