@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "spire-lens-mcp": {
+      "type": "stdio",
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "D:\\repos\\spire-lens-mcp\\mcp",
+        "python",
+        "server.py"
+      ],
+      "env": {
+        "STS2_GAME_DIR": "D:\\Programs\\SteamLibrary\\steamapps\\common\\Slay the Spire 2"
+      }
+    }
+  }
+}
