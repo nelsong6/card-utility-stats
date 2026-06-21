@@ -46,8 +46,6 @@ func Dispatch(ctx context.Context, args []string) int {
 		return probeBridgeCmd(ctx, rest)
 	case "build-deploy":
 		return buildDeployCmd(ctx, rest)
-	case "pack-evidence":
-		return packEvidenceCmd(ctx, rest)
 	default:
 		fmt.Fprintf(os.Stderr, "host: unknown subcommand %q\n", sub)
 		return 2
@@ -133,21 +131,6 @@ func buildDeployCmd(ctx context.Context, args []string) int {
 	return 0
 }
 
-func packEvidenceCmd(_ context.Context, args []string) int {
-	fs := flag.NewFlagSet("pack-evidence", flag.ContinueOnError)
-	workingDir := fs.String("working-dir", "", "per-run working dir")
-	out := fs.String("out", "", "output zip path")
-	if err := fs.Parse(args); err != nil || *workingDir == "" || *out == "" {
-		fmt.Fprintln(os.Stderr, "pack-evidence: --working-dir and --out are required")
-		return 2
-	}
-	if err := PackEvidence(*workingDir, *out); err != nil {
-		fmt.Fprintln(os.Stderr, err.Error())
-		return 1
-	}
-	return 0
-}
-
 func decodeB64(s string) string {
 	if s == "" {
 		return ""
@@ -161,12 +144,11 @@ func decodeB64(s string) string {
 
 func probeModsCmd(_ context.Context, args []string) int {
 	fs := flag.NewFlagSet("probe-mods", flag.ContinueOnError)
-	out := fs.String("out", "", "path to write the mod-probe JSON verdict")
-	if err := fs.Parse(args); err != nil || *out == "" {
-		fmt.Fprintln(os.Stderr, "probe-mods: --out is required")
+	if err := fs.Parse(args); err != nil {
 		return 2
 	}
-	if err := ProbeMods(*out); err != nil {
+	// The verdict JSON streams back to the pod over RunSelf's stdout.
+	if err := ProbeMods(os.Stdout); err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		return 1
 	}
@@ -175,12 +157,12 @@ func probeModsCmd(_ context.Context, args []string) int {
 
 func probeBridgeCmd(ctx context.Context, args []string) int {
 	fs := flag.NewFlagSet("probe-bridge", flag.ContinueOnError)
-	out := fs.String("out", "", "path to write the bridge-probe JSON verdict")
-	if err := fs.Parse(args); err != nil || *out == "" {
-		fmt.Fprintln(os.Stderr, "probe-bridge: --out is required")
+	if err := fs.Parse(args); err != nil {
 		return 2
 	}
-	if !ProbeBridge(ctx, *out) {
+	// {"ready":bool} streams to stdout; a non-zero exit on a miss is what the pod
+	// keys its bridge_not_ready abort on.
+	if !ProbeBridge(ctx, os.Stdout) {
 		fmt.Fprintln(os.Stderr, "bridge not ready")
 		return 1
 	}

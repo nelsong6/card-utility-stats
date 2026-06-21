@@ -3,6 +3,7 @@ package host
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -20,8 +21,10 @@ const BaseLibMinVersion = "3.1.8"
 // install (per-run), so only a name OUTSIDE this set is unexpected.
 var allowedMods = []string{"BaseLib", "SpireLens", "SpireLensMcp"}
 
-// ModProbeResult is the JSON the probe-mods subcommand writes for the pod to read
-// (RunSelf returns no stdout, so the verdict is returned via a file the pod scp-pulls).
+// ModProbeResult is the structured verdict the probe-mods subcommand prints to
+// stdout. RunSelf streams the host stdout line-unbuffered back to the pod step
+// (SDK v0.2.0), so the pod captures this JSON straight off the stream instead of
+// scp-pulling a file the host wrote.
 type ModProbeResult struct {
 	ModsFound      []string `json:"mods_found"`
 	BaseLibVersion string   `json:"baselib_version"`
@@ -29,15 +32,16 @@ type ModProbeResult struct {
 }
 
 // ProbeMods inspects the live mods/ dir against the AGENTS.md allowlist and the
-// BaseLib version floor, mirroring env-prep.sh's probe_mod_set, and writes the
-// verdict to outPath. It always exits 0; the pod reads the file and decides the
-// abort. Game-dir resolution failure is surfaced as a host_unavailable abort.
-func ProbeMods(outPath string) error {
+// BaseLib version floor, mirroring env-prep.sh's probe_mod_set, and prints the
+// verdict JSON to out. It always exits 0; the pod reads the streamed JSON and
+// decides the abort. Game-dir resolution failure is surfaced as a host_unavailable
+// abort.
+func ProbeMods(out io.Writer) error {
 	res := ModProbeResult{ModsFound: []string{}}
 	gameDir, err := ResolveSts2GameDir()
 	if err != nil {
 		res.AbortReason = "host_unavailable"
-		return writeJSON(outPath, res)
+		return writeJSONTo(out, res)
 	}
 	modsDir := filepath.Join(gameDir, "mods")
 	entries, _ := os.ReadDir(modsDir)
@@ -53,26 +57,27 @@ func ProbeMods(outPath string) error {
 	for _, m := range res.ModsFound {
 		if !containsFold(allowedMods, m) {
 			res.AbortReason = "unexpected_mod:" + m
-			return writeJSON(outPath, res)
+			return writeJSONTo(out, res)
 		}
 	}
 
 	res.BaseLibVersion = readBaseLibVersion(filepath.Join(modsDir, "BaseLib", "BaseLib.json"))
 	if res.BaseLibVersion == "" {
 		res.AbortReason = "baselib_missing_or_unversioned:expected>=" + BaseLibMinVersion
-		return writeJSON(outPath, res)
+		return writeJSONTo(out, res)
 	}
 	if !semverGE(res.BaseLibVersion, BaseLibMinVersion) {
 		res.AbortReason = "baselib_too_old:found=" + res.BaseLibVersion + ":expected>=" + BaseLibMinVersion
-		return writeJSON(outPath, res)
+		return writeJSONTo(out, res)
 	}
-	return writeJSON(outPath, res)
+	return writeJSONTo(out, res)
 }
 
 // ProbeBridge polls the SpireLensMcp bridge until ready, mirroring
-// env-prep.sh's probe_bridge_ready (90s deadline). Writes {"ready":bool} and
-// exits non-zero on miss so the pod aborts bridge_not_ready.
-func ProbeBridge(ctx context.Context, outPath string) bool {
+// env-prep.sh's probe_bridge_ready (90s deadline). Prints {"ready":bool} to out
+// and returns the readiness; the caller exits non-zero on a miss so RunSelf
+// surfaces a host-layer error and the pod aborts bridge_not_ready.
+func ProbeBridge(ctx context.Context, out io.Writer) bool {
 	deadline := time.Now().Add(90 * time.Second)
 	ready := false
 	for time.Now().Before(deadline) {
@@ -82,7 +87,7 @@ func ProbeBridge(ctx context.Context, outPath string) bool {
 		}
 		time.Sleep(3 * time.Second)
 	}
-	_ = writeJSON(outPath, map[string]any{"ready": ready})
+	_ = writeJSONTo(out, map[string]any{"ready": ready})
 	return ready
 }
 
@@ -165,10 +170,13 @@ func containsFold(set []string, v string) bool {
 	return false
 }
 
-func writeJSON(path string, v any) error {
+// writeJSONTo emits v as indented JSON followed by a newline, so RunSelf's
+// line-unbuffered forwarder flushes the whole verdict to the pod step's stream.
+func writeJSONTo(w io.Writer, v any) error {
 	b, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, b, 0o644)
+	_, err = w.Write(append(b, '\n'))
+	return err
 }

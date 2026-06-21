@@ -1,69 +1,61 @@
 package host
 
 import (
-	"archive/zip"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
 )
 
-// PackEvidence builds a single zip of the verification verdict + evidence so the
-// pod can pull it with one ScpPull (remotehost has no directory pull). The zip
-// lands the exact finalizer tree when unpacked into the pod's artifacts dir:
+// StageFinalizerEvidence copies the run's screenshot and live-mcp evidence into
+// the finalizer artifact tree verification.WriteFinalizable created under
+// workingDir, so the complete tree
 //
-//	verification.json
-//	screenshots/<name>
-//	evidence/<live-mcp-*.json>
+//	artifacts/verification.json
+//	artifacts/screenshots/<name>
+//	artifacts/evidence/<live-mcp-*.json>
 //
-// NOTE [SDK gap, flagged for the hub]: remotehost has ScpPushTree (push a dir)
-// and ScpPull (pull a file) but no ScpPullTree, so directory evidence is packed
-// host-side and pulled as one archive.
-func PackEvidence(workingDir, outZip string) error {
-	artifactDir := filepath.Join(workingDir, "sts2-artifacts")
-	screenshotDir := filepath.Join(workingDir, "sts2-screenshots")
-
-	f, err := os.Create(outZip)
-	if err != nil {
-		return err
+// can be pulled back to the pod with one recursive ScpPullTree (SDK v0.2.0). It
+// replaces the retired host-side zip pack + pod-side unzip: the host no longer
+// archives evidence, and the pod no longer unpacks it.
+//
+// Screenshots come from sts2-screenshots/ (the agent's SCREENSHOT_DIR) and the
+// captured get_game_state JSON from sts2-artifacts/live-mcp-*.json (the agent's
+// VALIDATION_ARTIFACT_DIR), remapped into the finalizer's screenshots/ and
+// evidence/ subdirs.
+func StageFinalizerEvidence(workingDir string) error {
+	artifacts := filepath.Join(workingDir, "artifacts")
+	screenshotsDst := filepath.Join(artifacts, "screenshots")
+	evidenceDst := filepath.Join(artifacts, "evidence")
+	for _, dir := range []string{screenshotsDst, evidenceDst} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return err
+		}
 	}
-	defer f.Close()
-	zw := zip.NewWriter(f)
-	defer zw.Close()
 
-	// verification.json (and verification.md if present).
-	for _, name := range []string{"verification.json", "verification.md"} {
-		_ = addFileToZip(zw, filepath.Join(artifactDir, name), name)
-	}
-	// screenshots/*
-	if entries, err := os.ReadDir(screenshotDir); err == nil {
+	srcScreens := filepath.Join(workingDir, "sts2-screenshots")
+	if entries, err := os.ReadDir(srcScreens); err == nil {
 		for _, e := range entries {
-			if !e.IsDir() {
-				_ = addFileToZip(zw, filepath.Join(screenshotDir, e.Name()), "screenshots/"+e.Name())
+			if e.IsDir() {
+				continue
+			}
+			if err := copyFile(filepath.Join(srcScreens, e.Name()), filepath.Join(screenshotsDst, e.Name())); err != nil {
+				return err
 			}
 		}
 	}
-	// evidence/<live-mcp-*.json> — the verifier's captured get_game_state JSON.
-	if entries, err := os.ReadDir(artifactDir); err == nil {
+
+	srcArtifacts := filepath.Join(workingDir, "sts2-artifacts")
+	if entries, err := os.ReadDir(srcArtifacts); err == nil {
 		for _, e := range entries {
-			if !e.IsDir() && strings.HasPrefix(e.Name(), "live-mcp-") && strings.HasSuffix(e.Name(), ".json") {
-				_ = addFileToZip(zw, filepath.Join(artifactDir, e.Name()), "evidence/"+e.Name())
+			if e.IsDir() {
+				continue
+			}
+			if strings.HasPrefix(e.Name(), "live-mcp-") && strings.HasSuffix(e.Name(), ".json") {
+				if err := copyFile(filepath.Join(srcArtifacts, e.Name()), filepath.Join(evidenceDst, e.Name())); err != nil {
+					return err
+				}
 			}
 		}
 	}
 	return nil
-}
-
-func addFileToZip(zw *zip.Writer, src, name string) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-	w, err := zw.Create(name)
-	if err != nil {
-		return err
-	}
-	_, err = io.Copy(w, in)
-	return err
 }

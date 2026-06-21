@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/romaine-life/glimmung/harness/remotehost"
+	"github.com/romaine-life/glimmung/harness/runcallbacks"
 	"github.com/romaine-life/glimmung/harness/step"
 )
 
@@ -50,7 +51,7 @@ func syncHostCheckout(ctx context.Context, c *step.Context, conn *remotehost.Con
 	if err != nil {
 		return step.HarnessError("sync_checkout", "resolve pod HEAD sha", err)
 	}
-	token, lerr := mintGitHubToken(ctx, c)
+	token, lerr := runcallbacks.FromContext(c).MintGitHubToken(ctx)
 	if lerr != nil {
 		return lerr
 	}

@@ -1,7 +1,7 @@
 // Package pod is the orchestrator-pod face of the glimmung-spirelens binary: one
 // step.Handler per workflow step slug. Handlers reach the warm gaming laptop
-// through the SDK's harness/remotehost venue (MintAndConnect / RunSelf / ScpPull
-// / ScpPushTree / SyncCheckout) and invoke the binary's own host face over ssh,
+// through the SDK's harness/remotehost venue (MintAndConnect / RunSelf / ScpPush
+// / ScpPullTree / SyncCheckout) and invoke the binary's own host face over ssh,
 // replacing the retired pwsh-over-ssh here-docs in scripts/glimmung-native/*.sh.
 //
 // The host face is the SAME binary cross-compiled for Windows and staged onto
@@ -13,6 +13,7 @@ package pod
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -55,14 +56,27 @@ func hostArtifact(c *step.Context, name string) string {
 // returns a connected remotehost.Conn whose RunSelf targets the staged host
 // binary. Any venue failure is a host-layer error.
 //
-// NOTE [SDK gap, flagged for the hub]: MintAndConnect is monolithic — it
-// re-keygens and re-mints the ssh cert + tailscale authkey on every call. The
-// retired lib.sh native_connect_host was step-idempotent within a pod (reuse a
-// running tailscaled, only re-mint the short-TTL cert). Re-running MintAndConnect
-// per step works (tailscale up is idempotent) but re-mints more than necessary;
-// a step-idempotent connect belongs in the SDK.
+// MintAndConnect is step-idempotent within a pod (SDK v0.2.0): a prepare phase
+// runs several steps in one process-per-step pod sharing the working dir, so a
+// per-step call converges on the existing venue — the ed25519 keypair is reused
+// while on disk, tailscaled/up runs only when no daemon is already serving the
+// pod's socket, and only the short-TTL ssh cert is re-minted each call. So every
+// step may simply call connect().
 func connect(ctx context.Context, c *step.Context) (*remotehost.Conn, *step.LayeredError) {
+	return connectCapturing(ctx, c, nil)
+}
+
+// connectCapturing is connect with RunSelf's streamed remote stdout redirected to
+// stdout instead of the default os.Stdout. A nil stdout keeps the default (the
+// pod step's captured log stream, where the runner prices each agent `usage`
+// line). The mod-set probe sets a buffer to read its structured JSON verdict
+// straight off RunSelf's streaming stdout (SDK v0.2.0), replacing the retired
+// write-to-file-then-scp-pull probe handoff.
+func connectCapturing(ctx context.Context, c *step.Context, stdout io.Writer) (*remotehost.Conn, *step.LayeredError) {
 	cfg := remotehost.FromContext(c, sshUser(), hostBinaryPath(c))
+	if stdout != nil {
+		cfg.Stdout = stdout
+	}
 	return remotehost.MintAndConnect(ctx, cfg, hostTag)
 }
 
@@ -70,18 +84,15 @@ func connect(ctx context.Context, c *step.Context) (*remotehost.Conn, *step.Laye
 // checkout and scp's it onto the laptop, so RunSelf can exec it. git_ref controls
 // the harness because the binary is built from the run's checkout.
 //
-// NOTE [SDK gap, flagged for the hub]: remotehost has ScpPushTree (a directory)
-// but no single-file push, so the binary is staged via a one-file directory tree.
+// The single .exe is pushed directly with Conn.ScpPush (SDK v0.2.0): no one-file
+// directory wrapper. Only the remote hostbin/ parent dir is ensured first, since
+// a single-file scp does not create intermediate directories.
 func stageHostBinary(ctx context.Context, c *remotehost.Conn, sc *step.Context) *step.LayeredError {
 	repoRoot := sc.Env("GLIMMUNG_REPO_ROOT")
 	if repoRoot == "" {
 		repoRoot = "/workspace/spirelens"
 	}
-	stageDir := filepath.Join(sc.WorkingDir(), "hostbin")
-	if err := os.MkdirAll(stageDir, 0o755); err != nil {
-		return step.HarnessError("host_binary_stage", "create stage dir", err)
-	}
-	exePath := filepath.Join(stageDir, "glimmung-spirelens.exe")
+	exePath := filepath.Join(sc.WorkingDir(), "glimmung-spirelens.exe")
 	build := exec.CommandContext(ctx, "go", "build", "-o", exePath, "./cmd/glimmung-spirelens")
 	build.Dir = repoRoot
 	build.Env = append(os.Environ(), "GOOS=windows", "GOARCH=amd64")
@@ -90,9 +101,10 @@ func stageHostBinary(ctx context.Context, c *remotehost.Conn, sc *step.Context) 
 	if err := build.Run(); err != nil {
 		return step.HarnessError("host_binary_build", "cross-compile windows host binary", err)
 	}
-	// Ensure the laptop working dir exists, then push the staging tree.
-	_ = c.RunCommand(ctx, "powershell", "-NoProfile", "-Command", fmt.Sprintf("New-Item -ItemType Directory -Force -Path '%s' | Out-Null", hostWorkingDir(sc)))
-	if lerr := c.ScpPushTree(ctx, stageDir, hostWorkingDir(sc)); lerr != nil {
+	// Ensure the remote hostbin/ dir exists, then push the single file into it.
+	hostbinDir := hostWorkingDir(sc) + "/hostbin"
+	_ = c.RunCommand(ctx, "powershell", "-NoProfile", "-Command", fmt.Sprintf("New-Item -ItemType Directory -Force -Path '%s' | Out-Null", hostbinDir))
+	if lerr := c.ScpPush(ctx, exePath, hostBinaryPath(sc)); lerr != nil {
 		return lerr
 	}
 	return nil

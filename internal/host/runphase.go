@@ -134,14 +134,23 @@ func runVerification(ctx context.Context, p RunPhaseParams, def prompts.PhaseDef
 		return out.Err
 	}
 
-	if err := verify.WriteVerificationJSON(artifactDir, out.Verdict); err != nil {
+	// Serialize the verdict through the SDK finalizable writer: it lands
+	// ${WorkingDir}/artifacts/verification.json and creates the screenshots/ and
+	// evidence/ dirs the finalizer scans.
+	finalizerArtifacts, err := verify.WriteVerdict(p.WorkingDir, out.Verdict)
+	if err != nil {
 		return step.HarnessError("verification_write", err.Error(), nil)
 	}
 	md := out.Markdown
 	if md == "" {
 		md = fmt.Sprintf("Status: %s\n\nAbort reason: %s\n\n%s\n", out.Verdict.Str("status"), out.Verdict.Str("abort_reason"), out.Verdict.Str("notes"))
 	}
-	_ = verify.WriteMarkdown(artifactDir, def.Markdown, md)
+	_ = verify.WriteMarkdown(finalizerArtifacts, def.Markdown, md)
+	// Assemble the screenshot + live-mcp evidence into the same finalizer tree so
+	// the whole thing pulls back to the pod with one recursive ScpPullTree.
+	if err := StageFinalizerEvidence(p.WorkingDir); err != nil {
+		return step.HarnessError("evidence_stage", err.Error(), nil)
+	}
 	return nil
 }
 
