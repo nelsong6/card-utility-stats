@@ -196,6 +196,7 @@ public static class ViewStatsInjectorPatch
         // the unique-name owner relationship, so restore it before insertion.
         if (innerTickbox != null)
         {
+            SetOwnerRecursive(clone, clone);
             var preAddVisuals = innerTickbox.GetNodeOrNull<Control>("TickboxVisuals");
             if (preAddVisuals != null)
                 preAddVisuals.UniqueNameInOwner = true;
@@ -291,6 +292,16 @@ public static class ViewStatsInjectorPatch
         catch (Exception e)
         {
             CoreMain.Logger.Error($"DisplayCards re-render failed: {e.Message}");
+        }
+    }
+
+    private static void SetOwnerRecursive(Node node, Node owner)
+    {
+        for (int i = 0; i < node.GetChildCount(); i++)
+        {
+            var child = node.GetChild(i);
+            child.Owner = owner;
+            SetOwnerRecursive(child, owner);
         }
     }
 
