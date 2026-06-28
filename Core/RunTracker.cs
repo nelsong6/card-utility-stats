@@ -1106,8 +1106,9 @@ public static class RunTracker
                     if (dre.Receiver.IsPlayer)
                     {
                         RecordPlayerBlockedDamage(dre);
-                        RecordEnemyDamageAgainstPlayer(dre);
                     }
+
+                    RecordEnemyDamage(dre);
 
                     if (dre.CardSource != null)
                     {
@@ -4615,9 +4616,8 @@ public static class RunTracker
         }
     }
 
-    private static void RecordEnemyDamageAgainstPlayer(DamageReceivedEntry entry)
+    private static void RecordEnemyDamage(DamageReceivedEntry entry)
     {
-        if (!entry.Receiver.IsPlayer) return;
         if (entry.Dealer == null || entry.Dealer.IsPlayer || entry.Dealer.Monster == null) return;
 
         int blocked = Math.Max(0, entry.Result.BlockedDamage);
@@ -4640,7 +4640,7 @@ public static class RunTracker
             }
             catch (Exception e)
             {
-                CoreMain.LogDebug($"RecordEnemyDamageAgainstPlayer failed: {e.Message}");
+                CoreMain.LogDebug($"RecordEnemyDamage failed: {e.Message}");
             }
         }
     }
