@@ -60,6 +60,18 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `v20-bone-flute-run.json`
   Adds Bone Flute owned-Osty trigger tracking alongside actual block gained in
   relic aggregates.
+- `v21-unleash-osty-hp-run.json`
+  Adds Unleash-specific Osty current-HP attack bonus tracking to card
+  aggregates.
+- `v22-osty-summon-body-run.json`
+  Adds card-sourced Osty summon HP to card aggregates and run-level Osty
+  absorbed damage to meta stats.
+- `v23-replay-extra-plays-run.json`
+  Adds per-card replay extra-play tracking, where total plays still includes
+  all plays and this field counts the subset with nonzero play-series index.
+- `v24-replay-source-breakdown-run.json`
+  Adds per-card replay extra-play source breakdowns, preserving both the total
+  extra-play count and the observed source counts when the game exposes them.
 
 Why these exist:
 

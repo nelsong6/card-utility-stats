@@ -49,7 +49,7 @@ This combat-boundary rule is important:
 
 - [Core/RunData.cs](../Core/RunData.cs) defines the serialized run shape.
 - [Core/RunStorage.cs](../Core/RunStorage.cs) handles load/save and resumability rules.
-- Schema changes are additive when possible. The current schema is `v16`.
+- Schema changes are additive when possible. The current schema fixture is `v23`.
 
 Historical compatibility is pinned by:
 
@@ -70,6 +70,7 @@ Examples already implemented:
 - observed cards drawn from draw effects
 - blocked draw attempts, categorized blocked reasons, and effect-side downstream blocked counts
 - successful self-summons to hand for recurring cards like Make It So
+- Osty summon HP, current-body absorbed damage, and Unleash's Osty-HP payoff damage
 - effect applications credited back to the source card
 - Artifact-blocked debuffs
 - downstream poison damage and poison overkill
@@ -79,6 +80,8 @@ When attribution is not naturally one-card-to-one-outcome, the code prefers:
 
 - observed outcomes over listed intent
 - pooled summaries for combat-generated cards when they do not have stable deck identity
+- run-level meta-stats surfaced on related cards when the value describes all
+  instances or occurrences of a mechanic rather than one card's own effect
 - explicitly heuristic handling instead of pretending certainty
 
 ## UI Surface
@@ -112,7 +115,7 @@ That distinction matters for both tooltip wording and data integrity.
 Use this checklist:
 
 1. read [docs/sts2-runtime-primer.md](sts2-runtime-primer.md) for hook timing and attribution traps
-2. decide whether the stat should be per-instance, pooled, effect-oriented, or relic-oriented
+2. decide whether the stat should be per-instance, pooled, meta-stat, effect-oriented, or relic-oriented
 3. record the observed game outcome, not just the requested amount, if those can diverge
 4. update [RunData.cs](../Core/RunData.cs) if persistence changes
 5. update fixtures under [Fixtures/RunSchema](../Fixtures/RunSchema/README.md)

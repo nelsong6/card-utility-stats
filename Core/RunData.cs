@@ -48,6 +48,13 @@ public class RunData
     public Dictionary<string, RelicAggregate> RelicAggregates { get; set; } = new();
 
     /// <summary>
+    /// Run-level facts surfaced on related cards when that card is the natural
+    /// place to inspect the mechanic, but the value is not caused by that
+    /// specific card instance.
+    /// </summary>
+    public RunMetaStats MetaStats { get; set; } = new();
+
+    /// <summary>
     /// Snapshot of per-instance number assignments, serialized so that hot
     /// reload mid-run can resume with the same numbers instead of losing
     /// the CardModel-ref → number mapping (which only lives in memory on
@@ -206,6 +213,28 @@ public class CardAggregate
     // of this number.
     public int TimesSummonedToHand { get; set; }
 
+    // M3n: Unleash-specific Osty HP scaling. Unleash adds Osty's current HP
+    // to its attack payload; these fields track that contribution separately
+    // from the normal observed damage totals.
+    public int TotalOstyHpAttackBonus { get; set; }
+    public int TimesOstyHpAttackBonusApplied { get; set; }
+
+    // M3o: Card-sourced successful Osty summons. These are direct card
+    // contributions: how often this card summoned/revived Osty and how much
+    // Osty HP the command actually added.
+    public int TimesOstySummoned { get; set; }
+    public decimal TotalOstyHpSummoned { get; set; }
+
+    // M3p: Extra plays caused by the game's replay/multi-play series. Total
+    // Plays already includes these; this field tracks the subset where the
+    // finished CardPlay was not the first play in its series.
+    public int TimesReplayExtraPlanned { get; set; }
+    public Dictionary<string, ReplayExtraPlayReasonAggregate> ReplayExtraPlayPlannedReasons { get; set; } = new();
+    public int TimesReplayExtraPlayed { get; set; }
+    public Dictionary<string, ReplayExtraPlayReasonAggregate> ReplayExtraPlayReasons { get; set; } = new();
+    public int TimesReplayAttackNoDamage { get; set; }
+    public Dictionary<string, ReplayExtraPlayReasonAggregate> ReplayAttackNoDamageReasons { get; set; } = new();
+
     // M4a: Effect / power application summary for this specific card
     // instance. First pass tracks ONLY that the card caused a power/effect
     // to be applied, not what the downstream effect later did. Keyed by the
@@ -248,6 +277,12 @@ public class CardAggregate
     // M3c: Draw count attribution. Null until M3c.
 }
 
+public class RunMetaStats
+{
+    public decimal TotalOstyHpSummoned { get; set; }
+    public decimal TotalOstyDamageAbsorbed { get; set; }
+}
+
 /// <summary>
 /// First-pass effect/power tracking credited back to a card instance.
 /// Keeps enough display metadata for tooltip rendering without forcing the
@@ -279,6 +314,13 @@ public class HealingLostReasonAggregate
     public string ReasonId { get; set; } = "";
     public string DisplayName { get; set; } = "";
     public decimal Amount { get; set; }
+}
+
+public class ReplayExtraPlayReasonAggregate
+{
+    public string ReasonId { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public int Count { get; set; }
 }
 
 /// <summary>

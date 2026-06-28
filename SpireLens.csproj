@@ -86,6 +86,41 @@
                 Condition="('$(Sts2DataDir)' == '' or !Exists('$(Sts2DataDir)')) and !Exists('$(Sts2LibDir)/sts2.dll')" />
     </Target>
 
+    <Target Name="GenerateSpireLensBuildInfo" BeforeTargets="CoreCompile">
+        <PropertyGroup>
+            <SpireLensBuildTimestampUtc>$([System.DateTime]::UtcNow.ToString("O"))</SpireLensBuildTimestampUtc>
+            <SpireLensBuildSource>Local</SpireLensBuildSource>
+        </PropertyGroup>
+        <Exec Command="git rev-parse --short=12 HEAD" ConsoleToMSBuild="true" IgnoreExitCode="true">
+            <Output TaskParameter="ConsoleOutput" ItemName="_SpireLensGitCommitOutput" />
+        </Exec>
+        <PropertyGroup>
+            <SpireLensGitCommitHash>@(_SpireLensGitCommitOutput)</SpireLensGitCommitHash>
+            <SpireLensGitCommitHash Condition="'$(SpireLensGitCommitHash)' == ''">unknown</SpireLensGitCommitHash>
+            <SpireLensBuildSource Condition="'$(GITHUB_ACTIONS)' == 'true'">GitHub</SpireLensBuildSource>
+            <SpireLensBuildVersion>$(SpireLensGitCommitHash)</SpireLensBuildVersion>
+            <SpireLensBuildVersion Condition="'$(GITHUB_ACTIONS)' == 'true' and '$(GITHUB_REF_NAME)' != ''">$(GITHUB_REF_NAME)</SpireLensBuildVersion>
+        </PropertyGroup>
+        <ItemGroup>
+            <Compile Include="$(IntermediateOutputPath)BuildInfo.g.cs" />
+            <_SpireLensBuildInfoLines Include="// &lt;auto-generated /&gt;" />
+            <_SpireLensBuildInfoLines Include="namespace SpireLens.Config" />
+            <_SpireLensBuildInfoLines Include="{" />
+            <_SpireLensBuildInfoLines Include="internal static class BuildInfo" />
+            <_SpireLensBuildInfoLines Include="{" />
+            <_SpireLensBuildInfoLines Include="    public const string Version = &quot;$(SpireLensBuildVersion)&quot;%3B" />
+            <_SpireLensBuildInfoLines Include="    public const string CommitHash = &quot;$(SpireLensGitCommitHash)&quot;%3B" />
+            <_SpireLensBuildInfoLines Include="    public const string Source = &quot;$(SpireLensBuildSource)&quot;%3B" />
+            <_SpireLensBuildInfoLines Include="    public const string BuildTimestampUtc = &quot;$(SpireLensBuildTimestampUtc)&quot;%3B" />
+            <_SpireLensBuildInfoLines Include="}" />
+            <_SpireLensBuildInfoLines Include="}" />
+        </ItemGroup>
+        <WriteLinesToFile
+            File="$(IntermediateOutputPath)BuildInfo.g.cs"
+            Lines="@(_SpireLensBuildInfoLines)"
+            Overwrite="true" />
+    </Target>
+
     <Target Name="CopyToModsFolderOnBuild" AfterTargets="PostBuildEvent" Condition="'$(SkipModsDeploy)' != 'true'">
         <Message Text="Copying .dll, manifest, and dependencies to mods folder." Importance="high" />
         <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ModsPath)$(MSBuildProjectName)/" />

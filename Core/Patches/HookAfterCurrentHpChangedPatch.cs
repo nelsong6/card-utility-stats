@@ -6,9 +6,9 @@ using MegaCrit.Sts2.Core.Hooks;
 namespace SpireLens.Core.Patches;
 
 /// <summary>
-/// Captures actual HP restored for owner-specific healing attribution windows.
-/// Attempted healing is recorded at the owner callback; this hook records what
-/// the game actually applied after max-HP clamping or prevention.
+/// Captures observed HP deltas after the game applies clamping, prevention, or
+/// redirection. Positive deltas feed owner-specific healing attribution; Osty
+/// negative deltas feed summon-body absorbed-damage attribution.
 /// </summary>
 [HarmonyPatch(typeof(Hook), nameof(Hook.AfterCurrentHpChanged))]
 public static class HookAfterCurrentHpChangedPatch
@@ -18,8 +18,12 @@ public static class HookAfterCurrentHpChangedPatch
     {
         try
         {
-            if (creature == null || delta <= 0m) return;
-            RunTracker.RecordRelicHealingHpChanged(creature, delta);
+            if (creature == null || delta == 0m) return;
+
+            if (delta > 0m)
+                RunTracker.RecordRelicHealingHpChanged(creature, delta);
+            else
+                RunTracker.RecordOstyHpLost(creature, -delta);
         }
         catch (Exception e)
         {

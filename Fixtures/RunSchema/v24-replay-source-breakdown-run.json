@@ -1,0 +1,74 @@
+{
+  "schema_version": 24,
+  "run_id": "fixture-v24-replay-source-breakdown",
+  "started_at": "2026-06-28T22:00:00Z",
+  "updated_at": "2026-06-28T22:12:00Z",
+  "ended_at": "2026-06-28T22:15:00Z",
+  "character": "IRONCLAD",
+  "ascension": 5,
+  "floor_reached": 12,
+  "outcome": "win",
+  "game_start_time": 1782684000,
+  "aggregates": {
+    "CARD.STRIKE_KIN#1": {
+      "plays": 6,
+      "total_intended": 36,
+      "total_blocked": 4,
+      "total_overkill": 1,
+      "total_effective": 31,
+      "kills": 1,
+      "total_energy_spent": 3,
+      "total_energy_generated": 0,
+      "total_stars_spent": 0,
+      "total_stars_generated": 0,
+      "total_forge_generated": 0,
+      "total_block_gained": 0,
+      "total_block_effective": 0,
+      "total_block_wasted": 0,
+      "times_drawn": 4,
+      "times_discarded": 0,
+      "times_placed_on_top_from_hand": 0,
+      "times_placed_on_top_from_discard": 0,
+      "times_exhausted_other_cards": 0,
+      "times_exhausted": 0,
+      "total_hp_lost": 0,
+      "times_cards_drawn": 0,
+      "times_cards_draw_attempted": 0,
+      "times_cards_draw_blocked": 0,
+      "blocked_draw_reasons": {},
+      "times_summoned_to_hand": 0,
+      "total_osty_hp_attack_bonus": 0,
+      "times_osty_hp_attack_bonus_applied": 0,
+      "times_osty_summoned": 0,
+      "total_osty_hp_summoned": 0,
+      "times_replay_extra_played": 3,
+      "replay_extra_play_reasons": {
+        "replay": {
+          "reason_id": "replay",
+          "display_name": "Replay",
+          "count": 1
+        },
+        "power:POWER.BURST": {
+          "reason_id": "power:POWER.BURST",
+          "display_name": "Burst",
+          "count": 2
+        }
+      },
+      "applied_effects": {},
+      "floor_added": 1,
+      "initial_upgrade_level": 0,
+      "removed": false
+    }
+  },
+  "relic_aggregates": {},
+  "meta_stats": {},
+  "events": [],
+  "instance_numbers_by_def": {
+    "CARD.STRIKE_KIN": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.STRIKE_KIN": 1
+  }
+}

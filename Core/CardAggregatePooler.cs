@@ -54,7 +54,18 @@ internal static class CardAggregatePooler
         target.TimesCardsDrawn += source.TimesCardsDrawn;
         target.TimesCardsDrawAttempted += source.TimesCardsDrawAttempted;
         target.TimesCardsDrawBlocked += source.TimesCardsDrawBlocked;
+        target.TimesSummonedToHand += source.TimesSummonedToHand;
+        target.TotalOstyHpAttackBonus += source.TotalOstyHpAttackBonus;
+        target.TimesOstyHpAttackBonusApplied += source.TimesOstyHpAttackBonusApplied;
+        target.TimesOstySummoned += source.TimesOstySummoned;
+        target.TotalOstyHpSummoned += source.TotalOstyHpSummoned;
+        target.TimesReplayExtraPlanned += source.TimesReplayExtraPlanned;
+        target.TimesReplayExtraPlayed += source.TimesReplayExtraPlayed;
+        target.TimesReplayAttackNoDamage += source.TimesReplayAttackNoDamage;
         MergeBlockedDrawReasonsInto(target.BlockedDrawReasons, source.BlockedDrawReasons);
+        MergeReplayExtraPlayReasonsInto(target.ReplayExtraPlayPlannedReasons, source.ReplayExtraPlayPlannedReasons);
+        MergeReplayExtraPlayReasonsInto(target.ReplayExtraPlayReasons, source.ReplayExtraPlayReasons);
+        MergeReplayExtraPlayReasonsInto(target.ReplayAttackNoDamageReasons, source.ReplayAttackNoDamageReasons);
         MergeAppliedEffectsInto(target.AppliedEffects, source.AppliedEffects);
     }
 
@@ -67,6 +78,28 @@ internal static class CardAggregatePooler
             if (!target.TryGetValue(kv.Key, out var reason))
             {
                 reason = new BlockedDrawReasonAggregate
+                {
+                    ReasonId = kv.Value.ReasonId,
+                    DisplayName = kv.Value.DisplayName,
+                };
+                target[kv.Key] = reason;
+            }
+
+            reason.Count += kv.Value.Count;
+            if (string.IsNullOrWhiteSpace(reason.DisplayName) && !string.IsNullOrWhiteSpace(kv.Value.DisplayName))
+                reason.DisplayName = kv.Value.DisplayName;
+        }
+    }
+
+    private static void MergeReplayExtraPlayReasonsInto(
+        Dictionary<string, ReplayExtraPlayReasonAggregate> target,
+        Dictionary<string, ReplayExtraPlayReasonAggregate> source)
+    {
+        foreach (var kv in source)
+        {
+            if (!target.TryGetValue(kv.Key, out var reason))
+            {
+                reason = new ReplayExtraPlayReasonAggregate
                 {
                     ReasonId = kv.Value.ReasonId,
                     DisplayName = kv.Value.DisplayName,

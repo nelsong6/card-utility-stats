@@ -15,6 +15,7 @@ public sealed class RuntimeOptionsSnapshot
     public bool ShowHandTooltips { get; set; } = true;
     public bool UseVerboseHandStats { get; set; }
     public bool EnableDebugLogging { get; set; }
+    public string BuildTimeZoneId { get; set; } = "America/Los_Angeles";
 }
 
 public static class RuntimeOptionsBridge
@@ -60,6 +61,7 @@ public static class RuntimeOptionsBridge
             ShowHandTooltips = SpireLensConfig.ShowHandTooltips,
             UseVerboseHandStats = SpireLensConfig.UseVerboseHandStats,
             EnableDebugLogging = SpireLensConfig.EnableDebugLogging,
+            BuildTimeZoneId = BuildMetadataFormatter.GetTimeZoneId(SpireLensConfig.BuildTimeZone),
         };
     }
 

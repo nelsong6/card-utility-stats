@@ -190,6 +190,18 @@ public static class ViewStatsInjectorPatch
             CoreMain.Logger.Warn("ViewStatsInjector: label not found in clone");
         }
 
+        // Godot runs the clone's _Ready() during AddChild(). NTickbox._Ready()
+        // calls ConnectSignals(), which looks up %TickboxVisuals before our
+        // post-add field rewiring below. Duplicate() does not reliably preserve
+        // the unique-name owner relationship, so restore it before insertion.
+        if (innerTickbox != null)
+        {
+            SetOwnerRecursive(clone, clone);
+            var preAddVisuals = innerTickbox.GetNodeOrNull<Control>("TickboxVisuals");
+            if (preAddVisuals != null)
+                preAddVisuals.UniqueNameInOwner = true;
+        }
+
         // Insert into the same parent as the original (the DeckViewScreen).
         var parent = viewUpgradesContainer.GetParent();
         parent.AddChild(clone);
@@ -280,6 +292,16 @@ public static class ViewStatsInjectorPatch
         catch (Exception e)
         {
             CoreMain.Logger.Error($"DisplayCards re-render failed: {e.Message}");
+        }
+    }
+
+    private static void SetOwnerRecursive(Node node, Node owner)
+    {
+        for (int i = 0; i < node.GetChildCount(); i++)
+        {
+            var child = node.GetChild(i);
+            child.Owner = owner;
+            SetOwnerRecursive(child, owner);
         }
     }
 
