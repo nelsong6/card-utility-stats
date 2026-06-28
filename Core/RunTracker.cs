@@ -987,6 +987,7 @@ public static class RunTracker
                 runRelicAgg.BlockedTriggers += pendingRelicAgg.BlockedTriggers;
                 runRelicAgg.Activations += pendingRelicAgg.Activations;
                 runRelicAgg.StrengthAdded += pendingRelicAgg.StrengthAdded;
+                runRelicAgg.PlatingAdded += pendingRelicAgg.PlatingAdded;
                 runRelicAgg.BoneFluteTriggers += pendingRelicAgg.BoneFluteTriggers;
                 runRelicAgg.TotalOstyHpSummoned += pendingRelicAgg.TotalOstyHpSummoned;
                 runRelicAgg.TotalHealingAttempted += pendingRelicAgg.TotalHealingAttempted;
@@ -1571,6 +1572,7 @@ public static class RunTracker
     private const string PrismaticGemRelicId = "RELIC.PRISMATIC_GEM";
     private const string CloakClaspRelicId = "RELIC.CLOAK_CLASP";
     private const string ReptileTrinketRelicId = "RELIC.REPTILE_TRINKET";
+    private const string GorgetRelicId = "RELIC.GORGET";
     private const string MealTicketRelicId = "RELIC.MEAL_TICKET";
     private const string BurningBloodRelicId = "RELIC.BURNING_BLOOD";
     private const string WhiteBeastStatueRelicId = "RELIC.WHITE_BEAST_STATUE";
@@ -1736,6 +1738,31 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordReptileTrinketActivation failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record Gorget's owner-specific combat-room activation. Called from
+    /// <see cref="Patches.GorgetAfterRoomEnteredPatch"/> after matching the
+    /// game's CombatRoom check and reading the same Plating dynamic var that
+    /// the relic applies.
+    /// </summary>
+    public static void RecordGorgetActivation(decimal platingAdded)
+    {
+        if (platingAdded <= 0m) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(GorgetRelicId);
+                agg.Activations += 1;
+                agg.PlatingAdded += platingAdded;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordGorgetActivation failed: {e.Message}");
             }
         }
     }
@@ -2489,6 +2516,7 @@ public static class RunTracker
                     AdditionalBlockGained = committed.AdditionalBlockGained,
                     BlockedTriggers = committed.BlockedTriggers,
                     StrengthAdded = committed.StrengthAdded,
+                    PlatingAdded = committed.PlatingAdded,
                     BoneFluteTriggers = committed.BoneFluteTriggers,
                     TotalOstyHpSummoned = committed.TotalOstyHpSummoned,
                     TotalHealingAttempted = committed.TotalHealingAttempted,
@@ -2519,6 +2547,7 @@ public static class RunTracker
                 result.BlockedTriggers += pending.BlockedTriggers;
                 result.Activations += pending.Activations;
                 result.StrengthAdded += pending.StrengthAdded;
+                result.PlatingAdded += pending.PlatingAdded;
                 result.BoneFluteTriggers += pending.BoneFluteTriggers;
                 result.TotalOstyHpSummoned += pending.TotalOstyHpSummoned;
                 result.TotalHealingAttempted += pending.TotalHealingAttempted;

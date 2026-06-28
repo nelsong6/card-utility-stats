@@ -148,6 +148,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is Gorget)
+            {
+                const string relicId = "RELIC.GORGET";
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+
+                var body = BuildGorgetBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Gorget", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is MealTicket)
             {
                 const string relicId = "RELIC.MEAL_TICKET";
@@ -284,6 +294,14 @@ public static class RelicHoverShowPatch
         var sb = new StringBuilder();
         Row3(sb, "Activations", agg.Activations.ToString(), "");
         Row3(sb, "Strength added", FormatDecimal(agg.StrengthAdded), "");
+        return sb.ToString();
+    }
+
+    private static string BuildGorgetBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, "Plating added", FormatDecimal(agg.PlatingAdded), "");
         return sb.ToString();
     }
 

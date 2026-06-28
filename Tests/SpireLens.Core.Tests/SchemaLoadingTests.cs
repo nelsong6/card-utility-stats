@@ -863,4 +863,15 @@ public class SchemaLoadingTests
         Assert.Equal(3, relicAgg.Activations);
         Assert.Equal(6m, relicAgg.StrengthAdded);
     }
+
+    [Fact]
+    public void ResumableLoad_AcceptsV29GorgetFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v29-gorget-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.GORGET"];
+        Assert.Equal(4, relicAgg.Activations);
+        Assert.Equal(12m, relicAgg.PlatingAdded);
+    }
 }

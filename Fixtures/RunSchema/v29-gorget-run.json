@@ -1,0 +1,20 @@
+{
+  "run_id": "schema-v29-gorget",
+  "started_at": "2026-06-28T00:00:00Z",
+  "updated_at": "2026-06-28T00:12:00Z",
+  "outcome": "in_progress",
+  "character": "CHAR.IRONCLAD",
+  "ascension": 0,
+  "floor_reached": 4,
+  "game_start_time": 1782605500,
+  "aggregates": {},
+  "events": [],
+  "instance_numbers_by_def": {},
+  "def_counters": {},
+  "relic_aggregates": {
+    "RELIC.GORGET": {
+      "activations": 4,
+      "plating_added": 12
+    }
+  }
+}

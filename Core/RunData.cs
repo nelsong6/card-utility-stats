@@ -366,6 +366,9 @@ public class RelicAggregate
     // Total Strength this relic added. Used by Reptile Trinket.
     public decimal StrengthAdded { get; set; }
 
+    // Total Plating this relic added. Used by Gorget.
+    public decimal PlatingAdded { get; set; }
+
     // Total times Bone Flute triggered from an owned Osty attack.
     public int BoneFluteTriggers { get; set; }
 
