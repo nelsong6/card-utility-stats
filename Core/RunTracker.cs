@@ -1011,6 +1011,14 @@ public static class RunTracker
                 MergeCardRewardCategories(runRelicAgg.CardRewardCategories, pendingRelicAgg.CardRewardCategories);
             }
 
+            foreach (var (enemyId, pendingEnemyAgg) in _pendingCombat.EnemyAggregates)
+            {
+                var runEnemyAgg = GetOrCreateEnemyAggregate(_currentRun, enemyId, pendingEnemyAgg.DisplayName);
+                runEnemyAgg.DamageAttempted += pendingEnemyAgg.DamageAttempted;
+                runEnemyAgg.DamageDealt += pendingEnemyAgg.DamageDealt;
+                runEnemyAgg.DamageBlocked += pendingEnemyAgg.DamageBlocked;
+            }
+
             MergeMetaStatsInto(_currentRun.MetaStats, _pendingCombat.MetaStats);
 
             // Refresh run-level metadata from the current game state (floor may have advanced).
@@ -1096,7 +1104,10 @@ public static class RunTracker
                     break;
                 case DamageReceivedEntry dre:
                     if (dre.Receiver.IsPlayer)
+                    {
                         RecordPlayerBlockedDamage(dre);
+                        RecordEnemyDamageAgainstPlayer(dre);
+                    }
 
                     if (dre.CardSource != null)
                     {
@@ -4604,6 +4615,36 @@ public static class RunTracker
         }
     }
 
+    private static void RecordEnemyDamageAgainstPlayer(DamageReceivedEntry entry)
+    {
+        if (!entry.Receiver.IsPlayer) return;
+        if (entry.Dealer == null || entry.Dealer.IsPlayer || entry.Dealer.Monster == null) return;
+
+        int blocked = Math.Max(0, entry.Result.BlockedDamage);
+        int dealt = Math.Max(0, entry.Result.UnblockedDamage);
+        int overkill = Math.Max(0, entry.Result.OverkillDamage);
+        int attempted = blocked + dealt + overkill;
+        if (attempted <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                _pendingCombat ??= new PendingCombat();
+                string enemyId = GetEnemyId(entry.Dealer);
+                string displayName = GetEnemyDisplayName(entry.Dealer);
+                var agg = GetOrCreateEnemyAggregate(_pendingCombat, enemyId, displayName);
+                agg.DamageAttempted += attempted;
+                agg.DamageDealt += dealt;
+                agg.DamageBlocked += blocked;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordEnemyDamageAgainstPlayer failed: {e.Message}");
+            }
+        }
+    }
+
     public static void NotePotentialPlayerBlockClear(Creature creature)
     {
         lock (_lock)
@@ -4905,6 +4946,93 @@ public static class RunTracker
             run.Aggregates[cardId] = agg;
         }
         return agg;
+    }
+
+    private static EnemyAggregate GetOrCreateEnemyAggregate(PendingCombat pending, string enemyId, string displayName)
+    {
+        if (!pending.EnemyAggregates.TryGetValue(enemyId, out var agg))
+        {
+            agg = new EnemyAggregate
+            {
+                EnemyId = enemyId,
+                DisplayName = displayName,
+            };
+            pending.EnemyAggregates[enemyId] = agg;
+        }
+
+        if (string.IsNullOrWhiteSpace(agg.DisplayName) && !string.IsNullOrWhiteSpace(displayName))
+            agg.DisplayName = displayName;
+        return agg;
+    }
+
+    private static EnemyAggregate GetOrCreateEnemyAggregate(RunData run, string enemyId, string displayName)
+    {
+        if (!run.EnemyAggregates.TryGetValue(enemyId, out var agg))
+        {
+            agg = new EnemyAggregate
+            {
+                EnemyId = enemyId,
+                DisplayName = displayName,
+            };
+            run.EnemyAggregates[enemyId] = agg;
+        }
+
+        if (string.IsNullOrWhiteSpace(agg.DisplayName) && !string.IsNullOrWhiteSpace(displayName))
+            agg.DisplayName = displayName;
+        return agg;
+    }
+
+    public static EnemyAggregate? GetEnemyAggregate(Creature creature)
+    {
+        if (creature?.Monster == null) return null;
+
+        string enemyId = GetEnemyId(creature);
+        string displayName = GetEnemyDisplayName(creature);
+
+        lock (_lock)
+        {
+            EnemyAggregate? result = null;
+            if (_currentRun != null && _currentRun.EnemyAggregates.TryGetValue(enemyId, out var committed))
+                result = CloneEnemyAggregate(committed);
+
+            if (_pendingCombat != null && _pendingCombat.EnemyAggregates.TryGetValue(enemyId, out var pending))
+            {
+                result ??= new EnemyAggregate
+                {
+                    EnemyId = enemyId,
+                    DisplayName = displayName,
+                };
+                result.DamageAttempted += pending.DamageAttempted;
+                result.DamageDealt += pending.DamageDealt;
+                result.DamageBlocked += pending.DamageBlocked;
+                if (string.IsNullOrWhiteSpace(result.DisplayName))
+                    result.DisplayName = pending.DisplayName;
+            }
+
+            return result;
+        }
+    }
+
+    private static EnemyAggregate CloneEnemyAggregate(EnemyAggregate source)
+    {
+        return new EnemyAggregate
+        {
+            EnemyId = source.EnemyId,
+            DisplayName = source.DisplayName,
+            DamageAttempted = source.DamageAttempted,
+            DamageDealt = source.DamageDealt,
+            DamageBlocked = source.DamageBlocked,
+        };
+    }
+
+    private static string GetEnemyId(Creature creature)
+    {
+        return creature.Monster?.Id.ToString() ?? "MONSTER.UNKNOWN";
+    }
+
+    private static string GetEnemyDisplayName(Creature creature)
+    {
+        return creature.Monster?.Id.ToString() ?? "Enemy";
     }
 
     private static int GetMakeItSoThreshold(CardModel card)
@@ -5366,6 +5494,7 @@ internal class PendingCombat
     public Dictionary<string, CardAggregate> CombatAggregates { get; } = new();
     public List<CardEvent> CombatEvents { get; } = new();
     public Dictionary<string, RelicAggregate> RelicAggregates { get; } = new();
+    public Dictionary<string, EnemyAggregate> EnemyAggregates { get; } = new();
     public List<BlockChunk> PlayerBlockLedger { get; } = new();
     public Dictionary<AbstractModel, PlayerPowerOwnershipShare> PlayerPowerOwnershipByModifier { get; }
         = new(ReferenceEqualityComparer.Instance);

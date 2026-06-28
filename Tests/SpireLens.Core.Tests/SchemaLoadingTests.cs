@@ -900,4 +900,17 @@ public class SchemaLoadingTests
         Assert.Equal(1, relicAgg.CardRewardCategories["colorless"].Count);
         Assert.Equal("Colorless", relicAgg.CardRewardCategories["colorless"].DisplayName);
     }
+
+    [Fact]
+    public void ResumableLoad_AcceptsV32EnemyDamageFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v32-enemy-damage-run.json"));
+
+        Assert.NotNull(resumed);
+        var enemyAgg = resumed!.EnemyAggregates["MONSTER.JAW_WORM"];
+        Assert.Equal("MONSTER.JAW_WORM", enemyAgg.EnemyId);
+        Assert.Equal(20, enemyAgg.DamageAttempted);
+        Assert.Equal(12, enemyAgg.DamageDealt);
+        Assert.Equal(8, enemyAgg.DamageBlocked);
+    }
 }

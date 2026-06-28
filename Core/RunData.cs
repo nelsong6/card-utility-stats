@@ -47,6 +47,9 @@ public class RunData
     /// <summary>Per-relic stat aggregates. Keyed by relic id (e.g. "RELIC.BAG_OF_MARBLES").</summary>
     public Dictionary<string, RelicAggregate> RelicAggregates { get; set; } = new();
 
+    /// <summary>Per-enemy observed damage output. Keyed by monster id.</summary>
+    public Dictionary<string, EnemyAggregate> EnemyAggregates { get; set; } = new();
+
     /// <summary>
     /// Run-level facts surfaced on related cards when that card is the natural
     /// place to inspect the mechanic, but the value is not caused by that
@@ -286,6 +289,15 @@ public class RunMetaStats
 {
     public decimal TotalOstyHpSummoned { get; set; }
     public decimal TotalOstyDamageAbsorbed { get; set; }
+}
+
+public class EnemyAggregate
+{
+    public string EnemyId { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public int DamageAttempted { get; set; }
+    public int DamageDealt { get; set; }
+    public int DamageBlocked { get; set; }
 }
 
 /// <summary>

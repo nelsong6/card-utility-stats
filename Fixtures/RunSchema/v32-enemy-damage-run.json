@@ -1,0 +1,23 @@
+{
+  "run_id": "schema-v32-enemy-damage",
+  "started_at": "2026-06-28T00:00:00Z",
+  "updated_at": "2026-06-28T00:20:00Z",
+  "outcome": "in_progress",
+  "character": "CHAR.KIN",
+  "ascension": 0,
+  "floor_reached": 5,
+  "game_start_time": 1782606000,
+  "aggregates": {},
+  "events": [],
+  "instance_numbers_by_def": {},
+  "def_counters": {},
+  "enemy_aggregates": {
+    "MONSTER.JAW_WORM": {
+      "enemy_id": "MONSTER.JAW_WORM",
+      "display_name": "MONSTER.JAW_WORM",
+      "damage_attempted": 20,
+      "damage_dealt": 12,
+      "damage_blocked": 8
+    }
+  }
+}
