@@ -355,13 +355,33 @@ For new persisted fields:
 
 Use this decision order when adding a stat:
 
-1. Prefer an observed outcome hook over card text or intent.
-2. If the observed outcome lacks source context, capture the source earlier and resolve it later through a narrow pending window.
-3. If a high-level combat-history wrapper is tiny, beware JIT inlining; prefer a substantive `Hook.*` method or actual mutation point.
-4. If the game method mutates a value, use prefix/postfix before/after snapshots to record actual delta.
-5. If an action can be redirected, use a final post-mutation hook for the result.
-6. If the outcome is heuristic, label the implementation and tooltip behavior as heuristic.
-7. If no narrow source window exists, do not guess. Prefer no attribution or a pooled/unknown bucket.
+1. Prefer the narrowest reliable owner-specific hook for the mechanic being measured. See [ADR 0001](adr/0001-owner-specific-attribution-hooks.md).
+2. Prefer an observed outcome hook over card text or intent.
+3. If the observed outcome lacks source context, capture the source earlier and resolve it later through a narrow pending window.
+4. If a high-level combat-history wrapper is tiny, beware JIT inlining; prefer a substantive `Hook.*` method or actual mutation point.
+5. If the game method mutates a value, use prefix/postfix before/after snapshots to record actual delta.
+6. If an action can be redirected, use a final post-mutation hook for the result.
+7. If the outcome is heuristic, label the implementation and tooltip behavior as heuristic.
+8. If no narrow source window exists, do not guess. Prefer no attribution or a pooled/unknown bucket.
+
+Owner-specific means the game is invoking the card, relic, power, or mechanic
+that owns the behavior, not merely reporting a nearby downstream fact. For
+example, Book Repair Knife should start from
+`BookRepairKnife.AfterDiedToDoom`, then treat the killed-creature payload as the
+per-enemy trigger/value unit because the relic heals once per killed creature.
+A global Doom-death observer is too broad unless there is no reliable
+relic-owned callback.
+
+For per-enemy-killed effects, do not equate "callback invoked once" with
+"triggered once" unless the game mechanic really works once per callback. If an
+owner callback receives three killed creatures and applies its effect per
+creature, the user-facing trigger count is three. If the effect also changes a
+resource, measure the actual resource delta around the owner-specific callback
+when the attempted amount can diverge from the observed result.
+
+Healing has its own attribution rule: track attempted, actually restored, and
+lost healing separately, with lost-healing reason buckets such as `full_hp` and
+specific blocker ids as they are discovered. See [ADR 0002](adr/0002-healing-attribution.md).
 
 Good hook surfaces already proven useful:
 
@@ -406,7 +426,7 @@ Where do I start for a card stat?
 
 Where do I start for a relic stat?
 
-- Identify whether it fires at combat start, turn start, damage, block, draw, or resource mutation. Direct relic model callbacks are acceptable when the behavior is specific and stable; otherwise prefer common observed hooks.
+- Identify whether the relic has its own callback for the behavior first. If it does, prefer that owner-specific callback and decide whether callback count or payload-item count matches the mechanic's semantic trigger. For per-enemy effects, payload count is often the trigger/value unit. If the relic mutates a resource, record the actual observed delta when it can diverge. If no owner callback exists, identify whether the behavior fires at combat start, turn start, damage, block, draw, or resource mutation. Direct relic model callbacks are preferred when specific and stable; common observed hooks are fallbacks.
 
 How do I know whether a stat belongs to a card instance, pooled generated summary, effect summary, or relic aggregate?
 

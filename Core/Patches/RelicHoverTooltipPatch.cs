@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Text;
 using Godot;
 using HarmonyLib;
@@ -88,6 +89,33 @@ public static class RelicHoverShowPatch
                 StatsTooltip.Show(tree, __instance, "The Abacus", "SpireLens", body);
                 return;
             }
+
+            if (relicNode.Model is BookRepairKnife)
+            {
+                const string relicId = "RELIC.BOOK_REPAIR_KNIFE";
+                var agg = RunTracker.GetRelicAggregate(relicId);
+                if (agg == null
+                    || (agg.DoomDeathTriggers == 0
+                        && agg.DoomKills == 0
+                        && agg.TotalHealingRestored == 0m
+                        && agg.TotalHealingLost == 0m))
+                    return;
+
+                var body = BuildBookRepairKnifeBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Book Repair Knife", "SpireLens", body);
+                return;
+            }
+
+            if (relicNode.Model is BoneFlute)
+            {
+                const string relicId = "RELIC.BONE_FLUTE";
+                var agg = RunTracker.GetRelicAggregate(relicId);
+                if (agg == null || (agg.BoneFluteTriggers == 0 && agg.AdditionalBlockGained == 0)) return;
+
+                var body = BuildBoneFluteBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Bone Flute", "SpireLens", body);
+                return;
+            }
         }
         catch (Exception e)
         {
@@ -131,6 +159,22 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
+    private static string BuildBookRepairKnifeBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Doom kills", agg.DoomKills.ToString(), "");
+        AppendHealingStats(sb, agg);
+        return sb.ToString();
+    }
+
+    private static string BuildBoneFluteBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Times triggered", agg.BoneFluteTriggers.ToString(), "");
+        Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
+        return sb.ToString();
+    }
+
     private static string VulnerableLabel(string suffix)
     {
         var path = NormalizeResourcePath(VulnerableIconPath);
@@ -147,6 +191,33 @@ public static class RelicHoverShowPatch
     {
         var path = NormalizeResourcePath(BlockIconPath);
         return $"[img={InlineIconSize}x{InlineIconSize}]{path}[/img] {suffix}";
+    }
+
+    private static void AppendHealingStats(StringBuilder sb, RelicAggregate agg)
+    {
+        if (agg.TotalHealingRestored > 0m)
+            Row3(sb, "HP healed", FormatDecimal(agg.TotalHealingRestored), "");
+
+        if (agg.TotalHealingLost <= 0m) return;
+
+        Row3(sb, "healing lost", FormatDecimal(agg.TotalHealingLost), "");
+        foreach (var reason in agg.HealingLostReasons.Values
+                     .OrderByDescending(r => r.Amount)
+                     .ThenBy(r => r.DisplayName))
+        {
+            if (reason.Amount <= 0m) continue;
+            var label = string.IsNullOrWhiteSpace(reason.DisplayName)
+                ? "lost to other/prevented"
+                : $"lost to {reason.DisplayName}";
+            Row3(sb, label, FormatDecimal(reason.Amount), "");
+        }
+    }
+
+    private static string FormatDecimal(decimal value)
+    {
+        return decimal.Truncate(value) == value
+            ? value.ToString("0")
+            : value.ToString("0.##");
     }
 
     private static string NormalizeResourcePath(string path)

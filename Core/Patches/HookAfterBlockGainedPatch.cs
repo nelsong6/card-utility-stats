@@ -20,6 +20,7 @@ public static class HookAfterBlockGainedPatch
             if (creature == null || !creature.IsPlayer) return;
             RunTracker.RecordOrichalcumBlockGained((int)amount);
             RunTracker.RecordTheAbacusBlockGained((int)amount);
+            RunTracker.RecordBoneFluteBlockGained((int)amount);
         }
         catch (Exception e)
         {
