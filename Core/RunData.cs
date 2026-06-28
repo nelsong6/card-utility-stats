@@ -382,6 +382,7 @@ public class RelicAggregate
     public int CommonPotionsGained { get; set; }
     public int UncommonPotionsGained { get; set; }
     public int RarePotionsGained { get; set; }
+    public int PotionsSkipped { get; set; }
 }
 
 /// <summary>

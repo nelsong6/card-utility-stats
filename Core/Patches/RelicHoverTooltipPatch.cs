@@ -175,7 +175,7 @@ public static class RelicHoverShowPatch
             {
                 const string relicId = "RELIC.WHITE_BEAST_STATUE";
                 var agg = RunTracker.GetRelicAggregate(relicId);
-                if (agg == null || agg.PotionsGained == 0) return;
+                if (agg == null || (agg.PotionsGained == 0 && agg.PotionsSkipped == 0)) return;
 
                 var body = BuildWhiteBeastStatueBodyBBCode(agg);
                 StatsTooltip.Show(tree, __instance, "White Beast Statue", "SpireLens", body);
@@ -274,6 +274,7 @@ public static class RelicHoverShowPatch
     {
         var sb = new StringBuilder();
         Row3(sb, "Potions gained", agg.PotionsGained.ToString(), "");
+        Row3(sb, "Potions skipped", agg.PotionsSkipped.ToString(), "");
         Row3(sb, "common potions", agg.CommonPotionsGained.ToString(), "");
         Row3(sb, "uncommon potions", agg.UncommonPotionsGained.ToString(), "");
         Row3(sb, "rare potions", agg.RarePotionsGained.ToString(), "");

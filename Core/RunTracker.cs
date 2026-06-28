@@ -993,6 +993,7 @@ public static class RunTracker
                 runRelicAgg.CommonPotionsGained += pendingRelicAgg.CommonPotionsGained;
                 runRelicAgg.UncommonPotionsGained += pendingRelicAgg.UncommonPotionsGained;
                 runRelicAgg.RarePotionsGained += pendingRelicAgg.RarePotionsGained;
+                runRelicAgg.PotionsSkipped += pendingRelicAgg.PotionsSkipped;
             }
 
             MergeMetaStatsInto(_currentRun.MetaStats, _pendingCombat.MetaStats);
@@ -1897,6 +1898,33 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Record a White Beast potion reward skipped by the player. This only
+    /// counts rewards previously marked from White Beast's force decision.
+    /// </summary>
+    public static void RecordWhiteBeastPotionRewardSkipped(PotionReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_whiteBeastPotionRewards.Remove(reward)) return;
+
+                var agg = GetOrCreateRelicAggregateForCurrentContextLocked(WhiteBeastStatueRelicId);
+                agg.PotionsSkipped++;
+
+                if (_pendingCombat == null)
+                    SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordWhiteBeastPotionRewardSkipped failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Record Unleash's Osty-current-HP contribution to its attack payload.
     /// This is card-specific intent metadata captured at the owner callback;
     /// observed damage still flows through DamageReceivedEntry.
@@ -2317,6 +2345,7 @@ public static class RunTracker
                     CommonPotionsGained = committed.CommonPotionsGained,
                     UncommonPotionsGained = committed.UncommonPotionsGained,
                     RarePotionsGained = committed.RarePotionsGained,
+                    PotionsSkipped = committed.PotionsSkipped,
                 };
                 MergeHealingLostReasonsInto(result, committed);
             }
@@ -2342,6 +2371,7 @@ public static class RunTracker
                 result.CommonPotionsGained += pending.CommonPotionsGained;
                 result.UncommonPotionsGained += pending.UncommonPotionsGained;
                 result.RarePotionsGained += pending.RarePotionsGained;
+                result.PotionsSkipped += pending.PotionsSkipped;
             }
 
             return result;

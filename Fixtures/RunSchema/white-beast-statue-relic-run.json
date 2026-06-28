@@ -62,7 +62,8 @@
       "potions_gained": 5,
       "common_potions_gained": 2,
       "uncommon_potions_gained": 2,
-      "rare_potions_gained": 1
+      "rare_potions_gained": 1,
+      "potions_skipped": 3
     }
   },
   "events": [],

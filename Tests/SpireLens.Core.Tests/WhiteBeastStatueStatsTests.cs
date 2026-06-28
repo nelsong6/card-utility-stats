@@ -31,6 +31,7 @@ public class WhiteBeastStatueStatsTests
         Assert.Equal(0, agg.CommonPotionsGained);
         Assert.Equal(0, agg.UncommonPotionsGained);
         Assert.Equal(0, agg.RarePotionsGained);
+        Assert.Equal(0, agg.PotionsSkipped);
     }
 
     [Fact]
@@ -42,6 +43,7 @@ public class WhiteBeastStatueStatsTests
             CommonPotionsGained = 2,
             UncommonPotionsGained = 2,
             RarePotionsGained = 1,
+            PotionsSkipped = 3,
         };
         var run = new RunData();
         run.RelicAggregates[WhiteBeastStatueRelicId] = agg;
@@ -52,6 +54,7 @@ public class WhiteBeastStatueStatsTests
         Assert.Contains("common_potions_gained", json);
         Assert.Contains("uncommon_potions_gained", json);
         Assert.Contains("rare_potions_gained", json);
+        Assert.Contains("potions_skipped", json);
 
         var restored = JsonSerializer.Deserialize<RunData>(json, SerializerOptions);
 
@@ -62,6 +65,7 @@ public class WhiteBeastStatueStatsTests
         Assert.Equal(2, restoredAgg.CommonPotionsGained);
         Assert.Equal(2, restoredAgg.UncommonPotionsGained);
         Assert.Equal(1, restoredAgg.RarePotionsGained);
+        Assert.Equal(3, restoredAgg.PotionsSkipped);
     }
 
     [Fact]
@@ -73,6 +77,7 @@ public class WhiteBeastStatueStatsTests
             CommonPotionsGained = 2,
             UncommonPotionsGained = 2,
             RarePotionsGained = 1,
+            PotionsSkipped = 3,
         };
 
         var body = (string)(BuildWhiteBeastStatueBodyMethod.Invoke(null, new object?[] { agg })
@@ -80,6 +85,8 @@ public class WhiteBeastStatueStatsTests
 
         Assert.Contains("Potions gained", body);
         Assert.Contains("[b]5[/b]", body);
+        Assert.Contains("Potions skipped", body);
+        Assert.Contains("[b]3[/b]", body);
         Assert.Contains("common potions", body);
         Assert.Contains("uncommon potions", body);
         Assert.Contains("rare potions", body);
@@ -117,5 +124,6 @@ public class WhiteBeastStatueStatsTests
         Assert.Equal(0, agg.CommonPotionsGained);
         Assert.Equal(0, agg.UncommonPotionsGained);
         Assert.Equal(0, agg.RarePotionsGained);
+        Assert.Equal(0, agg.PotionsSkipped);
     }
 }

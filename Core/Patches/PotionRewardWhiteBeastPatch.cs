@@ -75,3 +75,26 @@ public static class PotionRewardWhiteBeastOnSelectPatch
         }
     }
 }
+
+[HarmonyPatch]
+public static class PotionRewardWhiteBeastOnSkippedPatch
+{
+    private static MethodBase? TargetMethod()
+    {
+        var t = AccessTools.TypeByName("MegaCrit.Sts2.Core.Rewards.PotionReward");
+        return t == null ? null : AccessTools.Method(t, "OnSkipped");
+    }
+
+    [HarmonyPostfix]
+    public static void Postfix(PotionReward __instance)
+    {
+        try
+        {
+            RunTracker.RecordWhiteBeastPotionRewardSkipped(__instance);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"PotionRewardWhiteBeastOnSkippedPatch.Postfix failed: {e.Message}");
+        }
+    }
+}

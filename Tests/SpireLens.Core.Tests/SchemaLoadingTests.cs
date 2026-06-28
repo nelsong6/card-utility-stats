@@ -420,6 +420,7 @@ public class SchemaLoadingTests
         Assert.Equal(2, relicAgg.CommonPotionsGained);
         Assert.Equal(2, relicAgg.UncommonPotionsGained);
         Assert.Equal(1, relicAgg.RarePotionsGained);
+        Assert.Equal(3, relicAgg.PotionsSkipped);
     }
 
     [Fact]
@@ -794,5 +795,6 @@ public class SchemaLoadingTests
         Assert.Equal(2, relicAgg.CommonPotionsGained);
         Assert.Equal(2, relicAgg.UncommonPotionsGained);
         Assert.Equal(1, relicAgg.RarePotionsGained);
+        Assert.Equal(3, relicAgg.PotionsSkipped);
     }
 }

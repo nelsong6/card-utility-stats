@@ -80,7 +80,7 @@ New fixtures added going forward do not need a `v*-` prefix.
   attribution, including restored healing and full-HP lost healing.
 - `white-beast-statue-relic-run.json`
   Adds White Beast Statue potion-gained tracking with common, uncommon, and
-  rare potion rarity splits.
+  rare potion rarity splits, plus skipped White Beast potion reward tracking.
 
 Why these exist:
 
