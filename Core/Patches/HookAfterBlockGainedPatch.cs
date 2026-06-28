@@ -21,6 +21,7 @@ public static class HookAfterBlockGainedPatch
             RunTracker.RecordOrichalcumBlockGained((int)amount);
             RunTracker.RecordTheAbacusBlockGained((int)amount);
             RunTracker.RecordBoneFluteBlockGained((int)amount);
+            RunTracker.RecordCloakClaspBlockGained((int)amount);
         }
         catch (Exception e)
         {

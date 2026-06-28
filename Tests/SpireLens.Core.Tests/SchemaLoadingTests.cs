@@ -260,7 +260,7 @@ public class SchemaLoadingTests
     }
 
     [Fact]
-    public void HistoricalLoad_AcceptsV19Fixture()
+    public void HistoricalLoad_AcceptsV19BookRepairKnifeFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("v19-book-repair-knife-run.json"));
 
@@ -278,7 +278,7 @@ public class SchemaLoadingTests
     }
 
     [Fact]
-    public void HistoricalLoad_AcceptsV20Fixture()
+    public void HistoricalLoad_AcceptsV20BoneFluteFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("v20-bone-flute-run.json"));
 
@@ -491,7 +491,7 @@ public class SchemaLoadingTests
     }
 
     [Fact]
-    public void ResumableLoad_AcceptsV19Fixture()
+    public void ResumableLoad_AcceptsV19BookRepairKnifeFixture()
     {
         var resumed = RunStorage.LoadResumable(FixturePath("v19-book-repair-knife-run.json"));
 
@@ -506,12 +506,56 @@ public class SchemaLoadingTests
     }
 
     [Fact]
-    public void ResumableLoad_AcceptsV20Fixture()
+    public void HistoricalLoad_AcceptsV19HappyFlowerFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("v19-happy-flower-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.HAPPY_FLOWER"];
+        Assert.Equal(3, relicAgg.EnergyGenerated);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsV19HappyFlowerFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v19-happy-flower-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.HAPPY_FLOWER"];
+        Assert.Equal(3, relicAgg.EnergyGenerated);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsV20CloakClaspFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("v20-cloak-clasp-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.CLOAK_CLASP"];
+        Assert.Equal(21, relicAgg.AdditionalBlockGained);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsV20BoneFluteFixture()
     {
         var resumed = RunStorage.LoadResumable(FixturePath("v20-bone-flute-run.json"));
 
         Assert.NotNull(resumed);
         Assert.Equal(2, resumed!.RelicAggregates["RELIC.BONE_FLUTE"].BoneFluteTriggers);
         Assert.Equal(14, resumed!.RelicAggregates["RELIC.BONE_FLUTE"].AdditionalBlockGained);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsV20CloakClaspFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v20-cloak-clasp-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.CLOAK_CLASP"];
+        Assert.Equal(21, relicAgg.AdditionalBlockGained);
     }
 }

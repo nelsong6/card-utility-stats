@@ -81,10 +81,20 @@ ephemeral Tailscale tailnet:
   against `auth.romaine.life`; the resulting tailnet node is `ephemeral` and
   dies when the orchestrator pod disconnects.
 
-The cluster-side scripts live at `scripts/glimmung-native/` and the laptop-side
-pwsh scripts at `.github/scripts/`. The pwsh contract is glimmung-shaped:
-`GLIMMUNG_RUN_ID`, `GLIMMUNG_ATTEMPT_INDEX`, `GLIMMUNG_PROJECT_REPO`,
-`GLIMMUNG_WORKING_DIR`, `GLIMMUNG_REPO_ROOT` — no GHA env vars.
+The harness is a single Go binary, `cmd/glimmung-spirelens`, built on the
+`github.com/romaine-life/glimmung/harness` run-harness SDK. It has two faces:
+the **pod face** (`glimmung-spirelens pod <slug>`) runs on the cluster-side k8s
+job pods — `main()` builds a `harness/step.Registry` and calls `step.Main`,
+which dispatches `GLIMMUNG_STEP_SLUG`; and the **host face**
+(`glimmung-spirelens <subcmd>`) is the same binary cross-compiled for Windows
+and run on this laptop over ssh by the pod (replacing the retired pwsh-over-ssh
+here-docs). The pod reaches the laptop through the SDK's `harness/remotehost`
+venue (mint ssh cert + tailscale authkey, userspace `tailscaled`, `tailscale nc`
+ssh proxy). `git_ref` controls the harness end to end: the pod cross-compiles
+the host `.exe` from its own checkout and scps it per run, and the `.mcp.json`
+template is embedded in the binary. The retired `scripts/glimmung-native/*.sh`
+and `.github/scripts/*.ps1` are gone; a Go reintroduction guard
+(`internal/migrationguard`) fails if they return.
 
 There is no GitHub Actions self-hosted runner on this host, and no GitHub
 Actions workflow file drives these runs. Sign-in remains manual (no
@@ -97,10 +107,10 @@ protocol and `docs/glimmung-workflow.md` here for the registered phase shape.
 
 In the verification phase, the unit-test gate is harness-owned and deterministic
 (an observed-outcomes-over-claimed-intent application of the attribution
-principle above). `run-phases.ps1` runs `dotnet test` on
+principle above). The host face's `run-phase` runs `dotnet test` on
 `Tests/SpireLens.Core.Tests` with a `trx` logger before the verification agent
-starts and reads the observed exit code + TRX
-(`.github/scripts/lib/UnitTestResult.ps1`); `passed` is
+starts and reads the observed exit code + TRX via the SDK's
+`harness/evidence.ObservedUnitTestResult`; `passed` is
 `exit_code == 0 && failed == 0`. A failing observed result aborts with
 `unit_tests_failed` (carrying the real failing test names) without invoking the
 agent; a passing result is stamped into `verification.json` authoritatively. The
