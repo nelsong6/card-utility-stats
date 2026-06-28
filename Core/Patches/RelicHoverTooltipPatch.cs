@@ -138,6 +138,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is ReptileTrinket)
+            {
+                const string relicId = "RELIC.REPTILE_TRINKET";
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+
+                var body = BuildReptileTrinketBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Reptile Trinket", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is MealTicket)
             {
                 const string relicId = "RELIC.MEAL_TICKET";
@@ -266,6 +276,14 @@ public static class RelicHoverShowPatch
     {
         var sb = new StringBuilder();
         Row3(sb, BlockLabel("Block gained"), agg.AdditionalBlockGained.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildReptileTrinketBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, "Strength added", FormatDecimal(agg.StrengthAdded), "");
         return sb.ToString();
     }
 

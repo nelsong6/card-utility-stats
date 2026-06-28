@@ -363,6 +363,9 @@ public class RelicAggregate
     // has block at end of turn.
     public int BlockedTriggers { get; set; }
 
+    // Total Strength this relic added. Used by Reptile Trinket.
+    public decimal StrengthAdded { get; set; }
+
     // Total times Bone Flute triggered from an owned Osty attack.
     public int BoneFluteTriggers { get; set; }
 

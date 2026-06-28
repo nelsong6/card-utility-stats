@@ -985,6 +985,8 @@ public static class RunTracker
                 runRelicAgg.AdditionalCardsDrawn += pendingRelicAgg.AdditionalCardsDrawn;
                 runRelicAgg.AdditionalBlockGained += pendingRelicAgg.AdditionalBlockGained;
                 runRelicAgg.BlockedTriggers += pendingRelicAgg.BlockedTriggers;
+                runRelicAgg.Activations += pendingRelicAgg.Activations;
+                runRelicAgg.StrengthAdded += pendingRelicAgg.StrengthAdded;
                 runRelicAgg.BoneFluteTriggers += pendingRelicAgg.BoneFluteTriggers;
                 runRelicAgg.TotalOstyHpSummoned += pendingRelicAgg.TotalOstyHpSummoned;
                 runRelicAgg.TotalHealingAttempted += pendingRelicAgg.TotalHealingAttempted;
@@ -1568,6 +1570,7 @@ public static class RunTracker
     private const string HappyFlowerRelicId = "RELIC.HAPPY_FLOWER";
     private const string PrismaticGemRelicId = "RELIC.PRISMATIC_GEM";
     private const string CloakClaspRelicId = "RELIC.CLOAK_CLASP";
+    private const string ReptileTrinketRelicId = "RELIC.REPTILE_TRINKET";
     private const string MealTicketRelicId = "RELIC.MEAL_TICKET";
     private const string BurningBloodRelicId = "RELIC.BURNING_BLOOD";
     private const string WhiteBeastStatueRelicId = "RELIC.WHITE_BEAST_STATUE";
@@ -1708,6 +1711,31 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordOrichalcumBlockedTrigger failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record Reptile Trinket's owner-specific potion-use activation. Called
+    /// from <see cref="Patches.ReptileTrinketAfterPotionUsedPatch"/> after
+    /// matching the game's owner/combat checks and reading the same Strength
+    /// dynamic var that the relic applies.
+    /// </summary>
+    public static void RecordReptileTrinketActivation(decimal strengthAdded)
+    {
+        if (strengthAdded <= 0m) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(ReptileTrinketRelicId);
+                agg.Activations += 1;
+                agg.StrengthAdded += strengthAdded;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordReptileTrinketActivation failed: {e.Message}");
             }
         }
     }
@@ -2460,6 +2488,7 @@ public static class RunTracker
                     AdditionalCardsDrawn = committed.AdditionalCardsDrawn,
                     AdditionalBlockGained = committed.AdditionalBlockGained,
                     BlockedTriggers = committed.BlockedTriggers,
+                    StrengthAdded = committed.StrengthAdded,
                     BoneFluteTriggers = committed.BoneFluteTriggers,
                     TotalOstyHpSummoned = committed.TotalOstyHpSummoned,
                     TotalHealingAttempted = committed.TotalHealingAttempted,
@@ -2488,6 +2517,8 @@ public static class RunTracker
                 result.AdditionalCardsDrawn += pending.AdditionalCardsDrawn;
                 result.AdditionalBlockGained += pending.AdditionalBlockGained;
                 result.BlockedTriggers += pending.BlockedTriggers;
+                result.Activations += pending.Activations;
+                result.StrengthAdded += pending.StrengthAdded;
                 result.BoneFluteTriggers += pending.BoneFluteTriggers;
                 result.TotalOstyHpSummoned += pending.TotalOstyHpSummoned;
                 result.TotalHealingAttempted += pending.TotalHealingAttempted;

@@ -852,4 +852,15 @@ public class SchemaLoadingTests
         Assert.Equal(3, resumed.Aggregates["CARD.SPOILS_MAP#1"].CombatsInDeck);
         Assert.Equal(3, resumed.Aggregates["CARD.STRIKE_IRONCLAD#1"].CombatsInDeck);
     }
+
+    [Fact]
+    public void ResumableLoad_AcceptsV28ReptileTrinketFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v28-reptile-trinket-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.REPTILE_TRINKET"];
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(6m, relicAgg.StrengthAdded);
+    }
 }
