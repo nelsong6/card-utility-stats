@@ -4,7 +4,6 @@ using HarmonyLib;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Models.Relics;
 using MegaCrit.Sts2.Core.Rooms;
-using MegaCrit.Sts2.Core.Runs;
 
 namespace SpireLens.Core.Patches;
 
@@ -24,7 +23,6 @@ public static class WhiteBeastStatueShouldForcePotionRewardPatch
     [HarmonyPostfix]
     public static void Postfix(
         WhiteBeastStatue __instance,
-        IRunState runState,
         Player player,
         RoomType roomType,
         bool __result)
