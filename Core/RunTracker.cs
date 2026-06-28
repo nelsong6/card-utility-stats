@@ -1930,6 +1930,7 @@ public static class RunTracker
                         RelicId = BookRepairKnifeRelicId,
                         Creature = healedCreature,
                         Attempted = attemptedHealing,
+                        InitialCurrentHp = healedCreature.CurrentHp,
                         InitialMissingHp = initialMissingHp,
                     });
                 }
@@ -1991,6 +1992,7 @@ public static class RunTracker
                     RelicId = relicId,
                     Creature = healedCreature,
                     Attempted = attemptedHealing,
+                    InitialCurrentHp = healedCreature.CurrentHp,
                     InitialMissingHp = initialMissingHp,
                 });
             }
@@ -2046,7 +2048,19 @@ public static class RunTracker
                 if (!string.Equals(pending.RelicId, relicId, StringComparison.Ordinal)) continue;
 
                 _pendingRelicHeals.RemoveAt(i);
-                decimal lost = Math.Max(0m, pending.Attempted - pending.ActualRestored);
+                decimal observedRestored = CalculateRelicHealingActualRestored(
+                    pending.Attempted,
+                    pending.ActualRestored,
+                    pending.InitialCurrentHp,
+                    creature.CurrentHp);
+                var observedRestoredDelta = Math.Max(0m, observedRestored - pending.ActualRestored);
+                if (observedRestoredDelta > 0m)
+                {
+                    var restoredAgg = GetOrCreateRelicAggregateForCurrentContextLocked(relicId);
+                    restoredAgg.TotalHealingRestored += observedRestoredDelta;
+                }
+
+                decimal lost = Math.Max(0m, pending.Attempted - observedRestored);
                 if (lost <= 0m)
                 {
                     if (_pendingCombat == null)
@@ -2071,6 +2085,18 @@ public static class RunTracker
                 return;
             }
         }
+    }
+
+    internal static decimal CalculateRelicHealingActualRestored(
+        decimal attempted,
+        decimal hookRecordedRestored,
+        decimal initialCurrentHp,
+        decimal finalCurrentHp)
+    {
+        if (attempted <= 0m) return 0m;
+
+        var observedHpGain = Math.Max(0m, finalCurrentHp - initialCurrentHp);
+        return Math.Min(attempted, Math.Max(hookRecordedRestored, observedHpGain));
     }
 
     /// <summary>
@@ -4775,6 +4801,7 @@ internal sealed class PendingRelicHealing
     public required string RelicId { get; init; }
     public required Creature Creature { get; init; }
     public required decimal Attempted { get; init; }
+    public required decimal InitialCurrentHp { get; init; }
     public required decimal InitialMissingHp { get; init; }
     public decimal ActualRestored { get; set; }
 }

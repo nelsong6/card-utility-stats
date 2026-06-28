@@ -102,6 +102,30 @@ public class MealTicketStatsTests
     }
 
     [Fact]
+    public void RelicHealingFinalization_UsesObservedHpGainWhenHookDeltaWasMissed()
+    {
+        var restored = RunTracker.CalculateRelicHealingActualRestored(
+            attempted: 15m,
+            hookRecordedRestored: 0m,
+            initialCurrentHp: 30m,
+            finalCurrentHp: 45m);
+
+        Assert.Equal(15m, restored);
+    }
+
+    [Fact]
+    public void RelicHealingFinalization_PreservesPartialFullHpLoss()
+    {
+        var restored = RunTracker.CalculateRelicHealingActualRestored(
+            attempted: 15m,
+            hookRecordedRestored: 0m,
+            initialCurrentHp: 60m,
+            finalCurrentHp: 70m);
+
+        Assert.Equal(10m, restored);
+    }
+
+    [Fact]
     public void RunData_OlderShapeWithoutActivations_DeserializesWithZeroDefault()
     {
         const string json = """
