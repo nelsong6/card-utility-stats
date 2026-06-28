@@ -47,6 +47,12 @@ public static class ViewStatsInjectorPatch
     // Otherwise the injected checkbox stays on screen after unload, referencing
     // a dead assembly and potentially causing exceptions when clicked.
     private static readonly List<Node> _injectedClones = new();
+    private static readonly string[] InjectedCloneNames =
+    [
+        "ViewStats",
+        "ViewRemovedCards",
+        "ViewRelicStatsBeforeCollected",
+    ];
 
     // Persist the user's checkbox choice across deck-view open/close cycles
     // AND across Core hot reloads. Each time the deck view re-opens or Core
@@ -167,6 +173,8 @@ public static class ViewStatsInjectorPatch
             return;
         }
 
+        RemoveExistingInjectedControls(viewUpgradesContainer.GetParent());
+
         InjectTickbox(
             viewUpgradesContainer,
             "ViewStats",
@@ -190,6 +198,30 @@ public static class ViewStatsInjectorPatch
             tickbox => LastInjectedShowRemovedCardsTickbox = tickbox);
 
         CoreMain.Logger.Info("ViewStatsInjector: injected deck-view SpireLens checkboxes");
+    }
+
+    private static void RemoveExistingInjectedControls(Node? parent)
+    {
+        if (parent == null) return;
+
+        int removed = 0;
+        foreach (var cloneName in InjectedCloneNames)
+        {
+            for (int i = parent.GetChildCount() - 1; i >= 0; i--)
+            {
+                var child = parent.GetChild(i);
+                if (!string.Equals(child.Name.ToString(), cloneName, StringComparison.Ordinal))
+                    continue;
+
+                parent.RemoveChild(child);
+                child.QueueFree();
+                _injectedClones.Remove(child);
+                removed++;
+            }
+        }
+
+        if (removed > 0)
+            CoreMain.Logger.Info($"ViewStatsInjector: queued {removed} stale injected controls for removal");
     }
 
     private static void InjectTickbox(
