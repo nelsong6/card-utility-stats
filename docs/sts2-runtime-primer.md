@@ -143,6 +143,22 @@ A card play has at least three useful phases for stats:
 
 `CardPlay.Resources.EnergySpent` and star spend are the source of truth for actual cost paid, not printed card cost. This captures cost reduction, free plays, X-cost behavior, and modifiers.
 
+`CardPlay.PlayIndex` and `CardPlay.PlayCount` describe a play series. Total
+card plays should still count every `CardPlayFinishedEntry`; replay extra plays
+are the subset where `PlayIndex > 0`. This preserves the normal "played N"
+stat while revealing how often Replay/Glam-like mechanics caused additional
+plays.
+
+Replay source attribution is a two-phase pattern. Capture play-count modifiers
+when the game calculates the series, then spend those pending sources only when
+an actual extra `CardPlayFinishedEntry` arrives. `Hook.ModifyCardPlayCount`
+exposes power/model contributors such as Burst, Echo Form, One Two Punch,
+Duplication, Signal Boost, and Tag Team. `Glam.EnchantPlayCount` covers the
+card-enchantment Replay path. If an extra play has no captured source, count it
+as plain `Replay`; this is the fallback for card-native/base replay counts and
+other effects that mutate the card's replay count before the hook can expose a
+source.
+
 For source context, `RunTracker` keeps notions like current player card play, recently completed player card play, pending draw source, pending effect source, and history counts. These are deliberately temporal and should be handled carefully. When adding a stat, ask:
 
 - Is the source card still current at the outcome hook?
@@ -175,6 +191,23 @@ Effective damage is the user-facing total damage because it is the HP actually r
 Known trap: an attack can play and produce no damage event, for example if the target is already dead/not fully removed or if no damage is actually received. Tooltip code treats a played attack with zero intended damage as a real but zero-damage case rather than inventing damage.
 
 Player self-damage is tracked as HP lost from playing a card and uses observed unblocked damage after reductions. That is the real cost, not the text value.
+
+## Osty Body Attribution
+
+Necrobinder has both investment cards that create or maintain Osty and payoff
+cards that spend the resulting board state. Track those as different signals.
+
+- Patch `OstyCmd.Summon`, not individual card text, for successful card-sourced
+  Osty summons. The command carries the source model and returns the
+  game-observed summon amount.
+- Attribute the summon amount to the source card. That is the card's own
+  contribution.
+- Attribute Osty HP lost through `Hook.AfterCurrentHpChanged` negative deltas
+  on any Osty creature into run-level meta stats. Do not assign all later Osty
+  damage absorbed to the card that happened to summon most recently.
+- Keep payoff tracking separate. For example, Unleash's Osty-current-HP attack
+  bonus belongs on Unleash, while HP summoned belongs on the summon card, and
+  total Osty damage absorbed is a meta stat surfaced on related summon cards.
 
 ## Block Attribution
 

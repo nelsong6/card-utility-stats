@@ -291,6 +291,67 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsV21UnleashOstyHpFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("v21-unleash-osty-hp-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        var agg = loaded.Data.Aggregates["CARD.UNLEASH#1"];
+        Assert.Equal(30, agg.TotalOstyHpAttackBonus);
+        Assert.Equal(3, agg.TimesOstyHpAttackBonusApplied);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsV22OstySummonBodyFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("v22-osty-summon-body-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        var summonAgg = loaded.Data.Aggregates["CARD.SUMMON_FORTH#1"];
+        Assert.Equal(2, summonAgg.TimesOstySummoned);
+        Assert.Equal(18m, summonAgg.TotalOstyHpSummoned);
+        Assert.Equal(11m, loaded.Data.MetaStats.TotalOstyDamageAbsorbed);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsV23ReplayExtraPlaysFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("v23-replay-extra-plays-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        var agg = loaded.Data.Aggregates["CARD.STRIKE_KIN#1"];
+        Assert.Equal(5, agg.Plays);
+        Assert.Equal(2, agg.TimesReplayExtraPlayed);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsV24ReplaySourceBreakdownFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("v24-replay-source-breakdown-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        var agg = loaded.Data.Aggregates["CARD.STRIKE_KIN#1"];
+        Assert.Equal(6, agg.Plays);
+        Assert.Equal(3, agg.TimesReplayExtraPlayed);
+        Assert.Equal(1, agg.ReplayExtraPlayReasons["replay"].Count);
+        Assert.Equal("Replay", agg.ReplayExtraPlayReasons["replay"].DisplayName);
+        Assert.Equal(2, agg.ReplayExtraPlayReasons["power:POWER.BURST"].Count);
+        Assert.Equal("Burst", agg.ReplayExtraPlayReasons["power:POWER.BURST"].DisplayName);
+    }
+
+    [Fact]
     public void ResumableLoad_RejectsLegacyV1Fixture()
     {
         var resumed = RunStorage.LoadResumable(FixturePath("v1-pooled-run.json"));
@@ -557,5 +618,52 @@ public class SchemaLoadingTests
         Assert.NotNull(resumed);
         var relicAgg = resumed!.RelicAggregates["RELIC.CLOAK_CLASP"];
         Assert.Equal(21, relicAgg.AdditionalBlockGained);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsV21UnleashOstyHpFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v21-unleash-osty-hp-run.json"));
+
+        Assert.NotNull(resumed);
+        var agg = resumed!.Aggregates["CARD.UNLEASH#1"];
+        Assert.Equal(30, agg.TotalOstyHpAttackBonus);
+        Assert.Equal(3, agg.TimesOstyHpAttackBonusApplied);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsV22OstySummonBodyFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v22-osty-summon-body-run.json"));
+
+        Assert.NotNull(resumed);
+        var summonAgg = resumed!.Aggregates["CARD.SUMMON_FORTH#1"];
+        Assert.Equal(2, summonAgg.TimesOstySummoned);
+        Assert.Equal(18m, summonAgg.TotalOstyHpSummoned);
+        Assert.Equal(11m, resumed.MetaStats.TotalOstyDamageAbsorbed);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsV23ReplayExtraPlaysFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v23-replay-extra-plays-run.json"));
+
+        Assert.NotNull(resumed);
+        var agg = resumed!.Aggregates["CARD.STRIKE_KIN#1"];
+        Assert.Equal(5, agg.Plays);
+        Assert.Equal(2, agg.TimesReplayExtraPlayed);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsV24ReplaySourceBreakdownFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v24-replay-source-breakdown-run.json"));
+
+        Assert.NotNull(resumed);
+        var agg = resumed!.Aggregates["CARD.STRIKE_KIN#1"];
+        Assert.Equal(6, agg.Plays);
+        Assert.Equal(3, agg.TimesReplayExtraPlayed);
+        Assert.Equal(1, agg.ReplayExtraPlayReasons["replay"].Count);
+        Assert.Equal(2, agg.ReplayExtraPlayReasons["power:POWER.BURST"].Count);
     }
 }

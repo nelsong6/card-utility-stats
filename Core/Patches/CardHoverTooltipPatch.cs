@@ -251,6 +251,9 @@ public static class CardHoverShowPatch
         }
 
         AppendMakeItSoStats(sb, cardModel, agg, compact: false);
+        AppendUnleashStats(sb, cardModel, agg, compact: false);
+        AppendOstySummonStats(sb, cardModel, agg, RunTracker.GetEffectiveMetaStats(), compact: false);
+        AppendReplayStats(sb, agg);
 
         bool hasDedicatedPoison = AppendDedicatedPoisonStats(sb, agg, compact: false);
         AppendAppliedEffects(sb, agg, compact: false, excludePoison: hasDedicatedPoison);
@@ -436,6 +439,9 @@ public static class CardHoverShowPatch
             Row3(sb, GetForgeStatLabel("gained"), FormatDecimal(agg.TotalForgeGenerated), "");
 
         AppendMakeItSoStats(sb, cardModel, agg, compact: true);
+        AppendUnleashStats(sb, cardModel, agg, compact: true);
+        AppendOstySummonStats(sb, cardModel, agg, RunTracker.GetEffectiveMetaStats(), compact: true);
+        AppendReplayStats(sb, agg);
 
         bool showDamage = isAttack || agg.TotalIntended > 0;
         if (showDamage)
@@ -480,6 +486,89 @@ public static class CardHoverShowPatch
         catch
         {
             return true;  // error → assume deck
+        }
+    }
+
+    private static void AppendUnleashStats(
+        StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel card,
+        CardAggregate agg,
+        bool compact)
+    {
+        if (agg.TotalOstyHpAttackBonus <= 0) return;
+        if (card is not MegaCrit.Sts2.Core.Models.Cards.Unleash
+            && !IsCardId(card, "CARD.UNLEASH"))
+            return;
+
+        Row3(sb, "Osty HP damage", agg.TotalOstyHpAttackBonus.ToString(), "");
+        if (compact) return;
+
+        decimal avgBonus = agg.TimesOstyHpAttackBonusApplied > 0
+            ? (decimal)agg.TotalOstyHpAttackBonus / agg.TimesOstyHpAttackBonusApplied
+            : 0m;
+        Row3(sb, "avg Osty HP damage", FormatDecimal(avgBonus), "");
+    }
+
+    private static void AppendOstySummonStats(
+        StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel card,
+        CardAggregate agg,
+        RunMetaStats metaStats,
+        bool compact)
+    {
+        agg ??= new CardAggregate();
+        metaStats ??= new RunMetaStats();
+
+        if (!IsOstySummonStatsHome(card, agg)) return;
+        if (agg.TotalOstyHpSummoned <= 0m && metaStats.TotalOstyDamageAbsorbed <= 0m) return;
+
+        if (agg.TotalOstyHpSummoned > 0m)
+            Row3(sb, "Osty HP summoned", FormatDecimal(agg.TotalOstyHpSummoned), "");
+
+        if (!compact && agg.TimesOstySummoned > 0)
+            Row3(sb, "Osty summons", agg.TimesOstySummoned.ToString(), "");
+
+        if (metaStats.TotalOstyDamageAbsorbed > 0m)
+            Row3(sb, "Osty dmg absorbed", FormatDecimal(metaStats.TotalOstyDamageAbsorbed), "");
+    }
+
+    private static bool IsOstySummonStatsHome(
+        MegaCrit.Sts2.Core.Models.CardModel card,
+        CardAggregate agg)
+    {
+        return agg.TimesOstySummoned > 0
+            || agg.TotalOstyHpSummoned > 0m
+            || card is SummonForth
+            || IsCardId(card, "CARD.SUMMON_FORTH");
+    }
+
+    private static bool IsCardId(MegaCrit.Sts2.Core.Models.CardModel? card, string id)
+    {
+        try
+        {
+            return card?.Id != null
+                && string.Equals(card.Id.ToString(), id, StringComparison.Ordinal);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static void AppendReplayStats(StringBuilder sb, CardAggregate agg)
+    {
+        if (agg.TimesReplayExtraPlayed <= 0) return;
+
+        Row3(sb, "Replay extra plays", agg.TimesReplayExtraPlayed.ToString(), "");
+        foreach (var reason in agg.ReplayExtraPlayReasons.Values
+                     .Where(r => r.Count > 0)
+                     .OrderByDescending(r => r.Count)
+                     .ThenBy(r => r.DisplayName))
+        {
+            var displayName = string.IsNullOrWhiteSpace(reason.DisplayName)
+                ? reason.ReasonId
+                : reason.DisplayName;
+            Row3(sb, $"Replay from {displayName}", reason.Count.ToString(), "");
         }
     }
 

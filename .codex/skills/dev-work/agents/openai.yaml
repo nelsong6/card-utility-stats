@@ -1,0 +1,4 @@
+interface:
+  display_name: "Dev Work"
+  short_description: "SpireLens branch, push, and validation flow"
+  default_prompt: "Use $dev-work for this SpireLens change."

@@ -8,7 +8,9 @@ using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Entities.Powers;
 using MegaCrit.Sts2.Core.Entities.Players;
+using MegaCrit.Sts2.Core.Hooks;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Models.Enchantments;
 using MegaCrit.Sts2.Core.Models.Cards;
 using MegaCrit.Sts2.Core.Models.Powers;
 using MegaCrit.Sts2.Core.Rooms;
@@ -92,6 +94,7 @@ public static class RunTracker
     // next added Strike gets the NEXT number, not a reused old one.
     private static readonly Dictionary<string, int> _defCounters = new();
     private static readonly HashSet<CardModel> _pendingMakeItSoSummons = new();
+    private static readonly Dictionary<CardModel, Queue<PendingReplayExtraPlaySource>> _pendingReplayExtraPlaySources = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>
     /// Wire up game event subscriptions. Called by <see cref="CoreMain.Initialize"/>
@@ -173,6 +176,19 @@ public static class RunTracker
                 MergeAggregateInto(result, pending);
             }
 
+            return result;
+        }
+    }
+
+    public static RunMetaStats GetEffectiveMetaStats()
+    {
+        lock (_lock)
+        {
+            var result = new RunMetaStats();
+            if (_currentRun != null)
+                MergeMetaStatsInto(result, _currentRun.MetaStats);
+            if (_pendingCombat != null)
+                MergeMetaStatsInto(result, _pendingCombat.MetaStats);
             return result;
         }
     }
@@ -630,6 +646,7 @@ public static class RunTracker
         _pendingHappyFlowerEnergyAttribution = false;
         _pendingCloakClaspBlockAttribution = false;
         _pendingMakeItSoSummons.Clear();
+        _pendingReplayExtraPlaySources.Clear();
     }
 
     /// <summary>
@@ -965,6 +982,8 @@ public static class RunTracker
                 runRelicAgg.EnergyGenerated += pendingRelicAgg.EnergyGenerated;
             }
 
+            MergeMetaStatsInto(_currentRun.MetaStats, _pendingCombat.MetaStats);
+
             // Refresh run-level metadata from the current game state (floor may have advanced).
             var runState = RunManager.Instance.State;
             if (runState != null)
@@ -1107,6 +1126,12 @@ public static class RunTracker
 
             var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
             agg.Plays++;
+            if (IsReplayExtraPlay(cardPlay))
+            {
+                agg.TimesReplayExtraPlayed++;
+                var reason = ConsumeReplayExtraPlaySourceLocked(cardPlay.Card);
+                RecordReplayExtraPlayReason(agg, reason.ReasonId, reason.DisplayName);
+            }
             // Energy spent = actual energy paid this play, accounting for any
             // cost modifiers (Mummified Hand / similar making a card free
             // still counts 0 here, which is what we want — the card DIDN'T
@@ -1126,6 +1151,173 @@ public static class RunTracker
                 StarsSpent = cardPlay.Resources.StarsSpent,
             });
         }
+    }
+
+    internal static bool IsReplayExtraPlay(CardPlay cardPlay)
+    {
+        return cardPlay != null && cardPlay.PlayIndex > 0;
+    }
+
+    public static void NoteGlamReplayPlayCount(Glam glam, int baseCount, int finalCount)
+    {
+        if (glam?.Card == null) return;
+        int extra = Math.Max(0, finalCount - baseCount);
+        if (extra <= 0) return;
+
+        lock (_lock)
+        {
+            EnqueueReplayExtraPlaySourceLocked(glam.Card, "enchantment:GLAM", "Glam", extra);
+        }
+    }
+
+    public static void NoteReplayPlayCountModifiers(
+        CardModel card,
+        int baseCount,
+        int finalCount,
+        IEnumerable<AbstractModel>? modifyingModels)
+    {
+        if (card == null || modifyingModels == null) return;
+
+        int remaining = Math.Max(0, finalCount - baseCount);
+        if (remaining <= 0) return;
+
+        lock (_lock)
+        {
+            foreach (var modifier in modifyingModels)
+            {
+                if (modifier == null || remaining <= 0) break;
+                var source = ResolveReplayExtraPlaySource(modifier, remaining);
+                if (source.Count <= 0) continue;
+
+                int count = Math.Min(source.Count, remaining);
+                EnqueueReplayExtraPlaySourceLocked(card, source.ReasonId, source.DisplayName, count);
+                remaining -= count;
+            }
+        }
+    }
+
+    private static void EnqueueReplayExtraPlaySourceLocked(
+        CardModel card,
+        string reasonId,
+        string displayName,
+        int count)
+    {
+        if (card == null || count <= 0) return;
+
+        var key = Canonical(card);
+        if (!_pendingReplayExtraPlaySources.TryGetValue(key, out var queue))
+        {
+            queue = new Queue<PendingReplayExtraPlaySource>();
+            _pendingReplayExtraPlaySources[key] = queue;
+        }
+
+        queue.Enqueue(new PendingReplayExtraPlaySource
+        {
+            ReasonId = string.IsNullOrWhiteSpace(reasonId) ? "replay" : reasonId,
+            DisplayName = string.IsNullOrWhiteSpace(displayName) ? "Replay" : displayName,
+            Count = count,
+        });
+    }
+
+    private static (string ReasonId, string DisplayName) ConsumeReplayExtraPlaySourceLocked(CardModel? card)
+    {
+        if (card == null) return ("replay", "Replay");
+
+        var key = Canonical(card);
+        if (!_pendingReplayExtraPlaySources.TryGetValue(key, out var queue))
+            return ("replay", "Replay");
+
+        while (queue.Count > 0)
+        {
+            var source = queue.Peek();
+            if (source.Count <= 0)
+            {
+                queue.Dequeue();
+                continue;
+            }
+
+            source.Count--;
+            var result = (source.ReasonId, source.DisplayName);
+            if (source.Count <= 0)
+                queue.Dequeue();
+            if (queue.Count == 0)
+                _pendingReplayExtraPlaySources.Remove(key);
+            return result;
+        }
+
+        _pendingReplayExtraPlaySources.Remove(key);
+        return ("replay", "Replay");
+    }
+
+    private static PendingReplayExtraPlaySource ResolveReplayExtraPlaySource(AbstractModel modifier, int remaining)
+    {
+        if (modifier is PowerModel power)
+        {
+            var effectId = power.Id.ToString();
+            var count = modifier.GetType().Name == "TagTeamPower" && power.Amount > 0
+                ? Math.Min(power.Amount, remaining)
+                : 1;
+            return new PendingReplayExtraPlaySource
+            {
+                ReasonId = $"power:{effectId}",
+                DisplayName = GetPowerDisplayName(power),
+                Count = count,
+            };
+        }
+
+        if (modifier is EnchantmentModel enchantment)
+        {
+            var name = enchantment.GetType().Name;
+            return new PendingReplayExtraPlaySource
+            {
+                ReasonId = $"enchantment:{name}",
+                DisplayName = GetReadableTypeName(name),
+                Count = 1,
+            };
+        }
+
+        var typeName = modifier.GetType().Name;
+        return new PendingReplayExtraPlaySource
+        {
+            ReasonId = $"modifier:{modifier.GetType().FullName}",
+            DisplayName = GetReadableTypeName(typeName),
+            Count = 1,
+        };
+    }
+
+    private static void RecordReplayExtraPlayReason(CardAggregate agg, string reasonId, string displayName)
+    {
+        reasonId = string.IsNullOrWhiteSpace(reasonId) ? "replay" : reasonId;
+        displayName = string.IsNullOrWhiteSpace(displayName) ? "Replay" : displayName;
+
+        if (!agg.ReplayExtraPlayReasons.TryGetValue(reasonId, out var reason))
+        {
+            reason = new ReplayExtraPlayReasonAggregate
+            {
+                ReasonId = reasonId,
+                DisplayName = displayName,
+            };
+            agg.ReplayExtraPlayReasons[reasonId] = reason;
+        }
+
+        reason.Count++;
+        if (string.IsNullOrWhiteSpace(reason.DisplayName) && !string.IsNullOrWhiteSpace(displayName))
+            reason.DisplayName = displayName;
+    }
+
+    private static string GetReadableTypeName(string typeName)
+    {
+        if (string.IsNullOrWhiteSpace(typeName)) return "Replay";
+        var trimmed = typeName;
+        if (trimmed.EndsWith("Power", StringComparison.Ordinal))
+            trimmed = trimmed[..^"Power".Length];
+        if (trimmed.EndsWith("Enchantment", StringComparison.Ordinal))
+            trimmed = trimmed[..^"Enchantment".Length];
+
+        return string.Concat(trimmed.Select((ch, index) =>
+            index > 0 && char.IsUpper(ch) && !char.IsWhiteSpace(trimmed[index - 1])
+                ? " " + ch
+                : ch.ToString()));
     }
 
     private static void NoteCardPlayStarted(CardPlay cardPlay)
@@ -1558,6 +1750,81 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordPocketwatchDraw failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record Unleash's Osty-current-HP contribution to its attack payload.
+    /// This is card-specific intent metadata captured at the owner callback;
+    /// observed damage still flows through DamageReceivedEntry.
+    /// </summary>
+    public static void RecordUnleashOstyHpAttackBonus(CardModel card, int ostyHpBonus)
+    {
+        if (card == null || ostyHpBonus <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                _pendingCombat ??= new PendingCombat();
+                var instanceId = GetOrAssignInstanceId(card);
+                var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
+                agg.TotalOstyHpAttackBonus += ostyHpBonus;
+                agg.TimesOstyHpAttackBonusApplied++;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordUnleashOstyHpAttackBonus failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record a successful card-sourced Osty summon/revive.
+    /// Called from <see cref="Patches.OstyCmdSummonPatch"/> after the async
+    /// summon command returns the game-observed amount.
+    /// </summary>
+    public static void RecordOstySummoned(Player player, CardModel sourceCard, Creature? ostyCreature, decimal amount)
+    {
+        if (player == null || sourceCard == null || amount <= 0m) return;
+        if (sourceCard.Owner != null && !ReferenceEquals(sourceCard.Owner, player)) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                _pendingCombat ??= new PendingCombat();
+                var instanceId = GetOrAssignInstanceId(sourceCard);
+                var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
+                agg.TimesOstySummoned++;
+                agg.TotalOstyHpSummoned += amount;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordOstySummoned failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record HP lost by any Osty body as a run-level meta fact.
+    /// </summary>
+    public static void RecordOstyHpLost(Creature creature, decimal hpLost)
+    {
+        if (creature == null || hpLost <= 0m) return;
+        if (creature.Monster is not MegaCrit.Sts2.Core.Models.Monsters.Osty) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                _pendingCombat ??= new PendingCombat();
+                _pendingCombat.MetaStats.TotalOstyDamageAbsorbed += hpLost;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordOstyHpLost failed: {e.Message}");
             }
         }
     }
@@ -3877,6 +4144,11 @@ public static class RunTracker
             TimesCardsDrawAttempted = source.TimesCardsDrawAttempted,
             TimesCardsDrawBlocked = source.TimesCardsDrawBlocked,
             TimesSummonedToHand = source.TimesSummonedToHand,
+            TotalOstyHpAttackBonus = source.TotalOstyHpAttackBonus,
+            TimesOstyHpAttackBonusApplied = source.TimesOstyHpAttackBonusApplied,
+            TimesOstySummoned = source.TimesOstySummoned,
+            TotalOstyHpSummoned = source.TotalOstyHpSummoned,
+            TimesReplayExtraPlayed = source.TimesReplayExtraPlayed,
             FloorAdded = source.FloorAdded,
             InitialUpgradeLevel = source.InitialUpgradeLevel,
             Removed = source.Removed,
@@ -3884,6 +4156,7 @@ public static class RunTracker
             RemovedSnapshot = source.RemovedSnapshot,
         };
         MergeBlockedDrawReasonsInto(clone.BlockedDrawReasons, source.BlockedDrawReasons);
+        MergeReplayExtraPlayReasonsInto(clone.ReplayExtraPlayReasons, source.ReplayExtraPlayReasons);
         MergeAppliedEffectsInto(clone.AppliedEffects, source.AppliedEffects);
         return clone;
     }
@@ -3915,8 +4188,21 @@ public static class RunTracker
         target.TimesCardsDrawAttempted += source.TimesCardsDrawAttempted;
         target.TimesCardsDrawBlocked += source.TimesCardsDrawBlocked;
         target.TimesSummonedToHand += source.TimesSummonedToHand;
+        target.TotalOstyHpAttackBonus += source.TotalOstyHpAttackBonus;
+        target.TimesOstyHpAttackBonusApplied += source.TimesOstyHpAttackBonusApplied;
+        target.TimesOstySummoned += source.TimesOstySummoned;
+        target.TotalOstyHpSummoned += source.TotalOstyHpSummoned;
+        target.TimesReplayExtraPlayed += source.TimesReplayExtraPlayed;
         MergeBlockedDrawReasonsInto(target.BlockedDrawReasons, source.BlockedDrawReasons);
+        MergeReplayExtraPlayReasonsInto(target.ReplayExtraPlayReasons, source.ReplayExtraPlayReasons);
         MergeAppliedEffectsInto(target.AppliedEffects, source.AppliedEffects);
+    }
+
+    private static void MergeMetaStatsInto(RunMetaStats target, RunMetaStats? source)
+    {
+        if (source == null) return;
+
+        target.TotalOstyDamageAbsorbed += source.TotalOstyDamageAbsorbed;
     }
 
     private static void MergeBlockedDrawReasonsInto(
@@ -3928,6 +4214,28 @@ public static class RunTracker
             if (!target.TryGetValue(kv.Key, out var reason))
             {
                 reason = new BlockedDrawReasonAggregate
+                {
+                    ReasonId = kv.Value.ReasonId,
+                    DisplayName = kv.Value.DisplayName,
+                };
+                target[kv.Key] = reason;
+            }
+
+            reason.Count += kv.Value.Count;
+            if (string.IsNullOrWhiteSpace(reason.DisplayName) && !string.IsNullOrWhiteSpace(kv.Value.DisplayName))
+                reason.DisplayName = kv.Value.DisplayName;
+        }
+    }
+
+    private static void MergeReplayExtraPlayReasonsInto(
+        Dictionary<string, ReplayExtraPlayReasonAggregate> target,
+        Dictionary<string, ReplayExtraPlayReasonAggregate> source)
+    {
+        foreach (var kv in source)
+        {
+            if (!target.TryGetValue(kv.Key, out var reason))
+            {
+                reason = new ReplayExtraPlayReasonAggregate
                 {
                     ReasonId = kv.Value.ReasonId,
                     DisplayName = kv.Value.DisplayName,
@@ -4231,6 +4539,7 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Creature, PendingPoisonTick> PendingPoisonTicks { get; }
         = new(ReferenceEqualityComparer.Instance);
+    public RunMetaStats MetaStats { get; } = new();
     public int NextBlockSequence { get; set; }
 }
 
@@ -4255,6 +4564,13 @@ internal sealed class PendingDrawAttempt
 {
     public required Player Player { get; init; }
     public required CardModel SourceCard { get; init; }
+}
+
+internal sealed class PendingReplayExtraPlaySource
+{
+    public required string ReasonId { get; init; }
+    public required string DisplayName { get; init; }
+    public int Count { get; set; }
 }
 
 internal sealed class PendingRelicHealing

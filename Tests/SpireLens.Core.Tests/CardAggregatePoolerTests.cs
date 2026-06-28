@@ -16,6 +16,11 @@ public class CardAggregatePoolerTests
             TimesExhausted = 1,
             TimesCardsDrawAttempted = 3,
             TimesCardsDrawBlocked = 2,
+            TotalOstyHpAttackBonus = 7,
+            TimesOstyHpAttackBonusApplied = 1,
+            TimesOstySummoned = 1,
+            TotalOstyHpSummoned = 8m,
+            TimesReplayExtraPlayed = 1,
         };
         first.AppliedEffects["POWER.ARTIFACT"] = new AppliedEffectAggregate
         {
@@ -31,6 +36,12 @@ public class CardAggregatePoolerTests
             DisplayName = "No Draw",
             Count = 2,
         };
+        first.ReplayExtraPlayReasons["replay"] = new ReplayExtraPlayReasonAggregate
+        {
+            ReasonId = "replay",
+            DisplayName = "Replay",
+            Count = 1,
+        };
 
         var second = new CardAggregate
         {
@@ -40,6 +51,11 @@ public class CardAggregatePoolerTests
             TimesExhausted = 2,
             TimesCardsDrawAttempted = 1,
             TimesCardsDrawBlocked = 1,
+            TotalOstyHpAttackBonus = 11,
+            TimesOstyHpAttackBonusApplied = 2,
+            TimesOstySummoned = 2,
+            TotalOstyHpSummoned = 12m,
+            TimesReplayExtraPlayed = 3,
         };
         second.AppliedEffects["POWER.VULNERABLE"] = new AppliedEffectAggregate
         {
@@ -53,6 +69,12 @@ public class CardAggregatePoolerTests
             ReasonId = "full_hand",
             DisplayName = "Hand full",
             Count = 1,
+        };
+        second.ReplayExtraPlayReasons["power:POWER.BURST"] = new ReplayExtraPlayReasonAggregate
+        {
+            ReasonId = "power:POWER.BURST",
+            DisplayName = "Burst",
+            Count = 3,
         };
 
         var otherDefinition = new CardAggregate
@@ -78,6 +100,13 @@ public class CardAggregatePoolerTests
         Assert.Equal(3, pooled.TimesExhausted);
         Assert.Equal(4, pooled.TimesCardsDrawAttempted);
         Assert.Equal(3, pooled.TimesCardsDrawBlocked);
+        Assert.Equal(18, pooled.TotalOstyHpAttackBonus);
+        Assert.Equal(3, pooled.TimesOstyHpAttackBonusApplied);
+        Assert.Equal(3, pooled.TimesOstySummoned);
+        Assert.Equal(20m, pooled.TotalOstyHpSummoned);
+        Assert.Equal(4, pooled.TimesReplayExtraPlayed);
+        Assert.Equal(1, pooled.ReplayExtraPlayReasons["replay"].Count);
+        Assert.Equal(3, pooled.ReplayExtraPlayReasons["power:POWER.BURST"].Count);
         Assert.Equal(2, pooled.BlockedDrawReasons["effect:POWER.NO_DRAW"].Count);
         Assert.Equal(1, pooled.BlockedDrawReasons["full_hand"].Count);
 
