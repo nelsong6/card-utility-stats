@@ -20,7 +20,9 @@ public class CardAggregatePoolerTests
             TimesOstyHpAttackBonusApplied = 1,
             TimesOstySummoned = 1,
             TotalOstyHpSummoned = 8m,
+            TimesReplayExtraPlanned = 2,
             TimesReplayExtraPlayed = 1,
+            TimesReplayAttackNoDamage = 1,
         };
         first.AppliedEffects["POWER.ARTIFACT"] = new AppliedEffectAggregate
         {
@@ -42,6 +44,18 @@ public class CardAggregatePoolerTests
             DisplayName = "Replay",
             Count = 1,
         };
+        first.ReplayExtraPlayPlannedReasons["replay"] = new ReplayExtraPlayReasonAggregate
+        {
+            ReasonId = "replay",
+            DisplayName = "Replay",
+            Count = 2,
+        };
+        first.ReplayAttackNoDamageReasons["replay"] = new ReplayExtraPlayReasonAggregate
+        {
+            ReasonId = "replay",
+            DisplayName = "Replay",
+            Count = 1,
+        };
 
         var second = new CardAggregate
         {
@@ -55,7 +69,9 @@ public class CardAggregatePoolerTests
             TimesOstyHpAttackBonusApplied = 2,
             TimesOstySummoned = 2,
             TotalOstyHpSummoned = 12m,
+            TimesReplayExtraPlanned = 3,
             TimesReplayExtraPlayed = 3,
+            TimesReplayAttackNoDamage = 2,
         };
         second.AppliedEffects["POWER.VULNERABLE"] = new AppliedEffectAggregate
         {
@@ -75,6 +91,18 @@ public class CardAggregatePoolerTests
             ReasonId = "power:POWER.BURST",
             DisplayName = "Burst",
             Count = 3,
+        };
+        second.ReplayExtraPlayPlannedReasons["power:POWER.BURST"] = new ReplayExtraPlayReasonAggregate
+        {
+            ReasonId = "power:POWER.BURST",
+            DisplayName = "Burst",
+            Count = 3,
+        };
+        second.ReplayAttackNoDamageReasons["power:POWER.BURST"] = new ReplayExtraPlayReasonAggregate
+        {
+            ReasonId = "power:POWER.BURST",
+            DisplayName = "Burst",
+            Count = 2,
         };
 
         var otherDefinition = new CardAggregate
@@ -104,9 +132,15 @@ public class CardAggregatePoolerTests
         Assert.Equal(3, pooled.TimesOstyHpAttackBonusApplied);
         Assert.Equal(3, pooled.TimesOstySummoned);
         Assert.Equal(20m, pooled.TotalOstyHpSummoned);
+        Assert.Equal(5, pooled.TimesReplayExtraPlanned);
         Assert.Equal(4, pooled.TimesReplayExtraPlayed);
+        Assert.Equal(3, pooled.TimesReplayAttackNoDamage);
+        Assert.Equal(2, pooled.ReplayExtraPlayPlannedReasons["replay"].Count);
+        Assert.Equal(3, pooled.ReplayExtraPlayPlannedReasons["power:POWER.BURST"].Count);
         Assert.Equal(1, pooled.ReplayExtraPlayReasons["replay"].Count);
         Assert.Equal(3, pooled.ReplayExtraPlayReasons["power:POWER.BURST"].Count);
+        Assert.Equal(1, pooled.ReplayAttackNoDamageReasons["replay"].Count);
+        Assert.Equal(2, pooled.ReplayAttackNoDamageReasons["power:POWER.BURST"].Count);
         Assert.Equal(2, pooled.BlockedDrawReasons["effect:POWER.NO_DRAW"].Count);
         Assert.Equal(1, pooled.BlockedDrawReasons["full_hand"].Count);
 

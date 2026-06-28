@@ -228,8 +228,12 @@ public class CardAggregate
     // M3p: Extra plays caused by the game's replay/multi-play series. Total
     // Plays already includes these; this field tracks the subset where the
     // finished CardPlay was not the first play in its series.
+    public int TimesReplayExtraPlanned { get; set; }
+    public Dictionary<string, ReplayExtraPlayReasonAggregate> ReplayExtraPlayPlannedReasons { get; set; } = new();
     public int TimesReplayExtraPlayed { get; set; }
     public Dictionary<string, ReplayExtraPlayReasonAggregate> ReplayExtraPlayReasons { get; set; } = new();
+    public int TimesReplayAttackNoDamage { get; set; }
+    public Dictionary<string, ReplayExtraPlayReasonAggregate> ReplayAttackNoDamageReasons { get; set; } = new();
 
     // M4a: Effect / power application summary for this specific card
     // instance. First pass tracks ONLY that the card caused a power/effect

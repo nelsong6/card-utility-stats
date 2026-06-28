@@ -159,6 +159,16 @@ as plain `Replay`; this is the fallback for card-native/base replay counts and
 other effects that mutate the card's replay count before the hook can expose a
 source.
 
+Replay shortfalls and no-outcome replays are not the same thing. `PlayCardAction`
+can cancel before `OnPlayWrapper` starts if `CanPlay` or `IsValidTarget` fails;
+that produces no `CardPlayStartedEntry`, no `CardPlayFinishedEntry`, and no
+resource spend. Once `OnPlayWrapper` starts, the game loops through the generated
+`playCount`, emits started/finished history for each iteration, and lets the
+card's own async `OnPlay` body run its commands. A later replay can therefore be
+a real finished card play while a command such as `AttackCommand` finds no valid
+target and produces no damage entries. Track planned replay extras, finished
+replay extras, and command-specific no-outcome buckets separately.
+
 For source context, `RunTracker` keeps notions like current player card play, recently completed player card play, pending draw source, pending effect source, and history counts. These are deliberately temporal and should be handled carefully. When adding a stat, ask:
 
 - Is the source card still current at the outcome hook?

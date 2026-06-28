@@ -563,9 +563,15 @@ public static class CardHoverShowPatch
 
     private static void AppendReplayStats(StringBuilder sb, CardAggregate agg)
     {
-        if (agg.TimesReplayExtraPlayed <= 0) return;
+        if (agg.TimesReplayExtraPlanned <= 0
+            && agg.TimesReplayExtraPlayed <= 0
+            && agg.TimesReplayAttackNoDamage <= 0)
+            return;
 
-        Row3(sb, "Replay extra plays", agg.TimesReplayExtraPlayed.ToString(), "");
+        if (agg.TimesReplayExtraPlanned > 0)
+            Row3(sb, "Replay planned/played", $"{agg.TimesReplayExtraPlanned}/{agg.TimesReplayExtraPlayed}", "");
+        else
+            Row3(sb, "Replay extra plays", agg.TimesReplayExtraPlayed.ToString(), "");
         foreach (var reason in agg.ReplayExtraPlayReasons.Values
                      .Where(r => r.Count > 0)
                      .OrderByDescending(r => r.Count)
@@ -575,6 +581,20 @@ public static class CardHoverShowPatch
                 ? reason.ReasonId
                 : reason.DisplayName;
             Row3(sb, $"Replay from {displayName}", reason.Count.ToString(), "");
+        }
+
+        if (agg.TimesReplayAttackNoDamage <= 0) return;
+
+        Row3(sb, "Replay no-damage attacks", agg.TimesReplayAttackNoDamage.ToString(), "");
+        foreach (var reason in agg.ReplayAttackNoDamageReasons.Values
+                     .Where(r => r.Count > 0)
+                     .OrderByDescending(r => r.Count)
+                     .ThenBy(r => r.DisplayName))
+        {
+            var displayName = string.IsNullOrWhiteSpace(reason.DisplayName)
+                ? reason.ReasonId
+                : reason.DisplayName;
+            Row3(sb, $"No damage from {displayName}", reason.Count.ToString(), "");
         }
     }
 

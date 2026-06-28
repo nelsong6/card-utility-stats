@@ -353,6 +353,26 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsV25ReplayOutcomesFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("v25-replay-outcomes-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        var agg = loaded.Data.Aggregates["CARD.STRIKE_KIN#1"];
+        Assert.Equal(6, agg.Plays);
+        Assert.Equal(4, agg.TimesReplayExtraPlanned);
+        Assert.Equal(3, agg.TimesReplayExtraPlayed);
+        Assert.Equal(1, agg.TimesReplayAttackNoDamage);
+        Assert.Equal(1, agg.ReplayExtraPlayPlannedReasons["replay"].Count);
+        Assert.Equal(3, agg.ReplayExtraPlayPlannedReasons["power:POWER.BURST"].Count);
+        Assert.Equal(2, agg.ReplayExtraPlayReasons["power:POWER.BURST"].Count);
+        Assert.Equal(1, agg.ReplayAttackNoDamageReasons["power:POWER.BURST"].Count);
+    }
+
+    [Fact]
     public void ResumableLoad_RejectsLegacyV1Fixture()
     {
         var resumed = RunStorage.LoadResumable(FixturePath("v1-pooled-run.json"));
@@ -667,5 +687,21 @@ public class SchemaLoadingTests
         Assert.Equal(3, agg.TimesReplayExtraPlayed);
         Assert.Equal(1, agg.ReplayExtraPlayReasons["replay"].Count);
         Assert.Equal(2, agg.ReplayExtraPlayReasons["power:POWER.BURST"].Count);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsV25ReplayOutcomesFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v25-replay-outcomes-run.json"));
+
+        Assert.NotNull(resumed);
+        var agg = resumed!.Aggregates["CARD.STRIKE_KIN#1"];
+        Assert.Equal(6, agg.Plays);
+        Assert.Equal(4, agg.TimesReplayExtraPlanned);
+        Assert.Equal(3, agg.TimesReplayExtraPlayed);
+        Assert.Equal(1, agg.TimesReplayAttackNoDamage);
+        Assert.Equal(3, agg.ReplayExtraPlayPlannedReasons["power:POWER.BURST"].Count);
+        Assert.Equal(2, agg.ReplayExtraPlayReasons["power:POWER.BURST"].Count);
+        Assert.Equal(1, agg.ReplayAttackNoDamageReasons["power:POWER.BURST"].Count);
     }
 }

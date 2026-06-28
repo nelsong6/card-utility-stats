@@ -59,9 +59,13 @@ internal static class CardAggregatePooler
         target.TimesOstyHpAttackBonusApplied += source.TimesOstyHpAttackBonusApplied;
         target.TimesOstySummoned += source.TimesOstySummoned;
         target.TotalOstyHpSummoned += source.TotalOstyHpSummoned;
+        target.TimesReplayExtraPlanned += source.TimesReplayExtraPlanned;
         target.TimesReplayExtraPlayed += source.TimesReplayExtraPlayed;
+        target.TimesReplayAttackNoDamage += source.TimesReplayAttackNoDamage;
         MergeBlockedDrawReasonsInto(target.BlockedDrawReasons, source.BlockedDrawReasons);
+        MergeReplayExtraPlayReasonsInto(target.ReplayExtraPlayPlannedReasons, source.ReplayExtraPlayPlannedReasons);
         MergeReplayExtraPlayReasonsInto(target.ReplayExtraPlayReasons, source.ReplayExtraPlayReasons);
+        MergeReplayExtraPlayReasonsInto(target.ReplayAttackNoDamageReasons, source.ReplayAttackNoDamageReasons);
         MergeAppliedEffectsInto(target.AppliedEffects, source.AppliedEffects);
     }
 

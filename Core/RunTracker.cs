@@ -95,6 +95,8 @@ public static class RunTracker
     private static readonly Dictionary<string, int> _defCounters = new();
     private static readonly HashSet<CardModel> _pendingMakeItSoSummons = new();
     private static readonly Dictionary<CardModel, Queue<PendingReplayExtraPlaySource>> _pendingReplayExtraPlaySources = new(ReferenceEqualityComparer.Instance);
+    private static readonly Dictionary<CardModel, bool> _pendingReplayExtraPlaySeriesStarted = new(ReferenceEqualityComparer.Instance);
+    private static readonly Dictionary<CardPlay, PendingReplayAttackOutcome> _pendingReplayAttackOutcomes = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>
     /// Wire up game event subscriptions. Called by <see cref="CoreMain.Initialize"/>
@@ -647,6 +649,8 @@ public static class RunTracker
         _pendingCloakClaspBlockAttribution = false;
         _pendingMakeItSoSummons.Clear();
         _pendingReplayExtraPlaySources.Clear();
+        _pendingReplayExtraPlaySeriesStarted.Clear();
+        _pendingReplayAttackOutcomes.Clear();
     }
 
     /// <summary>
@@ -1130,7 +1134,11 @@ public static class RunTracker
             {
                 agg.TimesReplayExtraPlayed++;
                 var reason = ConsumeReplayExtraPlaySourceLocked(cardPlay.Card);
+                if (!reason.FromPlannedSource)
+                    RecordReplayExtraPlayPlannedReason(agg, reason.ReasonId, reason.DisplayName, 1);
                 RecordReplayExtraPlayReason(agg, reason.ReasonId, reason.DisplayName);
+                if (TryFinishReplayAttackNoDamageLocked(cardPlay))
+                    RecordReplayAttackNoDamageReason(agg, reason.ReasonId, reason.DisplayName);
             }
             // Energy spent = actual energy paid this play, accounting for any
             // cost modifiers (Mummified Hand / similar making a card free
@@ -1205,6 +1213,9 @@ public static class RunTracker
         if (card == null || count <= 0) return;
 
         var key = Canonical(card);
+        if (_pendingReplayExtraPlaySeriesStarted.Remove(key))
+            _pendingReplayExtraPlaySources.Remove(key);
+
         if (!_pendingReplayExtraPlaySources.TryGetValue(key, out var queue))
         {
             queue = new Queue<PendingReplayExtraPlaySource>();
@@ -1217,15 +1228,20 @@ public static class RunTracker
             DisplayName = string.IsNullOrWhiteSpace(displayName) ? "Replay" : displayName,
             Count = count,
         });
+
+        _pendingCombat ??= new PendingCombat();
+        var instanceId = GetOrAssignInstanceId(card);
+        var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
+        RecordReplayExtraPlayPlannedReason(agg, reasonId, displayName, count);
     }
 
-    private static (string ReasonId, string DisplayName) ConsumeReplayExtraPlaySourceLocked(CardModel? card)
+    private static (string ReasonId, string DisplayName, bool FromPlannedSource) ConsumeReplayExtraPlaySourceLocked(CardModel? card)
     {
-        if (card == null) return ("replay", "Replay");
+        if (card == null) return ("replay", "Replay", false);
 
         var key = Canonical(card);
         if (!_pendingReplayExtraPlaySources.TryGetValue(key, out var queue))
-            return ("replay", "Replay");
+            return ("replay", "Replay", false);
 
         while (queue.Count > 0)
         {
@@ -1237,16 +1253,20 @@ public static class RunTracker
             }
 
             source.Count--;
-            var result = (source.ReasonId, source.DisplayName);
+            var result = (source.ReasonId, source.DisplayName, true);
             if (source.Count <= 0)
                 queue.Dequeue();
             if (queue.Count == 0)
+            {
                 _pendingReplayExtraPlaySources.Remove(key);
+                _pendingReplayExtraPlaySeriesStarted.Remove(key);
+            }
             return result;
         }
 
         _pendingReplayExtraPlaySources.Remove(key);
-        return ("replay", "Replay");
+        _pendingReplayExtraPlaySeriesStarted.Remove(key);
+        return ("replay", "Replay", false);
     }
 
     private static PendingReplayExtraPlaySource ResolveReplayExtraPlaySource(AbstractModel modifier, int remaining)
@@ -1287,20 +1307,43 @@ public static class RunTracker
 
     private static void RecordReplayExtraPlayReason(CardAggregate agg, string reasonId, string displayName)
     {
+        RecordReplayReason(agg.ReplayExtraPlayReasons, reasonId, displayName, 1);
+    }
+
+    private static void RecordReplayExtraPlayPlannedReason(CardAggregate agg, string reasonId, string displayName, int count)
+    {
+        if (count <= 0) return;
+        agg.TimesReplayExtraPlanned += count;
+        RecordReplayReason(agg.ReplayExtraPlayPlannedReasons, reasonId, displayName, count);
+    }
+
+    private static void RecordReplayAttackNoDamageReason(CardAggregate agg, string reasonId, string displayName)
+    {
+        agg.TimesReplayAttackNoDamage++;
+        RecordReplayReason(agg.ReplayAttackNoDamageReasons, reasonId, displayName, 1);
+    }
+
+    private static void RecordReplayReason(
+        Dictionary<string, ReplayExtraPlayReasonAggregate> reasons,
+        string reasonId,
+        string displayName,
+        int count)
+    {
+        if (count <= 0) return;
         reasonId = string.IsNullOrWhiteSpace(reasonId) ? "replay" : reasonId;
         displayName = string.IsNullOrWhiteSpace(displayName) ? "Replay" : displayName;
 
-        if (!agg.ReplayExtraPlayReasons.TryGetValue(reasonId, out var reason))
+        if (!reasons.TryGetValue(reasonId, out var reason))
         {
             reason = new ReplayExtraPlayReasonAggregate
             {
                 ReasonId = reasonId,
                 DisplayName = displayName,
             };
-            agg.ReplayExtraPlayReasons[reasonId] = reason;
+            reasons[reasonId] = reason;
         }
 
-        reason.Count++;
+        reason.Count += count;
         if (string.IsNullOrWhiteSpace(reason.DisplayName) && !string.IsNullOrWhiteSpace(displayName))
             reason.DisplayName = displayName;
     }
@@ -1325,6 +1368,15 @@ public static class RunTracker
         lock (_lock)
         {
             _currentPlayerCardPlay = cardPlay;
+            if (cardPlay?.Card != null)
+            {
+                var key = Canonical(cardPlay.Card);
+                if (cardPlay.PlayIndex == 0 && _pendingReplayExtraPlaySources.ContainsKey(key))
+                    _pendingReplayExtraPlaySeriesStarted[key] = true;
+
+                if (IsReplayExtraPlay(cardPlay) && cardPlay.Card.Type == CardType.Attack)
+                    _pendingReplayAttackOutcomes[cardPlay] = new PendingReplayAttackOutcome();
+            }
             _recentCompletedPlayerCardPlay = null;
             _recentCompletedPlayerCardPlayHistoryCount = 0;
             _pendingDrawSourceCard = null;
@@ -1343,6 +1395,13 @@ public static class RunTracker
                 && ReferenceEquals(Canonical(_currentPlayerCardPlay.Card), Canonical(cardPlay.Card)))
             {
                 _currentPlayerCardPlay = null;
+            }
+
+            if (cardPlay?.Card != null && cardPlay.IsLastInSeries)
+            {
+                var key = Canonical(cardPlay.Card);
+                _pendingReplayExtraPlaySources.Remove(key);
+                _pendingReplayExtraPlaySeriesStarted.Remove(key);
             }
 
             _recentCompletedPlayerCardPlay = cardPlay;
@@ -3936,6 +3995,7 @@ public static class RunTracker
             _pendingCombat ??= new PendingCombat();
             var instanceId = GetOrAssignInstanceId(entry.CardSource!);
             var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
+            MarkReplayAttackDamageLocked(entry.CardSource!);
 
             if (entry.Receiver.IsPlayer)
             {
@@ -3974,6 +4034,25 @@ public static class RunTracker
                 Killed = result.WasTargetKilled,
             });
         }
+    }
+
+    private static void MarkReplayAttackDamageLocked(CardModel card)
+    {
+        if (_currentPlayerCardPlay?.Card == null) return;
+        if (!IsReplayExtraPlay(_currentPlayerCardPlay)) return;
+        if (!ReferenceEquals(Canonical(_currentPlayerCardPlay.Card), Canonical(card))) return;
+
+        if (_pendingReplayAttackOutcomes.TryGetValue(_currentPlayerCardPlay, out var outcome))
+            outcome.HasDamage = true;
+    }
+
+    private static bool TryFinishReplayAttackNoDamageLocked(CardPlay cardPlay)
+    {
+        if (!_pendingReplayAttackOutcomes.TryGetValue(cardPlay, out var outcome))
+            return false;
+
+        _pendingReplayAttackOutcomes.Remove(cardPlay);
+        return !outcome.HasDamage;
     }
 
     internal static (int IntendedDamage, int EffectiveDamage) ComputeEnemyDamageTotals(
@@ -4149,7 +4228,9 @@ public static class RunTracker
             TimesOstyHpAttackBonusApplied = source.TimesOstyHpAttackBonusApplied,
             TimesOstySummoned = source.TimesOstySummoned,
             TotalOstyHpSummoned = source.TotalOstyHpSummoned,
+            TimesReplayExtraPlanned = source.TimesReplayExtraPlanned,
             TimesReplayExtraPlayed = source.TimesReplayExtraPlayed,
+            TimesReplayAttackNoDamage = source.TimesReplayAttackNoDamage,
             FloorAdded = source.FloorAdded,
             InitialUpgradeLevel = source.InitialUpgradeLevel,
             Removed = source.Removed,
@@ -4157,7 +4238,9 @@ public static class RunTracker
             RemovedSnapshot = source.RemovedSnapshot,
         };
         MergeBlockedDrawReasonsInto(clone.BlockedDrawReasons, source.BlockedDrawReasons);
+        MergeReplayExtraPlayReasonsInto(clone.ReplayExtraPlayPlannedReasons, source.ReplayExtraPlayPlannedReasons);
         MergeReplayExtraPlayReasonsInto(clone.ReplayExtraPlayReasons, source.ReplayExtraPlayReasons);
+        MergeReplayExtraPlayReasonsInto(clone.ReplayAttackNoDamageReasons, source.ReplayAttackNoDamageReasons);
         MergeAppliedEffectsInto(clone.AppliedEffects, source.AppliedEffects);
         return clone;
     }
@@ -4193,9 +4276,13 @@ public static class RunTracker
         target.TimesOstyHpAttackBonusApplied += source.TimesOstyHpAttackBonusApplied;
         target.TimesOstySummoned += source.TimesOstySummoned;
         target.TotalOstyHpSummoned += source.TotalOstyHpSummoned;
+        target.TimesReplayExtraPlanned += source.TimesReplayExtraPlanned;
         target.TimesReplayExtraPlayed += source.TimesReplayExtraPlayed;
+        target.TimesReplayAttackNoDamage += source.TimesReplayAttackNoDamage;
         MergeBlockedDrawReasonsInto(target.BlockedDrawReasons, source.BlockedDrawReasons);
+        MergeReplayExtraPlayReasonsInto(target.ReplayExtraPlayPlannedReasons, source.ReplayExtraPlayPlannedReasons);
         MergeReplayExtraPlayReasonsInto(target.ReplayExtraPlayReasons, source.ReplayExtraPlayReasons);
+        MergeReplayExtraPlayReasonsInto(target.ReplayAttackNoDamageReasons, source.ReplayAttackNoDamageReasons);
         MergeAppliedEffectsInto(target.AppliedEffects, source.AppliedEffects);
     }
 
@@ -4573,6 +4660,11 @@ internal sealed class PendingReplayExtraPlaySource
     public required string ReasonId { get; init; }
     public required string DisplayName { get; init; }
     public int Count { get; set; }
+}
+
+internal sealed class PendingReplayAttackOutcome
+{
+    public bool HasDamage { get; set; }
 }
 
 internal sealed class PendingRelicHealing
