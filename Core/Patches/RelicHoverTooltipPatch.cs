@@ -40,8 +40,7 @@ public static class RelicHoverShowPatch
             if (relicNode.Model is BagOfMarbles)
             {
                 const string relicId = "RELIC.BAG_OF_MARBLES";
-                var agg = RunTracker.GetRelicAggregate(relicId);
-                if (agg == null || (agg.EnemiesAffected == 0 && agg.VulnerableApplied == 0)) return;
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
 
                 var body = BuildBagOfMarblesBodyBBCode(agg);
                 StatsTooltip.Show(tree, __instance, "Bag of Marbles", "SpireLens", body);
@@ -51,8 +50,7 @@ public static class RelicHoverShowPatch
             if (relicNode.Model is RedMask)
             {
                 const string relicId = "RELIC.RED_MASK";
-                var agg = RunTracker.GetRelicAggregate(relicId);
-                if (agg == null || (agg.EnemiesAffected == 0 && agg.WeakApplied == 0)) return;
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
 
                 var body = BuildRedMaskBodyBBCode(agg);
                 StatsTooltip.Show(tree, __instance, "Red Mask", "SpireLens", body);
@@ -62,8 +60,7 @@ public static class RelicHoverShowPatch
             if (relicNode.Model is Pocketwatch)
             {
                 const string relicId = "RELIC.POCKETWATCH";
-                var agg = RunTracker.GetRelicAggregate(relicId);
-                if (agg == null || agg.AdditionalCardsDrawn == 0) return;
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
 
                 var body = BuildPocketwatchBodyBBCode(agg);
                 StatsTooltip.Show(tree, __instance, "Pocketwatch", "SpireLens", body);
@@ -73,8 +70,7 @@ public static class RelicHoverShowPatch
             if (relicNode.Model is Orichalcum)
             {
                 const string relicId = "RELIC.ORICHALCUM";
-                var agg = RunTracker.GetRelicAggregate(relicId);
-                if (agg == null || agg.AdditionalBlockGained == 0) return;
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
 
                 var body = BuildOrichalcumBodyBBCode(agg);
                 StatsTooltip.Show(tree, __instance, "Orichalcum", "SpireLens", body);
@@ -84,8 +80,7 @@ public static class RelicHoverShowPatch
             if (relicNode.Model is TheAbacus)
             {
                 const string relicId = "RELIC.THE_ABACUS";
-                var agg = RunTracker.GetRelicAggregate(relicId);
-                if (agg == null || agg.AdditionalBlockGained == 0) return;
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
 
                 var body = BuildTheAbacusBodyBBCode(agg);
                 StatsTooltip.Show(tree, __instance, "The Abacus", "SpireLens", body);
@@ -95,13 +90,7 @@ public static class RelicHoverShowPatch
             if (relicNode.Model is BookRepairKnife)
             {
                 const string relicId = "RELIC.BOOK_REPAIR_KNIFE";
-                var agg = RunTracker.GetRelicAggregate(relicId);
-                if (agg == null
-                    || (agg.DoomDeathTriggers == 0
-                        && agg.DoomKills == 0
-                        && agg.TotalHealingRestored == 0m
-                        && agg.TotalHealingLost == 0m))
-                    return;
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
 
                 var body = BuildBookRepairKnifeBodyBBCode(agg);
                 StatsTooltip.Show(tree, __instance, "Book Repair Knife", "SpireLens", body);
@@ -111,8 +100,7 @@ public static class RelicHoverShowPatch
             if (relicNode.Model is BoneFlute)
             {
                 const string relicId = "RELIC.BONE_FLUTE";
-                var agg = RunTracker.GetRelicAggregate(relicId);
-                if (agg == null || (agg.BoneFluteTriggers == 0 && agg.AdditionalBlockGained == 0)) return;
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
 
                 var body = BuildBoneFluteBodyBBCode(agg);
                 StatsTooltip.Show(tree, __instance, "Bone Flute", "SpireLens", body);
@@ -122,8 +110,7 @@ public static class RelicHoverShowPatch
             if (relicNode.Model is HappyFlower)
             {
                 const string relicId = "RELIC.HAPPY_FLOWER";
-                var agg = RunTracker.GetRelicAggregate(relicId);
-                if (agg == null || agg.EnergyGenerated == 0) return;
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
 
                 var body = BuildHappyFlowerBodyBBCode(agg);
                 StatsTooltip.Show(tree, __instance, "Happy Flower", "SpireLens", body);
@@ -133,8 +120,7 @@ public static class RelicHoverShowPatch
             if (relicNode.Model is CloakClasp)
             {
                 const string relicId = "RELIC.CLOAK_CLASP";
-                var agg = RunTracker.GetRelicAggregate(relicId);
-                if (agg == null || agg.AdditionalBlockGained == 0) return;
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
 
                 var body = BuildCloakClaspBodyBBCode(agg);
                 StatsTooltip.Show(tree, __instance, "Cloak Clasp", "SpireLens", body);
@@ -144,12 +130,7 @@ public static class RelicHoverShowPatch
             if (relicNode.Model is MealTicket)
             {
                 const string relicId = "RELIC.MEAL_TICKET";
-                var agg = RunTracker.GetRelicAggregate(relicId);
-                if (agg == null
-                    || (agg.Activations == 0
-                        && agg.TotalHealingRestored == 0m
-                        && agg.TotalHealingLost == 0m))
-                    return;
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
 
                 var body = BuildMealTicketBodyBBCode(agg);
                 StatsTooltip.Show(tree, __instance, "Meal Ticket", "SpireLens", body);
@@ -159,12 +140,7 @@ public static class RelicHoverShowPatch
             if (relicNode.Model is BurningBlood)
             {
                 const string relicId = "RELIC.BURNING_BLOOD";
-                var agg = RunTracker.GetRelicAggregate(relicId);
-                if (agg == null
-                    || (agg.Activations == 0
-                        && agg.TotalHealingRestored == 0m
-                        && agg.TotalHealingLost == 0m))
-                    return;
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
 
                 var body = BuildBurningBloodBodyBBCode(agg);
                 StatsTooltip.Show(tree, __instance, "Burning Blood", "SpireLens", body);
@@ -174,8 +150,7 @@ public static class RelicHoverShowPatch
             if (relicNode.Model is WhiteBeastStatue)
             {
                 const string relicId = "RELIC.WHITE_BEAST_STATUE";
-                var agg = RunTracker.GetRelicAggregate(relicId);
-                if (agg == null || (agg.PotionsGained == 0 && agg.PotionsSkipped == 0)) return;
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
 
                 var body = BuildWhiteBeastStatueBodyBBCode(agg);
                 StatsTooltip.Show(tree, __instance, "White Beast Statue", "SpireLens", body);
