@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Godot;
 using HarmonyLib;
 using MegaCrit.Sts2.addons.mega_text;
@@ -34,16 +35,18 @@ public static class ViewStatsInjectorPatch
     // Track the most recently injected tickbox so phase 2 can read its state.
     public static NTickbox? LastInjectedTickbox { get; private set; }
 
+    public static NTickbox? LastInjectedShowRemovedCardsTickbox { get; private set; }
+
     // Track the active deck-view screen so the toggle handler can trigger
     // a live re-render (via DisplayCards) when the user flips the checkbox.
     // Without this, toggling the checkbox wouldn't show/hide removed cards
     // until the user closed and reopened the deck view.
     public static NDeckViewScreen? LastInjectedDeckView { get; private set; }
 
-    // Track the cloned container so Shutdown can QueueFree() it on hot-reload.
+    // Track the cloned containers so Shutdown can QueueFree() them on hot-reload.
     // Otherwise the injected checkbox stays on screen after unload, referencing
     // a dead assembly and potentially causing exceptions when clicked.
-    private static Node? _injectedClone;
+    private static readonly List<Node> _injectedClones = new();
 
     // Persist the user's checkbox choice across deck-view open/close cycles
     // AND across Core hot reloads. Each time the deck view re-opens or Core
@@ -51,6 +54,7 @@ public static class ViewStatsInjectorPatch
     // the new state back. Cheap disk I/O (single-bool JSON file), worth it
     // so F5 doesn't keep flipping the checkbox off.
     private static bool _persistedTicked;
+    private static bool _persistedShowRemovedCardsTicked = true;
     private static bool _prefsLoaded;
 
     /// <summary>
@@ -66,6 +70,7 @@ public static class ViewStatsInjectorPatch
         {
             var prefs = PrefsStorage.Load();
             _persistedTicked = prefs.ViewStatsTicked;
+            _persistedShowRemovedCardsTicked = prefs.ShowRemovedCardsTicked;
         }
         catch (Exception e)
         {
@@ -120,13 +125,18 @@ public static class ViewStatsInjectorPatch
     /// </summary>
     public static void TeardownInjectedUI()
     {
-        if (_injectedClone != null && Godot.GodotObject.IsInstanceValid(_injectedClone))
+        foreach (var clone in _injectedClones)
         {
-            _injectedClone.QueueFree();
-            CoreMain.Logger.Info("ViewStatsInjector: cloned container queued for removal");
+            if (clone != null && Godot.GodotObject.IsInstanceValid(clone))
+            {
+                clone.QueueFree();
+            }
         }
-        _injectedClone = null;
+        if (_injectedClones.Count > 0)
+            CoreMain.Logger.Info($"ViewStatsInjector: {_injectedClones.Count} cloned containers queued for removal");
+        _injectedClones.Clear();
         LastInjectedTickbox = null;
+        LastInjectedShowRemovedCardsTickbox = null;
     }
 
     [HarmonyPostfix]
@@ -157,37 +167,73 @@ public static class ViewStatsInjectorPatch
             return;
         }
 
+        InjectTickbox(
+            viewUpgradesContainer,
+            "ViewStats",
+            "Stats",
+            "ViewStatsLabel",
+            "spirelens: show stats",
+            new Vector2(0, -120),
+            _persistedTicked,
+            OnStatsToggled,
+            tickbox => LastInjectedTickbox = tickbox);
+
+        InjectTickbox(
+            viewUpgradesContainer,
+            "ViewRemovedCards",
+            "RemovedCards",
+            "ViewRemovedCardsLabel",
+            "spirelens: show removed cards",
+            new Vector2(0, -60),
+            _persistedShowRemovedCardsTicked,
+            OnShowRemovedCardsToggled,
+            tickbox => LastInjectedShowRemovedCardsTickbox = tickbox);
+
+        CoreMain.Logger.Info("ViewStatsInjector: injected deck-view SpireLens checkboxes");
+    }
+
+    private static void InjectTickbox(
+        Node viewUpgradesContainer,
+        string cloneName,
+        string tickboxName,
+        string labelName,
+        string labelText,
+        Vector2 offset,
+        bool isTicked,
+        Action<NTickbox> onToggled,
+        Action<NTickbox> rememberTickbox)
+    {
         // Default Duplicate() copies structure + scripts. Runtime-connected signals
         // (made via .Connect() in ConnectSignals) are per-instance and NOT copied,
         // so our clone starts with no inherited toggle handlers — good.
         var clone = (Node)viewUpgradesContainer.Duplicate();
-        clone.Name = "ViewStats";
+        clone.Name = cloneName;
 
         // Rename the inner tickbox so GetNode lookups don't collide with the original %Upgrades.
         var innerTickbox = FindChildOfType<NUpgradePreviewTickbox>(clone);
         if (innerTickbox != null)
         {
-            innerTickbox.Name = "Stats";
+            innerTickbox.Name = tickboxName;
             // Connect our toggle handler. Use the Toggled signal defined on NTickbox.
-            innerTickbox.Connect(NTickbox.SignalName.Toggled, Callable.From<NTickbox>(OnStatsToggled));
-            LastInjectedTickbox = innerTickbox;
+            innerTickbox.Connect(NTickbox.SignalName.Toggled, Callable.From<NTickbox>(onToggled));
+            rememberTickbox(innerTickbox);
         }
         else
         {
-            CoreMain.Logger.Warn("ViewStatsInjector: inner tickbox not found in clone");
+            CoreMain.Logger.Warn($"ViewStatsInjector: inner tickbox not found in {cloneName}");
         }
 
         // Update the label text. MegaLabel.SetTextAutoSize takes a raw string.
         var label = FindChildOfType<MegaLabel>(clone);
         if (label != null)
         {
-            label.Name = "ViewStatsLabel";
-            label.SetTextAutoSize("Card Utility");  // mirrors the tooltip header; references our mod name
+            label.Name = labelName;
+            label.SetTextAutoSize(labelText);
             // TODO(i18n): pull from localization once we have keys
         }
         else
         {
-            CoreMain.Logger.Warn("ViewStatsInjector: label not found in clone");
+            CoreMain.Logger.Warn($"ViewStatsInjector: label not found in {cloneName}");
         }
 
         // Godot runs the clone's _Ready() during AddChild(). NTickbox._Ready()
@@ -207,7 +253,7 @@ public static class ViewStatsInjectorPatch
         parent.AddChild(clone);
 
         // Track for Shutdown (hot-reload cleanup).
-        _injectedClone = clone;
+        _injectedClones.Add(clone);
 
         // Rewire the clone's visuals to point at its OWN subtree.
         //
@@ -249,9 +295,9 @@ public static class ViewStatsInjectorPatch
                 // clone always constructs unticked, but the player expects
                 // their "I want stats on" preference to survive closing and
                 // re-opening the deck view within the same session.
-                if (innerTickbox._tickedImage != null) innerTickbox._tickedImage.Visible = _persistedTicked;
-                if (innerTickbox._notTickedImage != null) innerTickbox._notTickedImage.Visible = !_persistedTicked;
-                innerTickbox.IsTicked = _persistedTicked;
+                if (innerTickbox._tickedImage != null) innerTickbox._tickedImage.Visible = isTicked;
+                if (innerTickbox._notTickedImage != null) innerTickbox._notTickedImage.Visible = !isTicked;
+                innerTickbox.IsTicked = isTicked;
             }
             else
             {
@@ -264,10 +310,10 @@ public static class ViewStatsInjectorPatch
         // original. Empirical offset; may need adjustment once we see it.
         if (clone is Control control && viewUpgradesContainer is Control origControl)
         {
-            control.Position = origControl.Position + new Vector2(0, -60);
+            control.Position = origControl.Position + offset;
         }
 
-        CoreMain.Logger.Info($"ViewStatsInjector: injected — tickbox={innerTickbox != null} label={label != null}");
+        CoreMain.Logger.Info($"ViewStatsInjector: injected {cloneName} — tickbox={innerTickbox != null} label={label != null}");
     }
 
     private static void OnStatsToggled(NTickbox tickbox)
@@ -278,8 +324,23 @@ public static class ViewStatsInjectorPatch
         // every time they close and reopen the deck view.
         _persistedTicked = tickbox.IsTicked;
         // Persist to disk so F5 / game restart reloads with the same state.
-        PrefsStorage.Save(new Prefs { ViewStatsTicked = _persistedTicked });
+        PrefsStorage.Save(new Prefs
+        {
+            ViewStatsTicked = _persistedTicked,
+            ShowRemovedCardsTicked = _persistedShowRemovedCardsTicked,
+        });
         CoreMain.Logger.Info($"ViewStats toggled: IsTicked={tickbox.IsTicked}");
+    }
+
+    private static void OnShowRemovedCardsToggled(NTickbox tickbox)
+    {
+        _persistedShowRemovedCardsTicked = tickbox.IsTicked;
+        PrefsStorage.Save(new Prefs
+        {
+            ViewStatsTicked = _persistedTicked,
+            ShowRemovedCardsTicked = _persistedShowRemovedCardsTicked,
+        });
+        CoreMain.Logger.Info($"ShowRemovedCards toggled: IsTicked={tickbox.IsTicked}");
 
         // Live re-render so removed cards appear/disappear the moment the
         // user flips the checkbox. DisplayCards reads our prefix-appended
