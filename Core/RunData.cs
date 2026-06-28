@@ -411,7 +411,20 @@ public class RelicAggregate
     // Total card rewards whose creation options were modified by this relic.
     // Used by Prismatic Gem.
     public int CardRewardsAffected { get; set; }
+
+    // Observed card reward options by card pool while Prismatic Gem is owned.
+    // This is intentionally meta: other reward modifiers may also affect the
+    // final options. Used by Prismatic Gem.
+    public Dictionary<string, CardRewardCategoryAggregate> CardRewardCategories { get; set; } = new();
 }
+
+public class CardRewardCategoryAggregate
+{
+    public string DisplayName { get; set; } = "";
+    public int Count { get; set; }
+}
+
+public readonly record struct CardRewardCategoryObservation(string Key, string DisplayName);
 
 /// <summary>
 /// One entry in the full event log. Captures what the mod observed, not what the

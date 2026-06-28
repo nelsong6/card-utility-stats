@@ -1004,6 +1004,7 @@ public static class RunTracker
                 runRelicAgg.RarePotionsGained += pendingRelicAgg.RarePotionsGained;
                 runRelicAgg.PotionsSkipped += pendingRelicAgg.PotionsSkipped;
                 runRelicAgg.CardRewardsAffected += pendingRelicAgg.CardRewardsAffected;
+                MergeCardRewardCategories(runRelicAgg.CardRewardCategories, pendingRelicAgg.CardRewardCategories);
             }
 
             MergeMetaStatsInto(_currentRun.MetaStats, _pendingCombat.MetaStats);
@@ -2468,6 +2469,45 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Record observed card reward options by pool/category while Prismatic Gem
+    /// is owned. This is meta rather than sole relic attribution: another relic
+    /// may also have participated in producing the final visible options.
+    /// </summary>
+    public static void RecordPrismaticGemObservedCardRewardCategories(IEnumerable<CardRewardCategoryObservation> categories)
+    {
+        lock (_lock)
+        {
+            try
+            {
+                _currentRun ??= new RunData
+                {
+                    RunId = Guid.NewGuid().ToString("N"),
+                    StartedAt = Now(),
+                    UpdatedAt = Now(),
+                };
+
+                if (!_currentRun.RelicAggregates.TryGetValue(PrismaticGemRelicId, out var agg))
+                {
+                    agg = new RelicAggregate();
+                    _currentRun.RelicAggregates[PrismaticGemRelicId] = agg;
+                }
+
+                foreach (var category in categories)
+                {
+                    AddCardRewardCategory(agg.CardRewardCategories, category.Key, category.DisplayName, 1);
+                }
+
+                _currentRun.UpdatedAt = Now();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPrismaticGemObservedCardRewardCategories failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Arm the flag that attributes player block gains to Cloak Clasp.
     /// Called from <see cref="Patches.CloakClaspBeforeTurnEndPatch"/> when
     /// Cloak Clasp's end-of-turn hook fires on the player's side.
@@ -2559,6 +2599,7 @@ public static class RunTracker
                     RarePotionsGained = committed.RarePotionsGained,
                     PotionsSkipped = committed.PotionsSkipped,
                     CardRewardsAffected = committed.CardRewardsAffected,
+                    CardRewardCategories = CloneCardRewardCategories(committed.CardRewardCategories),
                 };
                 MergeHealingLostReasonsInto(result, committed);
             }
@@ -2592,6 +2633,7 @@ public static class RunTracker
                 result.RarePotionsGained += pending.RarePotionsGained;
                 result.PotionsSkipped += pending.PotionsSkipped;
                 result.CardRewardsAffected += pending.CardRewardsAffected;
+                MergeCardRewardCategories(result.CardRewardCategories, pending.CardRewardCategories);
             }
 
             return result;
@@ -2695,6 +2737,65 @@ public static class RunTracker
                 reason.DisplayName,
                 reason.Amount);
         }
+    }
+
+    private static Dictionary<string, CardRewardCategoryAggregate> CloneCardRewardCategories(
+        Dictionary<string, CardRewardCategoryAggregate> source)
+    {
+        var result = new Dictionary<string, CardRewardCategoryAggregate>();
+        MergeCardRewardCategories(result, source);
+        return result;
+    }
+
+    private static void MergeCardRewardCategories(
+        Dictionary<string, CardRewardCategoryAggregate> target,
+        Dictionary<string, CardRewardCategoryAggregate>? source)
+    {
+        if (source == null || source.Count == 0) return;
+
+        foreach (var kvp in source)
+        {
+            if (kvp.Value.Count <= 0) continue;
+            AddCardRewardCategory(target, kvp.Key, kvp.Value.DisplayName, kvp.Value.Count);
+        }
+    }
+
+    private static void AddCardRewardCategory(
+        Dictionary<string, CardRewardCategoryAggregate> categories,
+        string key,
+        string displayName,
+        int count)
+    {
+        if (count <= 0 || string.IsNullOrWhiteSpace(key)) return;
+
+        if (!categories.TryGetValue(key, out var agg))
+        {
+            agg = new CardRewardCategoryAggregate
+            {
+                DisplayName = string.IsNullOrWhiteSpace(displayName) ? ToDisplayName(key) : displayName,
+            };
+            categories[key] = agg;
+        }
+
+        if (string.IsNullOrWhiteSpace(agg.DisplayName))
+        {
+            agg.DisplayName = string.IsNullOrWhiteSpace(displayName) ? ToDisplayName(key) : displayName;
+        }
+
+        agg.Count += count;
+    }
+
+    private static string ToDisplayName(string key)
+    {
+        if (string.IsNullOrWhiteSpace(key)) return "Unknown";
+
+        var words = key
+            .Replace('-', '_')
+            .Split('_', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (words.Length == 0) return key;
+
+        return string.Join(" ", words.Select(word =>
+            char.ToUpperInvariant(word[0]) + (word.Length > 1 ? word[1..].ToLowerInvariant() : "")));
     }
 
     /// <summary>

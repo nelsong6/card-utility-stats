@@ -121,7 +121,10 @@ public static class RelicHoverShowPatch
             {
                 const string relicId = "RELIC.PRISMATIC_GEM";
                 var agg = RunTracker.GetRelicAggregate(relicId);
-                if (agg == null || (agg.EnergyGenerated == 0 && agg.CardRewardsAffected == 0)) return;
+                if (agg == null
+                    || (agg.EnergyGenerated == 0
+                        && agg.CardRewardsAffected == 0
+                        && (agg.CardRewardCategories == null || agg.CardRewardCategories.Count == 0))) return;
 
                 var body = BuildPrismaticGemBodyBBCode(agg);
                 StatsTooltip.Show(tree, __instance, "Prismatic Gem", "SpireLens", body);
@@ -289,6 +292,13 @@ public static class RelicHoverShowPatch
         var sb = new StringBuilder();
         Row3(sb, EnergyLabel("Energy generated"), agg.EnergyGenerated.ToString(), "");
         Row3(sb, "Card rewards affected", agg.CardRewardsAffected.ToString(), "");
+        foreach (var category in agg.CardRewardCategories
+            .Where(kvp => kvp.Value.Count > 0)
+            .OrderBy(kvp => kvp.Key == "colorless" ? 1 : 0)
+            .ThenBy(kvp => kvp.Value.DisplayName, StringComparer.OrdinalIgnoreCase))
+        {
+            Row3(sb, $"{category.Value.DisplayName} rewards", category.Value.Count.ToString(), "");
+        }
         return sb.ToString();
     }
 

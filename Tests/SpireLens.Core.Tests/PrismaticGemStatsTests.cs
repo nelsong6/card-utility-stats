@@ -29,6 +29,7 @@ public class PrismaticGemStatsTests
 
         Assert.Equal(0, agg.EnergyGenerated);
         Assert.Equal(0, agg.CardRewardsAffected);
+        Assert.Empty(agg.CardRewardCategories);
     }
 
     [Fact]
@@ -39,12 +40,18 @@ public class PrismaticGemStatsTests
         {
             EnergyGenerated = 4,
             CardRewardsAffected = 2,
+            CardRewardCategories =
+            {
+                ["defect"] = new CardRewardCategoryAggregate { DisplayName = "Defect", Count = 3 },
+                ["colorless"] = new CardRewardCategoryAggregate { DisplayName = "Colorless", Count = 1 },
+            },
         };
 
         var json = JsonSerializer.Serialize(run, SerializerOptions);
 
         Assert.Contains("energy_generated", json);
         Assert.Contains("card_rewards_affected", json);
+        Assert.Contains("card_reward_categories", json);
 
         var restored = JsonSerializer.Deserialize<RunData>(json, SerializerOptions);
 
@@ -52,6 +59,10 @@ public class PrismaticGemStatsTests
         var agg = restored!.RelicAggregates[PrismaticGemRelicId];
         Assert.Equal(4, agg.EnergyGenerated);
         Assert.Equal(2, agg.CardRewardsAffected);
+        Assert.Equal(3, agg.CardRewardCategories["defect"].Count);
+        Assert.Equal("Defect", agg.CardRewardCategories["defect"].DisplayName);
+        Assert.Equal(1, agg.CardRewardCategories["colorless"].Count);
+        Assert.Equal("Colorless", agg.CardRewardCategories["colorless"].DisplayName);
     }
 
     [Fact]
@@ -61,6 +72,11 @@ public class PrismaticGemStatsTests
         {
             EnergyGenerated = 4,
             CardRewardsAffected = 2,
+            CardRewardCategories =
+            {
+                ["defect"] = new CardRewardCategoryAggregate { DisplayName = "Defect", Count = 3 },
+                ["colorless"] = new CardRewardCategoryAggregate { DisplayName = "Colorless", Count = 1 },
+            },
         };
 
         var body = (string)(BuildPrismaticGemBodyMethod.Invoke(null, new object?[] { agg })
@@ -70,6 +86,10 @@ public class PrismaticGemStatsTests
         Assert.Contains("[b]4[/b]", body);
         Assert.Contains("Card rewards affected", body);
         Assert.Contains("[b]2[/b]", body);
+        Assert.Contains("Defect rewards", body);
+        Assert.Contains("[b]3[/b]", body);
+        Assert.Contains("Colorless rewards", body);
+        Assert.Contains("[b]1[/b]", body);
     }
 
     [Fact]
@@ -99,5 +119,6 @@ public class PrismaticGemStatsTests
         var agg = run!.RelicAggregates[PrismaticGemRelicId];
         Assert.Equal(3, agg.EnergyGenerated);
         Assert.Equal(0, agg.CardRewardsAffected);
+        Assert.Empty(agg.CardRewardCategories);
     }
 }

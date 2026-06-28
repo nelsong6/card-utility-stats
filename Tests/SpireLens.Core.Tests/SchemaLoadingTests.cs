@@ -885,4 +885,19 @@ public class SchemaLoadingTests
         Assert.Equal(3, relicAgg.Activations);
         Assert.Equal(6, relicAgg.CardsUpgraded);
     }
+
+    [Fact]
+    public void ResumableLoad_AcceptsV31PrismaticGemRewardCategoriesFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v31-prismatic-gem-reward-categories-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.PRISMATIC_GEM"];
+        Assert.Equal(4, relicAgg.EnergyGenerated);
+        Assert.Equal(2, relicAgg.CardRewardsAffected);
+        Assert.Equal(3, relicAgg.CardRewardCategories["defect"].Count);
+        Assert.Equal("Defect", relicAgg.CardRewardCategories["defect"].DisplayName);
+        Assert.Equal(1, relicAgg.CardRewardCategories["colorless"].Count);
+        Assert.Equal("Colorless", relicAgg.CardRewardCategories["colorless"].DisplayName);
+    }
 }
