@@ -32,12 +32,13 @@ public class OrichalcumStatsTests
     {
         var agg = new RelicAggregate();
         Assert.Equal(0, agg.AdditionalBlockGained);
+        Assert.Equal(0, agg.BlockedTriggers);
     }
 
     [Fact]
     public void RelicAggregate_AdditionalBlockGained_JsonRoundtrip_PreservesField()
     {
-        var agg = new RelicAggregate { AdditionalBlockGained = 24 };
+        var agg = new RelicAggregate { AdditionalBlockGained = 24, BlockedTriggers = 3 };
         var run = new RunData();
         run.RelicAggregates[OrichalcumRelicId] = agg;
 
@@ -45,12 +46,14 @@ public class OrichalcumStatsTests
 
         Assert.Contains("relic_aggregates", json);
         Assert.Contains("additional_block_gained", json);
+        Assert.Contains("blocked_triggers", json);
 
         var restored = JsonSerializer.Deserialize<RunData>(json, SerializerOptions);
         Assert.NotNull(restored);
         Assert.True(restored!.RelicAggregates.ContainsKey(OrichalcumRelicId));
         var restoredAgg = restored.RelicAggregates[OrichalcumRelicId];
         Assert.Equal(24, restoredAgg.AdditionalBlockGained);
+        Assert.Equal(3, restoredAgg.BlockedTriggers);
     }
 
     [Fact]
@@ -74,13 +77,15 @@ public class OrichalcumStatsTests
     [Fact]
     public void RelicTooltip_AdditionalBlockGained_ShowsBlockIconAndTotal()
     {
-        var agg = new RelicAggregate { AdditionalBlockGained = 12 };
+        var agg = new RelicAggregate { AdditionalBlockGained = 12, BlockedTriggers = 2 };
 
         var body = (string)(BuildOrichalcumBodyMethod.Invoke(null, new object?[] { agg })
             ?? throw new InvalidOperationException("BuildOrichalcumBodyBBCode returned null."));
 
         Assert.Contains("[img=16x16]res://images/ui/combat/block.png[/img] block gained", body);
         Assert.Contains("[b]12[/b]", body);
+        Assert.Contains("Triggers blocked", body);
+        Assert.Contains("[b]2[/b]", body);
     }
 
     [Fact]
@@ -112,5 +117,6 @@ public class OrichalcumStatsTests
         Assert.True(run!.RelicAggregates.ContainsKey(OrichalcumRelicId));
         var agg = run.RelicAggregates[OrichalcumRelicId];
         Assert.Equal(0, agg.AdditionalBlockGained);
+        Assert.Equal(0, agg.BlockedTriggers);
     }
 }

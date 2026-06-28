@@ -1,8 +1,12 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Combat;
+using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Hooks;
+using MegaCrit.Sts2.Core.Models.Relics;
 
 namespace SpireLens.Core.Patches;
 
@@ -11,6 +15,36 @@ namespace SpireLens.Core.Patches;
 /// end-of-turn check runs. If the player has no block, Orichalcum will gain
 /// block and <see cref="HookAfterBlockGainedPatch"/> records the amount.
 /// </summary>
+[HarmonyPatch]
+public static class OrichalcumBeforeSideTurnEndVeryEarlyPatch
+{
+    private static MethodBase? TargetMethod()
+    {
+        var t = AccessTools.TypeByName("MegaCrit.Sts2.Core.Models.Relics.Orichalcum");
+        return t == null ? null : AccessTools.Method(t, "BeforeSideTurnEndVeryEarly");
+    }
+
+    [HarmonyPrefix]
+    public static void Prefix(Orichalcum __instance, CombatSide side, IEnumerable<Creature> participants)
+    {
+        try
+        {
+            if (side != CombatSide.Player) return;
+
+            var owner = __instance?.Owner?.Creature;
+            if (owner == null) return;
+            if (participants == null || !participants.Contains(owner)) return;
+            if (owner.Block <= 0) return;
+
+            RunTracker.RecordOrichalcumBlockedTrigger();
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"OrichalcumBeforeSideTurnEndVeryEarlyPatch.Prefix failed: {e.Message}");
+        }
+    }
+}
+
 [HarmonyPatch]
 public static class OrichalcumBeforeTurnEndPatch
 {

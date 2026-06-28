@@ -97,6 +97,11 @@ public class RunData
 /// <summary>Aggregated per-card attribution stats for this run.</summary>
 public class CardAggregate
 {
+    // Number of combats that started while this physical card was in the
+    // player's permanent deck. Useful denominator for dud cards that may
+    // rarely be drawn or played.
+    public int CombatsInDeck { get; set; }
+
     public int Plays { get; set; }
 
     // M1: Attack attribution. Null/zero for non-attack cards.
@@ -352,6 +357,11 @@ public class RelicAggregate
     // Total block gained from this relic across all combats.
     // Used by Orichalcum, The Abacus, and Bone Flute.
     public int AdditionalBlockGained { get; set; }
+
+    // Total times this relic got its own trigger check but was blocked by
+    // its condition not being met. Used by Orichalcum when the player already
+    // has block at end of turn.
+    public int BlockedTriggers { get; set; }
 
     // Total times Bone Flute triggered from an owned Osty attack.
     public int BoneFluteTriggers { get; set; }

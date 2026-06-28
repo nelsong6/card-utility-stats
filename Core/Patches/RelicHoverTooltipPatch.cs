@@ -220,6 +220,7 @@ public static class RelicHoverShowPatch
     {
         var sb = new StringBuilder();
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
+        Row3(sb, "Triggers blocked", agg.BlockedTriggers.ToString(), "");
         return sb.ToString();
     }
 

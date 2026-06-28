@@ -938,6 +938,7 @@ public static class RunTracker
             // combat that didn't get a CombatEnded (shouldn't happen but defensive) is dropped.
             _pendingCombat = new PendingCombat();
             ResetCombatContextState();
+            RecordCombatsInDeckForCurrentDeckLocked();
         }
     }
 
@@ -983,6 +984,7 @@ public static class RunTracker
                 runRelicAgg.WeakApplied += pendingRelicAgg.WeakApplied;
                 runRelicAgg.AdditionalCardsDrawn += pendingRelicAgg.AdditionalCardsDrawn;
                 runRelicAgg.AdditionalBlockGained += pendingRelicAgg.AdditionalBlockGained;
+                runRelicAgg.BlockedTriggers += pendingRelicAgg.BlockedTriggers;
                 runRelicAgg.BoneFluteTriggers += pendingRelicAgg.BoneFluteTriggers;
                 runRelicAgg.TotalOstyHpSummoned += pendingRelicAgg.TotalOstyHpSummoned;
                 runRelicAgg.TotalHealingAttempted += pendingRelicAgg.TotalHealingAttempted;
@@ -1684,6 +1686,28 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordOrichalcumBlockGained failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record Orichalcum's owner-specific end-turn check being blocked by the
+    /// player already having block. Called from the relic's
+    /// <c>BeforeSideTurnEndVeryEarly</c> method, where the game performs this
+    /// exact condition check before arming <c>ShouldTrigger</c>.
+    /// </summary>
+    public static void RecordOrichalcumBlockedTrigger()
+    {
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(OrichalcumRelicId);
+                agg.BlockedTriggers += 1;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordOrichalcumBlockedTrigger failed: {e.Message}");
             }
         }
     }
@@ -2435,6 +2459,7 @@ public static class RunTracker
                     WeakApplied = committed.WeakApplied,
                     AdditionalCardsDrawn = committed.AdditionalCardsDrawn,
                     AdditionalBlockGained = committed.AdditionalBlockGained,
+                    BlockedTriggers = committed.BlockedTriggers,
                     BoneFluteTriggers = committed.BoneFluteTriggers,
                     TotalOstyHpSummoned = committed.TotalOstyHpSummoned,
                     TotalHealingAttempted = committed.TotalHealingAttempted,
@@ -2462,6 +2487,7 @@ public static class RunTracker
                 result.WeakApplied += pending.WeakApplied;
                 result.AdditionalCardsDrawn += pending.AdditionalCardsDrawn;
                 result.AdditionalBlockGained += pending.AdditionalBlockGained;
+                result.BlockedTriggers += pending.BlockedTriggers;
                 result.BoneFluteTriggers += pending.BoneFluteTriggers;
                 result.TotalOstyHpSummoned += pending.TotalOstyHpSummoned;
                 result.TotalHealingAttempted += pending.TotalHealingAttempted;
@@ -2523,6 +2549,27 @@ public static class RunTracker
         }
 
         return runAgg;
+    }
+
+    private static void RecordCombatsInDeckForCurrentDeckLocked()
+    {
+        try
+        {
+            var player = RunManager.Instance?.State?.Players.FirstOrDefault();
+            if (player?.Deck?.Cards == null) return;
+
+            foreach (var card in player.Deck.Cards)
+            {
+                if (card == null) continue;
+                var instanceId = GetOrAssignInstanceId(card);
+                var agg = GetOrCreateAggregate(_pendingCombat!, instanceId);
+                agg.CombatsInDeck += 1;
+            }
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordCombatsInDeckForCurrentDeckLocked failed: {e.Message}");
+        }
     }
 
     private static void AddHealingLostReasonLocked(
@@ -4551,6 +4598,7 @@ public static class RunTracker
     {
         var clone = new CardAggregate
         {
+            CombatsInDeck = source.CombatsInDeck,
             Plays = source.Plays,
             TotalIntended = source.TotalIntended,
             TotalBlocked = source.TotalBlocked,
@@ -4599,6 +4647,7 @@ public static class RunTracker
 
     private static void MergeAggregateInto(CardAggregate target, CardAggregate source)
     {
+        target.CombatsInDeck += source.CombatsInDeck;
         target.Plays += source.Plays;
         target.TotalIntended += source.TotalIntended;
         target.TotalBlocked += source.TotalBlocked;

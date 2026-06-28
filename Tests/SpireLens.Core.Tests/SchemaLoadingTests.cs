@@ -839,4 +839,17 @@ public class SchemaLoadingTests
         Assert.Equal(4, relicAgg.EnergyGenerated);
         Assert.Equal(2, relicAgg.CardRewardsAffected);
     }
+
+    [Fact]
+    public void ResumableLoad_AcceptsV27OrichalcumBlockedAndCombatsInDeckFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v27-orichalcum-blocked-and-combats-in-deck-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.ORICHALCUM"];
+        Assert.Equal(12, relicAgg.AdditionalBlockGained);
+        Assert.Equal(4, relicAgg.BlockedTriggers);
+        Assert.Equal(3, resumed.Aggregates["CARD.SPOILS_MAP#1"].CombatsInDeck);
+        Assert.Equal(3, resumed.Aggregates["CARD.STRIKE_IRONCLAD#1"].CombatsInDeck);
+    }
 }
