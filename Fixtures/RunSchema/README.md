@@ -75,6 +75,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `meal-ticket-relic-run.json`
   Adds relic activation tracking plus Meal Ticket shop-entry healing
   attribution, including restored healing and full-HP lost healing.
+- `burning-blood-relic-run.json`
+  Adds Burning Blood combat-victory activation tracking and relic healing
+  attribution, including restored healing and full-HP lost healing.
 
 Why these exist:
 

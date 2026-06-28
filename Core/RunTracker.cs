@@ -1553,6 +1553,7 @@ public static class RunTracker
     private const string HappyFlowerRelicId = "RELIC.HAPPY_FLOWER";
     private const string CloakClaspRelicId = "RELIC.CLOAK_CLASP";
     private const string MealTicketRelicId = "RELIC.MEAL_TICKET";
+    private const string BurningBloodRelicId = "RELIC.BURNING_BLOOD";
 
     /// <summary>
     /// Record a Bag of Marbles combat-start Vulnerable application.
@@ -1947,13 +1948,32 @@ public static class RunTracker
     /// </summary>
     public static void RecordMealTicketTrigger(Creature healedCreature, decimal attemptedHealing)
     {
+        RecordRelicHealingTrigger(MealTicketRelicId, healedCreature, attemptedHealing, nameof(RecordMealTicketTrigger));
+    }
+
+    /// <summary>
+    /// Record Burning Blood's combat-victory trigger and arm its observed
+    /// healing window. Depending on combat teardown timing, this can land in
+    /// the pending combat buffer or directly in the run aggregate.
+    /// </summary>
+    public static void RecordBurningBloodTrigger(Creature healedCreature, decimal attemptedHealing)
+    {
+        RecordRelicHealingTrigger(BurningBloodRelicId, healedCreature, attemptedHealing, nameof(RecordBurningBloodTrigger));
+    }
+
+    private static void RecordRelicHealingTrigger(
+        string relicId,
+        Creature healedCreature,
+        decimal attemptedHealing,
+        string callerName)
+    {
         if (healedCreature == null || attemptedHealing <= 0m) return;
 
         lock (_lock)
         {
             try
             {
-                var agg = GetOrCreateRelicAggregateForCurrentContextLocked(MealTicketRelicId);
+                var agg = GetOrCreateRelicAggregateForCurrentContextLocked(relicId);
                 agg.Activations++;
                 agg.TotalHealingAttempted += attemptedHealing;
 
@@ -1968,7 +1988,7 @@ public static class RunTracker
 
                 _pendingRelicHeals.Add(new PendingRelicHealing
                 {
-                    RelicId = MealTicketRelicId,
+                    RelicId = relicId,
                     Creature = healedCreature,
                     Attempted = attemptedHealing,
                     InitialMissingHp = initialMissingHp,
@@ -1976,7 +1996,7 @@ public static class RunTracker
             }
             catch (Exception e)
             {
-                CoreMain.LogDebug($"RecordMealTicketTrigger failed: {e.Message}");
+                CoreMain.LogDebug($"{callerName} failed: {e.Message}");
             }
         }
     }

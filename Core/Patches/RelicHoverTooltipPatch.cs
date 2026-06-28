@@ -155,6 +155,21 @@ public static class RelicHoverShowPatch
                 StatsTooltip.Show(tree, __instance, "Meal Ticket", "SpireLens", body);
                 return;
             }
+
+            if (relicNode.Model is BurningBlood)
+            {
+                const string relicId = "RELIC.BURNING_BLOOD";
+                var agg = RunTracker.GetRelicAggregate(relicId);
+                if (agg == null
+                    || (agg.Activations == 0
+                        && agg.TotalHealingRestored == 0m
+                        && agg.TotalHealingLost == 0m))
+                    return;
+
+                var body = BuildBurningBloodBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Burning Blood", "SpireLens", body);
+                return;
+            }
         }
         catch (Exception e)
         {
@@ -229,6 +244,14 @@ public static class RelicHoverShowPatch
     }
 
     private static string BuildMealTicketBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        AppendHealingStats(sb, agg);
+        return sb.ToString();
+    }
+
+    private static string BuildBurningBloodBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
         Row3(sb, "Activations", agg.Activations.ToString(), "");

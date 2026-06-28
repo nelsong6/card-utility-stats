@@ -390,6 +390,23 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsBurningBloodRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("burning-blood-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.BURNING_BLOOD"];
+        Assert.Equal(2, relicAgg.Activations);
+        Assert.Equal(12m, relicAgg.TotalHealingAttempted);
+        Assert.Equal(9m, relicAgg.TotalHealingRestored);
+        Assert.Equal(3m, relicAgg.TotalHealingLost);
+        Assert.Equal(3m, relicAgg.HealingLostReasons["full_hp"].Amount);
+    }
+
+    [Fact]
     public void ResumableLoad_RejectsLegacyV1Fixture()
     {
         var resumed = RunStorage.LoadResumable(FixturePath("v1-pooled-run.json"));
@@ -734,5 +751,19 @@ public class SchemaLoadingTests
         Assert.Equal(18m, relicAgg.TotalHealingRestored);
         Assert.Equal(12m, relicAgg.TotalHealingLost);
         Assert.Equal(12m, relicAgg.HealingLostReasons["full_hp"].Amount);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsBurningBloodRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("burning-blood-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.BURNING_BLOOD"];
+        Assert.Equal(2, relicAgg.Activations);
+        Assert.Equal(12m, relicAgg.TotalHealingAttempted);
+        Assert.Equal(9m, relicAgg.TotalHealingRestored);
+        Assert.Equal(3m, relicAgg.TotalHealingLost);
+        Assert.Equal(3m, relicAgg.HealingLostReasons["full_hp"].Amount);
     }
 }
