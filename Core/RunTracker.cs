@@ -1799,6 +1799,7 @@ public static class RunTracker
                 var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
                 agg.TimesOstySummoned++;
                 agg.TotalOstyHpSummoned += amount;
+                _pendingCombat.MetaStats.TotalOstyHpSummoned += amount;
             }
             catch (Exception e)
             {
@@ -4202,6 +4203,7 @@ public static class RunTracker
     {
         if (source == null) return;
 
+        target.TotalOstyHpSummoned += source.TotalOstyHpSummoned;
         target.TotalOstyDamageAbsorbed += source.TotalOstyDamageAbsorbed;
     }
 

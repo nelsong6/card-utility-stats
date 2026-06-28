@@ -520,16 +520,22 @@ public static class CardHoverShowPatch
         metaStats ??= new RunMetaStats();
 
         if (!IsOstySummonStatsHome(card, agg)) return;
-        if (agg.TotalOstyHpSummoned <= 0m && metaStats.TotalOstyDamageAbsorbed <= 0m) return;
+        if (agg.TotalOstyHpSummoned <= 0m
+            && metaStats.TotalOstyHpSummoned <= 0m
+            && metaStats.TotalOstyDamageAbsorbed <= 0m)
+            return;
 
         if (agg.TotalOstyHpSummoned > 0m)
-            Row3(sb, "Osty HP summoned", FormatDecimal(agg.TotalOstyHpSummoned), "");
+            Row3(sb, "Summon gained", FormatDecimal(agg.TotalOstyHpSummoned), "");
 
         if (!compact && agg.TimesOstySummoned > 0)
             Row3(sb, "Osty summons", agg.TimesOstySummoned.ToString(), "");
 
+        if (metaStats.TotalOstyHpSummoned > 0m)
+            Row3(sb, "All Osty total summon", FormatDecimal(metaStats.TotalOstyHpSummoned), "");
+
         if (metaStats.TotalOstyDamageAbsorbed > 0m)
-            Row3(sb, "Osty dmg absorbed", FormatDecimal(metaStats.TotalOstyDamageAbsorbed), "");
+            Row3(sb, "All Osty damage absorbed", FormatDecimal(metaStats.TotalOstyDamageAbsorbed), "");
     }
 
     private static bool IsOstySummonStatsHome(

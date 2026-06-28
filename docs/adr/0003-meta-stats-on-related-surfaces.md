@@ -35,8 +35,12 @@ For Osty:
 
 - `TimesOstySummoned` and `TotalOstyHpSummoned` belong to the source card that
   successfully called `OstyCmd.Summon`.
-- `TotalOstyDamageAbsorbed` belongs to run-level meta stats and may be surfaced
-  on Osty summon cards as a related mechanic stat.
+- `RunMetaStats.TotalOstyHpSummoned` and `TotalOstyDamageAbsorbed` belong to
+  run-level meta stats and may be surfaced on Osty summon cards as related
+  mechanic stats.
+- Label card-owned summon HP as a local contribution, such as `Summon gained`.
+  Label run-level values with an `All Osty ...` prefix so the hovered card does
+  not appear to own them.
 - Unleash's Osty HP damage bonus remains on Unleash because Unleash itself uses
   Osty's current HP at play time.
 

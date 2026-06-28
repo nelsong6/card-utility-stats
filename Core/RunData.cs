@@ -275,6 +275,7 @@ public class CardAggregate
 
 public class RunMetaStats
 {
+    public decimal TotalOstyHpSummoned { get; set; }
     public decimal TotalOstyDamageAbsorbed { get; set; }
 }
 

@@ -201,13 +201,16 @@ cards that spend the resulting board state. Track those as different signals.
   Osty summons. The command carries the source model and returns the
   game-observed summon amount.
 - Attribute the summon amount to the source card. That is the card's own
-  contribution.
+  contribution. Tooltip label: `Summon gained`.
+- Also add successful summon amount to run-level Osty meta stats. Tooltip
+  label: `All Osty total summon`.
 - Attribute Osty HP lost through `Hook.AfterCurrentHpChanged` negative deltas
   on any Osty creature into run-level meta stats. Do not assign all later Osty
-  damage absorbed to the card that happened to summon most recently.
+  damage absorbed to the card that happened to summon most recently. Tooltip
+  label: `All Osty damage absorbed`.
 - Keep payoff tracking separate. For example, Unleash's Osty-current-HP attack
   bonus belongs on Unleash, while HP summoned belongs on the summon card, and
-  total Osty damage absorbed is a meta stat surfaced on related summon cards.
+  all-Osty totals are meta stats surfaced on related summon cards.
 
 ## Block Attribution
 

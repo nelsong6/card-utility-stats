@@ -316,6 +316,7 @@ public class SchemaLoadingTests
         var summonAgg = loaded.Data.Aggregates["CARD.SUMMON_FORTH#1"];
         Assert.Equal(2, summonAgg.TimesOstySummoned);
         Assert.Equal(18m, summonAgg.TotalOstyHpSummoned);
+        Assert.Equal(18m, loaded.Data.MetaStats.TotalOstyHpSummoned);
         Assert.Equal(11m, loaded.Data.MetaStats.TotalOstyDamageAbsorbed);
     }
 
@@ -640,6 +641,7 @@ public class SchemaLoadingTests
         var summonAgg = resumed!.Aggregates["CARD.SUMMON_FORTH#1"];
         Assert.Equal(2, summonAgg.TimesOstySummoned);
         Assert.Equal(18m, summonAgg.TotalOstyHpSummoned);
+        Assert.Equal(18m, resumed.MetaStats.TotalOstyHpSummoned);
         Assert.Equal(11m, resumed.MetaStats.TotalOstyDamageAbsorbed);
     }
 

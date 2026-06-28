@@ -85,6 +85,7 @@
   },
   "relic_aggregates": {},
   "meta_stats": {
+    "total_osty_hp_summoned": 18,
     "total_osty_damage_absorbed": 11
   },
   "events": [],
