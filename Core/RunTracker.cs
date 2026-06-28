@@ -65,6 +65,8 @@ public static class RunTracker
     private static bool _pendingBoneFluteBlockAttribution;
     private static readonly List<PendingRelicHealing> _pendingRelicHeals = new();
     private static bool _pendingHappyFlowerEnergyAttribution;
+    private static readonly List<Player> _pendingGremlinHornEnergyAttributions = new();
+    private static readonly List<Player> _pendingGremlinHornDrawAttributions = new();
     private static int? _lastPrismaticGemEnergyRoundNumber;
     private static bool _pendingCloakClaspBlockAttribution;
     private static int _pendingWhiteBeastPotionRewards;
@@ -651,6 +653,8 @@ public static class RunTracker
         _pendingOrichalcumBlockAttribution = false;
         _pendingTheAbacusBlockAttribution = false;
         _pendingHappyFlowerEnergyAttribution = false;
+        _pendingGremlinHornEnergyAttributions.Clear();
+        _pendingGremlinHornDrawAttributions.Clear();
         _lastPrismaticGemEnergyRoundNumber = null;
         _pendingCloakClaspBlockAttribution = false;
         _pendingMakeItSoSummons.Clear();
@@ -1571,6 +1575,7 @@ public static class RunTracker
     private const string HealingLostFullHpReasonId = "full_hp";
     private const string HealingLostOtherReasonId = "other";
     private const string HappyFlowerRelicId = "RELIC.HAPPY_FLOWER";
+    private const string GremlinHornRelicId = "RELIC.GREMLIN_HORN";
     private const string PrismaticGemRelicId = "RELIC.PRISMATIC_GEM";
     private const string CloakClaspRelicId = "RELIC.CLOAK_CLASP";
     private const string ReptileTrinketRelicId = "RELIC.REPTILE_TRINKET";
@@ -2403,6 +2408,114 @@ public static class RunTracker
                 CoreMain.LogDebug($"RecordHappyFlowerEnergyGained failed: {e.Message}");
             }
         }
+    }
+
+    /// <summary>
+    /// Record Gremlin Horn's owner-specific enemy-death activation and arm
+    /// one-shot attribution windows for the resource effects it immediately
+    /// performs. Energy is measured at the player energy mutation point; cards
+    /// drawn are measured from <c>CardPileCmd.Draw</c>'s returned cards.
+    /// </summary>
+    public static void ArmGremlinHornAttribution(Player owner)
+    {
+        if (owner == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(GremlinHornRelicId);
+                agg.Activations += 1;
+                _pendingGremlinHornEnergyAttributions.Add(owner);
+                _pendingGremlinHornDrawAttributions.Add(owner);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"ArmGremlinHornAttribution failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordGremlinHornEnergyGained(PlayerCombatState combatState, int amount)
+    {
+        if (amount <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var owner = combatState._player;
+                if (!ConsumePendingGremlinHornAttribution(_pendingGremlinHornEnergyAttributions, owner)) return;
+
+                var agg = GetOrCreateRelicAggregateLocked(GremlinHornRelicId);
+                agg.EnergyGenerated += amount;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordGremlinHornEnergyGained failed: {e.Message}");
+            }
+        }
+    }
+
+    public static bool TryConsumeGremlinHornDrawAttribution(Player player)
+    {
+        if (player == null) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                DisarmGremlinHornEnergyAttributionLocked(player);
+                return ConsumePendingGremlinHornAttribution(_pendingGremlinHornDrawAttributions, player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"TryConsumeGremlinHornDrawAttribution failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    public static void RecordGremlinHornCardsDrawn(int cardsDrawn)
+    {
+        if (cardsDrawn <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(GremlinHornRelicId);
+                agg.AdditionalCardsDrawn += cardsDrawn;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordGremlinHornCardsDrawn failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void DisarmGremlinHornEnergyAttributionLocked(Player player)
+    {
+        for (int i = 0; i < _pendingGremlinHornEnergyAttributions.Count; i++)
+        {
+            if (!ReferenceEquals(_pendingGremlinHornEnergyAttributions[i], player)) continue;
+            _pendingGremlinHornEnergyAttributions.RemoveAt(i);
+            return;
+        }
+    }
+
+    private static bool ConsumePendingGremlinHornAttribution(List<Player> pendingPlayers, Player? player)
+    {
+        if (player == null) return false;
+
+        for (int i = 0; i < pendingPlayers.Count; i++)
+        {
+            if (!ReferenceEquals(pendingPlayers[i], player)) continue;
+            pendingPlayers.RemoveAt(i);
+            return true;
+        }
+
+        return false;
     }
 
     /// <summary>
