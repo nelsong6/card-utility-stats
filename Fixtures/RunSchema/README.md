@@ -54,6 +54,12 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds Orichalcum additional block gained tracking to relic aggregates.
 - `v18-pocketwatch-run.json`
   Adds Pocketwatch additional cards drawn tracking to relic aggregates.
+- `v19-book-repair-knife-run.json`
+  Adds Book Repair Knife confirmed per-enemy Doom trigger, kill-payload, and
+  healing attribution tracking to relic aggregates.
+- `v20-bone-flute-run.json`
+  Adds Bone Flute owned-Osty trigger tracking alongside actual block gained in
+  relic aggregates.
 
 Why these exist:
 

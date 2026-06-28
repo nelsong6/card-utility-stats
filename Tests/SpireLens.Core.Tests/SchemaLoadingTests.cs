@@ -260,6 +260,37 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsV19BookRepairKnifeFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("v19-book-repair-knife-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        Assert.Equal(3, loaded.Data.RelicAggregates["RELIC.BOOK_REPAIR_KNIFE"].DoomDeathTriggers);
+        Assert.Equal(3, loaded.Data.RelicAggregates["RELIC.BOOK_REPAIR_KNIFE"].DoomKills);
+        Assert.Equal(18m, loaded.Data.RelicAggregates["RELIC.BOOK_REPAIR_KNIFE"].TotalHealingAttempted);
+        Assert.Equal(10m, loaded.Data.RelicAggregates["RELIC.BOOK_REPAIR_KNIFE"].TotalHealingRestored);
+        Assert.Equal(8m, loaded.Data.RelicAggregates["RELIC.BOOK_REPAIR_KNIFE"].TotalHealingLost);
+        Assert.Equal(6m, loaded.Data.RelicAggregates["RELIC.BOOK_REPAIR_KNIFE"].HealingLostReasons["full_hp"].Amount);
+        Assert.Equal(2m, loaded.Data.RelicAggregates["RELIC.BOOK_REPAIR_KNIFE"].HealingLostReasons["other"].Amount);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsV20BoneFluteFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("v20-bone-flute-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        Assert.Equal(2, loaded.Data.RelicAggregates["RELIC.BONE_FLUTE"].BoneFluteTriggers);
+        Assert.Equal(14, loaded.Data.RelicAggregates["RELIC.BONE_FLUTE"].AdditionalBlockGained);
+    }
+
+    [Fact]
     public void ResumableLoad_RejectsLegacyV1Fixture()
     {
         var resumed = RunStorage.LoadResumable(FixturePath("v1-pooled-run.json"));
@@ -460,7 +491,22 @@ public class SchemaLoadingTests
     }
 
     [Fact]
-    public void HistoricalLoad_AcceptsV19Fixture()
+    public void ResumableLoad_AcceptsV19BookRepairKnifeFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v19-book-repair-knife-run.json"));
+
+        Assert.NotNull(resumed);
+        Assert.Equal(3, resumed!.RelicAggregates["RELIC.BOOK_REPAIR_KNIFE"].DoomDeathTriggers);
+        Assert.Equal(3, resumed!.RelicAggregates["RELIC.BOOK_REPAIR_KNIFE"].DoomKills);
+        Assert.Equal(18m, resumed!.RelicAggregates["RELIC.BOOK_REPAIR_KNIFE"].TotalHealingAttempted);
+        Assert.Equal(10m, resumed!.RelicAggregates["RELIC.BOOK_REPAIR_KNIFE"].TotalHealingRestored);
+        Assert.Equal(8m, resumed!.RelicAggregates["RELIC.BOOK_REPAIR_KNIFE"].TotalHealingLost);
+        Assert.Equal(6m, resumed!.RelicAggregates["RELIC.BOOK_REPAIR_KNIFE"].HealingLostReasons["full_hp"].Amount);
+        Assert.Equal(2m, resumed!.RelicAggregates["RELIC.BOOK_REPAIR_KNIFE"].HealingLostReasons["other"].Amount);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsV19HappyFlowerFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("v19-happy-flower-run.json"));
 
@@ -472,7 +518,7 @@ public class SchemaLoadingTests
     }
 
     [Fact]
-    public void ResumableLoad_AcceptsV19Fixture()
+    public void ResumableLoad_AcceptsV19HappyFlowerFixture()
     {
         var resumed = RunStorage.LoadResumable(FixturePath("v19-happy-flower-run.json"));
 
@@ -482,7 +528,7 @@ public class SchemaLoadingTests
     }
 
     [Fact]
-    public void HistoricalLoad_AcceptsV20Fixture()
+    public void HistoricalLoad_AcceptsV20CloakClaspFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("v20-cloak-clasp-run.json"));
 
@@ -494,7 +540,17 @@ public class SchemaLoadingTests
     }
 
     [Fact]
-    public void ResumableLoad_AcceptsV20Fixture()
+    public void ResumableLoad_AcceptsV20BoneFluteFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v20-bone-flute-run.json"));
+
+        Assert.NotNull(resumed);
+        Assert.Equal(2, resumed!.RelicAggregates["RELIC.BONE_FLUTE"].BoneFluteTriggers);
+        Assert.Equal(14, resumed!.RelicAggregates["RELIC.BONE_FLUTE"].AdditionalBlockGained);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsV20CloakClaspFixture()
     {
         var resumed = RunStorage.LoadResumable(FixturePath("v20-cloak-clasp-run.json"));
 

@@ -58,6 +58,8 @@ public static class RunTracker
     private static bool _pendingPlayerBlockClearArmed;
     private static bool _pendingOrichalcumBlockAttribution;
     private static bool _pendingTheAbacusBlockAttribution;
+    private static bool _pendingBoneFluteBlockAttribution;
+    private static readonly List<PendingRelicHealing> _pendingRelicHeals = new();
     private static bool _pendingHappyFlowerEnergyAttribution;
     private static bool _pendingCloakClaspBlockAttribution;
     private static bool _shivAvailableThisRun;
@@ -953,6 +955,13 @@ public static class RunTracker
                 runRelicAgg.WeakApplied += pendingRelicAgg.WeakApplied;
                 runRelicAgg.AdditionalCardsDrawn += pendingRelicAgg.AdditionalCardsDrawn;
                 runRelicAgg.AdditionalBlockGained += pendingRelicAgg.AdditionalBlockGained;
+                runRelicAgg.BoneFluteTriggers += pendingRelicAgg.BoneFluteTriggers;
+                runRelicAgg.TotalHealingAttempted += pendingRelicAgg.TotalHealingAttempted;
+                runRelicAgg.TotalHealingRestored += pendingRelicAgg.TotalHealingRestored;
+                runRelicAgg.TotalHealingLost += pendingRelicAgg.TotalHealingLost;
+                MergeHealingLostReasonsInto(runRelicAgg, pendingRelicAgg);
+                runRelicAgg.DoomDeathTriggers += pendingRelicAgg.DoomDeathTriggers;
+                runRelicAgg.DoomKills += pendingRelicAgg.DoomKills;
                 runRelicAgg.EnergyGenerated += pendingRelicAgg.EnergyGenerated;
             }
 
@@ -1285,6 +1294,10 @@ public static class RunTracker
     private const string PocketwatchRelicId = "RELIC.POCKETWATCH";
     private const string OrichalcumRelicId = "RELIC.ORICHALCUM";
     private const string TheAbacusRelicId = "RELIC.THE_ABACUS";
+    private const string BookRepairKnifeRelicId = "RELIC.BOOK_REPAIR_KNIFE";
+    private const string BoneFluteRelicId = "RELIC.BONE_FLUTE";
+    private const string HealingLostFullHpReasonId = "full_hp";
+    private const string HealingLostOtherReasonId = "other";
     private const string HappyFlowerRelicId = "RELIC.HAPPY_FLOWER";
     private const string CloakClaspRelicId = "RELIC.CLOAK_CLASP";
 
@@ -1449,6 +1462,79 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Record a confirmed Bone Flute trigger and arm the next player block
+    /// gain as its observed payload. Called from
+    /// <see cref="Patches.BoneFluteAfterAttackPatch"/> only after the relic's
+    /// owner-specific Osty attack condition is satisfied.
+    /// </summary>
+    public static void RecordBoneFluteTriggerAndArmBlockAttribution()
+    {
+        lock (_lock)
+        {
+            try
+            {
+                _pendingCombat ??= new PendingCombat();
+                if (!_pendingCombat.RelicAggregates.TryGetValue(BoneFluteRelicId, out var agg))
+                {
+                    agg = new RelicAggregate();
+                    _pendingCombat.RelicAggregates[BoneFluteRelicId] = agg;
+                }
+
+                agg.BoneFluteTriggers++;
+                _pendingBoneFluteBlockAttribution = true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordBoneFluteTriggerAndArmBlockAttribution failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Clear any armed Bone Flute attribution window without recording block.
+    /// Used as a safety reset after the relic's async gain-block task finishes.
+    /// </summary>
+    public static void DisarmBoneFluteBlockAttribution()
+    {
+        lock (_lock)
+        {
+            _pendingBoneFluteBlockAttribution = false;
+        }
+    }
+
+    /// <summary>
+    /// Record actual block gained from Bone Flute's owned-Osty attack trigger.
+    /// Called from <see cref="Patches.HookAfterBlockGainedPatch"/> while the
+    /// owner-specific attribution flag is armed.
+    /// </summary>
+    public static void RecordBoneFluteBlockGained(int amount)
+    {
+        if (amount <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_pendingBoneFluteBlockAttribution) return;
+                _pendingBoneFluteBlockAttribution = false;
+
+                _pendingCombat ??= new PendingCombat();
+                if (!_pendingCombat.RelicAggregates.TryGetValue(BoneFluteRelicId, out var agg))
+                {
+                    agg = new RelicAggregate();
+                    _pendingCombat.RelicAggregates[BoneFluteRelicId] = agg;
+                }
+
+                agg.AdditionalBlockGained += amount;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordBoneFluteBlockGained failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Record additional cards drawn by Pocketwatch's turn-start bonus.
     /// <paramref name="cardsDrawn"/> is the number of extra cards drawn (normally 3).
     /// Called from <see cref="Patches.PocketwatchModifyHandDrawPatch"/>.
@@ -1472,6 +1558,119 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordPocketwatchDraw failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record a confirmed Book Repair Knife trigger and its Doom-death/healing
+    /// payload.
+    /// <paramref name="killCount"/> is counted from the game's
+    /// <c>AfterDiedToDoom</c> creature list, so this tracks actual Doom
+    /// deaths rather than inferred Doom applications.
+    /// </summary>
+    public static void RecordBookRepairKnifeTrigger(
+        int killCount,
+        Creature healedCreature,
+        decimal attemptedHealing)
+    {
+        if (killCount <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(BookRepairKnifeRelicId);
+                agg.DoomDeathTriggers += killCount;
+                agg.DoomKills += killCount;
+
+                if (healedCreature != null && attemptedHealing > 0m)
+                {
+                    agg.TotalHealingAttempted += attemptedHealing;
+                    decimal initialMissingHp = Math.Max(0m, healedCreature.MaxHp - healedCreature.CurrentHp);
+                    if (initialMissingHp <= 0m)
+                    {
+                        agg.TotalHealingLost += attemptedHealing;
+                        AddHealingLostReasonLocked(agg, HealingLostFullHpReasonId, "full HP", attemptedHealing);
+                        return;
+                    }
+
+                    _pendingRelicHeals.Add(new PendingRelicHealing
+                    {
+                        RelicId = BookRepairKnifeRelicId,
+                        Creature = healedCreature,
+                        Attempted = attemptedHealing,
+                        InitialMissingHp = initialMissingHp,
+                    });
+                }
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordBookRepairKnifeTrigger failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record observed HP restored while an owner-specific relic healing window
+    /// is armed. Called from <see cref="Patches.HookAfterCurrentHpChangedPatch"/>.
+    /// </summary>
+    public static void RecordRelicHealingHpChanged(Creature creature, decimal delta)
+    {
+        if (creature == null || delta <= 0m) return;
+
+        lock (_lock)
+        {
+            for (int i = _pendingRelicHeals.Count - 1; i >= 0; i--)
+            {
+                var pending = _pendingRelicHeals[i];
+                if (!ReferenceEquals(pending.Creature, creature)) continue;
+
+                decimal remaining = Math.Max(0m, pending.Attempted - pending.ActualRestored);
+                if (remaining <= 0m) return;
+
+                decimal restored = Math.Min(delta, remaining);
+                pending.ActualRestored += restored;
+                var agg = GetOrCreateRelicAggregateLocked(pending.RelicId);
+                agg.TotalHealingRestored += restored;
+                return;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Finalize lost healing for a relic healing window after the game's heal
+    /// task has completed. Records full-HP overfill separately from any other
+    /// prevention or modification gap.
+    /// </summary>
+    public static void FinalizeRelicHealing(Creature creature, string relicId)
+    {
+        if (creature == null || string.IsNullOrWhiteSpace(relicId)) return;
+
+        lock (_lock)
+        {
+            for (int i = _pendingRelicHeals.Count - 1; i >= 0; i--)
+            {
+                var pending = _pendingRelicHeals[i];
+                if (!ReferenceEquals(pending.Creature, creature)) continue;
+                if (!string.Equals(pending.RelicId, relicId, StringComparison.Ordinal)) continue;
+
+                _pendingRelicHeals.RemoveAt(i);
+                decimal lost = Math.Max(0m, pending.Attempted - pending.ActualRestored);
+                if (lost <= 0m) return;
+
+                var agg = GetOrCreateRelicAggregateLocked(relicId);
+                agg.TotalHealingLost += lost;
+
+                decimal fullHpLost = Math.Max(0m, pending.Attempted - pending.InitialMissingHp);
+                fullHpLost = Math.Min(fullHpLost, lost);
+                if (fullHpLost > 0m)
+                    AddHealingLostReasonLocked(agg, HealingLostFullHpReasonId, "full HP", fullHpLost);
+
+                decimal otherLost = Math.Max(0m, lost - fullHpLost);
+                if (otherLost > 0m)
+                    AddHealingLostReasonLocked(agg, HealingLostOtherReasonId, "other/prevented", otherLost);
+                return;
             }
         }
     }
@@ -1519,12 +1718,7 @@ public static class RunTracker
                 if (!_pendingHappyFlowerEnergyAttribution) return;
                 _pendingHappyFlowerEnergyAttribution = false;
 
-                _pendingCombat ??= new PendingCombat();
-                if (!_pendingCombat.RelicAggregates.TryGetValue(HappyFlowerRelicId, out var agg))
-                {
-                    agg = new RelicAggregate();
-                    _pendingCombat.RelicAggregates[HappyFlowerRelicId] = agg;
-                }
+                var agg = GetOrCreateRelicAggregateLocked(HappyFlowerRelicId);
                 agg.EnergyGenerated += amount;
             }
             catch (Exception e)
@@ -1578,12 +1772,7 @@ public static class RunTracker
             {
                 if (!_pendingCloakClaspBlockAttribution) return;
 
-                _pendingCombat ??= new PendingCombat();
-                if (!_pendingCombat.RelicAggregates.TryGetValue(CloakClaspRelicId, out var agg))
-                {
-                    agg = new RelicAggregate();
-                    _pendingCombat.RelicAggregates[CloakClaspRelicId] = agg;
-                }
+                var agg = GetOrCreateRelicAggregateLocked(CloakClaspRelicId);
                 agg.AdditionalBlockGained += amount;
             }
             catch (Exception e)
@@ -1612,8 +1801,15 @@ public static class RunTracker
                     WeakApplied = committed.WeakApplied,
                     AdditionalCardsDrawn = committed.AdditionalCardsDrawn,
                     AdditionalBlockGained = committed.AdditionalBlockGained,
+                    BoneFluteTriggers = committed.BoneFluteTriggers,
+                    TotalHealingAttempted = committed.TotalHealingAttempted,
+                    TotalHealingRestored = committed.TotalHealingRestored,
+                    TotalHealingLost = committed.TotalHealingLost,
+                    DoomDeathTriggers = committed.DoomDeathTriggers,
+                    DoomKills = committed.DoomKills,
                     EnergyGenerated = committed.EnergyGenerated,
                 };
+                MergeHealingLostReasonsInto(result, committed);
             }
 
             if (_pendingCombat != null && _pendingCombat.RelicAggregates.TryGetValue(relicId, out var pending))
@@ -1624,10 +1820,65 @@ public static class RunTracker
                 result.WeakApplied += pending.WeakApplied;
                 result.AdditionalCardsDrawn += pending.AdditionalCardsDrawn;
                 result.AdditionalBlockGained += pending.AdditionalBlockGained;
+                result.BoneFluteTriggers += pending.BoneFluteTriggers;
+                result.TotalHealingAttempted += pending.TotalHealingAttempted;
+                result.TotalHealingRestored += pending.TotalHealingRestored;
+                result.TotalHealingLost += pending.TotalHealingLost;
+                MergeHealingLostReasonsInto(result, pending);
+                result.DoomDeathTriggers += pending.DoomDeathTriggers;
+                result.DoomKills += pending.DoomKills;
                 result.EnergyGenerated += pending.EnergyGenerated;
             }
 
             return result;
+        }
+    }
+
+    private static RelicAggregate GetOrCreateRelicAggregateLocked(string relicId)
+    {
+        _pendingCombat ??= new PendingCombat();
+        if (!_pendingCombat.RelicAggregates.TryGetValue(relicId, out var agg))
+        {
+            agg = new RelicAggregate();
+            _pendingCombat.RelicAggregates[relicId] = agg;
+        }
+
+        return agg;
+    }
+
+    private static void AddHealingLostReasonLocked(
+        RelicAggregate agg,
+        string reasonId,
+        string displayName,
+        decimal amount)
+    {
+        if (amount <= 0m) return;
+
+        if (!agg.HealingLostReasons.TryGetValue(reasonId, out var reason))
+        {
+            reason = new HealingLostReasonAggregate
+            {
+                ReasonId = reasonId,
+                DisplayName = displayName,
+            };
+            agg.HealingLostReasons[reasonId] = reason;
+        }
+
+        reason.Amount += amount;
+    }
+
+    private static void MergeHealingLostReasonsInto(RelicAggregate target, RelicAggregate source)
+    {
+        if (source.HealingLostReasons == null || source.HealingLostReasons.Count == 0) return;
+
+        foreach (var reason in source.HealingLostReasons.Values)
+        {
+            if (reason.Amount <= 0m) continue;
+            AddHealingLostReasonLocked(
+                target,
+                string.IsNullOrWhiteSpace(reason.ReasonId) ? reason.DisplayName : reason.ReasonId,
+                reason.DisplayName,
+                reason.Amount);
         }
     }
 
@@ -4004,6 +4255,15 @@ internal sealed class PendingDrawAttempt
 {
     public required Player Player { get; init; }
     public required CardModel SourceCard { get; init; }
+}
+
+internal sealed class PendingRelicHealing
+{
+    public required string RelicId { get; init; }
+    public required Creature Creature { get; init; }
+    public required decimal Attempted { get; init; }
+    public required decimal InitialMissingHp { get; init; }
+    public decimal ActualRestored { get; set; }
 }
 
 internal sealed class PlayerPowerOwnershipShare
