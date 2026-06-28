@@ -988,6 +988,7 @@ public static class RunTracker
                 runRelicAgg.Activations += pendingRelicAgg.Activations;
                 runRelicAgg.StrengthAdded += pendingRelicAgg.StrengthAdded;
                 runRelicAgg.PlatingAdded += pendingRelicAgg.PlatingAdded;
+                runRelicAgg.CardsUpgraded += pendingRelicAgg.CardsUpgraded;
                 runRelicAgg.BoneFluteTriggers += pendingRelicAgg.BoneFluteTriggers;
                 runRelicAgg.TotalOstyHpSummoned += pendingRelicAgg.TotalOstyHpSummoned;
                 runRelicAgg.TotalHealingAttempted += pendingRelicAgg.TotalHealingAttempted;
@@ -1573,6 +1574,7 @@ public static class RunTracker
     private const string CloakClaspRelicId = "RELIC.CLOAK_CLASP";
     private const string ReptileTrinketRelicId = "RELIC.REPTILE_TRINKET";
     private const string GorgetRelicId = "RELIC.GORGET";
+    private const string StoneCrackerRelicId = "RELIC.STONE_CRACKER";
     private const string MealTicketRelicId = "RELIC.MEAL_TICKET";
     private const string BurningBloodRelicId = "RELIC.BURNING_BLOOD";
     private const string WhiteBeastStatueRelicId = "RELIC.WHITE_BEAST_STATUE";
@@ -1763,6 +1765,31 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordGorgetActivation failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record Stone Cracker's owner-specific combat-room activation and the
+    /// number of upgradeable deck cards selected for upgrade. The game filters
+    /// the owner's deck by <c>IsUpgradable</c>, shuffles, then takes the relic's
+    /// Cards dynamic var count; callers pass that selected count.
+    /// </summary>
+    public static void RecordStoneCrackerActivation(int cardsUpgraded)
+    {
+        if (cardsUpgraded < 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(StoneCrackerRelicId);
+                agg.Activations += 1;
+                agg.CardsUpgraded += cardsUpgraded;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordStoneCrackerActivation failed: {e.Message}");
             }
         }
     }
@@ -2517,6 +2544,7 @@ public static class RunTracker
                     BlockedTriggers = committed.BlockedTriggers,
                     StrengthAdded = committed.StrengthAdded,
                     PlatingAdded = committed.PlatingAdded,
+                    CardsUpgraded = committed.CardsUpgraded,
                     BoneFluteTriggers = committed.BoneFluteTriggers,
                     TotalOstyHpSummoned = committed.TotalOstyHpSummoned,
                     TotalHealingAttempted = committed.TotalHealingAttempted,
@@ -2548,6 +2576,7 @@ public static class RunTracker
                 result.Activations += pending.Activations;
                 result.StrengthAdded += pending.StrengthAdded;
                 result.PlatingAdded += pending.PlatingAdded;
+                result.CardsUpgraded += pending.CardsUpgraded;
                 result.BoneFluteTriggers += pending.BoneFluteTriggers;
                 result.TotalOstyHpSummoned += pending.TotalOstyHpSummoned;
                 result.TotalHealingAttempted += pending.TotalHealingAttempted;

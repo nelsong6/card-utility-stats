@@ -369,6 +369,9 @@ public class RelicAggregate
     // Total Plating this relic added. Used by Gorget.
     public decimal PlatingAdded { get; set; }
 
+    // Total cards this relic upgraded. Used by Stone Cracker.
+    public int CardsUpgraded { get; set; }
+
     // Total times Bone Flute triggered from an owned Osty attack.
     public int BoneFluteTriggers { get; set; }
 

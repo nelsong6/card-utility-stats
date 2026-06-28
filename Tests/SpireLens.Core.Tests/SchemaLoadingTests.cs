@@ -874,4 +874,15 @@ public class SchemaLoadingTests
         Assert.Equal(4, relicAgg.Activations);
         Assert.Equal(12m, relicAgg.PlatingAdded);
     }
+
+    [Fact]
+    public void ResumableLoad_AcceptsV30StoneCrackerFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v30-stone-cracker-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.STONE_CRACKER"];
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(6, relicAgg.CardsUpgraded);
+    }
 }

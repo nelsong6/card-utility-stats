@@ -158,6 +158,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is StoneCracker)
+            {
+                const string relicId = "RELIC.STONE_CRACKER";
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+
+                var body = BuildStoneCrackerBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Stone Cracker", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is MealTicket)
             {
                 const string relicId = "RELIC.MEAL_TICKET";
@@ -302,6 +312,14 @@ public static class RelicHoverShowPatch
         var sb = new StringBuilder();
         Row3(sb, "Activations", agg.Activations.ToString(), "");
         Row3(sb, "Plating added", FormatDecimal(agg.PlatingAdded), "");
+        return sb.ToString();
+    }
+
+    private static string BuildStoneCrackerBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, "Cards upgraded", agg.CardsUpgraded.ToString(), "");
         return sb.ToString();
     }
 
