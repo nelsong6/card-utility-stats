@@ -117,6 +117,17 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is PrismaticGem)
+            {
+                const string relicId = "RELIC.PRISMATIC_GEM";
+                var agg = RunTracker.GetRelicAggregate(relicId);
+                if (agg == null || (agg.EnergyGenerated == 0 && agg.CardRewardsAffected == 0)) return;
+
+                var body = BuildPrismaticGemBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Prismatic Gem", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is CloakClasp)
             {
                 const string relicId = "RELIC.CLOAK_CLASP";
@@ -239,6 +250,14 @@ public static class RelicHoverShowPatch
     {
         var sb = new StringBuilder();
         Row3(sb, EnergyLabel("Energy generated"), agg.EnergyGenerated.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildPrismaticGemBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, EnergyLabel("Energy generated"), agg.EnergyGenerated.ToString(), "");
+        Row3(sb, "Card rewards affected", agg.CardRewardsAffected.ToString(), "");
         return sb.ToString();
     }
 

@@ -1,0 +1,20 @@
+{
+  "run_id": "schema-v26-prismatic-gem",
+  "started_at": "2026-06-28T00:00:00Z",
+  "updated_at": "2026-06-28T00:05:00Z",
+  "outcome": "in_progress",
+  "character": "CHAR.KIN",
+  "ascension": 0,
+  "floor_reached": 2,
+  "game_start_time": 1782604800,
+  "aggregates": {},
+  "events": [],
+  "instance_numbers_by_def": {},
+  "def_counters": {},
+  "relic_aggregates": {
+    "RELIC.PRISMATIC_GEM": {
+      "energy_generated": 4,
+      "card_rewards_affected": 2
+    }
+  }
+}

@@ -828,4 +828,15 @@ public class SchemaLoadingTests
         Assert.Equal(4, unboundAgg.Activations);
         Assert.Equal(20m, unboundAgg.TotalOstyHpSummoned);
     }
+
+    [Fact]
+    public void ResumableLoad_AcceptsV26PrismaticGemFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v26-prismatic-gem-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.PRISMATIC_GEM"];
+        Assert.Equal(4, relicAgg.EnergyGenerated);
+        Assert.Equal(2, relicAgg.CardRewardsAffected);
+    }
 }

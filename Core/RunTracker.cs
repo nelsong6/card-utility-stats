@@ -65,6 +65,7 @@ public static class RunTracker
     private static bool _pendingBoneFluteBlockAttribution;
     private static readonly List<PendingRelicHealing> _pendingRelicHeals = new();
     private static bool _pendingHappyFlowerEnergyAttribution;
+    private static int? _lastPrismaticGemEnergyRoundNumber;
     private static bool _pendingCloakClaspBlockAttribution;
     private static int _pendingWhiteBeastPotionRewards;
     private static readonly HashSet<PotionReward> _whiteBeastPotionRewards = new(ReferenceEqualityComparer.Instance);
@@ -650,6 +651,7 @@ public static class RunTracker
         _pendingOrichalcumBlockAttribution = false;
         _pendingTheAbacusBlockAttribution = false;
         _pendingHappyFlowerEnergyAttribution = false;
+        _lastPrismaticGemEnergyRoundNumber = null;
         _pendingCloakClaspBlockAttribution = false;
         _pendingMakeItSoSummons.Clear();
         _pendingReplayExtraPlaySources.Clear();
@@ -995,6 +997,7 @@ public static class RunTracker
                 runRelicAgg.UncommonPotionsGained += pendingRelicAgg.UncommonPotionsGained;
                 runRelicAgg.RarePotionsGained += pendingRelicAgg.RarePotionsGained;
                 runRelicAgg.PotionsSkipped += pendingRelicAgg.PotionsSkipped;
+                runRelicAgg.CardRewardsAffected += pendingRelicAgg.CardRewardsAffected;
             }
 
             MergeMetaStatsInto(_currentRun.MetaStats, _pendingCombat.MetaStats);
@@ -1561,6 +1564,7 @@ public static class RunTracker
     private const string HealingLostFullHpReasonId = "full_hp";
     private const string HealingLostOtherReasonId = "other";
     private const string HappyFlowerRelicId = "RELIC.HAPPY_FLOWER";
+    private const string PrismaticGemRelicId = "RELIC.PRISMATIC_GEM";
     private const string CloakClaspRelicId = "RELIC.CLOAK_CLASP";
     private const string MealTicketRelicId = "RELIC.MEAL_TICKET";
     private const string BurningBloodRelicId = "RELIC.BURNING_BLOOD";
@@ -2295,6 +2299,69 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Record Prismatic Gem's +1 max-energy contribution once per player
+    /// energy reset. The relic modifies max energy whenever the game queries
+    /// it, so this is tied to the actual reset hook instead of the modifier
+    /// method to avoid counting UI/query calls as generated energy.
+    /// </summary>
+    public static void RecordPrismaticGemEnergyGenerated(MegaCrit.Sts2.Core.Combat.ICombatState combatState, int amount)
+    {
+        if (amount <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                int roundNumber = combatState.RoundNumber;
+                if (_lastPrismaticGemEnergyRoundNumber == roundNumber) return;
+                _lastPrismaticGemEnergyRoundNumber = roundNumber;
+
+                var agg = GetOrCreateRelicAggregateLocked(PrismaticGemRelicId);
+                agg.EnergyGenerated += amount;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPrismaticGemEnergyGenerated failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record that Prismatic Gem modified one card reward's creation options.
+    /// Card rewards are created outside combat, so persist directly to the
+    /// committed run instead of waiting for a combat boundary.
+    /// </summary>
+    public static void RecordPrismaticGemCardRewardAffected()
+    {
+        lock (_lock)
+        {
+            try
+            {
+                _currentRun ??= new RunData
+                {
+                    RunId = Guid.NewGuid().ToString("N"),
+                    StartedAt = Now(),
+                    UpdatedAt = Now(),
+                };
+
+                if (!_currentRun.RelicAggregates.TryGetValue(PrismaticGemRelicId, out var agg))
+                {
+                    agg = new RelicAggregate();
+                    _currentRun.RelicAggregates[PrismaticGemRelicId] = agg;
+                }
+
+                agg.CardRewardsAffected += 1;
+                _currentRun.UpdatedAt = Now();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPrismaticGemCardRewardAffected failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Arm the flag that attributes player block gains to Cloak Clasp.
     /// Called from <see cref="Patches.CloakClaspBeforeTurnEndPatch"/> when
     /// Cloak Clasp's end-of-turn hook fires on the player's side.
@@ -2381,6 +2448,7 @@ public static class RunTracker
                     UncommonPotionsGained = committed.UncommonPotionsGained,
                     RarePotionsGained = committed.RarePotionsGained,
                     PotionsSkipped = committed.PotionsSkipped,
+                    CardRewardsAffected = committed.CardRewardsAffected,
                 };
                 MergeHealingLostReasonsInto(result, committed);
             }
@@ -2408,6 +2476,7 @@ public static class RunTracker
                 result.UncommonPotionsGained += pending.UncommonPotionsGained;
                 result.RarePotionsGained += pending.RarePotionsGained;
                 result.PotionsSkipped += pending.PotionsSkipped;
+                result.CardRewardsAffected += pending.CardRewardsAffected;
             }
 
             return result;
