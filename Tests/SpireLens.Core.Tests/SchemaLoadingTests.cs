@@ -373,6 +373,23 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsMealTicketRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("meal-ticket-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.MEAL_TICKET"];
+        Assert.Equal(2, relicAgg.Activations);
+        Assert.Equal(30m, relicAgg.TotalHealingAttempted);
+        Assert.Equal(18m, relicAgg.TotalHealingRestored);
+        Assert.Equal(12m, relicAgg.TotalHealingLost);
+        Assert.Equal(12m, relicAgg.HealingLostReasons["full_hp"].Amount);
+    }
+
+    [Fact]
     public void ResumableLoad_RejectsLegacyV1Fixture()
     {
         var resumed = RunStorage.LoadResumable(FixturePath("v1-pooled-run.json"));
@@ -703,5 +720,19 @@ public class SchemaLoadingTests
         Assert.Equal(3, agg.ReplayExtraPlayPlannedReasons["power:POWER.BURST"].Count);
         Assert.Equal(2, agg.ReplayExtraPlayReasons["power:POWER.BURST"].Count);
         Assert.Equal(1, agg.ReplayAttackNoDamageReasons["power:POWER.BURST"].Count);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsMealTicketRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("meal-ticket-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.MEAL_TICKET"];
+        Assert.Equal(2, relicAgg.Activations);
+        Assert.Equal(30m, relicAgg.TotalHealingAttempted);
+        Assert.Equal(18m, relicAgg.TotalHealingRestored);
+        Assert.Equal(12m, relicAgg.TotalHealingLost);
+        Assert.Equal(12m, relicAgg.HealingLostReasons["full_hp"].Amount);
     }
 }

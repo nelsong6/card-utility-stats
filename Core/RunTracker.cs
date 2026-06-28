@@ -971,6 +971,7 @@ public static class RunTracker
                     runRelicAgg = new RelicAggregate();
                     _currentRun.RelicAggregates[relicId] = runRelicAgg;
                 }
+                runRelicAgg.Activations += pendingRelicAgg.Activations;
                 runRelicAgg.EnemiesAffected += pendingRelicAgg.EnemiesAffected;
                 runRelicAgg.VulnerableApplied += pendingRelicAgg.VulnerableApplied;
                 runRelicAgg.WeakApplied += pendingRelicAgg.WeakApplied;
@@ -1551,6 +1552,7 @@ public static class RunTracker
     private const string HealingLostOtherReasonId = "other";
     private const string HappyFlowerRelicId = "RELIC.HAPPY_FLOWER";
     private const string CloakClaspRelicId = "RELIC.CLOAK_CLASP";
+    private const string MealTicketRelicId = "RELIC.MEAL_TICKET";
 
     /// <summary>
     /// Record a Bag of Marbles combat-start Vulnerable application.
@@ -1939,6 +1941,47 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Record Meal Ticket's shop-entry trigger and arm its observed healing
+    /// window. Meal Ticket fires outside combat, so this writes directly to
+    /// the committed run when no pending combat buffer exists.
+    /// </summary>
+    public static void RecordMealTicketTrigger(Creature healedCreature, decimal attemptedHealing)
+    {
+        if (healedCreature == null || attemptedHealing <= 0m) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateForCurrentContextLocked(MealTicketRelicId);
+                agg.Activations++;
+                agg.TotalHealingAttempted += attemptedHealing;
+
+                decimal initialMissingHp = Math.Max(0m, healedCreature.MaxHp - healedCreature.CurrentHp);
+                if (initialMissingHp <= 0m)
+                {
+                    agg.TotalHealingLost += attemptedHealing;
+                    AddHealingLostReasonLocked(agg, HealingLostFullHpReasonId, "full HP", attemptedHealing);
+                    SaveCurrentRun();
+                    return;
+                }
+
+                _pendingRelicHeals.Add(new PendingRelicHealing
+                {
+                    RelicId = MealTicketRelicId,
+                    Creature = healedCreature,
+                    Attempted = attemptedHealing,
+                    InitialMissingHp = initialMissingHp,
+                });
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordMealTicketTrigger failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Record observed HP restored while an owner-specific relic healing window
     /// is armed. Called from <see cref="Patches.HookAfterCurrentHpChangedPatch"/>.
     /// </summary>
@@ -1958,7 +2001,7 @@ public static class RunTracker
 
                 decimal restored = Math.Min(delta, remaining);
                 pending.ActualRestored += restored;
-                var agg = GetOrCreateRelicAggregateLocked(pending.RelicId);
+                var agg = GetOrCreateRelicAggregateForCurrentContextLocked(pending.RelicId);
                 agg.TotalHealingRestored += restored;
                 return;
             }
@@ -1984,9 +2027,14 @@ public static class RunTracker
 
                 _pendingRelicHeals.RemoveAt(i);
                 decimal lost = Math.Max(0m, pending.Attempted - pending.ActualRestored);
-                if (lost <= 0m) return;
+                if (lost <= 0m)
+                {
+                    if (_pendingCombat == null)
+                        SaveCurrentRun();
+                    return;
+                }
 
-                var agg = GetOrCreateRelicAggregateLocked(relicId);
+                var agg = GetOrCreateRelicAggregateForCurrentContextLocked(relicId);
                 agg.TotalHealingLost += lost;
 
                 decimal fullHpLost = Math.Max(0m, pending.Attempted - pending.InitialMissingHp);
@@ -1997,6 +2045,9 @@ public static class RunTracker
                 decimal otherLost = Math.Max(0m, lost - fullHpLost);
                 if (otherLost > 0m)
                     AddHealingLostReasonLocked(agg, HealingLostOtherReasonId, "other/prevented", otherLost);
+
+                if (_pendingCombat == null)
+                    SaveCurrentRun();
                 return;
             }
         }
@@ -2123,6 +2174,7 @@ public static class RunTracker
             {
                 result = new RelicAggregate
                 {
+                    Activations = committed.Activations,
                     EnemiesAffected = committed.EnemiesAffected,
                     VulnerableApplied = committed.VulnerableApplied,
                     WeakApplied = committed.WeakApplied,
@@ -2142,6 +2194,7 @@ public static class RunTracker
             if (_pendingCombat != null && _pendingCombat.RelicAggregates.TryGetValue(relicId, out var pending))
             {
                 result ??= new RelicAggregate();
+                result.Activations += pending.Activations;
                 result.EnemiesAffected += pending.EnemiesAffected;
                 result.VulnerableApplied += pending.VulnerableApplied;
                 result.WeakApplied += pending.WeakApplied;
@@ -2171,6 +2224,36 @@ public static class RunTracker
         }
 
         return agg;
+    }
+
+    private static RelicAggregate GetOrCreateRelicAggregateForCurrentContextLocked(string relicId)
+    {
+        if (_pendingCombat != null)
+        {
+            if (!_pendingCombat.RelicAggregates.TryGetValue(relicId, out var pendingAgg))
+            {
+                pendingAgg = new RelicAggregate();
+                _pendingCombat.RelicAggregates[relicId] = pendingAgg;
+            }
+
+            return pendingAgg;
+        }
+
+        _currentRun ??= new RunData
+        {
+            RunId = Guid.NewGuid().ToString("N"),
+            StartedAt = Now(),
+            UpdatedAt = Now(),
+        };
+        _currentRun.UpdatedAt = Now();
+
+        if (!_currentRun.RelicAggregates.TryGetValue(relicId, out var runAgg))
+        {
+            runAgg = new RelicAggregate();
+            _currentRun.RelicAggregates[relicId] = runAgg;
+        }
+
+        return runAgg;
     }
 
     private static void AddHealingLostReasonLocked(

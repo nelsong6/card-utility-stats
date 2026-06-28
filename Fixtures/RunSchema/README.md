@@ -72,6 +72,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `v24-replay-source-breakdown-run.json`
   Adds per-card replay extra-play source breakdowns, preserving both the total
   extra-play count and the observed source counts when the game exposes them.
+- `meal-ticket-relic-run.json`
+  Adds relic activation tracking plus Meal Ticket shop-entry healing
+  attribution, including restored healing and full-HP lost healing.
 
 Why these exist:
 

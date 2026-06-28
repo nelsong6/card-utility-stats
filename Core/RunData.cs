@@ -329,6 +329,10 @@ public class ReplayExtraPlayReasonAggregate
 /// </summary>
 public class RelicAggregate
 {
+    // Total times this relic's tracked effect activated.
+    // Used by room/trigger-based relics such as Meal Ticket.
+    public int Activations { get; set; }
+
     // Total enemies across all combats this run that had a debuff applied
     // by this relic at combat start.
     public int EnemiesAffected { get; set; }
