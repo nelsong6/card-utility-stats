@@ -100,6 +100,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is EternalFeather)
+            {
+                const string relicId = "RELIC.ETERNAL_FEATHER";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildEternalFeatherBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Eternal Feather", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is BoneFlute)
             {
                 const string relicId = "RELIC.BONE_FLUTE";
@@ -281,6 +291,14 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
+    private static string BuildEternalFeatherBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        AppendHealingStats(sb, agg);
+        return sb.ToString();
+    }
+
     private static string BuildBoneFluteBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
@@ -406,12 +424,11 @@ public static class RelicHoverShowPatch
 
     private static void AppendHealingStats(StringBuilder sb, RelicAggregate agg)
     {
-        if (agg.TotalHealingRestored > 0m)
-            Row3(sb, "HP healed", FormatDecimal(agg.TotalHealingRestored), "");
+        Row3(sb, "HP healed", FormatDecimal(agg.TotalHealingRestored), "");
+        Row3(sb, "healing lost", FormatDecimal(agg.TotalHealingLost), "");
 
         if (agg.TotalHealingLost <= 0m) return;
 
-        Row3(sb, "healing lost", FormatDecimal(agg.TotalHealingLost), "");
         foreach (var reason in agg.HealingLostReasons.Values
                      .OrderByDescending(r => r.Amount)
                      .ThenBy(r => r.DisplayName))

@@ -1571,6 +1571,7 @@ public static class RunTracker
     private const string OrichalcumRelicId = "RELIC.ORICHALCUM";
     private const string TheAbacusRelicId = "RELIC.THE_ABACUS";
     private const string BookRepairKnifeRelicId = "RELIC.BOOK_REPAIR_KNIFE";
+    private const string EternalFeatherRelicId = "RELIC.ETERNAL_FEATHER";
     private const string BoneFluteRelicId = "RELIC.BONE_FLUTE";
     private const string HealingLostFullHpReasonId = "full_hp";
     private const string HealingLostOtherReasonId = "other";
@@ -2190,6 +2191,7 @@ public static class RunTracker
                         Attempted = attemptedHealing,
                         InitialCurrentHp = healedCreature.CurrentHp,
                         InitialMissingHp = initialMissingHp,
+                        PersistDirectlyToRun = false,
                     });
                 }
             }
@@ -2220,28 +2222,58 @@ public static class RunTracker
         RecordRelicHealingTrigger(BurningBloodRelicId, healedCreature, attemptedHealing, nameof(RecordBurningBloodTrigger));
     }
 
+    /// <summary>
+    /// Record Eternal Feather's rest-site activation and attempted heal. This
+    /// happens outside combat, so the aggregate is written directly to the
+    /// committed run data instead of the pending combat buffer.
+    /// </summary>
+    public static void RecordEternalFeatherTrigger(Creature healedCreature, decimal attemptedHealing)
+    {
+        RecordRelicHealingTrigger(
+            EternalFeatherRelicId,
+            healedCreature,
+            attemptedHealing,
+            nameof(RecordEternalFeatherTrigger),
+            forceDirectRunPersistence: true,
+            allowZeroAttempt: true);
+    }
+
     private static void RecordRelicHealingTrigger(
         string relicId,
         Creature healedCreature,
         decimal attemptedHealing,
-        string callerName)
+        string callerName,
+        bool forceDirectRunPersistence = false,
+        bool allowZeroAttempt = false)
     {
-        if (healedCreature == null || attemptedHealing <= 0m) return;
+        if (healedCreature == null) return;
+        if (attemptedHealing < 0m || (!allowZeroAttempt && attemptedHealing <= 0m)) return;
 
         lock (_lock)
         {
             try
             {
-                var agg = GetOrCreateRelicAggregateForCurrentContextLocked(relicId);
+                bool persistDirectlyToRun = forceDirectRunPersistence || _pendingCombat == null;
+                var agg = persistDirectlyToRun
+                    ? GetOrCreateCurrentRunRelicAggregateLocked(relicId)
+                    : GetOrCreateRelicAggregateLocked(relicId);
                 agg.Activations++;
-                agg.TotalHealingAttempted += attemptedHealing;
 
+                if (attemptedHealing <= 0m)
+                {
+                    if (persistDirectlyToRun)
+                        SaveCurrentRun();
+                    return;
+                }
+
+                agg.TotalHealingAttempted += attemptedHealing;
                 decimal initialMissingHp = Math.Max(0m, healedCreature.MaxHp - healedCreature.CurrentHp);
                 if (initialMissingHp <= 0m)
                 {
                     agg.TotalHealingLost += attemptedHealing;
                     AddHealingLostReasonLocked(agg, HealingLostFullHpReasonId, "full HP", attemptedHealing);
-                    SaveCurrentRun();
+                    if (persistDirectlyToRun)
+                        SaveCurrentRun();
                     return;
                 }
 
@@ -2252,6 +2284,7 @@ public static class RunTracker
                     Attempted = attemptedHealing,
                     InitialCurrentHp = healedCreature.CurrentHp,
                     InitialMissingHp = initialMissingHp,
+                    PersistDirectlyToRun = persistDirectlyToRun,
                 });
             }
             catch (Exception e)
@@ -2281,7 +2314,7 @@ public static class RunTracker
 
                 decimal restored = Math.Min(delta, remaining);
                 pending.ActualRestored += restored;
-                var agg = GetOrCreateRelicAggregateForCurrentContextLocked(pending.RelicId);
+                var agg = GetOrCreateRelicAggregateForHealingLocked(pending);
                 agg.TotalHealingRestored += restored;
                 return;
             }
@@ -2314,7 +2347,7 @@ public static class RunTracker
                 var observedRestoredDelta = Math.Max(0m, observedRestored - pending.ActualRestored);
                 if (observedRestoredDelta > 0m)
                 {
-                    var restoredAgg = GetOrCreateRelicAggregateForCurrentContextLocked(relicId);
+                    var restoredAgg = GetOrCreateRelicAggregateForHealingLocked(pending);
                     restoredAgg.TotalHealingRestored += observedRestoredDelta;
                 }
 
@@ -2326,7 +2359,7 @@ public static class RunTracker
                     return;
                 }
 
-                var agg = GetOrCreateRelicAggregateForCurrentContextLocked(relicId);
+                var agg = GetOrCreateRelicAggregateForHealingLocked(pending);
                 agg.TotalHealingLost += lost;
 
                 decimal fullHpLost = Math.Max(0m, pending.Attempted - pending.InitialMissingHp);
@@ -2338,7 +2371,7 @@ public static class RunTracker
                 if (otherLost > 0m)
                     AddHealingLostReasonLocked(agg, HealingLostOtherReasonId, "other/prevented", otherLost);
 
-                if (_pendingCombat == null)
+                if (pending.PersistDirectlyToRun)
                     SaveCurrentRun();
                 return;
             }
@@ -2778,21 +2811,33 @@ public static class RunTracker
             return pendingAgg;
         }
 
+        return GetOrCreateCurrentRunRelicAggregateLocked(relicId);
+    }
+
+    private static RelicAggregate GetOrCreateRelicAggregateForHealingLocked(PendingRelicHealing pending)
+    {
+        return pending.PersistDirectlyToRun
+            ? GetOrCreateCurrentRunRelicAggregateLocked(pending.RelicId)
+            : GetOrCreateRelicAggregateLocked(pending.RelicId);
+    }
+
+    private static RelicAggregate GetOrCreateCurrentRunRelicAggregateLocked(string relicId)
+    {
         _currentRun ??= new RunData
         {
             RunId = Guid.NewGuid().ToString("N"),
             StartedAt = Now(),
             UpdatedAt = Now(),
         };
-        _currentRun.UpdatedAt = Now();
 
-        if (!_currentRun.RelicAggregates.TryGetValue(relicId, out var runAgg))
+        if (!_currentRun.RelicAggregates.TryGetValue(relicId, out var agg))
         {
-            runAgg = new RelicAggregate();
-            _currentRun.RelicAggregates[relicId] = runAgg;
+            agg = new RelicAggregate();
+            _currentRun.RelicAggregates[relicId] = agg;
         }
 
-        return runAgg;
+        _currentRun.UpdatedAt = Now();
+        return agg;
     }
 
     private static void RecordCombatsInDeckForCurrentDeckLocked()
@@ -5378,6 +5423,7 @@ internal sealed class PendingRelicHealing
     public required decimal Attempted { get; init; }
     public required decimal InitialCurrentHp { get; init; }
     public required decimal InitialMissingHp { get; init; }
+    public bool PersistDirectlyToRun { get; init; }
     public decimal ActualRestored { get; set; }
 }
 
