@@ -170,6 +170,17 @@ public static class RelicHoverShowPatch
                 StatsTooltip.Show(tree, __instance, "Burning Blood", "SpireLens", body);
                 return;
             }
+
+            if (relicNode.Model is WhiteBeastStatue)
+            {
+                const string relicId = "RELIC.WHITE_BEAST_STATUE";
+                var agg = RunTracker.GetRelicAggregate(relicId);
+                if (agg == null || agg.PotionsGained == 0) return;
+
+                var body = BuildWhiteBeastStatueBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "White Beast Statue", "SpireLens", body);
+                return;
+            }
         }
         catch (Exception e)
         {
@@ -256,6 +267,16 @@ public static class RelicHoverShowPatch
         var sb = new StringBuilder();
         Row3(sb, "Activations", agg.Activations.ToString(), "");
         AppendHealingStats(sb, agg);
+        return sb.ToString();
+    }
+
+    private static string BuildWhiteBeastStatueBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Potions gained", agg.PotionsGained.ToString(), "");
+        Row3(sb, "common potions", agg.CommonPotionsGained.ToString(), "");
+        Row3(sb, "uncommon potions", agg.UncommonPotionsGained.ToString(), "");
+        Row3(sb, "rare potions", agg.RarePotionsGained.ToString(), "");
         return sb.ToString();
     }
 

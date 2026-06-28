@@ -407,6 +407,22 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsWhiteBeastStatueRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("white-beast-statue-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.WHITE_BEAST_STATUE"];
+        Assert.Equal(5, relicAgg.PotionsGained);
+        Assert.Equal(2, relicAgg.CommonPotionsGained);
+        Assert.Equal(2, relicAgg.UncommonPotionsGained);
+        Assert.Equal(1, relicAgg.RarePotionsGained);
+    }
+
+    [Fact]
     public void ResumableLoad_RejectsLegacyV1Fixture()
     {
         var resumed = RunStorage.LoadResumable(FixturePath("v1-pooled-run.json"));
@@ -765,5 +781,18 @@ public class SchemaLoadingTests
         Assert.Equal(9m, relicAgg.TotalHealingRestored);
         Assert.Equal(3m, relicAgg.TotalHealingLost);
         Assert.Equal(3m, relicAgg.HealingLostReasons["full_hp"].Amount);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsWhiteBeastStatueRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("white-beast-statue-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.WHITE_BEAST_STATUE"];
+        Assert.Equal(5, relicAgg.PotionsGained);
+        Assert.Equal(2, relicAgg.CommonPotionsGained);
+        Assert.Equal(2, relicAgg.UncommonPotionsGained);
+        Assert.Equal(1, relicAgg.RarePotionsGained);
     }
 }

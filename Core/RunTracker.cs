@@ -8,11 +8,13 @@ using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Entities.Powers;
 using MegaCrit.Sts2.Core.Entities.Players;
+using MegaCrit.Sts2.Core.Entities.Potions;
 using MegaCrit.Sts2.Core.Hooks;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Enchantments;
 using MegaCrit.Sts2.Core.Models.Cards;
 using MegaCrit.Sts2.Core.Models.Powers;
+using MegaCrit.Sts2.Core.Rewards;
 using MegaCrit.Sts2.Core.Rooms;
 using MegaCrit.Sts2.Core.Runs;
 
@@ -64,6 +66,8 @@ public static class RunTracker
     private static readonly List<PendingRelicHealing> _pendingRelicHeals = new();
     private static bool _pendingHappyFlowerEnergyAttribution;
     private static bool _pendingCloakClaspBlockAttribution;
+    private static int _pendingWhiteBeastPotionRewards;
+    private static readonly HashSet<PotionReward> _whiteBeastPotionRewards = new(ReferenceEqualityComparer.Instance);
     private static bool _shivAvailableThisRun;
     private static CardModel? _shivDeckViewCard;
     private const decimal PoisonOwnershipEpsilon = 0.0001m;
@@ -985,6 +989,10 @@ public static class RunTracker
                 runRelicAgg.DoomDeathTriggers += pendingRelicAgg.DoomDeathTriggers;
                 runRelicAgg.DoomKills += pendingRelicAgg.DoomKills;
                 runRelicAgg.EnergyGenerated += pendingRelicAgg.EnergyGenerated;
+                runRelicAgg.PotionsGained += pendingRelicAgg.PotionsGained;
+                runRelicAgg.CommonPotionsGained += pendingRelicAgg.CommonPotionsGained;
+                runRelicAgg.UncommonPotionsGained += pendingRelicAgg.UncommonPotionsGained;
+                runRelicAgg.RarePotionsGained += pendingRelicAgg.RarePotionsGained;
             }
 
             MergeMetaStatsInto(_currentRun.MetaStats, _pendingCombat.MetaStats);
@@ -1554,6 +1562,7 @@ public static class RunTracker
     private const string CloakClaspRelicId = "RELIC.CLOAK_CLASP";
     private const string MealTicketRelicId = "RELIC.MEAL_TICKET";
     private const string BurningBloodRelicId = "RELIC.BURNING_BLOOD";
+    private const string WhiteBeastStatueRelicId = "RELIC.WHITE_BEAST_STATUE";
 
     /// <summary>
     /// Record a Bag of Marbles combat-start Vulnerable application.
@@ -1812,6 +1821,77 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordPocketwatchDraw failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Mark that White Beast Statue forced a potion reward. Called from the
+    /// relic-owned ShouldForcePotionReward callback after the game confirms
+    /// the relic returned true.
+    /// </summary>
+    public static void NoteWhiteBeastPotionRewardForced()
+    {
+        lock (_lock)
+        {
+            _pendingWhiteBeastPotionRewards++;
+        }
+    }
+
+    /// <summary>
+    /// Attach a pending White Beast force decision to the concrete potion
+    /// reward object the game created from that decision.
+    /// </summary>
+    public static void NotePotionRewardCreated(PotionReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            if (_pendingWhiteBeastPotionRewards <= 0) return;
+
+            _pendingWhiteBeastPotionRewards--;
+            _whiteBeastPotionRewards.Add(reward);
+        }
+    }
+
+    /// <summary>
+    /// Record a White Beast potion only after the marked reward is actually
+    /// selected successfully.
+    /// </summary>
+    public static void RecordWhiteBeastPotionRewardClaimed(PotionReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_whiteBeastPotionRewards.Remove(reward)) return;
+
+                var potion = reward.ClaimedPotion ?? reward.Potion;
+                var agg = GetOrCreateRelicAggregateForCurrentContextLocked(WhiteBeastStatueRelicId);
+                agg.PotionsGained++;
+
+                switch (potion?.Rarity)
+                {
+                    case PotionRarity.Common:
+                        agg.CommonPotionsGained++;
+                        break;
+                    case PotionRarity.Uncommon:
+                        agg.UncommonPotionsGained++;
+                        break;
+                    case PotionRarity.Rare:
+                        agg.RarePotionsGained++;
+                        break;
+                }
+
+                if (_pendingCombat == null)
+                    SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordWhiteBeastPotionRewardClaimed failed: {e.Message}");
             }
         }
     }
@@ -2233,6 +2313,10 @@ public static class RunTracker
                     DoomDeathTriggers = committed.DoomDeathTriggers,
                     DoomKills = committed.DoomKills,
                     EnergyGenerated = committed.EnergyGenerated,
+                    PotionsGained = committed.PotionsGained,
+                    CommonPotionsGained = committed.CommonPotionsGained,
+                    UncommonPotionsGained = committed.UncommonPotionsGained,
+                    RarePotionsGained = committed.RarePotionsGained,
                 };
                 MergeHealingLostReasonsInto(result, committed);
             }
@@ -2254,6 +2338,10 @@ public static class RunTracker
                 result.DoomDeathTriggers += pending.DoomDeathTriggers;
                 result.DoomKills += pending.DoomKills;
                 result.EnergyGenerated += pending.EnergyGenerated;
+                result.PotionsGained += pending.PotionsGained;
+                result.CommonPotionsGained += pending.CommonPotionsGained;
+                result.UncommonPotionsGained += pending.UncommonPotionsGained;
+                result.RarePotionsGained += pending.RarePotionsGained;
             }
 
             return result;
