@@ -450,6 +450,10 @@ public class SchemaLoadingTests
         Assert.True(loaded.HasPerInstanceIdentity);
         Assert.Null(loaded.CompatibilityNote);
         var hauntedShipAgg = loaded.Data.EnemyAggregates["MONSTER.HAUNTED_SHIP"];
+        Assert.Equal(2, hauntedShipAgg.DamageInstances);
+        Assert.Equal(16, hauntedShipAgg.DamageAttempted);
+        Assert.Equal(6, hauntedShipAgg.DamageBlocked);
+        Assert.Equal(10, hauntedShipAgg.DamageDealt);
         Assert.Equal(3, hauntedShipAgg.StatusCardsAdded);
         Assert.Equal(1, hauntedShipAgg.StatusCardsAddedToHand);
         Assert.Equal(2, hauntedShipAgg.StatusCardsAddedToDraw);
@@ -937,6 +941,10 @@ public class SchemaLoadingTests
 
         Assert.NotNull(resumed);
         var hauntedShipAgg = resumed!.EnemyAggregates["MONSTER.HAUNTED_SHIP"];
+        Assert.Equal(2, hauntedShipAgg.DamageInstances);
+        Assert.Equal(16, hauntedShipAgg.DamageAttempted);
+        Assert.Equal(6, hauntedShipAgg.DamageBlocked);
+        Assert.Equal(10, hauntedShipAgg.DamageDealt);
         Assert.Equal(3, hauntedShipAgg.StatusCardsAdded);
         Assert.Equal(1, hauntedShipAgg.StatusCardsAddedToHand);
         Assert.Equal(2, hauntedShipAgg.StatusCardsAddedToDraw);

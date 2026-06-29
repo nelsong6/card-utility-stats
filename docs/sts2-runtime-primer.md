@@ -369,6 +369,11 @@ Enemy status-card pollution uses a source-window plus observed-result pattern:
   by destination pile and by status card id so enemy hovers can answer what the
   enemy actually added.
 
+Enemy damage dealt to the player can be observed from `DamageReceivedEntry`
+when `Receiver.IsPlayer` and `Dealer.Monster` is present. Attribute this to the
+enemy definition, not a card. Use `BlockedDamage + UnblockedDamage` as attempted
+damage, `BlockedDamage` as blocked, and `UnblockedDamage` as dealt/effective.
+
 ## UI Timing And Tooltip Surfaces
 
 Card stats are exposed through Godot UI patches, not through game combat state alone.

@@ -12,6 +12,10 @@
   "relic_aggregates": {},
   "enemy_aggregates": {
     "MONSTER.HAUNTED_SHIP": {
+      "damage_instances": 2,
+      "damage_attempted": 16,
+      "damage_blocked": 6,
+      "damage_dealt": 10,
       "status_cards_added": 3,
       "status_cards_added_to_hand": 1,
       "status_cards_added_to_draw": 2,
@@ -24,6 +28,10 @@
       }
     },
     "MONSTER.ENTOMANCER": {
+      "damage_instances": 1,
+      "damage_attempted": 8,
+      "damage_blocked": 3,
+      "damage_dealt": 5,
       "status_cards_added": 2,
       "status_cards_added_to_draw": 2,
       "status_cards_by_id": {

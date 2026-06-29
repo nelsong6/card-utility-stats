@@ -88,8 +88,9 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds per-enemy observed damage output aggregates: attempted damage, HP damage
   dealt, and damage blocked by player block.
 - `enemy-status-pollution-run.json`
-  Adds run-level enemy aggregates for status cards that enemies actually add,
-  split by destination pile and status card id.
+  Adds run-level enemy aggregates for enemy damage dealt to the player and
+  status cards that enemies actually add, split by destination pile and status
+  card id.
 
 Why these exist:
 

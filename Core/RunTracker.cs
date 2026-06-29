@@ -2218,6 +2218,18 @@ public static class RunTracker
         }
     }
 
+    internal static void RecordEnemyDamageToPlayerForTest(
+        EnemyAggregate agg,
+        int blockedDamage,
+        int unblockedDamage)
+    {
+        if (blockedDamage <= 0 && unblockedDamage <= 0) return;
+        agg.DamageInstances++;
+        agg.DamageAttempted += blockedDamage + unblockedDamage;
+        agg.DamageBlocked += blockedDamage;
+        agg.DamageDealt += unblockedDamage;
+    }
+
     internal static void RecordEnemyStatusCardAddedForTest(
         EnemyAggregate agg,
         string cardId,

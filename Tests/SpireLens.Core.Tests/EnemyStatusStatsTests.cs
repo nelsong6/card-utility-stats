@@ -22,6 +22,10 @@ public class EnemyStatusStatsTests
     {
         var agg = new EnemyAggregate();
 
+        Assert.Equal(0, agg.DamageInstances);
+        Assert.Equal(0, agg.DamageAttempted);
+        Assert.Equal(0, agg.DamageBlocked);
+        Assert.Equal(0, agg.DamageDealt);
         Assert.Equal(0, agg.StatusCardsAdded);
         Assert.Equal(0, agg.StatusCardsAddedToHand);
         Assert.Equal(0, agg.StatusCardsAddedToDraw);
@@ -36,6 +40,10 @@ public class EnemyStatusStatsTests
         var run = new RunData();
         run.EnemyAggregates[HauntedShipEnemyId] = new EnemyAggregate
         {
+            DamageInstances = 2,
+            DamageAttempted = 12,
+            DamageBlocked = 5,
+            DamageDealt = 7,
             StatusCardsAdded = 3,
             StatusCardsAddedToHand = 1,
             StatusCardsAddedToDraw = 2,
@@ -53,6 +61,10 @@ public class EnemyStatusStatsTests
         var json = JsonSerializer.Serialize(run, SerializerOptions);
 
         Assert.Contains("enemy_aggregates", json);
+        Assert.Contains("damage_instances", json);
+        Assert.Contains("damage_attempted", json);
+        Assert.Contains("damage_blocked", json);
+        Assert.Contains("damage_dealt", json);
         Assert.Contains("status_cards_added", json);
         Assert.Contains("status_cards_added_to_hand", json);
         Assert.Contains("status_cards_by_id", json);
@@ -61,11 +73,48 @@ public class EnemyStatusStatsTests
 
         Assert.NotNull(restored);
         var agg = restored!.EnemyAggregates[HauntedShipEnemyId];
+        Assert.Equal(2, agg.DamageInstances);
+        Assert.Equal(12, agg.DamageAttempted);
+        Assert.Equal(5, agg.DamageBlocked);
+        Assert.Equal(7, agg.DamageDealt);
         Assert.Equal(3, agg.StatusCardsAdded);
         Assert.Equal(1, agg.StatusCardsAddedToHand);
         Assert.Equal(2, agg.StatusCardsAddedToDraw);
         Assert.Equal("Dazed", agg.StatusCardsById["CARD.DAZED"].DisplayName);
         Assert.Equal(3, agg.StatusCardsById["CARD.DAZED"].Count);
+    }
+
+    [Fact]
+    public void EnemyAggregate_RecordDamage_SplitsAttemptedBlockedAndDealt()
+    {
+        var agg = new EnemyAggregate();
+
+        RunTracker.RecordEnemyDamageToPlayerForTest(agg, blockedDamage: 4, unblockedDamage: 6);
+        RunTracker.RecordEnemyDamageToPlayerForTest(agg, blockedDamage: 3, unblockedDamage: 0);
+
+        Assert.Equal(2, agg.DamageInstances);
+        Assert.Equal(13, agg.DamageAttempted);
+        Assert.Equal(7, agg.DamageBlocked);
+        Assert.Equal(6, agg.DamageDealt);
+    }
+
+    [Fact]
+    public void EnemyTooltip_DamageFields_ShowAttemptedBlockedAndDealt()
+    {
+        var agg = new EnemyAggregate();
+        RunTracker.RecordEnemyDamageToPlayerForTest(agg, blockedDamage: 4, unblockedDamage: 6);
+        RunTracker.RecordEnemyDamageToPlayerForTest(agg, blockedDamage: 3, unblockedDamage: 0);
+
+        var body = EnemyHoverShowPatch.BuildEnemyBodyBBCode(agg);
+
+        Assert.Contains("Damage attempted", body);
+        Assert.Contains("Damage dealt", body);
+        Assert.Contains("Damage blocked", body);
+        Assert.Contains("Damage instances", body);
+        Assert.Contains("[b]13[/b]", body);
+        Assert.Contains("[b]7[/b]", body);
+        Assert.Contains("[b]6[/b]", body);
+        Assert.Contains("54%", body);
     }
 
     [Fact]
