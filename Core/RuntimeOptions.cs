@@ -20,6 +20,7 @@ public static class RuntimeOptionsProvider
     private const string BridgeTypeName = "SpireLens.Loader.RuntimeOptionsBridge";
     private const string GetCurrentOptionsJsonMethodName = "GetCurrentOptionsJson";
     private const string SetViewStatsToggleEnabledMethodName = "SetViewStatsToggleEnabled";
+    private const string SetShowRemovedCardsInDeckViewMethodName = "SetShowRemovedCardsInDeckView";
     private const string SetVerboseHandStatsEnabledMethodName = "SetVerboseHandStatsEnabled";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -30,10 +31,12 @@ public static class RuntimeOptionsProvider
     private static Type? _bridgeType;
     private static MethodInfo? _getCurrentOptionsJsonMethod;
     private static MethodInfo? _setViewStatsToggleEnabledMethod;
+    private static MethodInfo? _setShowRemovedCardsInDeckViewMethod;
     private static MethodInfo? _setVerboseHandStatsEnabledMethod;
     private static bool _loggedMissingBridge;
     private static bool _loggedRefreshFailure;
     private static bool _loggedToggleFailure;
+    private static bool _loggedShowRemovedCardsFailure;
     private static bool _loggedVerboseHandStatsFailure;
 
     public static RuntimeOptions Current { get; private set; } = new();
@@ -83,6 +86,26 @@ public static class RuntimeOptionsProvider
         Refresh();
     }
 
+    public static void SetShowRemovedCardsInDeckView(bool isEnabled)
+    {
+        try
+        {
+            var setShowRemovedCardsMethod = ResolveSetShowRemovedCardsInDeckViewMethod();
+            setShowRemovedCardsMethod?.Invoke(null, new object?[] { isEnabled });
+            _loggedShowRemovedCardsFailure = false;
+        }
+        catch (Exception e)
+        {
+            if (!_loggedShowRemovedCardsFailure)
+            {
+                CoreMain.Logger.Warn($"RuntimeOptionsProvider.SetShowRemovedCardsInDeckView failed: {e.Message}");
+                _loggedShowRemovedCardsFailure = true;
+            }
+        }
+
+        Refresh();
+    }
+
     public static void SetVerboseHandStatsEnabled(bool isEnabled)
     {
         try
@@ -117,6 +140,14 @@ public static class RuntimeOptionsProvider
             SetViewStatsToggleEnabledMethodName,
             BindingFlags.Public | BindingFlags.Static);
         return _setViewStatsToggleEnabledMethod;
+    }
+
+    private static MethodInfo? ResolveSetShowRemovedCardsInDeckViewMethod()
+    {
+        _setShowRemovedCardsInDeckViewMethod ??= ResolveBridgeType()?.GetMethod(
+            SetShowRemovedCardsInDeckViewMethodName,
+            BindingFlags.Public | BindingFlags.Static);
+        return _setShowRemovedCardsInDeckViewMethod;
     }
 
     private static MethodInfo? ResolveSetVerboseHandStatsEnabledMethod()

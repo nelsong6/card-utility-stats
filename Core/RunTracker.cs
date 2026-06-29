@@ -8,11 +8,13 @@ using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Entities.Powers;
 using MegaCrit.Sts2.Core.Entities.Players;
+using MegaCrit.Sts2.Core.Entities.Potions;
 using MegaCrit.Sts2.Core.Hooks;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Enchantments;
 using MegaCrit.Sts2.Core.Models.Cards;
 using MegaCrit.Sts2.Core.Models.Powers;
+using MegaCrit.Sts2.Core.Rewards;
 using MegaCrit.Sts2.Core.Rooms;
 using MegaCrit.Sts2.Core.Runs;
 
@@ -64,6 +66,8 @@ public static class RunTracker
     private static readonly List<PendingRelicHealing> _pendingRelicHeals = new();
     private static bool _pendingHappyFlowerEnergyAttribution;
     private static bool _pendingCloakClaspBlockAttribution;
+    private static int _pendingWhiteBeastPotionRewards;
+    private static readonly HashSet<PotionReward> _whiteBeastPotionRewards = new(ReferenceEqualityComparer.Instance);
     private static bool _shivAvailableThisRun;
     private static CardModel? _shivDeckViewCard;
     private const decimal PoisonOwnershipEpsilon = 0.0001m;
@@ -971,12 +975,14 @@ public static class RunTracker
                     runRelicAgg = new RelicAggregate();
                     _currentRun.RelicAggregates[relicId] = runRelicAgg;
                 }
+                runRelicAgg.Activations += pendingRelicAgg.Activations;
                 runRelicAgg.EnemiesAffected += pendingRelicAgg.EnemiesAffected;
                 runRelicAgg.VulnerableApplied += pendingRelicAgg.VulnerableApplied;
                 runRelicAgg.WeakApplied += pendingRelicAgg.WeakApplied;
                 runRelicAgg.AdditionalCardsDrawn += pendingRelicAgg.AdditionalCardsDrawn;
                 runRelicAgg.AdditionalBlockGained += pendingRelicAgg.AdditionalBlockGained;
                 runRelicAgg.BoneFluteTriggers += pendingRelicAgg.BoneFluteTriggers;
+                runRelicAgg.TotalOstyHpSummoned += pendingRelicAgg.TotalOstyHpSummoned;
                 runRelicAgg.TotalHealingAttempted += pendingRelicAgg.TotalHealingAttempted;
                 runRelicAgg.TotalHealingRestored += pendingRelicAgg.TotalHealingRestored;
                 runRelicAgg.TotalHealingLost += pendingRelicAgg.TotalHealingLost;
@@ -984,6 +990,11 @@ public static class RunTracker
                 runRelicAgg.DoomDeathTriggers += pendingRelicAgg.DoomDeathTriggers;
                 runRelicAgg.DoomKills += pendingRelicAgg.DoomKills;
                 runRelicAgg.EnergyGenerated += pendingRelicAgg.EnergyGenerated;
+                runRelicAgg.PotionsGained += pendingRelicAgg.PotionsGained;
+                runRelicAgg.CommonPotionsGained += pendingRelicAgg.CommonPotionsGained;
+                runRelicAgg.UncommonPotionsGained += pendingRelicAgg.UncommonPotionsGained;
+                runRelicAgg.RarePotionsGained += pendingRelicAgg.RarePotionsGained;
+                runRelicAgg.PotionsSkipped += pendingRelicAgg.PotionsSkipped;
             }
 
             MergeMetaStatsInto(_currentRun.MetaStats, _pendingCombat.MetaStats);
@@ -1551,6 +1562,11 @@ public static class RunTracker
     private const string HealingLostOtherReasonId = "other";
     private const string HappyFlowerRelicId = "RELIC.HAPPY_FLOWER";
     private const string CloakClaspRelicId = "RELIC.CLOAK_CLASP";
+    private const string MealTicketRelicId = "RELIC.MEAL_TICKET";
+    private const string BurningBloodRelicId = "RELIC.BURNING_BLOOD";
+    private const string WhiteBeastStatueRelicId = "RELIC.WHITE_BEAST_STATUE";
+    private const string BoundPhylacteryRelicId = "RELIC.BOUND_PHYLACTERY";
+    private const string PhylacteryUnboundRelicId = "RELIC.PHYLACTERY_UNBOUND";
 
     /// <summary>
     /// Record a Bag of Marbles combat-start Vulnerable application.
@@ -1814,6 +1830,104 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Mark that White Beast Statue forced a potion reward. Called from the
+    /// relic-owned ShouldForcePotionReward callback after the game confirms
+    /// the relic returned true.
+    /// </summary>
+    public static void NoteWhiteBeastPotionRewardForced()
+    {
+        lock (_lock)
+        {
+            _pendingWhiteBeastPotionRewards++;
+        }
+    }
+
+    /// <summary>
+    /// Attach a pending White Beast force decision to the concrete potion
+    /// reward object the game created from that decision.
+    /// </summary>
+    public static void NotePotionRewardCreated(PotionReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            if (_pendingWhiteBeastPotionRewards <= 0) return;
+
+            _pendingWhiteBeastPotionRewards--;
+            _whiteBeastPotionRewards.Add(reward);
+        }
+    }
+
+    /// <summary>
+    /// Record a White Beast potion only after the marked reward is actually
+    /// selected successfully.
+    /// </summary>
+    public static void RecordWhiteBeastPotionRewardClaimed(PotionReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_whiteBeastPotionRewards.Remove(reward)) return;
+
+                var potion = reward.ClaimedPotion ?? reward.Potion;
+                var agg = GetOrCreateRelicAggregateForCurrentContextLocked(WhiteBeastStatueRelicId);
+                agg.PotionsGained++;
+
+                switch (potion?.Rarity)
+                {
+                    case PotionRarity.Common:
+                        agg.CommonPotionsGained++;
+                        break;
+                    case PotionRarity.Uncommon:
+                        agg.UncommonPotionsGained++;
+                        break;
+                    case PotionRarity.Rare:
+                        agg.RarePotionsGained++;
+                        break;
+                }
+
+                if (_pendingCombat == null)
+                    SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordWhiteBeastPotionRewardClaimed failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record a White Beast potion reward skipped by the player. This only
+    /// counts rewards previously marked from White Beast's force decision.
+    /// </summary>
+    public static void RecordWhiteBeastPotionRewardSkipped(PotionReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_whiteBeastPotionRewards.Remove(reward)) return;
+
+                var agg = GetOrCreateRelicAggregateForCurrentContextLocked(WhiteBeastStatueRelicId);
+                agg.PotionsSkipped++;
+
+                if (_pendingCombat == null)
+                    SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordWhiteBeastPotionRewardSkipped failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Record Unleash's Osty-current-HP contribution to its attack payload.
     /// This is card-specific intent metadata captured at the owner callback;
     /// observed damage still flows through DamageReceivedEntry.
@@ -1863,6 +1977,37 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordOstySummoned failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record a relic-owned Osty summon/revive after the shared summon command
+    /// completes. Activation count follows the command completion; amount is
+    /// the observed HP actually added.
+    /// </summary>
+    public static void RecordRelicOstySummon(AbstractModel sourceRelic, decimal amount)
+    {
+        var relicId = sourceRelic switch
+        {
+            MegaCrit.Sts2.Core.Models.Relics.BoundPhylactery => BoundPhylacteryRelicId,
+            MegaCrit.Sts2.Core.Models.Relics.PhylacteryUnbound => PhylacteryUnboundRelicId,
+            _ => null,
+        };
+        if (relicId == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(relicId);
+                agg.Activations++;
+                if (amount > 0m)
+                    agg.TotalOstyHpSummoned += amount;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordRelicOstySummon failed: {e.Message}");
             }
         }
     }
@@ -1927,6 +2072,7 @@ public static class RunTracker
                         RelicId = BookRepairKnifeRelicId,
                         Creature = healedCreature,
                         Attempted = attemptedHealing,
+                        InitialCurrentHp = healedCreature.CurrentHp,
                         InitialMissingHp = initialMissingHp,
                     });
                 }
@@ -1934,6 +2080,67 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordBookRepairKnifeTrigger failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record Meal Ticket's shop-entry trigger and arm its observed healing
+    /// window. Meal Ticket fires outside combat, so this writes directly to
+    /// the committed run when no pending combat buffer exists.
+    /// </summary>
+    public static void RecordMealTicketTrigger(Creature healedCreature, decimal attemptedHealing)
+    {
+        RecordRelicHealingTrigger(MealTicketRelicId, healedCreature, attemptedHealing, nameof(RecordMealTicketTrigger));
+    }
+
+    /// <summary>
+    /// Record Burning Blood's combat-victory trigger and arm its observed
+    /// healing window. Depending on combat teardown timing, this can land in
+    /// the pending combat buffer or directly in the run aggregate.
+    /// </summary>
+    public static void RecordBurningBloodTrigger(Creature healedCreature, decimal attemptedHealing)
+    {
+        RecordRelicHealingTrigger(BurningBloodRelicId, healedCreature, attemptedHealing, nameof(RecordBurningBloodTrigger));
+    }
+
+    private static void RecordRelicHealingTrigger(
+        string relicId,
+        Creature healedCreature,
+        decimal attemptedHealing,
+        string callerName)
+    {
+        if (healedCreature == null || attemptedHealing <= 0m) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateForCurrentContextLocked(relicId);
+                agg.Activations++;
+                agg.TotalHealingAttempted += attemptedHealing;
+
+                decimal initialMissingHp = Math.Max(0m, healedCreature.MaxHp - healedCreature.CurrentHp);
+                if (initialMissingHp <= 0m)
+                {
+                    agg.TotalHealingLost += attemptedHealing;
+                    AddHealingLostReasonLocked(agg, HealingLostFullHpReasonId, "full HP", attemptedHealing);
+                    SaveCurrentRun();
+                    return;
+                }
+
+                _pendingRelicHeals.Add(new PendingRelicHealing
+                {
+                    RelicId = relicId,
+                    Creature = healedCreature,
+                    Attempted = attemptedHealing,
+                    InitialCurrentHp = healedCreature.CurrentHp,
+                    InitialMissingHp = initialMissingHp,
+                });
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"{callerName} failed: {e.Message}");
             }
         }
     }
@@ -1958,7 +2165,7 @@ public static class RunTracker
 
                 decimal restored = Math.Min(delta, remaining);
                 pending.ActualRestored += restored;
-                var agg = GetOrCreateRelicAggregateLocked(pending.RelicId);
+                var agg = GetOrCreateRelicAggregateForCurrentContextLocked(pending.RelicId);
                 agg.TotalHealingRestored += restored;
                 return;
             }
@@ -1983,10 +2190,27 @@ public static class RunTracker
                 if (!string.Equals(pending.RelicId, relicId, StringComparison.Ordinal)) continue;
 
                 _pendingRelicHeals.RemoveAt(i);
-                decimal lost = Math.Max(0m, pending.Attempted - pending.ActualRestored);
-                if (lost <= 0m) return;
+                decimal observedRestored = CalculateRelicHealingActualRestored(
+                    pending.Attempted,
+                    pending.ActualRestored,
+                    pending.InitialCurrentHp,
+                    creature.CurrentHp);
+                var observedRestoredDelta = Math.Max(0m, observedRestored - pending.ActualRestored);
+                if (observedRestoredDelta > 0m)
+                {
+                    var restoredAgg = GetOrCreateRelicAggregateForCurrentContextLocked(relicId);
+                    restoredAgg.TotalHealingRestored += observedRestoredDelta;
+                }
 
-                var agg = GetOrCreateRelicAggregateLocked(relicId);
+                decimal lost = Math.Max(0m, pending.Attempted - observedRestored);
+                if (lost <= 0m)
+                {
+                    if (_pendingCombat == null)
+                        SaveCurrentRun();
+                    return;
+                }
+
+                var agg = GetOrCreateRelicAggregateForCurrentContextLocked(relicId);
                 agg.TotalHealingLost += lost;
 
                 decimal fullHpLost = Math.Max(0m, pending.Attempted - pending.InitialMissingHp);
@@ -1997,9 +2221,24 @@ public static class RunTracker
                 decimal otherLost = Math.Max(0m, lost - fullHpLost);
                 if (otherLost > 0m)
                     AddHealingLostReasonLocked(agg, HealingLostOtherReasonId, "other/prevented", otherLost);
+
+                if (_pendingCombat == null)
+                    SaveCurrentRun();
                 return;
             }
         }
+    }
+
+    internal static decimal CalculateRelicHealingActualRestored(
+        decimal attempted,
+        decimal hookRecordedRestored,
+        decimal initialCurrentHp,
+        decimal finalCurrentHp)
+    {
+        if (attempted <= 0m) return 0m;
+
+        var observedHpGain = Math.Max(0m, finalCurrentHp - initialCurrentHp);
+        return Math.Min(attempted, Math.Max(hookRecordedRestored, observedHpGain));
     }
 
     /// <summary>
@@ -2123,18 +2362,25 @@ public static class RunTracker
             {
                 result = new RelicAggregate
                 {
+                    Activations = committed.Activations,
                     EnemiesAffected = committed.EnemiesAffected,
                     VulnerableApplied = committed.VulnerableApplied,
                     WeakApplied = committed.WeakApplied,
                     AdditionalCardsDrawn = committed.AdditionalCardsDrawn,
                     AdditionalBlockGained = committed.AdditionalBlockGained,
                     BoneFluteTriggers = committed.BoneFluteTriggers,
+                    TotalOstyHpSummoned = committed.TotalOstyHpSummoned,
                     TotalHealingAttempted = committed.TotalHealingAttempted,
                     TotalHealingRestored = committed.TotalHealingRestored,
                     TotalHealingLost = committed.TotalHealingLost,
                     DoomDeathTriggers = committed.DoomDeathTriggers,
                     DoomKills = committed.DoomKills,
                     EnergyGenerated = committed.EnergyGenerated,
+                    PotionsGained = committed.PotionsGained,
+                    CommonPotionsGained = committed.CommonPotionsGained,
+                    UncommonPotionsGained = committed.UncommonPotionsGained,
+                    RarePotionsGained = committed.RarePotionsGained,
+                    PotionsSkipped = committed.PotionsSkipped,
                 };
                 MergeHealingLostReasonsInto(result, committed);
             }
@@ -2142,12 +2388,14 @@ public static class RunTracker
             if (_pendingCombat != null && _pendingCombat.RelicAggregates.TryGetValue(relicId, out var pending))
             {
                 result ??= new RelicAggregate();
+                result.Activations += pending.Activations;
                 result.EnemiesAffected += pending.EnemiesAffected;
                 result.VulnerableApplied += pending.VulnerableApplied;
                 result.WeakApplied += pending.WeakApplied;
                 result.AdditionalCardsDrawn += pending.AdditionalCardsDrawn;
                 result.AdditionalBlockGained += pending.AdditionalBlockGained;
                 result.BoneFluteTriggers += pending.BoneFluteTriggers;
+                result.TotalOstyHpSummoned += pending.TotalOstyHpSummoned;
                 result.TotalHealingAttempted += pending.TotalHealingAttempted;
                 result.TotalHealingRestored += pending.TotalHealingRestored;
                 result.TotalHealingLost += pending.TotalHealingLost;
@@ -2155,6 +2403,11 @@ public static class RunTracker
                 result.DoomDeathTriggers += pending.DoomDeathTriggers;
                 result.DoomKills += pending.DoomKills;
                 result.EnergyGenerated += pending.EnergyGenerated;
+                result.PotionsGained += pending.PotionsGained;
+                result.CommonPotionsGained += pending.CommonPotionsGained;
+                result.UncommonPotionsGained += pending.UncommonPotionsGained;
+                result.RarePotionsGained += pending.RarePotionsGained;
+                result.PotionsSkipped += pending.PotionsSkipped;
             }
 
             return result;
@@ -2171,6 +2424,36 @@ public static class RunTracker
         }
 
         return agg;
+    }
+
+    private static RelicAggregate GetOrCreateRelicAggregateForCurrentContextLocked(string relicId)
+    {
+        if (_pendingCombat != null)
+        {
+            if (!_pendingCombat.RelicAggregates.TryGetValue(relicId, out var pendingAgg))
+            {
+                pendingAgg = new RelicAggregate();
+                _pendingCombat.RelicAggregates[relicId] = pendingAgg;
+            }
+
+            return pendingAgg;
+        }
+
+        _currentRun ??= new RunData
+        {
+            RunId = Guid.NewGuid().ToString("N"),
+            StartedAt = Now(),
+            UpdatedAt = Now(),
+        };
+        _currentRun.UpdatedAt = Now();
+
+        if (!_currentRun.RelicAggregates.TryGetValue(relicId, out var runAgg))
+        {
+            runAgg = new RelicAggregate();
+            _currentRun.RelicAggregates[relicId] = runAgg;
+        }
+
+        return runAgg;
     }
 
     private static void AddHealingLostReasonLocked(
@@ -4672,6 +4955,7 @@ internal sealed class PendingRelicHealing
     public required string RelicId { get; init; }
     public required Creature Creature { get; init; }
     public required decimal Attempted { get; init; }
+    public required decimal InitialCurrentHp { get; init; }
     public required decimal InitialMissingHp { get; init; }
     public decimal ActualRestored { get; set; }
 }

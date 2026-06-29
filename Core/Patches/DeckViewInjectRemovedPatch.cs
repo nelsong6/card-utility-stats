@@ -7,7 +7,7 @@ using MegaCrit.Sts2.Core.Nodes.Screens;
 namespace SpireLens.Core.Patches;
 
 /// <summary>
-/// Extend the deck-view display with supplemental cards when our ViewStats
+/// Extend the deck-view display with supplemental cards when our show-removed
 /// checkbox is ticked. Harmony prefix on <c>NDeckViewScreen.DisplayCards</c>
 /// mutates the screen's private <c>_cards</c> list (via Publicizer access)
 /// to append removed-card refs plus synthetic pooled deck-level meta cards
@@ -24,10 +24,10 @@ namespace SpireLens.Core.Patches;
 /// patch and shows our stats including the "Removed floor X" lineage line
 /// or the supplemental pooled-card banner for Shiv/Sovereign Blade.
 ///
-/// Gate: only appends if the ViewStats checkbox is currently ticked. If the
-/// tickbox isn't injected yet (deck view never opened this session), behaves
-/// as if unchecked — removed cards stay hidden. Toggle live-updates via the
-/// deck-view re-render wired up in <see cref="ViewStatsInjectorPatch"/>.
+/// Gate: only appends if the SpireLens show-removed-cards checkbox is currently
+/// ticked, falling back to persisted runtime config if the checkbox has not
+/// been injected yet. Toggle live-updates via the deck-view re-render wired up
+/// in <see cref="ViewStatsInjectorPatch"/>.
 /// </summary>
 [HarmonyPatch(typeof(NDeckViewScreen), nameof(NDeckViewScreen.DisplayCards))]
 public static class DeckViewInjectRemovedPatch
@@ -49,10 +49,10 @@ public static class DeckViewInjectRemovedPatch
             __instance._cards = __instance._pile.Cards.ToList();
 
             RuntimeOptionsProvider.Refresh();
-            if (!RuntimeOptionsProvider.Current.ShowRemovedCardsInDeckView) return;
 
-            var tickbox = ViewStatsInjectorPatch.LastInjectedTickbox;
-            if (tickbox == null || !tickbox.IsTicked) return;
+            var tickbox = ViewStatsInjectorPatch.LastInjectedShowRemovedCardsTickbox;
+            var showRemovedCards = tickbox?.IsTicked ?? RuntimeOptionsProvider.Current.ShowRemovedCardsInDeckView;
+            if (!showRemovedCards) return;
 
             var supplemental = RunTracker.GetSupplementalDeckViewCards();
             if (supplemental.Count == 0) return;

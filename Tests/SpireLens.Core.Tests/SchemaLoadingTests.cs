@@ -373,6 +373,74 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsMealTicketRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("meal-ticket-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.MEAL_TICKET"];
+        Assert.Equal(2, relicAgg.Activations);
+        Assert.Equal(30m, relicAgg.TotalHealingAttempted);
+        Assert.Equal(18m, relicAgg.TotalHealingRestored);
+        Assert.Equal(12m, relicAgg.TotalHealingLost);
+        Assert.Equal(12m, relicAgg.HealingLostReasons["full_hp"].Amount);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsBurningBloodRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("burning-blood-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.BURNING_BLOOD"];
+        Assert.Equal(2, relicAgg.Activations);
+        Assert.Equal(12m, relicAgg.TotalHealingAttempted);
+        Assert.Equal(9m, relicAgg.TotalHealingRestored);
+        Assert.Equal(3m, relicAgg.TotalHealingLost);
+        Assert.Equal(3m, relicAgg.HealingLostReasons["full_hp"].Amount);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsWhiteBeastStatueRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("white-beast-statue-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.WHITE_BEAST_STATUE"];
+        Assert.Equal(5, relicAgg.PotionsGained);
+        Assert.Equal(2, relicAgg.CommonPotionsGained);
+        Assert.Equal(2, relicAgg.UncommonPotionsGained);
+        Assert.Equal(1, relicAgg.RarePotionsGained);
+        Assert.Equal(3, relicAgg.PotionsSkipped);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsPhylacteryRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("phylactery-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        var boundAgg = loaded.Data.RelicAggregates["RELIC.BOUND_PHYLACTERY"];
+        Assert.Equal(3, boundAgg.Activations);
+        Assert.Equal(12m, boundAgg.TotalOstyHpSummoned);
+        var unboundAgg = loaded.Data.RelicAggregates["RELIC.PHYLACTERY_UNBOUND"];
+        Assert.Equal(4, unboundAgg.Activations);
+        Assert.Equal(20m, unboundAgg.TotalOstyHpSummoned);
+    }
+
+    [Fact]
     public void ResumableLoad_RejectsLegacyV1Fixture()
     {
         var resumed = RunStorage.LoadResumable(FixturePath("v1-pooled-run.json"));
@@ -703,5 +771,61 @@ public class SchemaLoadingTests
         Assert.Equal(3, agg.ReplayExtraPlayPlannedReasons["power:POWER.BURST"].Count);
         Assert.Equal(2, agg.ReplayExtraPlayReasons["power:POWER.BURST"].Count);
         Assert.Equal(1, agg.ReplayAttackNoDamageReasons["power:POWER.BURST"].Count);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsMealTicketRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("meal-ticket-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.MEAL_TICKET"];
+        Assert.Equal(2, relicAgg.Activations);
+        Assert.Equal(30m, relicAgg.TotalHealingAttempted);
+        Assert.Equal(18m, relicAgg.TotalHealingRestored);
+        Assert.Equal(12m, relicAgg.TotalHealingLost);
+        Assert.Equal(12m, relicAgg.HealingLostReasons["full_hp"].Amount);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsBurningBloodRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("burning-blood-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.BURNING_BLOOD"];
+        Assert.Equal(2, relicAgg.Activations);
+        Assert.Equal(12m, relicAgg.TotalHealingAttempted);
+        Assert.Equal(9m, relicAgg.TotalHealingRestored);
+        Assert.Equal(3m, relicAgg.TotalHealingLost);
+        Assert.Equal(3m, relicAgg.HealingLostReasons["full_hp"].Amount);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsWhiteBeastStatueRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("white-beast-statue-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.WHITE_BEAST_STATUE"];
+        Assert.Equal(5, relicAgg.PotionsGained);
+        Assert.Equal(2, relicAgg.CommonPotionsGained);
+        Assert.Equal(2, relicAgg.UncommonPotionsGained);
+        Assert.Equal(1, relicAgg.RarePotionsGained);
+        Assert.Equal(3, relicAgg.PotionsSkipped);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsPhylacteryRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("phylactery-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var boundAgg = resumed!.RelicAggregates["RELIC.BOUND_PHYLACTERY"];
+        Assert.Equal(3, boundAgg.Activations);
+        Assert.Equal(12m, boundAgg.TotalOstyHpSummoned);
+        var unboundAgg = resumed.RelicAggregates["RELIC.PHYLACTERY_UNBOUND"];
+        Assert.Equal(4, unboundAgg.Activations);
+        Assert.Equal(20m, unboundAgg.TotalOstyHpSummoned);
     }
 }

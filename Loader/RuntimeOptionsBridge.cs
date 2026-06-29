@@ -44,6 +44,14 @@ public static class RuntimeOptionsBridge
         ModConfig.SaveDebounced<SpireLensConfig>();
     }
 
+    public static void SetShowRemovedCardsInDeckView(bool isEnabled)
+    {
+        if (SpireLensConfig.ShowRemovedCardsInDeckView == isEnabled) return;
+
+        SpireLensConfig.ShowRemovedCardsInDeckView = isEnabled;
+        ModConfig.SaveDebounced<SpireLensConfig>();
+    }
+
     public static void SetVerboseHandStatsEnabled(bool isEnabled)
     {
         if (SpireLensConfig.UseVerboseHandStats == isEnabled) return;

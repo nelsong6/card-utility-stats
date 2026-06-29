@@ -27,10 +27,10 @@ public static class OstyCmdSummonPatch
     {
         try
         {
-            if (__result == null || summoner == null || source is not MegaCrit.Sts2.Core.Models.CardModel sourceCard)
+            if (__result == null || summoner == null)
                 return;
 
-            __result = ObserveSummonAsync(__result, summoner, sourceCard);
+            __result = ObserveSummonAsync(__result, summoner, source);
         }
         catch (Exception e)
         {
@@ -41,13 +41,17 @@ public static class OstyCmdSummonPatch
     private static async Task<SummonResult> ObserveSummonAsync(
         Task<SummonResult> inner,
         Player player,
-        MegaCrit.Sts2.Core.Models.CardModel sourceCard)
+        AbstractModel source)
     {
         var result = await inner.ConfigureAwait(false);
         try
         {
-            if (result != null && result.Amount > 0m)
+            if (result == null) return result!;
+
+            if (source is MegaCrit.Sts2.Core.Models.CardModel sourceCard && result.Amount > 0m)
                 RunTracker.RecordOstySummoned(player, sourceCard, result.Creature, result.Amount);
+            else
+                RunTracker.RecordRelicOstySummon(source, result.Amount);
         }
         catch (Exception e)
         {

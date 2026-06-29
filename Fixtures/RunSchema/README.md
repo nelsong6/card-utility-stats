@@ -72,6 +72,18 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `v24-replay-source-breakdown-run.json`
   Adds per-card replay extra-play source breakdowns, preserving both the total
   extra-play count and the observed source counts when the game exposes them.
+- `meal-ticket-relic-run.json`
+  Adds relic activation tracking plus Meal Ticket shop-entry healing
+  attribution, including restored healing and full-HP lost healing.
+- `burning-blood-relic-run.json`
+  Adds Burning Blood combat-victory activation tracking and relic healing
+  attribution, including restored healing and full-HP lost healing.
+- `white-beast-statue-relic-run.json`
+  Adds White Beast Statue potion-gained tracking with common, uncommon, and
+  rare potion rarity splits, plus skipped White Beast potion reward tracking.
+- `phylactery-relic-run.json`
+  Adds Bound Phylactery and Phylactery Unbound activation tracking plus actual
+  Osty summon HP gained from the shared summon command result.
 
 Why these exist:
 
