@@ -981,6 +981,14 @@ public class SchemaLoadingTests
         var pendulumAgg = loaded.Data.RelicAggregates["RELIC.PENDULUM"];
         Assert.Equal(3, pendulumAgg.Activations);
         Assert.Equal(6, pendulumAgg.AdditionalCardsDrawn);
+        var parryingShieldAgg = loaded.Data.RelicAggregates["RELIC.PARRYING_SHIELD"];
+        Assert.Equal(2, parryingShieldAgg.Activations);
+        Assert.Equal(17, parryingShieldAgg.TotalDamageAttempted);
+        Assert.Equal(11, parryingShieldAgg.TotalDamageDealt);
+        Assert.Equal(4, parryingShieldAgg.TotalDamageBlocked);
+        Assert.Equal(2, parryingShieldAgg.TotalDamageOverkill);
+        Assert.Equal(1, parryingShieldAgg.Kills);
+        Assert.Equal(2, parryingShieldAgg.TotalTargets);
         var toolboxAgg = loaded.Data.RelicAggregates["RELIC.TOOLBOX"];
         Assert.Equal(2, toolboxAgg.Activations);
         Assert.Equal(4, toolboxAgg.UncommonCardsOffered);
@@ -999,6 +1007,8 @@ public class SchemaLoadingTests
         Assert.Equal(16, resumed.RelicAggregates["RELIC.AKABEKO"].VigorGained);
         Assert.Equal(4, resumed.RelicAggregates["RELIC.BOOMING_CONCH"].AdditionalCardsDrawn);
         Assert.Equal(6, resumed.RelicAggregates["RELIC.PENDULUM"].AdditionalCardsDrawn);
+        Assert.Equal(11, resumed.RelicAggregates["RELIC.PARRYING_SHIELD"].TotalDamageDealt);
+        Assert.Equal(4, resumed.RelicAggregates["RELIC.PARRYING_SHIELD"].TotalDamageBlocked);
         Assert.Equal(4, resumed.RelicAggregates["RELIC.TOOLBOX"].UncommonCardsOffered);
         Assert.Equal(1, resumed.RelicAggregates["RELIC.TOOLBOX"].RareCardsOffered);
     }

@@ -23,6 +23,10 @@ public class OpenBranchRelicStatsTests
 
         Assert.Equal(0, agg.VigorGained);
         Assert.Equal(0, agg.TotalDamageAttempted);
+        Assert.Equal(0, agg.TotalDamageDealt);
+        Assert.Equal(0, agg.TotalDamageBlocked);
+        Assert.Equal(0, agg.TotalDamageOverkill);
+        Assert.Equal(0, agg.Kills);
         Assert.Equal(0, agg.TotalTargets);
         Assert.Equal(0, agg.UncommonCardsOffered);
         Assert.Equal(0, agg.RareCardsOffered);
@@ -50,6 +54,16 @@ public class OpenBranchRelicStatsTests
             Activations = 3,
             AdditionalCardsDrawn = 6,
         };
+        run.RelicAggregates["RELIC.PARRYING_SHIELD"] = new RelicAggregate
+        {
+            Activations = 2,
+            TotalDamageAttempted = 17,
+            TotalDamageDealt = 11,
+            TotalDamageBlocked = 4,
+            TotalDamageOverkill = 2,
+            Kills = 1,
+            TotalTargets = 2,
+        };
 
         var json = JsonSerializer.Serialize(run, SerializerOptions);
 
@@ -58,6 +72,10 @@ public class OpenBranchRelicStatsTests
         Assert.Contains("total_targets", json);
         Assert.Contains("uncommon_cards_offered", json);
         Assert.Contains("rare_cards_offered", json);
+        Assert.Contains("total_damage_dealt", json);
+        Assert.Contains("total_damage_blocked", json);
+        Assert.Contains("total_damage_overkill", json);
+        Assert.Contains("kills", json);
 
         var restored = JsonSerializer.Deserialize<RunData>(json, SerializerOptions);
 
@@ -71,6 +89,13 @@ public class OpenBranchRelicStatsTests
         Assert.Equal(1, restored.RelicAggregates["RELIC.TOOLBOX"].RareCardsOffered);
         Assert.Equal(3, restored.RelicAggregates["RELIC.PENDULUM"].Activations);
         Assert.Equal(6, restored.RelicAggregates["RELIC.PENDULUM"].AdditionalCardsDrawn);
+        Assert.Equal(2, restored.RelicAggregates["RELIC.PARRYING_SHIELD"].Activations);
+        Assert.Equal(17, restored.RelicAggregates["RELIC.PARRYING_SHIELD"].TotalDamageAttempted);
+        Assert.Equal(11, restored.RelicAggregates["RELIC.PARRYING_SHIELD"].TotalDamageDealt);
+        Assert.Equal(4, restored.RelicAggregates["RELIC.PARRYING_SHIELD"].TotalDamageBlocked);
+        Assert.Equal(2, restored.RelicAggregates["RELIC.PARRYING_SHIELD"].TotalDamageOverkill);
+        Assert.Equal(1, restored.RelicAggregates["RELIC.PARRYING_SHIELD"].Kills);
+        Assert.Equal(2, restored.RelicAggregates["RELIC.PARRYING_SHIELD"].TotalTargets);
     }
 
     [Fact]
@@ -125,6 +150,26 @@ public class OpenBranchRelicStatsTests
         Assert.Contains("Cards drawn", pendulumBody);
         Assert.Contains("[b]3[/b]", pendulumBody);
         Assert.Contains("[b]6[/b]", pendulumBody);
+
+        var parryingShieldBody = InvokeTooltipBuilder(
+            "BuildParryingShieldBodyBBCode",
+            new RelicAggregate
+            {
+                Activations = 2,
+                TotalDamageAttempted = 17,
+                TotalDamageDealt = 11,
+                TotalDamageBlocked = 4,
+                TotalDamageOverkill = 2,
+                Kills = 1,
+            });
+        Assert.Contains("Activations", parryingShieldBody);
+        Assert.Contains("Damage attempted", parryingShieldBody);
+        Assert.Contains("Damage dealt", parryingShieldBody);
+        Assert.Contains("Damage blocked", parryingShieldBody);
+        Assert.Contains("Overkill", parryingShieldBody);
+        Assert.Contains("Kills", parryingShieldBody);
+        Assert.Contains("[b]17[/b]", parryingShieldBody);
+        Assert.Contains("[b]11[/b]", parryingShieldBody);
     }
 
     private static string InvokeTooltipBuilder(string methodName, RelicAggregate agg)

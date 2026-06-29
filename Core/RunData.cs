@@ -436,11 +436,19 @@ public class RelicAggregate
     public int VigorGained { get; set; }
 
     // Total attempted damage from relic effects whose actual damage is not
-    // source-attributed by the game's damage entries. Used by Letter Opener.
+    // source-attributed by the game's damage entries. Used by Letter Opener
+    // and Parrying Shield.
     public int TotalDamageAttempted { get; set; }
 
+    // Relic damage outcome split. Used by Parrying Shield when its end-of-turn
+    // strike actually resolves through the game's damage command.
+    public int TotalDamageDealt { get; set; }
+    public int TotalDamageBlocked { get; set; }
+    public int TotalDamageOverkill { get; set; }
+    public int Kills { get; set; }
+
     // Total targets included in those attempted relic-damage payloads. Used by
-    // Letter Opener.
+    // Letter Opener and Parrying Shield.
     public int TotalTargets { get; set; }
 
     // Total potions gained from this relic, split by the potion rarity that

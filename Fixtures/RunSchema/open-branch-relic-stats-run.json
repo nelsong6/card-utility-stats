@@ -43,6 +43,15 @@
       "activations": 3,
       "additional_cards_drawn": 6
     },
+    "RELIC.PARRYING_SHIELD": {
+      "activations": 2,
+      "total_damage_attempted": 17,
+      "total_damage_dealt": 11,
+      "total_damage_blocked": 4,
+      "total_damage_overkill": 2,
+      "kills": 1,
+      "total_targets": 2
+    },
     "RELIC.TOOLBOX": {
       "activations": 2,
       "uncommon_cards_offered": 4,

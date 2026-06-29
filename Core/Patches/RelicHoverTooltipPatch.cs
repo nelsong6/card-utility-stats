@@ -191,6 +191,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is ParryingShield)
+            {
+                const string relicId = "RELIC.PARRYING_SHIELD";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildParryingShieldBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Parrying Shield", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is PrismaticGem)
             {
                 const string relicId = "RELIC.PRISMATIC_GEM";
@@ -431,6 +441,18 @@ public static class RelicHoverShowPatch
         var sb = new StringBuilder();
         Row3(sb, "Activations", agg.Activations.ToString(), "");
         Row3(sb, "Cards drawn", agg.AdditionalCardsDrawn.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildParryingShieldBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, "Damage attempted", agg.TotalDamageAttempted.ToString(), "");
+        Row3(sb, "Damage dealt", agg.TotalDamageDealt.ToString(), "");
+        Row3(sb, "Damage blocked", agg.TotalDamageBlocked.ToString(), "");
+        Row3(sb, "Overkill", agg.TotalDamageOverkill.ToString(), "");
+        Row3(sb, "Kills", agg.Kills.ToString(), "");
         return sb.ToString();
     }
 

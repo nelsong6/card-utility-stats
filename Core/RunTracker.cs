@@ -72,6 +72,7 @@ public static class RunTracker
     private static readonly List<Player> _pendingGremlinHornEnergyAttributions = new();
     private static readonly List<Player> _pendingGremlinHornDrawAttributions = new();
     private static readonly List<Player> _pendingPendulumDrawAttributions = new();
+    private static readonly List<Creature> _pendingParryingShieldDamageAttributions = new();
     private static int? _lastPrismaticGemEnergyRoundNumber;
     private static bool _pendingCloakClaspBlockAttribution;
     private static int _pendingWhiteBeastPotionRewards;
@@ -666,6 +667,7 @@ public static class RunTracker
         _pendingGremlinHornEnergyAttributions.Clear();
         _pendingGremlinHornDrawAttributions.Clear();
         _pendingPendulumDrawAttributions.Clear();
+        _pendingParryingShieldDamageAttributions.Clear();
         _lastPrismaticGemEnergyRoundNumber = null;
         _pendingCloakClaspBlockAttribution = false;
         _pendingToolboxOfferScreens = 0;
@@ -1015,6 +1017,10 @@ public static class RunTracker
                 runRelicAgg.EnergyGenerated += pendingRelicAgg.EnergyGenerated;
                 runRelicAgg.VigorGained += pendingRelicAgg.VigorGained;
                 runRelicAgg.TotalDamageAttempted += pendingRelicAgg.TotalDamageAttempted;
+                runRelicAgg.TotalDamageDealt += pendingRelicAgg.TotalDamageDealt;
+                runRelicAgg.TotalDamageBlocked += pendingRelicAgg.TotalDamageBlocked;
+                runRelicAgg.TotalDamageOverkill += pendingRelicAgg.TotalDamageOverkill;
+                runRelicAgg.Kills += pendingRelicAgg.Kills;
                 runRelicAgg.TotalTargets += pendingRelicAgg.TotalTargets;
                 runRelicAgg.PotionsGained += pendingRelicAgg.PotionsGained;
                 runRelicAgg.CommonPotionsGained += pendingRelicAgg.CommonPotionsGained;
@@ -1614,6 +1620,7 @@ public static class RunTracker
     private const string BoomingConchRelicId = "RELIC.BOOMING_CONCH";
     private const string GremlinHornRelicId = "RELIC.GREMLIN_HORN";
     private const string PendulumRelicId = "RELIC.PENDULUM";
+    private const string ParryingShieldRelicId = "RELIC.PARRYING_SHIELD";
     private const string PrismaticGemRelicId = "RELIC.PRISMATIC_GEM";
     private const string CloakClaspRelicId = "RELIC.CLOAK_CLASP";
     private const string ReptileTrinketRelicId = "RELIC.REPTILE_TRINKET";
@@ -2950,6 +2957,95 @@ public static class RunTracker
         }
     }
 
+    /// <summary>
+    /// Record Parrying Shield's owner-specific end-of-turn activation. The
+    /// damage split is observed from the damage command result.
+    /// </summary>
+    public static void ArmParryingShieldAttribution(Creature dealer)
+    {
+        if (dealer == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(ParryingShieldRelicId);
+                agg.Activations += 1;
+                _pendingParryingShieldDamageAttributions.Add(dealer);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"ArmParryingShieldAttribution failed: {e.Message}");
+            }
+        }
+    }
+
+    public static bool TryConsumeParryingShieldDamageAttribution(Creature dealer)
+    {
+        if (dealer == null) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                return ConsumePendingCreatureAttribution(_pendingParryingShieldDamageAttributions, dealer);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"TryConsumeParryingShieldDamageAttribution failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    public static void RecordParryingShieldDamage(IEnumerable<DamageResult>? results)
+    {
+        if (results == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(ParryingShieldRelicId);
+                foreach (var result in results)
+                {
+                    if (result == null) continue;
+                    var damageTotals = ComputeEnemyDamageTotals(
+                        result.BlockedDamage,
+                        result.UnblockedDamage,
+                        result.OverkillDamage);
+                    agg.TotalDamageAttempted += damageTotals.IntendedDamage;
+                    agg.TotalDamageDealt += damageTotals.EffectiveDamage;
+                    agg.TotalDamageBlocked += result.BlockedDamage;
+                    agg.TotalDamageOverkill += result.OverkillDamage;
+                    agg.TotalTargets += 1;
+                    if (result.WasTargetKilled) agg.Kills += 1;
+                }
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordParryingShieldDamage failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordParryingShieldDamageForTest(RelicAggregate agg, IEnumerable<DamageResult> results)
+    {
+        foreach (var result in results)
+        {
+            var damageTotals = ComputeEnemyDamageTotals(
+                result.BlockedDamage,
+                result.UnblockedDamage,
+                result.OverkillDamage);
+            agg.TotalDamageAttempted += damageTotals.IntendedDamage;
+            agg.TotalDamageDealt += damageTotals.EffectiveDamage;
+            agg.TotalDamageBlocked += result.BlockedDamage;
+            agg.TotalDamageOverkill += result.OverkillDamage;
+            agg.TotalTargets += 1;
+            if (result.WasTargetKilled) agg.Kills += 1;
+        }
+    }
+
     private static void DisarmGremlinHornEnergyAttributionLocked(Player player)
     {
         for (int i = 0; i < _pendingGremlinHornEnergyAttributions.Count; i++)
@@ -2968,6 +3064,18 @@ public static class RunTracker
         {
             if (!ReferenceEquals(pendingPlayers[i], player)) continue;
             pendingPlayers.RemoveAt(i);
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool ConsumePendingCreatureAttribution(List<Creature> pending, Creature creature)
+    {
+        for (int i = 0; i < pending.Count; i++)
+        {
+            if (!ReferenceEquals(pending[i], creature)) continue;
+            pending.RemoveAt(i);
             return true;
         }
 
@@ -3164,6 +3272,10 @@ public static class RunTracker
                     EnergyGenerated = committed.EnergyGenerated,
                     VigorGained = committed.VigorGained,
                     TotalDamageAttempted = committed.TotalDamageAttempted,
+                    TotalDamageDealt = committed.TotalDamageDealt,
+                    TotalDamageBlocked = committed.TotalDamageBlocked,
+                    TotalDamageOverkill = committed.TotalDamageOverkill,
+                    Kills = committed.Kills,
                     TotalTargets = committed.TotalTargets,
                     PotionsGained = committed.PotionsGained,
                     CommonPotionsGained = committed.CommonPotionsGained,
@@ -3202,6 +3314,10 @@ public static class RunTracker
                 result.EnergyGenerated += pending.EnergyGenerated;
                 result.VigorGained += pending.VigorGained;
                 result.TotalDamageAttempted += pending.TotalDamageAttempted;
+                result.TotalDamageDealt += pending.TotalDamageDealt;
+                result.TotalDamageBlocked += pending.TotalDamageBlocked;
+                result.TotalDamageOverkill += pending.TotalDamageOverkill;
+                result.Kills += pending.Kills;
                 result.TotalTargets += pending.TotalTargets;
                 result.PotionsGained += pending.PotionsGained;
                 result.CommonPotionsGained += pending.CommonPotionsGained;
