@@ -22,6 +22,7 @@ public static class EnemyHoverShowPatch
             var creature = __instance.Entity;
             var monster = creature?.Monster;
             if (monster == null || creature!.IsPlayer) return;
+            if (!ShouldShowForCreature(__instance, creature)) { StatsTooltip.Hide(); return; }
 
             var enemyId = monster.Id.ToString();
             var agg = RunTracker.GetEnemyAggregate(enemyId);
@@ -92,6 +93,15 @@ public static class EnemyHoverShowPatch
         return agg.DamageAttempted > 0 || agg.StatusCardsAdded > 0;
     }
 
+    internal static bool ShouldShowForCreature(NCreature node, MegaCrit.Sts2.Core.Entities.Creatures.Creature creature)
+    {
+        if (node == null || creature == null) return false;
+        if (creature.IsDead || !creature.IsAlive) return false;
+        if (node.IsPlayingDeathAnimation) return false;
+        if (!node.IsInteractable) return false;
+        return true;
+    }
+
     private static string FormatEnemyIdForDisplay(string enemyId)
     {
         var value = enemyId;
@@ -124,5 +134,16 @@ public static class EnemyHoverHidePatch
     {
         try { StatsTooltip.Hide(); }
         catch (Exception e) { CoreMain.Logger.Error($"EnemyHoverHidePatch failed: {e.Message}"); }
+    }
+}
+
+[HarmonyPatch(typeof(NCreature), nameof(NCreature.StartDeathAnim))]
+public static class EnemyHoverHideOnDeathPatch
+{
+    [HarmonyPrefix]
+    public static void Prefix()
+    {
+        try { StatsTooltip.Hide(); }
+        catch (Exception e) { CoreMain.Logger.Error($"EnemyHoverHideOnDeathPatch failed: {e.Message}"); }
     }
 }
