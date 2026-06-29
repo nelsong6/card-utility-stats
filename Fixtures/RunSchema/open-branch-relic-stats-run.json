@@ -59,7 +59,9 @@
     "RELIC.TOOLBOX": {
       "activations": 2,
       "uncommon_cards_offered": 4,
-      "rare_cards_offered": 1
+      "rare_cards_offered": 1,
+      "uncommon_cards_taken": 2,
+      "rare_cards_taken": 1
     }
   },
   "meta_stats": {},

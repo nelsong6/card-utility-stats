@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Threading.Tasks;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Commands;
@@ -49,15 +50,38 @@ public static class ToolboxChooseACardScreenPatch
         PlayerChoiceContext context,
         IReadOnlyList<CardModel> cards,
         Player player,
-        bool canSkip)
+        bool canSkip,
+        out bool __state)
     {
+        __state = false;
+
         try
         {
-            RunTracker.RecordToolboxOffers(cards);
+            __state = RunTracker.RecordToolboxOffers(cards);
         }
         catch (Exception e)
         {
-            CoreMain.LogDebug($"ToolboxChooseACardScreenPatch failed: {e.Message}");
+            CoreMain.LogDebug($"ToolboxChooseACardScreenPatch.Prefix failed: {e.Message}");
+        }
+    }
+
+    [HarmonyPostfix]
+    public static void Postfix(bool __state, Task<CardModel> __result)
+    {
+        if (!__state || __result == null) return;
+        ObserveSelectionAsync(__result);
+    }
+
+    private static async void ObserveSelectionAsync(Task<CardModel> selectionTask)
+    {
+        try
+        {
+            var selectedCard = await selectionTask.ConfigureAwait(false);
+            RunTracker.RecordToolboxTaken(selectedCard);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"ToolboxChooseACardScreenPatch selection observation failed: {e.Message}");
         }
     }
 }

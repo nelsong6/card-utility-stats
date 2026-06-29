@@ -30,6 +30,8 @@ public class OpenBranchRelicStatsTests
         Assert.Equal(0, agg.TotalTargets);
         Assert.Equal(0, agg.UncommonCardsOffered);
         Assert.Equal(0, agg.RareCardsOffered);
+        Assert.Equal(0, agg.UncommonCardsTaken);
+        Assert.Equal(0, agg.RareCardsTaken);
     }
 
     [Fact]
@@ -48,6 +50,8 @@ public class OpenBranchRelicStatsTests
             Activations = 2,
             UncommonCardsOffered = 4,
             RareCardsOffered = 1,
+            UncommonCardsTaken = 2,
+            RareCardsTaken = 1,
         };
         run.RelicAggregates["RELIC.PENDULUM"] = new RelicAggregate
         {
@@ -77,6 +81,8 @@ public class OpenBranchRelicStatsTests
         Assert.Contains("total_targets", json);
         Assert.Contains("uncommon_cards_offered", json);
         Assert.Contains("rare_cards_offered", json);
+        Assert.Contains("uncommon_cards_taken", json);
+        Assert.Contains("rare_cards_taken", json);
         Assert.Contains("total_damage_dealt", json);
         Assert.Contains("total_damage_blocked", json);
         Assert.Contains("total_damage_overkill", json);
@@ -92,6 +98,8 @@ public class OpenBranchRelicStatsTests
         Assert.Equal(2, restored.RelicAggregates["RELIC.TOOLBOX"].Activations);
         Assert.Equal(4, restored.RelicAggregates["RELIC.TOOLBOX"].UncommonCardsOffered);
         Assert.Equal(1, restored.RelicAggregates["RELIC.TOOLBOX"].RareCardsOffered);
+        Assert.Equal(2, restored.RelicAggregates["RELIC.TOOLBOX"].UncommonCardsTaken);
+        Assert.Equal(1, restored.RelicAggregates["RELIC.TOOLBOX"].RareCardsTaken);
         Assert.Equal(3, restored.RelicAggregates["RELIC.PENDULUM"].Activations);
         Assert.Equal(6, restored.RelicAggregates["RELIC.PENDULUM"].AdditionalCardsDrawn);
         Assert.Equal(2, restored.RelicAggregates["RELIC.PARRYING_SHIELD"].Activations);
@@ -143,11 +151,21 @@ public class OpenBranchRelicStatsTests
 
         var toolboxBody = InvokeTooltipBuilder(
             "BuildToolboxBodyBBCode",
-            new RelicAggregate { Activations = 2, UncommonCardsOffered = 4, RareCardsOffered = 1 });
+            new RelicAggregate
+            {
+                Activations = 2,
+                UncommonCardsOffered = 4,
+                RareCardsOffered = 1,
+                UncommonCardsTaken = 2,
+                RareCardsTaken = 1,
+            });
         Assert.Contains("Activations", toolboxBody);
         Assert.Contains("Uncommon cards offered", toolboxBody);
         Assert.Contains("Rare cards offered", toolboxBody);
+        Assert.Contains("Uncommon cards taken", toolboxBody);
+        Assert.Contains("Rare cards taken", toolboxBody);
         Assert.Contains("[b]4[/b]", toolboxBody);
+        Assert.Contains("[b]2[/b]", toolboxBody);
         Assert.Contains("[b]1[/b]", toolboxBody);
 
         var pendulumBody = InvokeTooltipBuilder(

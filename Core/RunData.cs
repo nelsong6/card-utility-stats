@@ -464,6 +464,8 @@ public class RelicAggregate
     // screens. Used by Toolbox.
     public int UncommonCardsOffered { get; set; }
     public int RareCardsOffered { get; set; }
+    public int UncommonCardsTaken { get; set; }
+    public int RareCardsTaken { get; set; }
 
     // Total card rewards whose creation options were modified by this relic.
     // Used by Prismatic Gem.

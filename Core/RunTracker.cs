@@ -1031,6 +1031,8 @@ public static class RunTracker
                 runRelicAgg.PotionsSkipped += pendingRelicAgg.PotionsSkipped;
                 runRelicAgg.UncommonCardsOffered += pendingRelicAgg.UncommonCardsOffered;
                 runRelicAgg.RareCardsOffered += pendingRelicAgg.RareCardsOffered;
+                runRelicAgg.UncommonCardsTaken += pendingRelicAgg.UncommonCardsTaken;
+                runRelicAgg.RareCardsTaken += pendingRelicAgg.RareCardsTaken;
                 runRelicAgg.CardRewardsAffected += pendingRelicAgg.CardRewardsAffected;
                 MergeCardRewardCategories(runRelicAgg.CardRewardCategories, pendingRelicAgg.CardRewardCategories);
             }
@@ -2204,15 +2206,15 @@ public static class RunTracker
         }
     }
 
-    public static void RecordToolboxOffers(IReadOnlyList<CardModel> cards)
+    public static bool RecordToolboxOffers(IReadOnlyList<CardModel> cards)
     {
-        if (cards == null || cards.Count == 0) return;
+        if (cards == null || cards.Count == 0) return false;
 
         lock (_lock)
         {
             try
             {
-                if (_pendingToolboxOfferScreens <= 0) return;
+                if (_pendingToolboxOfferScreens <= 0) return false;
                 _pendingToolboxOfferScreens -= 1;
 
                 var agg = GetOrCreateRelicAggregateLocked(ToolboxRelicId);
@@ -2229,10 +2231,39 @@ public static class RunTracker
                             break;
                     }
                 }
+
+                return true;
             }
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordToolboxOffers failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    public static void RecordToolboxTaken(CardModel card)
+    {
+        if (card == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(ToolboxRelicId);
+                switch (card.Rarity)
+                {
+                    case CardRarity.Uncommon:
+                        agg.UncommonCardsTaken += 1;
+                        break;
+                    case CardRarity.Rare:
+                        agg.RareCardsTaken += 1;
+                        break;
+                }
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordToolboxTaken failed: {e.Message}");
             }
         }
     }
@@ -3346,6 +3377,8 @@ public static class RunTracker
                     PotionsSkipped = committed.PotionsSkipped,
                     UncommonCardsOffered = committed.UncommonCardsOffered,
                     RareCardsOffered = committed.RareCardsOffered,
+                    UncommonCardsTaken = committed.UncommonCardsTaken,
+                    RareCardsTaken = committed.RareCardsTaken,
                     CardRewardsAffected = committed.CardRewardsAffected,
                     CardRewardCategories = CloneCardRewardCategories(committed.CardRewardCategories),
                 };
@@ -3388,6 +3421,8 @@ public static class RunTracker
                 result.PotionsSkipped += pending.PotionsSkipped;
                 result.UncommonCardsOffered += pending.UncommonCardsOffered;
                 result.RareCardsOffered += pending.RareCardsOffered;
+                result.UncommonCardsTaken += pending.UncommonCardsTaken;
+                result.RareCardsTaken += pending.RareCardsTaken;
                 result.CardRewardsAffected += pending.CardRewardsAffected;
                 MergeCardRewardCategories(result.CardRewardCategories, pending.CardRewardCategories);
             }

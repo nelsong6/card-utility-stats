@@ -550,6 +550,8 @@ public static class RelicHoverShowPatch
         Row3(sb, "Activations", agg.Activations.ToString(), "");
         Row3(sb, "Uncommon cards offered", agg.UncommonCardsOffered.ToString(), "");
         Row3(sb, "Rare cards offered", agg.RareCardsOffered.ToString(), "");
+        Row3(sb, "Uncommon cards taken", agg.UncommonCardsTaken.ToString(), "");
+        Row3(sb, "Rare cards taken", agg.RareCardsTaken.ToString(), "");
         return sb.ToString();
     }
 

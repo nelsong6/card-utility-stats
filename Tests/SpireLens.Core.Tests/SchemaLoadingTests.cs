@@ -996,6 +996,8 @@ public class SchemaLoadingTests
         Assert.Equal(2, toolboxAgg.Activations);
         Assert.Equal(4, toolboxAgg.UncommonCardsOffered);
         Assert.Equal(1, toolboxAgg.RareCardsOffered);
+        Assert.Equal(2, toolboxAgg.UncommonCardsTaken);
+        Assert.Equal(1, toolboxAgg.RareCardsTaken);
     }
 
     [Fact]
@@ -1015,5 +1017,7 @@ public class SchemaLoadingTests
         Assert.Equal(24, resumed.RelicAggregates["RELIC.HORN_CLEAT"].AdditionalBlockGained);
         Assert.Equal(4, resumed.RelicAggregates["RELIC.TOOLBOX"].UncommonCardsOffered);
         Assert.Equal(1, resumed.RelicAggregates["RELIC.TOOLBOX"].RareCardsOffered);
+        Assert.Equal(2, resumed.RelicAggregates["RELIC.TOOLBOX"].UncommonCardsTaken);
+        Assert.Equal(1, resumed.RelicAggregates["RELIC.TOOLBOX"].RareCardsTaken);
     }
 }
