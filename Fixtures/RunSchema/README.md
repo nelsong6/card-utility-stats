@@ -93,7 +93,7 @@ New fixtures added going forward do not need a `v*-` prefix.
   card id.
 - `open-branch-relic-stats-run.json`
   Adds consolidated relic aggregates rescued from stale open branches: Anchor,
-  Letter Opener, Blood Vial, Akabeko, and Booming Conch.
+  Letter Opener, Blood Vial, Akabeko, Booming Conch, and Toolbox.
 
 Why these exist:
 

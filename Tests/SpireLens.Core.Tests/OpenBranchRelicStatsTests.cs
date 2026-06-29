@@ -24,6 +24,8 @@ public class OpenBranchRelicStatsTests
         Assert.Equal(0, agg.VigorGained);
         Assert.Equal(0, agg.TotalDamageAttempted);
         Assert.Equal(0, agg.TotalTargets);
+        Assert.Equal(0, agg.UncommonCardsOffered);
+        Assert.Equal(0, agg.RareCardsOffered);
     }
 
     [Fact]
@@ -37,12 +39,20 @@ public class OpenBranchRelicStatsTests
             TotalDamageAttempted = 45,
             TotalTargets = 9,
         };
+        run.RelicAggregates["RELIC.TOOLBOX"] = new RelicAggregate
+        {
+            Activations = 2,
+            UncommonCardsOffered = 4,
+            RareCardsOffered = 1,
+        };
 
         var json = JsonSerializer.Serialize(run, SerializerOptions);
 
         Assert.Contains("vigor_gained", json);
         Assert.Contains("total_damage_attempted", json);
         Assert.Contains("total_targets", json);
+        Assert.Contains("uncommon_cards_offered", json);
+        Assert.Contains("rare_cards_offered", json);
 
         var restored = JsonSerializer.Deserialize<RunData>(json, SerializerOptions);
 
@@ -51,6 +61,9 @@ public class OpenBranchRelicStatsTests
         Assert.Equal(3, restored.RelicAggregates["RELIC.LETTER_OPENER"].Activations);
         Assert.Equal(45, restored.RelicAggregates["RELIC.LETTER_OPENER"].TotalDamageAttempted);
         Assert.Equal(9, restored.RelicAggregates["RELIC.LETTER_OPENER"].TotalTargets);
+        Assert.Equal(2, restored.RelicAggregates["RELIC.TOOLBOX"].Activations);
+        Assert.Equal(4, restored.RelicAggregates["RELIC.TOOLBOX"].UncommonCardsOffered);
+        Assert.Equal(1, restored.RelicAggregates["RELIC.TOOLBOX"].RareCardsOffered);
     }
 
     [Fact]
@@ -88,6 +101,15 @@ public class OpenBranchRelicStatsTests
             new RelicAggregate { Activations = 2, TotalHealingRestored = 3, TotalHealingLost = 1 });
         Assert.Contains("HP healed", bloodVialBody);
         Assert.Contains("healing lost", bloodVialBody);
+
+        var toolboxBody = InvokeTooltipBuilder(
+            "BuildToolboxBodyBBCode",
+            new RelicAggregate { Activations = 2, UncommonCardsOffered = 4, RareCardsOffered = 1 });
+        Assert.Contains("Activations", toolboxBody);
+        Assert.Contains("Uncommon cards offered", toolboxBody);
+        Assert.Contains("Rare cards offered", toolboxBody);
+        Assert.Contains("[b]4[/b]", toolboxBody);
+        Assert.Contains("[b]1[/b]", toolboxBody);
     }
 
     private static string InvokeTooltipBuilder(string methodName, RelicAggregate agg)

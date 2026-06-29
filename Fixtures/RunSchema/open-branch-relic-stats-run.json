@@ -38,6 +38,11 @@
     "RELIC.BOOMING_CONCH": {
       "energy_generated": 2,
       "additional_cards_drawn": 4
+    },
+    "RELIC.TOOLBOX": {
+      "activations": 2,
+      "uncommon_cards_offered": 4,
+      "rare_cards_offered": 1
     }
   },
   "meta_stats": {},

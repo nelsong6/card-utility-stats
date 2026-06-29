@@ -261,6 +261,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (IsRelicModel(relicNode.Model, "MegaCrit.Sts2.Core.Models.Relics.Toolbox"))
+            {
+                const string relicId = "RELIC.TOOLBOX";
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+
+                var body = BuildToolboxBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Toolbox", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is WhiteBeastStatue)
             {
                 const string relicId = "RELIC.WHITE_BEAST_STATUE";
@@ -473,6 +483,15 @@ public static class RelicHoverShowPatch
         var sb = new StringBuilder();
         Row3(sb, "Activations", agg.Activations.ToString(), "");
         AppendHealingStats(sb, agg);
+        return sb.ToString();
+    }
+
+    private static string BuildToolboxBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, "Uncommon cards offered", agg.UncommonCardsOffered.ToString(), "");
+        Row3(sb, "Rare cards offered", agg.RareCardsOffered.ToString(), "");
         return sb.ToString();
     }
 

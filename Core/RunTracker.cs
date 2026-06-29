@@ -74,6 +74,7 @@ public static class RunTracker
     private static int? _lastPrismaticGemEnergyRoundNumber;
     private static bool _pendingCloakClaspBlockAttribution;
     private static int _pendingWhiteBeastPotionRewards;
+    private static int _pendingToolboxOfferScreens;
     private static readonly HashSet<PotionReward> _whiteBeastPotionRewards = new(ReferenceEqualityComparer.Instance);
     private static bool _shivAvailableThisRun;
     private static CardModel? _shivDeckViewCard;
@@ -665,6 +666,7 @@ public static class RunTracker
         _pendingGremlinHornDrawAttributions.Clear();
         _lastPrismaticGemEnergyRoundNumber = null;
         _pendingCloakClaspBlockAttribution = false;
+        _pendingToolboxOfferScreens = 0;
         _pendingMakeItSoSummons.Clear();
         _pendingReplayExtraPlaySources.Clear();
         _pendingReplayExtraPlaySeriesStarted.Clear();
@@ -1017,6 +1019,8 @@ public static class RunTracker
                 runRelicAgg.UncommonPotionsGained += pendingRelicAgg.UncommonPotionsGained;
                 runRelicAgg.RarePotionsGained += pendingRelicAgg.RarePotionsGained;
                 runRelicAgg.PotionsSkipped += pendingRelicAgg.PotionsSkipped;
+                runRelicAgg.UncommonCardsOffered += pendingRelicAgg.UncommonCardsOffered;
+                runRelicAgg.RareCardsOffered += pendingRelicAgg.RareCardsOffered;
                 runRelicAgg.CardRewardsAffected += pendingRelicAgg.CardRewardsAffected;
                 MergeCardRewardCategories(runRelicAgg.CardRewardCategories, pendingRelicAgg.CardRewardCategories);
             }
@@ -1618,6 +1622,7 @@ public static class RunTracker
     private const string WhiteBeastStatueRelicId = "RELIC.WHITE_BEAST_STATUE";
     private const string BoundPhylacteryRelicId = "RELIC.BOUND_PHYLACTERY";
     private const string PhylacteryUnboundRelicId = "RELIC.PHYLACTERY_UNBOUND";
+    private const string ToolboxRelicId = "RELIC.TOOLBOX";
 
     /// <summary>
     /// Record a Bag of Marbles combat-start Vulnerable application.
@@ -2161,6 +2166,60 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordWhiteBeastPotionRewardSkipped failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record Toolbox's owner-specific opening-hand trigger and arm the next
+    /// choose-card screen as the actual offer payload to inspect.
+    /// </summary>
+    public static void RecordToolboxTrigger()
+    {
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(ToolboxRelicId);
+                agg.Activations += 1;
+                _pendingToolboxOfferScreens += 1;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordToolboxTrigger failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordToolboxOffers(IReadOnlyList<CardModel> cards)
+    {
+        if (cards == null || cards.Count == 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingToolboxOfferScreens <= 0) return;
+                _pendingToolboxOfferScreens -= 1;
+
+                var agg = GetOrCreateRelicAggregateLocked(ToolboxRelicId);
+                foreach (var card in cards)
+                {
+                    if (card == null) continue;
+                    switch (card.Rarity)
+                    {
+                        case CardRarity.Uncommon:
+                            agg.UncommonCardsOffered += 1;
+                            break;
+                        case CardRarity.Rare:
+                            agg.RareCardsOffered += 1;
+                            break;
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordToolboxOffers failed: {e.Message}");
             }
         }
     }
@@ -3049,6 +3108,8 @@ public static class RunTracker
                     UncommonPotionsGained = committed.UncommonPotionsGained,
                     RarePotionsGained = committed.RarePotionsGained,
                     PotionsSkipped = committed.PotionsSkipped,
+                    UncommonCardsOffered = committed.UncommonCardsOffered,
+                    RareCardsOffered = committed.RareCardsOffered,
                     CardRewardsAffected = committed.CardRewardsAffected,
                     CardRewardCategories = CloneCardRewardCategories(committed.CardRewardCategories),
                 };
@@ -3085,6 +3146,8 @@ public static class RunTracker
                 result.UncommonPotionsGained += pending.UncommonPotionsGained;
                 result.RarePotionsGained += pending.RarePotionsGained;
                 result.PotionsSkipped += pending.PotionsSkipped;
+                result.UncommonCardsOffered += pending.UncommonCardsOffered;
+                result.RareCardsOffered += pending.RareCardsOffered;
                 result.CardRewardsAffected += pending.CardRewardsAffected;
                 MergeCardRewardCategories(result.CardRewardCategories, pending.CardRewardCategories);
             }

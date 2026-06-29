@@ -450,6 +450,11 @@ public class RelicAggregate
     public int RarePotionsGained { get; set; }
     public int PotionsSkipped { get; set; }
 
+    // Total offered cards by rarity for relics that generate card-choice
+    // screens. Used by Toolbox.
+    public int UncommonCardsOffered { get; set; }
+    public int RareCardsOffered { get; set; }
+
     // Total card rewards whose creation options were modified by this relic.
     // Used by Prismatic Gem.
     public int CardRewardsAffected { get; set; }
