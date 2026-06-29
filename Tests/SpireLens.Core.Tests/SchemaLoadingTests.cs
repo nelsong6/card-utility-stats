@@ -989,6 +989,9 @@ public class SchemaLoadingTests
         Assert.Equal(2, parryingShieldAgg.TotalDamageOverkill);
         Assert.Equal(1, parryingShieldAgg.Kills);
         Assert.Equal(2, parryingShieldAgg.TotalTargets);
+        var hornCleatAgg = loaded.Data.RelicAggregates["RELIC.HORN_CLEAT"];
+        Assert.Equal(2, hornCleatAgg.Activations);
+        Assert.Equal(24, hornCleatAgg.AdditionalBlockGained);
         var toolboxAgg = loaded.Data.RelicAggregates["RELIC.TOOLBOX"];
         Assert.Equal(2, toolboxAgg.Activations);
         Assert.Equal(4, toolboxAgg.UncommonCardsOffered);
@@ -1009,6 +1012,7 @@ public class SchemaLoadingTests
         Assert.Equal(6, resumed.RelicAggregates["RELIC.PENDULUM"].AdditionalCardsDrawn);
         Assert.Equal(11, resumed.RelicAggregates["RELIC.PARRYING_SHIELD"].TotalDamageDealt);
         Assert.Equal(4, resumed.RelicAggregates["RELIC.PARRYING_SHIELD"].TotalDamageBlocked);
+        Assert.Equal(24, resumed.RelicAggregates["RELIC.HORN_CLEAT"].AdditionalBlockGained);
         Assert.Equal(4, resumed.RelicAggregates["RELIC.TOOLBOX"].UncommonCardsOffered);
         Assert.Equal(1, resumed.RelicAggregates["RELIC.TOOLBOX"].RareCardsOffered);
     }

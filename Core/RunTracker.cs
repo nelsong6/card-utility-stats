@@ -73,6 +73,7 @@ public static class RunTracker
     private static readonly List<Player> _pendingGremlinHornDrawAttributions = new();
     private static readonly List<Player> _pendingPendulumDrawAttributions = new();
     private static readonly List<Creature> _pendingParryingShieldDamageAttributions = new();
+    private static readonly List<Creature> _pendingHornCleatBlockAttributions = new();
     private static int? _lastPrismaticGemEnergyRoundNumber;
     private static bool _pendingCloakClaspBlockAttribution;
     private static int _pendingWhiteBeastPotionRewards;
@@ -668,6 +669,7 @@ public static class RunTracker
         _pendingGremlinHornDrawAttributions.Clear();
         _pendingPendulumDrawAttributions.Clear();
         _pendingParryingShieldDamageAttributions.Clear();
+        _pendingHornCleatBlockAttributions.Clear();
         _lastPrismaticGemEnergyRoundNumber = null;
         _pendingCloakClaspBlockAttribution = false;
         _pendingToolboxOfferScreens = 0;
@@ -1621,6 +1623,7 @@ public static class RunTracker
     private const string GremlinHornRelicId = "RELIC.GREMLIN_HORN";
     private const string PendulumRelicId = "RELIC.PENDULUM";
     private const string ParryingShieldRelicId = "RELIC.PARRYING_SHIELD";
+    private const string HornCleatRelicId = "RELIC.HORN_CLEAT";
     private const string PrismaticGemRelicId = "RELIC.PRISMATIC_GEM";
     private const string CloakClaspRelicId = "RELIC.CLOAK_CLASP";
     private const string ReptileTrinketRelicId = "RELIC.REPTILE_TRINKET";
@@ -3043,6 +3046,65 @@ public static class RunTracker
             agg.TotalDamageOverkill += result.OverkillDamage;
             agg.TotalTargets += 1;
             if (result.WasTargetKilled) agg.Kills += 1;
+        }
+    }
+
+    /// <summary>
+    /// Record Horn Cleat's owner-specific second-turn block-clear trigger.
+    /// The actual block gained is observed from the gain-block command result.
+    /// </summary>
+    public static void ArmHornCleatAttribution(Creature creature)
+    {
+        if (creature == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(HornCleatRelicId);
+                agg.Activations += 1;
+                _pendingHornCleatBlockAttributions.Add(creature);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"ArmHornCleatAttribution failed: {e.Message}");
+            }
+        }
+    }
+
+    public static bool TryConsumeHornCleatBlockAttribution(Creature creature)
+    {
+        if (creature == null) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                return ConsumePendingCreatureAttribution(_pendingHornCleatBlockAttributions, creature);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"TryConsumeHornCleatBlockAttribution failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    public static void RecordHornCleatBlockGained(decimal amount)
+    {
+        if (amount <= 0m) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(HornCleatRelicId);
+                agg.AdditionalBlockGained += (int)amount;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordHornCleatBlockGained failed: {e.Message}");
+            }
         }
     }
 

@@ -64,6 +64,11 @@ public class OpenBranchRelicStatsTests
             Kills = 1,
             TotalTargets = 2,
         };
+        run.RelicAggregates["RELIC.HORN_CLEAT"] = new RelicAggregate
+        {
+            Activations = 2,
+            AdditionalBlockGained = 24,
+        };
 
         var json = JsonSerializer.Serialize(run, SerializerOptions);
 
@@ -96,6 +101,8 @@ public class OpenBranchRelicStatsTests
         Assert.Equal(2, restored.RelicAggregates["RELIC.PARRYING_SHIELD"].TotalDamageOverkill);
         Assert.Equal(1, restored.RelicAggregates["RELIC.PARRYING_SHIELD"].Kills);
         Assert.Equal(2, restored.RelicAggregates["RELIC.PARRYING_SHIELD"].TotalTargets);
+        Assert.Equal(2, restored.RelicAggregates["RELIC.HORN_CLEAT"].Activations);
+        Assert.Equal(24, restored.RelicAggregates["RELIC.HORN_CLEAT"].AdditionalBlockGained);
     }
 
     [Fact]
@@ -170,6 +177,14 @@ public class OpenBranchRelicStatsTests
         Assert.Contains("Kills", parryingShieldBody);
         Assert.Contains("[b]17[/b]", parryingShieldBody);
         Assert.Contains("[b]11[/b]", parryingShieldBody);
+
+        var hornCleatBody = InvokeTooltipBuilder(
+            "BuildHornCleatBodyBBCode",
+            new RelicAggregate { Activations = 2, AdditionalBlockGained = 24 });
+        Assert.Contains("Activations", hornCleatBody);
+        Assert.Contains("block gained", hornCleatBody);
+        Assert.Contains("[b]2[/b]", hornCleatBody);
+        Assert.Contains("[b]24[/b]", hornCleatBody);
     }
 
     private static string InvokeTooltipBuilder(string methodName, RelicAggregate agg)

@@ -52,6 +52,10 @@
       "kills": 1,
       "total_targets": 2
     },
+    "RELIC.HORN_CLEAT": {
+      "activations": 2,
+      "additional_block_gained": 24
+    },
     "RELIC.TOOLBOX": {
       "activations": 2,
       "uncommon_cards_offered": 4,

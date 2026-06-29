@@ -384,7 +384,8 @@ public class RelicAggregate
     public int AdditionalCardsDrawn { get; set; }
 
     // Total block gained from this relic across all combats.
-    // Used by Orichalcum, The Abacus, Bone Flute, Cloak Clasp, and Anchor.
+    // Used by Orichalcum, The Abacus, Bone Flute, Cloak Clasp, Anchor, and
+    // Horn Cleat.
     public int AdditionalBlockGained { get; set; }
 
     // Total times this relic got its own trigger check but was blocked by
