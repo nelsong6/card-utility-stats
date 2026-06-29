@@ -58,6 +58,7 @@ public static class RunTracker
     private static CardModel? _pendingEffectSourceCard;
     private static int _pendingEffectSourceHistoryCount;
     private static readonly List<PendingPowerChangeAttempt> _pendingPowerChangeAttempts = new();
+    private static readonly System.Threading.AsyncLocal<EnemyStatusSourceFrame?> _enemyStatusSourceFrame = new();
     private static int _pendingPlayerBlockClearAmount;
     private static bool _pendingPlayerBlockClearArmed;
     private static bool _pendingOrichalcumBlockAttribution;
@@ -1013,10 +1014,13 @@ public static class RunTracker
 
             foreach (var (enemyId, pendingEnemyAgg) in _pendingCombat.EnemyAggregates)
             {
-                var runEnemyAgg = GetOrCreateEnemyAggregate(_currentRun, enemyId, pendingEnemyAgg.DisplayName);
-                runEnemyAgg.DamageAttempted += pendingEnemyAgg.DamageAttempted;
-                runEnemyAgg.DamageDealt += pendingEnemyAgg.DamageDealt;
-                runEnemyAgg.DamageBlocked += pendingEnemyAgg.DamageBlocked;
+                if (!_currentRun.EnemyAggregates.TryGetValue(enemyId, out var runEnemyAgg))
+                {
+                    runEnemyAgg = new EnemyAggregate { EnemyId = enemyId };
+                    _currentRun.EnemyAggregates[enemyId] = runEnemyAgg;
+                }
+
+                MergeEnemyAggregateInto(runEnemyAgg, pendingEnemyAgg);
             }
 
             MergeMetaStatsInto(_currentRun.MetaStats, _pendingCombat.MetaStats);
@@ -2164,6 +2168,66 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Enter a scoped enemy status-card attribution window. Exact owner
+    /// hooks, such as HauntedShip.HauntMove or PersonalHivePower's hit
+    /// trigger, push this before the generated-card command runs.
+    /// </summary>
+    public static object? PushEnemyStatusCardSource(Creature source)
+    {
+        if (source?.Monster == null) return _enemyStatusSourceFrame.Value;
+
+        var previous = _enemyStatusSourceFrame.Value;
+        _enemyStatusSourceFrame.Value = new EnemyStatusSourceFrame
+        {
+            Source = source,
+            Previous = previous,
+        };
+        return previous;
+    }
+
+    public static void RestoreEnemyStatusCardSource(object? previous)
+    {
+        _enemyStatusSourceFrame.Value = previous as EnemyStatusSourceFrame;
+    }
+
+    public static void RecordGeneratedStatusCardAdded(CardPileAddResult result, PileType pileType)
+    {
+        if (!result.success) return;
+        var card = result.cardAdded;
+        if (card == null || card.Type != CardType.Status) return;
+
+        var source = _enemyStatusSourceFrame.Value?.Source;
+        if (source?.Monster == null) return;
+
+        var enemyId = source.Monster.Id.ToString();
+        var cardId = card.Id.ToString();
+        var displayName = FormatCardIdForDisplay(cardId);
+
+        lock (_lock)
+        {
+            try
+            {
+                _pendingCombat ??= new PendingCombat();
+                var agg = GetOrCreateEnemyAggregateLocked(enemyId);
+                RecordEnemyStatusCardAddedLocked(agg, cardId, displayName, pileType);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordGeneratedStatusCardAdded failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordEnemyStatusCardAddedForTest(
+        EnemyAggregate agg,
+        string cardId,
+        string displayName,
+        PileType pileType)
+    {
+        RecordEnemyStatusCardAddedLocked(agg, cardId, displayName, pileType);
+    }
+
+    /// <summary>
     /// Record a confirmed Book Repair Knife trigger and its Doom-death/healing
     /// payload.
     /// <paramref name="killCount"/> is counted from the game's
@@ -2798,6 +2862,27 @@ public static class RunTracker
         }
     }
 
+    public static EnemyAggregate? GetEnemyAggregate(string enemyId)
+    {
+        lock (_lock)
+        {
+            EnemyAggregate? result = null;
+
+            if (_currentRun != null && _currentRun.EnemyAggregates.TryGetValue(enemyId, out var committed))
+            {
+                result = CloneEnemyAggregate(committed);
+            }
+
+            if (_pendingCombat != null && _pendingCombat.EnemyAggregates.TryGetValue(enemyId, out var pending))
+            {
+                result ??= new EnemyAggregate();
+                MergeEnemyAggregateInto(result, pending);
+            }
+
+            return result;
+        }
+    }
+
     private static RelicAggregate GetOrCreateRelicAggregateLocked(string relicId)
     {
         _pendingCombat ??= new PendingCombat();
@@ -2808,6 +2893,130 @@ public static class RunTracker
         }
 
         return agg;
+    }
+
+    private static EnemyAggregate GetOrCreateEnemyAggregateLocked(string enemyId)
+    {
+        _pendingCombat ??= new PendingCombat();
+        if (!_pendingCombat.EnemyAggregates.TryGetValue(enemyId, out var agg))
+        {
+            agg = new EnemyAggregate { EnemyId = enemyId };
+            _pendingCombat.EnemyAggregates[enemyId] = agg;
+        }
+
+        return agg;
+    }
+
+    private static void RecordEnemyStatusCardAddedLocked(
+        EnemyAggregate agg,
+        string cardId,
+        string displayName,
+        PileType pileType)
+    {
+        agg.StatusCardsAdded++;
+        switch (pileType)
+        {
+            case PileType.Hand:
+                agg.StatusCardsAddedToHand++;
+                break;
+            case PileType.Draw:
+                agg.StatusCardsAddedToDraw++;
+                break;
+            case PileType.Discard:
+                agg.StatusCardsAddedToDiscard++;
+                break;
+            case PileType.Deck:
+                agg.StatusCardsAddedToDeck++;
+                break;
+        }
+
+        if (!agg.StatusCardsById.TryGetValue(cardId, out var cardAgg))
+        {
+            cardAgg = new EnemyStatusCardAggregate
+            {
+                CardId = cardId,
+                DisplayName = displayName,
+            };
+            agg.StatusCardsById[cardId] = cardAgg;
+        }
+
+        cardAgg.Count++;
+    }
+
+    private static EnemyAggregate CloneEnemyAggregate(EnemyAggregate source)
+    {
+        var clone = new EnemyAggregate
+        {
+            EnemyId = source.EnemyId,
+            DisplayName = source.DisplayName,
+            DamageInstances = source.DamageInstances,
+            DamageAttempted = source.DamageAttempted,
+            DamageDealt = source.DamageDealt,
+            DamageBlocked = source.DamageBlocked,
+            StatusCardsAdded = source.StatusCardsAdded,
+            StatusCardsAddedToHand = source.StatusCardsAddedToHand,
+            StatusCardsAddedToDraw = source.StatusCardsAddedToDraw,
+            StatusCardsAddedToDiscard = source.StatusCardsAddedToDiscard,
+            StatusCardsAddedToDeck = source.StatusCardsAddedToDeck,
+        };
+
+        MergeEnemyStatusCardBreakdownInto(clone, source);
+        return clone;
+    }
+
+    private static void MergeEnemyAggregateInto(EnemyAggregate target, EnemyAggregate source)
+    {
+        if (string.IsNullOrWhiteSpace(target.EnemyId))
+            target.EnemyId = source.EnemyId;
+        if (string.IsNullOrWhiteSpace(target.DisplayName))
+            target.DisplayName = source.DisplayName;
+        target.DamageInstances += source.DamageInstances;
+        target.DamageAttempted += source.DamageAttempted;
+        target.DamageDealt += source.DamageDealt;
+        target.DamageBlocked += source.DamageBlocked;
+        target.StatusCardsAdded += source.StatusCardsAdded;
+        target.StatusCardsAddedToHand += source.StatusCardsAddedToHand;
+        target.StatusCardsAddedToDraw += source.StatusCardsAddedToDraw;
+        target.StatusCardsAddedToDiscard += source.StatusCardsAddedToDiscard;
+        target.StatusCardsAddedToDeck += source.StatusCardsAddedToDeck;
+        MergeEnemyStatusCardBreakdownInto(target, source);
+    }
+
+    private static void MergeEnemyStatusCardBreakdownInto(EnemyAggregate target, EnemyAggregate source)
+    {
+        if (source.StatusCardsById == null || source.StatusCardsById.Count == 0) return;
+
+        foreach (var sourceCard in source.StatusCardsById.Values)
+        {
+            if (sourceCard.Count <= 0 || string.IsNullOrWhiteSpace(sourceCard.CardId)) continue;
+            if (!target.StatusCardsById.TryGetValue(sourceCard.CardId, out var targetCard))
+            {
+                targetCard = new EnemyStatusCardAggregate
+                {
+                    CardId = sourceCard.CardId,
+                    DisplayName = sourceCard.DisplayName,
+                };
+                target.StatusCardsById[sourceCard.CardId] = targetCard;
+            }
+
+            targetCard.Count += sourceCard.Count;
+            if (string.IsNullOrWhiteSpace(targetCard.DisplayName))
+                targetCard.DisplayName = sourceCard.DisplayName;
+        }
+    }
+
+    internal static string FormatCardIdForDisplay(string cardId)
+    {
+        var value = cardId;
+        const string prefix = "CARD.";
+        if (value.StartsWith(prefix, StringComparison.Ordinal))
+            value = value[prefix.Length..];
+
+        return string.Join(" ", value
+            .Split('_', StringSplitOptions.RemoveEmptyEntries)
+            .Select(part => part.Length == 0
+                ? part
+                : char.ToUpperInvariant(part[0]) + part[1..].ToLowerInvariant()));
     }
 
     private static RelicAggregate GetOrCreateRelicAggregateForCurrentContextLocked(string relicId)
@@ -4633,7 +4842,10 @@ public static class RunTracker
                 _pendingCombat ??= new PendingCombat();
                 string enemyId = GetEnemyId(entry.Dealer);
                 string displayName = GetEnemyDisplayName(entry.Dealer);
-                var agg = GetOrCreateEnemyAggregate(_pendingCombat, enemyId, displayName);
+                var agg = GetOrCreateEnemyAggregateLocked(enemyId);
+                if (string.IsNullOrWhiteSpace(agg.DisplayName))
+                    agg.DisplayName = displayName;
+                agg.DamageInstances += 1;
                 agg.DamageAttempted += attempted;
                 agg.DamageDealt += dealt;
                 agg.DamageBlocked += blocked;
@@ -4946,83 +5158,6 @@ public static class RunTracker
             run.Aggregates[cardId] = agg;
         }
         return agg;
-    }
-
-    private static EnemyAggregate GetOrCreateEnemyAggregate(PendingCombat pending, string enemyId, string displayName)
-    {
-        if (!pending.EnemyAggregates.TryGetValue(enemyId, out var agg))
-        {
-            agg = new EnemyAggregate
-            {
-                EnemyId = enemyId,
-                DisplayName = displayName,
-            };
-            pending.EnemyAggregates[enemyId] = agg;
-        }
-
-        if (string.IsNullOrWhiteSpace(agg.DisplayName) && !string.IsNullOrWhiteSpace(displayName))
-            agg.DisplayName = displayName;
-        return agg;
-    }
-
-    private static EnemyAggregate GetOrCreateEnemyAggregate(RunData run, string enemyId, string displayName)
-    {
-        if (!run.EnemyAggregates.TryGetValue(enemyId, out var agg))
-        {
-            agg = new EnemyAggregate
-            {
-                EnemyId = enemyId,
-                DisplayName = displayName,
-            };
-            run.EnemyAggregates[enemyId] = agg;
-        }
-
-        if (string.IsNullOrWhiteSpace(agg.DisplayName) && !string.IsNullOrWhiteSpace(displayName))
-            agg.DisplayName = displayName;
-        return agg;
-    }
-
-    public static EnemyAggregate? GetEnemyAggregate(Creature creature)
-    {
-        if (creature?.Monster == null) return null;
-
-        string enemyId = GetEnemyId(creature);
-        string displayName = GetEnemyDisplayName(creature);
-
-        lock (_lock)
-        {
-            EnemyAggregate? result = null;
-            if (_currentRun != null && _currentRun.EnemyAggregates.TryGetValue(enemyId, out var committed))
-                result = CloneEnemyAggregate(committed);
-
-            if (_pendingCombat != null && _pendingCombat.EnemyAggregates.TryGetValue(enemyId, out var pending))
-            {
-                result ??= new EnemyAggregate
-                {
-                    EnemyId = enemyId,
-                    DisplayName = displayName,
-                };
-                result.DamageAttempted += pending.DamageAttempted;
-                result.DamageDealt += pending.DamageDealt;
-                result.DamageBlocked += pending.DamageBlocked;
-                if (string.IsNullOrWhiteSpace(result.DisplayName))
-                    result.DisplayName = pending.DisplayName;
-            }
-
-            return result;
-        }
-    }
-
-    private static EnemyAggregate CloneEnemyAggregate(EnemyAggregate source)
-    {
-        return new EnemyAggregate
-        {
-            EnemyId = source.EnemyId,
-            DisplayName = source.DisplayName,
-            DamageAttempted = source.DamageAttempted,
-            DamageDealt = source.DamageDealt,
-            DamageBlocked = source.DamageBlocked,
-        };
     }
 
     private static string GetEnemyId(Creature creature)
@@ -5508,6 +5643,12 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public RunMetaStats MetaStats { get; } = new();
     public int NextBlockSequence { get; set; }
+}
+
+internal sealed class EnemyStatusSourceFrame
+{
+    public required Creature Source { get; init; }
+    public EnemyStatusSourceFrame? Previous { get; init; }
 }
 
 internal sealed class BlockChunk

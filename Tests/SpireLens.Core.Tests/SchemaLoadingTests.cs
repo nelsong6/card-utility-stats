@@ -441,6 +441,22 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsEnemyStatusPollutionFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("enemy-status-pollution-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        var hauntedShipAgg = loaded.Data.EnemyAggregates["MONSTER.HAUNTED_SHIP"];
+        Assert.Equal(3, hauntedShipAgg.StatusCardsAdded);
+        Assert.Equal(1, hauntedShipAgg.StatusCardsAddedToHand);
+        Assert.Equal(2, hauntedShipAgg.StatusCardsAddedToDraw);
+        Assert.Equal(3, hauntedShipAgg.StatusCardsById["CARD.DAZED"].Count);
+    }
+
+    [Fact]
     public void ResumableLoad_RejectsLegacyV1Fixture()
     {
         var resumed = RunStorage.LoadResumable(FixturePath("v1-pooled-run.json"));
@@ -912,5 +928,21 @@ public class SchemaLoadingTests
         Assert.Equal(20, enemyAgg.DamageAttempted);
         Assert.Equal(12, enemyAgg.DamageDealt);
         Assert.Equal(8, enemyAgg.DamageBlocked);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsEnemyStatusPollutionFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("enemy-status-pollution-run.json"));
+
+        Assert.NotNull(resumed);
+        var hauntedShipAgg = resumed!.EnemyAggregates["MONSTER.HAUNTED_SHIP"];
+        Assert.Equal(3, hauntedShipAgg.StatusCardsAdded);
+        Assert.Equal(1, hauntedShipAgg.StatusCardsAddedToHand);
+        Assert.Equal(2, hauntedShipAgg.StatusCardsAddedToDraw);
+        Assert.Equal(3, hauntedShipAgg.StatusCardsById["CARD.DAZED"].Count);
+        var entomancerAgg = resumed.EnemyAggregates["MONSTER.ENTOMANCER"];
+        Assert.Equal(2, entomancerAgg.StatusCardsAdded);
+        Assert.Equal(2, entomancerAgg.StatusCardsById["CARD.DAZED"].Count);
     }
 }

@@ -356,6 +356,19 @@ Examples:
 
 Use pooled summaries when a card does not meaningfully exist as a stable deck resident and per-copy identities would mislead the user.
 
+Enemy status-card pollution uses a source-window plus observed-result pattern:
+
+- Patch the exact enemy-owned move or power trigger that creates the status
+  card. Examples include `HauntedShip.HauntMove` and Entomancer's
+  `PersonalHivePower.AfterDamageReceived` callback.
+- While that owner-specific window is active, observe
+  `CardPileCmd.AddGeneratedCardsToCombat` results.
+- Count only successful `CardPileAddResult` entries whose `cardAdded.Type` is
+  `CardType.Status`.
+- Attribute the result to the enemy definition, not to a card or relic. Split
+  by destination pile and by status card id so enemy hovers can answer what the
+  enemy actually added.
+
 ## UI Timing And Tooltip Surfaces
 
 Card stats are exposed through Godot UI patches, not through game combat state alone.

@@ -47,7 +47,7 @@ public class RunData
     /// <summary>Per-relic stat aggregates. Keyed by relic id (e.g. "RELIC.BAG_OF_MARBLES").</summary>
     public Dictionary<string, RelicAggregate> RelicAggregates { get; set; } = new();
 
-    /// <summary>Per-enemy observed damage output. Keyed by monster id.</summary>
+    /// <summary>Per-enemy stat aggregates. Keyed by monster id (e.g. "MONSTER.HAUNTED_SHIP").</summary>
     public Dictionary<string, EnemyAggregate> EnemyAggregates { get; set; } = new();
 
     /// <summary>
@@ -295,9 +295,23 @@ public class EnemyAggregate
 {
     public string EnemyId { get; set; } = "";
     public string DisplayName { get; set; } = "";
+    public int DamageInstances { get; set; }
     public int DamageAttempted { get; set; }
     public int DamageDealt { get; set; }
     public int DamageBlocked { get; set; }
+    public int StatusCardsAdded { get; set; }
+    public int StatusCardsAddedToHand { get; set; }
+    public int StatusCardsAddedToDraw { get; set; }
+    public int StatusCardsAddedToDiscard { get; set; }
+    public int StatusCardsAddedToDeck { get; set; }
+    public Dictionary<string, EnemyStatusCardAggregate> StatusCardsById { get; set; } = new();
+}
+
+public class EnemyStatusCardAggregate
+{
+    public string CardId { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public int Count { get; set; }
 }
 
 /// <summary>

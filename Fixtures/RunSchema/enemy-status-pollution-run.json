@@ -1,0 +1,47 @@
+{
+  "run_id": "enemy-status-pollution-fixture",
+  "started_at": "2026-06-29T00:00:00Z",
+  "updated_at": "2026-06-29T00:10:00Z",
+  "outcome": "in_progress",
+  "aggregates": {
+    "CARD.STRIKE_KIN#1": {
+      "plays": 1
+    }
+  },
+  "events": [],
+  "relic_aggregates": {},
+  "enemy_aggregates": {
+    "MONSTER.HAUNTED_SHIP": {
+      "status_cards_added": 3,
+      "status_cards_added_to_hand": 1,
+      "status_cards_added_to_draw": 2,
+      "status_cards_by_id": {
+        "CARD.DAZED": {
+          "card_id": "CARD.DAZED",
+          "display_name": "Dazed",
+          "count": 3
+        }
+      }
+    },
+    "MONSTER.ENTOMANCER": {
+      "status_cards_added": 2,
+      "status_cards_added_to_draw": 2,
+      "status_cards_by_id": {
+        "CARD.DAZED": {
+          "card_id": "CARD.DAZED",
+          "display_name": "Dazed",
+          "count": 2
+        }
+      }
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.STRIKE_KIN": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.STRIKE_KIN": 1
+  }
+}

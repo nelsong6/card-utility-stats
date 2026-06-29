@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Text;
 using Godot;
 using HarmonyLib;
@@ -19,19 +20,20 @@ public static class EnemyHoverShowPatch
             if (!viewStatsEnabled) return;
 
             var creature = __instance.Entity;
-            if (creature?.Monster == null || creature.IsPlayer) return;
+            var monster = creature?.Monster;
+            if (monster == null || creature!.IsPlayer) return;
+
+            var enemyId = monster.Id.ToString();
+            var agg = RunTracker.GetEnemyAggregate(enemyId);
+            if (agg == null || !HasEnemyStats(agg)) return;
 
             var tree = Engine.GetMainLoop() as SceneTree;
             if (tree == null) return;
 
-            var agg = RunTracker.GetEnemyAggregate(creature) ?? new EnemyAggregate
-            {
-                EnemyId = creature.Monster.Id.ToString(),
-                DisplayName = GetEnemyDisplayName(creature),
-            };
-
-            var body = BuildEnemyDamageBodyBBCode(agg);
-            StatsTooltip.Show(tree, __instance, GetEnemyDisplayName(creature), "SpireLens", body);
+            var title = string.IsNullOrWhiteSpace(agg.DisplayName)
+                ? FormatEnemyIdForDisplay(enemyId)
+                : agg.DisplayName;
+            StatsTooltip.Show(tree, __instance, title, "SpireLens", BuildEnemyBodyBBCode(agg));
         }
         catch (Exception e)
         {
@@ -39,18 +41,69 @@ public static class EnemyHoverShowPatch
         }
     }
 
-    private static string BuildEnemyDamageBodyBBCode(EnemyAggregate agg)
+    internal static string BuildEnemyBodyBBCode(EnemyAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Damage attempted", agg.DamageAttempted.ToString(), "");
-        Row3(sb, "Damage dealt", agg.DamageDealt.ToString(), "");
-        Row3(sb, "Damage blocked", agg.DamageBlocked.ToString(), "");
+
+        if (agg.DamageAttempted > 0)
+        {
+            var blockedPct = 100f * agg.DamageBlocked / agg.DamageAttempted;
+            Row3(sb, "Damage attempted", agg.DamageAttempted.ToString(), "");
+            Row3(sb, "Damage dealt", agg.DamageDealt.ToString(), "");
+            Row3(sb, "Damage blocked", agg.DamageBlocked.ToString(), $"{blockedPct:F0}%");
+            if (agg.DamageInstances > 0)
+                Row3(sb, "Damage instances", agg.DamageInstances.ToString(), "");
+        }
+
+        if (agg.StatusCardsAdded <= 0)
+            return sb.ToString();
+
+        Row3(sb, "Status cards added", agg.StatusCardsAdded.ToString(), "");
+        if (agg.StatusCardsAddedToHand > 0)
+            Row3(sb, "added to hand", agg.StatusCardsAddedToHand.ToString(), "");
+        if (agg.StatusCardsAddedToDraw > 0)
+            Row3(sb, "added to draw pile", agg.StatusCardsAddedToDraw.ToString(), "");
+        if (agg.StatusCardsAddedToDiscard > 0)
+            Row3(sb, "added to discard", agg.StatusCardsAddedToDiscard.ToString(), "");
+        if (agg.StatusCardsAddedToDeck > 0)
+            Row3(sb, "added to deck", agg.StatusCardsAddedToDeck.ToString(), "");
+
+        foreach (var card in agg.StatusCardsById.Values
+                     .OrderByDescending(card => card.Count)
+                     .ThenBy(card => card.DisplayName))
+        {
+            if (card.Count <= 0) continue;
+            var label = string.IsNullOrWhiteSpace(card.DisplayName)
+                ? RunTracker.FormatCardIdForDisplay(card.CardId)
+                : card.DisplayName;
+            Row3(sb, label, card.Count.ToString(), "");
+        }
+
         return sb.ToString();
     }
 
-    private static string GetEnemyDisplayName(MegaCrit.Sts2.Core.Entities.Creatures.Creature creature)
+    private static string BuildEnemyDamageBodyBBCode(EnemyAggregate agg)
     {
-        return creature.Monster?.Id.ToString() ?? "Enemy";
+        return BuildEnemyBodyBBCode(agg);
+    }
+
+    private static bool HasEnemyStats(EnemyAggregate agg)
+    {
+        return agg.DamageAttempted > 0 || agg.StatusCardsAdded > 0;
+    }
+
+    private static string FormatEnemyIdForDisplay(string enemyId)
+    {
+        var value = enemyId;
+        const string prefix = "MONSTER.";
+        if (value.StartsWith(prefix, StringComparison.Ordinal))
+            value = value[prefix.Length..];
+
+        return string.Join(" ", value
+            .Split('_', StringSplitOptions.RemoveEmptyEntries)
+            .Select(part => part.Length == 0
+                ? part
+                : char.ToUpperInvariant(part[0]) + part[1..].ToLowerInvariant()));
     }
 
     private static void Row3(StringBuilder sb, string label, string value, string pct)
@@ -63,22 +116,13 @@ public static class EnemyHoverShowPatch
     }
 }
 
-[HarmonyPatch(typeof(NCreature), nameof(NCreature.OnUnfocus))]
+[HarmonyPatch(typeof(NCreature), nameof(NCreature.HideHoverTips))]
 public static class EnemyHoverHidePatch
 {
     [HarmonyPostfix]
-    public static void Postfix(NCreature __instance)
+    public static void Postfix()
     {
-        try
-        {
-            var creature = __instance.Entity;
-            if (creature?.Monster == null || creature.IsPlayer) return;
-
-            StatsTooltip.Hide();
-        }
-        catch (Exception e)
-        {
-            CoreMain.Logger.Error($"EnemyHoverHidePatch failed: {e.Message}");
-        }
+        try { StatsTooltip.Hide(); }
+        catch (Exception e) { CoreMain.Logger.Error($"EnemyHoverHidePatch failed: {e.Message}"); }
     }
 }
