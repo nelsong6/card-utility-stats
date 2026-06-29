@@ -156,6 +156,26 @@ public static class RelicHoverShowPatch
                 StatsTooltip.Show(tree, __instance, "White Beast Statue", "SpireLens", body);
                 return;
             }
+
+            if (relicNode.Model is BoundPhylactery)
+            {
+                const string relicId = "RELIC.BOUND_PHYLACTERY";
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+
+                var body = BuildPhylacteryBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Bound Phylactery", "SpireLens", body);
+                return;
+            }
+
+            if (relicNode.Model is PhylacteryUnbound)
+            {
+                const string relicId = "RELIC.PHYLACTERY_UNBOUND";
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+
+                var body = BuildPhylacteryBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Phylactery Unbound", "SpireLens", body);
+                return;
+            }
         }
         catch (Exception e)
         {
@@ -253,6 +273,14 @@ public static class RelicHoverShowPatch
         Row3(sb, "common potions", agg.CommonPotionsGained.ToString(), "");
         Row3(sb, "uncommon potions", agg.UncommonPotionsGained.ToString(), "");
         Row3(sb, "rare potions", agg.RarePotionsGained.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildPhylacteryBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, "Osty summon gained", FormatDecimal(agg.TotalOstyHpSummoned), "");
         return sb.ToString();
     }
 

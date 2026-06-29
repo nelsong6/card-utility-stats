@@ -81,6 +81,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `white-beast-statue-relic-run.json`
   Adds White Beast Statue potion-gained tracking with common, uncommon, and
   rare potion rarity splits, plus skipped White Beast potion reward tracking.
+- `phylactery-relic-run.json`
+  Adds Bound Phylactery and Phylactery Unbound activation tracking plus actual
+  Osty summon HP gained from the shared summon command result.
 
 Why these exist:
 

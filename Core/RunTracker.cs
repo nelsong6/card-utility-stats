@@ -982,6 +982,7 @@ public static class RunTracker
                 runRelicAgg.AdditionalCardsDrawn += pendingRelicAgg.AdditionalCardsDrawn;
                 runRelicAgg.AdditionalBlockGained += pendingRelicAgg.AdditionalBlockGained;
                 runRelicAgg.BoneFluteTriggers += pendingRelicAgg.BoneFluteTriggers;
+                runRelicAgg.TotalOstyHpSummoned += pendingRelicAgg.TotalOstyHpSummoned;
                 runRelicAgg.TotalHealingAttempted += pendingRelicAgg.TotalHealingAttempted;
                 runRelicAgg.TotalHealingRestored += pendingRelicAgg.TotalHealingRestored;
                 runRelicAgg.TotalHealingLost += pendingRelicAgg.TotalHealingLost;
@@ -1564,6 +1565,8 @@ public static class RunTracker
     private const string MealTicketRelicId = "RELIC.MEAL_TICKET";
     private const string BurningBloodRelicId = "RELIC.BURNING_BLOOD";
     private const string WhiteBeastStatueRelicId = "RELIC.WHITE_BEAST_STATUE";
+    private const string BoundPhylacteryRelicId = "RELIC.BOUND_PHYLACTERY";
+    private const string PhylacteryUnboundRelicId = "RELIC.PHYLACTERY_UNBOUND";
 
     /// <summary>
     /// Record a Bag of Marbles combat-start Vulnerable application.
@@ -1979,6 +1982,37 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Record a relic-owned Osty summon/revive after the shared summon command
+    /// completes. Activation count follows the command completion; amount is
+    /// the observed HP actually added.
+    /// </summary>
+    public static void RecordRelicOstySummon(AbstractModel sourceRelic, decimal amount)
+    {
+        var relicId = sourceRelic switch
+        {
+            MegaCrit.Sts2.Core.Models.Relics.BoundPhylactery => BoundPhylacteryRelicId,
+            MegaCrit.Sts2.Core.Models.Relics.PhylacteryUnbound => PhylacteryUnboundRelicId,
+            _ => null,
+        };
+        if (relicId == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(relicId);
+                agg.Activations++;
+                if (amount > 0m)
+                    agg.TotalOstyHpSummoned += amount;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordRelicOstySummon failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Record HP lost by any Osty body as a run-level meta fact.
     /// </summary>
     public static void RecordOstyHpLost(Creature creature, decimal hpLost)
@@ -2335,6 +2369,7 @@ public static class RunTracker
                     AdditionalCardsDrawn = committed.AdditionalCardsDrawn,
                     AdditionalBlockGained = committed.AdditionalBlockGained,
                     BoneFluteTriggers = committed.BoneFluteTriggers,
+                    TotalOstyHpSummoned = committed.TotalOstyHpSummoned,
                     TotalHealingAttempted = committed.TotalHealingAttempted,
                     TotalHealingRestored = committed.TotalHealingRestored,
                     TotalHealingLost = committed.TotalHealingLost,
@@ -2360,6 +2395,7 @@ public static class RunTracker
                 result.AdditionalCardsDrawn += pending.AdditionalCardsDrawn;
                 result.AdditionalBlockGained += pending.AdditionalBlockGained;
                 result.BoneFluteTriggers += pending.BoneFluteTriggers;
+                result.TotalOstyHpSummoned += pending.TotalOstyHpSummoned;
                 result.TotalHealingAttempted += pending.TotalHealingAttempted;
                 result.TotalHealingRestored += pending.TotalHealingRestored;
                 result.TotalHealingLost += pending.TotalHealingLost;

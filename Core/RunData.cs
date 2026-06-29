@@ -356,6 +356,10 @@ public class RelicAggregate
     // Total times Bone Flute triggered from an owned Osty attack.
     public int BoneFluteTriggers { get; set; }
 
+    // Total Osty HP successfully summoned by this relic across the run.
+    // Used by Bound Phylactery and Phylactery Unbound.
+    public decimal TotalOstyHpSummoned { get; set; }
+
     // Healing attribution. Attempted is what the relic requested, restored is
     // observed HP actually gained, lost is the gap. Lost reasons keep the gap
     // explainable (full HP, prevention/modification, etc.).

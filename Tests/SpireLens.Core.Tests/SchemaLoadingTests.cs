@@ -424,6 +424,23 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsPhylacteryRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("phylactery-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        var boundAgg = loaded.Data.RelicAggregates["RELIC.BOUND_PHYLACTERY"];
+        Assert.Equal(3, boundAgg.Activations);
+        Assert.Equal(12m, boundAgg.TotalOstyHpSummoned);
+        var unboundAgg = loaded.Data.RelicAggregates["RELIC.PHYLACTERY_UNBOUND"];
+        Assert.Equal(4, unboundAgg.Activations);
+        Assert.Equal(20m, unboundAgg.TotalOstyHpSummoned);
+    }
+
+    [Fact]
     public void ResumableLoad_RejectsLegacyV1Fixture()
     {
         var resumed = RunStorage.LoadResumable(FixturePath("v1-pooled-run.json"));
@@ -796,5 +813,19 @@ public class SchemaLoadingTests
         Assert.Equal(2, relicAgg.UncommonPotionsGained);
         Assert.Equal(1, relicAgg.RarePotionsGained);
         Assert.Equal(3, relicAgg.PotionsSkipped);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsPhylacteryRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("phylactery-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var boundAgg = resumed!.RelicAggregates["RELIC.BOUND_PHYLACTERY"];
+        Assert.Equal(3, boundAgg.Activations);
+        Assert.Equal(12m, boundAgg.TotalOstyHpSummoned);
+        var unboundAgg = resumed.RelicAggregates["RELIC.PHYLACTERY_UNBOUND"];
+        Assert.Equal(4, unboundAgg.Activations);
+        Assert.Equal(20m, unboundAgg.TotalOstyHpSummoned);
     }
 }
