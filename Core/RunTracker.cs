@@ -58,6 +58,7 @@ public static class RunTracker
     private static CardModel? _pendingEffectSourceCard;
     private static int _pendingEffectSourceHistoryCount;
     private static readonly List<PendingPowerChangeAttempt> _pendingPowerChangeAttempts = new();
+    private static readonly System.Threading.AsyncLocal<EnemyStatusSourceFrame?> _enemyStatusSourceFrame = new();
     private static int _pendingPlayerBlockClearAmount;
     private static bool _pendingPlayerBlockClearArmed;
     private static bool _pendingOrichalcumBlockAttribution;
@@ -65,6 +66,9 @@ public static class RunTracker
     private static bool _pendingBoneFluteBlockAttribution;
     private static readonly List<PendingRelicHealing> _pendingRelicHeals = new();
     private static bool _pendingHappyFlowerEnergyAttribution;
+    private static readonly List<Player> _pendingGremlinHornEnergyAttributions = new();
+    private static readonly List<Player> _pendingGremlinHornDrawAttributions = new();
+    private static int? _lastPrismaticGemEnergyRoundNumber;
     private static bool _pendingCloakClaspBlockAttribution;
     private static int _pendingWhiteBeastPotionRewards;
     private static readonly HashSet<PotionReward> _whiteBeastPotionRewards = new(ReferenceEqualityComparer.Instance);
@@ -650,6 +654,9 @@ public static class RunTracker
         _pendingOrichalcumBlockAttribution = false;
         _pendingTheAbacusBlockAttribution = false;
         _pendingHappyFlowerEnergyAttribution = false;
+        _pendingGremlinHornEnergyAttributions.Clear();
+        _pendingGremlinHornDrawAttributions.Clear();
+        _lastPrismaticGemEnergyRoundNumber = null;
         _pendingCloakClaspBlockAttribution = false;
         _pendingMakeItSoSummons.Clear();
         _pendingReplayExtraPlaySources.Clear();
@@ -936,6 +943,7 @@ public static class RunTracker
             // combat that didn't get a CombatEnded (shouldn't happen but defensive) is dropped.
             _pendingCombat = new PendingCombat();
             ResetCombatContextState();
+            RecordCombatsInDeckForCurrentDeckLocked();
         }
     }
 
@@ -981,6 +989,11 @@ public static class RunTracker
                 runRelicAgg.WeakApplied += pendingRelicAgg.WeakApplied;
                 runRelicAgg.AdditionalCardsDrawn += pendingRelicAgg.AdditionalCardsDrawn;
                 runRelicAgg.AdditionalBlockGained += pendingRelicAgg.AdditionalBlockGained;
+                runRelicAgg.BlockedTriggers += pendingRelicAgg.BlockedTriggers;
+                runRelicAgg.Activations += pendingRelicAgg.Activations;
+                runRelicAgg.StrengthAdded += pendingRelicAgg.StrengthAdded;
+                runRelicAgg.PlatingAdded += pendingRelicAgg.PlatingAdded;
+                runRelicAgg.CardsUpgraded += pendingRelicAgg.CardsUpgraded;
                 runRelicAgg.BoneFluteTriggers += pendingRelicAgg.BoneFluteTriggers;
                 runRelicAgg.TotalOstyHpSummoned += pendingRelicAgg.TotalOstyHpSummoned;
                 runRelicAgg.TotalHealingAttempted += pendingRelicAgg.TotalHealingAttempted;
@@ -995,6 +1008,19 @@ public static class RunTracker
                 runRelicAgg.UncommonPotionsGained += pendingRelicAgg.UncommonPotionsGained;
                 runRelicAgg.RarePotionsGained += pendingRelicAgg.RarePotionsGained;
                 runRelicAgg.PotionsSkipped += pendingRelicAgg.PotionsSkipped;
+                runRelicAgg.CardRewardsAffected += pendingRelicAgg.CardRewardsAffected;
+                MergeCardRewardCategories(runRelicAgg.CardRewardCategories, pendingRelicAgg.CardRewardCategories);
+            }
+
+            foreach (var (enemyId, pendingEnemyAgg) in _pendingCombat.EnemyAggregates)
+            {
+                if (!_currentRun.EnemyAggregates.TryGetValue(enemyId, out var runEnemyAgg))
+                {
+                    runEnemyAgg = new EnemyAggregate { EnemyId = enemyId };
+                    _currentRun.EnemyAggregates[enemyId] = runEnemyAgg;
+                }
+
+                MergeEnemyAggregateInto(runEnemyAgg, pendingEnemyAgg);
             }
 
             MergeMetaStatsInto(_currentRun.MetaStats, _pendingCombat.MetaStats);
@@ -1082,7 +1108,11 @@ public static class RunTracker
                     break;
                 case DamageReceivedEntry dre:
                     if (dre.Receiver.IsPlayer)
+                    {
                         RecordPlayerBlockedDamage(dre);
+                    }
+
+                    RecordEnemyDamage(dre);
 
                     if (dre.CardSource != null)
                     {
@@ -1557,11 +1587,17 @@ public static class RunTracker
     private const string OrichalcumRelicId = "RELIC.ORICHALCUM";
     private const string TheAbacusRelicId = "RELIC.THE_ABACUS";
     private const string BookRepairKnifeRelicId = "RELIC.BOOK_REPAIR_KNIFE";
+    private const string EternalFeatherRelicId = "RELIC.ETERNAL_FEATHER";
     private const string BoneFluteRelicId = "RELIC.BONE_FLUTE";
     private const string HealingLostFullHpReasonId = "full_hp";
     private const string HealingLostOtherReasonId = "other";
     private const string HappyFlowerRelicId = "RELIC.HAPPY_FLOWER";
+    private const string GremlinHornRelicId = "RELIC.GREMLIN_HORN";
+    private const string PrismaticGemRelicId = "RELIC.PRISMATIC_GEM";
     private const string CloakClaspRelicId = "RELIC.CLOAK_CLASP";
+    private const string ReptileTrinketRelicId = "RELIC.REPTILE_TRINKET";
+    private const string GorgetRelicId = "RELIC.GORGET";
+    private const string StoneCrackerRelicId = "RELIC.STONE_CRACKER";
     private const string MealTicketRelicId = "RELIC.MEAL_TICKET";
     private const string BurningBloodRelicId = "RELIC.BURNING_BLOOD";
     private const string WhiteBeastStatueRelicId = "RELIC.WHITE_BEAST_STATUE";
@@ -1680,6 +1716,103 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordOrichalcumBlockGained failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record Orichalcum's owner-specific end-turn check being blocked by the
+    /// player already having block. Called from the relic's
+    /// <c>BeforeSideTurnEndVeryEarly</c> method, where the game performs this
+    /// exact condition check before arming <c>ShouldTrigger</c>.
+    /// </summary>
+    public static void RecordOrichalcumBlockedTrigger()
+    {
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(OrichalcumRelicId);
+                agg.BlockedTriggers += 1;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordOrichalcumBlockedTrigger failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record Reptile Trinket's owner-specific potion-use activation. Called
+    /// from <see cref="Patches.ReptileTrinketAfterPotionUsedPatch"/> after
+    /// matching the game's owner/combat checks and reading the same Strength
+    /// dynamic var that the relic applies.
+    /// </summary>
+    public static void RecordReptileTrinketActivation(decimal strengthAdded)
+    {
+        if (strengthAdded <= 0m) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(ReptileTrinketRelicId);
+                agg.Activations += 1;
+                agg.StrengthAdded += strengthAdded;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordReptileTrinketActivation failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record Gorget's owner-specific combat-room activation. Called from
+    /// <see cref="Patches.GorgetAfterRoomEnteredPatch"/> after matching the
+    /// game's CombatRoom check and reading the same Plating dynamic var that
+    /// the relic applies.
+    /// </summary>
+    public static void RecordGorgetActivation(decimal platingAdded)
+    {
+        if (platingAdded <= 0m) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(GorgetRelicId);
+                agg.Activations += 1;
+                agg.PlatingAdded += platingAdded;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordGorgetActivation failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record Stone Cracker's owner-specific combat-room activation and the
+    /// number of upgradeable deck cards selected for upgrade. The game filters
+    /// the owner's deck by <c>IsUpgradable</c>, shuffles, then takes the relic's
+    /// Cards dynamic var count; callers pass that selected count.
+    /// </summary>
+    public static void RecordStoneCrackerActivation(int cardsUpgraded)
+    {
+        if (cardsUpgraded < 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(StoneCrackerRelicId);
+                agg.Activations += 1;
+                agg.CardsUpgraded += cardsUpgraded;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordStoneCrackerActivation failed: {e.Message}");
             }
         }
     }
@@ -2035,6 +2168,78 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Enter a scoped enemy status-card attribution window. Exact owner
+    /// hooks, such as HauntedShip.HauntMove or PersonalHivePower's hit
+    /// trigger, push this before the generated-card command runs.
+    /// </summary>
+    public static object? PushEnemyStatusCardSource(Creature source)
+    {
+        if (source?.Monster == null) return _enemyStatusSourceFrame.Value;
+
+        var previous = _enemyStatusSourceFrame.Value;
+        _enemyStatusSourceFrame.Value = new EnemyStatusSourceFrame
+        {
+            Source = source,
+            Previous = previous,
+        };
+        return previous;
+    }
+
+    public static void RestoreEnemyStatusCardSource(object? previous)
+    {
+        _enemyStatusSourceFrame.Value = previous as EnemyStatusSourceFrame;
+    }
+
+    public static void RecordGeneratedStatusCardAdded(CardPileAddResult result, PileType pileType)
+    {
+        if (!result.success) return;
+        var card = result.cardAdded;
+        if (card == null || card.Type != CardType.Status) return;
+
+        var source = _enemyStatusSourceFrame.Value?.Source;
+        if (source?.Monster == null) return;
+
+        var enemyId = source.Monster.Id.ToString();
+        var cardId = card.Id.ToString();
+        var displayName = FormatCardIdForDisplay(cardId);
+
+        lock (_lock)
+        {
+            try
+            {
+                _pendingCombat ??= new PendingCombat();
+                var agg = GetOrCreateEnemyAggregateLocked(enemyId);
+                RecordEnemyStatusCardAddedLocked(agg, cardId, displayName, pileType);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordGeneratedStatusCardAdded failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordEnemyDamageToPlayerForTest(
+        EnemyAggregate agg,
+        int blockedDamage,
+        int unblockedDamage)
+    {
+        if (blockedDamage <= 0 && unblockedDamage <= 0) return;
+        agg.DamageInstances++;
+        agg.DamageAttempted += blockedDamage + unblockedDamage;
+        agg.DamageBlocked += blockedDamage;
+        agg.DamageDealt += unblockedDamage;
+    }
+
+    internal static void RecordEnemyStatusCardAddedForTest(
+        EnemyAggregate agg,
+        string cardId,
+        string displayName,
+        PileType pileType)
+    {
+        RecordEnemyStatusCardAddedLocked(agg, cardId, displayName, pileType);
+    }
+
+    /// <summary>
     /// Record a confirmed Book Repair Knife trigger and its Doom-death/healing
     /// payload.
     /// <paramref name="killCount"/> is counted from the game's
@@ -2074,6 +2279,7 @@ public static class RunTracker
                         Attempted = attemptedHealing,
                         InitialCurrentHp = healedCreature.CurrentHp,
                         InitialMissingHp = initialMissingHp,
+                        PersistDirectlyToRun = false,
                     });
                 }
             }
@@ -2104,28 +2310,58 @@ public static class RunTracker
         RecordRelicHealingTrigger(BurningBloodRelicId, healedCreature, attemptedHealing, nameof(RecordBurningBloodTrigger));
     }
 
+    /// <summary>
+    /// Record Eternal Feather's rest-site activation and attempted heal. This
+    /// happens outside combat, so the aggregate is written directly to the
+    /// committed run data instead of the pending combat buffer.
+    /// </summary>
+    public static void RecordEternalFeatherTrigger(Creature healedCreature, decimal attemptedHealing)
+    {
+        RecordRelicHealingTrigger(
+            EternalFeatherRelicId,
+            healedCreature,
+            attemptedHealing,
+            nameof(RecordEternalFeatherTrigger),
+            forceDirectRunPersistence: true,
+            allowZeroAttempt: true);
+    }
+
     private static void RecordRelicHealingTrigger(
         string relicId,
         Creature healedCreature,
         decimal attemptedHealing,
-        string callerName)
+        string callerName,
+        bool forceDirectRunPersistence = false,
+        bool allowZeroAttempt = false)
     {
-        if (healedCreature == null || attemptedHealing <= 0m) return;
+        if (healedCreature == null) return;
+        if (attemptedHealing < 0m || (!allowZeroAttempt && attemptedHealing <= 0m)) return;
 
         lock (_lock)
         {
             try
             {
-                var agg = GetOrCreateRelicAggregateForCurrentContextLocked(relicId);
+                bool persistDirectlyToRun = forceDirectRunPersistence || _pendingCombat == null;
+                var agg = persistDirectlyToRun
+                    ? GetOrCreateCurrentRunRelicAggregateLocked(relicId)
+                    : GetOrCreateRelicAggregateLocked(relicId);
                 agg.Activations++;
-                agg.TotalHealingAttempted += attemptedHealing;
 
+                if (attemptedHealing <= 0m)
+                {
+                    if (persistDirectlyToRun)
+                        SaveCurrentRun();
+                    return;
+                }
+
+                agg.TotalHealingAttempted += attemptedHealing;
                 decimal initialMissingHp = Math.Max(0m, healedCreature.MaxHp - healedCreature.CurrentHp);
                 if (initialMissingHp <= 0m)
                 {
                     agg.TotalHealingLost += attemptedHealing;
                     AddHealingLostReasonLocked(agg, HealingLostFullHpReasonId, "full HP", attemptedHealing);
-                    SaveCurrentRun();
+                    if (persistDirectlyToRun)
+                        SaveCurrentRun();
                     return;
                 }
 
@@ -2136,6 +2372,7 @@ public static class RunTracker
                     Attempted = attemptedHealing,
                     InitialCurrentHp = healedCreature.CurrentHp,
                     InitialMissingHp = initialMissingHp,
+                    PersistDirectlyToRun = persistDirectlyToRun,
                 });
             }
             catch (Exception e)
@@ -2165,7 +2402,7 @@ public static class RunTracker
 
                 decimal restored = Math.Min(delta, remaining);
                 pending.ActualRestored += restored;
-                var agg = GetOrCreateRelicAggregateForCurrentContextLocked(pending.RelicId);
+                var agg = GetOrCreateRelicAggregateForHealingLocked(pending);
                 agg.TotalHealingRestored += restored;
                 return;
             }
@@ -2198,7 +2435,7 @@ public static class RunTracker
                 var observedRestoredDelta = Math.Max(0m, observedRestored - pending.ActualRestored);
                 if (observedRestoredDelta > 0m)
                 {
-                    var restoredAgg = GetOrCreateRelicAggregateForCurrentContextLocked(relicId);
+                    var restoredAgg = GetOrCreateRelicAggregateForHealingLocked(pending);
                     restoredAgg.TotalHealingRestored += observedRestoredDelta;
                 }
 
@@ -2210,7 +2447,7 @@ public static class RunTracker
                     return;
                 }
 
-                var agg = GetOrCreateRelicAggregateForCurrentContextLocked(relicId);
+                var agg = GetOrCreateRelicAggregateForHealingLocked(pending);
                 agg.TotalHealingLost += lost;
 
                 decimal fullHpLost = Math.Max(0m, pending.Attempted - pending.InitialMissingHp);
@@ -2222,7 +2459,7 @@ public static class RunTracker
                 if (otherLost > 0m)
                     AddHealingLostReasonLocked(agg, HealingLostOtherReasonId, "other/prevented", otherLost);
 
-                if (_pendingCombat == null)
+                if (pending.PersistDirectlyToRun)
                     SaveCurrentRun();
                 return;
             }
@@ -2290,6 +2527,216 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordHappyFlowerEnergyGained failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record Gremlin Horn's owner-specific enemy-death activation and arm
+    /// one-shot attribution windows for the resource effects it immediately
+    /// performs. Energy is measured at the player energy mutation point; cards
+    /// drawn are measured from <c>CardPileCmd.Draw</c>'s returned cards.
+    /// </summary>
+    public static void ArmGremlinHornAttribution(Player owner)
+    {
+        if (owner == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(GremlinHornRelicId);
+                agg.Activations += 1;
+                _pendingGremlinHornEnergyAttributions.Add(owner);
+                _pendingGremlinHornDrawAttributions.Add(owner);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"ArmGremlinHornAttribution failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordGremlinHornEnergyGained(PlayerCombatState combatState, int amount)
+    {
+        if (amount <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var owner = combatState._player;
+                if (!ConsumePendingGremlinHornAttribution(_pendingGremlinHornEnergyAttributions, owner)) return;
+
+                var agg = GetOrCreateRelicAggregateLocked(GremlinHornRelicId);
+                agg.EnergyGenerated += amount;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordGremlinHornEnergyGained failed: {e.Message}");
+            }
+        }
+    }
+
+    public static bool TryConsumeGremlinHornDrawAttribution(Player player)
+    {
+        if (player == null) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                DisarmGremlinHornEnergyAttributionLocked(player);
+                return ConsumePendingGremlinHornAttribution(_pendingGremlinHornDrawAttributions, player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"TryConsumeGremlinHornDrawAttribution failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    public static void RecordGremlinHornCardsDrawn(int cardsDrawn)
+    {
+        if (cardsDrawn <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(GremlinHornRelicId);
+                agg.AdditionalCardsDrawn += cardsDrawn;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordGremlinHornCardsDrawn failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void DisarmGremlinHornEnergyAttributionLocked(Player player)
+    {
+        for (int i = 0; i < _pendingGremlinHornEnergyAttributions.Count; i++)
+        {
+            if (!ReferenceEquals(_pendingGremlinHornEnergyAttributions[i], player)) continue;
+            _pendingGremlinHornEnergyAttributions.RemoveAt(i);
+            return;
+        }
+    }
+
+    private static bool ConsumePendingGremlinHornAttribution(List<Player> pendingPlayers, Player? player)
+    {
+        if (player == null) return false;
+
+        for (int i = 0; i < pendingPlayers.Count; i++)
+        {
+            if (!ReferenceEquals(pendingPlayers[i], player)) continue;
+            pendingPlayers.RemoveAt(i);
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Record Prismatic Gem's +1 max-energy contribution once per player
+    /// energy reset. The relic modifies max energy whenever the game queries
+    /// it, so this is tied to the actual reset hook instead of the modifier
+    /// method to avoid counting UI/query calls as generated energy.
+    /// </summary>
+    public static void RecordPrismaticGemEnergyGenerated(MegaCrit.Sts2.Core.Combat.ICombatState combatState, int amount)
+    {
+        if (amount <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                int roundNumber = combatState.RoundNumber;
+                if (_lastPrismaticGemEnergyRoundNumber == roundNumber) return;
+                _lastPrismaticGemEnergyRoundNumber = roundNumber;
+
+                var agg = GetOrCreateRelicAggregateLocked(PrismaticGemRelicId);
+                agg.EnergyGenerated += amount;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPrismaticGemEnergyGenerated failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record that Prismatic Gem modified one card reward's creation options.
+    /// Card rewards are created outside combat, so persist directly to the
+    /// committed run instead of waiting for a combat boundary.
+    /// </summary>
+    public static void RecordPrismaticGemCardRewardAffected()
+    {
+        lock (_lock)
+        {
+            try
+            {
+                _currentRun ??= new RunData
+                {
+                    RunId = Guid.NewGuid().ToString("N"),
+                    StartedAt = Now(),
+                    UpdatedAt = Now(),
+                };
+
+                if (!_currentRun.RelicAggregates.TryGetValue(PrismaticGemRelicId, out var agg))
+                {
+                    agg = new RelicAggregate();
+                    _currentRun.RelicAggregates[PrismaticGemRelicId] = agg;
+                }
+
+                agg.CardRewardsAffected += 1;
+                _currentRun.UpdatedAt = Now();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPrismaticGemCardRewardAffected failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record observed card reward options by pool/category while Prismatic Gem
+    /// is owned. This is meta rather than sole relic attribution: another relic
+    /// may also have participated in producing the final visible options.
+    /// </summary>
+    public static void RecordPrismaticGemObservedCardRewardCategories(IEnumerable<CardRewardCategoryObservation> categories)
+    {
+        lock (_lock)
+        {
+            try
+            {
+                _currentRun ??= new RunData
+                {
+                    RunId = Guid.NewGuid().ToString("N"),
+                    StartedAt = Now(),
+                    UpdatedAt = Now(),
+                };
+
+                if (!_currentRun.RelicAggregates.TryGetValue(PrismaticGemRelicId, out var agg))
+                {
+                    agg = new RelicAggregate();
+                    _currentRun.RelicAggregates[PrismaticGemRelicId] = agg;
+                }
+
+                foreach (var category in categories)
+                {
+                    AddCardRewardCategory(agg.CardRewardCategories, category.Key, category.DisplayName, 1);
+                }
+
+                _currentRun.UpdatedAt = Now();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPrismaticGemObservedCardRewardCategories failed: {e.Message}");
             }
         }
     }
@@ -2368,6 +2815,10 @@ public static class RunTracker
                     WeakApplied = committed.WeakApplied,
                     AdditionalCardsDrawn = committed.AdditionalCardsDrawn,
                     AdditionalBlockGained = committed.AdditionalBlockGained,
+                    BlockedTriggers = committed.BlockedTriggers,
+                    StrengthAdded = committed.StrengthAdded,
+                    PlatingAdded = committed.PlatingAdded,
+                    CardsUpgraded = committed.CardsUpgraded,
                     BoneFluteTriggers = committed.BoneFluteTriggers,
                     TotalOstyHpSummoned = committed.TotalOstyHpSummoned,
                     TotalHealingAttempted = committed.TotalHealingAttempted,
@@ -2381,6 +2832,8 @@ public static class RunTracker
                     UncommonPotionsGained = committed.UncommonPotionsGained,
                     RarePotionsGained = committed.RarePotionsGained,
                     PotionsSkipped = committed.PotionsSkipped,
+                    CardRewardsAffected = committed.CardRewardsAffected,
+                    CardRewardCategories = CloneCardRewardCategories(committed.CardRewardCategories),
                 };
                 MergeHealingLostReasonsInto(result, committed);
             }
@@ -2394,6 +2847,11 @@ public static class RunTracker
                 result.WeakApplied += pending.WeakApplied;
                 result.AdditionalCardsDrawn += pending.AdditionalCardsDrawn;
                 result.AdditionalBlockGained += pending.AdditionalBlockGained;
+                result.BlockedTriggers += pending.BlockedTriggers;
+                result.Activations += pending.Activations;
+                result.StrengthAdded += pending.StrengthAdded;
+                result.PlatingAdded += pending.PlatingAdded;
+                result.CardsUpgraded += pending.CardsUpgraded;
                 result.BoneFluteTriggers += pending.BoneFluteTriggers;
                 result.TotalOstyHpSummoned += pending.TotalOstyHpSummoned;
                 result.TotalHealingAttempted += pending.TotalHealingAttempted;
@@ -2408,6 +2866,29 @@ public static class RunTracker
                 result.UncommonPotionsGained += pending.UncommonPotionsGained;
                 result.RarePotionsGained += pending.RarePotionsGained;
                 result.PotionsSkipped += pending.PotionsSkipped;
+                result.CardRewardsAffected += pending.CardRewardsAffected;
+                MergeCardRewardCategories(result.CardRewardCategories, pending.CardRewardCategories);
+            }
+
+            return result;
+        }
+    }
+
+    public static EnemyAggregate? GetEnemyAggregate(string enemyId)
+    {
+        lock (_lock)
+        {
+            EnemyAggregate? result = null;
+
+            if (_currentRun != null && _currentRun.EnemyAggregates.TryGetValue(enemyId, out var committed))
+            {
+                result = CloneEnemyAggregate(committed);
+            }
+
+            if (_pendingCombat != null && _pendingCombat.EnemyAggregates.TryGetValue(enemyId, out var pending))
+            {
+                result ??= new EnemyAggregate();
+                MergeEnemyAggregateInto(result, pending);
             }
 
             return result;
@@ -2426,6 +2907,130 @@ public static class RunTracker
         return agg;
     }
 
+    private static EnemyAggregate GetOrCreateEnemyAggregateLocked(string enemyId)
+    {
+        _pendingCombat ??= new PendingCombat();
+        if (!_pendingCombat.EnemyAggregates.TryGetValue(enemyId, out var agg))
+        {
+            agg = new EnemyAggregate { EnemyId = enemyId };
+            _pendingCombat.EnemyAggregates[enemyId] = agg;
+        }
+
+        return agg;
+    }
+
+    private static void RecordEnemyStatusCardAddedLocked(
+        EnemyAggregate agg,
+        string cardId,
+        string displayName,
+        PileType pileType)
+    {
+        agg.StatusCardsAdded++;
+        switch (pileType)
+        {
+            case PileType.Hand:
+                agg.StatusCardsAddedToHand++;
+                break;
+            case PileType.Draw:
+                agg.StatusCardsAddedToDraw++;
+                break;
+            case PileType.Discard:
+                agg.StatusCardsAddedToDiscard++;
+                break;
+            case PileType.Deck:
+                agg.StatusCardsAddedToDeck++;
+                break;
+        }
+
+        if (!agg.StatusCardsById.TryGetValue(cardId, out var cardAgg))
+        {
+            cardAgg = new EnemyStatusCardAggregate
+            {
+                CardId = cardId,
+                DisplayName = displayName,
+            };
+            agg.StatusCardsById[cardId] = cardAgg;
+        }
+
+        cardAgg.Count++;
+    }
+
+    private static EnemyAggregate CloneEnemyAggregate(EnemyAggregate source)
+    {
+        var clone = new EnemyAggregate
+        {
+            EnemyId = source.EnemyId,
+            DisplayName = source.DisplayName,
+            DamageInstances = source.DamageInstances,
+            DamageAttempted = source.DamageAttempted,
+            DamageDealt = source.DamageDealt,
+            DamageBlocked = source.DamageBlocked,
+            StatusCardsAdded = source.StatusCardsAdded,
+            StatusCardsAddedToHand = source.StatusCardsAddedToHand,
+            StatusCardsAddedToDraw = source.StatusCardsAddedToDraw,
+            StatusCardsAddedToDiscard = source.StatusCardsAddedToDiscard,
+            StatusCardsAddedToDeck = source.StatusCardsAddedToDeck,
+        };
+
+        MergeEnemyStatusCardBreakdownInto(clone, source);
+        return clone;
+    }
+
+    private static void MergeEnemyAggregateInto(EnemyAggregate target, EnemyAggregate source)
+    {
+        if (string.IsNullOrWhiteSpace(target.EnemyId))
+            target.EnemyId = source.EnemyId;
+        if (string.IsNullOrWhiteSpace(target.DisplayName))
+            target.DisplayName = source.DisplayName;
+        target.DamageInstances += source.DamageInstances;
+        target.DamageAttempted += source.DamageAttempted;
+        target.DamageDealt += source.DamageDealt;
+        target.DamageBlocked += source.DamageBlocked;
+        target.StatusCardsAdded += source.StatusCardsAdded;
+        target.StatusCardsAddedToHand += source.StatusCardsAddedToHand;
+        target.StatusCardsAddedToDraw += source.StatusCardsAddedToDraw;
+        target.StatusCardsAddedToDiscard += source.StatusCardsAddedToDiscard;
+        target.StatusCardsAddedToDeck += source.StatusCardsAddedToDeck;
+        MergeEnemyStatusCardBreakdownInto(target, source);
+    }
+
+    private static void MergeEnemyStatusCardBreakdownInto(EnemyAggregate target, EnemyAggregate source)
+    {
+        if (source.StatusCardsById == null || source.StatusCardsById.Count == 0) return;
+
+        foreach (var sourceCard in source.StatusCardsById.Values)
+        {
+            if (sourceCard.Count <= 0 || string.IsNullOrWhiteSpace(sourceCard.CardId)) continue;
+            if (!target.StatusCardsById.TryGetValue(sourceCard.CardId, out var targetCard))
+            {
+                targetCard = new EnemyStatusCardAggregate
+                {
+                    CardId = sourceCard.CardId,
+                    DisplayName = sourceCard.DisplayName,
+                };
+                target.StatusCardsById[sourceCard.CardId] = targetCard;
+            }
+
+            targetCard.Count += sourceCard.Count;
+            if (string.IsNullOrWhiteSpace(targetCard.DisplayName))
+                targetCard.DisplayName = sourceCard.DisplayName;
+        }
+    }
+
+    internal static string FormatCardIdForDisplay(string cardId)
+    {
+        var value = cardId;
+        const string prefix = "CARD.";
+        if (value.StartsWith(prefix, StringComparison.Ordinal))
+            value = value[prefix.Length..];
+
+        return string.Join(" ", value
+            .Split('_', StringSplitOptions.RemoveEmptyEntries)
+            .Select(part => part.Length == 0
+                ? part
+                : char.ToUpperInvariant(part[0]) + part[1..].ToLowerInvariant()));
+    }
+
     private static RelicAggregate GetOrCreateRelicAggregateForCurrentContextLocked(string relicId)
     {
         if (_pendingCombat != null)
@@ -2439,21 +3044,54 @@ public static class RunTracker
             return pendingAgg;
         }
 
+        return GetOrCreateCurrentRunRelicAggregateLocked(relicId);
+    }
+
+    private static RelicAggregate GetOrCreateRelicAggregateForHealingLocked(PendingRelicHealing pending)
+    {
+        return pending.PersistDirectlyToRun
+            ? GetOrCreateCurrentRunRelicAggregateLocked(pending.RelicId)
+            : GetOrCreateRelicAggregateLocked(pending.RelicId);
+    }
+
+    private static RelicAggregate GetOrCreateCurrentRunRelicAggregateLocked(string relicId)
+    {
         _currentRun ??= new RunData
         {
             RunId = Guid.NewGuid().ToString("N"),
             StartedAt = Now(),
             UpdatedAt = Now(),
         };
-        _currentRun.UpdatedAt = Now();
 
-        if (!_currentRun.RelicAggregates.TryGetValue(relicId, out var runAgg))
+        if (!_currentRun.RelicAggregates.TryGetValue(relicId, out var agg))
         {
-            runAgg = new RelicAggregate();
-            _currentRun.RelicAggregates[relicId] = runAgg;
+            agg = new RelicAggregate();
+            _currentRun.RelicAggregates[relicId] = agg;
         }
 
-        return runAgg;
+        _currentRun.UpdatedAt = Now();
+        return agg;
+    }
+
+    private static void RecordCombatsInDeckForCurrentDeckLocked()
+    {
+        try
+        {
+            var player = RunManager.Instance?.State?.Players.FirstOrDefault();
+            if (player?.Deck?.Cards == null) return;
+
+            foreach (var card in player.Deck.Cards)
+            {
+                if (card == null) continue;
+                var instanceId = GetOrAssignInstanceId(card);
+                var agg = GetOrCreateAggregate(_pendingCombat!, instanceId);
+                agg.CombatsInDeck += 1;
+            }
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordCombatsInDeckForCurrentDeckLocked failed: {e.Message}");
+        }
     }
 
     private static void AddHealingLostReasonLocked(
@@ -2490,6 +3128,65 @@ public static class RunTracker
                 reason.DisplayName,
                 reason.Amount);
         }
+    }
+
+    private static Dictionary<string, CardRewardCategoryAggregate> CloneCardRewardCategories(
+        Dictionary<string, CardRewardCategoryAggregate> source)
+    {
+        var result = new Dictionary<string, CardRewardCategoryAggregate>();
+        MergeCardRewardCategories(result, source);
+        return result;
+    }
+
+    private static void MergeCardRewardCategories(
+        Dictionary<string, CardRewardCategoryAggregate> target,
+        Dictionary<string, CardRewardCategoryAggregate>? source)
+    {
+        if (source == null || source.Count == 0) return;
+
+        foreach (var kvp in source)
+        {
+            if (kvp.Value.Count <= 0) continue;
+            AddCardRewardCategory(target, kvp.Key, kvp.Value.DisplayName, kvp.Value.Count);
+        }
+    }
+
+    private static void AddCardRewardCategory(
+        Dictionary<string, CardRewardCategoryAggregate> categories,
+        string key,
+        string displayName,
+        int count)
+    {
+        if (count <= 0 || string.IsNullOrWhiteSpace(key)) return;
+
+        if (!categories.TryGetValue(key, out var agg))
+        {
+            agg = new CardRewardCategoryAggregate
+            {
+                DisplayName = string.IsNullOrWhiteSpace(displayName) ? ToDisplayName(key) : displayName,
+            };
+            categories[key] = agg;
+        }
+
+        if (string.IsNullOrWhiteSpace(agg.DisplayName))
+        {
+            agg.DisplayName = string.IsNullOrWhiteSpace(displayName) ? ToDisplayName(key) : displayName;
+        }
+
+        agg.Count += count;
+    }
+
+    private static string ToDisplayName(string key)
+    {
+        if (string.IsNullOrWhiteSpace(key)) return "Unknown";
+
+        var words = key
+            .Replace('-', '_')
+            .Split('_', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (words.Length == 0) return key;
+
+        return string.Join(" ", words.Select(word =>
+            char.ToUpperInvariant(word[0]) + (word.Length > 1 ? word[1..].ToLowerInvariant() : "")));
     }
 
     /// <summary>
@@ -4140,6 +4837,38 @@ public static class RunTracker
         }
     }
 
+    private static void RecordEnemyDamage(DamageReceivedEntry entry)
+    {
+        if (entry.Dealer == null || entry.Dealer.IsPlayer || entry.Dealer.Monster == null) return;
+
+        int blocked = Math.Max(0, entry.Result.BlockedDamage);
+        int dealt = Math.Max(0, entry.Result.UnblockedDamage);
+        int overkill = Math.Max(0, entry.Result.OverkillDamage);
+        int attempted = blocked + dealt + overkill;
+        if (attempted <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                _pendingCombat ??= new PendingCombat();
+                string enemyId = GetEnemyId(entry.Dealer);
+                string displayName = GetEnemyDisplayName(entry.Dealer);
+                var agg = GetOrCreateEnemyAggregateLocked(enemyId);
+                if (string.IsNullOrWhiteSpace(agg.DisplayName))
+                    agg.DisplayName = displayName;
+                agg.DamageInstances += 1;
+                agg.DamageAttempted += attempted;
+                agg.DamageDealt += dealt;
+                agg.DamageBlocked += blocked;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordEnemyDamage failed: {e.Message}");
+            }
+        }
+    }
+
     public static void NotePotentialPlayerBlockClear(Creature creature)
     {
         lock (_lock)
@@ -4443,6 +5172,16 @@ public static class RunTracker
         return agg;
     }
 
+    private static string GetEnemyId(Creature creature)
+    {
+        return creature.Monster?.Id.ToString() ?? "MONSTER.UNKNOWN";
+    }
+
+    private static string GetEnemyDisplayName(Creature creature)
+    {
+        return creature.Monster?.Id.ToString() ?? "Enemy";
+    }
+
     private static int GetMakeItSoThreshold(CardModel card)
     {
         if (card is not MakeItSo makeItSo) return 0;
@@ -4482,6 +5221,7 @@ public static class RunTracker
     {
         var clone = new CardAggregate
         {
+            CombatsInDeck = source.CombatsInDeck,
             Plays = source.Plays,
             TotalIntended = source.TotalIntended,
             TotalBlocked = source.TotalBlocked,
@@ -4530,6 +5270,7 @@ public static class RunTracker
 
     private static void MergeAggregateInto(CardAggregate target, CardAggregate source)
     {
+        target.CombatsInDeck += source.CombatsInDeck;
         target.Plays += source.Plays;
         target.TotalIntended += source.TotalIntended;
         target.TotalBlocked += source.TotalBlocked;
@@ -4900,6 +5641,7 @@ internal class PendingCombat
     public Dictionary<string, CardAggregate> CombatAggregates { get; } = new();
     public List<CardEvent> CombatEvents { get; } = new();
     public Dictionary<string, RelicAggregate> RelicAggregates { get; } = new();
+    public Dictionary<string, EnemyAggregate> EnemyAggregates { get; } = new();
     public List<BlockChunk> PlayerBlockLedger { get; } = new();
     public Dictionary<AbstractModel, PlayerPowerOwnershipShare> PlayerPowerOwnershipByModifier { get; }
         = new(ReferenceEqualityComparer.Instance);
@@ -4913,6 +5655,12 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public RunMetaStats MetaStats { get; } = new();
     public int NextBlockSequence { get; set; }
+}
+
+internal sealed class EnemyStatusSourceFrame
+{
+    public required Creature Source { get; init; }
+    public EnemyStatusSourceFrame? Previous { get; init; }
 }
 
 internal sealed class BlockChunk
@@ -4957,6 +5705,7 @@ internal sealed class PendingRelicHealing
     public required decimal Attempted { get; init; }
     public required decimal InitialCurrentHp { get; init; }
     public required decimal InitialMissingHp { get; init; }
+    public bool PersistDirectlyToRun { get; init; }
     public decimal ActualRestored { get; set; }
 }
 

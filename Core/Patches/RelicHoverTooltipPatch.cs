@@ -37,10 +37,13 @@ public static class RelicHoverShowPatch
             var tree = Engine.GetMainLoop() as SceneTree;
             if (tree == null) return;
 
+            RelicAggregate RelicAgg(string relicId) =>
+                RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+
             if (relicNode.Model is BagOfMarbles)
             {
                 const string relicId = "RELIC.BAG_OF_MARBLES";
-                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+                var agg = RelicAgg(relicId);
 
                 var body = BuildBagOfMarblesBodyBBCode(agg);
                 StatsTooltip.Show(tree, __instance, "Bag of Marbles", "SpireLens", body);
@@ -50,7 +53,7 @@ public static class RelicHoverShowPatch
             if (relicNode.Model is RedMask)
             {
                 const string relicId = "RELIC.RED_MASK";
-                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+                var agg = RelicAgg(relicId);
 
                 var body = BuildRedMaskBodyBBCode(agg);
                 StatsTooltip.Show(tree, __instance, "Red Mask", "SpireLens", body);
@@ -60,7 +63,7 @@ public static class RelicHoverShowPatch
             if (relicNode.Model is Pocketwatch)
             {
                 const string relicId = "RELIC.POCKETWATCH";
-                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+                var agg = RelicAgg(relicId);
 
                 var body = BuildPocketwatchBodyBBCode(agg);
                 StatsTooltip.Show(tree, __instance, "Pocketwatch", "SpireLens", body);
@@ -70,7 +73,7 @@ public static class RelicHoverShowPatch
             if (relicNode.Model is Orichalcum)
             {
                 const string relicId = "RELIC.ORICHALCUM";
-                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+                var agg = RelicAgg(relicId);
 
                 var body = BuildOrichalcumBodyBBCode(agg);
                 StatsTooltip.Show(tree, __instance, "Orichalcum", "SpireLens", body);
@@ -80,7 +83,7 @@ public static class RelicHoverShowPatch
             if (relicNode.Model is TheAbacus)
             {
                 const string relicId = "RELIC.THE_ABACUS";
-                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+                var agg = RelicAgg(relicId);
 
                 var body = BuildTheAbacusBodyBBCode(agg);
                 StatsTooltip.Show(tree, __instance, "The Abacus", "SpireLens", body);
@@ -90,17 +93,27 @@ public static class RelicHoverShowPatch
             if (relicNode.Model is BookRepairKnife)
             {
                 const string relicId = "RELIC.BOOK_REPAIR_KNIFE";
-                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+                var agg = RelicAgg(relicId);
 
                 var body = BuildBookRepairKnifeBodyBBCode(agg);
                 StatsTooltip.Show(tree, __instance, "Book Repair Knife", "SpireLens", body);
                 return;
             }
 
+            if (relicNode.Model is EternalFeather)
+            {
+                const string relicId = "RELIC.ETERNAL_FEATHER";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildEternalFeatherBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Eternal Feather", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is BoneFlute)
             {
                 const string relicId = "RELIC.BONE_FLUTE";
-                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+                var agg = RelicAgg(relicId);
 
                 var body = BuildBoneFluteBodyBBCode(agg);
                 StatsTooltip.Show(tree, __instance, "Bone Flute", "SpireLens", body);
@@ -110,20 +123,70 @@ public static class RelicHoverShowPatch
             if (relicNode.Model is HappyFlower)
             {
                 const string relicId = "RELIC.HAPPY_FLOWER";
-                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+                var agg = RelicAgg(relicId);
 
                 var body = BuildHappyFlowerBodyBBCode(agg);
                 StatsTooltip.Show(tree, __instance, "Happy Flower", "SpireLens", body);
                 return;
             }
 
+            if (relicNode.Model is GremlinHorn)
+            {
+                const string relicId = "RELIC.GREMLIN_HORN";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildGremlinHornBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Gremlin Horn", "SpireLens", body);
+                return;
+            }
+
+            if (relicNode.Model is PrismaticGem)
+            {
+                const string relicId = "RELIC.PRISMATIC_GEM";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildPrismaticGemBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Prismatic Gem", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is CloakClasp)
             {
                 const string relicId = "RELIC.CLOAK_CLASP";
-                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+                var agg = RelicAgg(relicId);
 
                 var body = BuildCloakClaspBodyBBCode(agg);
                 StatsTooltip.Show(tree, __instance, "Cloak Clasp", "SpireLens", body);
+                return;
+            }
+
+            if (relicNode.Model is ReptileTrinket)
+            {
+                const string relicId = "RELIC.REPTILE_TRINKET";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildReptileTrinketBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Reptile Trinket", "SpireLens", body);
+                return;
+            }
+
+            if (relicNode.Model is Gorget)
+            {
+                const string relicId = "RELIC.GORGET";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildGorgetBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Gorget", "SpireLens", body);
+                return;
+            }
+
+            if (relicNode.Model is StoneCracker)
+            {
+                const string relicId = "RELIC.STONE_CRACKER";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildStoneCrackerBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Stone Cracker", "SpireLens", body);
                 return;
             }
 
@@ -209,6 +272,7 @@ public static class RelicHoverShowPatch
     {
         var sb = new StringBuilder();
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
+        Row3(sb, "Triggers blocked", agg.BlockedTriggers.ToString(), "");
         return sb.ToString();
     }
 
@@ -223,6 +287,14 @@ public static class RelicHoverShowPatch
     {
         var sb = new StringBuilder();
         Row3(sb, "Doom kills", agg.DoomKills.ToString(), "");
+        AppendHealingStats(sb, agg);
+        return sb.ToString();
+    }
+
+    private static string BuildEternalFeatherBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
         AppendHealingStats(sb, agg);
         return sb.ToString();
     }
@@ -242,10 +314,58 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
+    private static string BuildGremlinHornBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, EnergyLabel("Energy generated"), agg.EnergyGenerated.ToString(), "");
+        Row3(sb, "Cards drawn", agg.AdditionalCardsDrawn.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildPrismaticGemBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, EnergyLabel("Energy generated"), agg.EnergyGenerated.ToString(), "");
+        Row3(sb, "Card rewards affected", agg.CardRewardsAffected.ToString(), "");
+        foreach (var category in agg.CardRewardCategories
+            .Where(kvp => kvp.Value.Count > 0)
+            .OrderBy(kvp => kvp.Key == "colorless" ? 1 : 0)
+            .ThenBy(kvp => kvp.Value.DisplayName, StringComparer.OrdinalIgnoreCase))
+        {
+            Row3(sb, $"{category.Value.DisplayName} rewards", category.Value.Count.ToString(), "");
+        }
+        return sb.ToString();
+    }
+
     private static string BuildCloakClaspBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
         Row3(sb, BlockLabel("Block gained"), agg.AdditionalBlockGained.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildReptileTrinketBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, "Strength added", FormatDecimal(agg.StrengthAdded), "");
+        return sb.ToString();
+    }
+
+    private static string BuildGorgetBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, "Plating added", FormatDecimal(agg.PlatingAdded), "");
+        return sb.ToString();
+    }
+
+    private static string BuildStoneCrackerBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, "Cards upgraded", agg.CardsUpgraded.ToString(), "");
         return sb.ToString();
     }
 
@@ -304,12 +424,11 @@ public static class RelicHoverShowPatch
 
     private static void AppendHealingStats(StringBuilder sb, RelicAggregate agg)
     {
-        if (agg.TotalHealingRestored > 0m)
-            Row3(sb, "HP healed", FormatDecimal(agg.TotalHealingRestored), "");
+        Row3(sb, "HP healed", FormatDecimal(agg.TotalHealingRestored), "");
+        Row3(sb, "healing lost", FormatDecimal(agg.TotalHealingLost), "");
 
         if (agg.TotalHealingLost <= 0m) return;
 
-        Row3(sb, "healing lost", FormatDecimal(agg.TotalHealingLost), "");
         foreach (var reason in agg.HealingLostReasons.Values
                      .OrderByDescending(r => r.Amount)
                      .ThenBy(r => r.DisplayName))

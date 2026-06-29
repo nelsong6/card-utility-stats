@@ -250,6 +250,8 @@ public static class CardHoverShowPatch
             Row3(sb, "Played/Drawn", $"{agg.Plays}/{agg.TimesDrawn}", $"{playRate:F0}%");
         }
 
+        Row3(sb, "Combats in deck", agg.CombatsInDeck.ToString(), "");
+
         AppendMakeItSoStats(sb, cardModel, agg, compact: false);
         AppendUnleashStats(sb, cardModel, agg, compact: false);
         AppendOstySummonStats(sb, cardModel, agg, RunTracker.GetEffectiveMetaStats(), compact: false);

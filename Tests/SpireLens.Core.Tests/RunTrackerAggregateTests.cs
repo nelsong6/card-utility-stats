@@ -19,6 +19,7 @@ public class RunTrackerAggregateTests
     {
         var source = new CardAggregate
         {
+            CombatsInDeck = 7,
             TimesSummonedToHand = 2,
             TotalForgeGenerated = 9m,
             TotalOstyHpAttackBonus = 21,
@@ -52,6 +53,7 @@ public class RunTrackerAggregateTests
             ?? throw new InvalidOperationException("CloneAggregate returned null."));
 
         Assert.Equal(2, clone.TimesSummonedToHand);
+        Assert.Equal(7, clone.CombatsInDeck);
         Assert.Equal(9m, clone.TotalForgeGenerated);
         Assert.Equal(21, clone.TotalOstyHpAttackBonus);
         Assert.Equal(3, clone.TimesOstyHpAttackBonusApplied);
@@ -71,6 +73,7 @@ public class RunTrackerAggregateTests
     {
         var target = new CardAggregate
         {
+            CombatsInDeck = 4,
             TimesSummonedToHand = 1,
             TotalForgeGenerated = 5m,
             TotalOstyHpAttackBonus = 8,
@@ -101,6 +104,7 @@ public class RunTrackerAggregateTests
         };
         var source = new CardAggregate
         {
+            CombatsInDeck = 7,
             TimesSummonedToHand = 2,
             TotalForgeGenerated = 4m,
             TotalOstyHpAttackBonus = 13,
@@ -133,6 +137,7 @@ public class RunTrackerAggregateTests
         _ = MergeAggregateIntoMethod.Invoke(null, new object?[] { target, source });
 
         Assert.Equal(3, target.TimesSummonedToHand);
+        Assert.Equal(11, target.CombatsInDeck);
         Assert.Equal(9m, target.TotalForgeGenerated);
         Assert.Equal(21, target.TotalOstyHpAttackBonus);
         Assert.Equal(3, target.TimesOstyHpAttackBonusApplied);

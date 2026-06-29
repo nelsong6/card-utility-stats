@@ -441,6 +441,26 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsEnemyStatusPollutionFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("enemy-status-pollution-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        var hauntedShipAgg = loaded.Data.EnemyAggregates["MONSTER.HAUNTED_SHIP"];
+        Assert.Equal(2, hauntedShipAgg.DamageInstances);
+        Assert.Equal(16, hauntedShipAgg.DamageAttempted);
+        Assert.Equal(6, hauntedShipAgg.DamageBlocked);
+        Assert.Equal(10, hauntedShipAgg.DamageDealt);
+        Assert.Equal(3, hauntedShipAgg.StatusCardsAdded);
+        Assert.Equal(1, hauntedShipAgg.StatusCardsAddedToHand);
+        Assert.Equal(2, hauntedShipAgg.StatusCardsAddedToDraw);
+        Assert.Equal(3, hauntedShipAgg.StatusCardsById["CARD.DAZED"].Count);
+    }
+
+    [Fact]
     public void ResumableLoad_RejectsLegacyV1Fixture()
     {
         var resumed = RunStorage.LoadResumable(FixturePath("v1-pooled-run.json"));
@@ -827,5 +847,110 @@ public class SchemaLoadingTests
         var unboundAgg = resumed.RelicAggregates["RELIC.PHYLACTERY_UNBOUND"];
         Assert.Equal(4, unboundAgg.Activations);
         Assert.Equal(20m, unboundAgg.TotalOstyHpSummoned);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsV26PrismaticGemFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v26-prismatic-gem-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.PRISMATIC_GEM"];
+        Assert.Equal(4, relicAgg.EnergyGenerated);
+        Assert.Equal(2, relicAgg.CardRewardsAffected);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsV27OrichalcumBlockedAndCombatsInDeckFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v27-orichalcum-blocked-and-combats-in-deck-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.ORICHALCUM"];
+        Assert.Equal(12, relicAgg.AdditionalBlockGained);
+        Assert.Equal(4, relicAgg.BlockedTriggers);
+        Assert.Equal(3, resumed.Aggregates["CARD.SPOILS_MAP#1"].CombatsInDeck);
+        Assert.Equal(3, resumed.Aggregates["CARD.STRIKE_IRONCLAD#1"].CombatsInDeck);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsV28ReptileTrinketFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v28-reptile-trinket-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.REPTILE_TRINKET"];
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(6m, relicAgg.StrengthAdded);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsV29GorgetFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v29-gorget-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.GORGET"];
+        Assert.Equal(4, relicAgg.Activations);
+        Assert.Equal(12m, relicAgg.PlatingAdded);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsV30StoneCrackerFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v30-stone-cracker-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.STONE_CRACKER"];
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(6, relicAgg.CardsUpgraded);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsV31PrismaticGemRewardCategoriesFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v31-prismatic-gem-reward-categories-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.PRISMATIC_GEM"];
+        Assert.Equal(4, relicAgg.EnergyGenerated);
+        Assert.Equal(2, relicAgg.CardRewardsAffected);
+        Assert.Equal(3, relicAgg.CardRewardCategories["defect"].Count);
+        Assert.Equal("Defect", relicAgg.CardRewardCategories["defect"].DisplayName);
+        Assert.Equal(1, relicAgg.CardRewardCategories["colorless"].Count);
+        Assert.Equal("Colorless", relicAgg.CardRewardCategories["colorless"].DisplayName);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsV32EnemyDamageFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("v32-enemy-damage-run.json"));
+
+        Assert.NotNull(resumed);
+        var enemyAgg = resumed!.EnemyAggregates["MONSTER.JAW_WORM"];
+        Assert.Equal("MONSTER.JAW_WORM", enemyAgg.EnemyId);
+        Assert.Equal(20, enemyAgg.DamageAttempted);
+        Assert.Equal(12, enemyAgg.DamageDealt);
+        Assert.Equal(8, enemyAgg.DamageBlocked);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsEnemyStatusPollutionFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("enemy-status-pollution-run.json"));
+
+        Assert.NotNull(resumed);
+        var hauntedShipAgg = resumed!.EnemyAggregates["MONSTER.HAUNTED_SHIP"];
+        Assert.Equal(2, hauntedShipAgg.DamageInstances);
+        Assert.Equal(16, hauntedShipAgg.DamageAttempted);
+        Assert.Equal(6, hauntedShipAgg.DamageBlocked);
+        Assert.Equal(10, hauntedShipAgg.DamageDealt);
+        Assert.Equal(3, hauntedShipAgg.StatusCardsAdded);
+        Assert.Equal(1, hauntedShipAgg.StatusCardsAddedToHand);
+        Assert.Equal(2, hauntedShipAgg.StatusCardsAddedToDraw);
+        Assert.Equal(3, hauntedShipAgg.StatusCardsById["CARD.DAZED"].Count);
+        var entomancerAgg = resumed.EnemyAggregates["MONSTER.ENTOMANCER"];
+        Assert.Equal(2, entomancerAgg.StatusCardsAdded);
+        Assert.Equal(2, entomancerAgg.StatusCardsById["CARD.DAZED"].Count);
     }
 }
