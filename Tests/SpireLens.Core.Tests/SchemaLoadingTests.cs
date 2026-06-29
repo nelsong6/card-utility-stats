@@ -953,4 +953,43 @@ public class SchemaLoadingTests
         Assert.Equal(2, entomancerAgg.StatusCardsAdded);
         Assert.Equal(2, entomancerAgg.StatusCardsById["CARD.DAZED"].Count);
     }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsOpenBranchRelicStatsFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("open-branch-relic-stats-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        var anchorAgg = loaded.Data.RelicAggregates["RELIC.ANCHOR"];
+        Assert.Equal(2, anchorAgg.Activations);
+        Assert.Equal(20, anchorAgg.AdditionalBlockGained);
+        var letterOpenerAgg = loaded.Data.RelicAggregates["RELIC.LETTER_OPENER"];
+        Assert.Equal(3, letterOpenerAgg.Activations);
+        Assert.Equal(45, letterOpenerAgg.TotalDamageAttempted);
+        Assert.Equal(9, letterOpenerAgg.TotalTargets);
+        var bloodVialAgg = loaded.Data.RelicAggregates["RELIC.BLOOD_VIAL"];
+        Assert.Equal(2, bloodVialAgg.Activations);
+        Assert.Equal(3m, bloodVialAgg.TotalHealingRestored);
+        Assert.Equal(1m, bloodVialAgg.TotalHealingLost);
+        Assert.Equal(1m, bloodVialAgg.HealingLostReasons["full_hp"].Amount);
+        Assert.Equal(16, loaded.Data.RelicAggregates["RELIC.AKABEKO"].VigorGained);
+        var boomingConchAgg = loaded.Data.RelicAggregates["RELIC.BOOMING_CONCH"];
+        Assert.Equal(2, boomingConchAgg.EnergyGenerated);
+        Assert.Equal(4, boomingConchAgg.AdditionalCardsDrawn);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsOpenBranchRelicStatsFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("open-branch-relic-stats-run.json"));
+
+        Assert.NotNull(resumed);
+        var letterOpenerAgg = resumed!.RelicAggregates["RELIC.LETTER_OPENER"];
+        Assert.Equal(45, letterOpenerAgg.TotalDamageAttempted);
+        Assert.Equal(9, letterOpenerAgg.TotalTargets);
+        Assert.Equal(16, resumed.RelicAggregates["RELIC.AKABEKO"].VigorGained);
+        Assert.Equal(4, resumed.RelicAggregates["RELIC.BOOMING_CONCH"].AdditionalCardsDrawn);
+    }
 }

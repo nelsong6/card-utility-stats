@@ -20,6 +20,7 @@ public static class RelicHoverShowPatch
     private const string WeakIconPath = "res://images/atlases/power_atlas.sprites/weak_power.tres";
     private const string BlockIconPath = "res://images/ui/combat/block.png";
     private const string EnergyIconPath = "res://images/atlases/potion_atlas.sprites/energy_potion.tres";
+    private const string VigorIconPath = "res://images/atlases/power_atlas.sprites/vigor_power.tres";
     private const int InlineIconSize = 16;
 
     [HarmonyPostfix]
@@ -90,6 +91,36 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (IsRelicModel(relicNode.Model, "MegaCrit.Sts2.Core.Models.Relics.Anchor"))
+            {
+                const string relicId = "RELIC.ANCHOR";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildAnchorBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Anchor", "SpireLens", body);
+                return;
+            }
+
+            if (IsRelicModel(relicNode.Model, "MegaCrit.Sts2.Core.Models.Relics.LetterOpener"))
+            {
+                const string relicId = "RELIC.LETTER_OPENER";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildLetterOpenerBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Letter Opener", "SpireLens", body);
+                return;
+            }
+
+            if (IsRelicModel(relicNode.Model, "MegaCrit.Sts2.Core.Models.Relics.Akabeko"))
+            {
+                const string relicId = "RELIC.AKABEKO";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildAkabekoBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Akabeko", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is BookRepairKnife)
             {
                 const string relicId = "RELIC.BOOK_REPAIR_KNIFE";
@@ -127,6 +158,16 @@ public static class RelicHoverShowPatch
 
                 var body = BuildHappyFlowerBodyBBCode(agg);
                 StatsTooltip.Show(tree, __instance, "Happy Flower", "SpireLens", body);
+                return;
+            }
+
+            if (IsRelicModel(relicNode.Model, "MegaCrit.Sts2.Core.Models.Relics.BoomingConch"))
+            {
+                const string relicId = "RELIC.BOOMING_CONCH";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildBoomingConchBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Booming Conch", "SpireLens", body);
                 return;
             }
 
@@ -210,6 +251,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (IsRelicModel(relicNode.Model, "MegaCrit.Sts2.Core.Models.Relics.BloodVial"))
+            {
+                const string relicId = "RELIC.BLOOD_VIAL";
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+
+                var body = BuildBloodVialBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Blood Vial", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is WhiteBeastStatue)
             {
                 const string relicId = "RELIC.WHITE_BEAST_STATUE";
@@ -283,6 +334,30 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
+    private static string BuildAnchorBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildLetterOpenerBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, "Damage attempted", agg.TotalDamageAttempted.ToString(), "");
+        Row3(sb, "Targets hit", agg.TotalTargets.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildAkabekoBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, VigorLabel("vigor gained"), agg.VigorGained.ToString(), "");
+        return sb.ToString();
+    }
+
     private static string BuildBookRepairKnifeBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
@@ -311,6 +386,14 @@ public static class RelicHoverShowPatch
     {
         var sb = new StringBuilder();
         Row3(sb, EnergyLabel("Energy generated"), agg.EnergyGenerated.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildBoomingConchBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, EnergyLabel("Energy generated"), agg.EnergyGenerated.ToString(), "");
+        Row3(sb, "Cards drawn", agg.AdditionalCardsDrawn.ToString(), "");
         return sb.ToString();
     }
 
@@ -385,6 +468,14 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
+    private static string BuildBloodVialBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        AppendHealingStats(sb, agg);
+        return sb.ToString();
+    }
+
     private static string BuildWhiteBeastStatueBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
@@ -452,6 +543,18 @@ public static class RelicHoverShowPatch
     {
         var path = NormalizeResourcePath(EnergyIconPath);
         return $"[img={InlineIconSize}x{InlineIconSize}]{path}[/img] {suffix}";
+    }
+
+    private static string VigorLabel(string suffix)
+    {
+        var path = NormalizeResourcePath(VigorIconPath);
+        return $"[img={InlineIconSize}x{InlineIconSize}]{path}[/img] {suffix}";
+    }
+
+    private static bool IsRelicModel(object model, string typeName)
+    {
+        var type = AccessTools.TypeByName(typeName);
+        return type != null && type.IsInstanceOfType(model);
     }
 
     private static string NormalizeResourcePath(string path)
