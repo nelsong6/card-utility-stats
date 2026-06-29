@@ -39,6 +39,10 @@
       "energy_generated": 2,
       "additional_cards_drawn": 4
     },
+    "RELIC.PENDULUM": {
+      "activations": 3,
+      "additional_cards_drawn": 6
+    },
     "RELIC.TOOLBOX": {
       "activations": 2,
       "uncommon_cards_offered": 4,

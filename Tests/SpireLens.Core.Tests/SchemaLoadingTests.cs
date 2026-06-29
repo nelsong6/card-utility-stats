@@ -978,6 +978,9 @@ public class SchemaLoadingTests
         var boomingConchAgg = loaded.Data.RelicAggregates["RELIC.BOOMING_CONCH"];
         Assert.Equal(2, boomingConchAgg.EnergyGenerated);
         Assert.Equal(4, boomingConchAgg.AdditionalCardsDrawn);
+        var pendulumAgg = loaded.Data.RelicAggregates["RELIC.PENDULUM"];
+        Assert.Equal(3, pendulumAgg.Activations);
+        Assert.Equal(6, pendulumAgg.AdditionalCardsDrawn);
         var toolboxAgg = loaded.Data.RelicAggregates["RELIC.TOOLBOX"];
         Assert.Equal(2, toolboxAgg.Activations);
         Assert.Equal(4, toolboxAgg.UncommonCardsOffered);
@@ -995,6 +998,7 @@ public class SchemaLoadingTests
         Assert.Equal(9, letterOpenerAgg.TotalTargets);
         Assert.Equal(16, resumed.RelicAggregates["RELIC.AKABEKO"].VigorGained);
         Assert.Equal(4, resumed.RelicAggregates["RELIC.BOOMING_CONCH"].AdditionalCardsDrawn);
+        Assert.Equal(6, resumed.RelicAggregates["RELIC.PENDULUM"].AdditionalCardsDrawn);
         Assert.Equal(4, resumed.RelicAggregates["RELIC.TOOLBOX"].UncommonCardsOffered);
         Assert.Equal(1, resumed.RelicAggregates["RELIC.TOOLBOX"].RareCardsOffered);
     }

@@ -45,6 +45,11 @@ public class OpenBranchRelicStatsTests
             UncommonCardsOffered = 4,
             RareCardsOffered = 1,
         };
+        run.RelicAggregates["RELIC.PENDULUM"] = new RelicAggregate
+        {
+            Activations = 3,
+            AdditionalCardsDrawn = 6,
+        };
 
         var json = JsonSerializer.Serialize(run, SerializerOptions);
 
@@ -64,6 +69,8 @@ public class OpenBranchRelicStatsTests
         Assert.Equal(2, restored.RelicAggregates["RELIC.TOOLBOX"].Activations);
         Assert.Equal(4, restored.RelicAggregates["RELIC.TOOLBOX"].UncommonCardsOffered);
         Assert.Equal(1, restored.RelicAggregates["RELIC.TOOLBOX"].RareCardsOffered);
+        Assert.Equal(3, restored.RelicAggregates["RELIC.PENDULUM"].Activations);
+        Assert.Equal(6, restored.RelicAggregates["RELIC.PENDULUM"].AdditionalCardsDrawn);
     }
 
     [Fact]
@@ -110,6 +117,14 @@ public class OpenBranchRelicStatsTests
         Assert.Contains("Rare cards offered", toolboxBody);
         Assert.Contains("[b]4[/b]", toolboxBody);
         Assert.Contains("[b]1[/b]", toolboxBody);
+
+        var pendulumBody = InvokeTooltipBuilder(
+            "BuildPendulumBodyBBCode",
+            new RelicAggregate { Activations = 3, AdditionalCardsDrawn = 6 });
+        Assert.Contains("Activations", pendulumBody);
+        Assert.Contains("Cards drawn", pendulumBody);
+        Assert.Contains("[b]3[/b]", pendulumBody);
+        Assert.Contains("[b]6[/b]", pendulumBody);
     }
 
     private static string InvokeTooltipBuilder(string methodName, RelicAggregate agg)

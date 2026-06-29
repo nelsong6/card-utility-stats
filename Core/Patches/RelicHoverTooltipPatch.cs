@@ -181,6 +181,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is Pendulum)
+            {
+                const string relicId = "RELIC.PENDULUM";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildPendulumBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Pendulum", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is PrismaticGem)
             {
                 const string relicId = "RELIC.PRISMATIC_GEM";
@@ -412,6 +422,14 @@ public static class RelicHoverShowPatch
         var sb = new StringBuilder();
         Row3(sb, "Activations", agg.Activations.ToString(), "");
         Row3(sb, EnergyLabel("Energy generated"), agg.EnergyGenerated.ToString(), "");
+        Row3(sb, "Cards drawn", agg.AdditionalCardsDrawn.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildPendulumBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
         Row3(sb, "Cards drawn", agg.AdditionalCardsDrawn.ToString(), "");
         return sb.ToString();
     }

@@ -71,6 +71,7 @@ public static class RunTracker
     private static bool _pendingBoomingConchEnergyAttribution;
     private static readonly List<Player> _pendingGremlinHornEnergyAttributions = new();
     private static readonly List<Player> _pendingGremlinHornDrawAttributions = new();
+    private static readonly List<Player> _pendingPendulumDrawAttributions = new();
     private static int? _lastPrismaticGemEnergyRoundNumber;
     private static bool _pendingCloakClaspBlockAttribution;
     private static int _pendingWhiteBeastPotionRewards;
@@ -664,6 +665,7 @@ public static class RunTracker
         _pendingBoomingConchEnergyAttribution = false;
         _pendingGremlinHornEnergyAttributions.Clear();
         _pendingGremlinHornDrawAttributions.Clear();
+        _pendingPendulumDrawAttributions.Clear();
         _lastPrismaticGemEnergyRoundNumber = null;
         _pendingCloakClaspBlockAttribution = false;
         _pendingToolboxOfferScreens = 0;
@@ -1611,6 +1613,7 @@ public static class RunTracker
     private const string HappyFlowerRelicId = "RELIC.HAPPY_FLOWER";
     private const string BoomingConchRelicId = "RELIC.BOOMING_CONCH";
     private const string GremlinHornRelicId = "RELIC.GREMLIN_HORN";
+    private const string PendulumRelicId = "RELIC.PENDULUM";
     private const string PrismaticGemRelicId = "RELIC.PRISMATIC_GEM";
     private const string CloakClaspRelicId = "RELIC.CLOAK_CLASP";
     private const string ReptileTrinketRelicId = "RELIC.REPTILE_TRINKET";
@@ -2884,6 +2887,65 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordGremlinHornCardsDrawn failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record Pendulum's owner-specific every-N-turns activation. The actual
+    /// number of cards drawn is observed from the draw command result.
+    /// </summary>
+    public static void ArmPendulumAttribution(Player owner)
+    {
+        if (owner == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(PendulumRelicId);
+                agg.Activations += 1;
+                _pendingPendulumDrawAttributions.Add(owner);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"ArmPendulumAttribution failed: {e.Message}");
+            }
+        }
+    }
+
+    public static bool TryConsumePendulumDrawAttribution(Player player)
+    {
+        if (player == null) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                return ConsumePendingGremlinHornAttribution(_pendingPendulumDrawAttributions, player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"TryConsumePendulumDrawAttribution failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    public static void RecordPendulumCardsDrawn(int cardsDrawn)
+    {
+        if (cardsDrawn <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(PendulumRelicId);
+                agg.AdditionalCardsDrawn += cardsDrawn;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPendulumCardsDrawn failed: {e.Message}");
             }
         }
     }

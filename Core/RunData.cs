@@ -378,8 +378,9 @@ public class RelicAggregate
 
     // Total additional cards drawn by this relic across the run.
     // Used by Pocketwatch (draws 3 extra cards when 3 or fewer cards were
-    // played last turn), Gremlin Horn (draws after enemy death), and Booming
-    // Conch (draws extra cards at Elite combat start).
+    // played last turn), Gremlin Horn (draws after enemy death), Pendulum
+    // (draws every N turns), and Booming Conch (draws extra cards at Elite
+    // combat start).
     public int AdditionalCardsDrawn { get; set; }
 
     // Total block gained from this relic across all combats.
