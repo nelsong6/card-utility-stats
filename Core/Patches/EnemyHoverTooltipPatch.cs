@@ -25,8 +25,11 @@ public static class EnemyHoverShowPatch
             if (!ShouldShowForCreature(__instance, creature)) { StatsTooltip.Hide(); return; }
 
             var enemyId = monster.Id.ToString();
-            var agg = RunTracker.GetEnemyAggregate(enemyId);
-            if (agg == null || !HasEnemyStats(agg)) return;
+            var agg = RunTracker.GetEnemyAggregate(enemyId) ?? new EnemyAggregate
+            {
+                EnemyId = enemyId,
+                DisplayName = FormatEnemyIdForDisplay(enemyId),
+            };
 
             var tree = Engine.GetMainLoop() as SceneTree;
             if (tree == null) return;
@@ -46,15 +49,13 @@ public static class EnemyHoverShowPatch
     {
         var sb = new StringBuilder();
 
-        if (agg.DamageAttempted > 0)
-        {
-            var blockedPct = 100f * agg.DamageBlocked / agg.DamageAttempted;
-            Row3(sb, "Damage attempted", agg.DamageAttempted.ToString(), "");
-            Row3(sb, "Damage dealt", agg.DamageDealt.ToString(), "");
-            Row3(sb, "Damage blocked", agg.DamageBlocked.ToString(), $"{blockedPct:F0}%");
-            if (agg.DamageInstances > 0)
-                Row3(sb, "Damage instances", agg.DamageInstances.ToString(), "");
-        }
+        var blockedPct = agg.DamageAttempted > 0
+            ? $"{100f * agg.DamageBlocked / agg.DamageAttempted:F0}%"
+            : "";
+        Row3(sb, "Damage attempted", agg.DamageAttempted.ToString(), "");
+        Row3(sb, "Damage dealt", agg.DamageDealt.ToString(), "");
+        Row3(sb, "Damage blocked", agg.DamageBlocked.ToString(), blockedPct);
+        Row3(sb, "Damage instances", agg.DamageInstances.ToString(), "");
 
         if (agg.StatusCardsAdded <= 0)
             return sb.ToString();
@@ -86,11 +87,6 @@ public static class EnemyHoverShowPatch
     private static string BuildEnemyDamageBodyBBCode(EnemyAggregate agg)
     {
         return BuildEnemyBodyBBCode(agg);
-    }
-
-    private static bool HasEnemyStats(EnemyAggregate agg)
-    {
-        return agg.DamageAttempted > 0 || agg.StatusCardsAdded > 0;
     }
 
     internal static bool ShouldShowForCreature(NCreature node, MegaCrit.Sts2.Core.Entities.Creatures.Creature creature)
