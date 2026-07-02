@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
@@ -22,6 +23,7 @@ public static class RunStorage
     {
         public long? GameStartTime { get; set; }
         public string RunId { get; set; } = "";
+        public string? Outcome { get; set; }
     }
 
     private static readonly JsonSerializerOptions Options = new()
@@ -194,7 +196,18 @@ public static class RunStorage
     /// Returns null if no match or if the directory doesn't exist yet.
     /// Malformed / unreadable files are skipped, not fatal.
     /// </summary>
-    public static RunData? FindByGameStartTime(long gameStartTime, out bool foundUnsupportedMatch)
+    // How many of the newest run files FindByGameStartTime probes before
+    // giving up. The in-progress run it looks for is by construction among
+    // the most recently written files — only one run is ever active and its
+    // file is rewritten on every save — so a bounded probe keeps the miss
+    // case (fresh run start, no match anywhere) from reading and JSON-parsing
+    // months of accumulated run files on the main thread.
+    private const int MaxFindHeaderProbes = 25;
+
+    public static RunData? FindByGameStartTime(
+        long gameStartTime,
+        out bool foundUnsupportedMatch,
+        bool requireInProgress = false)
     {
         foundUnsupportedMatch = false;
         try
@@ -202,16 +215,35 @@ public static class RunStorage
             if (!Directory.Exists(RunsDir)) return null;
 
             // Sort newest-first so if multiple files match (shouldn't happen
-            // but defensive), we pick the most recent.
-            var files = Directory.GetFiles(RunsDir, "*.json");
-            Array.Sort(files, (a, b) => File.GetLastWriteTimeUtc(b).CompareTo(File.GetLastWriteTimeUtc(a)));
+            // but defensive), we pick the most recent. Sort keys are
+            // precomputed — GetLastWriteTimeUtc inside a comparator would
+            // stat each file O(log N) times.
+            var byNewest = Directory.GetFiles(RunsDir, "*.json")
+                .Select(p => (Path: p, Mtime: File.GetLastWriteTimeUtc(p)))
+                .OrderByDescending(f => f.Mtime)
+                .Select(f => f.Path);
 
-            foreach (var path in files)
+            int probed = 0;
+            foreach (var path in byNewest)
             {
+                if (probed++ >= MaxFindHeaderProbes)
+                {
+                    CoreMain.LogDebug(
+                        $"FindByGameStartTime: no match for {gameStartTime} in the {MaxFindHeaderProbes} newest run files; stopping scan");
+                    break;
+                }
                 try
                 {
                     var header = ReadHeader(path);
                     if (header?.GameStartTime != gameStartTime) continue;
+
+                    // Filter at scan level, not post-hoc: a finished record
+                    // (e.g. a hot reload on the game-over screen) must not
+                    // shadow an older in-progress one for the same run.
+                    // Null outcome (very old files) is treated as unknown
+                    // and allowed through; LoadForResume gates the shape.
+                    if (requireInProgress && header.Outcome != null
+                        && header.Outcome != "in_progress") continue;
 
                     var data = LoadForResume(path);
                     if (data != null) return data;

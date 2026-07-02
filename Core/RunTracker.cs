@@ -106,6 +106,21 @@ public static class RunTracker
     private static readonly Dictionary<CardModel, bool> _pendingReplayExtraPlaySeriesStarted = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardPlay, PendingReplayAttackOutcome> _pendingReplayAttackOutcomes = new(ReferenceEqualityComparer.Instance);
 
+    // DamageResult objects already seen through a real DamageReceivedEntry
+    // this combat. Lets the combat-ending capture (HookAfterDamageGivenPatch →
+    // RecordCombatEndingSuppressedDamage) tell a hit whose history entry the
+    // game suppressed apart from one it recorded normally. Reference-keyed —
+    // the game allocates a distinct DamageResult per hit.
+    private static readonly HashSet<DamageResult> _observedDamageResults = new(ReferenceEqualityComparer.Instance);
+
+    // Saved instance numbers still waiting for the deck to (re)populate after
+    // a resume/adoption. Continue-loads don't guarantee whether RunStarted
+    // fires before or after CardPile.AddInternal repopulates the deck; numbers
+    // the adoption deck walk couldn't bind yet are claimed here in arrival
+    // (deck) order by CardEnterDeckPatch instead of minting fresh numbers
+    // that would orphan the saved stats.
+    private static readonly Dictionary<string, Queue<int>> _pendingRankRestores = new();
+
     /// <summary>
     /// Wire up game event subscriptions. Called by <see cref="CoreMain.Initialize"/>
     /// on first load and each hot-reload. Safe to call before CombatManager/RunManager
@@ -348,6 +363,21 @@ public static class RunTracker
         return false;
     }
 
+    /// <summary>
+    /// Clear the synthetic deck-view card caches and availability flags.
+    /// Single home for the per-run deck-view reset — used by fresh run start,
+    /// run end, and run adoption (which recomputes availability right after
+    /// via the Refresh*AvailabilityLocked pair).
+    /// </summary>
+    private static void ResetDeckViewCachesLocked()
+    {
+        _shivAvailableThisRun = false;
+        _shivDeckViewCard = null;
+        _sovereignBladeAvailableThisRun = false;
+        _sovereignBladeDeckViewCard = null;
+        _sovereignBladeDefinitionIdThisRun = null;
+    }
+
     private static void RefreshShivAvailabilityLocked()
     {
         _shivAvailableThisRun = HasShivDataLocked();
@@ -492,6 +522,22 @@ public static class RunTracker
         if (_instanceNumbers.TryGetValue(key, out var existing)) return existing;
 
         var defId = key.Id.ToString();
+
+        // A resume/adoption may run before the game repopulates the deck.
+        // Saved numbers the adoption deck walk couldn't bind wait in
+        // _pendingRankRestores and are claimed here in arrival (deck) order,
+        // so the reload boundary doesn't mint fresh numbers that would
+        // orphan the saved stats. Cleared at combat setup, so combat-time
+        // ephemeral cards can't steal a waiting number.
+        if (_pendingRankRestores.TryGetValue(defId, out var waiting) && waiting.Count > 0)
+        {
+            var restored = waiting.Dequeue();
+            if (waiting.Count == 0) _pendingRankRestores.Remove(defId);
+            _instanceNumbers[key] = restored;
+            StampArrival(key, restored);
+            return restored;
+        }
+
         _defCounters.TryGetValue(defId, out var n);
         n++;
         _defCounters[defId] = n;
@@ -604,23 +650,43 @@ public static class RunTracker
         try
         {
             var player = RunManager.Instance.State?.Players.FirstOrDefault();
-            if (player?.Deck == null) return result;
-            foreach (var card in player.Deck.Cards)
+            if (player?.Deck != null)
             {
-                var key = Canonical(card);
-                if (!_instanceNumbers.TryGetValue(key, out var n)) continue;
-                var defId = key.Id.ToString();
-                if (!result.TryGetValue(defId, out var list))
+                foreach (var card in player.Deck.Cards)
                 {
-                    list = new List<int>();
-                    result[defId] = list;
+                    var key = Canonical(card);
+                    if (!_instanceNumbers.TryGetValue(key, out var n)) continue;
+                    var defId = key.Id.ToString();
+                    if (!result.TryGetValue(defId, out var list))
+                    {
+                        list = new List<int>();
+                        result[defId] = list;
+                    }
+                    list.Add(n);
                 }
-                list.Add(n);
             }
         }
         catch (Exception e)
         {
             CoreMain.LogDebug($"CaptureInstanceNumbersByDeckRank failed: {e.Message}");
+        }
+
+        // Numbers still queued for late deck population are part of the
+        // mapping too: deck arrivals claim the queue front in deck order, so
+        // the remaining queue is exactly the deck-rank suffix after whatever
+        // the walk above saw. Without this, a save during adoption (repair or
+        // ghost-prune) on a not-yet-repopulated deck would overwrite the
+        // on-disk snapshot with just the visible prefix — and a crash before
+        // the next save would permanently orphan every queued card's stats.
+        foreach (var kv in _pendingRankRestores)
+        {
+            if (kv.Value.Count == 0) continue;
+            if (!result.TryGetValue(kv.Key, out var list))
+            {
+                list = new List<int>();
+                result[kv.Key] = list;
+            }
+            list.AddRange(kv.Value);
         }
         return result;
     }
@@ -634,8 +700,22 @@ public static class RunTracker
     private static void SaveCurrentRun()
     {
         if (_currentRun == null) return;
-        _currentRun.InstanceNumbersByDef = CaptureInstanceNumbersByDeckRank();
-        _currentRun.DefCounters = new Dictionary<string, int>(_defCounters);
+
+        // Never capture identity from a deck that belongs to a DIFFERENT game
+        // run. During a new-run embark or continue-load, CardEnterDeckPatch
+        // can repopulate the deck before RunStarted re-points _currentRun —
+        // recapturing here would overwrite the old run's last good snapshot
+        // and counters with the new run's deck state. Freeze identity in that
+        // window; the aggregates themselves still save.
+        long liveGameStartTime = 0;
+        try { liveGameStartTime = RunManager.Instance._startTime; }
+        catch { /* no live run state — keep the frozen snapshot */ }
+        if (_currentRun.GameStartTime == null || _currentRun.GameStartTime == liveGameStartTime)
+        {
+            _currentRun.InstanceNumbersByDef = CaptureInstanceNumbersByDeckRank();
+            _currentRun.DefCounters = new Dictionary<string, int>(_defCounters);
+        }
+
         RunStorage.SaveAsync(_currentRun);
     }
 
@@ -662,6 +742,16 @@ public static class RunTracker
         _pendingReplayExtraPlaySources.Clear();
         _pendingReplayExtraPlaySeriesStarted.Clear();
         _pendingReplayAttackOutcomes.Clear();
+        _observedDamageResults.Clear();
+        if (_pendingRankRestores.Count > 0)
+        {
+            // Leftover queued numbers mean saved cards never re-arrived via
+            // CardEnterDeckPatch before combat — their aggregates stay
+            // unbound. Should be empty here; log so a rebind gap is visible.
+            var leftovers = string.Join(", ", _pendingRankRestores.Select(kv => $"{kv.Key}x{kv.Value.Count}"));
+            CoreMain.Logger.Info($"ResetCombatContextState: discarding unclaimed rank restores: {leftovers}");
+            _pendingRankRestores.Clear();
+        }
     }
 
     /// <summary>
@@ -703,7 +793,10 @@ public static class RunTracker
                     return;
                 }
 
-                var saved = RunStorage.FindByGameStartTime(gameStartTime, out var foundUnsupportedMatch);
+                // requireInProgress: a hot reload on the game-over screen still
+                // has live RunState and _startTime — adopting the just-
+                // finalized record would resurrect a finished run.
+                var saved = RunStorage.FindByGameStartTime(gameStartTime, out var foundUnsupportedMatch, requireInProgress: true);
                 if (saved == null)
                 {
                     if (foundUnsupportedMatch)
@@ -721,116 +814,7 @@ public static class RunTracker
                     return;
                 }
 
-                _currentRun = saved;
-                bool repairedDamageAggregates = RepairOffensiveDamageAggregatesFromEvents(_currentRun);
-                _pendingCombat = null;
-                _instanceNumbers.Clear();
-                _defCounters.Clear();
-                _shivDeckViewCard = null;
-                _sovereignBladeDeckViewCard = null;
-                _sovereignBladeDefinitionIdThisRun = null;
-
-                // Restore monotonic counters first so any lazy-assign after
-                // this picks up the next unused number (not a conflict).
-                if (saved.DefCounters != null)
-                {
-                    foreach (var kv in saved.DefCounters) _defCounters[kv.Key] = kv.Value;
-                }
-
-                // Rebuild the ref → number map by walking the live deck in
-                // its current order. For each card, count its rank among
-                // same-def cards and look up the saved number at that rank.
-                //
-                // Removal-safe: if the player Smith'd Strike #3, the saved
-                // list for STRIKE is [1, 2, 4, 5] — rank 0 → #1, rank 1 →
-                // #2, rank 2 → #4 (the old #4, correctly), rank 3 → #5.
-                var player = runState.Players.FirstOrDefault();
-                int restored = 0, unmatched = 0;
-                if (player?.Deck != null && saved.InstanceNumbersByDef != null)
-                {
-                    var rankCounters = new Dictionary<string, int>();
-                    foreach (var card in player.Deck.Cards)
-                    {
-                        var key = Canonical(card);
-                        var defId = key.Id.ToString();
-                        rankCounters.TryGetValue(defId, out var rank);
-                        rankCounters[defId] = rank + 1;
-
-                        if (saved.InstanceNumbersByDef.TryGetValue(defId, out var list) && rank < list.Count)
-                        {
-                            _instanceNumbers[key] = list[rank];
-                            restored++;
-                        }
-                        else
-                        {
-                            // Card in deck that wasn't in the saved snapshot — probably
-                            // added between the last save and the hot reload. Lazy-assign
-                            // via counter (which is already restored above).
-                            GetOrAssignNumber(key);
-                            unmatched++;
-                        }
-                    }
-                }
-
-                // Reconstruct refs for REMOVED cards. These aren't in
-                // player.Deck.Cards anymore, so the deck walk above didn't
-                // find them. But they still need entries in _instanceNumbers
-                // so GetRemovedCards() can surface them for the deck-view
-                // injection.
-                //
-                // State-accurate reconstruction: we snapshot the card's
-                // full SerializableCard state at removal time (upgrade
-                // level, enchantment, etc.) and use CardModel.FromSerializable
-                // to rebuild a ref matching the removed card's state.
-                // If no snapshot exists (aggregate from a pre-snapshot
-                // build), fall back to a canonical ref via ModelDb.
-                int reconstructedRemoved = 0;
-                if (_currentRun.Aggregates != null)
-                {
-                    foreach (var kv in _currentRun.Aggregates)
-                    {
-                        if (!kv.Value.Removed) continue;
-                        var hashIdx = kv.Key.LastIndexOf('#');
-                        if (hashIdx < 0) continue;
-                        if (!int.TryParse(kv.Key.Substring(hashIdx + 1), out var num)) continue;
-                        var defIdStr = kv.Key.Substring(0, hashIdx);
-                        try
-                        {
-                            CardModel reconstructed;
-                            if (kv.Value.RemovedSnapshot != null)
-                            {
-                                reconstructed = CardModel.FromSerializable(kv.Value.RemovedSnapshot);
-                            }
-                            else
-                            {
-                                var modelId = MegaCrit.Sts2.Core.Models.ModelId.Deserialize(defIdStr);
-                                reconstructed = MegaCrit.Sts2.Core.Models.ModelDb.GetById<CardModel>(modelId).ToMutable();
-                            }
-                            _instanceNumbers[reconstructed] = num;
-                            reconstructedRemoved++;
-                        }
-                        catch (Exception e)
-                        {
-                            CoreMain.LogDebug($"TryResumeActiveRun: couldn't reconstruct {kv.Key}: {e.Message}");
-                        }
-                    }
-                }
-
-                CoreMain.Logger.Info(
-                    $"TryResumeActiveRun: resumed run_id={_currentRun.RunId} " +
-                    $"game_start_time={gameStartTime} aggregates={_currentRun.Aggregates?.Count ?? 0} " +
-                    $"reconstructed_removed={reconstructedRemoved} " +
-                    $"restored_numbers={restored} unmatched_in_deck={unmatched}");
-
-                RefreshShivAvailabilityLocked();
-                RefreshSovereignBladeAvailabilityLocked();
-
-                if (repairedDamageAggregates)
-                {
-                    CoreMain.Logger.Info(
-                        $"TryResumeActiveRun: repaired offensive damage aggregates for run_id={_currentRun.RunId}");
-                    SaveCurrentRun();
-                }
+                AdoptRunLocked(saved, runState, "TryResumeActiveRun", repairAggregates: true);
             }
             catch (Exception e)
             {
@@ -839,17 +823,314 @@ public static class RunTracker
         }
     }
 
+    /// <summary>
+    /// Make <paramref name="run"/> the tracked current run and rebind per-card
+    /// identity to the CURRENT CardModel refs. Shared by hot-reload resume
+    /// (<see cref="TryResumeActiveRun"/>), main-menu Continue re-fires of
+    /// RunStarted (same run object kept in memory), and Continue-after-game-
+    /// restart adoption from disk.
+    ///
+    /// The deck walk maps live refs to saved numbers by (def, deck-rank);
+    /// snapshot numbers the walk couldn't bind (deck not yet repopulated on
+    /// some continue-load orderings) wait in <see cref="_pendingRankRestores"/>
+    /// for CardEnterDeckPatch arrivals. Ghost aggregates minted by
+    /// CardEnterDeckPatch firing BEFORE RunStarted on continue-loads are
+    /// pruned afterward.
+    /// </summary>
+    private static void AdoptRunLocked(RunData run, RunState? runState, string context, bool repairAggregates)
+    {
+        _currentRun = run;
+        // Old builds stamped EndedAt on every Continue re-fire; an in-progress
+        // run is live again the moment we adopt it. Guarded on outcome so a
+        // defensive future caller can't resurrect a genuinely finished record
+        // (every current caller already filters to in_progress).
+        if (run.Outcome == "in_progress")
+            run.EndedAt = null;
+
+        bool repairedDamageAggregates = repairAggregates && RepairOffensiveDamageAggregatesFromEvents(run);
+
+        _pendingCombat = null;
+        ResetCombatContextState();
+        _instanceNumbers.Clear();
+        _defCounters.Clear();
+        ResetDeckViewCachesLocked();
+
+        // Restore monotonic counters first so any lazy-assign after
+        // this picks up the next unused number (not a conflict).
+        if (run.DefCounters != null)
+        {
+            foreach (var kv in run.DefCounters) _defCounters[kv.Key] = kv.Value;
+        }
+
+        // Seed every saved instance number, in deck-rank order, into the
+        // pending-restore queues, then walk the live deck through the normal
+        // GetOrAssignNumber path: each deck card claims its def's next queued
+        // number in arrival order — the same (def, rank) binding the snapshot
+        // was captured with. Removal-safe: if the player Smith'd Strike #3,
+        // the saved list for STRIKE is [1, 2, 4, 5] and deck order claims
+        // #1, #2, #4, #5. Whatever the walk can't bind (deck not yet
+        // repopulated on some continue-load orderings) stays queued for
+        // CardEnterDeckPatch arrivals; deck cards beyond the snapshot fall
+        // through to the restored counters. One binding mechanism regardless
+        // of whether the deck populates before or after this runs.
+        int seeded = 0;
+        if (run.InstanceNumbersByDef != null)
+        {
+            foreach (var kv in run.InstanceNumbersByDef)
+            {
+                if (kv.Value.Count == 0) continue;
+                _pendingRankRestores[kv.Key] = new Queue<int>(kv.Value);
+                seeded += kv.Value.Count;
+            }
+        }
+
+        int deckCards = 0;
+        var player = runState?.Players.FirstOrDefault();
+        if (player?.Deck != null)
+        {
+            foreach (var card in player.Deck.Cards)
+            {
+                deckCards++;
+                GetOrAssignNumber(card);
+            }
+        }
+        int stillWaiting = _pendingRankRestores.Values.Sum(q => q.Count);
+        int restored = seeded - stillWaiting;
+        int unmatched = deckCards - restored;
+
+        // If the deck was already (re)populated when we adopted, leftover
+        // queued numbers aren't late-population waiters — they're snapshot
+        // entries the game's own save no longer contains (e.g. a crash rolled
+        // the save back past a card acquisition). Keeping them queued would
+        // let the next same-def acquisition claim a dead card's number and
+        // silently inherit its stats. Drop them; their aggregates stay in the
+        // file as history (the ≤-saved-counter rule shields them from the
+        // ghost prune below).
+        if (deckCards > 0 && stillWaiting > 0)
+        {
+            var dropped = string.Join(", ", _pendingRankRestores.Select(kv => $"{kv.Key}x{kv.Value.Count}"));
+            CoreMain.Logger.Info($"{context}: dropping stale rank restores not present in the live deck: {dropped}");
+            _pendingRankRestores.Clear();
+        }
+
+        // Reconstruct refs for REMOVED cards. These aren't in
+        // player.Deck.Cards anymore, so the deck walk above didn't
+        // find them. But they still need entries in _instanceNumbers
+        // so GetRemovedCards() can surface them for the deck-view
+        // injection.
+        //
+        // State-accurate reconstruction: we snapshot the card's
+        // full SerializableCard state at removal time (upgrade
+        // level, enchantment, etc.) and use CardModel.FromSerializable
+        // to rebuild a ref matching the removed card's state.
+        // If no snapshot exists (aggregate from a pre-snapshot
+        // build), fall back to a canonical ref via ModelDb.
+        int reconstructedRemoved = 0;
+        if (run.Aggregates != null)
+        {
+            foreach (var kv in run.Aggregates)
+            {
+                if (!kv.Value.Removed) continue;
+                if (!TryParseAggregateKey(kv.Key, out var defIdStr, out var num)) continue;
+                try
+                {
+                    CardModel reconstructed;
+                    if (kv.Value.RemovedSnapshot != null)
+                    {
+                        reconstructed = CardModel.FromSerializable(kv.Value.RemovedSnapshot);
+                    }
+                    else
+                    {
+                        var modelId = MegaCrit.Sts2.Core.Models.ModelId.Deserialize(defIdStr);
+                        reconstructed = MegaCrit.Sts2.Core.Models.ModelDb.GetById<CardModel>(modelId).ToMutable();
+                    }
+                    _instanceNumbers[reconstructed] = num;
+                    reconstructedRemoved++;
+                }
+                catch (Exception e)
+                {
+                    CoreMain.LogDebug($"{context}: couldn't reconstruct {kv.Key}: {e.Message}");
+                }
+            }
+        }
+
+        int prunedGhosts = PruneGhostAggregates(run, run.DefCounters, BuildLiveInstanceIdSetLocked());
+
+        CoreMain.Logger.Info(
+            $"{context}: resumed run_id={run.RunId} " +
+            $"game_start_time={run.GameStartTime} aggregates={run.Aggregates?.Count ?? 0} " +
+            $"reconstructed_removed={reconstructedRemoved} " +
+            $"restored_numbers={restored} unmatched_in_deck={unmatched} " +
+            $"pending_rank_restores={_pendingRankRestores.Count} pruned_ghosts={prunedGhosts}");
+
+        RefreshShivAvailabilityLocked();
+        RefreshSovereignBladeAvailabilityLocked();
+
+        if (repairedDamageAggregates)
+        {
+            CoreMain.Logger.Info(
+                $"{context}: repaired offensive damage aggregates for run_id={run.RunId}");
+        }
+        if (repairedDamageAggregates || prunedGhosts > 0)
+        {
+            SaveCurrentRun();
+        }
+    }
+
+    /// <summary>
+    /// Every instance id ("DEF#N") currently bound to a live card ref, plus
+    /// numbers still waiting in <see cref="_pendingRankRestores"/> for late
+    /// deck population. Input to <see cref="PruneGhostAggregates"/>.
+    /// </summary>
+    private static HashSet<string> BuildLiveInstanceIdSetLocked()
+    {
+        var live = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var kv in _instanceNumbers)
+            live.Add($"{kv.Key.Id}#{kv.Value}");
+        foreach (var kv in _pendingRankRestores)
+            foreach (var n in kv.Value)
+                live.Add($"{kv.Key}#{n}");
+        return live;
+    }
+
+    /// <summary>
+    /// Remove ghost aggregates minted by CardEnterDeckPatch firing before
+    /// RunStarted on a continue-load: the repopulated deck's fresh CardModel
+    /// refs get brand-new instance numbers (continuing the old counters) and
+    /// empty arrival stamps before the adoption rebind can map them back to
+    /// their saved numbers. Those stamps are pure file pollution — never
+    /// played, never referenced, invisible after the rebind.
+    ///
+    /// Conservative by construction: prunes only aggregates whose number
+    /// exceeds the last-saved counter for their def, that aren't bound to any
+    /// live card, hold no recorded activity, and are referenced by no event.
+    /// A pruned number can be re-minted later; that's safe precisely because
+    /// nothing ever referenced it.
+    /// </summary>
+    internal static int PruneGhostAggregates(
+        RunData run,
+        Dictionary<string, int>? savedDefCounters,
+        HashSet<string> liveInstanceIds)
+    {
+        if (run.Aggregates == null || run.Aggregates.Count == 0) return 0;
+
+        // One pass over the event log up front; candidates check membership
+        // instead of rescanning the (thousands-long) list each.
+        HashSet<string>? eventCardIds = null;
+        if (run.Events != null && run.Events.Count > 0)
+        {
+            eventCardIds = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var cardEvent in run.Events) eventCardIds.Add(cardEvent.CardId);
+        }
+
+        List<string>? toRemove = null;
+        foreach (var kv in run.Aggregates)
+        {
+            if (!TryParseAggregateKey(kv.Key, out var defId, out var num)) continue;
+
+            int savedCounter = 0;
+            savedDefCounters?.TryGetValue(defId, out savedCounter);
+            if (num <= savedCounter) continue;                       // predates the last save — trust it
+            if (liveInstanceIds.Contains(kv.Key)) continue;          // bound to a live card
+            if (!IsGhostStampAggregate(kv.Value)) continue;          // has recorded activity
+            if (eventCardIds != null && eventCardIds.Contains(kv.Key)) continue;
+
+            (toRemove ??= new List<string>()).Add(kv.Key);
+        }
+
+        if (toRemove == null) return 0;
+        foreach (var key in toRemove) run.Aggregates.Remove(key);
+        return toRemove.Count;
+    }
+
+    /// <summary>
+    /// Split an aggregate key ("CARD.STRIKE#3") into its definition id and
+    /// instance number. False for keys that don't carry a numeric instance
+    /// suffix (e.g. historic pooled-shape keys).
+    /// </summary>
+    private static bool TryParseAggregateKey(string key, out string defId, out int number)
+    {
+        defId = "";
+        number = 0;
+        var hashIdx = key.LastIndexOf('#');
+        if (hashIdx < 0) return false;
+        if (!int.TryParse(key.Substring(hashIdx + 1), out number)) return false;
+        defId = key.Substring(0, hashIdx);
+        return true;
+    }
+
+    private static readonly System.Text.Json.JsonSerializerOptions GhostCompareOptions = new();
+
+    /// <summary>
+    /// True when the aggregate holds nothing beyond an arrival stamp
+    /// (FloorAdded / InitialUpgradeLevel) — the shape a pre-RunStarted
+    /// CardEnterDeckPatch ghost has. Compared structurally against a bare
+    /// stamp with the same lineage so ANY recorded activity — including
+    /// fields added after this check was written — disqualifies. Runs only
+    /// during adoption on a handful of candidates, so the serialization cost
+    /// is irrelevant next to the maintenance risk of a hand-kept field list.
+    /// </summary>
+    private static bool IsGhostStampAggregate(CardAggregate agg)
+    {
+        if (agg.Removed) return false;
+        var bareStamp = new CardAggregate
+        {
+            FloorAdded = agg.FloorAdded,
+            InitialUpgradeLevel = agg.InitialUpgradeLevel,
+        };
+        return System.Text.Json.JsonSerializer.Serialize(agg, GhostCompareOptions)
+            == System.Text.Json.JsonSerializer.Serialize(bareStamp, GhostCompareOptions);
+    }
+
     // -------- Lifecycle callbacks --------
 
     private static void OnRunStarted(RunState runState)
     {
         lock (_lock)
         {
-            // If a previous run was in progress (mod reload, unusual path), finalize it first.
+            long gameStartTime = 0;
+            try { gameStartTime = RunManager.Instance._startTime; }
+            catch (Exception e) { CoreMain.LogDebug($"OnRunStarted: couldn't read _startTime: {e.Message}"); }
+
+            // The game re-fires RunStarted with the SAME _startTime whenever a
+            // saved run is continued from the main menu ("Continuing run with
+            // character"). That's a continuation of the run we're already
+            // tracking, not a new run — minting a fresh RunData here is what
+            // used to strand every previously-committed stat in an orphaned
+            // file and reset tooltips to zero mid-run.
+            if (gameStartTime != 0 && _currentRun != null
+                && _currentRun.GameStartTime == gameStartTime
+                && _currentRun.Outcome == "in_progress")
+            {
+                AdoptRunLocked(_currentRun, runState, "RunStarted(continue)", repairAggregates: false);
+                return;
+            }
+
+            // If a previous (different) run was in progress (mod reload, unusual path), finalize it first.
             if (_currentRun != null)
             {
+                // The NEW run's pre-RunStarted deck population may have stamped
+                // ghost aggregates into the old run's data (CardEnterDeckPatch
+                // fires before RunStarted). This is the old run's last save —
+                // scrub them now or they're permanent. Empty live set: nothing
+                // in the identity map legitimately belongs to the old run
+                // beyond its last-saved counters at this point.
+                PruneGhostAggregates(_currentRun, _currentRun.DefCounters, new HashSet<string>(StringComparer.Ordinal));
                 _currentRun.EndedAt = Now();
                 SaveCurrentRun();
+            }
+
+            // Continue after a game restart: our statics are fresh but the
+            // run isn't. Adopt the newest resumable on-disk record for this
+            // game run rather than starting a stranded parallel file.
+            if (gameStartTime != 0)
+            {
+                var saved = RunStorage.FindByGameStartTime(gameStartTime, out _, requireInProgress: true);
+                if (saved != null && saved.Outcome == "in_progress")
+                {
+                    AdoptRunLocked(saved, runState, "RunStarted(adopt-saved)", repairAggregates: true);
+                    return;
+                }
             }
 
             // Per-instance identity is per-run. Clear assignments so the next
@@ -858,11 +1139,7 @@ public static class RunTracker
             _instanceNumbers.Clear();
             _defCounters.Clear();
             ResetCombatContextState();
-            _shivAvailableThisRun = false;
-            _shivDeckViewCard = null;
-            _sovereignBladeAvailableThisRun = false;
-            _sovereignBladeDeckViewCard = null;
-            _sovereignBladeDefinitionIdThisRun = null;
+            ResetDeckViewCachesLocked();
 
             string now = Now();
             _currentRun = new RunData
@@ -873,10 +1150,13 @@ public static class RunTracker
                 Character = runState.Players.FirstOrDefault()?.Character?.Id.ToString(),
                 Ascension = runState.AscensionLevel,
                 FloorReached = runState.TotalFloor,
-                // Publicizer gives us the private _startTime field. This is the
-                // game's own run identifier — matches the filename it uses for
-                // its run-history save ({StartTime}.run). Enables M5 correlation.
-                GameStartTime = RunManager.Instance._startTime,
+                // The game's own run identifier (RunManager._startTime via
+                // Publicizer) — matches the filename it uses for its
+                // run-history save ({StartTime}.run). Enables M5 correlation.
+                // Reuses the guarded read from the top of this method: a
+                // second raw read here would rethrow into the game's
+                // RunStarted dispatch exactly when the first read failed.
+                GameStartTime = gameStartTime != 0 ? gameStartTime : null,
             };
             _pendingCombat = null;
 
@@ -908,6 +1188,17 @@ public static class RunTracker
         {
             if (_currentRun == null) return;
 
+            // A loss reaches RunManager.OnEnded synchronously from the killing
+            // action; the fatal combat's CombatEnded only fires LATER via
+            // ProcessPendingLoss — after this handler has consumed the buffer.
+            // So promote the fatal combat here: the fight genuinely resolved
+            // (the player died). Loss only: an Abandon Run mid-combat is NOT a
+            // resolved combat, and promoting it would commit a half-played
+            // fight (and mislabel surviving block as wasted); wins always get
+            // a normal CombatEnded first, so the buffer is already null there.
+            if (string.Equals(outcome, "loss", StringComparison.Ordinal))
+                PromotePendingCombatIntoRunLocked();
+
             _currentRun.Outcome = outcome;
             _currentRun.EndedAt = Now();
             _currentRun.UpdatedAt = _currentRun.EndedAt;
@@ -927,11 +1218,7 @@ public static class RunTracker
             _currentRun = null;
             _pendingCombat = null;
             ResetCombatContextState();
-            _shivAvailableThisRun = false;
-            _shivDeckViewCard = null;
-            _sovereignBladeAvailableThisRun = false;
-            _sovereignBladeDeckViewCard = null;
-            _sovereignBladeDefinitionIdThisRun = null;
+            ResetDeckViewCachesLocked();
         }
     }
 
@@ -963,67 +1250,7 @@ public static class RunTracker
                 UpdatedAt = Now(),
             };
 
-            // Surviving player block at combat end never absorbed future
-            // damage, so treat any remaining ledger as wasted before
-            // promoting the combat aggregates into the run.
-            AttributeUnusedBlockLocked(TotalTrackedPlayerBlockLocked());
-
-            // Promote pending buffer into the run's committed state.
-            foreach (var (cardId, combatAgg) in _pendingCombat.CombatAggregates)
-            {
-                var runAgg = GetOrCreateAggregate(_currentRun, cardId);
-                MergeAggregateInto(runAgg, combatAgg);
-            }
-            _currentRun.Events.AddRange(_pendingCombat.CombatEvents);
-
-            foreach (var (relicId, pendingRelicAgg) in _pendingCombat.RelicAggregates)
-            {
-                if (!_currentRun.RelicAggregates.TryGetValue(relicId, out var runRelicAgg))
-                {
-                    runRelicAgg = new RelicAggregate();
-                    _currentRun.RelicAggregates[relicId] = runRelicAgg;
-                }
-                runRelicAgg.Activations += pendingRelicAgg.Activations;
-                runRelicAgg.EnemiesAffected += pendingRelicAgg.EnemiesAffected;
-                runRelicAgg.VulnerableApplied += pendingRelicAgg.VulnerableApplied;
-                runRelicAgg.WeakApplied += pendingRelicAgg.WeakApplied;
-                runRelicAgg.AdditionalCardsDrawn += pendingRelicAgg.AdditionalCardsDrawn;
-                runRelicAgg.AdditionalBlockGained += pendingRelicAgg.AdditionalBlockGained;
-                runRelicAgg.BlockedTriggers += pendingRelicAgg.BlockedTriggers;
-                runRelicAgg.Activations += pendingRelicAgg.Activations;
-                runRelicAgg.StrengthAdded += pendingRelicAgg.StrengthAdded;
-                runRelicAgg.PlatingAdded += pendingRelicAgg.PlatingAdded;
-                runRelicAgg.CardsUpgraded += pendingRelicAgg.CardsUpgraded;
-                runRelicAgg.BoneFluteTriggers += pendingRelicAgg.BoneFluteTriggers;
-                runRelicAgg.TotalOstyHpSummoned += pendingRelicAgg.TotalOstyHpSummoned;
-                runRelicAgg.TotalHealingAttempted += pendingRelicAgg.TotalHealingAttempted;
-                runRelicAgg.TotalHealingRestored += pendingRelicAgg.TotalHealingRestored;
-                runRelicAgg.TotalHealingLost += pendingRelicAgg.TotalHealingLost;
-                MergeHealingLostReasonsInto(runRelicAgg, pendingRelicAgg);
-                runRelicAgg.DoomDeathTriggers += pendingRelicAgg.DoomDeathTriggers;
-                runRelicAgg.DoomKills += pendingRelicAgg.DoomKills;
-                runRelicAgg.EnergyGenerated += pendingRelicAgg.EnergyGenerated;
-                runRelicAgg.PotionsGained += pendingRelicAgg.PotionsGained;
-                runRelicAgg.CommonPotionsGained += pendingRelicAgg.CommonPotionsGained;
-                runRelicAgg.UncommonPotionsGained += pendingRelicAgg.UncommonPotionsGained;
-                runRelicAgg.RarePotionsGained += pendingRelicAgg.RarePotionsGained;
-                runRelicAgg.PotionsSkipped += pendingRelicAgg.PotionsSkipped;
-                runRelicAgg.CardRewardsAffected += pendingRelicAgg.CardRewardsAffected;
-                MergeCardRewardCategories(runRelicAgg.CardRewardCategories, pendingRelicAgg.CardRewardCategories);
-            }
-
-            foreach (var (enemyId, pendingEnemyAgg) in _pendingCombat.EnemyAggregates)
-            {
-                if (!_currentRun.EnemyAggregates.TryGetValue(enemyId, out var runEnemyAgg))
-                {
-                    runEnemyAgg = new EnemyAggregate { EnemyId = enemyId };
-                    _currentRun.EnemyAggregates[enemyId] = runEnemyAgg;
-                }
-
-                MergeEnemyAggregateInto(runEnemyAgg, pendingEnemyAgg);
-            }
-
-            MergeMetaStatsInto(_currentRun.MetaStats, _pendingCombat.MetaStats);
+            PromotePendingCombatIntoRunLocked();
 
             // Refresh run-level metadata from the current game state (floor may have advanced).
             var runState = RunManager.Instance.State;
@@ -1039,6 +1266,100 @@ public static class RunTracker
             ResetCombatContextState();
             SaveCurrentRun();
         }
+    }
+
+    /// <summary>
+    /// Promote the pending combat buffer into the committed run state. Shared
+    /// by <see cref="OnCombatEnded"/> (the normal path) and
+    /// <see cref="OnRunEnded"/> — a lost run ends mid-combat with no
+    /// CombatEnded, and without this promotion everything the player did in
+    /// the fatal combat would be discarded with the buffer.
+    /// </summary>
+    private static void PromotePendingCombatIntoRunLocked()
+    {
+        if (_pendingCombat == null || _currentRun == null) return;
+
+        // Surviving player block at combat end never absorbed future
+        // damage, so treat any remaining ledger as wasted before
+        // promoting the combat aggregates into the run.
+        AttributeUnusedBlockLocked(TotalTrackedPlayerBlockLocked());
+
+        PromotePendingCombatIntoRun(_pendingCombat, _currentRun);
+    }
+
+    /// <summary>
+    /// Pure merge of a pending combat buffer into a run record. Internal so
+    /// tests can pin the promotion behavior without a live game.
+    /// </summary>
+    internal static void PromotePendingCombatIntoRun(PendingCombat pending, RunData run)
+    {
+        // Promote pending buffer into the run's committed state.
+        foreach (var (cardId, combatAgg) in pending.CombatAggregates)
+        {
+            var runAgg = GetOrCreateAggregate(run, cardId);
+            MergeAggregateInto(runAgg, combatAgg);
+        }
+        run.Events.AddRange(pending.CombatEvents);
+
+        foreach (var (relicId, pendingRelicAgg) in pending.RelicAggregates)
+        {
+            if (!run.RelicAggregates.TryGetValue(relicId, out var runRelicAgg))
+            {
+                runRelicAgg = new RelicAggregate();
+                run.RelicAggregates[relicId] = runRelicAgg;
+            }
+            MergeRelicAggregateInto(runRelicAgg, pendingRelicAgg);
+        }
+
+        foreach (var (enemyId, pendingEnemyAgg) in pending.EnemyAggregates)
+        {
+            if (!run.EnemyAggregates.TryGetValue(enemyId, out var runEnemyAgg))
+            {
+                runEnemyAgg = new EnemyAggregate { EnemyId = enemyId };
+                run.EnemyAggregates[enemyId] = runEnemyAgg;
+            }
+
+            MergeEnemyAggregateInto(runEnemyAgg, pendingEnemyAgg);
+        }
+
+        MergeMetaStatsInto(run.MetaStats, pending.MetaStats);
+    }
+
+    /// <summary>
+    /// Additive merge of one relic aggregate into another. The single home
+    /// for relic-field accumulation (mirrors <c>MergeAggregateInto</c> /
+    /// <c>MergeEnemyAggregateInto</c>) — used by both combat promotion and
+    /// the mid-combat tooltip overlay so the two can't drift. Add new relic
+    /// stat fields HERE, once.
+    /// </summary>
+    private static void MergeRelicAggregateInto(RelicAggregate target, RelicAggregate source)
+    {
+        target.Activations += source.Activations;
+        target.EnemiesAffected += source.EnemiesAffected;
+        target.VulnerableApplied += source.VulnerableApplied;
+        target.WeakApplied += source.WeakApplied;
+        target.AdditionalCardsDrawn += source.AdditionalCardsDrawn;
+        target.AdditionalBlockGained += source.AdditionalBlockGained;
+        target.BlockedTriggers += source.BlockedTriggers;
+        target.StrengthAdded += source.StrengthAdded;
+        target.PlatingAdded += source.PlatingAdded;
+        target.CardsUpgraded += source.CardsUpgraded;
+        target.BoneFluteTriggers += source.BoneFluteTriggers;
+        target.TotalOstyHpSummoned += source.TotalOstyHpSummoned;
+        target.TotalHealingAttempted += source.TotalHealingAttempted;
+        target.TotalHealingRestored += source.TotalHealingRestored;
+        target.TotalHealingLost += source.TotalHealingLost;
+        MergeHealingLostReasonsInto(target, source);
+        target.DoomDeathTriggers += source.DoomDeathTriggers;
+        target.DoomKills += source.DoomKills;
+        target.EnergyGenerated += source.EnergyGenerated;
+        target.PotionsGained += source.PotionsGained;
+        target.CommonPotionsGained += source.CommonPotionsGained;
+        target.UncommonPotionsGained += source.UncommonPotionsGained;
+        target.RarePotionsGained += source.RarePotionsGained;
+        target.PotionsSkipped += source.PotionsSkipped;
+        target.CardRewardsAffected += source.CardRewardsAffected;
+        MergeCardRewardCategories(target.CardRewardCategories, source.CardRewardCategories);
     }
 
     // -------- Event observation (from CombatHistory.Add postfix) --------
@@ -1107,6 +1428,11 @@ public static class RunTracker
                     RecordBlockGainedEntry(bge);
                     break;
                 case DamageReceivedEntry dre:
+                    // Remember the result ref so the combat-ending capture
+                    // (RecordCombatEndingSuppressedDamage) knows this hit was
+                    // recorded normally and won't synthesize a duplicate.
+                    TryMarkDamageResultObserved(dre.Result);
+
                     if (dre.Receiver.IsPlayer)
                     {
                         RecordPlayerBlockedDamage(dre);
@@ -2841,33 +3167,7 @@ public static class RunTracker
             if (_pendingCombat != null && _pendingCombat.RelicAggregates.TryGetValue(relicId, out var pending))
             {
                 result ??= new RelicAggregate();
-                result.Activations += pending.Activations;
-                result.EnemiesAffected += pending.EnemiesAffected;
-                result.VulnerableApplied += pending.VulnerableApplied;
-                result.WeakApplied += pending.WeakApplied;
-                result.AdditionalCardsDrawn += pending.AdditionalCardsDrawn;
-                result.AdditionalBlockGained += pending.AdditionalBlockGained;
-                result.BlockedTriggers += pending.BlockedTriggers;
-                result.Activations += pending.Activations;
-                result.StrengthAdded += pending.StrengthAdded;
-                result.PlatingAdded += pending.PlatingAdded;
-                result.CardsUpgraded += pending.CardsUpgraded;
-                result.BoneFluteTriggers += pending.BoneFluteTriggers;
-                result.TotalOstyHpSummoned += pending.TotalOstyHpSummoned;
-                result.TotalHealingAttempted += pending.TotalHealingAttempted;
-                result.TotalHealingRestored += pending.TotalHealingRestored;
-                result.TotalHealingLost += pending.TotalHealingLost;
-                MergeHealingLostReasonsInto(result, pending);
-                result.DoomDeathTriggers += pending.DoomDeathTriggers;
-                result.DoomKills += pending.DoomKills;
-                result.EnergyGenerated += pending.EnergyGenerated;
-                result.PotionsGained += pending.PotionsGained;
-                result.CommonPotionsGained += pending.CommonPotionsGained;
-                result.UncommonPotionsGained += pending.UncommonPotionsGained;
-                result.RarePotionsGained += pending.RarePotionsGained;
-                result.PotionsSkipped += pending.PotionsSkipped;
-                result.CardRewardsAffected += pending.CardRewardsAffected;
-                MergeCardRewardCategories(result.CardRewardCategories, pending.CardRewardCategories);
+                MergeRelicAggregateInto(result, pending);
             }
 
             return result;
@@ -5046,6 +5346,98 @@ public static class RunTracker
                 Killed = result.WasTargetKilled,
             });
         }
+    }
+
+    /// <summary>
+    /// Atomically record that this DamageResult has been observed, returning
+    /// true only for the FIRST observation. Observe() calls this for every
+    /// real DamageReceivedEntry (discarding the result); the combat-ending
+    /// capture branches on it — false means the game already emitted (or we
+    /// already synthesized) an entry for this exact DamageResult object.
+    /// One method for both sides so the dedup pairing can't drift.
+    /// </summary>
+    internal static bool TryMarkDamageResultObserved(DamageResult? result)
+    {
+        if (result == null) return false;
+        lock (_lock) { return _observedDamageResults.Add(result); }
+    }
+
+    /// <summary>Test isolation for the observed-result dedup set.</summary>
+    internal static void ClearObservedDamageResultsForTest()
+    {
+        lock (_lock) { _observedDamageResults.Clear(); }
+    }
+
+    /// <summary>
+    /// Record damage whose combat-history entry the game suppressed because
+    /// the hit itself ended the combat.
+    ///
+    /// <c>CreatureCmd.Damage</c> applies HP loss first and only then emits
+    /// <c>DamageReceivedEntry</c> behind an <c>IsInProgress &amp;&amp; !IsEnding</c>
+    /// gate — so the hit that kills the last living enemy flips
+    /// <c>CombatManager.IsEnding</c> and suppresses its own history entry.
+    /// Scaling finishers (Death March) systematically lost their biggest,
+    /// fight-ending hits to this.
+    ///
+    /// Called from <see cref="Patches.HookAfterDamageGivenPatch"/>.
+    /// <c>Hook.AfterDamageGiven</c> is dispatched directly by the game so it
+    /// "must still resolve" for the killing hit, and it fires AFTER the
+    /// (possible) history emission for the same DamageResult — so
+    /// "combat is ending" + "result not observed yet" identifies exactly the
+    /// suppressed window. Out-of-combat damage (<c>!IsInProgress</c>) stays
+    /// unrecorded, matching the game's own combat-history behavior.
+    ///
+    /// The synthesized entry is routed through <see cref="Observe"/> so
+    /// instance identity, replay marking, enemy bookkeeping, and the persisted
+    /// event schema stay identical to an organic entry. It is NOT added to the
+    /// game's own CombatHistory — game state is left untouched.
+    /// </summary>
+    public static void RecordCombatEndingSuppressedDamage(
+        MegaCrit.Sts2.Core.Combat.ICombatState? combatState,
+        Creature? dealer,
+        DamageResult? result,
+        CardModel? cardSource)
+    {
+        if (combatState == null || result == null) return;
+
+        var combatManager = CombatManager.Instance;
+        // IsEnding is only true while combat is still in progress — exactly
+        // the window where the game's emission gate is closed. Known residual:
+        // IsEnding is a live computed property re-derived here, slightly after
+        // the game's own gate evaluated it; a hook listener that spawns a new
+        // primary enemy between the two (Phrog-Parasite pattern) could flip it
+        // back and make us skip a genuinely suppressed hit. Capturing at the
+        // exact gate point would need a transpiler on CreatureCmd.Damage —
+        // deliberately not worth that fragility for the corner case.
+        if (combatManager == null || !combatManager.IsEnding) return;
+
+        // Post-OnRunEnded tail guard: on a loss the game calls
+        // RunManager.OnEnded synchronously from the killing action, and the
+        // deferred CombatEnded (ProcessPendingLoss) only fires afterwards.
+        // Damage resolving in that gap would lazily resurrect _pendingCombat
+        // through the Record* paths and mint a junk run file at that late
+        // CombatEnded. Once the run record is gone, stop capturing.
+        if (Current == null) return;
+
+        if (!TryMarkDamageResultObserved(result)) return;  // emitted normally
+
+        var receiver = result.Receiver;
+        if (receiver == null) return;
+
+        // Always-on Info (like the CardSource=null diagnostic): these should
+        // be rare — one per combat-ending hit — and when totals are disputed
+        // we want the evidence in the log without a debug flag.
+        CoreMain.Logger.Info(
+            $"Recording combat-ending suppressed damage: card={cardSource?.Title ?? "null"} " +
+            $"receiver={DescribeCreature(receiver)} dealer={DescribeCreature(dealer)} " +
+            $"blocked={result.BlockedDamage} unblocked={result.UnblockedDamage} " +
+            $"overkill={result.OverkillDamage} killed={result.WasTargetKilled}");
+
+        var entry = new DamageReceivedEntry(
+            result, receiver, dealer, cardSource,
+            combatState.RoundNumber, combatState.CurrentSide,
+            combatManager.History, combatState.Players);
+        Observe(entry);
     }
 
     private static void MarkReplayAttackDamageLocked(CardModel card)
