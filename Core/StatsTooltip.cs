@@ -1,6 +1,7 @@
 using System;
 using Godot;
 using MegaCrit.Sts2.Core.Nodes;
+using MegaCrit.Sts2.Core.Nodes.Combat;
 using MegaCrit.Sts2.Core.Nodes.HoverTips;
 
 namespace SpireLens.Core;
@@ -299,6 +300,12 @@ public static class StatsTooltip
         if (_shadow != null && GodotObject.IsInstanceValid(_shadow)) _shadow.Visible = false;
     }
 
+    public static void HideIfAnchoredTo(Control anchor)
+    {
+        if (anchor == null || !ReferenceEquals(_anchor, anchor)) return;
+        Hide();
+    }
+
     public static void Destroy()
     {
         if (_tree != null && _frameHandler != null)
@@ -326,6 +333,11 @@ public static class StatsTooltip
         if (!_panel.Visible) return;
         if (_tree == null) return;
         if (_anchor != null && (!GodotObject.IsInstanceValid(_anchor) || !_anchor.IsInsideTree() || !_anchor.IsVisibleInTree()))
+        {
+            Hide();
+            return;
+        }
+        if (_anchor is NCreature creatureAnchor && !creatureAnchor.IsFocused)
         {
             Hide();
             return;

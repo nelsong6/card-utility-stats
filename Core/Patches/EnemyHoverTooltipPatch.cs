@@ -126,10 +126,21 @@ public static class EnemyHoverShowPatch
 public static class EnemyHoverHidePatch
 {
     [HarmonyPostfix]
-    public static void Postfix()
+    public static void Postfix(NCreature __instance)
     {
-        try { StatsTooltip.Hide(); }
+        try { StatsTooltip.HideIfAnchoredTo(__instance); }
         catch (Exception e) { CoreMain.Logger.Error($"EnemyHoverHidePatch failed: {e.Message}"); }
+    }
+}
+
+[HarmonyPatch(typeof(NCreature), nameof(NCreature.OnUnfocus))]
+public static class EnemyHoverHideOnUnfocusPatch
+{
+    [HarmonyPostfix]
+    public static void Postfix(NCreature __instance)
+    {
+        try { StatsTooltip.HideIfAnchoredTo(__instance); }
+        catch (Exception e) { CoreMain.Logger.Error($"EnemyHoverHideOnUnfocusPatch failed: {e.Message}"); }
     }
 }
 
@@ -137,9 +148,9 @@ public static class EnemyHoverHidePatch
 public static class EnemyHoverHideOnDeathPatch
 {
     [HarmonyPrefix]
-    public static void Prefix()
+    public static void Prefix(NCreature __instance)
     {
-        try { StatsTooltip.Hide(); }
+        try { StatsTooltip.HideIfAnchoredTo(__instance); }
         catch (Exception e) { CoreMain.Logger.Error($"EnemyHoverHideOnDeathPatch failed: {e.Message}"); }
     }
 }
