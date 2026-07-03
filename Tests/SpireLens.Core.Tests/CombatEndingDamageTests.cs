@@ -16,7 +16,13 @@ namespace SpireLens.Core.Tests;
 /// DamageResult instances are materialized without running the game
 /// constructor (it requires a live Creature); the dedup set is
 /// reference-keyed, so field state is irrelevant.
+///
+/// These tests clear and mutate the process-wide observed-result set without
+/// restoring it, so they run in the serialized <c>RunTrackerState</c>
+/// collection — otherwise a future class that also touches that static could
+/// interleave and flake (#118).
 /// </summary>
+[Collection("RunTrackerState")]
 public class CombatEndingDamageTests
 {
     private static DamageResult UnconstructedResult() =>

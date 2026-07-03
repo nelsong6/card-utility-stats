@@ -5817,6 +5817,39 @@ public static class RunTracker
         return _pendingCombat?.PlayerBlockLedger.Sum(chunk => chunk.Remaining) ?? 0;
     }
 
+    /// <summary>
+    /// Test seam for the block-ledger attribution pipeline (issue #6). Runs the
+    /// real gain → absorb → clear sequence against a throwaway pending combat
+    /// and returns it so the FIFO-absorb / LIFO-waste invariant can be pinned
+    /// headlessly, without needing a live combat to feed BlockGainedEntry /
+    /// DamageReceivedEntry. Saves and restores the live <c>_pendingCombat</c>
+    /// under <c>_lock</c>, so it never disturbs a concurrent real combat.
+    /// </summary>
+    internal static PendingCombat RunBlockLedgerForTest(
+        IEnumerable<(string? cardInstanceId, int amount)> gains,
+        int blockedDamage,
+        int clearedUnusedBlock)
+    {
+        lock (_lock)
+        {
+            var previous = _pendingCombat;
+            try
+            {
+                var scratch = new PendingCombat();
+                _pendingCombat = scratch;
+                foreach (var (cardInstanceId, amount) in gains)
+                    AppendPlayerBlockChunkLocked(cardInstanceId, amount);
+                AttributeBlockedDamageLocked(blockedDamage);
+                AttributeUnusedBlockLocked(clearedUnusedBlock);
+                return scratch;
+            }
+            finally
+            {
+                _pendingCombat = previous;
+            }
+        }
+    }
+
     private static void ReconcilePlayerBlockLedgerLocked(Creature creature)
     {
         if (_pendingCombat == null || !creature.IsPlayer) return;
