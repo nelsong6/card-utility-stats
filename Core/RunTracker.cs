@@ -168,6 +168,24 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Serialize the current run to JSON in the canonical on-disk wire format
+    /// (snake_case, WhenWritingNull, IncludeFields) UNDER the lock, so external
+    /// API consumers read exactly the run-file shape and never observe a
+    /// half-promoted run mid-CombatEnded. The public API (SpireLensApiRegistry)
+    /// calls this reflectively instead of serializing the live ref itself,
+    /// which both raced OnCombatEnded and emitted an incompatible PascalCase
+    /// shape (#86/#96).
+    /// </summary>
+    public static string? SerializeCurrentRunJson()
+    {
+        lock (_lock)
+        {
+            if (_currentRun == null) return null;
+            return System.Text.Json.JsonSerializer.Serialize(_currentRun, RunStorage.Options);
+        }
+    }
+
+    /// <summary>
     /// Resolve any CardModel (combat clone or deck original) to its canonical
     /// per-deck reference. Combat clones have <c>DeckVersion</c> set to the
     /// original deck card by <c>Player.PopulateCombatState</c>

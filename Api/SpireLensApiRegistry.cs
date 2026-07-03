@@ -17,7 +17,18 @@ public static class SpireLensApiRegistry
 
     private sealed class ReflectionBackedSpireLensApi : ISpireLensApi
     {
-        private static readonly JsonSerializerOptions JsonOptions = new();
+        // Match the canonical on-disk run-file wire format so API consumers
+        // read the same shape as the JSON files (snake_case, nulls omitted,
+        // public fields included). Mirrors Core's RunStorage.Options, which the
+        // Loader assembly can't reference directly across the reflection
+        // boundary. Used for aggregate snapshots; the full run goes through the
+        // Core-side locked serializer below.
+        private static readonly JsonSerializerOptions JsonOptions = new()
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+            IncludeFields = true,
+        };
 
         public bool IsCoreLoaded => ResolveLatestCoreType("SpireLens.Core.RunTracker") != null;
 
@@ -28,6 +39,15 @@ public static class SpireLensApiRegistry
 
         public string? GetCurrentRunJson()
         {
+            // Serialize inside Core under RunTracker's lock and in the canonical
+            // wire format, rather than fetching the live ref and serializing it
+            // here (which raced OnCombatEnded promotion and emitted PascalCase).
+            var method = ResolveLatestCoreType("SpireLens.Core.RunTracker")
+                ?.GetMethod("SerializeCurrentRunJson", BindingFlags.Public | BindingFlags.Static);
+            if (method != null)
+                return (string?)method.Invoke(null, null);
+
+            // Fallback for an older Core without the locked serializer.
             var currentRun = ResolveLatestCoreType("SpireLens.Core.RunTracker")
                 ?.GetProperty("Current", BindingFlags.Public | BindingFlags.Static)
                 ?.GetValue(null);
