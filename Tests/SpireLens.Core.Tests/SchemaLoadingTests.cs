@@ -1075,4 +1075,29 @@ public class SchemaLoadingTests
         Assert.Equal(4, relicAgg.StrikeDummyBaseStrikesInDeck);
         Assert.Equal(3, relicAgg.StrikeDummyNonBaseStrikeCardsInDeck);
     }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsBrilliantScarfRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("brilliant-scarf-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.BRILLIANT_SCARF"];
+        Assert.Equal(5, relicAgg.DiscountsOffered);
+        Assert.Equal(3, relicAgg.DiscountsTaken);
+        Assert.Equal(7, relicAgg.EnergySavedByDiscount);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsBrilliantScarfRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("brilliant-scarf-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.BRILLIANT_SCARF"];
+        Assert.Equal(5, relicAgg.DiscountsOffered);
+        Assert.Equal(3, relicAgg.DiscountsTaken);
+        Assert.Equal(7, relicAgg.EnergySavedByDiscount);
+    }
 }

@@ -101,6 +101,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `strike-dummy-relic-run.json`
   Adds Strike Dummy tracked Strike-card plays since pickup plus current
   permanent-deck counts for base Strikes and non-base Strike-tagged cards.
+- `brilliant-scarf-relic-run.json`
+  Adds Brilliant Scarf discount tracking: energy-discount offers, taken
+  discounts, and energy saved by those taken discounts.
 
 Why these exist:
 

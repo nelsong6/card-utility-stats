@@ -376,6 +376,14 @@ to confirm the eligibility rule. Base Strikes are `IsBasicStrikeOrDefend` cards
 that also carry the Strike tag, while non-base Strike cards are every other
 permanent deck card with that tag.
 
+Brilliant Scarf increments its per-turn card counter from `AfterCardPlayed`,
+after `CardPlayFinished` has already entered combat history. Its actual cost
+discounts happen through `TryModifyEnergyCostInCombatLate` and `TryModifyStarCost`
+when that counter is one short of the configured threshold. Cost modifiers are
+queried repeatedly for UI/playability, so count the offer from the counter
+transition and use the modifier only to measure energy saved by the card that
+later consumes the offer.
+
 ## Generated And Supplemental Cards
 
 Not every visible card should become a permanent per-instance deck card.
