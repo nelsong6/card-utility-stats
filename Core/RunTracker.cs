@@ -85,6 +85,7 @@ public static class RunTracker
     private static int _pendingWhiteBeastPotionRewards;
     private static int _pendingToolboxOfferScreens;
     private static readonly HashSet<PotionReward> _whiteBeastPotionRewards = new(ReferenceEqualityComparer.Instance);
+    private static readonly Dictionary<CardReward, PendingPaelSacrificeReward> _paelSacrificeRewards = new(ReferenceEqualityComparer.Instance);
     private static bool _shivAvailableThisRun;
     private static CardModel? _shivDeckViewCard;
     private const decimal PoisonOwnershipEpsilon = 0.0001m;
@@ -860,6 +861,11 @@ public static class RunTracker
         }
     }
 
+    private static void ResetRewardContextState()
+    {
+        _paelSacrificeRewards.Clear();
+    }
+
     /// <summary>
     /// On Core assembly reload, detect if the game is in an active run and,
     /// if so, load the matching run file from disk and rebuild the
@@ -960,6 +966,7 @@ public static class RunTracker
 
         _pendingCombat = null;
         ResetCombatContextState();
+        ResetRewardContextState();
         _instanceNumbers.Clear();
         _defCounters.Clear();
         ResetDeckViewCachesLocked();
@@ -1251,6 +1258,7 @@ public static class RunTracker
             _instanceNumbers.Clear();
             _defCounters.Clear();
             ResetCombatContextState();
+            ResetRewardContextState();
             ResetDeckViewCachesLocked();
             ResolveTrackedPlayerLocked(runState);
 
@@ -1331,6 +1339,7 @@ public static class RunTracker
             _currentRun = null;
             _pendingCombat = null;
             ResetCombatContextState();
+            ResetRewardContextState();
             ResetDeckViewCachesLocked();
         }
     }
@@ -1483,6 +1492,11 @@ public static class RunTracker
         target.RareCardsOffered += source.RareCardsOffered;
         target.UncommonCardsTaken += source.UncommonCardsTaken;
         target.RareCardsTaken += source.RareCardsTaken;
+        target.CommonCardsConsumed += source.CommonCardsConsumed;
+        target.UncommonCardsConsumed += source.UncommonCardsConsumed;
+        target.RareCardsConsumed += source.RareCardsConsumed;
+        target.SacrificesMade += source.SacrificesMade;
+        target.SacrificesSkipped += source.SacrificesSkipped;
         target.CardRewardsAffected += source.CardRewardsAffected;
         MergeCardRewardCategories(target.CardRewardCategories, source.CardRewardCategories);
     }
@@ -2054,6 +2068,7 @@ public static class RunTracker
     private const string BoundPhylacteryRelicId = "RELIC.BOUND_PHYLACTERY";
     private const string PhylacteryUnboundRelicId = "RELIC.PHYLACTERY_UNBOUND";
     private const string ToolboxRelicId = "RELIC.TOOLBOX";
+    private const string PaelsWingRelicId = "RELIC.PAELS_WING";
 
     /// <summary>
     /// Record a Bag of Marbles combat-start Vulnerable application.
@@ -2687,6 +2702,85 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordToolboxTaken failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Mark one card reward where Pael's Wing added its Sacrifice alternative.
+    /// The reward may be generated/refreshed more than once, so the rarity
+    /// snapshot is refreshed without counting an opportunity until resolution.
+    /// </summary>
+    public static void NotePaelSacrificeOffered(CardReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                _paelSacrificeRewards[reward] = PendingPaelSacrificeReward.FromCards(reward.Cards);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"NotePaelSacrificeOffered failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record Pael's Wing's Sacrifice option after the player's selected
+    /// reward alternative invokes the relic-owned delegate.
+    /// </summary>
+    public static void RecordPaelSacrificeMade(CardReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_paelSacrificeRewards.Remove(reward, out var pending))
+                    pending = PendingPaelSacrificeReward.FromCards(reward.Cards);
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(PaelsWingRelicId);
+                agg.SacrificesMade += 1;
+                agg.CommonCardsConsumed += pending.CommonCards;
+                agg.UncommonCardsConsumed += pending.UncommonCards;
+                agg.RareCardsConsumed += pending.RareCards;
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPaelSacrificeMade failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record a Pael's Wing sacrifice opportunity that resolved without
+    /// selecting Sacrifice, either by taking a card or by using another
+    /// alternative such as Skip.
+    /// </summary>
+    public static void RecordPaelSacrificeSkipped(CardReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_paelSacrificeRewards.Remove(reward, out _)) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(PaelsWingRelicId);
+                agg.SacrificesSkipped += 1;
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPaelSacrificeSkipped failed: {e.Message}");
             }
         }
     }
@@ -3858,6 +3952,14 @@ public static class RunTracker
         }
     }
 
+    public static int GetCurrentFloorForRateStats()
+    {
+        lock (_lock)
+        {
+            return Math.Max(1, CurrentRunFloorLocked() ?? 1);
+        }
+    }
+
     public static EnemyAggregate? GetEnemyAggregate(string enemyId)
     {
         lock (_lock)
@@ -4044,6 +4146,40 @@ public static class RunTracker
 
         _currentRun.UpdatedAt = Now();
         return agg;
+    }
+
+    private static void RefreshCurrentRunMetadataLocked()
+    {
+        if (_currentRun == null) return;
+
+        try
+        {
+            var runState = RunManager.Instance?.State;
+            if (runState == null) return;
+
+            _currentRun.FloorReached = runState.TotalFloor;
+            _currentRun.Ascension ??= runState.AscensionLevel;
+            _currentRun.Character ??= runState.Players.FirstOrDefault()?.Character?.Id.ToString();
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RefreshCurrentRunMetadataLocked failed: {e.Message}");
+        }
+    }
+
+    private static int? CurrentRunFloorLocked()
+    {
+        try
+        {
+            var runState = RunManager.Instance?.State;
+            if (runState?.TotalFloor > 0) return runState.TotalFloor;
+        }
+        catch
+        {
+            // Fall back to the persisted run metadata below.
+        }
+
+        return _currentRun?.FloorReached;
     }
 
     private static void RecordCombatsInDeckForCurrentDeckLocked()
@@ -6738,6 +6874,38 @@ public static class RunTracker
         {
             return "err";
         }
+    }
+}
+
+internal sealed class PendingPaelSacrificeReward
+{
+    public int CommonCards { get; private set; }
+    public int UncommonCards { get; private set; }
+    public int RareCards { get; private set; }
+
+    public static PendingPaelSacrificeReward FromCards(IEnumerable<CardModel>? cards)
+    {
+        var result = new PendingPaelSacrificeReward();
+        if (cards == null) return result;
+
+        foreach (var card in cards)
+        {
+            if (card == null) continue;
+            switch (card.Rarity)
+            {
+                case CardRarity.Common:
+                    result.CommonCards += 1;
+                    break;
+                case CardRarity.Uncommon:
+                    result.UncommonCards += 1;
+                    break;
+                case CardRarity.Rare:
+                    result.RareCards += 1;
+                    break;
+            }
+        }
+
+        return result;
     }
 }
 

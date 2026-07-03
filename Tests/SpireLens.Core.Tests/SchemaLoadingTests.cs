@@ -1020,4 +1020,34 @@ public class SchemaLoadingTests
         Assert.Equal(2, resumed.RelicAggregates["RELIC.TOOLBOX"].UncommonCardsTaken);
         Assert.Equal(1, resumed.RelicAggregates["RELIC.TOOLBOX"].RareCardsTaken);
     }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsPaelsWingSacrificeRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("paels-wing-sacrifice-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.PAELS_WING"];
+        Assert.Equal(5, relicAgg.CommonCardsConsumed);
+        Assert.Equal(3, relicAgg.UncommonCardsConsumed);
+        Assert.Equal(1, relicAgg.RareCardsConsumed);
+        Assert.Equal(3, relicAgg.SacrificesMade);
+        Assert.Equal(2, relicAgg.SacrificesSkipped);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsPaelsWingSacrificeRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("paels-wing-sacrifice-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.PAELS_WING"];
+        Assert.Equal(5, relicAgg.CommonCardsConsumed);
+        Assert.Equal(3, relicAgg.UncommonCardsConsumed);
+        Assert.Equal(1, relicAgg.RareCardsConsumed);
+        Assert.Equal(3, relicAgg.SacrificesMade);
+        Assert.Equal(2, relicAgg.SacrificesSkipped);
+    }
 }
