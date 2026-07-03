@@ -21,10 +21,12 @@ public static class TheAbacusAfterShufflePatch
     }
 
     [HarmonyPrefix]
-    public static void Prefix()
+    public static void Prefix(MegaCrit.Sts2.Core.Models.RelicModel __instance)
     {
         try
         {
+            // Co-op: only arm for OUR Abacus, not a partner's shuffle.
+            if (!RunTracker.IsTrackedRelic(__instance)) return;
             RunTracker.ArmTheAbacusBlockAttribution();
         }
         catch (Exception e)

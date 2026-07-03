@@ -48,6 +48,12 @@ public static class RunTracker
     private const string SovereignBladeForgedEventType = "sovereign_blade_forged";
 
     private static readonly object _lock = new();
+
+    // Co-op local-player scoping (#260). NetId of the player whose run we track.
+    // Null => single-player OR local player unresolved: every guard ALLOWS, so
+    // SP is byte-identical and a mis-detection can never disable tracking.
+    // Re-derived from LocalContext.NetId on run start/adopt; never persisted.
+    private static ulong? _trackedNetId;
     private static RunData? _currentRun;
     private static PendingCombat? _pendingCombat;
     private static CardPlay? _currentPlayerCardPlay;
@@ -567,7 +573,13 @@ public static class RunTracker
     /// </summary>
     public static void RecordCardEntered(CardModel card)
     {
-        lock (_lock) { GetOrAssignNumber(card); }
+        lock (_lock)
+        {
+            // Co-op: CardPile.AddInternal(Deck) fires for BOTH decks; only mint
+            // identity for the tracked player's cards.
+            if (!IsTrackedCard(card)) return;
+            GetOrAssignNumber(card);
+        }
     }
 
     /// <summary>
@@ -756,6 +768,54 @@ public static class RunTracker
     /// break combat/run flow. Always-on Error log so a broken handler is
     /// visible without a debug flag.
     /// </summary>
+    // -------- Co-op tracked-player scoping (#260); all ALLOW when _trackedNetId==null --------
+
+    private static void ResolveTrackedPlayerLocked(RunState? runState)
+    {
+        try
+        {
+            var players = runState?.Players;
+            var localNetId = MegaCrit.Sts2.Core.Context.LocalContext.NetId;
+            if (localNetId.HasValue && players != null && players.Any(p => p.NetId == localNetId.Value))
+                _trackedNetId = localNetId.Value;
+            else if (players != null && players.Count == 1)
+                _trackedNetId = players[0].NetId; // SP: sole player is us
+            else
+                _trackedNetId = null; // co-op w/ LocalContext missing: fail open
+        }
+        catch (Exception e)
+        {
+            _trackedNetId = null;
+            CoreMain.LogDebug($"ResolveTrackedPlayer failed (tracking all): {e.Message}");
+        }
+        CoreMain.Logger.Info($"TrackedPlayer resolved: net_id={(_trackedNetId?.ToString() ?? "<all>")}");
+    }
+
+    private static bool IsTrackedPlayer(Player? player)
+        => _trackedNetId == null || (player != null && player.NetId == _trackedNetId.Value);
+
+    private static bool IsTrackedPlayerCreature(Creature? creature)
+        => _trackedNetId == null || (creature?.Player != null && creature.Player.NetId == _trackedNetId.Value);
+
+    private static bool IsTrackedCard(CardModel? card)
+    {
+        if (_trackedNetId == null) return true;
+        if (card == null || !card.IsMutable) return true;
+        var owner = card.Owner;
+        return owner == null || owner.NetId == _trackedNetId.Value;
+    }
+
+    public static bool IsTrackedRelic(MegaCrit.Sts2.Core.Models.RelicModel? relic)
+    {
+        lock (_lock)
+        {
+            if (_trackedNetId == null) return true;
+            if (relic == null || !relic.IsMutable) return true;
+            var owner = relic.Owner;
+            return owner == null || owner.NetId == _trackedNetId.Value;
+        }
+    }
+
     private static void GuardLifecycle(string site, Action body)
     {
         try { body(); }
@@ -886,6 +946,9 @@ public static class RunTracker
     private static void AdoptRunLocked(RunData run, RunState? runState, string context, bool repairAggregates)
     {
         _currentRun = run;
+        // Re-derive the tracked local player on every adopt/resume/continue
+        // (hot-reload, main-menu Continue, continue-after-restart).
+        ResolveTrackedPlayerLocked(runState);
         // Old builds stamped EndedAt on every Continue re-fire; an in-progress
         // run is live again the moment we adopt it. Guarded on outcome so a
         // defensive future caller can't resurrect a genuinely finished record
@@ -1189,6 +1252,7 @@ public static class RunTracker
             _defCounters.Clear();
             ResetCombatContextState();
             ResetDeckViewCachesLocked();
+            ResolveTrackedPlayerLocked(runState);
 
             string now = Now();
             _currentRun = new RunData
@@ -1534,6 +1598,8 @@ public static class RunTracker
     {
         lock (_lock)
         {
+            // Co-op: only the tracked local player's card plays are ours.
+            if (!IsTrackedCard(cardPlay?.Card)) return;
             // Defensive: if CombatSetUp never fired (unusual), allocate lazily.
             _pendingCombat ??= new PendingCombat();
 
@@ -1780,6 +1846,9 @@ public static class RunTracker
     {
         lock (_lock)
         {
+            // Co-op: don't adopt a partner's play as the resolving play, or
+            // downstream energy/draw/power attribution would credit our cards.
+            if (!IsTrackedCard(cardPlay?.Card)) return;
             _currentPlayerCardPlay = cardPlay;
             if (cardPlay?.Card != null)
             {
@@ -3254,6 +3323,8 @@ public static class RunTracker
         {
             try
             {
+                // Co-op: a partner's energy gain is not ours.
+                if (!IsTrackedPlayer(combatState._player)) return;
                 if (_pendingCombat == null) { RecordEnergyGained(combatState, amount); return; }
                 var owner = combatState._player;
                 var key = _pendingCombat.Windows.TryConsume(
@@ -5739,6 +5810,9 @@ public static class RunTracker
     {
         lock (_lock)
         {
+            // Co-op: block gained by a partner (or their summon) must not enter
+            // our aggregates/ledger. Non-player receivers unaffected.
+            if (entry.Receiver.IsPlayer && !IsTrackedPlayerCreature(entry.Receiver)) return;
             _pendingCombat ??= new PendingCombat();
 
             string? instanceId = null;
@@ -5805,6 +5879,9 @@ public static class RunTracker
         // OWN attacks on enemies mint a phantom MONSTER.OSTY enemy aggregate.
         // Matches RecordPlayerBlockedDamage and the primer's enemy-damage spec.
         if (!entry.Receiver.IsPlayer) return;
+        // Co-op: only the TRACKED player's damage taken is our defensive stat
+        // (a partner soaking a hit is not).
+        if (!IsTrackedPlayerCreature(entry.Receiver)) return;
         if (entry.Dealer == null || entry.Dealer.IsPlayer || entry.Dealer.Monster == null) return;
 
         int blocked = Math.Max(0, entry.Result.BlockedDamage);
