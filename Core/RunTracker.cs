@@ -2060,6 +2060,7 @@ public static class RunTracker
     private const string TheAbacusRelicId = "RELIC.THE_ABACUS";
     private const string LetterOpenerRelicId = "RELIC.LETTER_OPENER";
     private const int LetterOpenerDamagePerTarget = 5;
+    private const string PenNibRelicId = "RELIC.PEN_NIB";
     private const string AkabekoRelicId = "RELIC.AKABEKO";
     private const string BookRepairKnifeRelicId = "RELIC.BOOK_REPAIR_KNIFE";
     private const string EternalFeatherRelicId = "RELIC.ETERNAL_FEATHER";
@@ -2393,7 +2394,41 @@ public static class RunTracker
     }
 
     /// <summary>
-    /// Record a confirmed Bone Flute trigger. Called from
+    /// Record the raw per-hit damage amount doubled by Pen Nib. This is the
+    /// extra base damage the relic contributed, intentionally before
+    /// downstream hook multipliers such as Lethality or Vulnerable.
+    /// </summary>
+    public static void RecordPenNibBaseDamageAdded(decimal baseDamageAdded)
+    {
+        if (baseDamageAdded <= 0m) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(PenNibRelicId);
+                AddPenNibBaseDamageAdded(agg, baseDamageAdded);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPenNibBaseDamageAdded failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordPenNibBaseDamageAddedForTest(RelicAggregate agg, decimal baseDamageAdded)
+        => AddPenNibBaseDamageAdded(agg, baseDamageAdded);
+
+    private static void AddPenNibBaseDamageAdded(RelicAggregate agg, decimal baseDamageAdded)
+    {
+        var added = (int)decimal.Truncate(baseDamageAdded);
+        if (added <= 0) return;
+        agg.TotalDamageAttempted += added;
+    }
+
+    /// <summary>
+    /// Record a confirmed Bone Flute trigger and arm the next player block
+    /// gain as its observed payload. Called from
     /// <see cref="Patches.BoneFluteAfterAttackPatch"/> only after the relic's
     /// owner-specific Osty attack condition is satisfied. (The block-gain
     /// arming this method's name refers to is currently non-functional — see

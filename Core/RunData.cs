@@ -436,10 +436,12 @@ public class RelicAggregate
     // Total Vigor applied by Akabeko's combat-start effect.
     public int VigorGained { get; set; }
 
-    // Total attempted damage from relic effects whose actual damage is not
+    // Total attempted/base damage from relic effects whose actual damage is not
     // source-attributed by the game's damage entries. Used by Letter Opener
     // and observed-damage relics such as Parrying Shield, Festive Popper, and
-    // Mercury Hourglass.
+    // Mercury Hourglass. For Pen Nib, this stores the raw per-hit amount
+    // handed to the damage command: the extra base damage added, before
+    // downstream hook effects such as Lethality or Vulnerable.
     public int TotalDamageAttempted { get; set; }
 
     // Relic damage outcome split. Used by relics such as Parrying Shield,
