@@ -354,6 +354,8 @@ alternative and `PaelsWing.OnSacrifice` increments the saved sacrifice count.
 Track consumed card reward rarities and skipped sacrifice opportunities from the
 card reward alternative flow, not from PaelsFlesh's energy hooks.
 
+For relics that grant block after a specific owner-owned condition, arm a narrow block-gain window at the relic callback and let `Hook.AfterBlockGained` record the modified amount. Permafrost follows this pattern from `Permafrost.AfterCardPlayed`: mirror the first-owned-Power condition, count that combat trigger, then derive block per combat from observed block gained divided by triggers.
+
 ## Generated And Supplemental Cards
 
 Not every visible card should become a permanent per-instance deck card.
