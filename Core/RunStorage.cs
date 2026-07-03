@@ -36,26 +36,56 @@ public static class RunStorage
     /// <summary>Resolved absolute path to runs/ directory. Created on first save.</summary>
     public static string RunsDir => ProjectSettings.GlobalizePath("user://SpireLens/runs/");
 
+    // Single-writer chain: every save is a continuation of the previous one,
+    // so writes to the same run file apply in the exact order SaveAsync was
+    // called (which, since callers hold RunTracker's lock and serialize the
+    // snapshot on the calling thread, equals logical order). This replaces the
+    // old fire-and-forget Task.Run, where two rapid saves of the same file
+    // (OnCombatEnded then OnRunEnded on a won/lost run) raced: FileShare
+    // collisions dropped a save, or pool scheduling let a stale in_progress
+    // snapshot overwrite the final outcome=win/loss one.
+    private static readonly object _writeChainGate = new();
+    private static Task _writeChain = Task.CompletedTask;
+
     /// <summary>Serialize and write the run data to disk without blocking the caller.</summary>
     public static void SaveAsync(RunData data)
     {
-        // Snapshot-serialize on the calling thread so we don't race with further mutations.
-        // (RunTracker holds the lock when it calls this; safe here.)
+        // Snapshot-serialize AND resolve paths on the calling thread (the game
+        // thread, under RunTracker's lock): ProjectSettings.GlobalizePath and
+        // the RunData mutations are not safe to touch from a pool thread,
+        // especially during engine teardown.
         string json = JsonSerializer.Serialize(data, Options);
-        string path = Path.Combine(RunsDir, data.RunId + ".json");
+        string dir = RunsDir;
+        string path = Path.Combine(dir, data.RunId + ".json");
 
-        Task.Run(() =>
+        lock (_writeChainGate)
         {
-            try
-            {
-                Directory.CreateDirectory(RunsDir);
-                File.WriteAllText(path, json);
-            }
-            catch (Exception e)
-            {
-                CoreMain.Logger.Error($"RunStorage.SaveAsync failed: {e}");
-            }
-        });
+            _writeChain = _writeChain.ContinueWith(
+                _ => WriteFileAtomic(dir, path, json),
+                CancellationToken.None,
+                TaskContinuationOptions.None,
+                TaskScheduler.Default);
+        }
+    }
+
+    // Atomic write: full content to a temp file, then replace. A crash mid-write
+    // leaves the old file intact (or an orphan .tmp that the "*.json" scans
+    // ignore) instead of a truncated .json that LoadKnownSchemaFile silently
+    // skips — which would lose the whole run. Swallows its own exceptions so
+    // one failed write can't fault the shared chain and stall every later save.
+    private static void WriteFileAtomic(string dir, string path, string json)
+    {
+        try
+        {
+            Directory.CreateDirectory(dir);
+            string tmp = path + ".tmp";
+            File.WriteAllText(tmp, json);
+            File.Move(tmp, path, overwrite: true);
+        }
+        catch (Exception e)
+        {
+            CoreMain.Logger.Error($"RunStorage.SaveAsync failed: {e}");
+        }
     }
 
     private static RunFileHeader? ReadHeader(string path)

@@ -4980,7 +4980,14 @@ public static class RunTracker
                 || ownership.Count == 0)
                 return false;
 
-            decimal totalAttempted = entry.Result.BlockedDamage + entry.Result.UnblockedDamage;
+            // Route through the one canonical damage convention: intended =
+            // blocked + unblocked + overkill (the true tick size), effective =
+            // unblocked (HP actually lost — overkill is disjoint). Omitting
+            // overkill previously made the normalize step scale ownership down
+            // on kills and the unarmed-fallback amount-match drop lethal ticks.
+            var tickTotals = ComputeEnemyDamageTotals(
+                entry.Result.BlockedDamage, entry.Result.UnblockedDamage, entry.Result.OverkillDamage);
+            decimal totalAttempted = tickTotals.IntendedDamage;
             if (totalAttempted <= 0m) return false;
 
             bool armedTick = false;
@@ -5009,7 +5016,10 @@ public static class RunTracker
                     share.Amount *= normalize;
             }
 
-            decimal effectiveDamage = Math.Max(0m, entry.Result.UnblockedDamage - entry.Result.OverkillDamage);
+            // Effective = HP actually lost (tickTotals.EffectiveDamage =
+            // UnblockedDamage). The old `unblocked - overkill` double-counted
+            // overkill and zeroed every killing tick's effective damage.
+            decimal effectiveDamage = Math.Max(0m, (decimal)tickTotals.EffectiveDamage);
             decimal overkillDamage = Math.Max(0m, entry.Result.OverkillDamage);
 
             foreach (var share in ownership.Values.ToList())
@@ -5139,6 +5149,13 @@ public static class RunTracker
 
     private static void RecordEnemyDamage(DamageReceivedEntry entry)
     {
+        // Only damage dealt TO the player counts as enemy damage. Without this
+        // guard, a summon body (Osty is a Creature with Monster set but
+        // IsPlayer=false) absorbing an enemy hit via DieForYou is counted as
+        // damage-to-player and doubles DamageInstances per redirect, and Osty's
+        // OWN attacks on enemies mint a phantom MONSTER.OSTY enemy aggregate.
+        // Matches RecordPlayerBlockedDamage and the primer's enemy-damage spec.
+        if (!entry.Receiver.IsPlayer) return;
         if (entry.Dealer == null || entry.Dealer.IsPlayer || entry.Dealer.Monster == null) return;
 
         int blocked = Math.Max(0, entry.Result.BlockedDamage);
@@ -5201,9 +5218,16 @@ public static class RunTracker
             }
 
             int actualRemaining = Math.Max(0, creature.Block);
+            // Unarmed fallback is 0, not the whole ledger: the game fires
+            // AfterBlockCleared even when a retain effect (Barricade/Blur/Sturdy
+            // Clamp) PREVENTED the clear, so wasting all tracked block would
+            // mislabel retained block as wasted and strip its card attribution.
+            // Reconcile below wastes exactly max(0, tracked - actual), which is
+            // correct whether block truly cleared (actual→0 wastes all) or was
+            // retained (actual unchanged wastes nothing).
             int removed = _pendingPlayerBlockClearArmed
                 ? Math.Max(0, _pendingPlayerBlockClearAmount - actualRemaining)
-                : TotalTrackedPlayerBlockLocked();
+                : 0;
 
             AttributeUnusedBlockLocked(removed);
             ReconcilePlayerBlockLedgerLocked(creature);
