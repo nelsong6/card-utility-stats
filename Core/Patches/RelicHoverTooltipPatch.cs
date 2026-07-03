@@ -361,6 +361,15 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (IsRelicModel(relicNode.Model, "MegaCrit.Sts2.Core.Models.Relics.StrikeDummy"))
+            {
+                var agg = RunTracker.GetStrikeDummyAggregate();
+
+                var body = BuildStrikeDummyBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Strike Dummy", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is WhiteBeastStatue)
             {
                 const string relicId = "RELIC.WHITE_BEAST_STATUE";
@@ -676,6 +685,15 @@ public static class RelicHoverShowPatch
         var floorCount = RunTracker.GetCurrentFloorForRateStats();
         var rate = floorCount <= 0 ? 0m : (decimal)agg.SacrificesMade / floorCount;
         Row3(sb, "Sacrifice rate", FormatDecimal(rate), "/floor");
+        return sb.ToString();
+    }
+
+    private static string BuildStrikeDummyBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Strikes played", agg.StrikeDummyStrikesPlayed.ToString(), "");
+        Row3(sb, "Base Strikes in deck", agg.StrikeDummyBaseStrikesInDeck.ToString(), "");
+        Row3(sb, "Non-base Strike cards in deck", agg.StrikeDummyNonBaseStrikeCardsInDeck.ToString(), "");
         return sb.ToString();
     }
 

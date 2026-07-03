@@ -369,6 +369,13 @@ across the full pickup callback when that is what the player experiences. Lee's
 Waffle records current-HP gained across `AfterObtained`, covering both its
 max-HP grant and the follow-up heal-to-full.
 
+Strike Dummy identifies eligible cards through the game's `CardTag.Strike`.
+Its damage modifier can run per damage evaluation, so count Strike cards played
+from finished card-play events while the relic is owned; use the modifier only
+to confirm the eligibility rule. Base Strikes are `IsBasicStrikeOrDefend` cards
+that also carry the Strike tag, while non-base Strike cards are every other
+permanent deck card with that tag.
+
 ## Generated And Supplemental Cards
 
 Not every visible card should become a permanent per-instance deck card.
