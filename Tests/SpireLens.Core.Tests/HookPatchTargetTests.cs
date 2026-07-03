@@ -1,0 +1,35 @@
+using System;
+using System.Linq;
+using System.Reflection;
+using MegaCrit.Sts2.Core.Combat;
+using MegaCrit.Sts2.Core.Hooks;
+using SpireLens.Core.Patches;
+using Xunit;
+
+namespace SpireLens.Core.Tests;
+
+public class HookPatchTargetTests
+{
+    [Theory]
+    [InlineData(typeof(HookAfterSideTurnEndCloakClaspCleanupPatch))]
+    [InlineData(typeof(HookAfterSideTurnEndOrichalcumCleanupPatch))]
+    public void EndTurnCleanupPatches_ResolveHookWithSideParameter(Type patchType)
+    {
+        var target = InvokeTargetMethod(patchType);
+
+        Assert.NotNull(target);
+        Assert.Equal(typeof(Hook), target!.DeclaringType);
+        Assert.Contains(target.Name, new[] { "AfterSideTurnEnd", "AfterTurnEnd" });
+
+        var sideParameter = target.GetParameters().SingleOrDefault(p => p.Name == "side");
+        Assert.NotNull(sideParameter);
+        Assert.Equal(typeof(CombatSide), sideParameter!.ParameterType);
+    }
+
+    private static MethodBase? InvokeTargetMethod(Type patchType)
+    {
+        var targetMethod = patchType.GetMethod("TargetMethod", BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(targetMethod);
+        return (MethodBase?)targetMethod!.Invoke(null, Array.Empty<object>());
+    }
+}

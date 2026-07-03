@@ -1667,7 +1667,7 @@ public static class RunTracker
     /// <summary>
     /// Arm the one-shot flag that attributes the next player block gain to
     /// Orichalcum. Called from <see cref="Patches.OrichalcumBeforeTurnEndPatch"/>
-    /// when Orichalcum's <c>BeforeTurnEnd</c> fires on the player's side.
+    /// when Orichalcum's end-of-turn hook fires on the player's side.
     /// </summary>
     public static void ArmOrichalcumBlockAttribution()
     {
@@ -2745,7 +2745,7 @@ public static class RunTracker
     /// Arm the flag that attributes player block gains to Cloak Clasp.
     /// Called from <see cref="Patches.CloakClaspBeforeTurnEndPatch"/> when
     /// Cloak Clasp's end-of-turn hook fires on the player's side.
-    /// The window stays open until <c>Hook.AfterTurnEnd</c> so that all
+    /// The window stays open until <c>Hook.AfterSideTurnEnd</c> so that all
     /// block grants from the relic (one per card in hand) are accumulated.
     /// </summary>
     public static void ArmCloakClaspBlockAttribution()
@@ -2758,7 +2758,7 @@ public static class RunTracker
 
     /// <summary>
     /// Clear the Cloak Clasp attribution window. Called at
-    /// <c>Hook.AfterTurnEnd</c> after the relic's block grants have resolved.
+    /// <c>Hook.AfterSideTurnEnd</c> after the relic's block grants have resolved.
     /// </summary>
     public static void DisarmCloakClaspBlockAttribution()
     {
@@ -2773,7 +2773,7 @@ public static class RunTracker
     /// from <see cref="Patches.HookAfterBlockGainedPatch"/> while the
     /// attribution window is armed. Does NOT clear the flag so that multiple
     /// <c>AfterBlockGained</c> calls (one per card in hand) are all captured.
-    /// The window is cleared at the <c>Hook.AfterTurnEnd</c> boundary.
+    /// The window is cleared at the <c>Hook.AfterSideTurnEnd</c> boundary.
     /// </summary>
     public static void RecordCloakClaspBlockGained(int amount)
     {

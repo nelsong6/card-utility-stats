@@ -76,9 +76,15 @@ public static class OrichalcumBeforeTurnEndPatch
 /// the relic method has returned its task, so cleanup cannot live in the
 /// relic postfix itself.
 /// </summary>
-[HarmonyPatch(typeof(Hook), nameof(Hook.AfterTurnEnd))]
-public static class HookAfterTurnEndOrichalcumCleanupPatch
+[HarmonyPatch]
+public static class HookAfterSideTurnEndOrichalcumCleanupPatch
 {
+    private static MethodBase? TargetMethod()
+    {
+        return AccessTools.Method(typeof(Hook), "AfterSideTurnEnd")
+            ?? AccessTools.Method(typeof(Hook), "AfterTurnEnd");
+    }
+
     [HarmonyPrefix]
     public static void Prefix(CombatSide side)
     {
@@ -89,7 +95,7 @@ public static class HookAfterTurnEndOrichalcumCleanupPatch
         }
         catch (Exception e)
         {
-            CoreMain.LogDebug($"HookAfterTurnEndOrichalcumCleanupPatch failed: {e.Message}");
+            CoreMain.LogDebug($"HookAfterSideTurnEndOrichalcumCleanupPatch failed: {e.Message}");
         }
     }
 }
