@@ -1337,7 +1337,7 @@ public static class RunTracker
     /// the mid-combat tooltip overlay so the two can't drift. Add new relic
     /// stat fields HERE, once.
     /// </summary>
-    private static void MergeRelicAggregateInto(RelicAggregate target, RelicAggregate source)
+    internal static void MergeRelicAggregateInto(RelicAggregate target, RelicAggregate source)
     {
         target.Activations += source.Activations;
         target.EnemiesAffected += source.EnemiesAffected;
@@ -3123,35 +3123,10 @@ public static class RunTracker
 
             if (_currentRun != null && _currentRun.RelicAggregates.TryGetValue(relicId, out var committed))
             {
-                result = new RelicAggregate
-                {
-                    Activations = committed.Activations,
-                    EnemiesAffected = committed.EnemiesAffected,
-                    VulnerableApplied = committed.VulnerableApplied,
-                    WeakApplied = committed.WeakApplied,
-                    AdditionalCardsDrawn = committed.AdditionalCardsDrawn,
-                    AdditionalBlockGained = committed.AdditionalBlockGained,
-                    BlockedTriggers = committed.BlockedTriggers,
-                    StrengthAdded = committed.StrengthAdded,
-                    PlatingAdded = committed.PlatingAdded,
-                    CardsUpgraded = committed.CardsUpgraded,
-                    BoneFluteTriggers = committed.BoneFluteTriggers,
-                    TotalOstyHpSummoned = committed.TotalOstyHpSummoned,
-                    TotalHealingAttempted = committed.TotalHealingAttempted,
-                    TotalHealingRestored = committed.TotalHealingRestored,
-                    TotalHealingLost = committed.TotalHealingLost,
-                    DoomDeathTriggers = committed.DoomDeathTriggers,
-                    DoomKills = committed.DoomKills,
-                    EnergyGenerated = committed.EnergyGenerated,
-                    PotionsGained = committed.PotionsGained,
-                    CommonPotionsGained = committed.CommonPotionsGained,
-                    UncommonPotionsGained = committed.UncommonPotionsGained,
-                    RarePotionsGained = committed.RarePotionsGained,
-                    PotionsSkipped = committed.PotionsSkipped,
-                    CardRewardsAffected = committed.CardRewardsAffected,
-                    CardRewardCategories = CloneCardRewardCategories(committed.CardRewardCategories),
-                };
-                MergeHealingLostReasonsInto(result, committed);
+                // new + Merge instead of a parallel 26-field clone — one
+                // RelicAggregate field list lives in MergeRelicAggregateInto.
+                result = new RelicAggregate();
+                MergeRelicAggregateInto(result, committed);
             }
 
             if (_pendingCombat != null && _pendingCombat.RelicAggregates.TryGetValue(relicId, out var pending))
@@ -3245,28 +3220,16 @@ public static class RunTracker
         cardAgg.Count++;
     }
 
-    private static EnemyAggregate CloneEnemyAggregate(EnemyAggregate source)
+    // new + Merge (target starts empty, so Merge copies identity and
+    // accumulates every stat) — one EnemyAggregate field list to maintain.
+    internal static EnemyAggregate CloneEnemyAggregate(EnemyAggregate source)
     {
-        var clone = new EnemyAggregate
-        {
-            EnemyId = source.EnemyId,
-            DisplayName = source.DisplayName,
-            DamageInstances = source.DamageInstances,
-            DamageAttempted = source.DamageAttempted,
-            DamageDealt = source.DamageDealt,
-            DamageBlocked = source.DamageBlocked,
-            StatusCardsAdded = source.StatusCardsAdded,
-            StatusCardsAddedToHand = source.StatusCardsAddedToHand,
-            StatusCardsAddedToDraw = source.StatusCardsAddedToDraw,
-            StatusCardsAddedToDiscard = source.StatusCardsAddedToDiscard,
-            StatusCardsAddedToDeck = source.StatusCardsAddedToDeck,
-        };
-
-        MergeEnemyStatusCardBreakdownInto(clone, source);
+        var clone = new EnemyAggregate();
+        MergeEnemyAggregateInto(clone, source);
         return clone;
     }
 
-    private static void MergeEnemyAggregateInto(EnemyAggregate target, EnemyAggregate source)
+    internal static void MergeEnemyAggregateInto(EnemyAggregate target, EnemyAggregate source)
     {
         if (string.IsNullOrWhiteSpace(target.EnemyId))
             target.EnemyId = source.EnemyId;
@@ -3418,14 +3381,6 @@ public static class RunTracker
                 reason.DisplayName,
                 reason.Amount);
         }
-    }
-
-    private static Dictionary<string, CardRewardCategoryAggregate> CloneCardRewardCategories(
-        Dictionary<string, CardRewardCategoryAggregate> source)
-    {
-        var result = new Dictionary<string, CardRewardCategoryAggregate>();
-        MergeCardRewardCategories(result, source);
-        return result;
     }
 
     private static void MergeCardRewardCategories(
@@ -5629,58 +5584,25 @@ public static class RunTracker
         }
     }
 
-    private static CardAggregate CloneAggregate(CardAggregate source)
+    // Clone = copy the per-instance lineage/identity fields (which a merge
+    // intentionally does NOT accumulate), then delegate every accumulating
+    // field to MergeAggregateInto so there is ONE field list to maintain.
+    // RemovedSnapshot is shared by reference (an immutable removal snapshot).
+    internal static CardAggregate CloneAggregate(CardAggregate source)
     {
         var clone = new CardAggregate
         {
-            CombatsInDeck = source.CombatsInDeck,
-            Plays = source.Plays,
-            TotalIntended = source.TotalIntended,
-            TotalBlocked = source.TotalBlocked,
-            TotalOverkill = source.TotalOverkill,
-            TotalEffective = source.TotalEffective,
-            Kills = source.Kills,
-            TotalEnergySpent = source.TotalEnergySpent,
-            TotalEnergyGenerated = source.TotalEnergyGenerated,
-            TotalStarsSpent = source.TotalStarsSpent,
-            TotalStarsGenerated = source.TotalStarsGenerated,
-            TotalForgeGenerated = source.TotalForgeGenerated,
-            TotalBlockGained = source.TotalBlockGained,
-            TotalBlockEffective = source.TotalBlockEffective,
-            TotalBlockWasted = source.TotalBlockWasted,
-            TimesDrawn = source.TimesDrawn,
-            TimesDiscarded = source.TimesDiscarded,
-            TimesPlacedOnTopFromHand = source.TimesPlacedOnTopFromHand,
-            TimesPlacedOnTopFromDiscard = source.TimesPlacedOnTopFromDiscard,
-            TimesExhaustedOtherCards = source.TimesExhaustedOtherCards,
-            TimesExhausted = source.TimesExhausted,
-            TotalHpLost = source.TotalHpLost,
-            TimesCardsDrawn = source.TimesCardsDrawn,
-            TimesCardsDrawAttempted = source.TimesCardsDrawAttempted,
-            TimesCardsDrawBlocked = source.TimesCardsDrawBlocked,
-            TimesSummonedToHand = source.TimesSummonedToHand,
-            TotalOstyHpAttackBonus = source.TotalOstyHpAttackBonus,
-            TimesOstyHpAttackBonusApplied = source.TimesOstyHpAttackBonusApplied,
-            TimesOstySummoned = source.TimesOstySummoned,
-            TotalOstyHpSummoned = source.TotalOstyHpSummoned,
-            TimesReplayExtraPlanned = source.TimesReplayExtraPlanned,
-            TimesReplayExtraPlayed = source.TimesReplayExtraPlayed,
-            TimesReplayAttackNoDamage = source.TimesReplayAttackNoDamage,
             FloorAdded = source.FloorAdded,
             InitialUpgradeLevel = source.InitialUpgradeLevel,
             Removed = source.Removed,
             RemovedAtFloor = source.RemovedAtFloor,
             RemovedSnapshot = source.RemovedSnapshot,
         };
-        MergeBlockedDrawReasonsInto(clone.BlockedDrawReasons, source.BlockedDrawReasons);
-        MergeReplayExtraPlayReasonsInto(clone.ReplayExtraPlayPlannedReasons, source.ReplayExtraPlayPlannedReasons);
-        MergeReplayExtraPlayReasonsInto(clone.ReplayExtraPlayReasons, source.ReplayExtraPlayReasons);
-        MergeReplayExtraPlayReasonsInto(clone.ReplayAttackNoDamageReasons, source.ReplayAttackNoDamageReasons);
-        MergeAppliedEffectsInto(clone.AppliedEffects, source.AppliedEffects);
+        MergeAggregateInto(clone, source);
         return clone;
     }
 
-    private static void MergeAggregateInto(CardAggregate target, CardAggregate source)
+    internal static void MergeAggregateInto(CardAggregate target, CardAggregate source)
     {
         target.CombatsInDeck += source.CombatsInDeck;
         target.Plays += source.Plays;

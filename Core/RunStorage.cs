@@ -26,11 +26,23 @@ public static class RunStorage
         public string? Outcome { get; set; }
     }
 
-    private static readonly JsonSerializerOptions Options = new()
+    /// <summary>
+    /// The single canonical serializer options for run files. Internal so tests
+    /// consume the exact production configuration instead of hand-copied
+    /// duplicates (which drift — the same parallel-list hazard as merge lists),
+    /// and so the public API layer can serialize in the on-disk shape.
+    ///
+    /// <c>IncludeFields</c> is required: the game's <c>SerializableCard</c>
+    /// (persisted as a removed-card snapshot) stores its data in public FIELDS,
+    /// not properties, so without this a removed card's props/enchantment
+    /// serialize as <c>{}</c> and rehydrate empty — silent data loss.
+    /// </summary>
+    internal static readonly JsonSerializerOptions Options = new()
     {
         WriteIndented = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+        IncludeFields = true,
     };
 
     /// <summary>Resolved absolute path to runs/ directory. Created on first save.</summary>
