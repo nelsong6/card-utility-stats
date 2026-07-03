@@ -345,6 +345,13 @@ This is intentionally outcome-shaped but still simple. It assumes the relic appl
 
 Relic aggregates live in `RunData.RelicAggregates`, keyed by relic id. Fields are shared across relics; each relic uses only relevant fields.
 
+Pael's sacrifice reward option is owned by `PaelsWing`, not `PaelsFlesh`.
+`PaelsWing.TryModifyCardRewardAlternatives` adds the `SACRIFICE` card reward
+alternative and `PaelsWing.OnSacrifice` increments the saved sacrifice count.
+`PaelsFlesh` is a separate combat max-energy relic that activates after turn 3.
+Track consumed card reward rarities and skipped sacrifice opportunities from the
+card reward alternative flow, not from PaelsFlesh's energy hooks.
+
 ## Generated And Supplemental Cards
 
 Not every visible card should become a permanent per-instance deck card.

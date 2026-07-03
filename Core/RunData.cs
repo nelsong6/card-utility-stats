@@ -467,6 +467,15 @@ public class RelicAggregate
     public int UncommonCardsTaken { get; set; }
     public int RareCardsTaken { get; set; }
 
+    // Total card reward options consumed when Pael's Wing's Sacrifice option
+    // is selected. The game model that owns the sacrifice option is
+    // PaelsWing; PaelsFlesh is the separate max-energy-after-turn-3 relic.
+    public int CommonCardsConsumed { get; set; }
+    public int UncommonCardsConsumed { get; set; }
+    public int RareCardsConsumed { get; set; }
+    public int SacrificesMade { get; set; }
+    public int SacrificesSkipped { get; set; }
+
     // Total card rewards whose creation options were modified by this relic.
     // Used by Prismatic Gem.
     public int CardRewardsAffected { get; set; }

@@ -301,6 +301,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is PaelsWing)
+            {
+                const string relicId = "RELIC.PAELS_WING";
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+
+                var body = BuildPaelsWingBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Pael's Wing", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is WhiteBeastStatue)
             {
                 const string relicId = "RELIC.WHITE_BEAST_STATUE";
@@ -552,6 +562,20 @@ public static class RelicHoverShowPatch
         Row3(sb, "Rare cards offered", agg.RareCardsOffered.ToString(), "");
         Row3(sb, "Uncommon cards taken", agg.UncommonCardsTaken.ToString(), "");
         Row3(sb, "Rare cards taken", agg.RareCardsTaken.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildPaelsWingBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "common cards consumed", agg.CommonCardsConsumed.ToString(), "");
+        Row3(sb, "uncommon cards consumed", agg.UncommonCardsConsumed.ToString(), "");
+        Row3(sb, "rare cards consumed", agg.RareCardsConsumed.ToString(), "");
+        Row3(sb, "Sacrifices made", agg.SacrificesMade.ToString(), "");
+        Row3(sb, "Sacrifices skipped", agg.SacrificesSkipped.ToString(), "");
+        var floorCount = RunTracker.GetCurrentFloorForRateStats();
+        var rate = floorCount <= 0 ? 0m : (decimal)agg.SacrificesMade / floorCount;
+        Row3(sb, "Sacrifice rate", FormatDecimal(rate), "/floor");
         return sb.ToString();
     }
 
