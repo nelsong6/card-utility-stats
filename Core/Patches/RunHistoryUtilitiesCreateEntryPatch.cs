@@ -1,4 +1,3 @@
-using System;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Runs;
 
@@ -34,9 +33,10 @@ public static class RunHistoryUtilitiesCreateEntryPatch
     {
         // Guard the terminal run-end funnel: an unhandled throw here would
         // propagate into RunManager.OnEnded / NMainMenu.AbandonRun and could
-        // skip the game's own run cleanup. Always-on Error log (not LogDebug)
-        // so a broken run-end is visible without a debug flag.
-        try
+        // skip the game's own run cleanup. PatchGuard logs at always-on Error
+        // level (not the debug-gated LogDebug) so a broken run-end is visible
+        // without a debug flag.
+        PatchGuard.Run(nameof(RunHistoryUtilitiesCreateEntryPatch), () =>
         {
             string outcome;
             if (isAbandoned) outcome = "abandoned";
@@ -44,10 +44,6 @@ public static class RunHistoryUtilitiesCreateEntryPatch
             else outcome = "loss";
 
             RunTracker.OnRunEnded(outcome);
-        }
-        catch (Exception e)
-        {
-            CoreMain.Logger.Error($"RunHistoryUtilitiesCreateEntryPatch.Postfix failed: {e}");
-        }
+        });
     }
 }

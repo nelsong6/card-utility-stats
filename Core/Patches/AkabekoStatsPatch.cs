@@ -24,16 +24,12 @@ public static class AkabekoAfterSideTurnStartPatch
     [HarmonyPrefix]
     public static void Prefix(CombatSide side, ICombatState combatState)
     {
-        try
+        PatchGuard.Run(nameof(AkabekoAfterSideTurnStartPatch), () =>
         {
             if (side != CombatSide.Player) return;
             if (combatState == null || combatState.RoundNumber != 1) return;
             RunTracker.ArmAkabekoVigorAttribution();
-        }
-        catch (Exception e)
-        {
-            CoreMain.LogDebug($"AkabekoAfterSideTurnStartPatch failed: {e.Message}");
-        }
+        });
     }
 }
 

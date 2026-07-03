@@ -579,9 +579,9 @@ public static class CardHoverShowPatch
                      .OrderByDescending(r => r.Count)
                      .ThenBy(r => r.DisplayName))
         {
-            var displayName = string.IsNullOrWhiteSpace(reason.DisplayName)
+            var displayName = StatsTooltip.EscapeBbcode(string.IsNullOrWhiteSpace(reason.DisplayName)
                 ? reason.ReasonId
-                : reason.DisplayName;
+                : reason.DisplayName);
             Row3(sb, $"Replay from {displayName}", reason.Count.ToString(), "");
         }
 
@@ -593,9 +593,9 @@ public static class CardHoverShowPatch
                      .OrderByDescending(r => r.Count)
                      .ThenBy(r => r.DisplayName))
         {
-            var displayName = string.IsNullOrWhiteSpace(reason.DisplayName)
+            var displayName = StatsTooltip.EscapeBbcode(string.IsNullOrWhiteSpace(reason.DisplayName)
                 ? reason.ReasonId
-                : reason.DisplayName;
+                : reason.DisplayName);
             Row3(sb, $"No damage from {displayName}", reason.Count.ToString(), "");
         }
     }
@@ -922,7 +922,10 @@ public static class CardHoverShowPatch
 
     private static string GetAppliedEffectLabel(AppliedEffectAggregate effect)
     {
-        var label = string.IsNullOrWhiteSpace(effect.DisplayName) ? effect.EffectId : effect.DisplayName;
+        // Escape the game/data-derived name before it lands in a BBCode cell:
+        // a display name containing '[' would otherwise be parsed as markup.
+        var label = StatsTooltip.EscapeBbcode(
+            string.IsNullOrWhiteSpace(effect.DisplayName) ? effect.EffectId : effect.DisplayName);
         if (!string.IsNullOrWhiteSpace(effect.IconPath))
             return GetInlineIconStatLabel(effect.IconPath, label);
         if (IsEnergyEffect(effect))
@@ -983,7 +986,7 @@ public static class CardHoverShowPatch
 
     private static string GetBlockedDrawReasonLabel(string reasonDisplayName)
     {
-        return GetBlockedDrawStatLabel($"blocked by {reasonDisplayName}");
+        return GetBlockedDrawStatLabel($"blocked by {StatsTooltip.EscapeBbcode(reasonDisplayName)}");
     }
 
     private static bool IsEnergyEffect(AppliedEffectAggregate effect)
