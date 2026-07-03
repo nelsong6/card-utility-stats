@@ -2083,6 +2083,7 @@ public static class RunTracker
     private const string MealTicketRelicId = "RELIC.MEAL_TICKET";
     private const string BurningBloodRelicId = "RELIC.BURNING_BLOOD";
     private const string BloodVialRelicId = "RELIC.BLOOD_VIAL";
+    private const string LeesWaffleRelicId = "RELIC.LEES_WAFFLE";
     private const string WhiteBeastStatueRelicId = "RELIC.WHITE_BEAST_STATUE";
     private const string BoundPhylacteryRelicId = "RELIC.BOUND_PHYLACTERY";
     private const string PhylacteryUnboundRelicId = "RELIC.PHYLACTERY_UNBOUND";
@@ -3030,6 +3031,36 @@ public static class RunTracker
             nameof(RecordEternalFeatherTrigger),
             forceDirectRunPersistence: true,
             allowZeroAttempt: true);
+    }
+
+    /// <summary>
+    /// Record Lee's Waffle's observed pickup HP gain. The relic first grants
+    /// max HP, which itself heals, then heals to full; the full pickup delta is
+    /// clearer than splitting those two game commands into separate attempts.
+    /// </summary>
+    public static void RecordLeesWafflePickupHpGained(decimal hpGained)
+    {
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(LeesWaffleRelicId);
+                RecordLeesWafflePickupHpGainedForTest(agg, hpGained);
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordLeesWafflePickupHpGained failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordLeesWafflePickupHpGainedForTest(RelicAggregate agg, decimal hpGained)
+    {
+        if (agg == null || hpGained < 0m) return;
+
+        agg.Activations++;
+        agg.TotalHealingRestored += hpGained;
     }
 
     private static void RecordRelicHealingTrigger(

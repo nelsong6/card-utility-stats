@@ -364,6 +364,11 @@ raw per-hit value passed into `CreatureCmd.Damage` before hook modifiers run.
 SpireLens labels this "base damage added" rather than deriving from final
 damage, so effects such as Lethality or Vulnerable do not inflate the stat.
 
+Pickup relics with multi-step health effects should record the observed result
+across the full pickup callback when that is what the player experiences. Lee's
+Waffle records current-HP gained across `AfterObtained`, covering both its
+max-HP grant and the follow-up heal-to-full.
+
 ## Generated And Supplemental Cards
 
 Not every visible card should become a permanent per-instance deck card.
