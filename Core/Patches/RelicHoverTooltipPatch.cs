@@ -484,7 +484,7 @@ public static class RelicHoverShowPatch
             .OrderBy(kvp => kvp.Key == "colorless" ? 1 : 0)
             .ThenBy(kvp => kvp.Value.DisplayName, StringComparer.OrdinalIgnoreCase))
         {
-            Row3(sb, $"{category.Value.DisplayName} rewards", category.Value.Count.ToString(), "");
+            Row3(sb, $"{StatsTooltip.EscapeBbcode(category.Value.DisplayName)} rewards", category.Value.Count.ToString(), "");
         }
         return sb.ToString();
     }
@@ -606,7 +606,7 @@ public static class RelicHoverShowPatch
             if (reason.Amount <= 0m) continue;
             var label = string.IsNullOrWhiteSpace(reason.DisplayName)
                 ? "lost to other/prevented"
-                : $"lost to {reason.DisplayName}";
+                : $"lost to {StatsTooltip.EscapeBbcode(reason.DisplayName)}";
             Row3(sb, label, FormatDecimal(reason.Amount), "");
         }
     }

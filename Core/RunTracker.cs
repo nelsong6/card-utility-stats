@@ -67,16 +67,12 @@ public static class RunTracker
     private static readonly System.Threading.AsyncLocal<EnemyStatusSourceFrame?> _enemyStatusSourceFrame = new();
     private static int _pendingPlayerBlockClearAmount;
     private static bool _pendingPlayerBlockClearArmed;
-    private static bool _pendingOrichalcumBlockAttribution;
     private static bool _pendingAnchorBlockAttribution;
-    private static bool _pendingTheAbacusBlockAttribution;
     private static bool _pendingAkabekoVigorAttribution;
     private static bool _pendingBoneFluteBlockAttribution;
     private static readonly List<PendingRelicHealing> _pendingRelicHeals = new();
     private static bool _pendingHappyFlowerEnergyAttribution;
     private static bool _pendingBoomingConchEnergyAttribution;
-    private static readonly List<Player> _pendingGremlinHornEnergyAttributions = new();
-    private static readonly List<Player> _pendingGremlinHornDrawAttributions = new();
     private static readonly List<Player> _pendingPendulumDrawAttributions = new();
     private static readonly List<Creature> _pendingParryingShieldDamageAttributions = new();
     private static readonly List<Creature> _pendingHornCleatBlockAttributions = new();
@@ -2162,37 +2158,6 @@ public static class RunTracker
     }
 
     /// <summary>
-    /// Record block gained from Orichalcum's end-of-turn effect. Called from
-    /// <see cref="Patches.HookAfterBlockGainedPatch"/> when the attribution
-    /// flag is armed and the player gains block.
-    /// </summary>
-    public static void RecordOrichalcumBlockGained(int amount)
-    {
-        if (amount <= 0) return;
-
-        lock (_lock)
-        {
-            try
-            {
-                if (!_pendingOrichalcumBlockAttribution) return;
-                _pendingOrichalcumBlockAttribution = false;
-
-                _pendingCombat ??= new PendingCombat();
-                if (!_pendingCombat.RelicAggregates.TryGetValue(OrichalcumRelicId, out var agg))
-                {
-                    agg = new RelicAggregate();
-                    _pendingCombat.RelicAggregates[OrichalcumRelicId] = agg;
-                }
-                agg.AdditionalBlockGained += amount;
-            }
-            catch (Exception e)
-            {
-                CoreMain.LogDebug($"RecordOrichalcumBlockGained failed: {e.Message}");
-            }
-        }
-    }
-
-    /// <summary>
     /// Record Orichalcum's owner-specific end-turn check being blocked by the
     /// player already having block. Called from the relic's
     /// <c>BeforeSideTurnEndVeryEarly</c> method, where the game performs this
@@ -2233,28 +2198,6 @@ public static class RunTracker
         lock (_lock)
         {
             _pendingAnchorBlockAttribution = false;
-        }
-    }
-
-    public static void RecordAnchorBlockGained(int amount)
-    {
-        if (amount <= 0) return;
-
-        lock (_lock)
-        {
-            try
-            {
-                if (!_pendingAnchorBlockAttribution) return;
-                _pendingAnchorBlockAttribution = false;
-
-                var agg = GetOrCreateRelicAggregateLocked(AnchorRelicId);
-                agg.Activations += 1;
-                agg.AdditionalBlockGained += amount;
-            }
-            catch (Exception e)
-            {
-                CoreMain.LogDebug($"RecordAnchorBlockGained failed: {e.Message}");
-            }
         }
     }
 
@@ -2349,37 +2292,6 @@ public static class RunTracker
     }
 
     /// <summary>
-    /// Record block gained from The Abacus's shuffle effect. Called from
-    /// <see cref="Patches.HookAfterBlockGainedPatch"/> when the attribution
-    /// flag is armed and the player gains block.
-    /// </summary>
-    public static void RecordTheAbacusBlockGained(int amount)
-    {
-        if (amount <= 0) return;
-
-        lock (_lock)
-        {
-            try
-            {
-                if (!_pendingTheAbacusBlockAttribution) return;
-                _pendingTheAbacusBlockAttribution = false;
-
-                _pendingCombat ??= new PendingCombat();
-                if (!_pendingCombat.RelicAggregates.TryGetValue(TheAbacusRelicId, out var agg))
-                {
-                    agg = new RelicAggregate();
-                    _pendingCombat.RelicAggregates[TheAbacusRelicId] = agg;
-                }
-                agg.AdditionalBlockGained += amount;
-            }
-            catch (Exception e)
-            {
-                CoreMain.LogDebug($"RecordTheAbacusBlockGained failed: {e.Message}");
-            }
-        }
-    }
-
-    /// <summary>
     /// Record Letter Opener's every-N-skills activation. The game does not
     /// source its damage entries to the relic, so this records attempted damage
     /// from the owner callback and the live hittable enemy count at trigger time.
@@ -2465,38 +2377,6 @@ public static class RunTracker
         lock (_lock)
         {
             _pendingBoneFluteBlockAttribution = false;
-        }
-    }
-
-    /// <summary>
-    /// Record actual block gained from Bone Flute's owned-Osty attack trigger.
-    /// Called from <see cref="Patches.HookAfterBlockGainedPatch"/> while the
-    /// owner-specific attribution flag is armed.
-    /// </summary>
-    public static void RecordBoneFluteBlockGained(int amount)
-    {
-        if (amount <= 0) return;
-
-        lock (_lock)
-        {
-            try
-            {
-                if (!_pendingBoneFluteBlockAttribution) return;
-                _pendingBoneFluteBlockAttribution = false;
-
-                _pendingCombat ??= new PendingCombat();
-                if (!_pendingCombat.RelicAggregates.TryGetValue(BoneFluteRelicId, out var agg))
-                {
-                    agg = new RelicAggregate();
-                    _pendingCombat.RelicAggregates[BoneFluteRelicId] = agg;
-                }
-
-                agg.AdditionalBlockGained += amount;
-            }
-            catch (Exception e)
-            {
-                CoreMain.LogDebug($"RecordBoneFluteBlockGained failed: {e.Message}");
-            }
         }
     }
 
@@ -3172,32 +3052,6 @@ public static class RunTracker
     }
 
     /// <summary>
-    /// Record energy generated by Happy Flower's every-3-turns effect. Called
-    /// from <see cref="Patches.PlayerGainEnergyPatch"/> when the Happy Flower
-    /// attribution window is armed and the player gains energy.
-    /// </summary>
-    public static void RecordHappyFlowerEnergyGained(int amount)
-    {
-        if (amount <= 0) return;
-
-        lock (_lock)
-        {
-            try
-            {
-                if (!_pendingHappyFlowerEnergyAttribution) return;
-                _pendingHappyFlowerEnergyAttribution = false;
-
-                var agg = GetOrCreateRelicAggregateLocked(HappyFlowerRelicId);
-                agg.EnergyGenerated += amount;
-            }
-            catch (Exception e)
-            {
-                CoreMain.LogDebug($"RecordHappyFlowerEnergyGained failed: {e.Message}");
-            }
-        }
-    }
-
-    /// <summary>
     /// Arm the one-shot flag that attributes the next player energy gain to
     /// Booming Conch's Elite combat-start effect.
     /// </summary>
@@ -3214,27 +3068,6 @@ public static class RunTracker
         lock (_lock)
         {
             _pendingBoomingConchEnergyAttribution = false;
-        }
-    }
-
-    public static void RecordBoomingConchEnergyGained(int amount)
-    {
-        if (amount <= 0) return;
-
-        lock (_lock)
-        {
-            try
-            {
-                if (!_pendingBoomingConchEnergyAttribution) return;
-                _pendingBoomingConchEnergyAttribution = false;
-
-                var agg = GetOrCreateRelicAggregateLocked(BoomingConchRelicId);
-                agg.EnergyGenerated += amount;
-            }
-            catch (Exception e)
-            {
-                CoreMain.LogDebug($"RecordBoomingConchEnergyGained failed: {e.Message}");
-            }
         }
     }
 
@@ -3359,27 +3192,6 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"DispatchPlayerEnergyGain failed: {e.Message}");
-            }
-        }
-    }
-
-    public static void RecordGremlinHornEnergyGained(PlayerCombatState combatState, int amount)
-    {
-        if (amount <= 0) return;
-
-        lock (_lock)
-        {
-            try
-            {
-                var owner = combatState._player;
-                if (!ConsumePendingGremlinHornAttribution(_pendingGremlinHornEnergyAttributions, owner)) return;
-
-                var agg = GetOrCreateRelicAggregateLocked(GremlinHornRelicId);
-                agg.EnergyGenerated += amount;
-            }
-            catch (Exception e)
-            {
-                CoreMain.LogDebug($"RecordGremlinHornEnergyGained failed: {e.Message}");
             }
         }
     }
@@ -3632,16 +3444,6 @@ public static class RunTracker
         }
     }
 
-    private static void DisarmGremlinHornEnergyAttributionLocked(Player player)
-    {
-        for (int i = 0; i < _pendingGremlinHornEnergyAttributions.Count; i++)
-        {
-            if (!ReferenceEquals(_pendingGremlinHornEnergyAttributions[i], player)) continue;
-            _pendingGremlinHornEnergyAttributions.RemoveAt(i);
-            return;
-        }
-    }
-
     private static bool ConsumePendingGremlinHornAttribution(List<Player> pendingPlayers, Player? player)
     {
         if (player == null) return false;
@@ -3794,13 +3596,6 @@ public static class RunTracker
         }
     }
 
-    /// <summary>
-    /// Accumulate block gained from Cloak Clasp's end-of-turn effect. Called
-    /// from <see cref="Patches.HookAfterBlockGainedPatch"/> while the
-    /// attribution window is armed. Does NOT clear the flag so that multiple
-    /// <c>AfterBlockGained</c> calls (one per card in hand) are all captured.
-    /// The window is cleared at the <c>Hook.AfterTurnEnd</c> boundary.
-    /// </summary>
     /// <summary>Single arbitration point for player block gains at
     /// Hook.AfterBlockGained. The oldest fresh armed PlayerBlockGain window
     /// claims the gain; that relic's AdditionalBlockGained is credited.
@@ -3824,26 +3619,6 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"DispatchPlayerBlockGain failed: {e.Message}");
-            }
-        }
-    }
-
-    public static void RecordCloakClaspBlockGained(int amount)
-    {
-        if (amount <= 0) return;
-
-        lock (_lock)
-        {
-            try
-            {
-                if (!_pendingCloakClaspBlockAttribution) return;
-
-                var agg = GetOrCreateRelicAggregateLocked(CloakClaspRelicId);
-                agg.AdditionalBlockGained += amount;
-            }
-            catch (Exception e)
-            {
-                CoreMain.LogDebug($"RecordCloakClaspBlockGained failed: {e.Message}");
             }
         }
     }
@@ -5987,7 +5762,6 @@ public static class RunTracker
         {
             CardInstanceId = cardInstanceId,
             Remaining = amount,
-            Sequence = _pendingCombat.NextBlockSequence++,
         });
     }
 
@@ -6085,6 +5859,23 @@ public static class RunTracker
                 // show up as less HP loss. That's what the user wants to
                 // see: what did this card really cost me?
                 agg.TotalHpLost += result.UnblockedDamage;
+
+                _pendingCombat.CombatEvents.Add(new CardEvent
+                {
+                    T = Now(),
+                    Type = "damage_received",
+                    CardId = instanceId,
+                    // A player creature always has a Character id; the
+                    // "PLAYER" fallback only guards the theoretical null
+                    // and — crucially — never carries the "MONSTER."
+                    // prefix, so the repair path keeps classifying this
+                    // as self-damage (excluded from offensive totals).
+                    Receiver = entry.Receiver.Player?.Character?.Id.ToString() ?? "PLAYER",
+                    Blocked = result.BlockedDamage,
+                    Unblocked = result.UnblockedDamage,
+                    Overkill = result.OverkillDamage,
+                    Killed = result.WasTargetKilled,
+                });
             }
             else
             {
@@ -6098,21 +5889,26 @@ public static class RunTracker
                 agg.TotalOverkill += result.OverkillDamage;
                 agg.TotalEffective += damageTotals.EffectiveDamage;
                 if (result.WasTargetKilled) agg.Kills++;
-            }
 
-            _pendingCombat.CombatEvents.Add(new CardEvent
-            {
-                T = Now(),
-                Type = "damage_received",
-                CardId = instanceId,
-                Receiver = entry.Receiver.IsPlayer
-                    ? entry.Receiver.Player?.Character?.Id.ToString()
-                    : entry.Receiver.Monster?.Id.ToString(),
-                Blocked = result.BlockedDamage,
-                Unblocked = result.UnblockedDamage,
-                Overkill = result.OverkillDamage,
-                Killed = result.WasTargetKilled,
-            });
+                _pendingCombat.CombatEvents.Add(new CardEvent
+                {
+                    T = Now(),
+                    Type = "damage_received",
+                    CardId = instanceId,
+                    // GetEnemyId falls back to "MONSTER.UNKNOWN" when the
+                    // receiver has no Monster ref, so an enemy event always
+                    // carries the "MONSTER." prefix the repair keys on. A
+                    // raw Monster?.Id.ToString() could be null, and the
+                    // repair drops null/non-"MONSTER." receivers — silently
+                    // wiping this card's damage + kills on any adopt or
+                    // Continue rebuild (#254).
+                    Receiver = GetEnemyId(entry.Receiver),
+                    Blocked = result.BlockedDamage,
+                    Unblocked = result.UnblockedDamage,
+                    Overkill = result.OverkillDamage,
+                    Killed = result.WasTargetKilled,
+                });
+            }
         }
     }
 
@@ -6250,8 +6046,14 @@ public static class RunTracker
         {
             if (!string.Equals(cardEvent.Type, "damage_received", StringComparison.Ordinal)) continue;
             if (string.IsNullOrWhiteSpace(cardEvent.CardId)) continue;
-            if (string.IsNullOrWhiteSpace(cardEvent.Receiver)) continue;
-            if (!cardEvent.Receiver.StartsWith("MONSTER.", StringComparison.Ordinal)) continue;
+            // A null/empty Receiver is treated as enemy damage. The pre-#254
+            // writer could stamp a null Receiver for enemy hits (no Monster
+            // ref), and dropping those here permanently wiped the card's
+            // offensive totals on rebuild. Self-damage always carries a
+            // non-null character id, so a present-but-non-"MONSTER." receiver
+            // is the only thing still excluded from offensive stats.
+            if (!string.IsNullOrWhiteSpace(cardEvent.Receiver) &&
+                !cardEvent.Receiver.StartsWith("MONSTER.", StringComparison.Ordinal)) continue;
 
             rebuilt.TryGetValue(cardEvent.CardId, out var totals);
 
@@ -6781,7 +6583,6 @@ internal class PendingCombat
     public Dictionary<Creature, PendingPoisonTick> PendingPoisonTicks { get; }
         = new(ReferenceEqualityComparer.Instance);
     public RunMetaStats MetaStats { get; } = new();
-    public int NextBlockSequence { get; set; }
 
     /// <summary>Exclusive per-kind attribution windows for this combat. A fresh
     /// PendingCombat (setup/end, run boundary) starts empty, so this IS the reset.</summary>
@@ -6798,7 +6599,6 @@ internal sealed class BlockChunk
 {
     public string? CardInstanceId { get; init; }
     public int Remaining { get; set; }
-    public int Sequence { get; init; }
     public bool CountsForCardStats => CardInstanceId != null;
 }
 

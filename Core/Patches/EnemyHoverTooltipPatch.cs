@@ -75,9 +75,9 @@ public static class EnemyHoverShowPatch
                      .ThenBy(card => card.DisplayName))
         {
             if (card.Count <= 0) continue;
-            var label = string.IsNullOrWhiteSpace(card.DisplayName)
+            var label = StatsTooltip.EscapeBbcode(string.IsNullOrWhiteSpace(card.DisplayName)
                 ? RunTracker.FormatCardIdForDisplay(card.CardId)
-                : card.DisplayName;
+                : card.DisplayName);
             Row3(sb, label, card.Count.ToString(), "");
         }
 

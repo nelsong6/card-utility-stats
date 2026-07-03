@@ -293,6 +293,20 @@ public static class StatsTooltip
         _panel.CallDeferred(Control.MethodName.ResetSize);
     }
 
+    /// <summary>
+    /// Escape a dynamic string for safe inclusion in a RichTextLabel BBCode
+    /// body. A display name containing '[' — a modded card/relic/status id or
+    /// future game content — would otherwise be parsed as a BBCode tag and
+    /// break the tooltip's formatting (or swallow the text that follows).
+    /// Godot renders "[lb]" as a literal '[', so neutralizing the opening
+    /// bracket is enough; a lone ']' is inert.
+    /// </summary>
+    public static string EscapeBbcode(string? text)
+    {
+        if (string.IsNullOrEmpty(text)) return text ?? string.Empty;
+        return text.Replace("[", "[lb]");
+    }
+
     public static void Hide()
     {
         _anchor = null;
