@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using HarmonyLib;
+using MegaCrit.Sts2.Core.Entities.Creatures;
 
 namespace SpireLens.Core.Patches;
 
@@ -19,13 +21,16 @@ public static class PoisonPowerAfterSideTurnStartPatch
         return poisonType == null ? null : AccessTools.Method(poisonType, "AfterSideTurnStart");
     }
 
+    // PoisonPower.AfterSideTurnStart bails unless participants.Contains(base.Owner)
+    // (verified PoisonPower.cs line 57). Bind participants by name and only arm
+    // when the tick will actually fire.
     [HarmonyPrefix]
-    public static void Prefix(object __instance)
+    public static void Prefix(object __instance, IReadOnlyList<Creature> participants)
     {
         try
         {
             if (__instance != null)
-                RunTracker.NotePoisonTickStarting(__instance);
+                RunTracker.NotePoisonTickStarting(__instance, participants);
         }
         catch (Exception e)
         {

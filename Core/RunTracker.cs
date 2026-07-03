@@ -4475,7 +4475,7 @@ public static class RunTracker
         }
     }
 
-    public static void NotePoisonTickStarting(object poisonPower)
+    public static void NotePoisonTickStarting(object poisonPower, IReadOnlyList<Creature>? participants = null)
     {
         lock (_lock)
         {
@@ -4483,6 +4483,14 @@ public static class RunTracker
             {
                 var target = TryResolvePoisonPowerTarget(poisonPower);
                 if (target == null || target.IsPlayer) return;
+
+                // Mirror PoisonPower.cs line 57: base.Owner == our resolved
+                // target, so if it is not a participant no tick fires and we
+                // must NOT arm (a stale window would mis-claim a later
+                // null-dealer hit). participants==null (defensive) falls back
+                // to arming (old behavior).
+                if (participants != null && !ParticipantsContain(participants, target))
+                    return;
 
                 _pendingCombat ??= new PendingCombat();
                 _pendingCombat.PendingPoisonTicks[target] = new PendingPoisonTick
@@ -4497,7 +4505,7 @@ public static class RunTracker
         }
     }
 
-    public static void NoteNoxiousFumesTick(object noxiousFumesPower)
+    public static void NoteNoxiousFumesTick(object noxiousFumesPower, IReadOnlyList<Creature>? participants = null)
     {
         lock (_lock)
         {
@@ -4507,6 +4515,11 @@ public static class RunTracker
 
                 var owner = GetPowerReceiverCreature(power);
                 if (owner == null) return;
+
+                // Mirror NoxiousFumesPower.cs line 28: only arm when owner
+                // (== base.Owner) is a participant of the starting side.
+                if (participants != null && !ParticipantsContain(participants, owner))
+                    return;
 
                 _pendingCombat ??= new PendingCombat();
                 if (!_pendingCombat.NoxiousFumesContributionsByPower.TryGetValue(power, out var contributions)
@@ -4968,6 +4981,17 @@ public static class RunTracker
             return collection.Count;
 
         return null;
+    }
+
+    // Reference-equality membership test matching the game's
+    // participants.Contains(base.Owner) (PoisonPower.cs line 57 /
+    // NoxiousFumesPower.cs line 28). Creatures are compared by identity.
+    private static bool ParticipantsContain(IReadOnlyList<Creature> participants, Creature creature)
+    {
+        if (participants == null || creature == null) return false;
+        for (int i = 0; i < participants.Count; i++)
+            if (ReferenceEquals(participants[i], creature)) return true;
+        return false;
     }
 
     private static Creature? GetPowerReceiverCreature(PowerModel power)
@@ -5478,6 +5502,14 @@ public static class RunTracker
         }
     }
 
+    // Max CombatHistory-entry distance between a poison window being armed in
+    // AfterSideTurnStart and its tick's DamageReceivedEntry arriving. Ticks land
+    // within a handful of history entries; 24 tolerates intervening
+    // power/decrement/vfx entries while rejecting a window that survived to an
+    // unrelated later hit. Re-stamped per tick, so it applies per-tick-gap not
+    // across a whole multi-iteration burst.
+    private const int PoisonTickMaxHistoryDistance = 24;
+
     private static bool TryRecordPoisonTickDamage(DamageReceivedEntry entry)
     {
         lock (_lock)
@@ -5497,23 +5529,48 @@ public static class RunTracker
             decimal totalAttempted = tickTotals.IntendedDamage;
             if (totalAttempted <= 0m) return false;
 
+            // Genuine poison ticks are dealt with dealer:null AND cardSource:null
+            // (PoisonPower.cs line 64). A non-null Dealer means some other hit
+            // that merely lands on a poisoned creature; never a tick.
+            if (entry.Dealer != null)
+                return false;
+
+            // Bounded freshness. The old `historyCount >= ArmedAtHistoryCount`
+            // was vacuous (CombatHistory only grows). A tick's entry lands only
+            // a small bounded number of history entries after the arm.
             bool armedTick = false;
-            if (_pendingCombat.PendingPoisonTicks.Remove(entry.Receiver, out var pendingTick))
+            if (_pendingCombat.PendingPoisonTicks.TryGetValue(entry.Receiver, out var pendingTick))
             {
                 int historyCount = CombatManager.Instance?.History?.Entries?.Count() ?? 0;
-                armedTick = historyCount >= pendingTick.ArmedAtHistoryCount;
+                int delta = historyCount - pendingTick.ArmedAtHistoryCount;
+                if (delta >= 0 && delta <= PoisonTickMaxHistoryDistance)
+                    armedTick = true;
+                else
+                    _pendingCombat.PendingPoisonTicks.Remove(entry.Receiver); // stale
             }
 
             decimal trackedTotal = ownership.Values.Sum(share => Math.Max(0m, share.Amount));
             if (trackedTotal <= 0m) return false;
 
+            // Dealer==null already established; fallback reduces to amount match.
             bool fallbackAmountMatch = AreClose(trackedTotal, totalAttempted);
-            bool fallbackDealerMatch = entry.Dealer == null;
-            if (!armedTick && !(fallbackDealerMatch && fallbackAmountMatch))
+            if (!armedTick && !fallbackAmountMatch)
             {
                 if (entry.Result.WasTargetKilled)
                     _pendingCombat.PoisonOwnershipByTarget.Remove(entry.Receiver);
                 return false;
+            }
+
+            // One AfterSideTurnStart loops TriggerCount times, each a separate
+            // null-dealer entry on the same receiver. Keep the armed entry live
+            // across the burst and re-stamp its freshness clock so the next tick
+            // stays in-window; dropped on kill/exhaust/stale below.
+            if (armedTick && _pendingCombat.PendingPoisonTicks.ContainsKey(entry.Receiver))
+            {
+                _pendingCombat.PendingPoisonTicks[entry.Receiver] = new PendingPoisonTick
+                {
+                    ArmedAtHistoryCount = CombatManager.Instance?.History?.Entries?.Count() ?? 0,
+                };
             }
 
             if (trackedTotal > totalAttempted)
@@ -5547,6 +5604,7 @@ public static class RunTracker
             if (entry.Result.WasTargetKilled || totalAttempted <= 1m)
             {
                 _pendingCombat.PoisonOwnershipByTarget.Remove(entry.Receiver);
+                _pendingCombat.PendingPoisonTicks.Remove(entry.Receiver);
                 return true;
             }
 
