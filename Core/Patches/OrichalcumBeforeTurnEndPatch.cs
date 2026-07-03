@@ -85,11 +85,13 @@ public static class OrichalcumBeforeTurnEndPatch
 [HarmonyPatch]
 public static class HookAfterTurnEndOrichalcumCleanupPatch
 {
-    private static System.Collections.Generic.IEnumerable<MethodBase> TargetMethods()
-    {
-        var m = AccessTools.Method(typeof(Hook), "AfterTurnEnd");
-        if (m != null) yield return m;
-    }
+    // Prepare() returning false is Harmony's idiom for skipping a patch class
+    // cleanly — no exception, no error log — when the target game method is
+    // absent (the STS2 update removed Hook.AfterTurnEnd). This replaces an
+    // empty-TargetMethods() approach, which Harmony throws on.
+    private static bool Prepare() => AccessTools.Method(typeof(Hook), "AfterTurnEnd") != null;
+
+    private static MethodBase TargetMethod() => AccessTools.Method(typeof(Hook), "AfterTurnEnd");
 
     [HarmonyPrefix]
     public static void Prefix(CombatSide side)
