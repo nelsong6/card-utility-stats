@@ -1,0 +1,76 @@
+{
+  "run_id": "open-branch-relic-stats-fixture",
+  "started_at": "2026-06-29T00:00:00Z",
+  "updated_at": "2026-06-29T00:15:00Z",
+  "outcome": "in_progress",
+  "aggregates": {
+    "CARD.STRIKE_KIN#1": {
+      "plays": 1
+    }
+  },
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.ANCHOR": {
+      "activations": 2,
+      "additional_block_gained": 20
+    },
+    "RELIC.LETTER_OPENER": {
+      "activations": 3,
+      "total_damage_attempted": 45,
+      "total_targets": 9
+    },
+    "RELIC.BLOOD_VIAL": {
+      "activations": 2,
+      "total_healing_attempted": 4,
+      "total_healing_restored": 3,
+      "total_healing_lost": 1,
+      "healing_lost_reasons": {
+        "full_hp": {
+          "reason_id": "full_hp",
+          "display_name": "full HP",
+          "amount": 1
+        }
+      }
+    },
+    "RELIC.AKABEKO": {
+      "vigor_gained": 16
+    },
+    "RELIC.BOOMING_CONCH": {
+      "energy_generated": 2,
+      "additional_cards_drawn": 4
+    },
+    "RELIC.PENDULUM": {
+      "activations": 3,
+      "additional_cards_drawn": 6
+    },
+    "RELIC.PARRYING_SHIELD": {
+      "activations": 2,
+      "total_damage_attempted": 17,
+      "total_damage_dealt": 11,
+      "total_damage_blocked": 4,
+      "total_damage_overkill": 2,
+      "kills": 1,
+      "total_targets": 2
+    },
+    "RELIC.HORN_CLEAT": {
+      "activations": 2,
+      "additional_block_gained": 24
+    },
+    "RELIC.TOOLBOX": {
+      "activations": 2,
+      "uncommon_cards_offered": 4,
+      "rare_cards_offered": 1,
+      "uncommon_cards_taken": 2,
+      "rare_cards_taken": 1
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.STRIKE_KIN": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.STRIKE_KIN": 1
+  }
+}

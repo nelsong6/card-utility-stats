@@ -81,6 +81,21 @@ public class EnemyDamageStatsTests
     }
 
     [Fact]
+    public void EnemyTooltip_ShowsZeroDamageRowsBeforeEnemyHasAttacked()
+    {
+        var body = (string)(BuildEnemyDamageBodyMethod.Invoke(null, new object?[]
+        {
+            new EnemyAggregate(),
+        }) ?? throw new InvalidOperationException("BuildEnemyDamageBodyBBCode returned null."));
+
+        Assert.Contains("Damage attempted", body);
+        Assert.Contains("Damage dealt", body);
+        Assert.Contains("Damage blocked", body);
+        Assert.Contains("Damage instances", body);
+        Assert.Contains("[b]0[/b]", body);
+    }
+
+    [Fact]
     public void RunData_OlderShapeWithoutEnemyAggregates_DeserializesWithEmptyDefault()
     {
         const string json = """

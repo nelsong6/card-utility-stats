@@ -91,6 +91,10 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds run-level enemy aggregates for enemy damage dealt to the player and
   status cards that enemies actually add, split by destination pile and status
   card id.
+- `open-branch-relic-stats-run.json`
+  Adds consolidated relic aggregates rescued from stale open branches: Anchor,
+  Letter Opener, Blood Vial, Akabeko, Booming Conch, Pendulum, Parrying
+  Shield, Horn Cleat, and Toolbox.
 
 Why these exist:
 

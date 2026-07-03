@@ -33,6 +33,7 @@ public static class PlayerGainEnergyPatch
             {
                 RunTracker.RecordEnergyGained(__instance, gained);
                 RunTracker.RecordHappyFlowerEnergyGained(gained);
+                RunTracker.RecordBoomingConchEnergyGained(gained);
                 RunTracker.RecordGremlinHornEnergyGained(__instance, gained);
             }
         }

@@ -62,15 +62,22 @@ public static class RunTracker
     private static int _pendingPlayerBlockClearAmount;
     private static bool _pendingPlayerBlockClearArmed;
     private static bool _pendingOrichalcumBlockAttribution;
+    private static bool _pendingAnchorBlockAttribution;
     private static bool _pendingTheAbacusBlockAttribution;
+    private static bool _pendingAkabekoVigorAttribution;
     private static bool _pendingBoneFluteBlockAttribution;
     private static readonly List<PendingRelicHealing> _pendingRelicHeals = new();
     private static bool _pendingHappyFlowerEnergyAttribution;
+    private static bool _pendingBoomingConchEnergyAttribution;
     private static readonly List<Player> _pendingGremlinHornEnergyAttributions = new();
     private static readonly List<Player> _pendingGremlinHornDrawAttributions = new();
+    private static readonly List<Player> _pendingPendulumDrawAttributions = new();
+    private static readonly List<Creature> _pendingParryingShieldDamageAttributions = new();
+    private static readonly List<Creature> _pendingHornCleatBlockAttributions = new();
     private static int? _lastPrismaticGemEnergyRoundNumber;
     private static bool _pendingCloakClaspBlockAttribution;
     private static int _pendingWhiteBeastPotionRewards;
+    private static int _pendingToolboxOfferScreens;
     private static readonly HashSet<PotionReward> _whiteBeastPotionRewards = new(ReferenceEqualityComparer.Instance);
     private static bool _shivAvailableThisRun;
     private static CardModel? _shivDeckViewCard;
@@ -652,12 +659,20 @@ public static class RunTracker
         _pendingPlayerBlockClearAmount = 0;
         _pendingPlayerBlockClearArmed = false;
         _pendingOrichalcumBlockAttribution = false;
+        _pendingAnchorBlockAttribution = false;
         _pendingTheAbacusBlockAttribution = false;
+        _pendingAkabekoVigorAttribution = false;
+        _pendingBoneFluteBlockAttribution = false;
         _pendingHappyFlowerEnergyAttribution = false;
+        _pendingBoomingConchEnergyAttribution = false;
         _pendingGremlinHornEnergyAttributions.Clear();
         _pendingGremlinHornDrawAttributions.Clear();
+        _pendingPendulumDrawAttributions.Clear();
+        _pendingParryingShieldDamageAttributions.Clear();
+        _pendingHornCleatBlockAttributions.Clear();
         _lastPrismaticGemEnergyRoundNumber = null;
         _pendingCloakClaspBlockAttribution = false;
+        _pendingToolboxOfferScreens = 0;
         _pendingMakeItSoSummons.Clear();
         _pendingReplayExtraPlaySources.Clear();
         _pendingReplayExtraPlaySeriesStarted.Clear();
@@ -990,7 +1005,6 @@ public static class RunTracker
                 runRelicAgg.AdditionalCardsDrawn += pendingRelicAgg.AdditionalCardsDrawn;
                 runRelicAgg.AdditionalBlockGained += pendingRelicAgg.AdditionalBlockGained;
                 runRelicAgg.BlockedTriggers += pendingRelicAgg.BlockedTriggers;
-                runRelicAgg.Activations += pendingRelicAgg.Activations;
                 runRelicAgg.StrengthAdded += pendingRelicAgg.StrengthAdded;
                 runRelicAgg.PlatingAdded += pendingRelicAgg.PlatingAdded;
                 runRelicAgg.CardsUpgraded += pendingRelicAgg.CardsUpgraded;
@@ -1003,11 +1017,22 @@ public static class RunTracker
                 runRelicAgg.DoomDeathTriggers += pendingRelicAgg.DoomDeathTriggers;
                 runRelicAgg.DoomKills += pendingRelicAgg.DoomKills;
                 runRelicAgg.EnergyGenerated += pendingRelicAgg.EnergyGenerated;
+                runRelicAgg.VigorGained += pendingRelicAgg.VigorGained;
+                runRelicAgg.TotalDamageAttempted += pendingRelicAgg.TotalDamageAttempted;
+                runRelicAgg.TotalDamageDealt += pendingRelicAgg.TotalDamageDealt;
+                runRelicAgg.TotalDamageBlocked += pendingRelicAgg.TotalDamageBlocked;
+                runRelicAgg.TotalDamageOverkill += pendingRelicAgg.TotalDamageOverkill;
+                runRelicAgg.Kills += pendingRelicAgg.Kills;
+                runRelicAgg.TotalTargets += pendingRelicAgg.TotalTargets;
                 runRelicAgg.PotionsGained += pendingRelicAgg.PotionsGained;
                 runRelicAgg.CommonPotionsGained += pendingRelicAgg.CommonPotionsGained;
                 runRelicAgg.UncommonPotionsGained += pendingRelicAgg.UncommonPotionsGained;
                 runRelicAgg.RarePotionsGained += pendingRelicAgg.RarePotionsGained;
                 runRelicAgg.PotionsSkipped += pendingRelicAgg.PotionsSkipped;
+                runRelicAgg.UncommonCardsOffered += pendingRelicAgg.UncommonCardsOffered;
+                runRelicAgg.RareCardsOffered += pendingRelicAgg.RareCardsOffered;
+                runRelicAgg.UncommonCardsTaken += pendingRelicAgg.UncommonCardsTaken;
+                runRelicAgg.RareCardsTaken += pendingRelicAgg.RareCardsTaken;
                 runRelicAgg.CardRewardsAffected += pendingRelicAgg.CardRewardsAffected;
                 MergeCardRewardCategories(runRelicAgg.CardRewardCategories, pendingRelicAgg.CardRewardCategories);
             }
@@ -1585,14 +1610,22 @@ public static class RunTracker
     private const string RedMaskRelicId = "RELIC.RED_MASK";
     private const string PocketwatchRelicId = "RELIC.POCKETWATCH";
     private const string OrichalcumRelicId = "RELIC.ORICHALCUM";
+    private const string AnchorRelicId = "RELIC.ANCHOR";
     private const string TheAbacusRelicId = "RELIC.THE_ABACUS";
+    private const string LetterOpenerRelicId = "RELIC.LETTER_OPENER";
+    private const int LetterOpenerDamagePerTarget = 5;
+    private const string AkabekoRelicId = "RELIC.AKABEKO";
     private const string BookRepairKnifeRelicId = "RELIC.BOOK_REPAIR_KNIFE";
     private const string EternalFeatherRelicId = "RELIC.ETERNAL_FEATHER";
     private const string BoneFluteRelicId = "RELIC.BONE_FLUTE";
     private const string HealingLostFullHpReasonId = "full_hp";
     private const string HealingLostOtherReasonId = "other";
     private const string HappyFlowerRelicId = "RELIC.HAPPY_FLOWER";
+    private const string BoomingConchRelicId = "RELIC.BOOMING_CONCH";
     private const string GremlinHornRelicId = "RELIC.GREMLIN_HORN";
+    private const string PendulumRelicId = "RELIC.PENDULUM";
+    private const string ParryingShieldRelicId = "RELIC.PARRYING_SHIELD";
+    private const string HornCleatRelicId = "RELIC.HORN_CLEAT";
     private const string PrismaticGemRelicId = "RELIC.PRISMATIC_GEM";
     private const string CloakClaspRelicId = "RELIC.CLOAK_CLASP";
     private const string ReptileTrinketRelicId = "RELIC.REPTILE_TRINKET";
@@ -1600,9 +1633,11 @@ public static class RunTracker
     private const string StoneCrackerRelicId = "RELIC.STONE_CRACKER";
     private const string MealTicketRelicId = "RELIC.MEAL_TICKET";
     private const string BurningBloodRelicId = "RELIC.BURNING_BLOOD";
+    private const string BloodVialRelicId = "RELIC.BLOOD_VIAL";
     private const string WhiteBeastStatueRelicId = "RELIC.WHITE_BEAST_STATUE";
     private const string BoundPhylacteryRelicId = "RELIC.BOUND_PHYLACTERY";
     private const string PhylacteryUnboundRelicId = "RELIC.PHYLACTERY_UNBOUND";
+    private const string ToolboxRelicId = "RELIC.TOOLBOX";
 
     /// <summary>
     /// Record a Bag of Marbles combat-start Vulnerable application.
@@ -1743,6 +1778,48 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Arm a one-shot attribution window for Anchor's combat-start block.
+    /// The actual block amount is observed by <see cref="Patches.HookAfterBlockGainedPatch"/>.
+    /// </summary>
+    public static void ArmAnchorBlockAttribution()
+    {
+        lock (_lock)
+        {
+            _pendingAnchorBlockAttribution = true;
+        }
+    }
+
+    public static void DisarmAnchorBlockAttribution()
+    {
+        lock (_lock)
+        {
+            _pendingAnchorBlockAttribution = false;
+        }
+    }
+
+    public static void RecordAnchorBlockGained(int amount)
+    {
+        if (amount <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_pendingAnchorBlockAttribution) return;
+                _pendingAnchorBlockAttribution = false;
+
+                var agg = GetOrCreateRelicAggregateLocked(AnchorRelicId);
+                agg.Activations += 1;
+                agg.AdditionalBlockGained += amount;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordAnchorBlockGained failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Record Reptile Trinket's owner-specific potion-use activation. Called
     /// from <see cref="Patches.ReptileTrinketAfterPotionUsedPatch"/> after
     /// matching the game's owner/combat checks and reading the same Strength
@@ -1858,6 +1935,54 @@ public static class RunTracker
             {
                 CoreMain.LogDebug($"RecordTheAbacusBlockGained failed: {e.Message}");
             }
+        }
+    }
+
+    /// <summary>
+    /// Record Letter Opener's every-N-skills activation. The game does not
+    /// source its damage entries to the relic, so this records attempted damage
+    /// from the owner callback and the live hittable enemy count at trigger time.
+    /// </summary>
+    public static void RecordLetterOpenerBeforeCardPlayed(
+        CardPlay cardPlay,
+        int skillsPlayedIncludingThis,
+        int activationThreshold)
+    {
+        if (cardPlay?.Card == null) return;
+        if (cardPlay.Card.Type != CardType.Skill) return;
+        if (activationThreshold <= 0) return;
+        if (skillsPlayedIncludingThis <= 0 || skillsPlayedIncludingThis % activationThreshold != 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                int targetCount = CountLetterOpenerTargets(cardPlay.Card.CombatState);
+                if (targetCount <= 0) return;
+
+                var agg = GetOrCreateRelicAggregateLocked(LetterOpenerRelicId);
+                agg.Activations += 1;
+                agg.TotalTargets += targetCount;
+                agg.TotalDamageAttempted += LetterOpenerDamagePerTarget * targetCount;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordLetterOpenerBeforeCardPlayed failed: {e.Message}");
+            }
+        }
+    }
+
+    private static int CountLetterOpenerTargets(ICombatState? combatState)
+    {
+        if (combatState is not CombatState concreteCombatState) return 0;
+
+        try
+        {
+            return concreteCombatState.HittableEnemies.Count(creature => creature.IsAlive && creature.IsHittable);
+        }
+        catch
+        {
+            return 0;
         }
     }
 
@@ -2056,6 +2181,89 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordWhiteBeastPotionRewardSkipped failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record Toolbox's owner-specific opening-hand trigger and arm the next
+    /// choose-card screen as the actual offer payload to inspect.
+    /// </summary>
+    public static void RecordToolboxTrigger()
+    {
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(ToolboxRelicId);
+                agg.Activations += 1;
+                _pendingToolboxOfferScreens += 1;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordToolboxTrigger failed: {e.Message}");
+            }
+        }
+    }
+
+    public static bool RecordToolboxOffers(IReadOnlyList<CardModel> cards)
+    {
+        if (cards == null || cards.Count == 0) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingToolboxOfferScreens <= 0) return false;
+                _pendingToolboxOfferScreens -= 1;
+
+                var agg = GetOrCreateRelicAggregateLocked(ToolboxRelicId);
+                foreach (var card in cards)
+                {
+                    if (card == null) continue;
+                    switch (card.Rarity)
+                    {
+                        case CardRarity.Uncommon:
+                            agg.UncommonCardsOffered += 1;
+                            break;
+                        case CardRarity.Rare:
+                            agg.RareCardsOffered += 1;
+                            break;
+                    }
+                }
+
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordToolboxOffers failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    public static void RecordToolboxTaken(CardModel card)
+    {
+        if (card == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(ToolboxRelicId);
+                switch (card.Rarity)
+                {
+                    case CardRarity.Uncommon:
+                        agg.UncommonCardsTaken += 1;
+                        break;
+                    case CardRarity.Rare:
+                        agg.RareCardsTaken += 1;
+                        break;
+                }
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordToolboxTaken failed: {e.Message}");
             }
         }
     }
@@ -2311,6 +2519,15 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Record Blood Vial's combat-start trigger and arm its observed healing
+    /// window.
+    /// </summary>
+    public static void RecordBloodVialTrigger(Creature healedCreature, decimal attemptedHealing)
+    {
+        RecordRelicHealingTrigger(BloodVialRelicId, healedCreature, attemptedHealing, nameof(RecordBloodVialTrigger));
+    }
+
+    /// <summary>
     /// Record Eternal Feather's rest-site activation and attempted heal. This
     /// happens outside combat, so the aggregate is written directly to the
     /// committed run data instead of the pending combat buffer.
@@ -2532,6 +2749,106 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Arm the one-shot flag that attributes the next player energy gain to
+    /// Booming Conch's Elite combat-start effect.
+    /// </summary>
+    public static void ArmBoomingConchEnergyAttribution()
+    {
+        lock (_lock)
+        {
+            _pendingBoomingConchEnergyAttribution = true;
+        }
+    }
+
+    public static void DisarmBoomingConchEnergyAttribution()
+    {
+        lock (_lock)
+        {
+            _pendingBoomingConchEnergyAttribution = false;
+        }
+    }
+
+    public static void RecordBoomingConchEnergyGained(int amount)
+    {
+        if (amount <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_pendingBoomingConchEnergyAttribution) return;
+                _pendingBoomingConchEnergyAttribution = false;
+
+                var agg = GetOrCreateRelicAggregateLocked(BoomingConchRelicId);
+                agg.EnergyGenerated += amount;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordBoomingConchEnergyGained failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordBoomingConchDraw(int cardsDrawn)
+    {
+        if (cardsDrawn <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(BoomingConchRelicId);
+                agg.AdditionalCardsDrawn += cardsDrawn;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordBoomingConchDraw failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Arm the one-shot flag that attributes the next player Vigor gain to
+    /// Akabeko's combat-start effect.
+    /// </summary>
+    public static void ArmAkabekoVigorAttribution()
+    {
+        lock (_lock)
+        {
+            _pendingAkabekoVigorAttribution = true;
+        }
+    }
+
+    public static void DisarmAkabekoVigorAttribution()
+    {
+        lock (_lock)
+        {
+            _pendingAkabekoVigorAttribution = false;
+        }
+    }
+
+    public static void RecordAkabekoVigorGained(int amount)
+    {
+        if (amount <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_pendingAkabekoVigorAttribution) return;
+                _pendingAkabekoVigorAttribution = false;
+
+                var agg = GetOrCreateRelicAggregateLocked(AkabekoRelicId);
+                agg.VigorGained += amount;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordAkabekoVigorGained failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Record Gremlin Horn's owner-specific enemy-death activation and arm
     /// one-shot attribution windows for the resource effects it immediately
     /// performs. Energy is measured at the player energy mutation point; cards
@@ -2615,6 +2932,213 @@ public static class RunTracker
         }
     }
 
+    /// <summary>
+    /// Record Pendulum's owner-specific every-N-turns activation. The actual
+    /// number of cards drawn is observed from the draw command result.
+    /// </summary>
+    public static void ArmPendulumAttribution(Player owner)
+    {
+        if (owner == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(PendulumRelicId);
+                agg.Activations += 1;
+                _pendingPendulumDrawAttributions.Add(owner);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"ArmPendulumAttribution failed: {e.Message}");
+            }
+        }
+    }
+
+    public static bool TryConsumePendulumDrawAttribution(Player player)
+    {
+        if (player == null) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                return ConsumePendingGremlinHornAttribution(_pendingPendulumDrawAttributions, player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"TryConsumePendulumDrawAttribution failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    public static void RecordPendulumCardsDrawn(int cardsDrawn)
+    {
+        if (cardsDrawn <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(PendulumRelicId);
+                agg.AdditionalCardsDrawn += cardsDrawn;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPendulumCardsDrawn failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record Parrying Shield's owner-specific end-of-turn activation. The
+    /// damage split is observed from the damage command result.
+    /// </summary>
+    public static void ArmParryingShieldAttribution(Creature dealer)
+    {
+        if (dealer == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(ParryingShieldRelicId);
+                agg.Activations += 1;
+                _pendingParryingShieldDamageAttributions.Add(dealer);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"ArmParryingShieldAttribution failed: {e.Message}");
+            }
+        }
+    }
+
+    public static bool TryConsumeParryingShieldDamageAttribution(Creature dealer)
+    {
+        if (dealer == null) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                return ConsumePendingCreatureAttribution(_pendingParryingShieldDamageAttributions, dealer);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"TryConsumeParryingShieldDamageAttribution failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    public static void RecordParryingShieldDamage(IEnumerable<DamageResult>? results)
+    {
+        if (results == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(ParryingShieldRelicId);
+                foreach (var result in results)
+                {
+                    if (result == null) continue;
+                    var damageTotals = ComputeEnemyDamageTotals(
+                        result.BlockedDamage,
+                        result.UnblockedDamage,
+                        result.OverkillDamage);
+                    agg.TotalDamageAttempted += damageTotals.IntendedDamage;
+                    agg.TotalDamageDealt += damageTotals.EffectiveDamage;
+                    agg.TotalDamageBlocked += result.BlockedDamage;
+                    agg.TotalDamageOverkill += result.OverkillDamage;
+                    agg.TotalTargets += 1;
+                    if (result.WasTargetKilled) agg.Kills += 1;
+                }
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordParryingShieldDamage failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordParryingShieldDamageForTest(RelicAggregate agg, IEnumerable<DamageResult> results)
+    {
+        foreach (var result in results)
+        {
+            var damageTotals = ComputeEnemyDamageTotals(
+                result.BlockedDamage,
+                result.UnblockedDamage,
+                result.OverkillDamage);
+            agg.TotalDamageAttempted += damageTotals.IntendedDamage;
+            agg.TotalDamageDealt += damageTotals.EffectiveDamage;
+            agg.TotalDamageBlocked += result.BlockedDamage;
+            agg.TotalDamageOverkill += result.OverkillDamage;
+            agg.TotalTargets += 1;
+            if (result.WasTargetKilled) agg.Kills += 1;
+        }
+    }
+
+    /// <summary>
+    /// Record Horn Cleat's owner-specific second-turn block-clear trigger.
+    /// The actual block gained is observed from the gain-block command result.
+    /// </summary>
+    public static void ArmHornCleatAttribution(Creature creature)
+    {
+        if (creature == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(HornCleatRelicId);
+                agg.Activations += 1;
+                _pendingHornCleatBlockAttributions.Add(creature);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"ArmHornCleatAttribution failed: {e.Message}");
+            }
+        }
+    }
+
+    public static bool TryConsumeHornCleatBlockAttribution(Creature creature)
+    {
+        if (creature == null) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                return ConsumePendingCreatureAttribution(_pendingHornCleatBlockAttributions, creature);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"TryConsumeHornCleatBlockAttribution failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    public static void RecordHornCleatBlockGained(decimal amount)
+    {
+        if (amount <= 0m) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(HornCleatRelicId);
+                agg.AdditionalBlockGained += (int)amount;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordHornCleatBlockGained failed: {e.Message}");
+            }
+        }
+    }
+
     private static void DisarmGremlinHornEnergyAttributionLocked(Player player)
     {
         for (int i = 0; i < _pendingGremlinHornEnergyAttributions.Count; i++)
@@ -2633,6 +3157,18 @@ public static class RunTracker
         {
             if (!ReferenceEquals(pendingPlayers[i], player)) continue;
             pendingPlayers.RemoveAt(i);
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool ConsumePendingCreatureAttribution(List<Creature> pending, Creature creature)
+    {
+        for (int i = 0; i < pending.Count; i++)
+        {
+            if (!ReferenceEquals(pending[i], creature)) continue;
+            pending.RemoveAt(i);
             return true;
         }
 
@@ -2827,11 +3363,22 @@ public static class RunTracker
                     DoomDeathTriggers = committed.DoomDeathTriggers,
                     DoomKills = committed.DoomKills,
                     EnergyGenerated = committed.EnergyGenerated,
+                    VigorGained = committed.VigorGained,
+                    TotalDamageAttempted = committed.TotalDamageAttempted,
+                    TotalDamageDealt = committed.TotalDamageDealt,
+                    TotalDamageBlocked = committed.TotalDamageBlocked,
+                    TotalDamageOverkill = committed.TotalDamageOverkill,
+                    Kills = committed.Kills,
+                    TotalTargets = committed.TotalTargets,
                     PotionsGained = committed.PotionsGained,
                     CommonPotionsGained = committed.CommonPotionsGained,
                     UncommonPotionsGained = committed.UncommonPotionsGained,
                     RarePotionsGained = committed.RarePotionsGained,
                     PotionsSkipped = committed.PotionsSkipped,
+                    UncommonCardsOffered = committed.UncommonCardsOffered,
+                    RareCardsOffered = committed.RareCardsOffered,
+                    UncommonCardsTaken = committed.UncommonCardsTaken,
+                    RareCardsTaken = committed.RareCardsTaken,
                     CardRewardsAffected = committed.CardRewardsAffected,
                     CardRewardCategories = CloneCardRewardCategories(committed.CardRewardCategories),
                 };
@@ -2848,7 +3395,6 @@ public static class RunTracker
                 result.AdditionalCardsDrawn += pending.AdditionalCardsDrawn;
                 result.AdditionalBlockGained += pending.AdditionalBlockGained;
                 result.BlockedTriggers += pending.BlockedTriggers;
-                result.Activations += pending.Activations;
                 result.StrengthAdded += pending.StrengthAdded;
                 result.PlatingAdded += pending.PlatingAdded;
                 result.CardsUpgraded += pending.CardsUpgraded;
@@ -2861,11 +3407,22 @@ public static class RunTracker
                 result.DoomDeathTriggers += pending.DoomDeathTriggers;
                 result.DoomKills += pending.DoomKills;
                 result.EnergyGenerated += pending.EnergyGenerated;
+                result.VigorGained += pending.VigorGained;
+                result.TotalDamageAttempted += pending.TotalDamageAttempted;
+                result.TotalDamageDealt += pending.TotalDamageDealt;
+                result.TotalDamageBlocked += pending.TotalDamageBlocked;
+                result.TotalDamageOverkill += pending.TotalDamageOverkill;
+                result.Kills += pending.Kills;
+                result.TotalTargets += pending.TotalTargets;
                 result.PotionsGained += pending.PotionsGained;
                 result.CommonPotionsGained += pending.CommonPotionsGained;
                 result.UncommonPotionsGained += pending.UncommonPotionsGained;
                 result.RarePotionsGained += pending.RarePotionsGained;
                 result.PotionsSkipped += pending.PotionsSkipped;
+                result.UncommonCardsOffered += pending.UncommonCardsOffered;
+                result.RareCardsOffered += pending.RareCardsOffered;
+                result.UncommonCardsTaken += pending.UncommonCardsTaken;
+                result.RareCardsTaken += pending.RareCardsTaken;
                 result.CardRewardsAffected += pending.CardRewardsAffected;
                 MergeCardRewardCategories(result.CardRewardCategories, pending.CardRewardCategories);
             }
