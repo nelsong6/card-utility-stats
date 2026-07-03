@@ -14,6 +14,7 @@ using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Enchantments;
 using MegaCrit.Sts2.Core.Models.Cards;
 using MegaCrit.Sts2.Core.Models.Powers;
+using MegaCrit.Sts2.Core.Models.Relics;
 using MegaCrit.Sts2.Core.Rewards;
 using MegaCrit.Sts2.Core.Rooms;
 using MegaCrit.Sts2.Core.Runs;
@@ -591,6 +592,8 @@ public static class RunTracker
             // identity for the tracked player's cards.
             if (!IsTrackedCard(card)) return;
             GetOrAssignNumber(card);
+            if (RefreshStrikeDummyDeckCountsIfOwnedLocked())
+                SaveCurrentRun();
         }
     }
 
@@ -1023,6 +1026,7 @@ public static class RunTracker
                 GetOrAssignNumber(card);
             }
         }
+        bool strikeDummyDeckCountsChanged = RefreshStrikeDummyDeckCountsIfOwnedLocked();
         int stillWaiting = _pendingRankRestores.Values.Sum(q => q.Count);
         int restored = seeded - stillWaiting;
         int unmatched = deckCards - restored;
@@ -1100,7 +1104,7 @@ public static class RunTracker
             CoreMain.Logger.Info(
                 $"{context}: repaired offensive damage aggregates for run_id={run.RunId}");
         }
-        if (repairedDamageAggregates || prunedGhosts > 0)
+        if (repairedDamageAggregates || prunedGhosts > 0 || strikeDummyDeckCountsChanged)
         {
             SaveCurrentRun();
         }
@@ -1510,6 +1514,12 @@ public static class RunTracker
         target.RareCardsConsumed += source.RareCardsConsumed;
         target.SacrificesMade += source.SacrificesMade;
         target.SacrificesSkipped += source.SacrificesSkipped;
+
+        target.StrikeDummyStrikesPlayed += source.StrikeDummyStrikesPlayed;
+        if (source.StrikeDummyBaseStrikesInDeck != 0 || target.StrikeDummyBaseStrikesInDeck == 0)
+            target.StrikeDummyBaseStrikesInDeck = source.StrikeDummyBaseStrikesInDeck;
+        if (source.StrikeDummyNonBaseStrikeCardsInDeck != 0 || target.StrikeDummyNonBaseStrikeCardsInDeck == 0)
+            target.StrikeDummyNonBaseStrikeCardsInDeck = source.StrikeDummyNonBaseStrikeCardsInDeck;
         target.CardRewardsAffected += source.CardRewardsAffected;
         MergeCardRewardCategories(target.CardRewardCategories, source.CardRewardCategories);
     }
@@ -1554,8 +1564,11 @@ public static class RunTracker
                     // At hover time, the deck view sees canonicalHash — matching
                     // the two is how we verify the DeckVersion-based key works.
                     CoreMain.LogDebug($"  -> RecordCardPlay '{card?.Title ?? "?"}' hash={card?.GetHashCode()} canonicalHash={(card == null ? 0 : Canonical(card).GetHashCode())}");
-                    if (cpf.CardPlay != null) NoteCardPlayFinished(cpf.CardPlay);
-                    RecordCardPlay(cpf.CardPlay);
+                    if (cpf.CardPlay != null)
+                    {
+                        NoteCardPlayFinished(cpf.CardPlay);
+                        RecordCardPlay(cpf.CardPlay);
+                    }
                     break;
                 case CardDrawnEntry cde:
                     // Draw-hook validation is complete; keep the trace debug-gated.
@@ -1627,8 +1640,10 @@ public static class RunTracker
     {
         lock (_lock)
         {
+            if (cardPlay?.Card == null) return;
+
             // Co-op: only the tracked local player's card plays are ours.
-            if (!IsTrackedCard(cardPlay?.Card)) return;
+            if (!IsTrackedCard(cardPlay.Card)) return;
             // Defensive: if CombatSetUp never fired (unusual), allocate lazily.
             _pendingCombat ??= new PendingCombat();
 
@@ -1638,6 +1653,7 @@ public static class RunTracker
 
             var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
             agg.Plays++;
+            RecordStrikeDummyStrikePlayedIfOwnedLocked(cardPlay.Card);
             if (IsReplayExtraPlay(cardPlay))
             {
                 agg.TimesReplayExtraPlayed++;
@@ -2089,6 +2105,7 @@ public static class RunTracker
     private const string PhylacteryUnboundRelicId = "RELIC.PHYLACTERY_UNBOUND";
     private const string ToolboxRelicId = "RELIC.TOOLBOX";
     private const string PaelsWingRelicId = "RELIC.PAELS_WING";
+    private const string StrikeDummyRelicId = "RELIC.STRIKE_DUMMY";
 
     /// <summary>
     /// Record a Bag of Marbles combat-start Vulnerable application.
@@ -3055,12 +3072,88 @@ public static class RunTracker
         }
     }
 
+    /// <summary>
+    /// Record that Strike Dummy was obtained, stamping the current permanent
+    /// deck split between base Strikes and other Strike-tagged cards.
+    /// </summary>
+    public static void RecordStrikeDummyObtained(RelicModel relic, Player player)
+    {
+        if (relic is not StrikeDummy || player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(StrikeDummyRelicId);
+                RefreshStrikeDummyDeckCountsLocked(agg, player);
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordStrikeDummyObtained failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Return Strike Dummy stats after refreshing the current permanent-deck
+    /// composition. Used by the relic hover tooltip so hot reload/continue
+    /// state catches up even if the pickup happened before this build.
+    /// </summary>
+    public static RelicAggregate GetStrikeDummyAggregate()
+    {
+        lock (_lock)
+        {
+            try
+            {
+                RefreshStrikeDummyDeckCountsIfOwnedLocked();
+
+                RelicAggregate? result = null;
+                if (_currentRun != null && _currentRun.RelicAggregates.TryGetValue(StrikeDummyRelicId, out var committed))
+                {
+                    result = new RelicAggregate();
+                    MergeRelicAggregateInto(result, committed);
+                }
+
+                if (_pendingCombat != null && _pendingCombat.RelicAggregates.TryGetValue(StrikeDummyRelicId, out var pending))
+                {
+                    result ??= new RelicAggregate();
+                    MergeRelicAggregateInto(result, pending);
+                }
+
+                return result ?? new RelicAggregate();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"GetStrikeDummyAggregate failed: {e.Message}");
+                return new RelicAggregate();
+            }
+        }
+    }
+
     internal static void RecordLeesWafflePickupHpGainedForTest(RelicAggregate agg, decimal hpGained)
     {
         if (agg == null || hpGained < 0m) return;
 
         agg.Activations++;
         agg.TotalHealingRestored += hpGained;
+    }
+
+    internal static void RecordStrikeDummyStrikePlayedForTest(RelicAggregate agg)
+    {
+        if (agg == null) return;
+        agg.StrikeDummyStrikesPlayed += 1;
+    }
+
+    internal static void SetStrikeDummyDeckCountsForTest(
+        RelicAggregate agg,
+        int baseStrikesInDeck,
+        int nonBaseStrikeCardsInDeck)
+    {
+        if (agg == null) return;
+        agg.StrikeDummyBaseStrikesInDeck = Math.Max(0, baseStrikesInDeck);
+        agg.StrikeDummyNonBaseStrikeCardsInDeck = Math.Max(0, nonBaseStrikeCardsInDeck);
     }
 
     private static void RecordRelicHealingTrigger(
@@ -4231,6 +4324,109 @@ public static class RunTracker
         return _currentRun?.FloorReached;
     }
 
+    private static void RecordStrikeDummyStrikePlayedIfOwnedLocked(CardModel card)
+    {
+        if (!IsStrikeDummyStrikeCard(card)) return;
+
+        var owner = card.Owner;
+        if (owner == null || !IsTrackedPlayer(owner) || !PlayerHasStrikeDummy(owner)) return;
+
+        var agg = GetOrCreateRelicAggregateForCurrentContextLocked(StrikeDummyRelicId);
+        agg.StrikeDummyStrikesPlayed += 1;
+    }
+
+    private static bool RefreshStrikeDummyDeckCountsIfOwnedLocked()
+    {
+        if (_currentRun == null) return false;
+
+        var player = GetTrackedRunPlayerLocked();
+        if (player == null || !PlayerHasStrikeDummy(player)) return false;
+
+        bool created = false;
+        if (!_currentRun.RelicAggregates.TryGetValue(StrikeDummyRelicId, out var agg) || agg == null)
+        {
+            agg = new RelicAggregate();
+            _currentRun.RelicAggregates[StrikeDummyRelicId] = agg;
+            created = true;
+        }
+        return RefreshStrikeDummyDeckCountsLocked(agg) || created;
+    }
+
+    private static bool RefreshStrikeDummyDeckCountsLocked(RelicAggregate agg, Player? player = null)
+    {
+        player ??= GetTrackedRunPlayerLocked();
+        if (player?.Deck?.Cards == null) return false;
+
+        int baseStrikes = 0;
+        int nonBaseStrikeCards = 0;
+        foreach (var deckCard in player.Deck.Cards)
+        {
+            if (deckCard == null) continue;
+            if (!IsStrikeDummyStrikeCard(deckCard)) continue;
+
+            if (IsBaseStrikeForStrikeDummy(deckCard))
+                baseStrikes++;
+            else
+                nonBaseStrikeCards++;
+        }
+
+        bool changed =
+            agg.StrikeDummyBaseStrikesInDeck != baseStrikes ||
+            agg.StrikeDummyNonBaseStrikeCardsInDeck != nonBaseStrikeCards;
+
+        agg.StrikeDummyBaseStrikesInDeck = baseStrikes;
+        agg.StrikeDummyNonBaseStrikeCardsInDeck = nonBaseStrikeCards;
+        return changed;
+    }
+
+    private static Player? GetTrackedRunPlayerLocked()
+    {
+        try
+        {
+            var players = RunManager.Instance?.State?.Players;
+            if (players == null || players.Count == 0) return null;
+
+            if (_trackedNetId.HasValue)
+                return players.FirstOrDefault(p => p.NetId == _trackedNetId.Value);
+
+            return players.Count == 1 ? players[0] : players.FirstOrDefault();
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"GetTrackedRunPlayerLocked failed: {e.Message}");
+            return null;
+        }
+    }
+
+    private static bool PlayerHasStrikeDummy(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is StrikeDummy);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool IsStrikeDummyStrikeCard(CardModel? card)
+    {
+        try
+        {
+            return card?.Tags?.Contains(CardTag.Strike) == true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool IsBaseStrikeForStrikeDummy(CardModel? card)
+    {
+        return card != null && IsStrikeDummyStrikeCard(card) && card.IsBasicStrikeOrDefend;
+    }
+
     private static void RecordCombatsInDeckForCurrentDeckLocked()
     {
         try
@@ -4461,6 +4657,7 @@ public static class RunTracker
             // flag lives only in memory and would be lost on F5 between the
             // removal and the next CombatEnded. Removals are infrequent so
             // the I/O cost is negligible.
+            RefreshStrikeDummyDeckCountsIfOwnedLocked();
             SaveCurrentRun();
         }
     }

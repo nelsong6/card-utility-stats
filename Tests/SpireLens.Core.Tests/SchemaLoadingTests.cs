@@ -1050,4 +1050,29 @@ public class SchemaLoadingTests
         Assert.Equal(3, relicAgg.SacrificesMade);
         Assert.Equal(2, relicAgg.SacrificesSkipped);
     }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsStrikeDummyRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("strike-dummy-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.STRIKE_DUMMY"];
+        Assert.Equal(8, relicAgg.StrikeDummyStrikesPlayed);
+        Assert.Equal(4, relicAgg.StrikeDummyBaseStrikesInDeck);
+        Assert.Equal(3, relicAgg.StrikeDummyNonBaseStrikeCardsInDeck);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsStrikeDummyRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("strike-dummy-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.STRIKE_DUMMY"];
+        Assert.Equal(8, relicAgg.StrikeDummyStrikesPlayed);
+        Assert.Equal(4, relicAgg.StrikeDummyBaseStrikesInDeck);
+        Assert.Equal(3, relicAgg.StrikeDummyNonBaseStrikeCardsInDeck);
+    }
 }

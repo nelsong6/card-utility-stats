@@ -480,6 +480,12 @@ public class RelicAggregate
     public int SacrificesMade { get; set; }
     public int SacrificesSkipped { get; set; }
 
+    // Strike Dummy tracking. StrikesPlayed is cumulative since the relic was
+    // picked up; deck counts are current permanent-deck snapshots.
+    public int StrikeDummyStrikesPlayed { get; set; }
+    public int StrikeDummyBaseStrikesInDeck { get; set; }
+    public int StrikeDummyNonBaseStrikeCardsInDeck { get; set; }
+
     // Total card rewards whose creation options were modified by this relic.
     // Used by Prismatic Gem.
     public int CardRewardsAffected { get; set; }
