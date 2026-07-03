@@ -719,6 +719,42 @@ public static class RunTracker
         RunStorage.SaveAsync(_currentRun);
     }
 
+    /// <summary>
+    /// Lazily create <c>_currentRun</c> when combat/relic data arrives before
+    /// <c>RunStarted</c> fired (mod hot-loaded mid-run). Always stamps
+    /// <c>GameStartTime</c> so a later Continue/hot-reload can match and resume
+    /// this record instead of stranding it — the previous inline mints omitted
+    /// it, re-seeding the stranding bug. Single home for the lazy mint.
+    /// </summary>
+    private static void EnsureLazyCurrentRunLocked()
+    {
+        if (_currentRun != null) return;
+        long gameStartTime = 0;
+        try { gameStartTime = RunManager.Instance._startTime; }
+        catch { /* no live run state — leave GameStartTime null */ }
+        string now = Now();
+        _currentRun = new RunData
+        {
+            RunId = Guid.NewGuid().ToString("N"),
+            StartedAt = now,
+            UpdatedAt = now,
+            GameStartTime = gameStartTime != 0 ? gameStartTime : null,
+        };
+    }
+
+    /// <summary>
+    /// Run a game-event handler body under a top-level guard. These handlers
+    /// are subscribed directly to RunManager/CombatManager events, so an
+    /// unhandled throw would propagate into the game's own dispatch and could
+    /// break combat/run flow. Always-on Error log so a broken handler is
+    /// visible without a debug flag.
+    /// </summary>
+    private static void GuardLifecycle(string site, Action body)
+    {
+        try { body(); }
+        catch (Exception e) { CoreMain.Logger.Error($"{site} failed: {e}"); }
+    }
+
     private static void ResetCombatContextState()
     {
         _currentPlayerCardPlay = null;
@@ -1089,7 +1125,10 @@ public static class RunTracker
 
     // -------- Lifecycle callbacks --------
 
-    private static void OnRunStarted(RunState runState)
+    private static void OnRunStarted(RunState runState) =>
+        GuardLifecycle(nameof(OnRunStarted), () => OnRunStartedImpl(runState));
+
+    private static void OnRunStartedImpl(RunState runState)
     {
         lock (_lock)
         {
@@ -1227,7 +1266,10 @@ public static class RunTracker
         }
     }
 
-    private static void OnCombatSetUp(CombatState state)
+    private static void OnCombatSetUp(CombatState state) =>
+        GuardLifecycle(nameof(OnCombatSetUp), () => OnCombatSetUpImpl(state));
+
+    private static void OnCombatSetUpImpl(CombatState state)
     {
         lock (_lock)
         {
@@ -1239,7 +1281,10 @@ public static class RunTracker
         }
     }
 
-    private static void OnCombatEnded(CombatRoom room)
+    private static void OnCombatEnded(CombatRoom room) =>
+        GuardLifecycle(nameof(OnCombatEnded), () => OnCombatEndedImpl(room));
+
+    private static void OnCombatEndedImpl(CombatRoom room)
     {
         lock (_lock)
         {
@@ -1248,12 +1293,7 @@ public static class RunTracker
             // Lazy run creation: if events came in before RunStarted ever fired
             // (e.g. mod loaded mid-run), create a minimal run record now so we
             // don't drop the combat's data.
-            _currentRun ??= new RunData
-            {
-                RunId = Guid.NewGuid().ToString("N"),
-                StartedAt = Now(),
-                UpdatedAt = Now(),
-            };
+            EnsureLazyCurrentRunLocked();
 
             PromotePendingCombatIntoRunLocked();
 
@@ -2775,7 +2815,9 @@ public static class RunTracker
                 if (otherLost > 0m)
                     AddHealingLostReasonLocked(agg, HealingLostOtherReasonId, "other/prevented", otherLost);
 
-                if (pending.PersistDirectlyToRun)
+                // Persist a late finalize that landed directly in the committed
+                // run (no live pending combat to carry it to CombatEnded).
+                if (pending.PersistDirectlyToRun || _pendingCombat == null)
                     SaveCurrentRun();
                 return;
             }
@@ -2994,12 +3036,7 @@ public static class RunTracker
         {
             try
             {
-                _currentRun ??= new RunData
-                {
-                    RunId = Guid.NewGuid().ToString("N"),
-                    StartedAt = Now(),
-                    UpdatedAt = Now(),
-                };
+                EnsureLazyCurrentRunLocked();
 
                 if (!_currentRun.RelicAggregates.TryGetValue(PrismaticGemRelicId, out var agg))
                 {
@@ -3029,12 +3066,7 @@ public static class RunTracker
         {
             try
             {
-                _currentRun ??= new RunData
-                {
-                    RunId = Guid.NewGuid().ToString("N"),
-                    StartedAt = Now(),
-                    UpdatedAt = Now(),
-                };
+                EnsureLazyCurrentRunLocked();
 
                 if (!_currentRun.RelicAggregates.TryGetValue(PrismaticGemRelicId, out var agg))
                 {
@@ -3302,19 +3334,20 @@ public static class RunTracker
 
     private static RelicAggregate GetOrCreateRelicAggregateForHealingLocked(PendingRelicHealing pending)
     {
+        // NOT GetOrCreateRelicAggregateLocked: that does `_pendingCombat ??= new`,
+        // which resurrects an orphan buffer when this healing finalize runs on a
+        // pool thread AFTER OnCombatEnded already promoted and nulled the buffer.
+        // The orphan is never promoted, so the lost-healing tail was silently
+        // dropped on a run's final victorious combat. ForCurrentContext routes to
+        // the committed run aggregate when there is no live pending combat.
         return pending.PersistDirectlyToRun
             ? GetOrCreateCurrentRunRelicAggregateLocked(pending.RelicId)
-            : GetOrCreateRelicAggregateLocked(pending.RelicId);
+            : GetOrCreateRelicAggregateForCurrentContextLocked(pending.RelicId);
     }
 
     private static RelicAggregate GetOrCreateCurrentRunRelicAggregateLocked(string relicId)
     {
-        _currentRun ??= new RunData
-        {
-            RunId = Guid.NewGuid().ToString("N"),
-            StartedAt = Now(),
-            UpdatedAt = Now(),
-        };
+        EnsureLazyCurrentRunLocked();
 
         if (!_currentRun.RelicAggregates.TryGetValue(relicId, out var agg))
         {
@@ -3564,23 +3597,24 @@ public static class RunTracker
     {
         lock (_lock)
         {
-            // Lazy run-creation guard — upgrade could fire before RunStarted
-            // if the mod hot-loaded mid-run and missed the signal. We still
-            // want to record the event.
-            _currentRun ??= new RunData
-            {
-                RunId = Guid.NewGuid().ToString("N"),
-                StartedAt = Now(),
-                UpdatedAt = Now(),
-            };
-
             // Non-assigning: skip upgrades on cards we haven't seen enter
             // the deck. This is what fixes the "starters begin at #5" bug
             // — the game fires UpgradeInternal on template/preview cards
             // at run init, and we'd previously assign them fresh numbers,
             // burning the counter before real starters arrived. Now we
             // silently ignore those.
+            //
+            // Gate BEFORE the lazy run mint: the game also fires
+            // UpgradeInternal on template cards during save deserialization,
+            // when _currentRun may be null. Minting first created a phantom
+            // in_progress run that OnRunStarted then saved. Return first so an
+            // untracked card never mints anything.
             if (!TryGetInstanceId(card, out var instanceId)) return;
+
+            // Lazy run-creation guard — upgrade could fire before RunStarted
+            // if the mod hot-loaded mid-run and missed the signal. We still
+            // want to record the event.
+            EnsureLazyCurrentRunLocked();
             var canonical = Canonical(card);
             var newLevel = canonical.CurrentUpgradeLevel;
             var floor = RunManager.Instance.State?.TotalFloor;
@@ -3886,12 +3920,7 @@ public static class RunTracker
 
             _shivAvailableThisRun = true;
 
-            _currentRun ??= new RunData
-            {
-                RunId = Guid.NewGuid().ToString("N"),
-                StartedAt = Now(),
-                UpdatedAt = Now(),
-            };
+            EnsureLazyCurrentRunLocked();
             _pendingCombat ??= new PendingCombat();
 
             bool alreadyRecorded =
@@ -4014,12 +4043,7 @@ public static class RunTracker
                 CoreMain.LogDebug($"RecordSovereignBladeGenerated clone failed: {e.Message}");
             }
 
-            _currentRun ??= new RunData
-            {
-                RunId = Guid.NewGuid().ToString("N"),
-                StartedAt = Now(),
-                UpdatedAt = Now(),
-            };
+            EnsureLazyCurrentRunLocked();
             _pendingCombat ??= new PendingCombat();
 
             var existingEvent = _pendingCombat.CombatEvents
@@ -4050,12 +4074,7 @@ public static class RunTracker
         {
             _sovereignBladeAvailableThisRun = true;
 
-            _currentRun ??= new RunData
-            {
-                RunId = Guid.NewGuid().ToString("N"),
-                StartedAt = Now(),
-                UpdatedAt = Now(),
-            };
+            EnsureLazyCurrentRunLocked();
             _pendingCombat ??= new PendingCombat();
 
             bool alreadyRecorded =
