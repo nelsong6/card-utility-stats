@@ -67,17 +67,12 @@ public static class RunTracker
     private static readonly System.Threading.AsyncLocal<EnemyStatusSourceFrame?> _enemyStatusSourceFrame = new();
     private static int _pendingPlayerBlockClearAmount;
     private static bool _pendingPlayerBlockClearArmed;
-    private static bool _pendingAnchorBlockAttribution;
     private static bool _pendingAkabekoVigorAttribution;
-    private static bool _pendingBoneFluteBlockAttribution;
     private static readonly List<PendingRelicHealing> _pendingRelicHeals = new();
-    private static bool _pendingHappyFlowerEnergyAttribution;
-    private static bool _pendingBoomingConchEnergyAttribution;
     private static readonly List<Player> _pendingPendulumDrawAttributions = new();
     private static readonly List<Creature> _pendingParryingShieldDamageAttributions = new();
     private static readonly List<Creature> _pendingHornCleatBlockAttributions = new();
     private static int? _lastPrismaticGemEnergyRoundNumber;
-    private static bool _pendingCloakClaspBlockAttribution;
     private static int _pendingWhiteBeastPotionRewards;
     private static int _pendingToolboxOfferScreens;
     private static readonly HashSet<PotionReward> _whiteBeastPotionRewards = new(ReferenceEqualityComparer.Instance);
@@ -2195,10 +2190,13 @@ public static class RunTracker
 
     public static void DisarmAnchorBlockAttribution()
     {
-        lock (_lock)
-        {
-            _pendingAnchorBlockAttribution = false;
-        }
+        // No-op. Anchor's attribution now lives entirely in the per-combat
+        // registry (see ArmAnchorBlockAttribution); the window closes on
+        // consumption or the combat boundary. Routing this to
+        // Windows.Disarm(...) — an explicit early close to prevent a late
+        // mis-claim — changes live window-close timing, so it's a deferred,
+        // live-verified follow-up (#257). Kept wired so that follow-up has a
+        // seam.
     }
 
     /// <summary>
@@ -2340,10 +2338,12 @@ public static class RunTracker
     }
 
     /// <summary>
-    /// Record a confirmed Bone Flute trigger and arm the next player block
-    /// gain as its observed payload. Called from
+    /// Record a confirmed Bone Flute trigger. Called from
     /// <see cref="Patches.BoneFluteAfterAttackPatch"/> only after the relic's
-    /// owner-specific Osty attack condition is satisfied.
+    /// owner-specific Osty attack condition is satisfied. (The block-gain
+    /// arming this method's name refers to is currently non-functional — see
+    /// <see cref="DisarmBoneFluteBlockAttribution"/> — so only the trigger
+    /// count is recorded today.)
     /// </summary>
     public static void RecordBoneFluteTriggerAndArmBlockAttribution()
     {
@@ -2359,7 +2359,6 @@ public static class RunTracker
                 }
 
                 agg.BoneFluteTriggers++;
-                _pendingBoneFluteBlockAttribution = true;
             }
             catch (Exception e)
             {
@@ -2369,15 +2368,15 @@ public static class RunTracker
     }
 
     /// <summary>
-    /// Clear any armed Bone Flute attribution window without recording block.
-    /// Used as a safety reset after the relic's async gain-block task finishes.
+    /// No-op safety reset kept wired for Bone Flute's async gain-block task.
+    /// The block-gain consumer that once read the armed flag was already
+    /// unreachable, so Bone Flute's per-block attribution is currently
+    /// non-functional (a known bug: it never routed to the registry). Fixing
+    /// it — arm a PlayerBlockGain window and credit AdditionalBlockGained — is
+    /// a separate, live-verified change; this seam stays so it has a home.
     /// </summary>
     public static void DisarmBoneFluteBlockAttribution()
     {
-        lock (_lock)
-        {
-            _pendingBoneFluteBlockAttribution = false;
-        }
     }
 
     /// <summary>
@@ -3039,36 +3038,32 @@ public static class RunTracker
     }
 
     /// <summary>
-    /// Clear the Happy Flower attribution flag without recording. Used as a
-    /// safety reset at <c>Hook.AfterSideTurnStart</c> if no energy was granted
-    /// this turn (counter not yet at 3).
+    /// No-op safety reset kept wired at <c>Hook.AfterSideTurnStart</c>. Happy
+    /// Flower's window is armed with maxHistoryAdvance=0 (see
+    /// <see cref="ArmHappyFlowerEnergyAttribution"/>), so it self-expires by
+    /// history-count and needs no explicit disarm — a Windows.Disarm call
+    /// here would find nothing armed.
     /// </summary>
     public static void DisarmHappyFlowerEnergyAttribution()
     {
-        lock (_lock)
-        {
-            _pendingHappyFlowerEnergyAttribution = false;
-        }
     }
 
     /// <summary>
-    /// Arm the one-shot flag that attributes the next player energy gain to
-    /// Booming Conch's Elite combat-start effect.
+    /// No-op arm/disarm pair kept wired for Booming Conch's Elite combat-start
+    /// energy. The energy-gain consumer that once read the armed flag was
+    /// already unreachable, so Booming Conch's energy attribution is currently
+    /// non-functional (a known bug: it never routed to the registry). Fixing
+    /// it — arm a PlayerEnergyGain window and credit EnergyGenerated, mirroring
+    /// Happy Flower — is a separate, live-verified change; these seams stay so
+    /// it has a home. (Its card-draw stat via RecordBoomingConchDraw still
+    /// works.)
     /// </summary>
     public static void ArmBoomingConchEnergyAttribution()
     {
-        lock (_lock)
-        {
-            _pendingBoomingConchEnergyAttribution = true;
-        }
     }
 
     public static void DisarmBoomingConchEnergyAttribution()
     {
-        lock (_lock)
-        {
-            _pendingBoomingConchEnergyAttribution = false;
-        }
     }
 
     public static void RecordBoomingConchDraw(int cardsDrawn)
@@ -3585,15 +3580,16 @@ public static class RunTracker
     }
 
     /// <summary>
-    /// Clear the Cloak Clasp attribution window. Called at
-    /// <c>Hook.AfterTurnEnd</c> after the relic's block grants have resolved.
+    /// No-op safety reset kept wired at <c>Hook.AfterTurnEnd</c>. Cloak Clasp's
+    /// attribution now lives entirely in the per-combat registry (see
+    /// <see cref="ArmCloakClaspBlockAttribution"/>); the window closes on
+    /// consumption or the combat boundary. Routing this to Windows.Disarm(...)
+    /// — an explicit early close after the relic's block grants resolve —
+    /// changes live window-close timing, so it's a deferred, live-verified
+    /// follow-up (#257). Kept wired so that follow-up has a seam.
     /// </summary>
     public static void DisarmCloakClaspBlockAttribution()
     {
-        lock (_lock)
-        {
-            _pendingCloakClaspBlockAttribution = false;
-        }
     }
 
     /// <summary>Single arbitration point for player block gains at
