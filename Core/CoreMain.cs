@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using HarmonyLib;
 using SpireLens.Core.Patches;
 using MegaCrit.Sts2.Core.Logging;
@@ -82,7 +83,30 @@ public static class CoreMain
         Logger.Info($"Core.Initialize starting (harmony_id={_harmonyId}, debug={DebugLogging})");
 
         _harmony = new Harmony(_harmonyId);
-        _harmony.PatchAll();
+
+        // Install each patch class in its own try/catch instead of a bare
+        // PatchAll. A single failing patch — e.g. one whose target game method
+        // a Slay the Spire 2 update renamed or changed — would otherwise abort
+        // PatchAll and silently take down EVERY other patch (all tracking).
+        // Per-class isolation degrades gracefully: the broken hook is skipped
+        // and logged, the rest keep working. Classes whose TargetMethod(s)
+        // resolve to nothing are simply no-ops.
+        int patchedClasses = 0, failedClasses = 0;
+        foreach (var type in AccessTools.GetTypesFromAssembly(Assembly.GetExecutingAssembly()))
+        {
+            try
+            {
+                var processor = _harmony.CreateClassProcessor(type);
+                var methods = processor.Patch();
+                if (methods != null && methods.Count > 0) patchedClasses++;
+            }
+            catch (Exception e)
+            {
+                failedClasses++;
+                Logger.Error($"Patch install failed for {type.FullName}: {e}");
+            }
+        }
+        Logger.Info($"Patch install: {patchedClasses} classes patched, {failedClasses} failed/skipped.");
 
         // Diagnostic: enumerate every Harmony-patched method so we can
         // confirm from the log whether a given hook (especially

@@ -75,10 +75,22 @@ public static class OrichalcumBeforeTurnEndPatch
 /// end-of-turn hook sequence. Orichalcum's async hook can gain block after
 /// the relic method has returned its task, so cleanup cannot live in the
 /// relic postfix itself.
+///
+/// Bound via a runtime <c>TargetMethods()</c> lookup rather than
+/// <c>nameof(Hook.AfterTurnEnd)</c>: a Slay the Spire 2 update can rename or
+/// remove the hook, and a compile-time reference would break the whole build
+/// (and, under bare PatchAll, take down every other patch). When the method is
+/// absent the class simply yields nothing and Harmony skips it.
 /// </summary>
-[HarmonyPatch(typeof(Hook), nameof(Hook.AfterTurnEnd))]
+[HarmonyPatch]
 public static class HookAfterTurnEndOrichalcumCleanupPatch
 {
+    private static System.Collections.Generic.IEnumerable<MethodBase> TargetMethods()
+    {
+        var m = AccessTools.Method(typeof(Hook), "AfterTurnEnd");
+        if (m != null) yield return m;
+    }
+
     [HarmonyPrefix]
     public static void Prefix(CombatSide side)
     {
