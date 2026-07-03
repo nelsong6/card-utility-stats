@@ -370,6 +370,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is BrilliantScarf)
+            {
+                const string relicId = "RELIC.BRILLIANT_SCARF";
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+
+                var body = BuildBrilliantScarfBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Brilliant Scarf", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is WhiteBeastStatue)
             {
                 const string relicId = "RELIC.WHITE_BEAST_STATUE";
@@ -694,6 +704,15 @@ public static class RelicHoverShowPatch
         Row3(sb, "Strikes played", agg.StrikeDummyStrikesPlayed.ToString(), "");
         Row3(sb, "Base Strikes in deck", agg.StrikeDummyBaseStrikesInDeck.ToString(), "");
         Row3(sb, "Non-base Strike cards in deck", agg.StrikeDummyNonBaseStrikeCardsInDeck.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildBrilliantScarfBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Discounts offered", agg.DiscountsOffered.ToString(), "");
+        Row3(sb, "Discounts taken", agg.DiscountsTaken.ToString(), "");
+        Row3(sb, EnergyLabel("Energy saved"), agg.EnergySavedByDiscount.ToString(), "");
         return sb.ToString();
     }
 

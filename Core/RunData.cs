@@ -486,6 +486,11 @@ public class RelicAggregate
     public int StrikeDummyBaseStrikesInDeck { get; set; }
     public int StrikeDummyNonBaseStrikeCardsInDeck { get; set; }
 
+    // Cost-discount tracking. Used by Brilliant Scarf.
+    public int DiscountsOffered { get; set; }
+    public int DiscountsTaken { get; set; }
+    public int EnergySavedByDiscount { get; set; }
+
     // Total card rewards whose creation options were modified by this relic.
     // Used by Prismatic Gem.
     public int CardRewardsAffected { get; set; }
