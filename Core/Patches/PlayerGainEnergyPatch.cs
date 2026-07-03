@@ -31,10 +31,10 @@ public static class PlayerGainEnergyPatch
             int gained = __instance.Energy - __state;
             if (gained > 0)
             {
-                RunTracker.RecordEnergyGained(__instance, gained);
-                RunTracker.RecordHappyFlowerEnergyGained(gained);
-                RunTracker.RecordBoomingConchEnergyGained(gained);
-                RunTracker.RecordGremlinHornEnergyGained(__instance, gained);
+                // Single arbitration: a live relic energy window (Gremlin Horn /
+                // Happy Flower / Booming Conch) claims the delta; otherwise the
+                // resolving card play is credited.
+                RunTracker.DispatchPlayerEnergyGain(__instance, gained);
             }
         }
         catch (Exception e)

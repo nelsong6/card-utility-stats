@@ -48,6 +48,12 @@ public static class RunTracker
     private const string SovereignBladeForgedEventType = "sovereign_blade_forged";
 
     private static readonly object _lock = new();
+
+    // Co-op local-player scoping (#260). NetId of the player whose run we track.
+    // Null => single-player OR local player unresolved: every guard ALLOWS, so
+    // SP is byte-identical and a mis-detection can never disable tracking.
+    // Re-derived from LocalContext.NetId on run start/adopt; never persisted.
+    private static ulong? _trackedNetId;
     private static RunData? _currentRun;
     private static PendingCombat? _pendingCombat;
     private static CardPlay? _currentPlayerCardPlay;
@@ -567,7 +573,13 @@ public static class RunTracker
     /// </summary>
     public static void RecordCardEntered(CardModel card)
     {
-        lock (_lock) { GetOrAssignNumber(card); }
+        lock (_lock)
+        {
+            // Co-op: CardPile.AddInternal(Deck) fires for BOTH decks; only mint
+            // identity for the tracked player's cards.
+            if (!IsTrackedCard(card)) return;
+            GetOrAssignNumber(card);
+        }
     }
 
     /// <summary>
@@ -756,6 +768,54 @@ public static class RunTracker
     /// break combat/run flow. Always-on Error log so a broken handler is
     /// visible without a debug flag.
     /// </summary>
+    // -------- Co-op tracked-player scoping (#260); all ALLOW when _trackedNetId==null --------
+
+    private static void ResolveTrackedPlayerLocked(RunState? runState)
+    {
+        try
+        {
+            var players = runState?.Players;
+            var localNetId = MegaCrit.Sts2.Core.Context.LocalContext.NetId;
+            if (localNetId.HasValue && players != null && players.Any(p => p.NetId == localNetId.Value))
+                _trackedNetId = localNetId.Value;
+            else if (players != null && players.Count == 1)
+                _trackedNetId = players[0].NetId; // SP: sole player is us
+            else
+                _trackedNetId = null; // co-op w/ LocalContext missing: fail open
+        }
+        catch (Exception e)
+        {
+            _trackedNetId = null;
+            CoreMain.LogDebug($"ResolveTrackedPlayer failed (tracking all): {e.Message}");
+        }
+        CoreMain.Logger.Info($"TrackedPlayer resolved: net_id={(_trackedNetId?.ToString() ?? "<all>")}");
+    }
+
+    private static bool IsTrackedPlayer(Player? player)
+        => _trackedNetId == null || (player != null && player.NetId == _trackedNetId.Value);
+
+    private static bool IsTrackedPlayerCreature(Creature? creature)
+        => _trackedNetId == null || (creature?.Player != null && creature.Player.NetId == _trackedNetId.Value);
+
+    private static bool IsTrackedCard(CardModel? card)
+    {
+        if (_trackedNetId == null) return true;
+        if (card == null || !card.IsMutable) return true;
+        var owner = card.Owner;
+        return owner == null || owner.NetId == _trackedNetId.Value;
+    }
+
+    public static bool IsTrackedRelic(MegaCrit.Sts2.Core.Models.RelicModel? relic)
+    {
+        lock (_lock)
+        {
+            if (_trackedNetId == null) return true;
+            if (relic == null || !relic.IsMutable) return true;
+            var owner = relic.Owner;
+            return owner == null || owner.NetId == _trackedNetId.Value;
+        }
+    }
+
     private static void GuardLifecycle(string site, Action body)
     {
         try { body(); }
@@ -774,26 +834,16 @@ public static class RunTracker
         _pendingPowerChangeAttempts.Clear();
         _pendingPlayerBlockClearAmount = 0;
         _pendingPlayerBlockClearArmed = false;
-        _pendingOrichalcumBlockAttribution = false;
-        _pendingAnchorBlockAttribution = false;
-        _pendingTheAbacusBlockAttribution = false;
+        // Ported windows (Orichalcum, Anchor, Abacus, BoneFlute, CloakClasp,
+        // HappyFlower, BoomingConch, GremlinHorn energy+draw) now live on
+        // PendingCombat.Windows and reset with a fresh PendingCombat.
+        // DEFERRED (not ported this pass — keep their own reset):
         _pendingAkabekoVigorAttribution = false;
-        _pendingBoneFluteBlockAttribution = false;
-        _pendingHappyFlowerEnergyAttribution = false;
-        _pendingBoomingConchEnergyAttribution = false;
-        _pendingGremlinHornEnergyAttributions.Clear();
-        _pendingGremlinHornDrawAttributions.Clear();
         _pendingPendulumDrawAttributions.Clear();
         _pendingParryingShieldDamageAttributions.Clear();
         _pendingHornCleatBlockAttributions.Clear();
         _lastPrismaticGemEnergyRoundNumber = null;
-        _pendingCloakClaspBlockAttribution = false;
         _pendingToolboxOfferScreens = 0;
-        // Bone Flute's only other disarm is a racing thread-pool ContinueWith;
-        // if the killing Osty attack abandons that task, a stale armed flag
-        // would credit the next combat's first Defend to Bone Flute. Reset it
-        // at the combat boundary like its sibling one-shots.
-        _pendingBoneFluteBlockAttribution = false;
         _pendingMakeItSoSummons.Clear();
         _pendingReplayExtraPlaySources.Clear();
         _pendingReplayExtraPlaySeriesStarted.Clear();
@@ -896,6 +946,9 @@ public static class RunTracker
     private static void AdoptRunLocked(RunData run, RunState? runState, string context, bool repairAggregates)
     {
         _currentRun = run;
+        // Re-derive the tracked local player on every adopt/resume/continue
+        // (hot-reload, main-menu Continue, continue-after-restart).
+        ResolveTrackedPlayerLocked(runState);
         // Old builds stamped EndedAt on every Continue re-fire; an in-progress
         // run is live again the moment we adopt it. Guarded on outcome so a
         // defensive future caller can't resurrect a genuinely finished record
@@ -1199,6 +1252,7 @@ public static class RunTracker
             _defCounters.Clear();
             ResetCombatContextState();
             ResetDeckViewCachesLocked();
+            ResolveTrackedPlayerLocked(runState);
 
             string now = Now();
             _currentRun = new RunData
@@ -1544,6 +1598,8 @@ public static class RunTracker
     {
         lock (_lock)
         {
+            // Co-op: only the tracked local player's card plays are ours.
+            if (!IsTrackedCard(cardPlay?.Card)) return;
             // Defensive: if CombatSetUp never fired (unusual), allocate lazily.
             _pendingCombat ??= new PendingCombat();
 
@@ -1790,6 +1846,9 @@ public static class RunTracker
     {
         lock (_lock)
         {
+            // Co-op: don't adopt a partner's play as the resolving play, or
+            // downstream energy/draw/power attribution would credit our cards.
+            if (!IsTrackedCard(cardPlay?.Card)) return;
             _currentPlayerCardPlay = cardPlay;
             if (cardPlay?.Card != null)
             {
@@ -2065,7 +2124,10 @@ public static class RunTracker
     {
         lock (_lock)
         {
-            _pendingOrichalcumBlockAttribution = true;
+            _pendingCombat ??= new PendingCombat();
+            // One-shot; block gain resolves async many history entries later.
+            _pendingCombat.Windows.Arm(OrichalcumRelicId, AttributionEventKind.PlayerBlockGain,
+                CurrentHistoryCountLocked(), maxHistoryAdvance: -1);
         }
     }
 
@@ -2077,7 +2139,7 @@ public static class RunTracker
     {
         lock (_lock)
         {
-            _pendingOrichalcumBlockAttribution = false;
+            _pendingCombat?.Windows.Disarm(OrichalcumRelicId, AttributionEventKind.PlayerBlockGain);
         }
     }
 
@@ -2142,7 +2204,9 @@ public static class RunTracker
     {
         lock (_lock)
         {
-            _pendingAnchorBlockAttribution = true;
+            _pendingCombat ??= new PendingCombat();
+            _pendingCombat.Windows.Arm(AnchorRelicId, AttributionEventKind.PlayerBlockGain,
+                CurrentHistoryCountLocked(), maxHistoryAdvance: -1);
         }
     }
 
@@ -2260,7 +2324,9 @@ public static class RunTracker
     {
         lock (_lock)
         {
-            _pendingTheAbacusBlockAttribution = true;
+            _pendingCombat ??= new PendingCombat();
+            _pendingCombat.Windows.Arm(TheAbacusRelicId, AttributionEventKind.PlayerBlockGain,
+                CurrentHistoryCountLocked(), maxHistoryAdvance: -1);
         }
     }
 
@@ -3064,7 +3130,13 @@ public static class RunTracker
     {
         lock (_lock)
         {
-            _pendingHappyFlowerEnergyAttribution = true;
+            _pendingCombat ??= new PendingCombat();
+            // Bug fix (#250): the energy grant is synchronous within
+            // AfterSideTurnStart, so maxHistoryAdvance=0 keeps it tight and the
+            // window self-expires by history-count rather than depending on the
+            // fragile cross-hook AfterPlayerTurnStart disarm ordering.
+            _pendingCombat.Windows.Arm(HappyFlowerRelicId, AttributionEventKind.PlayerEnergyGain,
+                CurrentHistoryCountLocked(), maxHistoryAdvance: 0);
         }
     }
 
@@ -3221,14 +3293,54 @@ public static class RunTracker
         {
             try
             {
+                _pendingCombat ??= new PendingCombat();
                 var agg = GetOrCreateRelicAggregateLocked(GremlinHornRelicId);
                 agg.Activations += 1;
-                _pendingGremlinHornEnergyAttributions.Add(owner);
-                _pendingGremlinHornDrawAttributions.Add(owner);
+                int hc = CurrentHistoryCountLocked();
+                // Owner-keyed one-shot energy + draw windows (resolve async after
+                // AfterDeath returns, so maxHistoryAdvance=-1).
+                _pendingCombat.Windows.Arm(GremlinHornRelicId, AttributionEventKind.PlayerEnergyGain,
+                    hc, ownerId: owner, maxHistoryAdvance: -1);
+                _pendingCombat.Windows.Arm(GremlinHornRelicId, AttributionEventKind.CardDraw,
+                    hc, ownerId: owner, maxHistoryAdvance: -1);
             }
             catch (Exception e)
             {
                 CoreMain.LogDebug($"ArmGremlinHornAttribution failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>Single arbitration point for player energy gains at
+    /// PlayerCombatState.GainEnergy. If a relic energy window (Gremlin Horn /
+    /// Happy Flower / Booming Conch) is live for this player it claims the
+    /// delta; otherwise the resolving card play is credited. Replaces the
+    /// un-arbitrated fan-out and closes the Gremlin-Horn card+relic double count.</summary>
+    public static void DispatchPlayerEnergyGain(PlayerCombatState combatState, int amount)
+    {
+        if (amount <= 0 || combatState == null) return;
+        lock (_lock)
+        {
+            try
+            {
+                // Co-op: a partner's energy gain is not ours.
+                if (!IsTrackedPlayer(combatState._player)) return;
+                if (_pendingCombat == null) { RecordEnergyGained(combatState, amount); return; }
+                var owner = combatState._player;
+                var key = _pendingCombat.Windows.TryConsume(
+                    AttributionEventKind.PlayerEnergyGain, CurrentHistoryCountLocked(), ownerId: owner);
+                if (key != null)
+                {
+                    var agg = GetOrCreateRelicAggregateLocked(key);
+                    agg.EnergyGenerated += amount; // GremlinHorn/HappyFlower/BoomingConch all use EnergyGenerated
+                    return;
+                }
+                // No relic window: credit the resolving card play as before.
+                RecordEnergyGained(combatState, amount);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"DispatchPlayerEnergyGain failed: {e.Message}");
             }
         }
     }
@@ -3262,8 +3374,12 @@ public static class RunTracker
         {
             try
             {
-                DisarmGremlinHornEnergyAttributionLocked(player);
-                return ConsumePendingGremlinHornAttribution(_pendingGremlinHornDrawAttributions, player);
+                if (_pendingCombat == null) return false;
+                bool claimed = _pendingCombat.Windows.TryConsume(
+                    AttributionEventKind.CardDraw, CurrentHistoryCountLocked(), ownerId: player) == GremlinHornRelicId;
+                if (claimed)
+                    _pendingCombat.Windows.Disarm(GremlinHornRelicId, AttributionEventKind.PlayerEnergyGain, ownerId: player);
+                return claimed;
             }
             catch (Exception e)
             {
@@ -3637,7 +3753,14 @@ public static class RunTracker
     {
         lock (_lock)
         {
-            _pendingCloakClaspBlockAttribution = true;
+            _pendingCombat ??= new PendingCombat();
+            // Bug fix (#250): Cloak Clasp does exactly ONE GainBlock of size
+            // (cards-in-hand * 1) (verified CloakClasp.BeforeSideTurnEnd), NOT
+            // one-per-card. One-shot window; no hand-count gate (a zero-hand
+            // end-of-turn simply never fires AfterBlockGained, and the window
+            // self-clears at the combat boundary).
+            _pendingCombat.Windows.Arm(CloakClaspRelicId, AttributionEventKind.PlayerBlockGain,
+                CurrentHistoryCountLocked(), maxHistoryAdvance: -1);
         }
     }
 
@@ -3660,6 +3783,33 @@ public static class RunTracker
     /// <c>AfterBlockGained</c> calls (one per card in hand) are all captured.
     /// The window is cleared at the <c>Hook.AfterTurnEnd</c> boundary.
     /// </summary>
+    /// <summary>Single arbitration point for player block gains at
+    /// Hook.AfterBlockGained. The oldest fresh armed PlayerBlockGain window
+    /// claims the gain; that relic's AdditionalBlockGained is credited.
+    /// Two distinct gains in one turn (Orichalcum + Cloak Clasp) are two
+    /// AfterBlockGained events, each claiming its own window in FIFO order.</summary>
+    public static void DispatchPlayerBlockGain(int amount)
+    {
+        if (amount <= 0) return;
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null) return;
+                var key = _pendingCombat.Windows.TryConsume(
+                    AttributionEventKind.PlayerBlockGain, CurrentHistoryCountLocked());
+                if (key == null) return;
+                var agg = GetOrCreateRelicAggregateLocked(key);
+                if (key == AnchorRelicId) agg.Activations += 1; // preserve Anchor activation count
+                agg.AdditionalBlockGained += amount;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"DispatchPlayerBlockGain failed: {e.Message}");
+            }
+        }
+    }
+
     public static void RecordCloakClaspBlockGained(int amount)
     {
         if (amount <= 0) return;
@@ -4384,6 +4534,11 @@ public static class RunTracker
     /// card that caused them, since the game's entries for those effects
     /// don't include a CardPlay reference.
     /// </summary>
+    // Current CombatHistory entry count for window staleness. Single source
+    // used both when arming (ArmedAtHistoryCount) and consuming.
+    private static int CurrentHistoryCountLocked()
+        => CombatManager.Instance?.History?.Entries?.Count() ?? 0;
+
     private static CardPlay? FindCurrentlyResolvingCardPlay()
     {
         if (_currentPlayerCardPlay?.Card != null) return _currentPlayerCardPlay;
@@ -4475,7 +4630,7 @@ public static class RunTracker
         }
     }
 
-    public static void NotePoisonTickStarting(object poisonPower)
+    public static void NotePoisonTickStarting(object poisonPower, IReadOnlyList<Creature>? participants = null)
     {
         lock (_lock)
         {
@@ -4483,6 +4638,14 @@ public static class RunTracker
             {
                 var target = TryResolvePoisonPowerTarget(poisonPower);
                 if (target == null || target.IsPlayer) return;
+
+                // Mirror PoisonPower.cs line 57: base.Owner == our resolved
+                // target, so if it is not a participant no tick fires and we
+                // must NOT arm (a stale window would mis-claim a later
+                // null-dealer hit). participants==null (defensive) falls back
+                // to arming (old behavior).
+                if (participants != null && !ParticipantsContain(participants, target))
+                    return;
 
                 _pendingCombat ??= new PendingCombat();
                 _pendingCombat.PendingPoisonTicks[target] = new PendingPoisonTick
@@ -4497,7 +4660,7 @@ public static class RunTracker
         }
     }
 
-    public static void NoteNoxiousFumesTick(object noxiousFumesPower)
+    public static void NoteNoxiousFumesTick(object noxiousFumesPower, IReadOnlyList<Creature>? participants = null)
     {
         lock (_lock)
         {
@@ -4507,6 +4670,11 @@ public static class RunTracker
 
                 var owner = GetPowerReceiverCreature(power);
                 if (owner == null) return;
+
+                // Mirror NoxiousFumesPower.cs line 28: only arm when owner
+                // (== base.Owner) is a participant of the starting side.
+                if (participants != null && !ParticipantsContain(participants, owner))
+                    return;
 
                 _pendingCombat ??= new PendingCombat();
                 if (!_pendingCombat.NoxiousFumesContributionsByPower.TryGetValue(power, out var contributions)
@@ -4968,6 +5136,17 @@ public static class RunTracker
             return collection.Count;
 
         return null;
+    }
+
+    // Reference-equality membership test matching the game's
+    // participants.Contains(base.Owner) (PoisonPower.cs line 57 /
+    // NoxiousFumesPower.cs line 28). Creatures are compared by identity.
+    private static bool ParticipantsContain(IReadOnlyList<Creature> participants, Creature creature)
+    {
+        if (participants == null || creature == null) return false;
+        for (int i = 0; i < participants.Count; i++)
+            if (ReferenceEquals(participants[i], creature)) return true;
+        return false;
     }
 
     private static Creature? GetPowerReceiverCreature(PowerModel power)
@@ -5478,6 +5657,14 @@ public static class RunTracker
         }
     }
 
+    // Max CombatHistory-entry distance between a poison window being armed in
+    // AfterSideTurnStart and its tick's DamageReceivedEntry arriving. Ticks land
+    // within a handful of history entries; 24 tolerates intervening
+    // power/decrement/vfx entries while rejecting a window that survived to an
+    // unrelated later hit. Re-stamped per tick, so it applies per-tick-gap not
+    // across a whole multi-iteration burst.
+    private const int PoisonTickMaxHistoryDistance = 24;
+
     private static bool TryRecordPoisonTickDamage(DamageReceivedEntry entry)
     {
         lock (_lock)
@@ -5497,23 +5684,48 @@ public static class RunTracker
             decimal totalAttempted = tickTotals.IntendedDamage;
             if (totalAttempted <= 0m) return false;
 
+            // Genuine poison ticks are dealt with dealer:null AND cardSource:null
+            // (PoisonPower.cs line 64). A non-null Dealer means some other hit
+            // that merely lands on a poisoned creature; never a tick.
+            if (entry.Dealer != null)
+                return false;
+
+            // Bounded freshness. The old `historyCount >= ArmedAtHistoryCount`
+            // was vacuous (CombatHistory only grows). A tick's entry lands only
+            // a small bounded number of history entries after the arm.
             bool armedTick = false;
-            if (_pendingCombat.PendingPoisonTicks.Remove(entry.Receiver, out var pendingTick))
+            if (_pendingCombat.PendingPoisonTicks.TryGetValue(entry.Receiver, out var pendingTick))
             {
                 int historyCount = CombatManager.Instance?.History?.Entries?.Count() ?? 0;
-                armedTick = historyCount >= pendingTick.ArmedAtHistoryCount;
+                int delta = historyCount - pendingTick.ArmedAtHistoryCount;
+                if (delta >= 0 && delta <= PoisonTickMaxHistoryDistance)
+                    armedTick = true;
+                else
+                    _pendingCombat.PendingPoisonTicks.Remove(entry.Receiver); // stale
             }
 
             decimal trackedTotal = ownership.Values.Sum(share => Math.Max(0m, share.Amount));
             if (trackedTotal <= 0m) return false;
 
+            // Dealer==null already established; fallback reduces to amount match.
             bool fallbackAmountMatch = AreClose(trackedTotal, totalAttempted);
-            bool fallbackDealerMatch = entry.Dealer == null;
-            if (!armedTick && !(fallbackDealerMatch && fallbackAmountMatch))
+            if (!armedTick && !fallbackAmountMatch)
             {
                 if (entry.Result.WasTargetKilled)
                     _pendingCombat.PoisonOwnershipByTarget.Remove(entry.Receiver);
                 return false;
+            }
+
+            // One AfterSideTurnStart loops TriggerCount times, each a separate
+            // null-dealer entry on the same receiver. Keep the armed entry live
+            // across the burst and re-stamp its freshness clock so the next tick
+            // stays in-window; dropped on kill/exhaust/stale below.
+            if (armedTick && _pendingCombat.PendingPoisonTicks.ContainsKey(entry.Receiver))
+            {
+                _pendingCombat.PendingPoisonTicks[entry.Receiver] = new PendingPoisonTick
+                {
+                    ArmedAtHistoryCount = CombatManager.Instance?.History?.Entries?.Count() ?? 0,
+                };
             }
 
             if (trackedTotal > totalAttempted)
@@ -5547,6 +5759,7 @@ public static class RunTracker
             if (entry.Result.WasTargetKilled || totalAttempted <= 1m)
             {
                 _pendingCombat.PoisonOwnershipByTarget.Remove(entry.Receiver);
+                _pendingCombat.PendingPoisonTicks.Remove(entry.Receiver);
                 return true;
             }
 
@@ -5597,6 +5810,9 @@ public static class RunTracker
     {
         lock (_lock)
         {
+            // Co-op: block gained by a partner (or their summon) must not enter
+            // our aggregates/ledger. Non-player receivers unaffected.
+            if (entry.Receiver.IsPlayer && !IsTrackedPlayerCreature(entry.Receiver)) return;
             _pendingCombat ??= new PendingCombat();
 
             string? instanceId = null;
@@ -5663,6 +5879,9 @@ public static class RunTracker
         // OWN attacks on enemies mint a phantom MONSTER.OSTY enemy aggregate.
         // Matches RecordPlayerBlockedDamage and the primer's enemy-damage spec.
         if (!entry.Receiver.IsPlayer) return;
+        // Co-op: only the TRACKED player's damage taken is our defensive stat
+        // (a partner soaking a hit is not).
+        if (!IsTrackedPlayerCreature(entry.Receiver)) return;
         if (entry.Dealer == null || entry.Dealer.IsPlayer || entry.Dealer.Monster == null) return;
 
         int blocked = Math.Max(0, entry.Result.BlockedDamage);
@@ -6545,6 +6764,10 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public RunMetaStats MetaStats { get; } = new();
     public int NextBlockSequence { get; set; }
+
+    /// <summary>Exclusive per-kind attribution windows for this combat. A fresh
+    /// PendingCombat (setup/end, run boundary) starts empty, so this IS the reset.</summary>
+    public AttributionWindowRegistry Windows { get; } = new();
 }
 
 internal sealed class EnemyStatusSourceFrame

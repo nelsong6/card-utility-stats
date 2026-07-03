@@ -20,10 +20,13 @@ public static class RedMaskBeforeSideTurnStartPatch
     }
 
     [HarmonyPostfix]
-    public static void Postfix(CombatSide side, ICombatState combatState)
+    public static void Postfix(MegaCrit.Sts2.Core.Models.RelicModel __instance, CombatSide side, ICombatState combatState)
     {
         try
         {
+            // Co-op: the shared CombatSide.Player fires this for every player's
+            // Red Mask; only record OUR relic's application.
+            if (!RunTracker.IsTrackedRelic(__instance)) return;
             if (side != CombatSide.Player) return;
             if (combatState == null) return;
             if (combatState.RoundNumber != 1) return;

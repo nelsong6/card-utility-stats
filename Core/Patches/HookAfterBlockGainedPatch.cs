@@ -18,11 +18,9 @@ public static class HookAfterBlockGainedPatch
         try
         {
             if (creature == null || !creature.IsPlayer) return;
-            RunTracker.RecordOrichalcumBlockGained((int)amount);
-            RunTracker.RecordAnchorBlockGained((int)amount);
-            RunTracker.RecordTheAbacusBlockGained((int)amount);
-            RunTracker.RecordBoneFluteBlockGained((int)amount);
-            RunTracker.RecordCloakClaspBlockGained((int)amount);
+            // Single arbitration: the registry decides which ONE window claims
+            // this player block gain (FIFO across armed windows).
+            RunTracker.DispatchPlayerBlockGain((int)amount);
         }
         catch (Exception e)
         {
