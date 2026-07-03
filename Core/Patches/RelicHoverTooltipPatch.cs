@@ -201,6 +201,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is MercuryHourglass)
+            {
+                const string relicId = "RELIC.MERCURY_HOURGLASS";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildMercuryHourglassBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Mercury Hourglass", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is ParryingShield)
             {
                 const string relicId = "RELIC.PARRYING_SHIELD";
@@ -493,6 +503,18 @@ public static class RelicHoverShowPatch
         var sb = new StringBuilder();
         Row3(sb, "Activations", agg.Activations.ToString(), "");
         Row3(sb, "Cards drawn", agg.AdditionalCardsDrawn.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildMercuryHourglassBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var damagePerCombat = agg.Activations <= 0
+            ? 0m
+            : (decimal)agg.TotalDamageDealt / agg.Activations;
+        Row3(sb, "Combats triggered", agg.Activations.ToString(), "");
+        Row3(sb, "Damage dealt", agg.TotalDamageDealt.ToString(), "");
+        Row3(sb, "Damage per combat", FormatDecimal(damagePerCombat), "");
         return sb.ToString();
     }
 
