@@ -231,6 +231,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is PenNib)
+            {
+                const string relicId = "RELIC.PEN_NIB";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildPenNibBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Pen Nib", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is HornCleat)
             {
                 const string relicId = "RELIC.HORN_CLEAT";
@@ -539,6 +549,13 @@ public static class RelicHoverShowPatch
         Row3(sb, "Combats triggered", agg.Activations.ToString(), "");
         Row3(sb, "Damage dealt", agg.TotalDamageDealt.ToString(), "");
         Row3(sb, "Damage per combat", FormatDecimal(damagePerCombat), "");
+        return sb.ToString();
+    }
+
+    private static string BuildPenNibBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Base damage added", agg.TotalDamageAttempted.ToString(), "");
         return sb.ToString();
     }
 

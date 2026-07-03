@@ -68,6 +68,10 @@ public class OpenBranchRelicStatsTests
             Kills = 1,
             TotalTargets = 2,
         };
+        run.RelicAggregates["RELIC.PEN_NIB"] = new RelicAggregate
+        {
+            TotalDamageAttempted = 27,
+        };
         run.RelicAggregates["RELIC.HORN_CLEAT"] = new RelicAggregate
         {
             Activations = 2,
@@ -109,8 +113,53 @@ public class OpenBranchRelicStatsTests
         Assert.Equal(2, restored.RelicAggregates["RELIC.PARRYING_SHIELD"].TotalDamageOverkill);
         Assert.Equal(1, restored.RelicAggregates["RELIC.PARRYING_SHIELD"].Kills);
         Assert.Equal(2, restored.RelicAggregates["RELIC.PARRYING_SHIELD"].TotalTargets);
+        Assert.Equal(27, restored.RelicAggregates["RELIC.PEN_NIB"].TotalDamageAttempted);
         Assert.Equal(2, restored.RelicAggregates["RELIC.HORN_CLEAT"].Activations);
         Assert.Equal(24, restored.RelicAggregates["RELIC.HORN_CLEAT"].AdditionalBlockGained);
+    }
+
+    [Fact]
+    public void RunTracker_RecordPenNibBaseDamageAdded_AccumulatesTruncatedBaseDamage()
+    {
+        var agg = new RelicAggregate();
+
+        RunTracker.RecordPenNibBaseDamageAddedForTest(agg, 9m);
+        RunTracker.RecordPenNibBaseDamageAddedForTest(agg, 6.9m);
+        RunTracker.RecordPenNibBaseDamageAddedForTest(agg, 0.9m);
+        RunTracker.RecordPenNibBaseDamageAddedForTest(agg, -5m);
+
+        Assert.Equal(15, agg.TotalDamageAttempted);
+    }
+
+    [Fact]
+    public void PenNib_ResolveBaseDamageAmount_PrefersRawDamageFrame()
+    {
+        try
+        {
+            PenNibModifyDamageMultiplicativePatch.PushDamageFrame(null, null, 9m);
+
+            Assert.Equal(
+                9m,
+                PenNibModifyDamageMultiplicativePatch.ResolveBaseDamageAmount(
+                    null,
+                    null,
+                    13.5m));
+        }
+        finally
+        {
+            PenNibModifyDamageMultiplicativePatch.PopDamageFrame();
+        }
+    }
+
+    [Fact]
+    public void PenNib_ResolveBaseDamageAmount_FallsBackWithoutRawDamageFrame()
+    {
+        Assert.Equal(
+            13.5m,
+            PenNibModifyDamageMultiplicativePatch.ResolveBaseDamageAmount(
+                null,
+                null,
+                13.5m));
     }
 
     [Fact]
@@ -195,6 +244,12 @@ public class OpenBranchRelicStatsTests
         Assert.Contains("Kills", parryingShieldBody);
         Assert.Contains("[b]17[/b]", parryingShieldBody);
         Assert.Contains("[b]11[/b]", parryingShieldBody);
+
+        var penNibBody = InvokeTooltipBuilder(
+            "BuildPenNibBodyBBCode",
+            new RelicAggregate { TotalDamageAttempted = 27 });
+        Assert.Contains("Base damage added", penNibBody);
+        Assert.Contains("[b]27[/b]", penNibBody);
 
         var hornCleatBody = InvokeTooltipBuilder(
             "BuildHornCleatBodyBBCode",
