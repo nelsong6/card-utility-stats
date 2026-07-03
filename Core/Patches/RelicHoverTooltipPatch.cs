@@ -81,6 +81,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is Permafrost)
+            {
+                const string relicId = "RELIC.PERMAFROST";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildPermafrostBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Permafrost", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is TheAbacus)
             {
                 const string relicId = "RELIC.THE_ABACUS";
@@ -384,6 +394,18 @@ public static class RelicHoverShowPatch
         var sb = new StringBuilder();
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
         Row3(sb, "Triggers blocked", agg.BlockedTriggers.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildPermafrostBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var blockPerCombat = agg.Activations <= 0
+            ? 0m
+            : (decimal)agg.AdditionalBlockGained / agg.Activations;
+        Row3(sb, "Combats triggered", agg.Activations.ToString(), "");
+        Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
+        Row3(sb, BlockLabel("block gained per combat"), FormatDecimal(blockPerCombat), "");
         return sb.ToString();
     }
 

@@ -2053,6 +2053,7 @@ public static class RunTracker
     private const string RedMaskRelicId = "RELIC.RED_MASK";
     private const string PocketwatchRelicId = "RELIC.POCKETWATCH";
     private const string OrichalcumRelicId = "RELIC.ORICHALCUM";
+    private const string PermafrostRelicId = "RELIC.PERMAFROST";
     private const string AnchorRelicId = "RELIC.ANCHOR";
     private const string TheAbacusRelicId = "RELIC.THE_ABACUS";
     private const string LetterOpenerRelicId = "RELIC.LETTER_OPENER";
@@ -2191,6 +2192,37 @@ public static class RunTracker
             {
                 CoreMain.LogDebug($"RecordOrichalcumBlockedTrigger failed: {e.Message}");
             }
+        }
+    }
+
+    /// <summary>
+    /// Record Permafrost's first-Power trigger for this combat and arm the
+    /// observed block gain. The actual block amount is observed by
+    /// <see cref="Patches.HookAfterBlockGainedPatch"/>.
+    /// </summary>
+    public static void RecordPermafrostActivationAndArmBlockAttribution()
+    {
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(PermafrostRelicId);
+                agg.Activations += 1;
+                _pendingCombat!.Windows.Arm(PermafrostRelicId, AttributionEventKind.PlayerBlockGain,
+                    CurrentHistoryCountLocked(), maxHistoryAdvance: -1);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPermafrostActivationAndArmBlockAttribution failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void DisarmPermafrostBlockAttribution()
+    {
+        lock (_lock)
+        {
+            _pendingCombat?.Windows.Disarm(PermafrostRelicId, AttributionEventKind.PlayerBlockGain);
         }
     }
 
