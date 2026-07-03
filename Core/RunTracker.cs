@@ -1506,7 +1506,14 @@ public static class RunTracker
     private static int _observeCount;
     public static void Observe(object entry)
     {
-        try
+        // Guard + throttle HERE, not just at the CombatHistoryAddPatch caller.
+        // This method wraps its whole body and never rethrows, so a PatchGuard
+        // at the call site would never see a throw — its per-site throttle
+        // would be dead. Routing Observe's own guard through PatchGuard gives
+        // this (the busiest hook) the rate-limited always-on Error logging, and
+        // covers every Observe caller — including the combat-ending
+        // suppressed-damage path, which is NOT itself PatchGuard-wrapped.
+        PatchGuard.Run("RunTracker.Observe", () =>
         {
             var n = System.Threading.Interlocked.Increment(ref _observeCount);
 
@@ -1595,12 +1602,7 @@ public static class RunTracker
                     RecordPowerReceived(pre);
                     break;
             }
-        }
-        catch (Exception e)
-        {
-            // Never let tracker exceptions escape into the game loop.
-            CoreMain.Logger.Error($"RunTracker.Observe failed: {e}");
-        }
+        });
     }
 
     private static void RecordCardPlay(CardPlay cardPlay)
@@ -5834,7 +5836,17 @@ public static class RunTracker
                 var scratch = new PendingCombat();
                 _pendingCombat = scratch;
                 foreach (var (cardInstanceId, amount) in gains)
+                {
+                    // Mirror the production block-gain pairing: a card-attributed
+                    // gain credits TotalBlockGained AND pushes a ledger chunk of
+                    // the same amount (see RecordBlockGainedEntry). Crediting it
+                    // here lets the conservation test assert the real invariant
+                    // gained == effective + wasted — the tooltip divides absorbed
+                    // and wasted percentages by TotalBlockGained.
+                    if (cardInstanceId != null)
+                        GetOrCreateAggregate(scratch, cardInstanceId).TotalBlockGained += amount;
                     AppendPlayerBlockChunkLocked(cardInstanceId, amount);
+                }
                 AttributeBlockedDamageLocked(blockedDamage);
                 AttributeUnusedBlockLocked(clearedUnusedBlock);
                 return scratch;
