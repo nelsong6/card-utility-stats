@@ -438,19 +438,20 @@ public class RelicAggregate
 
     // Total attempted damage from relic effects whose actual damage is not
     // source-attributed by the game's damage entries. Used by Letter Opener
-    // and observed-damage relics such as Parrying Shield and Festive Popper.
+    // and observed-damage relics such as Parrying Shield, Festive Popper, and
+    // Mercury Hourglass.
     public int TotalDamageAttempted { get; set; }
 
-    // Relic damage outcome split. Used by relics such as Parrying Shield and
-    // Festive Popper when their strikes actually resolve through the game's
-    // damage command.
+    // Relic damage outcome split. Used by relics such as Parrying Shield,
+    // Festive Popper, and Mercury Hourglass when their strikes actually
+    // resolve through the game's damage command.
     public int TotalDamageDealt { get; set; }
     public int TotalDamageBlocked { get; set; }
     public int TotalDamageOverkill { get; set; }
     public int Kills { get; set; }
 
     // Total targets included in those attempted relic-damage payloads. Used by
-    // Letter Opener, Parrying Shield, and Festive Popper.
+    // Letter Opener, Parrying Shield, Festive Popper, and Mercury Hourglass.
     public int TotalTargets { get; set; }
 
     // Total potions gained from this relic, split by the potion rarity that

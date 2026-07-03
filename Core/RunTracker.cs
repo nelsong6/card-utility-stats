@@ -72,6 +72,7 @@ public static class RunTracker
     private static readonly List<Player> _pendingPendulumDrawAttributions = new();
     private static readonly List<Creature> _pendingParryingShieldDamageAttributions = new();
     private static readonly List<Creature> _pendingFestivePopperDamageAttributions = new();
+    private static readonly List<Creature> _pendingMercuryHourglassDamageAttributions = new();
     private static readonly List<Creature> _pendingHornCleatBlockAttributions = new();
     private static int? _lastPrismaticGemEnergyRoundNumber;
     private static int _pendingWhiteBeastPotionRewards;
@@ -853,6 +854,7 @@ public static class RunTracker
         _pendingPendulumDrawAttributions.Clear();
         _pendingParryingShieldDamageAttributions.Clear();
         _pendingFestivePopperDamageAttributions.Clear();
+        _pendingMercuryHourglassDamageAttributions.Clear();
         _pendingHornCleatBlockAttributions.Clear();
         _lastPrismaticGemEnergyRoundNumber = null;
         _pendingToolboxOfferScreens = 0;
@@ -2070,6 +2072,7 @@ public static class RunTracker
     private const string PendulumRelicId = "RELIC.PENDULUM";
     private const string ParryingShieldRelicId = "RELIC.PARRYING_SHIELD";
     private const string FestivePopperRelicId = "RELIC.FESTIVE_POPPER";
+    private const string MercuryHourglassRelicId = "RELIC.MERCURY_HOURGLASS";
     private const string HornCleatRelicId = "RELIC.HORN_CLEAT";
     private const string PrismaticGemRelicId = "RELIC.PRISMATIC_GEM";
     private const string CloakClaspRelicId = "RELIC.CLOAK_CLASP";
@@ -3509,6 +3512,30 @@ public static class RunTracker
         }
     }
 
+    /// <summary>
+    /// Record Mercury Hourglass's owner-specific turn-start activation. The
+    /// damage split is observed from the damage command result. Activations are
+    /// counted once per combat so damage-per-combat has the expected denominator.
+    /// </summary>
+    public static void ArmMercuryHourglassAttribution(Creature dealer)
+    {
+        if (dealer == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(MercuryHourglassRelicId);
+                if (agg.Activations <= 0) agg.Activations = 1;
+                _pendingMercuryHourglassDamageAttributions.Add(dealer);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"ArmMercuryHourglassAttribution failed: {e.Message}");
+            }
+        }
+    }
+
     public static bool TryConsumeFestivePopperDamageAttribution(Creature dealer)
     {
         if (dealer == null) return false;
@@ -3522,6 +3549,24 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"TryConsumeFestivePopperDamageAttribution failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    public static bool TryConsumeMercuryHourglassDamageAttribution(Creature dealer)
+    {
+        if (dealer == null) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                return ConsumePendingCreatureAttribution(_pendingMercuryHourglassDamageAttributions, dealer);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"TryConsumeMercuryHourglassDamageAttribution failed: {e.Message}");
                 return false;
             }
         }
@@ -3545,7 +3590,40 @@ public static class RunTracker
         }
     }
 
+    public static void RecordMercuryHourglassDamage(IEnumerable<DamageResult>? results)
+    {
+        if (results == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(MercuryHourglassRelicId);
+                AddRelicDamageResultsLocked(agg, results);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordMercuryHourglassDamage failed: {e.Message}");
+            }
+        }
+    }
+
     internal static void RecordFestivePopperDamageForTest(
+        RelicAggregate agg,
+        IEnumerable<(int BlockedDamage, int UnblockedDamage, int OverkillDamage, bool WasTargetKilled)> results)
+    {
+        foreach (var result in results)
+        {
+            AddRelicDamageResultPartsLocked(
+                agg,
+                result.BlockedDamage,
+                result.UnblockedDamage,
+                result.OverkillDamage,
+                result.WasTargetKilled);
+        }
+    }
+
+    internal static void RecordMercuryHourglassDamageForTest(
         RelicAggregate agg,
         IEnumerable<(int BlockedDamage, int UnblockedDamage, int OverkillDamage, bool WasTargetKilled)> results)
     {
