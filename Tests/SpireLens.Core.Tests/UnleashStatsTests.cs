@@ -54,6 +54,7 @@ public class UnleashStatsTests
         Assert.Equal(3, agg.TimesOstyHpAttackBonusApplied);
     }
 
+    [Trait("Category", "RequiresLiveGame")]
     [Fact]
     public void Tooltip_UnleashStats_ShowTotalAndAverage()
     {
@@ -73,6 +74,7 @@ public class UnleashStatsTests
         Assert.Contains("[b]12.5[/b]", body);
     }
 
+    [Trait("Category", "RequiresLiveGame")]
     [Fact]
     public void Tooltip_UnleashStats_CompactShowsTotalOnly()
     {

@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
@@ -22,38 +23,81 @@ public static class RunStorage
     {
         public long? GameStartTime { get; set; }
         public string RunId { get; set; } = "";
+        public string? Outcome { get; set; }
     }
 
-    private static readonly JsonSerializerOptions Options = new()
+    /// <summary>
+    /// The single canonical serializer options for run files. Internal so tests
+    /// consume the exact production configuration instead of hand-copied
+    /// duplicates (which drift — the same parallel-list hazard as merge lists),
+    /// and so the public API layer can serialize in the on-disk shape.
+    ///
+    /// <c>IncludeFields</c> is required: the game's <c>SerializableCard</c>
+    /// (persisted as a removed-card snapshot) stores its data in public FIELDS,
+    /// not properties, so without this a removed card's props/enchantment
+    /// serialize as <c>{}</c> and rehydrate empty — silent data loss.
+    /// </summary>
+    internal static readonly JsonSerializerOptions Options = new()
     {
         WriteIndented = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+        IncludeFields = true,
     };
 
     /// <summary>Resolved absolute path to runs/ directory. Created on first save.</summary>
     public static string RunsDir => ProjectSettings.GlobalizePath("user://SpireLens/runs/");
 
+    // Single-writer chain: every save is a continuation of the previous one,
+    // so writes to the same run file apply in the exact order SaveAsync was
+    // called (which, since callers hold RunTracker's lock and serialize the
+    // snapshot on the calling thread, equals logical order). This replaces the
+    // old fire-and-forget Task.Run, where two rapid saves of the same file
+    // (OnCombatEnded then OnRunEnded on a won/lost run) raced: FileShare
+    // collisions dropped a save, or pool scheduling let a stale in_progress
+    // snapshot overwrite the final outcome=win/loss one.
+    private static readonly object _writeChainGate = new();
+    private static Task _writeChain = Task.CompletedTask;
+
     /// <summary>Serialize and write the run data to disk without blocking the caller.</summary>
     public static void SaveAsync(RunData data)
     {
-        // Snapshot-serialize on the calling thread so we don't race with further mutations.
-        // (RunTracker holds the lock when it calls this; safe here.)
+        // Snapshot-serialize AND resolve paths on the calling thread (the game
+        // thread, under RunTracker's lock): ProjectSettings.GlobalizePath and
+        // the RunData mutations are not safe to touch from a pool thread,
+        // especially during engine teardown.
         string json = JsonSerializer.Serialize(data, Options);
-        string path = Path.Combine(RunsDir, data.RunId + ".json");
+        string dir = RunsDir;
+        string path = Path.Combine(dir, data.RunId + ".json");
 
-        Task.Run(() =>
+        lock (_writeChainGate)
         {
-            try
-            {
-                Directory.CreateDirectory(RunsDir);
-                File.WriteAllText(path, json);
-            }
-            catch (Exception e)
-            {
-                CoreMain.Logger.Error($"RunStorage.SaveAsync failed: {e}");
-            }
-        });
+            _writeChain = _writeChain.ContinueWith(
+                _ => WriteFileAtomic(dir, path, json),
+                CancellationToken.None,
+                TaskContinuationOptions.None,
+                TaskScheduler.Default);
+        }
+    }
+
+    // Atomic write: full content to a temp file, then replace. A crash mid-write
+    // leaves the old file intact (or an orphan .tmp that the "*.json" scans
+    // ignore) instead of a truncated .json that LoadKnownSchemaFile silently
+    // skips — which would lose the whole run. Swallows its own exceptions so
+    // one failed write can't fault the shared chain and stall every later save.
+    private static void WriteFileAtomic(string dir, string path, string json)
+    {
+        try
+        {
+            Directory.CreateDirectory(dir);
+            string tmp = path + ".tmp";
+            File.WriteAllText(tmp, json);
+            File.Move(tmp, path, overwrite: true);
+        }
+        catch (Exception e)
+        {
+            CoreMain.Logger.Error($"RunStorage.SaveAsync failed: {e}");
+        }
     }
 
     private static RunFileHeader? ReadHeader(string path)
@@ -194,7 +238,18 @@ public static class RunStorage
     /// Returns null if no match or if the directory doesn't exist yet.
     /// Malformed / unreadable files are skipped, not fatal.
     /// </summary>
-    public static RunData? FindByGameStartTime(long gameStartTime, out bool foundUnsupportedMatch)
+    // How many of the newest run files FindByGameStartTime probes before
+    // giving up. The in-progress run it looks for is by construction among
+    // the most recently written files — only one run is ever active and its
+    // file is rewritten on every save — so a bounded probe keeps the miss
+    // case (fresh run start, no match anywhere) from reading and JSON-parsing
+    // months of accumulated run files on the main thread.
+    private const int MaxFindHeaderProbes = 25;
+
+    public static RunData? FindByGameStartTime(
+        long gameStartTime,
+        out bool foundUnsupportedMatch,
+        bool requireInProgress = false)
     {
         foundUnsupportedMatch = false;
         try
@@ -202,16 +257,35 @@ public static class RunStorage
             if (!Directory.Exists(RunsDir)) return null;
 
             // Sort newest-first so if multiple files match (shouldn't happen
-            // but defensive), we pick the most recent.
-            var files = Directory.GetFiles(RunsDir, "*.json");
-            Array.Sort(files, (a, b) => File.GetLastWriteTimeUtc(b).CompareTo(File.GetLastWriteTimeUtc(a)));
+            // but defensive), we pick the most recent. Sort keys are
+            // precomputed — GetLastWriteTimeUtc inside a comparator would
+            // stat each file O(log N) times.
+            var byNewest = Directory.GetFiles(RunsDir, "*.json")
+                .Select(p => (Path: p, Mtime: File.GetLastWriteTimeUtc(p)))
+                .OrderByDescending(f => f.Mtime)
+                .Select(f => f.Path);
 
-            foreach (var path in files)
+            int probed = 0;
+            foreach (var path in byNewest)
             {
+                if (probed++ >= MaxFindHeaderProbes)
+                {
+                    CoreMain.LogDebug(
+                        $"FindByGameStartTime: no match for {gameStartTime} in the {MaxFindHeaderProbes} newest run files; stopping scan");
+                    break;
+                }
                 try
                 {
                     var header = ReadHeader(path);
                     if (header?.GameStartTime != gameStartTime) continue;
+
+                    // Filter at scan level, not post-hoc: a finished record
+                    // (e.g. a hot reload on the game-over screen) must not
+                    // shadow an older in-progress one for the same run.
+                    // Null outcome (very old files) is treated as unknown
+                    // and allowed through; LoadForResume gates the shape.
+                    if (requireInProgress && header.Outcome != null
+                        && header.Outcome != "in_progress") continue;
 
                     var data = LoadForResume(path);
                     if (data != null) return data;

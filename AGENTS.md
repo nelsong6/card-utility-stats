@@ -21,7 +21,8 @@ When inspecting `mods/`, treat any non-(SpireLens|BaseLib|SpireLensMcp) entry as
   - [Core/CoreMain.cs](D:/repos/SpireLens/Core/CoreMain.cs:8) owns Harmony patch install/uninstall and re-entry on each reload.
 - Persistence is combat-boundary based.
   - [Core/RunTracker.cs](D:/repos/SpireLens/Core/RunTracker.cs:18) buffers live combat data in `_pendingCombat`.
-  - Nothing is promoted to the permanent run file until combat ends.
+  - Nothing is promoted to the permanent run file until combat ends — with one deliberate exception: a LOST run's end also promotes, because on a loss `RunManager.OnEnded` fires synchronously from the killing action and the fatal combat's `CombatEnded` only fires afterwards, too late for the buffer. Abandon-mid-combat still discards the buffer.
+  - The game re-fires `RunStarted` with the same `_startTime` on every main-menu Continue; `OnRunStarted` resumes/adopts the existing run record (matched by `game_start_time`) instead of minting a new one.
   - Reload between combats / between floors is supported and expected.
   - Mid-combat restore is intentionally out of scope.
 - The persisted shape evolves additively without an explicit version number.

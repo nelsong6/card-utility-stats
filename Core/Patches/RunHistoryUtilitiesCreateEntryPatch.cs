@@ -1,3 +1,4 @@
+using System;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Runs;
 
@@ -31,11 +32,22 @@ public static class RunHistoryUtilitiesCreateEntryPatch
     [HarmonyPostfix]
     public static void Postfix(bool victory, bool isAbandoned)
     {
-        string outcome;
-        if (isAbandoned) outcome = "abandoned";
-        else if (victory) outcome = "win";
-        else outcome = "loss";
+        // Guard the terminal run-end funnel: an unhandled throw here would
+        // propagate into RunManager.OnEnded / NMainMenu.AbandonRun and could
+        // skip the game's own run cleanup. Always-on Error log (not LogDebug)
+        // so a broken run-end is visible without a debug flag.
+        try
+        {
+            string outcome;
+            if (isAbandoned) outcome = "abandoned";
+            else if (victory) outcome = "win";
+            else outcome = "loss";
 
-        RunTracker.OnRunEnded(outcome);
+            RunTracker.OnRunEnded(outcome);
+        }
+        catch (Exception e)
+        {
+            CoreMain.Logger.Error($"RunHistoryUtilitiesCreateEntryPatch.Postfix failed: {e}");
+        }
     }
 }
