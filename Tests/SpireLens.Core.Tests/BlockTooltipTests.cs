@@ -48,6 +48,7 @@ public class BlockTooltipTests
         Assert.Equal("[img=16x16]res://images/ui/combat/block.png[/img] gained", label);
     }
 
+    [Trait("Category", "RequiresLiveGame")]
     [Fact]
     public void AppendCompactBody_UsesShieldIconForBlockRows()
     {
@@ -121,6 +122,7 @@ public class BlockTooltipTests
         Assert.Equal("Forge gained", label);
     }
 
+    [Trait("Category", "RequiresLiveGame")]
     [Fact]
     public void AppendCompactBody_UsesDrawPowerIconForUnplayableDrawRows()
     {
@@ -138,6 +140,7 @@ public class BlockTooltipTests
         Assert.Contains("[b]4[/b]", text);
     }
 
+    [Trait("Category", "RequiresLiveGame")]
     [Fact]
     public void AppendCompactBody_UsesEnergyPotionIconForEnergyRows()
     {
@@ -157,6 +160,7 @@ public class BlockTooltipTests
         Assert.Contains("[b]2[/b]", text);
     }
 
+    [Trait("Category", "RequiresLiveGame")]
     [Fact]
     public void AppendCompactBody_UsesStarIconForStarRows()
     {
@@ -176,6 +180,7 @@ public class BlockTooltipTests
         Assert.Contains("[b]2[/b]", text);
     }
 
+    [Trait("Category", "RequiresLiveGame")]
     [Fact]
     public void AppendCompactBody_UsesQuietTextForForgeRows()
     {
