@@ -774,26 +774,16 @@ public static class RunTracker
         _pendingPowerChangeAttempts.Clear();
         _pendingPlayerBlockClearAmount = 0;
         _pendingPlayerBlockClearArmed = false;
-        _pendingOrichalcumBlockAttribution = false;
-        _pendingAnchorBlockAttribution = false;
-        _pendingTheAbacusBlockAttribution = false;
+        // Ported windows (Orichalcum, Anchor, Abacus, BoneFlute, CloakClasp,
+        // HappyFlower, BoomingConch, GremlinHorn energy+draw) now live on
+        // PendingCombat.Windows and reset with a fresh PendingCombat.
+        // DEFERRED (not ported this pass — keep their own reset):
         _pendingAkabekoVigorAttribution = false;
-        _pendingBoneFluteBlockAttribution = false;
-        _pendingHappyFlowerEnergyAttribution = false;
-        _pendingBoomingConchEnergyAttribution = false;
-        _pendingGremlinHornEnergyAttributions.Clear();
-        _pendingGremlinHornDrawAttributions.Clear();
         _pendingPendulumDrawAttributions.Clear();
         _pendingParryingShieldDamageAttributions.Clear();
         _pendingHornCleatBlockAttributions.Clear();
         _lastPrismaticGemEnergyRoundNumber = null;
-        _pendingCloakClaspBlockAttribution = false;
         _pendingToolboxOfferScreens = 0;
-        // Bone Flute's only other disarm is a racing thread-pool ContinueWith;
-        // if the killing Osty attack abandons that task, a stale armed flag
-        // would credit the next combat's first Defend to Bone Flute. Reset it
-        // at the combat boundary like its sibling one-shots.
-        _pendingBoneFluteBlockAttribution = false;
         _pendingMakeItSoSummons.Clear();
         _pendingReplayExtraPlaySources.Clear();
         _pendingReplayExtraPlaySeriesStarted.Clear();
@@ -2065,7 +2055,10 @@ public static class RunTracker
     {
         lock (_lock)
         {
-            _pendingOrichalcumBlockAttribution = true;
+            _pendingCombat ??= new PendingCombat();
+            // One-shot; block gain resolves async many history entries later.
+            _pendingCombat.Windows.Arm(OrichalcumRelicId, AttributionEventKind.PlayerBlockGain,
+                CurrentHistoryCountLocked(), maxHistoryAdvance: -1);
         }
     }
 
@@ -2077,7 +2070,7 @@ public static class RunTracker
     {
         lock (_lock)
         {
-            _pendingOrichalcumBlockAttribution = false;
+            _pendingCombat?.Windows.Disarm(OrichalcumRelicId, AttributionEventKind.PlayerBlockGain);
         }
     }
 
@@ -2142,7 +2135,9 @@ public static class RunTracker
     {
         lock (_lock)
         {
-            _pendingAnchorBlockAttribution = true;
+            _pendingCombat ??= new PendingCombat();
+            _pendingCombat.Windows.Arm(AnchorRelicId, AttributionEventKind.PlayerBlockGain,
+                CurrentHistoryCountLocked(), maxHistoryAdvance: -1);
         }
     }
 
@@ -2260,7 +2255,9 @@ public static class RunTracker
     {
         lock (_lock)
         {
-            _pendingTheAbacusBlockAttribution = true;
+            _pendingCombat ??= new PendingCombat();
+            _pendingCombat.Windows.Arm(TheAbacusRelicId, AttributionEventKind.PlayerBlockGain,
+                CurrentHistoryCountLocked(), maxHistoryAdvance: -1);
         }
     }
 
@@ -3064,7 +3061,13 @@ public static class RunTracker
     {
         lock (_lock)
         {
-            _pendingHappyFlowerEnergyAttribution = true;
+            _pendingCombat ??= new PendingCombat();
+            // Bug fix (#250): the energy grant is synchronous within
+            // AfterSideTurnStart, so maxHistoryAdvance=0 keeps it tight and the
+            // window self-expires by history-count rather than depending on the
+            // fragile cross-hook AfterPlayerTurnStart disarm ordering.
+            _pendingCombat.Windows.Arm(HappyFlowerRelicId, AttributionEventKind.PlayerEnergyGain,
+                CurrentHistoryCountLocked(), maxHistoryAdvance: 0);
         }
     }
 
@@ -3221,14 +3224,52 @@ public static class RunTracker
         {
             try
             {
+                _pendingCombat ??= new PendingCombat();
                 var agg = GetOrCreateRelicAggregateLocked(GremlinHornRelicId);
                 agg.Activations += 1;
-                _pendingGremlinHornEnergyAttributions.Add(owner);
-                _pendingGremlinHornDrawAttributions.Add(owner);
+                int hc = CurrentHistoryCountLocked();
+                // Owner-keyed one-shot energy + draw windows (resolve async after
+                // AfterDeath returns, so maxHistoryAdvance=-1).
+                _pendingCombat.Windows.Arm(GremlinHornRelicId, AttributionEventKind.PlayerEnergyGain,
+                    hc, ownerId: owner, maxHistoryAdvance: -1);
+                _pendingCombat.Windows.Arm(GremlinHornRelicId, AttributionEventKind.CardDraw,
+                    hc, ownerId: owner, maxHistoryAdvance: -1);
             }
             catch (Exception e)
             {
                 CoreMain.LogDebug($"ArmGremlinHornAttribution failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>Single arbitration point for player energy gains at
+    /// PlayerCombatState.GainEnergy. If a relic energy window (Gremlin Horn /
+    /// Happy Flower / Booming Conch) is live for this player it claims the
+    /// delta; otherwise the resolving card play is credited. Replaces the
+    /// un-arbitrated fan-out and closes the Gremlin-Horn card+relic double count.</summary>
+    public static void DispatchPlayerEnergyGain(PlayerCombatState combatState, int amount)
+    {
+        if (amount <= 0 || combatState == null) return;
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null) { RecordEnergyGained(combatState, amount); return; }
+                var owner = combatState._player;
+                var key = _pendingCombat.Windows.TryConsume(
+                    AttributionEventKind.PlayerEnergyGain, CurrentHistoryCountLocked(), ownerId: owner);
+                if (key != null)
+                {
+                    var agg = GetOrCreateRelicAggregateLocked(key);
+                    agg.EnergyGenerated += amount; // GremlinHorn/HappyFlower/BoomingConch all use EnergyGenerated
+                    return;
+                }
+                // No relic window: credit the resolving card play as before.
+                RecordEnergyGained(combatState, amount);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"DispatchPlayerEnergyGain failed: {e.Message}");
             }
         }
     }
@@ -3262,8 +3303,12 @@ public static class RunTracker
         {
             try
             {
-                DisarmGremlinHornEnergyAttributionLocked(player);
-                return ConsumePendingGremlinHornAttribution(_pendingGremlinHornDrawAttributions, player);
+                if (_pendingCombat == null) return false;
+                bool claimed = _pendingCombat.Windows.TryConsume(
+                    AttributionEventKind.CardDraw, CurrentHistoryCountLocked(), ownerId: player) == GremlinHornRelicId;
+                if (claimed)
+                    _pendingCombat.Windows.Disarm(GremlinHornRelicId, AttributionEventKind.PlayerEnergyGain, ownerId: player);
+                return claimed;
             }
             catch (Exception e)
             {
@@ -3637,7 +3682,14 @@ public static class RunTracker
     {
         lock (_lock)
         {
-            _pendingCloakClaspBlockAttribution = true;
+            _pendingCombat ??= new PendingCombat();
+            // Bug fix (#250): Cloak Clasp does exactly ONE GainBlock of size
+            // (cards-in-hand * 1) (verified CloakClasp.BeforeSideTurnEnd), NOT
+            // one-per-card. One-shot window; no hand-count gate (a zero-hand
+            // end-of-turn simply never fires AfterBlockGained, and the window
+            // self-clears at the combat boundary).
+            _pendingCombat.Windows.Arm(CloakClaspRelicId, AttributionEventKind.PlayerBlockGain,
+                CurrentHistoryCountLocked(), maxHistoryAdvance: -1);
         }
     }
 
@@ -3660,6 +3712,33 @@ public static class RunTracker
     /// <c>AfterBlockGained</c> calls (one per card in hand) are all captured.
     /// The window is cleared at the <c>Hook.AfterTurnEnd</c> boundary.
     /// </summary>
+    /// <summary>Single arbitration point for player block gains at
+    /// Hook.AfterBlockGained. The oldest fresh armed PlayerBlockGain window
+    /// claims the gain; that relic's AdditionalBlockGained is credited.
+    /// Two distinct gains in one turn (Orichalcum + Cloak Clasp) are two
+    /// AfterBlockGained events, each claiming its own window in FIFO order.</summary>
+    public static void DispatchPlayerBlockGain(int amount)
+    {
+        if (amount <= 0) return;
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null) return;
+                var key = _pendingCombat.Windows.TryConsume(
+                    AttributionEventKind.PlayerBlockGain, CurrentHistoryCountLocked());
+                if (key == null) return;
+                var agg = GetOrCreateRelicAggregateLocked(key);
+                if (key == AnchorRelicId) agg.Activations += 1; // preserve Anchor activation count
+                agg.AdditionalBlockGained += amount;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"DispatchPlayerBlockGain failed: {e.Message}");
+            }
+        }
+    }
+
     public static void RecordCloakClaspBlockGained(int amount)
     {
         if (amount <= 0) return;
@@ -4384,6 +4463,11 @@ public static class RunTracker
     /// card that caused them, since the game's entries for those effects
     /// don't include a CardPlay reference.
     /// </summary>
+    // Current CombatHistory entry count for window staleness. Single source
+    // used both when arming (ArmedAtHistoryCount) and consuming.
+    private static int CurrentHistoryCountLocked()
+        => CombatManager.Instance?.History?.Entries?.Count() ?? 0;
+
     private static CardPlay? FindCurrentlyResolvingCardPlay()
     {
         if (_currentPlayerCardPlay?.Card != null) return _currentPlayerCardPlay;
@@ -6603,6 +6687,10 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public RunMetaStats MetaStats { get; } = new();
     public int NextBlockSequence { get; set; }
+
+    /// <summary>Exclusive per-kind attribution windows for this combat. A fresh
+    /// PendingCombat (setup/end, run boundary) starts empty, so this IS the reset.</summary>
+    public AttributionWindowRegistry Windows { get; } = new();
 }
 
 internal sealed class EnemyStatusSourceFrame
