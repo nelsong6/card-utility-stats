@@ -62,6 +62,7 @@ public class OstySummonStatsTests
         Assert.Equal(11m, restored.MetaStats.TotalOstyDamageAbsorbed);
     }
 
+    [Trait("Category", "RequiresLiveGame")]
     [Fact]
     public void Tooltip_OstySummonStats_FullViewShowsCardSummonsAndMetaAbsorbedDamage()
     {
@@ -86,6 +87,7 @@ public class OstySummonStatsTests
         Assert.Contains("[b]11[/b]", body);
     }
 
+    [Trait("Category", "RequiresLiveGame")]
     [Fact]
     public void Tooltip_OstySummonStats_CompactSkipsSummonCount()
     {
@@ -106,6 +108,7 @@ public class OstySummonStatsTests
         Assert.DoesNotContain("Osty summons", body);
     }
 
+    [Trait("Category", "RequiresLiveGame")]
     [Fact]
     public void Tooltip_OstySummonStats_MetaDamageCanShowOnUnplayedSummonCard()
     {

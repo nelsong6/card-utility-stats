@@ -91,6 +91,7 @@ public class ReplayStatsTests
         Assert.Equal("Burst", agg.ReplayExtraPlayReasons["power:POWER.BURST"].DisplayName);
     }
 
+    [Trait("Category", "RequiresLiveGame")]
     [Fact]
     public void IsReplayExtraPlay_UsesNonzeroPlayIndex()
     {
