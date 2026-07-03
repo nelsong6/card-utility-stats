@@ -56,7 +56,7 @@ Available only on in-run deck-view surfaces for now (not Compendium - lifetime a
 
 Additional shipped: discard count, pile-top placements (from hand / from discard), exhaust-others attribution, self-exhaust count, HP-lost from self-damage cards, cards-drawn attribution, blocked-draw attempt/reason tracking, Regent star-resource tracking, forge granted tracking, recurring summon-to-hand tracking, effect application summaries, Artifact-blocked debuff tracking, and downstream poison damage attribution including stacked Noxious Fumes contributor preservation.
 
-Open: [#10 Run outcome detection](https://github.com/romaine-life/spirelens/issues/10) - non-blocking for M1-M3, required before M6.
+Run outcome detection (win/loss/abandoned) is implemented ([#10](https://github.com/romaine-life/spirelens/issues/10), closed) via the run-history entry hook.
 
 ## Storage
 

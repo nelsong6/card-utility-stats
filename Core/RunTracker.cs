@@ -738,6 +738,11 @@ public static class RunTracker
         _pendingGremlinHornDrawAttributions.Clear();
         _lastPrismaticGemEnergyRoundNumber = null;
         _pendingCloakClaspBlockAttribution = false;
+        // Bone Flute's only other disarm is a racing thread-pool ContinueWith;
+        // if the killing Osty attack abandons that task, a stale armed flag
+        // would credit the next combat's first Defend to Bone Flute. Reset it
+        // at the combat boundary like its sibling one-shots.
+        _pendingBoneFluteBlockAttribution = false;
         _pendingMakeItSoSummons.Clear();
         _pendingReplayExtraPlaySources.Clear();
         _pendingReplayExtraPlaySeriesStarted.Clear();
@@ -1370,7 +1375,6 @@ public static class RunTracker
     /// by later milestones.
     /// </summary>
     private static int _observeCount;
-    private static readonly Dictionary<string, int> _typeCountDiag = new();
     public static void Observe(object entry)
     {
         try
@@ -1378,24 +1382,12 @@ public static class RunTracker
             var n = System.Threading.Interlocked.Increment(ref _observeCount);
 
             // Debug-level: per-event trace. Silent in production, verbose
-            // when CUS_DEBUG is set.
+            // when CUS_DEBUG is set. (The always-on [CUS-diag] type-count and
+            // first-500 dumps that lived here were a temporary draw-tracking
+            // probe — the question is resolved and documented in the primer,
+            // and the backing counter was the one tracker static mutated
+            // outside _lock, so it was removed.)
             CoreMain.LogDebug($"Observe #{n}: {entry.GetType().Name}");
-
-            // Temporary diagnostic for draw-tracking bug. Logs the first
-            // 500 entries per Core load, every CardDrawnEntry always, and a
-            // type-count summary every 50 entries so we can spot whether
-            // CardDrawnEntry ever shows up in the distribution.
-            var typeName = entry.GetType().Name;
-            _typeCountDiag.TryGetValue(typeName, out var typeN);
-            _typeCountDiag[typeName] = typeN + 1;
-            if (entry is CardDrawnEntry || entry is CardPlayFinishedEntry || n <= 500 || n % 500 == 0)
-                CoreMain.Logger.Info($"[CUS-diag] Observe #{n}: {typeName}");
-            if (n % 50 == 0)
-            {
-                var counts = string.Join(", ", _typeCountDiag.OrderBy(kv => kv.Key)
-                    .Select(kv => $"{kv.Key}={kv.Value}"));
-                CoreMain.Logger.Info($"[CUS-diag] types-so-far (n={n}): {counts}");
-            }
 
             switch (entry)
             {
@@ -1412,10 +1404,8 @@ public static class RunTracker
                     RecordCardPlay(cpf.CardPlay);
                     break;
                 case CardDrawnEntry cde:
-                    // Diagnostic always-on while we're validating draw tracking.
-                    // If we're seeing this line in logs, the hook works. If we're
-                    // not, CombatHistory.Add postfix isn't firing for draws (unusual).
-                    CoreMain.Logger.Info($"CardDrawnEntry card='{cde.Card?.Title ?? "null"}' fromHandDraw={cde.FromHandDraw}");
+                    // Draw-hook validation is complete; keep the trace debug-gated.
+                    CoreMain.LogDebug($"CardDrawnEntry card='{cde.Card?.Title ?? "null"}' fromHandDraw={cde.FromHandDraw}");
                     if (cde.Card != null) RecordCardDrawn(cde);
                     break;
                 case CardDiscardedEntry cdisc when cdisc.Card != null:
@@ -4948,8 +4938,14 @@ public static class RunTracker
                     && target != null
                     && !target.IsPlayer)
                     RecordPoisonApplicationLocked(target, instanceId, entry.Power, entry.Amount);
-                else
+                else if (entry.Amount > 0m)
                 {
+                    // Only positive applications count. The game fires
+                    // History.PowerReceived even for Artifact-zeroed (amount==0)
+                    // and debuff-consuming (negative) deltas; without this guard
+                    // an Artifact-eaten stack showed as both "applied" and
+                    // "blocked by Artifact", and negatives drove TotalAmountApplied
+                    // below zero.
                     var effect = GetOrCreateAppliedEffect(agg, entry.Power);
                     effect.TimesApplied++;
                     effect.TotalAmountApplied += entry.Amount;
