@@ -99,6 +99,19 @@ public class PatchGuardTests
             Assert.Contains("PatchGuard.Run", text);
         }
     }
+
+    [Fact]
+    public void Observe_SelfGuardsThroughPatchGuard()
+    {
+        // RunTracker.Observe wraps its whole body and never rethrows, so a guard
+        // only at the CombatHistoryAddPatch caller would have a dead throttle.
+        // The real, throttled guard for the busiest hook must live in Observe
+        // itself — pin that at the source level so it can't silently regress.
+        var runTracker = File.ReadAllText(Path.Combine(RepoRoot, "Core", "RunTracker.cs"));
+        Assert.Contains("PatchGuard.Run(\"RunTracker.Observe\"", runTracker);
+        // And the old un-throttled swallow it replaced must not creep back in.
+        Assert.DoesNotContain("RunTracker.Observe failed", runTracker);
+    }
 }
 
 /// <summary>
