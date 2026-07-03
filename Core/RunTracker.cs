@@ -71,6 +71,7 @@ public static class RunTracker
     private static readonly List<PendingRelicHealing> _pendingRelicHeals = new();
     private static readonly List<Player> _pendingPendulumDrawAttributions = new();
     private static readonly List<Creature> _pendingParryingShieldDamageAttributions = new();
+    private static readonly List<Creature> _pendingFestivePopperDamageAttributions = new();
     private static readonly List<Creature> _pendingHornCleatBlockAttributions = new();
     private static int? _lastPrismaticGemEnergyRoundNumber;
     private static int _pendingWhiteBeastPotionRewards;
@@ -851,6 +852,7 @@ public static class RunTracker
         _pendingAkabekoVigorAttribution = false;
         _pendingPendulumDrawAttributions.Clear();
         _pendingParryingShieldDamageAttributions.Clear();
+        _pendingFestivePopperDamageAttributions.Clear();
         _pendingHornCleatBlockAttributions.Clear();
         _lastPrismaticGemEnergyRoundNumber = null;
         _pendingToolboxOfferScreens = 0;
@@ -2066,6 +2068,7 @@ public static class RunTracker
     private const string GremlinHornRelicId = "RELIC.GREMLIN_HORN";
     private const string PendulumRelicId = "RELIC.PENDULUM";
     private const string ParryingShieldRelicId = "RELIC.PARRYING_SHIELD";
+    private const string FestivePopperRelicId = "RELIC.FESTIVE_POPPER";
     private const string HornCleatRelicId = "RELIC.HORN_CLEAT";
     private const string PrismaticGemRelicId = "RELIC.PRISMATIC_GEM";
     private const string CloakClaspRelicId = "RELIC.CLOAK_CLASP";
@@ -3437,20 +3440,7 @@ public static class RunTracker
             try
             {
                 var agg = GetOrCreateRelicAggregateLocked(ParryingShieldRelicId);
-                foreach (var result in results)
-                {
-                    if (result == null) continue;
-                    var damageTotals = ComputeEnemyDamageTotals(
-                        result.BlockedDamage,
-                        result.UnblockedDamage,
-                        result.OverkillDamage);
-                    agg.TotalDamageAttempted += damageTotals.IntendedDamage;
-                    agg.TotalDamageDealt += damageTotals.EffectiveDamage;
-                    agg.TotalDamageBlocked += result.BlockedDamage;
-                    agg.TotalDamageOverkill += result.OverkillDamage;
-                    agg.TotalTargets += 1;
-                    if (result.WasTargetKilled) agg.Kills += 1;
-                }
+                AddRelicDamageResultsLocked(agg, results);
             }
             catch (Exception e)
             {
@@ -3461,19 +3451,111 @@ public static class RunTracker
 
     internal static void RecordParryingShieldDamageForTest(RelicAggregate agg, IEnumerable<DamageResult> results)
     {
+        AddRelicDamageResultsLocked(agg, results);
+    }
+
+    /// <summary>
+    /// Record Festive Popper's owner-specific first-turn activation. The
+    /// damage split is observed from the damage command result.
+    /// </summary>
+    public static void ArmFestivePopperAttribution(Creature dealer)
+    {
+        if (dealer == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(FestivePopperRelicId);
+                agg.Activations += 1;
+                _pendingFestivePopperDamageAttributions.Add(dealer);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"ArmFestivePopperAttribution failed: {e.Message}");
+            }
+        }
+    }
+
+    public static bool TryConsumeFestivePopperDamageAttribution(Creature dealer)
+    {
+        if (dealer == null) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                return ConsumePendingCreatureAttribution(_pendingFestivePopperDamageAttributions, dealer);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"TryConsumeFestivePopperDamageAttribution failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    public static void RecordFestivePopperDamage(IEnumerable<DamageResult>? results)
+    {
+        if (results == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(FestivePopperRelicId);
+                AddRelicDamageResultsLocked(agg, results);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordFestivePopperDamage failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordFestivePopperDamageForTest(
+        RelicAggregate agg,
+        IEnumerable<(int BlockedDamage, int UnblockedDamage, int OverkillDamage, bool WasTargetKilled)> results)
+    {
         foreach (var result in results)
         {
-            var damageTotals = ComputeEnemyDamageTotals(
+            AddRelicDamageResultPartsLocked(
+                agg,
                 result.BlockedDamage,
                 result.UnblockedDamage,
-                result.OverkillDamage);
-            agg.TotalDamageAttempted += damageTotals.IntendedDamage;
-            agg.TotalDamageDealt += damageTotals.EffectiveDamage;
-            agg.TotalDamageBlocked += result.BlockedDamage;
-            agg.TotalDamageOverkill += result.OverkillDamage;
-            agg.TotalTargets += 1;
-            if (result.WasTargetKilled) agg.Kills += 1;
+                result.OverkillDamage,
+                result.WasTargetKilled);
         }
+    }
+
+    private static void AddRelicDamageResultsLocked(RelicAggregate agg, IEnumerable<DamageResult> results)
+    {
+        foreach (var result in results)
+        {
+            if (result == null) continue;
+            AddRelicDamageResultPartsLocked(
+                agg,
+                result.BlockedDamage,
+                result.UnblockedDamage,
+                result.OverkillDamage,
+                result.WasTargetKilled);
+        }
+    }
+
+    private static void AddRelicDamageResultPartsLocked(
+        RelicAggregate agg,
+        int blockedDamage,
+        int unblockedDamage,
+        int overkillDamage,
+        bool wasTargetKilled)
+    {
+        var damageTotals = ComputeEnemyDamageTotals(blockedDamage, unblockedDamage, overkillDamage);
+        agg.TotalDamageAttempted += damageTotals.IntendedDamage;
+        agg.TotalDamageDealt += damageTotals.EffectiveDamage;
+        agg.TotalDamageBlocked += blockedDamage;
+        agg.TotalDamageOverkill += overkillDamage;
+        agg.TotalTargets += 1;
+        if (wasTargetKilled) agg.Kills += 1;
     }
 
     /// <summary>

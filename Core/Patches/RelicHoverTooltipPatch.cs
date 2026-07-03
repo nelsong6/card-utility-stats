@@ -201,6 +201,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is FestivePopper)
+            {
+                const string relicId = "RELIC.FESTIVE_POPPER";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildFestivePopperBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Festive Popper", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is HornCleat)
             {
                 const string relicId = "RELIC.HORN_CLEAT";
@@ -473,6 +483,18 @@ public static class RelicHoverShowPatch
         Row3(sb, "Damage blocked", agg.TotalDamageBlocked.ToString(), "");
         Row3(sb, "Overkill", agg.TotalDamageOverkill.ToString(), "");
         Row3(sb, "Kills", agg.Kills.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildFestivePopperBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var damagePerCombat = agg.Activations <= 0
+            ? 0m
+            : (decimal)agg.TotalDamageDealt / agg.Activations;
+        Row3(sb, "Combats triggered", agg.Activations.ToString(), "");
+        Row3(sb, "Damage dealt", agg.TotalDamageDealt.ToString(), "");
+        Row3(sb, "Damage per combat", FormatDecimal(damagePerCombat), "");
         return sb.ToString();
     }
 
