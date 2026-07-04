@@ -2,7 +2,6 @@ using System;
 using System.Linq;
 using System.Reflection;
 using MegaCrit.Sts2.Core.Combat;
-using MegaCrit.Sts2.Core.Hooks;
 using SpireLens.Core.Patches;
 using Xunit;
 
@@ -18,7 +17,7 @@ public class HookPatchTargetTests
         var target = InvokeTargetMethod(patchType);
 
         Assert.NotNull(target);
-        Assert.Equal(typeof(Hook), target!.DeclaringType);
+        Assert.Equal("MegaCrit.Sts2.Core.Hooks.Hook", target!.DeclaringType?.FullName);
         Assert.Contains(target.Name, new[] { "AfterSideTurnEnd", "AfterTurnEnd" });
 
         var sideParameter = target.GetParameters().SingleOrDefault(p => p.Name == "side");

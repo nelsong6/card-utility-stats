@@ -5,7 +5,6 @@ using System.Reflection;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Entities.Creatures;
-using MegaCrit.Sts2.Core.Hooks;
 using MegaCrit.Sts2.Core.Models.Relics;
 
 namespace SpireLens.Core.Patches;
@@ -85,8 +84,11 @@ public static class HookAfterSideTurnEndOrichalcumCleanupPatch
 {
     private static MethodBase? CleanupHook()
     {
-        return AccessTools.Method(typeof(Hook), "AfterSideTurnEnd")
-            ?? AccessTools.Method(typeof(Hook), "AfterTurnEnd");
+        var hookType = AccessTools.TypeByName("MegaCrit.Sts2.Core.Hooks.Hook");
+        if (hookType == null) return null;
+
+        return AccessTools.Method(hookType, "AfterSideTurnEnd")
+            ?? AccessTools.Method(hookType, "AfterTurnEnd");
     }
 
     private static bool Prepare() => CleanupHook() != null;
