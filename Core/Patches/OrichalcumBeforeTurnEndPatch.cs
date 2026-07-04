@@ -5,7 +5,6 @@ using System.Reflection;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Entities.Creatures;
-using MegaCrit.Sts2.Core.Hooks;
 using MegaCrit.Sts2.Core.Models.Relics;
 
 namespace SpireLens.Core.Patches;
@@ -76,22 +75,38 @@ public static class OrichalcumBeforeTurnEndPatch
 /// the relic method has returned its task, so cleanup cannot live in the
 /// relic postfix itself.
 ///
-/// Bound via a runtime <c>TargetMethods()</c> lookup rather than
-/// <c>nameof(Hook.AfterTurnEnd)</c>: a Slay the Spire 2 update can rename or
-/// remove the hook, and a compile-time reference would break the whole build
-/// (and, under bare PatchAll, take down every other patch). When the method is
-/// absent the class simply yields nothing and Harmony skips it.
+/// Bound via runtime lookup rather than <c>nameof(Hook.AfterTurnEnd)</c>: a
+/// Slay the Spire 2 update can rename or remove the hook, and a compile-time
+/// reference would break the whole build.
 /// </summary>
 [HarmonyPatch]
-public static class HookAfterTurnEndOrichalcumCleanupPatch
+public static class HookAfterSideTurnEndOrichalcumCleanupPatch
 {
-    // Prepare() returning false is Harmony's idiom for skipping a patch class
-    // cleanly — no exception, no error log — when the target game method is
-    // absent (the STS2 update removed Hook.AfterTurnEnd). This replaces an
-    // empty-TargetMethods() approach, which Harmony throws on.
-    private static bool Prepare() => AccessTools.Method(typeof(Hook), "AfterTurnEnd") != null;
+    private static MethodBase? CleanupHook()
+    {
+        var hookType = Sts2CoreAssembly()?.GetType("MegaCrit.Sts2.Core.Hooks.Hook", throwOnError: false);
+        if (hookType == null) return null;
 
-    private static MethodBase TargetMethod() => AccessTools.Method(typeof(Hook), "AfterTurnEnd");
+        return AccessTools.Method(hookType, "AfterSideTurnEnd")
+            ?? AccessTools.Method(hookType, "AfterTurnEnd");
+    }
+
+    private static Assembly? Sts2CoreAssembly()
+    {
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            if (assembly.GetName().Name == "sts2") return assembly;
+        }
+
+        return null;
+    }
+
+    private static bool Prepare() => CleanupHook() != null;
+
+    private static MethodBase? TargetMethod()
+    {
+        return CleanupHook();
+    }
 
     [HarmonyPrefix]
     public static void Prefix(CombatSide side)
@@ -103,7 +118,7 @@ public static class HookAfterTurnEndOrichalcumCleanupPatch
         }
         catch (Exception e)
         {
-            CoreMain.LogDebug($"HookAfterTurnEndOrichalcumCleanupPatch failed: {e.Message}");
+            CoreMain.LogDebug($"HookAfterSideTurnEndOrichalcumCleanupPatch failed: {e.Message}");
         }
     }
 }

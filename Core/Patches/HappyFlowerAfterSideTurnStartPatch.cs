@@ -42,7 +42,7 @@ public static class HappyFlowerAfterSideTurnStartPatch
 /// energy grant this turn (counter not yet at 3), the flag is discarded here
 /// so it does not leak into later energy-gain events during the player's turn.
 /// Mirrors the later-boundary cleanup pattern used by Orichalcum's
-/// <c>Hook.AfterTurnEnd</c> patch.
+/// <c>Hook.AfterSideTurnEnd</c> patch.
 /// </summary>
 [HarmonyPatch(typeof(Hook), nameof(Hook.AfterPlayerTurnStart))]
 public static class HookAfterPlayerTurnStartHappyFlowerCleanupPatch

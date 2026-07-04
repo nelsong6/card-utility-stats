@@ -2176,7 +2176,7 @@ public static class RunTracker
     /// <summary>
     /// Arm the one-shot flag that attributes the next player block gain to
     /// Orichalcum. Called from <see cref="Patches.OrichalcumBeforeTurnEndPatch"/>
-    /// when Orichalcum's <c>BeforeTurnEnd</c> fires on the player's side.
+    /// when Orichalcum's end-of-turn hook fires on the player's side.
     /// </summary>
     public static void ArmOrichalcumBlockAttribution()
     {
@@ -4134,9 +4134,8 @@ public static class RunTracker
     /// <summary>
     /// Arm the flag that attributes player block gains to Cloak Clasp.
     /// Called from <see cref="Patches.CloakClaspBeforeTurnEndPatch"/> when
-    /// Cloak Clasp's end-of-turn hook fires on the player's side.
-    /// The window stays open until <c>Hook.AfterTurnEnd</c> so that all
-    /// block grants from the relic (one per card in hand) are accumulated.
+    /// Cloak Clasp's end-of-turn hook fires on the player's side. The registry
+    /// window closes on consumption or the combat boundary.
     /// </summary>
     public static void ArmCloakClaspBlockAttribution()
     {
@@ -4154,7 +4153,7 @@ public static class RunTracker
     }
 
     /// <summary>
-    /// No-op safety reset kept wired at <c>Hook.AfterTurnEnd</c>. Cloak Clasp's
+    /// No-op safety reset kept wired at <c>Hook.AfterSideTurnEnd</c>. Cloak Clasp's
     /// attribution now lives entirely in the per-combat registry (see
     /// <see cref="ArmCloakClaspBlockAttribution"/>); the window closes on
     /// consumption or the combat boundary. Routing this to Windows.Disarm(...)

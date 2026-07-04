@@ -2,14 +2,13 @@ using System;
 using System.Reflection;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Combat;
-using MegaCrit.Sts2.Core.Hooks;
 
 namespace SpireLens.Core.Patches;
 
 /// <summary>
 /// Arms the Cloak Clasp block-gain attribution window just before the relic's
 /// end-of-turn hook runs. Cloak Clasp gains 1 Block per card in Hand, so the
-/// window stays open until <see cref="HookAfterTurnEndCloakClaspCleanupPatch"/>
+/// window stays open until <see cref="HookAfterSideTurnEndCloakClaspCleanupPatch"/>
 /// clears it — allowing all per-card block gains to be accumulated by
 /// <see cref="HookAfterBlockGainedPatch"/>.
 /// </summary>
@@ -42,19 +41,38 @@ public static class CloakClaspBeforeTurnEndPatch
 /// Clears the Cloak Clasp attribution window after the player's end-of-turn
 /// hook sequence. Mirrors the later-boundary cleanup pattern used by Orichalcum.
 ///
-/// Bound via a runtime <c>TargetMethods()</c> lookup rather than
-/// <c>nameof(Hook.AfterTurnEnd)</c> so a Slay the Spire 2 update that renames or
-/// removes the hook skips this patch instead of breaking the build.
+/// Bound via runtime lookup rather than <c>nameof(Hook.AfterTurnEnd)</c> so a
+/// Slay the Spire 2 update that renames or removes the hook does not break the
+/// build.
 /// </summary>
 [HarmonyPatch]
-public static class HookAfterTurnEndCloakClaspCleanupPatch
+public static class HookAfterSideTurnEndCloakClaspCleanupPatch
 {
-    // Prepare() returning false cleanly skips this patch when the STS2 update
-    // removed Hook.AfterTurnEnd (no exception, no error log), unlike the empty
-    // TargetMethods() form which Harmony throws on.
-    private static bool Prepare() => AccessTools.Method(typeof(Hook), "AfterTurnEnd") != null;
+    private static MethodBase? CleanupHook()
+    {
+        var hookType = Sts2CoreAssembly()?.GetType("MegaCrit.Sts2.Core.Hooks.Hook", throwOnError: false);
+        if (hookType == null) return null;
 
-    private static MethodBase TargetMethod() => AccessTools.Method(typeof(Hook), "AfterTurnEnd");
+        return AccessTools.Method(hookType, "AfterSideTurnEnd")
+            ?? AccessTools.Method(hookType, "AfterTurnEnd");
+    }
+
+    private static Assembly? Sts2CoreAssembly()
+    {
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            if (assembly.GetName().Name == "sts2") return assembly;
+        }
+
+        return null;
+    }
+
+    private static bool Prepare() => CleanupHook() != null;
+
+    private static MethodBase? TargetMethod()
+    {
+        return CleanupHook();
+    }
 
     [HarmonyPrefix]
     public static void Prefix(CombatSide side)
@@ -66,7 +84,7 @@ public static class HookAfterTurnEndCloakClaspCleanupPatch
         }
         catch (Exception e)
         {
-            CoreMain.LogDebug($"HookAfterTurnEndCloakClaspCleanupPatch failed: {e.Message}");
+            CoreMain.LogDebug($"HookAfterSideTurnEndCloakClaspCleanupPatch failed: {e.Message}");
         }
     }
 }
