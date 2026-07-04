@@ -9,6 +9,7 @@ namespace SpireLens.Core.Tests;
 public class HookPatchTargetTests
 {
     [Theory]
+    [Trait("Category", "RequiresLiveGame")]
     [InlineData(typeof(HookAfterSideTurnEndCloakClaspCleanupPatch))]
     [InlineData(typeof(HookAfterSideTurnEndOrichalcumCleanupPatch))]
     public void EndTurnCleanupPatches_ResolveHookWithSideParameter(Type patchType)
