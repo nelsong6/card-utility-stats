@@ -22,9 +22,16 @@ public static class CombatHistoryAddPatch
 {
     // Postfix runs after the entry is already appended to CombatHistory._entries,
     // so we know the entry survived the game's own logic and is "real."
+    //
+    // This is the single busiest hook — every combat event flows through it, so
+    // a throw here must never reach the game's dispatch loop. Observe() self-
+    // guards (it routes its whole body through PatchGuard "RunTracker.Observe",
+    // which is where the surface-first-then-throttle happens for the flood-prone
+    // path); this outer PatchGuard.Run is defense-in-depth for anything around
+    // the Observe call itself.
     [HarmonyPostfix]
     public static void Postfix(CombatHistoryEntry entry)
     {
-        RunTracker.Observe(entry);
+        PatchGuard.Run(nameof(CombatHistoryAddPatch), () => RunTracker.Observe(entry));
     }
 }

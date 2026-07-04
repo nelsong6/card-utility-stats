@@ -1,0 +1,35 @@
+{
+  "run_id": "strike-dummy-relic-fixture",
+  "started_at": "2026-07-03T00:00:00Z",
+  "updated_at": "2026-07-03T00:10:00Z",
+  "outcome": "in_progress",
+  "aggregates": {
+    "CARD.STRIKE_IRONCLAD#1": {
+      "plays": 2
+    },
+    "CARD.POMMEL_STRIKE#1": {
+      "plays": 1
+    }
+  },
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.STRIKE_DUMMY": {
+      "strike_dummy_strikes_played": 8,
+      "strike_dummy_base_strikes_in_deck": 4,
+      "strike_dummy_non_base_strike_cards_in_deck": 3
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.STRIKE_IRONCLAD": [
+      1
+    ],
+    "CARD.POMMEL_STRIKE": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.STRIKE_IRONCLAD": 1,
+    "CARD.POMMEL_STRIKE": 1
+  }
+}

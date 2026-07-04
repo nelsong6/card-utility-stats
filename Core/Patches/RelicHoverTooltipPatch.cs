@@ -20,6 +20,7 @@ public static class RelicHoverShowPatch
     private const string WeakIconPath = "res://images/atlases/power_atlas.sprites/weak_power.tres";
     private const string BlockIconPath = "res://images/ui/combat/block.png";
     private const string EnergyIconPath = "res://images/atlases/potion_atlas.sprites/energy_potion.tres";
+    private const string VigorIconPath = "res://images/atlases/power_atlas.sprites/vigor_power.tres";
     private const int InlineIconSize = 16;
 
     [HarmonyPostfix]
@@ -80,6 +81,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is Permafrost)
+            {
+                const string relicId = "RELIC.PERMAFROST";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildPermafrostBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Permafrost", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is TheAbacus)
             {
                 const string relicId = "RELIC.THE_ABACUS";
@@ -87,6 +98,36 @@ public static class RelicHoverShowPatch
 
                 var body = BuildTheAbacusBodyBBCode(agg);
                 StatsTooltip.Show(tree, __instance, "The Abacus", "SpireLens", body);
+                return;
+            }
+
+            if (IsRelicModel(relicNode.Model, "MegaCrit.Sts2.Core.Models.Relics.Anchor"))
+            {
+                const string relicId = "RELIC.ANCHOR";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildAnchorBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Anchor", "SpireLens", body);
+                return;
+            }
+
+            if (IsRelicModel(relicNode.Model, "MegaCrit.Sts2.Core.Models.Relics.LetterOpener"))
+            {
+                const string relicId = "RELIC.LETTER_OPENER";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildLetterOpenerBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Letter Opener", "SpireLens", body);
+                return;
+            }
+
+            if (IsRelicModel(relicNode.Model, "MegaCrit.Sts2.Core.Models.Relics.Akabeko"))
+            {
+                const string relicId = "RELIC.AKABEKO";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildAkabekoBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Akabeko", "SpireLens", body);
                 return;
             }
 
@@ -130,6 +171,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (IsRelicModel(relicNode.Model, "MegaCrit.Sts2.Core.Models.Relics.BoomingConch"))
+            {
+                const string relicId = "RELIC.BOOMING_CONCH";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildBoomingConchBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Booming Conch", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is GremlinHorn)
             {
                 const string relicId = "RELIC.GREMLIN_HORN";
@@ -137,6 +188,66 @@ public static class RelicHoverShowPatch
 
                 var body = BuildGremlinHornBodyBBCode(agg);
                 StatsTooltip.Show(tree, __instance, "Gremlin Horn", "SpireLens", body);
+                return;
+            }
+
+            if (relicNode.Model is Pendulum)
+            {
+                const string relicId = "RELIC.PENDULUM";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildPendulumBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Pendulum", "SpireLens", body);
+                return;
+            }
+
+            if (relicNode.Model is MercuryHourglass)
+            {
+                const string relicId = "RELIC.MERCURY_HOURGLASS";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildMercuryHourglassBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Mercury Hourglass", "SpireLens", body);
+                return;
+            }
+
+            if (relicNode.Model is ParryingShield)
+            {
+                const string relicId = "RELIC.PARRYING_SHIELD";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildParryingShieldBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Parrying Shield", "SpireLens", body);
+                return;
+            }
+
+            if (relicNode.Model is FestivePopper)
+            {
+                const string relicId = "RELIC.FESTIVE_POPPER";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildFestivePopperBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Festive Popper", "SpireLens", body);
+                return;
+            }
+
+            if (relicNode.Model is PenNib)
+            {
+                const string relicId = "RELIC.PEN_NIB";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildPenNibBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Pen Nib", "SpireLens", body);
+                return;
+            }
+
+            if (relicNode.Model is HornCleat)
+            {
+                const string relicId = "RELIC.HORN_CLEAT";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildHornCleatBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Horn Cleat", "SpireLens", body);
                 return;
             }
 
@@ -210,6 +321,65 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is LeesWaffle)
+            {
+                const string relicId = "RELIC.LEES_WAFFLE";
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+
+                var body = BuildLeesWaffleBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Lee's Waffle", "SpireLens", body);
+                return;
+            }
+
+            if (IsRelicModel(relicNode.Model, "MegaCrit.Sts2.Core.Models.Relics.BloodVial"))
+            {
+                const string relicId = "RELIC.BLOOD_VIAL";
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+
+                var body = BuildBloodVialBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Blood Vial", "SpireLens", body);
+                return;
+            }
+
+            if (IsRelicModel(relicNode.Model, "MegaCrit.Sts2.Core.Models.Relics.Toolbox"))
+            {
+                const string relicId = "RELIC.TOOLBOX";
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+
+                var body = BuildToolboxBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Toolbox", "SpireLens", body);
+                return;
+            }
+
+            if (relicNode.Model is PaelsWing)
+            {
+                const string relicId = "RELIC.PAELS_WING";
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+
+                var body = BuildPaelsWingBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Pael's Wing", "SpireLens", body);
+                return;
+            }
+
+            if (IsRelicModel(relicNode.Model, "MegaCrit.Sts2.Core.Models.Relics.StrikeDummy"))
+            {
+                var agg = RunTracker.GetStrikeDummyAggregate();
+
+                var body = BuildStrikeDummyBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Strike Dummy", "SpireLens", body);
+                return;
+            }
+
+            if (relicNode.Model is BrilliantScarf)
+            {
+                const string relicId = "RELIC.BRILLIANT_SCARF";
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+
+                var body = BuildBrilliantScarfBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Brilliant Scarf", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is WhiteBeastStatue)
             {
                 const string relicId = "RELIC.WHITE_BEAST_STATUE";
@@ -276,10 +446,46 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
+    private static string BuildPermafrostBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var blockPerCombat = agg.Activations <= 0
+            ? 0m
+            : (decimal)agg.AdditionalBlockGained / agg.Activations;
+        Row3(sb, "Combats triggered", agg.Activations.ToString(), "");
+        Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
+        Row3(sb, BlockLabel("block gained per combat"), FormatDecimal(blockPerCombat), "");
+        return sb.ToString();
+    }
+
     private static string BuildTheAbacusBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildAnchorBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildLetterOpenerBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, "Damage attempted", agg.TotalDamageAttempted.ToString(), "");
+        Row3(sb, "Targets hit", agg.TotalTargets.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildAkabekoBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, VigorLabel("vigor gained"), agg.VigorGained.ToString(), "");
         return sb.ToString();
     }
 
@@ -314,12 +520,79 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
+    private static string BuildBoomingConchBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, EnergyLabel("Energy generated"), agg.EnergyGenerated.ToString(), "");
+        Row3(sb, "Cards drawn", agg.AdditionalCardsDrawn.ToString(), "");
+        return sb.ToString();
+    }
+
     private static string BuildGremlinHornBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
         Row3(sb, "Activations", agg.Activations.ToString(), "");
         Row3(sb, EnergyLabel("Energy generated"), agg.EnergyGenerated.ToString(), "");
         Row3(sb, "Cards drawn", agg.AdditionalCardsDrawn.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildPendulumBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, "Cards drawn", agg.AdditionalCardsDrawn.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildMercuryHourglassBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var damagePerCombat = agg.Activations <= 0
+            ? 0m
+            : (decimal)agg.TotalDamageDealt / agg.Activations;
+        Row3(sb, "Combats triggered", agg.Activations.ToString(), "");
+        Row3(sb, "Damage dealt", agg.TotalDamageDealt.ToString(), "");
+        Row3(sb, "Damage per combat", FormatDecimal(damagePerCombat), "");
+        return sb.ToString();
+    }
+
+    private static string BuildParryingShieldBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, "Damage attempted", agg.TotalDamageAttempted.ToString(), "");
+        Row3(sb, "Damage dealt", agg.TotalDamageDealt.ToString(), "");
+        Row3(sb, "Damage blocked", agg.TotalDamageBlocked.ToString(), "");
+        Row3(sb, "Overkill", agg.TotalDamageOverkill.ToString(), "");
+        Row3(sb, "Kills", agg.Kills.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildFestivePopperBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var damagePerCombat = agg.Activations <= 0
+            ? 0m
+            : (decimal)agg.TotalDamageDealt / agg.Activations;
+        Row3(sb, "Combats triggered", agg.Activations.ToString(), "");
+        Row3(sb, "Damage dealt", agg.TotalDamageDealt.ToString(), "");
+        Row3(sb, "Damage per combat", FormatDecimal(damagePerCombat), "");
+        return sb.ToString();
+    }
+
+    private static string BuildPenNibBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Base damage added", agg.TotalDamageAttempted.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildHornCleatBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
         return sb.ToString();
     }
 
@@ -333,7 +606,7 @@ public static class RelicHoverShowPatch
             .OrderBy(kvp => kvp.Key == "colorless" ? 1 : 0)
             .ThenBy(kvp => kvp.Value.DisplayName, StringComparer.OrdinalIgnoreCase))
         {
-            Row3(sb, $"{category.Value.DisplayName} rewards", category.Value.Count.ToString(), "");
+            Row3(sb, $"{StatsTooltip.EscapeBbcode(category.Value.DisplayName)} rewards", category.Value.Count.ToString(), "");
         }
         return sb.ToString();
     }
@@ -382,6 +655,64 @@ public static class RelicHoverShowPatch
         var sb = new StringBuilder();
         Row3(sb, "Activations", agg.Activations.ToString(), "");
         AppendHealingStats(sb, agg);
+        return sb.ToString();
+    }
+
+    private static string BuildLeesWaffleBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "HP gained", FormatDecimal(agg.TotalHealingRestored), "");
+        return sb.ToString();
+    }
+
+    private static string BuildBloodVialBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        AppendHealingStats(sb, agg);
+        return sb.ToString();
+    }
+
+    private static string BuildToolboxBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, "Uncommon cards offered", agg.UncommonCardsOffered.ToString(), "");
+        Row3(sb, "Rare cards offered", agg.RareCardsOffered.ToString(), "");
+        Row3(sb, "Uncommon cards taken", agg.UncommonCardsTaken.ToString(), "");
+        Row3(sb, "Rare cards taken", agg.RareCardsTaken.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildPaelsWingBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "common cards consumed", agg.CommonCardsConsumed.ToString(), "");
+        Row3(sb, "uncommon cards consumed", agg.UncommonCardsConsumed.ToString(), "");
+        Row3(sb, "rare cards consumed", agg.RareCardsConsumed.ToString(), "");
+        Row3(sb, "Sacrifices made", agg.SacrificesMade.ToString(), "");
+        Row3(sb, "Sacrifices skipped", agg.SacrificesSkipped.ToString(), "");
+        var floorCount = RunTracker.GetCurrentFloorForRateStats();
+        var rate = floorCount <= 0 ? 0m : (decimal)agg.SacrificesMade / floorCount;
+        Row3(sb, "Sacrifice rate", FormatDecimal(rate), "/floor");
+        return sb.ToString();
+    }
+
+    private static string BuildStrikeDummyBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Strikes played", agg.StrikeDummyStrikesPlayed.ToString(), "");
+        Row3(sb, "Base Strikes in deck", agg.StrikeDummyBaseStrikesInDeck.ToString(), "");
+        Row3(sb, "Non-base Strike cards in deck", agg.StrikeDummyNonBaseStrikeCardsInDeck.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildBrilliantScarfBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Discounts offered", agg.DiscountsOffered.ToString(), "");
+        Row3(sb, "Discounts taken", agg.DiscountsTaken.ToString(), "");
+        Row3(sb, EnergyLabel("Energy saved"), agg.EnergySavedByDiscount.ToString(), "");
         return sb.ToString();
     }
 
@@ -436,7 +767,7 @@ public static class RelicHoverShowPatch
             if (reason.Amount <= 0m) continue;
             var label = string.IsNullOrWhiteSpace(reason.DisplayName)
                 ? "lost to other/prevented"
-                : $"lost to {reason.DisplayName}";
+                : $"lost to {StatsTooltip.EscapeBbcode(reason.DisplayName)}";
             Row3(sb, label, FormatDecimal(reason.Amount), "");
         }
     }
@@ -452,6 +783,18 @@ public static class RelicHoverShowPatch
     {
         var path = NormalizeResourcePath(EnergyIconPath);
         return $"[img={InlineIconSize}x{InlineIconSize}]{path}[/img] {suffix}";
+    }
+
+    private static string VigorLabel(string suffix)
+    {
+        var path = NormalizeResourcePath(VigorIconPath);
+        return $"[img={InlineIconSize}x{InlineIconSize}]{path}[/img] {suffix}";
+    }
+
+    private static bool IsRelicModel(object model, string typeName)
+    {
+        var type = AccessTools.TypeByName(typeName);
+        return type != null && type.IsInstanceOfType(model);
     }
 
     private static string NormalizeResourcePath(string path)

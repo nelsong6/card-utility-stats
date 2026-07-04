@@ -41,14 +41,25 @@ public static class CloakClaspBeforeTurnEndPatch
 /// <summary>
 /// Clears the Cloak Clasp attribution window after the player's end-of-turn
 /// hook sequence. Mirrors the later-boundary cleanup pattern used by Orichalcum.
+///
+/// Bound via runtime lookup rather than <c>nameof(Hook.AfterTurnEnd)</c> so a
+/// Slay the Spire 2 update that renames or removes the hook does not break the
+/// build.
 /// </summary>
 [HarmonyPatch]
 public static class HookAfterSideTurnEndCloakClaspCleanupPatch
 {
-    private static MethodBase? TargetMethod()
+    private static MethodBase? CleanupHook()
     {
         return AccessTools.Method(typeof(Hook), "AfterSideTurnEnd")
             ?? AccessTools.Method(typeof(Hook), "AfterTurnEnd");
+    }
+
+    private static bool Prepare() => CleanupHook() != null;
+
+    private static MethodBase? TargetMethod()
+    {
+        return CleanupHook();
     }
 
     [HarmonyPrefix]

@@ -31,11 +31,19 @@ public static class RunHistoryUtilitiesCreateEntryPatch
     [HarmonyPostfix]
     public static void Postfix(bool victory, bool isAbandoned)
     {
-        string outcome;
-        if (isAbandoned) outcome = "abandoned";
-        else if (victory) outcome = "win";
-        else outcome = "loss";
+        // Guard the terminal run-end funnel: an unhandled throw here would
+        // propagate into RunManager.OnEnded / NMainMenu.AbandonRun and could
+        // skip the game's own run cleanup. PatchGuard logs at always-on Error
+        // level (not the debug-gated LogDebug) so a broken run-end is visible
+        // without a debug flag.
+        PatchGuard.Run(nameof(RunHistoryUtilitiesCreateEntryPatch), () =>
+        {
+            string outcome;
+            if (isAbandoned) outcome = "abandoned";
+            else if (victory) outcome = "win";
+            else outcome = "loss";
 
-        RunTracker.OnRunEnded(outcome);
+            RunTracker.OnRunEnded(outcome);
+        });
     }
 }

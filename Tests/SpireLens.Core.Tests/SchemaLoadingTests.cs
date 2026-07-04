@@ -953,4 +953,151 @@ public class SchemaLoadingTests
         Assert.Equal(2, entomancerAgg.StatusCardsAdded);
         Assert.Equal(2, entomancerAgg.StatusCardsById["CARD.DAZED"].Count);
     }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsOpenBranchRelicStatsFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("open-branch-relic-stats-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        var anchorAgg = loaded.Data.RelicAggregates["RELIC.ANCHOR"];
+        Assert.Equal(2, anchorAgg.Activations);
+        Assert.Equal(20, anchorAgg.AdditionalBlockGained);
+        var letterOpenerAgg = loaded.Data.RelicAggregates["RELIC.LETTER_OPENER"];
+        Assert.Equal(3, letterOpenerAgg.Activations);
+        Assert.Equal(45, letterOpenerAgg.TotalDamageAttempted);
+        Assert.Equal(9, letterOpenerAgg.TotalTargets);
+        var bloodVialAgg = loaded.Data.RelicAggregates["RELIC.BLOOD_VIAL"];
+        Assert.Equal(2, bloodVialAgg.Activations);
+        Assert.Equal(3m, bloodVialAgg.TotalHealingRestored);
+        Assert.Equal(1m, bloodVialAgg.TotalHealingLost);
+        Assert.Equal(1m, bloodVialAgg.HealingLostReasons["full_hp"].Amount);
+        Assert.Equal(16, loaded.Data.RelicAggregates["RELIC.AKABEKO"].VigorGained);
+        var boomingConchAgg = loaded.Data.RelicAggregates["RELIC.BOOMING_CONCH"];
+        Assert.Equal(2, boomingConchAgg.EnergyGenerated);
+        Assert.Equal(4, boomingConchAgg.AdditionalCardsDrawn);
+        var pendulumAgg = loaded.Data.RelicAggregates["RELIC.PENDULUM"];
+        Assert.Equal(3, pendulumAgg.Activations);
+        Assert.Equal(6, pendulumAgg.AdditionalCardsDrawn);
+        var parryingShieldAgg = loaded.Data.RelicAggregates["RELIC.PARRYING_SHIELD"];
+        Assert.Equal(2, parryingShieldAgg.Activations);
+        Assert.Equal(17, parryingShieldAgg.TotalDamageAttempted);
+        Assert.Equal(11, parryingShieldAgg.TotalDamageDealt);
+        Assert.Equal(4, parryingShieldAgg.TotalDamageBlocked);
+        Assert.Equal(2, parryingShieldAgg.TotalDamageOverkill);
+        Assert.Equal(1, parryingShieldAgg.Kills);
+        Assert.Equal(2, parryingShieldAgg.TotalTargets);
+        var hornCleatAgg = loaded.Data.RelicAggregates["RELIC.HORN_CLEAT"];
+        Assert.Equal(2, hornCleatAgg.Activations);
+        Assert.Equal(24, hornCleatAgg.AdditionalBlockGained);
+        var toolboxAgg = loaded.Data.RelicAggregates["RELIC.TOOLBOX"];
+        Assert.Equal(2, toolboxAgg.Activations);
+        Assert.Equal(4, toolboxAgg.UncommonCardsOffered);
+        Assert.Equal(1, toolboxAgg.RareCardsOffered);
+        Assert.Equal(2, toolboxAgg.UncommonCardsTaken);
+        Assert.Equal(1, toolboxAgg.RareCardsTaken);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsOpenBranchRelicStatsFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("open-branch-relic-stats-run.json"));
+
+        Assert.NotNull(resumed);
+        var letterOpenerAgg = resumed!.RelicAggregates["RELIC.LETTER_OPENER"];
+        Assert.Equal(45, letterOpenerAgg.TotalDamageAttempted);
+        Assert.Equal(9, letterOpenerAgg.TotalTargets);
+        Assert.Equal(16, resumed.RelicAggregates["RELIC.AKABEKO"].VigorGained);
+        Assert.Equal(4, resumed.RelicAggregates["RELIC.BOOMING_CONCH"].AdditionalCardsDrawn);
+        Assert.Equal(6, resumed.RelicAggregates["RELIC.PENDULUM"].AdditionalCardsDrawn);
+        Assert.Equal(11, resumed.RelicAggregates["RELIC.PARRYING_SHIELD"].TotalDamageDealt);
+        Assert.Equal(4, resumed.RelicAggregates["RELIC.PARRYING_SHIELD"].TotalDamageBlocked);
+        Assert.Equal(24, resumed.RelicAggregates["RELIC.HORN_CLEAT"].AdditionalBlockGained);
+        Assert.Equal(4, resumed.RelicAggregates["RELIC.TOOLBOX"].UncommonCardsOffered);
+        Assert.Equal(1, resumed.RelicAggregates["RELIC.TOOLBOX"].RareCardsOffered);
+        Assert.Equal(2, resumed.RelicAggregates["RELIC.TOOLBOX"].UncommonCardsTaken);
+        Assert.Equal(1, resumed.RelicAggregates["RELIC.TOOLBOX"].RareCardsTaken);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsPaelsWingSacrificeRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("paels-wing-sacrifice-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.PAELS_WING"];
+        Assert.Equal(5, relicAgg.CommonCardsConsumed);
+        Assert.Equal(3, relicAgg.UncommonCardsConsumed);
+        Assert.Equal(1, relicAgg.RareCardsConsumed);
+        Assert.Equal(3, relicAgg.SacrificesMade);
+        Assert.Equal(2, relicAgg.SacrificesSkipped);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsPaelsWingSacrificeRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("paels-wing-sacrifice-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.PAELS_WING"];
+        Assert.Equal(5, relicAgg.CommonCardsConsumed);
+        Assert.Equal(3, relicAgg.UncommonCardsConsumed);
+        Assert.Equal(1, relicAgg.RareCardsConsumed);
+        Assert.Equal(3, relicAgg.SacrificesMade);
+        Assert.Equal(2, relicAgg.SacrificesSkipped);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsStrikeDummyRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("strike-dummy-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.STRIKE_DUMMY"];
+        Assert.Equal(8, relicAgg.StrikeDummyStrikesPlayed);
+        Assert.Equal(4, relicAgg.StrikeDummyBaseStrikesInDeck);
+        Assert.Equal(3, relicAgg.StrikeDummyNonBaseStrikeCardsInDeck);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsStrikeDummyRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("strike-dummy-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.STRIKE_DUMMY"];
+        Assert.Equal(8, relicAgg.StrikeDummyStrikesPlayed);
+        Assert.Equal(4, relicAgg.StrikeDummyBaseStrikesInDeck);
+        Assert.Equal(3, relicAgg.StrikeDummyNonBaseStrikeCardsInDeck);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsBrilliantScarfRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("brilliant-scarf-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.BRILLIANT_SCARF"];
+        Assert.Equal(5, relicAgg.DiscountsOffered);
+        Assert.Equal(3, relicAgg.DiscountsTaken);
+        Assert.Equal(7, relicAgg.EnergySavedByDiscount);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsBrilliantScarfRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("brilliant-scarf-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.BRILLIANT_SCARF"];
+        Assert.Equal(5, relicAgg.DiscountsOffered);
+        Assert.Equal(3, relicAgg.DiscountsTaken);
+        Assert.Equal(7, relicAgg.EnergySavedByDiscount);
+    }
 }

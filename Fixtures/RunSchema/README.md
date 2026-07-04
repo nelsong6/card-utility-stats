@@ -91,6 +91,19 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds run-level enemy aggregates for enemy damage dealt to the player and
   status cards that enemies actually add, split by destination pile and status
   card id.
+- `open-branch-relic-stats-run.json`
+  Adds consolidated relic aggregates rescued from stale open branches: Anchor,
+  Letter Opener, Blood Vial, Akabeko, Booming Conch, Pendulum, Parrying
+  Shield, Horn Cleat, and Toolbox.
+- `paels-wing-sacrifice-relic-run.json`
+  Adds Pael's Wing sacrifice tracking: consumed card reward options split by
+  common, uncommon, and rare, plus sacrifices made and skipped.
+- `strike-dummy-relic-run.json`
+  Adds Strike Dummy tracked Strike-card plays since pickup plus current
+  permanent-deck counts for base Strikes and non-base Strike-tagged cards.
+- `brilliant-scarf-relic-run.json`
+  Adds Brilliant Scarf discount tracking: energy-discount offers, taken
+  discounts, and energy saved by those taken discounts.
 
 Why these exist:
 

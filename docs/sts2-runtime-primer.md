@@ -57,22 +57,27 @@ When adding a hook:
 
 SpireLens persistence is combat-boundary based.
 
-- `RunManager.Instance.RunStarted` starts a new run record.
+- `RunManager.Instance.RunStarted` starts a new run record — or resumes one; see below.
 - `CombatManager.Instance.CombatSetUp` creates `_pendingCombat`.
 - During combat, live observations accumulate in `_pendingCombat`.
 - `CombatManager.Instance.CombatEnded` promotes pending aggregates/events into committed `RunData`, updates run metadata, saves, and clears `_pendingCombat`.
+- `RunTracker.OnRunEnded` also promotes `_pendingCombat` before stamping the outcome — for the `loss` outcome only. Loss ordering (decompiled `CreatureCmd.Kill` → `LoseCombat()` → `RunManager.OnEnded`): `OnRunEnded` runs synchronously from the killing action, and the fatal combat's `CombatEnded` only fires LATER via `ProcessPendingLoss` — after the buffer has been consumed. Without this second promotion site the fatal combat's stats would be discarded. Abandoning mid-combat still discards the buffer (a half-played fight is not a resolved combat — a save-and-quit may even have rolled it back), and wins always get a normal `CombatEnded` first. Promotion is idempotent per buffer (the buffer is nulled after), so the two sites cannot double-promote. `RecordCombatEndingSuppressedDamage` stops capturing once `_currentRun` is null so the post-`OnRunEnded` damage tail can't resurrect the buffer and mint a junk run file at that deferred `CombatEnded`.
 - Between-combat and between-floor reloads are supported.
 - Mid-combat restore is intentionally out of scope.
 
-This distinction is easy to blur because tooltips merge committed and pending data for immediate display. That merged view is for UI only. The permanent run file is not promoted until combat ends.
+This distinction is easy to blur because tooltips merge committed and pending data for immediate display. That merged view is for UI only. The permanent run file is not promoted until combat ends — or, for the final combat of a lost run, until the run ends.
 
-When implementing new combat attribution, write it into `_pendingCombat` first unless the event is truly outside combat, such as card arrival/removal/upgrade lineage. Promotion should stay centralized at combat end.
+`RunStarted` does NOT always mean a new run. The game re-fires `RunManager.RunStarted` with the SAME `RunManager._startTime` every time a saved run is continued from the main menu (log line: "Continuing run with character"). `RunTracker.OnRunStarted` therefore treats a matching in-progress `game_start_time` as a continuation: it keeps the in-memory `RunData` (or, after a full game restart, adopts the newest resumable on-disk record via `RunStorage.FindByGameStartTime`) and rebinds card identity through `AdoptRunLocked` instead of minting a fresh run file. Historic builds minted a fresh `RunData` here, which stranded all previously committed stats in orphaned files and reset tooltips to zero mid-run.
+
+When implementing new combat attribution, write it into `_pendingCombat` first unless the event is truly outside combat, such as card arrival/removal/upgrade lineage. Promotion should stay centralized in `PromotePendingCombatIntoRun` and its two callers.
 
 ## RunStarted Is Not Deck-Ready
 
 Do not use `RunStarted` as the source of truth for starter deck population.
 
 Earlier code tried to walk `player.Deck.Cards` at `RunStarted`, but fresh runs had a timing race: the deck was not always populated yet. The durable hook is `CardPile.AddInternal` filtered to `PileType.Deck`, implemented by `CardEnterDeckPatch`.
+
+Continue-loads make the ordering worse: when a saved run is continued from the main menu, the game repopulates the deck with brand-new `CardModel` refs, and `CardPile.AddInternal` can fire BEFORE or AFTER the `RunStarted` re-fire — neither order is guaranteed. Observed consequence of the before-ordering: `CardEnterDeckPatch` stamps the fresh refs with brand-new instance numbers continuing the old counters (ghost aggregates like `CARD.DEATH_MARCH#3/#4` for a two-copy deck) before run adoption can rebind them. `AdoptRunLocked` handles both orderings with one mechanism: it seeds the saved `InstanceNumbersByDef` snapshot into `_pendingRankRestores` (per-def queues in deck-rank order), walks whatever portion of the deck already exists through `GetOrAssignNumber` (which claims queued numbers in arrival order before minting), leaves the rest queued for later `CardEnterDeckPatch` arrivals, and prunes the ghost stamps afterward via `PruneGhostAggregates`. Known assumption (shared with the hot-reload deck walk): repopulation arrival order matches `player.Deck.Cards` enumeration order at save time — if the game ever repopulates same-def copies out of deck order, two copies of the same def would silently swap stats. `CaptureInstanceNumbersByDeckRank` includes still-queued numbers in every snapshot, so a save during adoption cannot strand them; queues left unclaimed at combat setup are discarded with an always-on log line.
 
 `CardPile.AddInternal` catches:
 
@@ -198,7 +203,11 @@ SpireLens definitions:
 
 Effective damage is the user-facing total damage because it is the HP actually removed. Intended damage is useful internally and for waste percentages.
 
+Relic damage should follow the same observed-result path when the relic emits a damage command. For example, Festive Popper arms attribution from `FestivePopper.AfterPlayerTurnStart` only when its owner is about to fire on turn one, then records the actual `CreatureCmd.Damage` results so blocked damage, overkill, and dead targets are not inferred from the relic text.
+
 Known trap: an attack can play and produce no damage event, for example if the target is already dead/not fully removed or if no damage is actually received. Tooltip code treats a played attack with zero intended damage as a real but zero-damage case rather than inventing damage.
+
+Known trap — combat-ending killing blows: `DamageReceivedEntry` is NOT complete. In decompiled `CreatureCmd.Damage`, HP loss (`LoseHpInternal`) is applied BEFORE the emission gate `if (CombatManager.Instance.IsInProgress && !CombatManager.Instance.IsEnding) History.DamageReceived(...)`, and `CombatManager.IsEnding` is a live computed property that flips true the moment no living primary enemy remains — so the hit that kills the last enemy suppresses its own history entry and never reaches `CombatHistory.Add`. Mid-combat kills (another enemy still alive) emit normally. Scaling finishers systematically lose their biggest hits to this (diagnosed 2026-07-02 with Death March: 5/5 combat-ending kills unrecorded, all mid-combat hits recorded). SpireLens closes the gap with `HookAfterDamageGivenPatch`: `Hook.AfterDamageGiven` is dispatched directly by the game (its own doc comment: it "fires from the same damage event that ends combat (the killing hit), so it must still resolve for that hit"), fires after the possible emission for the same `DamageResult`, and runs before `Kill()` triggers `CombatEnded`. `RunTracker.RecordCombatEndingSuppressedDamage` synthesizes the missing `DamageReceivedEntry` (never touching the game's own history) only when `IsEnding` is true AND the `DamageResult` reference wasn't already observed via `CombatHistory.Add` — dedup is by result-object reference through `TryMarkDamageResultObserved`. Deliberate scope note: this captures ALL history-suppressed damage in the ending window, not only the killing blow itself — e.g. thorns or residual hits that really applied HP loss while combat wound down. That is the observed-outcomes principle: the damage genuinely happened (`LoseHpInternal` ran); only the game's history omitted it. Damage that never applied produces no `Hook.AfterDamageGiven` dispatch and is never invented.
 
 Player self-damage is tracked as HP lost from playing a card and uses observed unblocked damage after reductions. That is the real cost, not the text value.
 
@@ -338,6 +347,43 @@ This is intentionally outcome-shaped but still simple. It assumes the relic appl
 
 Relic aggregates live in `RunData.RelicAggregates`, keyed by relic id. Fields are shared across relics; each relic uses only relevant fields.
 
+Pael's sacrifice reward option is owned by `PaelsWing`, not `PaelsFlesh`.
+`PaelsWing.TryModifyCardRewardAlternatives` adds the `SACRIFICE` card reward
+alternative and `PaelsWing.OnSacrifice` increments the saved sacrifice count.
+`PaelsFlesh` is a separate combat max-energy relic that activates after turn 3.
+Track consumed card reward rarities and skipped sacrifice opportunities from the
+card reward alternative flow, not from PaelsFlesh's energy hooks.
+
+For relics that grant block after a specific owner-owned condition, arm a narrow block-gain window at the relic callback and let `Hook.AfterBlockGained` record the modified amount. Permafrost follows this pattern from `Permafrost.AfterCardPlayed`: mirror the first-owned-Power condition, count that combat trigger, then derive block per combat from observed block gained divided by triggers.
+
+For relics that emit damage commands, prefer the relic-owned callback plus the resolved `CreatureCmd.Damage` result. Mercury Hourglass arms from `MercuryHourglass.AfterPlayerTurnStart`, records the actual multi-target damage split from the command result on each turn, and counts the combat once so damage per combat is not confused with damage per turn-start trigger.
+
+Pen Nib is detected at its `ModifyDamageMultiplicative` hook when the relic
+returns `2` for the actual `CardPlay`, but the amount recorded comes from the
+raw per-hit value passed into `CreatureCmd.Damage` before hook modifiers run.
+SpireLens labels this "base damage added" rather than deriving from final
+damage, so effects such as Lethality or Vulnerable do not inflate the stat.
+
+Pickup relics with multi-step health effects should record the observed result
+across the full pickup callback when that is what the player experiences. Lee's
+Waffle records current-HP gained across `AfterObtained`, covering both its
+max-HP grant and the follow-up heal-to-full.
+
+Strike Dummy identifies eligible cards through the game's `CardTag.Strike`.
+Its damage modifier can run per damage evaluation, so count Strike cards played
+from finished card-play events while the relic is owned; use the modifier only
+to confirm the eligibility rule. Base Strikes are `IsBasicStrikeOrDefend` cards
+that also carry the Strike tag, while non-base Strike cards are every other
+permanent deck card with that tag.
+
+Brilliant Scarf increments its per-turn card counter from `AfterCardPlayed`,
+after `CardPlayFinished` has already entered combat history. Its actual cost
+discounts happen through `TryModifyEnergyCostInCombatLate` and `TryModifyStarCost`
+when that counter is one short of the configured threshold. Cost modifiers are
+queried repeatedly for UI/playability, so count the offer from the counter
+transition and use the modifier only to measure energy saved by the card that
+later consumes the offer.
+
 ## Generated And Supplemental Cards
 
 Not every visible card should become a permanent per-instance deck card.
@@ -449,7 +495,8 @@ specific blocker ids as they are discovered. See [ADR 0002](adr/0002-healing-att
 
 Good hook surfaces already proven useful:
 
-- `CombatHistory.Add`: broad real-entry observation point.
+- `CombatHistory.Add`: broad real-entry observation point. Caveat: does NOT see damage from combat-ending killing blows (see the Damage Attribution known trap).
+- `Hook.AfterDamageGiven`: fires for every `DamageResult` including the killing hit that ends combat (game dispatches it directly, bypassing the combat-hook guard); the surface used to capture history-suppressed combat-ending damage.
 - `Hook.AfterCardDrawn`: reliable card draw arrival.
 - `Hook.ShouldDraw`: draw attempts and blocked draw modifier.
 - `Hook.AfterCardChangedPiles`: final pile result.

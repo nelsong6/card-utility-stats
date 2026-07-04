@@ -1,0 +1,33 @@
+{
+  "run_id": "fixture-paels-wing-sacrifice-relic",
+  "started_at": "2026-07-03T00:00:00Z",
+  "updated_at": "2026-07-03T00:12:00Z",
+  "character": "IRONCLAD",
+  "ascension": 5,
+  "floor_reached": 8,
+  "outcome": "in_progress",
+  "aggregates": {
+    "CARD.STRIKE_KIN#1": {
+      "plays": 1
+    }
+  },
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.PAELS_WING": {
+      "common_cards_consumed": 5,
+      "uncommon_cards_consumed": 3,
+      "rare_cards_consumed": 1,
+      "sacrifices_made": 3,
+      "sacrifices_skipped": 2
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.STRIKE_KIN": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.STRIKE_KIN": 1
+  }
+}

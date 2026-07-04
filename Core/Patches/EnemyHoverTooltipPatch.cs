@@ -22,10 +22,14 @@ public static class EnemyHoverShowPatch
             var creature = __instance.Entity;
             var monster = creature?.Monster;
             if (monster == null || creature!.IsPlayer) return;
+            if (!ShouldShowForCreature(__instance, creature)) { StatsTooltip.Hide(); return; }
 
             var enemyId = monster.Id.ToString();
-            var agg = RunTracker.GetEnemyAggregate(enemyId);
-            if (agg == null || !HasEnemyStats(agg)) return;
+            var agg = RunTracker.GetEnemyAggregate(enemyId) ?? new EnemyAggregate
+            {
+                EnemyId = enemyId,
+                DisplayName = FormatEnemyIdForDisplay(enemyId),
+            };
 
             var tree = Engine.GetMainLoop() as SceneTree;
             if (tree == null) return;
@@ -45,15 +49,13 @@ public static class EnemyHoverShowPatch
     {
         var sb = new StringBuilder();
 
-        if (agg.DamageAttempted > 0)
-        {
-            var blockedPct = 100f * agg.DamageBlocked / agg.DamageAttempted;
-            Row3(sb, "Damage attempted", agg.DamageAttempted.ToString(), "");
-            Row3(sb, "Damage dealt", agg.DamageDealt.ToString(), "");
-            Row3(sb, "Damage blocked", agg.DamageBlocked.ToString(), $"{blockedPct:F0}%");
-            if (agg.DamageInstances > 0)
-                Row3(sb, "Damage instances", agg.DamageInstances.ToString(), "");
-        }
+        var blockedPct = agg.DamageAttempted > 0
+            ? $"{100f * agg.DamageBlocked / agg.DamageAttempted:F0}%"
+            : "";
+        Row3(sb, "Damage attempted", agg.DamageAttempted.ToString(), "");
+        Row3(sb, "Damage dealt", agg.DamageDealt.ToString(), "");
+        Row3(sb, "Damage blocked", agg.DamageBlocked.ToString(), blockedPct);
+        Row3(sb, "Damage instances", agg.DamageInstances.ToString(), "");
 
         if (agg.StatusCardsAdded <= 0)
             return sb.ToString();
@@ -73,9 +75,9 @@ public static class EnemyHoverShowPatch
                      .ThenBy(card => card.DisplayName))
         {
             if (card.Count <= 0) continue;
-            var label = string.IsNullOrWhiteSpace(card.DisplayName)
+            var label = StatsTooltip.EscapeBbcode(string.IsNullOrWhiteSpace(card.DisplayName)
                 ? RunTracker.FormatCardIdForDisplay(card.CardId)
-                : card.DisplayName;
+                : card.DisplayName);
             Row3(sb, label, card.Count.ToString(), "");
         }
 
@@ -87,9 +89,13 @@ public static class EnemyHoverShowPatch
         return BuildEnemyBodyBBCode(agg);
     }
 
-    private static bool HasEnemyStats(EnemyAggregate agg)
+    internal static bool ShouldShowForCreature(NCreature node, MegaCrit.Sts2.Core.Entities.Creatures.Creature creature)
     {
-        return agg.DamageAttempted > 0 || agg.StatusCardsAdded > 0;
+        if (node == null || creature == null) return false;
+        if (creature.IsDead || !creature.IsAlive) return false;
+        if (node.IsPlayingDeathAnimation) return false;
+        if (!node.IsInteractable) return false;
+        return true;
     }
 
     private static string FormatEnemyIdForDisplay(string enemyId)
@@ -120,9 +126,31 @@ public static class EnemyHoverShowPatch
 public static class EnemyHoverHidePatch
 {
     [HarmonyPostfix]
-    public static void Postfix()
+    public static void Postfix(NCreature __instance)
     {
-        try { StatsTooltip.Hide(); }
+        try { StatsTooltip.HideIfAnchoredTo(__instance); }
         catch (Exception e) { CoreMain.Logger.Error($"EnemyHoverHidePatch failed: {e.Message}"); }
+    }
+}
+
+[HarmonyPatch(typeof(NCreature), nameof(NCreature.OnUnfocus))]
+public static class EnemyHoverHideOnUnfocusPatch
+{
+    [HarmonyPostfix]
+    public static void Postfix(NCreature __instance)
+    {
+        try { StatsTooltip.HideIfAnchoredTo(__instance); }
+        catch (Exception e) { CoreMain.Logger.Error($"EnemyHoverHideOnUnfocusPatch failed: {e.Message}"); }
+    }
+}
+
+[HarmonyPatch(typeof(NCreature), nameof(NCreature.StartDeathAnim))]
+public static class EnemyHoverHideOnDeathPatch
+{
+    [HarmonyPrefix]
+    public static void Prefix(NCreature __instance)
+    {
+        try { StatsTooltip.HideIfAnchoredTo(__instance); }
+        catch (Exception e) { CoreMain.Logger.Error($"EnemyHoverHideOnDeathPatch failed: {e.Message}"); }
     }
 }

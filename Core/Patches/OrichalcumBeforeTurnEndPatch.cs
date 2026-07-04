@@ -75,14 +75,25 @@ public static class OrichalcumBeforeTurnEndPatch
 /// end-of-turn hook sequence. Orichalcum's async hook can gain block after
 /// the relic method has returned its task, so cleanup cannot live in the
 /// relic postfix itself.
+///
+/// Bound via runtime lookup rather than <c>nameof(Hook.AfterTurnEnd)</c>: a
+/// Slay the Spire 2 update can rename or remove the hook, and a compile-time
+/// reference would break the whole build.
 /// </summary>
 [HarmonyPatch]
 public static class HookAfterSideTurnEndOrichalcumCleanupPatch
 {
-    private static MethodBase? TargetMethod()
+    private static MethodBase? CleanupHook()
     {
         return AccessTools.Method(typeof(Hook), "AfterSideTurnEnd")
             ?? AccessTools.Method(typeof(Hook), "AfterTurnEnd");
+    }
+
+    private static bool Prepare() => CleanupHook() != null;
+
+    private static MethodBase? TargetMethod()
+    {
+        return CleanupHook();
     }
 
     [HarmonyPrefix]

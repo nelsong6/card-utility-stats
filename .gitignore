@@ -12,6 +12,7 @@ packages/
 *.user
 Directory.Build.props
 .env.local
+.codex/config.toml
 .terraform/
 *.tfstate
 *.tfstate.*

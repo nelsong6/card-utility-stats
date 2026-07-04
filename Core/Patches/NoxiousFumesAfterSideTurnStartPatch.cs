@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using HarmonyLib;
+using MegaCrit.Sts2.Core.Entities.Creatures;
 
 namespace SpireLens.Core.Patches;
 
@@ -19,13 +21,15 @@ public static class NoxiousFumesAfterSideTurnStartPatch
         return noxiousFumesType == null ? null : AccessTools.Method(noxiousFumesType, "AfterSideTurnStart");
     }
 
+    // NoxiousFumesPower.AfterSideTurnStart bails unless participants.Contains(base.Owner)
+    // (verified NoxiousFumesPower.cs line 28). Gate the arm on owner participation.
     [HarmonyPrefix]
-    public static void Prefix(object __instance)
+    public static void Prefix(object __instance, IReadOnlyList<Creature> participants)
     {
         try
         {
             if (__instance != null)
-                RunTracker.NoteNoxiousFumesTick(__instance);
+                RunTracker.NoteNoxiousFumesTick(__instance, participants);
         }
         catch (Exception e)
         {

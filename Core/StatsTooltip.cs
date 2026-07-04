@@ -1,6 +1,7 @@
 using System;
 using Godot;
 using MegaCrit.Sts2.Core.Nodes;
+using MegaCrit.Sts2.Core.Nodes.Combat;
 using MegaCrit.Sts2.Core.Nodes.HoverTips;
 
 namespace SpireLens.Core;
@@ -60,6 +61,7 @@ public static class StatsTooltip
     private static Label? _brandLabel;
     private static RichTextLabel? _statsLabel;
     private static SceneTree? _tree;
+    private static Control? _anchor;
     private static Action? _frameHandler;
 
     // Fonts loaded from the game. Cached so we don't hit ResourceLoader
@@ -277,6 +279,7 @@ public static class StatsTooltip
         EnsureBuilt(tree);
         if (_panel == null || _headerRow == null || _statsLabel == null || _titleLabel == null || _brandLabel == null) return;
 
+        _anchor = anchor;
         _headerRow.Visible = showHeader;
         _headerRow.CustomMinimumSize = new Vector2(0, showHeader ? HeaderHeight : 0f);
         _titleLabel.Text = titleText;
@@ -290,10 +293,31 @@ public static class StatsTooltip
         _panel.CallDeferred(Control.MethodName.ResetSize);
     }
 
+    /// <summary>
+    /// Escape a dynamic string for safe inclusion in a RichTextLabel BBCode
+    /// body. A display name containing '[' — a modded card/relic/status id or
+    /// future game content — would otherwise be parsed as a BBCode tag and
+    /// break the tooltip's formatting (or swallow the text that follows).
+    /// Godot renders "[lb]" as a literal '[', so neutralizing the opening
+    /// bracket is enough; a lone ']' is inert.
+    /// </summary>
+    public static string EscapeBbcode(string? text)
+    {
+        if (string.IsNullOrEmpty(text)) return text ?? string.Empty;
+        return text.Replace("[", "[lb]");
+    }
+
     public static void Hide()
     {
+        _anchor = null;
         if (_panel != null && GodotObject.IsInstanceValid(_panel)) _panel.Visible = false;
         if (_shadow != null && GodotObject.IsInstanceValid(_shadow)) _shadow.Visible = false;
+    }
+
+    public static void HideIfAnchoredTo(Control anchor)
+    {
+        if (anchor == null || !ReferenceEquals(_anchor, anchor)) return;
+        Hide();
     }
 
     public static void Destroy()
@@ -310,6 +334,7 @@ public static class StatsTooltip
         if (_panel != null && GodotObject.IsInstanceValid(_panel)) _panel.QueueFree();
         _shadow = null;
         _panel = null;
+        _anchor = null;
         _headerRow = null;
         _titleLabel = null;
         _brandLabel = null;
@@ -321,6 +346,16 @@ public static class StatsTooltip
         if (_panel == null || !GodotObject.IsInstanceValid(_panel)) return;
         if (!_panel.Visible) return;
         if (_tree == null) return;
+        if (_anchor != null && (!GodotObject.IsInstanceValid(_anchor) || !_anchor.IsInsideTree() || !_anchor.IsVisibleInTree()))
+        {
+            Hide();
+            return;
+        }
+        if (_anchor is NCreature creatureAnchor && !creatureAnchor.IsFocused)
+        {
+            Hide();
+            return;
+        }
 
         try
         {
