@@ -50,11 +50,21 @@ public static class HookAfterSideTurnEndCloakClaspCleanupPatch
 {
     private static MethodBase? CleanupHook()
     {
-        var hookType = typeof(CombatSide).Assembly.GetType("MegaCrit.Sts2.Core.Hooks.Hook", throwOnError: false);
+        var hookType = Sts2CoreAssembly()?.GetType("MegaCrit.Sts2.Core.Hooks.Hook", throwOnError: false);
         if (hookType == null) return null;
 
         return AccessTools.Method(hookType, "AfterSideTurnEnd")
             ?? AccessTools.Method(hookType, "AfterTurnEnd");
+    }
+
+    private static Assembly? Sts2CoreAssembly()
+    {
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            if (assembly.GetName().Name == "sts2") return assembly;
+        }
+
+        return null;
     }
 
     private static bool Prepare() => CleanupHook() != null;

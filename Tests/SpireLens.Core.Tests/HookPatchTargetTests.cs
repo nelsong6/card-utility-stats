@@ -1,7 +1,6 @@
 using System;
 using System.Linq;
 using System.Reflection;
-using MegaCrit.Sts2.Core.Combat;
 using SpireLens.Core.Patches;
 using Xunit;
 
@@ -22,7 +21,7 @@ public class HookPatchTargetTests
 
         var sideParameter = target.GetParameters().SingleOrDefault(p => p.Name == "side");
         Assert.NotNull(sideParameter);
-        Assert.Equal(typeof(CombatSide), sideParameter!.ParameterType);
+        Assert.Equal("MegaCrit.Sts2.Core.Combat.CombatSide", sideParameter!.ParameterType.FullName);
     }
 
     private static MethodBase? InvokeTargetMethod(Type patchType)
