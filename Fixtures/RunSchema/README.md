@@ -57,6 +57,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `v19-book-repair-knife-run.json`
   Adds Book Repair Knife confirmed per-enemy Doom trigger, kill-payload, and
   healing attribution tracking to relic aggregates.
+- `happy-flower-energy-average-run.json`
+  Adds Happy Flower held-combat tracking as the denominator for average energy
+  generated per combat.
 - `v20-bone-flute-run.json`
   Adds Bone Flute owned-Osty trigger tracking alongside actual block gained in
   relic aggregates.

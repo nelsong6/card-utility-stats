@@ -32,12 +32,17 @@ public class HappyFlowerStatsTests
     {
         var agg = new RelicAggregate();
         Assert.Equal(0, agg.EnergyGenerated);
+        Assert.Equal(0, agg.EnergyGeneratedCombats);
     }
 
     [Fact]
     public void RelicAggregate_EnergyGenerated_JsonRoundtrip_PreservesField()
     {
-        var agg = new RelicAggregate { EnergyGenerated = 3 };
+        var agg = new RelicAggregate
+        {
+            EnergyGenerated = 3,
+            EnergyGeneratedCombats = 2,
+        };
         var run = new RunData();
         run.RelicAggregates[HappyFlowerRelicId] = agg;
 
@@ -45,42 +50,58 @@ public class HappyFlowerStatsTests
 
         Assert.Contains("relic_aggregates", json);
         Assert.Contains("energy_generated", json);
+        Assert.Contains("energy_generated_combats", json);
 
         var restored = JsonSerializer.Deserialize<RunData>(json, SerializerOptions);
         Assert.NotNull(restored);
         Assert.True(restored!.RelicAggregates.ContainsKey(HappyFlowerRelicId));
         var restoredAgg = restored.RelicAggregates[HappyFlowerRelicId];
         Assert.Equal(3, restoredAgg.EnergyGenerated);
+        Assert.Equal(2, restoredAgg.EnergyGeneratedCombats);
     }
 
     [Fact]
     public void RelicAggregate_EnergyGenerated_AccumulatesAcrossTriggers()
     {
-        var run = new RunData();
+        var agg = new RelicAggregate();
 
-        if (!run.RelicAggregates.TryGetValue(HappyFlowerRelicId, out var agg))
-        {
-            agg = new RelicAggregate();
-            run.RelicAggregates[HappyFlowerRelicId] = agg;
-        }
+        RunTracker.RecordHappyFlowerEnergyGeneratedForTest(agg, amount: 3, combats: 2);
+        RunTracker.RecordHappyFlowerEnergyGeneratedForTest(agg, amount: -1, combats: -1);
 
-        agg.EnergyGenerated += 1;
-        agg.EnergyGenerated += 1;
-        agg.EnergyGenerated += 1;
-
-        Assert.Equal(3, run.RelicAggregates[HappyFlowerRelicId].EnergyGenerated);
+        Assert.Equal(3, agg.EnergyGenerated);
+        Assert.Equal(2, agg.EnergyGeneratedCombats);
     }
 
     [Fact]
-    public void RelicTooltip_EnergyGenerated_ShowsEnergyIconAndTotal()
+    public void RelicTooltip_EnergyGenerated_ShowsEnergyIconTotalAndAverage()
     {
-        var agg = new RelicAggregate { EnergyGenerated = 3 };
+        var agg = new RelicAggregate
+        {
+            EnergyGenerated = 3,
+            EnergyGeneratedCombats = 2,
+        };
 
         var body = (string)(BuildHappyFlowerBodyMethod.Invoke(null, new object?[] { agg })
             ?? throw new InvalidOperationException("BuildHappyFlowerBodyBBCode returned null."));
 
         Assert.Contains("Energy generated", body);
+        Assert.Contains("Combats held", body);
+        Assert.Contains("Avg energy generated per combat", body);
         Assert.Contains("[b]3[/b]", body);
+        Assert.Contains("[b]2[/b]", body);
+        Assert.Contains("[b]1.5[/b]", body);
+    }
+
+    [Fact]
+    public void RelicTooltip_EnergyGenerated_ShowsZeroAverageWithoutCombats()
+    {
+        var body = (string)(BuildHappyFlowerBodyMethod.Invoke(null, new object?[] { new RelicAggregate() })
+            ?? throw new InvalidOperationException("BuildHappyFlowerBodyBBCode returned null."));
+
+        Assert.Contains("Energy generated", body);
+        Assert.Contains("Combats held", body);
+        Assert.Contains("Avg energy generated per combat", body);
+        Assert.Contains("[b]0[/b]", body);
     }
 
     [Fact]
@@ -112,5 +133,6 @@ public class HappyFlowerStatsTests
         Assert.True(run!.RelicAggregates.ContainsKey(HappyFlowerRelicId));
         var agg = run.RelicAggregates[HappyFlowerRelicId];
         Assert.Equal(0, agg.EnergyGenerated);
+        Assert.Equal(0, agg.EnergyGeneratedCombats);
     }
 }

@@ -712,6 +712,29 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsHappyFlowerEnergyAverageFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("happy-flower-energy-average-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.HAPPY_FLOWER"];
+        Assert.Equal(5, relicAgg.EnergyGenerated);
+        Assert.Equal(3, relicAgg.EnergyGeneratedCombats);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsHappyFlowerEnergyAverageFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("happy-flower-energy-average-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.HAPPY_FLOWER"];
+        Assert.Equal(5, relicAgg.EnergyGenerated);
+        Assert.Equal(3, relicAgg.EnergyGeneratedCombats);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsV20CloakClaspFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("v20-cloak-clasp-run.json"));

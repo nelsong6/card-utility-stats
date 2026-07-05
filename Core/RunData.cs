@@ -445,6 +445,10 @@ public class RelicAggregate
     // Blood-Soaked Rose (max-energy relics counted once per player energy reset).
     public int EnergyGenerated { get; set; }
 
+    // Combats held for relics whose energy-generation tooltip reports a
+    // per-combat average. Used by Happy Flower.
+    public int EnergyGeneratedCombats { get; set; }
+
     // Total second player turns that ended with unspent energy while
     // Candelabra was held.
     public int SecondTurnsEndedWithExcessEnergy { get; set; }

@@ -1261,7 +1261,13 @@ public static class RelicHoverShowPatch
     private static string BuildHappyFlowerBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        AppendEnergyGeneratedStats(sb, agg);
+        AppendEnergyGeneratedStats(
+            sb,
+            agg,
+            includeAveragePerCombat: true,
+            averageLabel: "Avg energy generated per combat",
+            combatCount: agg.EnergyGeneratedCombats,
+            includeCombatsHeld: true);
         return sb.ToString();
     }
 
@@ -1772,14 +1778,20 @@ public static class RelicHoverShowPatch
         RelicAggregate agg,
         string totalLabel = "Energy generated",
         bool includeAveragePerCombat = false,
-        string averageLabel = "Avg energy gained per combat")
+        string averageLabel = "Avg energy gained per combat",
+        int? combatCount = null,
+        bool includeCombatsHeld = false)
     {
         Row3(sb, EnergyLabel(totalLabel), agg.EnergyGenerated.ToString(), "");
+        var combats = combatCount ?? agg.Activations;
+        if (includeCombatsHeld)
+            Row3(sb, "Combats held", combats.ToString(), "");
+
         if (!includeAveragePerCombat) return;
 
-        var average = agg.Activations <= 0
+        var average = combats <= 0
             ? 0m
-            : (decimal)agg.EnergyGenerated / agg.Activations;
+            : (decimal)agg.EnergyGenerated / combats;
         Row3(sb, EnergyLabel(averageLabel), FormatDecimal(average), "");
     }
 

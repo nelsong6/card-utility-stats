@@ -1400,6 +1400,7 @@ public static class RunTracker
             _pendingCombat = new PendingCombat();
             ResetCombatContextState();
             RecordCombatsInDeckForCurrentDeckLocked();
+            RecordHappyFlowerCombatForTrackedPlayerLocked();
             RecordBrilliantScarfCombatForTrackedPlayerLocked();
             RecordMiniatureCannonCombatForTrackedPlayerLocked();
             RecordBookmarkCombatForTrackedPlayerLocked();
@@ -1527,6 +1528,7 @@ public static class RunTracker
         target.DoomDeathTriggers += source.DoomDeathTriggers;
         target.DoomKills += source.DoomKills;
         target.EnergyGenerated += source.EnergyGenerated;
+        target.EnergyGeneratedCombats += source.EnergyGeneratedCombats;
         target.SecondTurnsEndedWithExcessEnergy += source.SecondTurnsEndedWithExcessEnergy;
         target.VigorGained += source.VigorGained;
         target.TotalDamageAttempted += source.TotalDamageAttempted;
@@ -4644,6 +4646,13 @@ public static class RunTracker
     {
     }
 
+    internal static void RecordHappyFlowerEnergyGeneratedForTest(RelicAggregate agg, int amount, int combats)
+    {
+        if (agg == null) return;
+        agg.EnergyGenerated += Math.Max(0, amount);
+        agg.EnergyGeneratedCombats += Math.Max(0, combats);
+    }
+
     /// <summary>
     /// Record Candelabra's owner-specific turn-2 activation and arm observed
     /// energy attribution for its immediate gain.
@@ -6313,6 +6322,29 @@ public static class RunTracker
         RefreshMiniatureCannonDeckCountsIfOwnedLocked();
     }
 
+    private static void RecordHappyFlowerCombatForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordHappyFlowerCombatForPlayerLocked(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordHappyFlowerCombatForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordHappyFlowerCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasHappyFlower(player)) return;
+
+        var agg = GetOrCreateRelicAggregateLocked(HappyFlowerRelicId);
+        agg.EnergyGeneratedCombats += 1;
+    }
+
     private static void RecordBookmarkCombatForTrackedPlayerLocked()
     {
         try
@@ -6377,6 +6409,18 @@ public static class RunTracker
         try
         {
             return player.Relics.Any(r => r is Bookmark);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool PlayerHasHappyFlower(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is HappyFlower);
         }
         catch
         {
