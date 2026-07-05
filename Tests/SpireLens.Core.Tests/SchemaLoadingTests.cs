@@ -1505,4 +1505,29 @@ public class SchemaLoadingTests
         Assert.Equal(19m, relicAgg.TotalHealingLost);
         Assert.Equal(19m, relicAgg.HealingLostReasons["full_hp"].Amount);
     }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsHeftyTabletRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("hefty-tablet-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.HEFTY_TABLET"];
+        Assert.Equal(1, relicAgg.CardsGranted["CARD.ADRENALINE"].Count);
+        Assert.Equal("Adrenaline", relicAgg.CardsGranted["CARD.ADRENALINE"].DisplayName);
+        Assert.Equal(1, relicAgg.CardChoicesSkipped);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsHeftyTabletRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("hefty-tablet-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.HEFTY_TABLET"];
+        Assert.Equal(1, relicAgg.CardsGranted["CARD.ADRENALINE"].Count);
+        Assert.Equal("Adrenaline", relicAgg.CardsGranted["CARD.ADRENALINE"].DisplayName);
+        Assert.Equal(1, relicAgg.CardChoicesSkipped);
+    }
 }

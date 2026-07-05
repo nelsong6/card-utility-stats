@@ -141,6 +141,9 @@ New fixtures added going forward do not need a `v*-` prefix.
   and after the relic's max-HP cost.
 - `sand-castle-relic-run.json`
   Adds Sand Castle pickup tracking: the actual cards upgraded by the relic.
+- `hefty-tablet-relic-run.json`
+  Adds Hefty Tablet rare-card choice tracking: cards granted by id/name and
+  skipped pickup choices.
 
 Why these exist:
 

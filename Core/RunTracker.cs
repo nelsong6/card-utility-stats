@@ -83,6 +83,7 @@ public static class RunTracker
     private static readonly Dictionary<string, int> _lastEnergyResetRoundByRelicAndPlayer = new();
     private static int _pendingWhiteBeastPotionRewards;
     private static int _pendingToolboxOfferScreens;
+    private static readonly List<Player> _pendingHeftyTabletChoicePlayers = new();
     private static readonly HashSet<PotionReward> _whiteBeastPotionRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, PendingPaelSacrificeReward> _paelSacrificeRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<Player, PendingRegalPillowRestHeal> _pendingRegalPillowRestHeals = new(ReferenceEqualityComparer.Instance);
@@ -887,6 +888,7 @@ public static class RunTracker
 
     private static void ResetRewardContextState()
     {
+        _pendingHeftyTabletChoicePlayers.Clear();
         _paelSacrificeRewards.Clear();
         _pendingRegalPillowRestHeals.Clear();
         _pendingPrecariousShearsPickups.Clear();
@@ -1556,6 +1558,8 @@ public static class RunTracker
         if (source.ResultingMaxHp.HasValue) target.ResultingMaxHp = source.ResultingMaxHp;
         target.CardRewardsAffected += source.CardRewardsAffected;
         MergeCardRewardCategories(target.CardRewardCategories, source.CardRewardCategories);
+        MergeRelicCardsGranted(target.CardsGranted, source.CardsGranted);
+        target.CardChoicesSkipped += source.CardChoicesSkipped;
     }
 
     private static void MergeDiscountedCardCosts(RelicAggregate target, RelicAggregate source)
@@ -2164,6 +2168,7 @@ public static class RunTracker
     private const string StrikeDummyRelicId = "RELIC.STRIKE_DUMMY";
     private const string BrilliantScarfRelicId = "RELIC.BRILLIANT_SCARF";
     private const string JuzuBraceletRelicId = "RELIC.JUZU_BRACELET";
+    private const string HeftyTabletRelicId = "RELIC.HEFTY_TABLET";
     private const string GamblingChipRelicId = "RELIC.GAMBLING_CHIP";
     private const string CentennialPuzzleRelicId = "RELIC.CENTENNIAL_PUZZLE";
     private const string PrecariousShearsRelicId = "RELIC.PRECARIOUS_SHEARS";
@@ -3053,6 +3058,102 @@ public static class RunTracker
     {
         if (agg == null || count <= 0) return;
         agg.QuestionMarkSitesEntered += count;
+    }
+
+    public static void ArmHeftyTabletChoice(Player owner)
+    {
+        if (owner == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(owner)) return;
+                _pendingHeftyTabletChoicePlayers.Add(owner);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"ArmHeftyTabletChoice failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void DisarmHeftyTabletChoice(Player owner)
+    {
+        if (owner == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                ConsumePendingGremlinHornAttribution(_pendingHeftyTabletChoicePlayers, owner);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"DisarmHeftyTabletChoice failed: {e.Message}");
+            }
+        }
+    }
+
+    public static bool TryConsumeHeftyTabletChoiceScreen(Player player, IReadOnlyList<CardModel> cards, bool canSkip)
+    {
+        if (player == null || cards == null || cards.Count == 0 || !canSkip) return false;
+        if (cards.Any(card => card == null || card.Rarity != CardRarity.Rare)) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                return ConsumePendingGremlinHornAttribution(_pendingHeftyTabletChoicePlayers, player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"TryConsumeHeftyTabletChoiceScreen failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    public static void RecordHeftyTabletChoice(CardModel? selectedCard)
+    {
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(HeftyTabletRelicId);
+                if (selectedCard == null)
+                {
+                    agg.CardChoicesSkipped += 1;
+                }
+                else
+                {
+                    AddRelicCardGranted(
+                        agg.CardsGranted,
+                        selectedCard.Id.ToString(),
+                        GetCardDisplayName(selectedCard),
+                        1);
+                }
+
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordHeftyTabletChoice failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordHeftyTabletChoiceForTest(RelicAggregate agg, string? cardId, string? displayName)
+    {
+        if (agg == null) return;
+        if (string.IsNullOrWhiteSpace(cardId))
+        {
+            agg.CardChoicesSkipped += 1;
+            return;
+        }
+
+        AddRelicCardGranted(agg.CardsGranted, cardId, displayName ?? "", 1);
     }
 
     /// <summary>
@@ -5878,6 +5979,61 @@ public static class RunTracker
         }
 
         agg.Count += count;
+    }
+
+    private static void MergeRelicCardsGranted(
+        Dictionary<string, RelicCardAggregate> target,
+        Dictionary<string, RelicCardAggregate>? source)
+    {
+        if (source == null || source.Count == 0) return;
+
+        foreach (var kvp in source)
+        {
+            var card = kvp.Value;
+            if (card.Count <= 0) continue;
+            var cardId = string.IsNullOrWhiteSpace(card.CardId) ? kvp.Key : card.CardId;
+            AddRelicCardGranted(target, cardId, card.DisplayName, card.Count);
+        }
+    }
+
+    private static void AddRelicCardGranted(
+        Dictionary<string, RelicCardAggregate> cards,
+        string cardId,
+        string displayName,
+        int count)
+    {
+        if (count <= 0 || string.IsNullOrWhiteSpace(cardId)) return;
+
+        if (!cards.TryGetValue(cardId, out var agg))
+        {
+            agg = new RelicCardAggregate
+            {
+                CardId = cardId,
+                DisplayName = string.IsNullOrWhiteSpace(displayName) ? FormatCardIdForDisplay(cardId) : displayName,
+            };
+            cards[cardId] = agg;
+        }
+
+        if (string.IsNullOrWhiteSpace(agg.CardId))
+            agg.CardId = cardId;
+        if (string.IsNullOrWhiteSpace(agg.DisplayName))
+            agg.DisplayName = string.IsNullOrWhiteSpace(displayName) ? FormatCardIdForDisplay(cardId) : displayName;
+
+        agg.Count += count;
+    }
+
+    private static string GetCardDisplayName(CardModel card)
+    {
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(card.Title))
+                return card.Title;
+        }
+        catch
+        {
+        }
+
+        return FormatCardIdForDisplay(card.Id.ToString());
     }
 
     private static string ToDisplayName(string key)

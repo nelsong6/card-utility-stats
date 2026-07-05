@@ -466,6 +466,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is HeftyTablet)
+            {
+                const string relicId = "RELIC.HEFTY_TABLET";
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+
+                var body = BuildHeftyTabletBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Hefty Tablet", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is PaelsWing)
             {
                 const string relicId = "RELIC.PAELS_WING";
@@ -955,6 +965,28 @@ public static class RelicHoverShowPatch
         Row3(sb, "Rare cards offered", agg.RareCardsOffered.ToString(), "");
         Row3(sb, "Uncommon cards taken", agg.UncommonCardsTaken.ToString(), "");
         Row3(sb, "Rare cards taken", agg.RareCardsTaken.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildHeftyTabletBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var cardsGranted = agg.CardsGranted.Values.Sum(card => Math.Max(0, card.Count));
+        Row3(sb, "Cards granted", cardsGranted.ToString(), "");
+        Row3(sb, "Skipped", agg.CardChoicesSkipped.ToString(), "");
+
+        foreach (var card in agg.CardsGranted.Values
+                     .Where(card => card.Count > 0)
+                     .OrderByDescending(card => card.Count)
+                     .ThenBy(card => card.DisplayName, StringComparer.OrdinalIgnoreCase))
+        {
+            var displayName = StatsTooltip.EscapeBbcode(string.IsNullOrWhiteSpace(card.DisplayName)
+                ? RunTracker.FormatCardIdForDisplay(card.CardId)
+                : card.DisplayName);
+            var value = card.Count == 1 ? displayName : $"{displayName} x{card.Count}";
+            Row3(sb, "Granted", value, "");
+        }
+
         return sb.ToString();
     }
 

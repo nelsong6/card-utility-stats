@@ -538,10 +538,24 @@ public class RelicAggregate
     // This is intentionally meta: other reward modifiers may also affect the
     // final options. Used by Prismatic Gem.
     public Dictionary<string, CardRewardCategoryAggregate> CardRewardCategories { get; set; } = new();
+
+    // Specific cards granted by relic-owned choice effects. Used by Hefty
+    // Tablet to show which rare card was picked from its pickup screen.
+    public Dictionary<string, RelicCardAggregate> CardsGranted { get; set; } = new();
+
+    // Times a relic-owned card choice was skipped. Used by Hefty Tablet.
+    public int CardChoicesSkipped { get; set; }
 }
 
 public class CardRewardCategoryAggregate
 {
+    public string DisplayName { get; set; } = "";
+    public int Count { get; set; }
+}
+
+public class RelicCardAggregate
+{
+    public string CardId { get; set; } = "";
     public string DisplayName { get; set; } = "";
     public int Count { get; set; }
 }

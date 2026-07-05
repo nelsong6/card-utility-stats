@@ -1,0 +1,40 @@
+{
+  "run_id": "hefty-tablet-relic-fixture",
+  "started_at": "2026-07-05T00:00:00Z",
+  "updated_at": "2026-07-05T00:05:00Z",
+  "outcome": "in_progress",
+  "aggregates": {
+    "CARD.ADRENALINE#1": {
+      "combats_in_deck": 1
+    },
+    "CARD.INJURY#1": {
+      "combats_in_deck": 1
+    }
+  },
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.HEFTY_TABLET": {
+      "cards_granted": {
+        "CARD.ADRENALINE": {
+          "card_id": "CARD.ADRENALINE",
+          "display_name": "Adrenaline",
+          "count": 1
+        }
+      },
+      "card_choices_skipped": 1
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.ADRENALINE": [
+      1
+    ],
+    "CARD.INJURY": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.ADRENALINE": 1,
+    "CARD.INJURY": 1
+  }
+}
