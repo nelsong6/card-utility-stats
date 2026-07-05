@@ -1611,6 +1611,7 @@ public static class RelicHoverShowPatch
     {
         var sb = new StringBuilder();
         Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, "Combats without activation", agg.CombatsWithoutActivation.ToString(), "");
         Row3(sb, "Statuses exhausted", agg.StatusCardsExhausted.ToString(), "");
         Row3(sb, "Curses exhausted", agg.CurseCardsExhausted.ToString(), "");
         return sb.ToString();

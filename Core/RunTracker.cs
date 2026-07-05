@@ -1447,6 +1447,7 @@ public static class RunTracker
     {
         if (_pendingCombat == null || _currentRun == null) return;
         RecordHeldCombatRelicBaselinesForTrackedPlayerLocked(requireActiveCombat: false, createPendingIfNeeded: false);
+        RecordPaelsEyeCombatsWithoutActivationForTrackedPlayerLocked();
 
         // Surviving player block at combat end never absorbed future
         // damage, so treat any remaining ledger as wasted before
@@ -1556,6 +1557,7 @@ public static class RunTracker
         target.SacrificesSkipped += source.SacrificesSkipped;
         target.StatusCardsExhausted += source.StatusCardsExhausted;
         target.CurseCardsExhausted += source.CurseCardsExhausted;
+        target.CombatsWithoutActivation += source.CombatsWithoutActivation;
 
         target.StrikeDummyStrikesPlayed += source.StrikeDummyStrikesPlayed;
         if (source.StrikeDummyBaseStrikesInDeck != 0 || target.StrikeDummyBaseStrikesInDeck == 0)
@@ -4225,6 +4227,28 @@ public static class RunTracker
         }
     }
 
+    public static void NotePaelsEyeActivationStarted(Player? player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null) return;
+                if (!IsTrackedPlayer(player)) return;
+
+                _pendingCombat.PaelsEyeCombatCountedPlayers.Add(player);
+                _pendingCombat.PaelsEyeActivationStartedPlayers.Add(player);
+                GetOrCreatePendingRelicAggregateLocked(PaelsEyeRelicId);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"NotePaelsEyeActivationStarted failed: {e.Message}");
+            }
+        }
+    }
+
     private static void RecordBookmarkActivation(RelicAggregate agg, CardRarity rarity)
     {
         agg.Activations += 1;
@@ -4253,6 +4277,13 @@ public static class RunTracker
         agg.Activations += 1;
         agg.StatusCardsExhausted += Math.Max(0, statusesExhausted);
         agg.CurseCardsExhausted += Math.Max(0, cursesExhausted);
+    }
+
+    internal static void RecordPaelsEyeCombatWithoutActivationForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+
+        agg.CombatsWithoutActivation += Math.Max(0, count);
     }
 
     internal static void RecordLeesWafflePickupHpGainedForTest(RelicAggregate agg, decimal hpGained)
@@ -6354,6 +6385,7 @@ public static class RunTracker
             RecordBrilliantScarfCombatForPlayerLocked(player);
             RecordMiniatureCannonCombatForPlayerLocked(player);
             RecordBookmarkCombatForPlayerLocked(player);
+            RecordPaelsEyeCombatForPlayerLocked(player);
         }
         catch (Exception e)
         {
@@ -6434,6 +6466,39 @@ public static class RunTracker
         agg.BookmarkCombats += 1;
     }
 
+    private static void RecordPaelsEyeCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasPaelsEye(player)) return;
+        if (!_pendingCombat.PaelsEyeCombatCountedPlayers.Add(player)) return;
+
+        GetOrCreatePendingRelicAggregateLocked(PaelsEyeRelicId);
+    }
+
+    private static void RecordPaelsEyeCombatsWithoutActivationForTrackedPlayerLocked()
+    {
+        try
+        {
+            if (_pendingCombat == null) return;
+
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+
+            RecordPaelsEyeCombatForPlayerLocked(player);
+            if (!_pendingCombat.PaelsEyeCombatCountedPlayers.Contains(player)) return;
+            if (_pendingCombat.PaelsEyeActivationStartedPlayers.Contains(player)) return;
+
+            var agg = GetOrCreatePendingRelicAggregateLocked(PaelsEyeRelicId);
+            if (agg.Activations > 0) return;
+
+            RecordPaelsEyeCombatWithoutActivationForTest(agg);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordPaelsEyeCombatsWithoutActivationForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
     private static void RecordBrilliantScarfCombatForTrackedPlayerLocked()
     {
         try
@@ -6463,6 +6528,18 @@ public static class RunTracker
         try
         {
             return player.Relics.Any(r => r is BrilliantScarf);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool PlayerHasPaelsEye(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is PaelsEye);
         }
         catch
         {
@@ -9524,6 +9601,10 @@ internal class PendingCombat
     public HashSet<Player> MiniatureCannonCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> BookmarkCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> PaelsEyeCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> PaelsEyeActivationStartedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> CandelabraSecondTurnExcessRecordedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

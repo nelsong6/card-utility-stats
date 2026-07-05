@@ -1600,6 +1600,7 @@ public class SchemaLoadingTests
         Assert.Equal(3, relicAgg.Activations);
         Assert.Equal(4, relicAgg.StatusCardsExhausted);
         Assert.Equal(2, relicAgg.CurseCardsExhausted);
+        Assert.Equal(5, relicAgg.CombatsWithoutActivation);
     }
 
     [Fact]
@@ -1612,6 +1613,7 @@ public class SchemaLoadingTests
         Assert.Equal(3, relicAgg.Activations);
         Assert.Equal(4, relicAgg.StatusCardsExhausted);
         Assert.Equal(2, relicAgg.CurseCardsExhausted);
+        Assert.Equal(5, relicAgg.CombatsWithoutActivation);
     }
 
     [Fact]

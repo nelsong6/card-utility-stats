@@ -40,6 +40,8 @@ public static class PaelsEyeBeforeSideTurnEndEarlyStatsPatch
             if (participants == null || !participants.Contains(ownerCreature)) return;
             if (!__instance.ShouldTakeExtraTurn(owner)) return;
 
+            RunTracker.NotePaelsEyeActivationStarted(owner);
+
             var cards = owner.PlayerCombatState?.Hand?.Cards?
                 .Where(card => card != null)
                 .Select(card => new PaelsEyeCardSnapshot(card, card.Type))

@@ -19,7 +19,8 @@
     "RELIC.PAELS_EYE": {
       "activations": 3,
       "status_cards_exhausted": 4,
-      "curse_cards_exhausted": 2
+      "curse_cards_exhausted": 2,
+      "combats_without_activation": 5
     }
   },
   "meta_stats": {},
