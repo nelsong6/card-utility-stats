@@ -133,6 +133,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `regal-pillow-relic-run.json`
   Adds Regal Pillow rest-site bonus healing tracking: activations, effective
   bonus HP healed, and bonus healing lost to full HP.
+- `pantograph-relic-run.json`
+  Adds Pantograph boss-combat healing tracking: activations, effective HP
+  healed, and healing wasted to full HP.
 - `precarious-shears-relic-run.json`
   Adds Precarious Shears pickup tracking: removed card names plus max HP before
   and after the relic's max-HP cost.

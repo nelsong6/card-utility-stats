@@ -376,6 +376,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is Pantograph)
+            {
+                const string relicId = "RELIC.PANTOGRAPH";
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+
+                var body = BuildPantographBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Pantograph", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is BurningBlood)
             {
                 const string relicId = "RELIC.BURNING_BLOOD";
@@ -866,6 +876,14 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
+    private static string BuildPantographBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        AppendHealingStats(sb, agg, lostLabel: "healing wasted", reasonPrefix: "wasted to");
+        return sb.ToString();
+    }
+
     private static string BuildBurningBloodBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
@@ -1079,10 +1097,14 @@ public static class RelicHoverShowPatch
         return $"[img={InlineIconSize}x{InlineIconSize}]{path}[/img] {suffix}";
     }
 
-    private static void AppendHealingStats(StringBuilder sb, RelicAggregate agg)
+    private static void AppendHealingStats(
+        StringBuilder sb,
+        RelicAggregate agg,
+        string lostLabel = "healing lost",
+        string reasonPrefix = "lost to")
     {
         Row3(sb, "HP healed", FormatDecimal(agg.TotalHealingRestored), "");
-        Row3(sb, "healing lost", FormatDecimal(agg.TotalHealingLost), "");
+        Row3(sb, lostLabel, FormatDecimal(agg.TotalHealingLost), "");
 
         if (agg.TotalHealingLost <= 0m) return;
 
@@ -1092,8 +1114,8 @@ public static class RelicHoverShowPatch
         {
             if (reason.Amount <= 0m) continue;
             var label = string.IsNullOrWhiteSpace(reason.DisplayName)
-                ? "lost to other/prevented"
-                : $"lost to {StatsTooltip.EscapeBbcode(reason.DisplayName)}";
+                ? $"{reasonPrefix} other/prevented"
+                : $"{reasonPrefix} {StatsTooltip.EscapeBbcode(reason.DisplayName)}";
             Row3(sb, label, FormatDecimal(reason.Amount), "");
         }
     }

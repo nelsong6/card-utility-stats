@@ -2149,6 +2149,7 @@ public static class RunTracker
     private const string MealTicketRelicId = "RELIC.MEAL_TICKET";
     private const string BurningBloodRelicId = "RELIC.BURNING_BLOOD";
     private const string BloodVialRelicId = "RELIC.BLOOD_VIAL";
+    private const string PantographRelicId = "RELIC.PANTOGRAPH";
     private const string PlanisphereRelicId = "RELIC.PLANISPHERE";
     private const string LeesWaffleRelicId = "RELIC.LEES_WAFFLE";
     private const string ChosenCheeseRelicId = "RELIC.CHOSEN_CHEESE";
@@ -3452,6 +3453,15 @@ public static class RunTracker
     public static void RecordBloodVialTrigger(Creature healedCreature, decimal attemptedHealing)
     {
         RecordRelicHealingTrigger(BloodVialRelicId, healedCreature, attemptedHealing, nameof(RecordBloodVialTrigger));
+    }
+
+    /// <summary>
+    /// Record Pantograph's boss-combat-start trigger and arm its observed
+    /// healing window.
+    /// </summary>
+    public static void RecordPantographTrigger(Creature healedCreature, decimal attemptedHealing)
+    {
+        RecordRelicHealingTrigger(PantographRelicId, healedCreature, attemptedHealing, nameof(RecordPantographTrigger));
     }
 
     /// <summary>

@@ -1474,4 +1474,35 @@ public class SchemaLoadingTests
         Assert.Equal(4m, relicAgg.TotalHealingLost);
         Assert.Equal(4m, relicAgg.HealingLostReasons["full_hp"].Amount);
     }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsPantographRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("pantograph-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.PANTOGRAPH"];
+        Assert.Equal(2, relicAgg.Activations);
+        Assert.Equal(50m, relicAgg.TotalHealingAttempted);
+        Assert.Equal(31m, relicAgg.TotalHealingRestored);
+        Assert.Equal(19m, relicAgg.TotalHealingLost);
+        Assert.Equal(19m, relicAgg.HealingLostReasons["full_hp"].Amount);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsPantographRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("pantograph-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.PANTOGRAPH"];
+        Assert.Equal(2, relicAgg.Activations);
+        Assert.Equal(50m, relicAgg.TotalHealingAttempted);
+        Assert.Equal(31m, relicAgg.TotalHealingRestored);
+        Assert.Equal(19m, relicAgg.TotalHealingLost);
+        Assert.Equal(19m, relicAgg.HealingLostReasons["full_hp"].Amount);
+    }
 }

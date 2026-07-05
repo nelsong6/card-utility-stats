@@ -1,0 +1,36 @@
+{
+  "run_id": "pantograph-relic-fixture",
+  "started_at": "2026-07-05T00:00:00Z",
+  "updated_at": "2026-07-05T00:15:00Z",
+  "outcome": "in_progress",
+  "aggregates": {
+    "CARD.STRIKE_KIN#1": {
+      "plays": 1
+    }
+  },
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.PANTOGRAPH": {
+      "activations": 2,
+      "total_healing_attempted": 50,
+      "total_healing_restored": 31,
+      "total_healing_lost": 19,
+      "healing_lost_reasons": {
+        "full_hp": {
+          "reason_id": "full_hp",
+          "display_name": "full HP",
+          "amount": 19
+        }
+      }
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.STRIKE_KIN": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.STRIKE_KIN": 1
+  }
+}
