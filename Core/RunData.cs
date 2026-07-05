@@ -508,6 +508,10 @@ public class RelicAggregate
     public int SacrificesMade { get; set; }
     public int SacrificesSkipped { get; set; }
 
+    // Status/curse cards exhausted by Pael's Eye when it takes an extra turn.
+    public int StatusCardsExhausted { get; set; }
+    public int CurseCardsExhausted { get; set; }
+
     // Strike Dummy tracking. StrikesPlayed is cumulative since the relic was
     // picked up; deck counts are current permanent-deck snapshots.
     public int StrikeDummyStrikesPlayed { get; set; }

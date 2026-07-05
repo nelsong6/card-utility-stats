@@ -3,7 +3,6 @@ using System.Threading.Tasks;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Models.Relics;
-using MegaCrit.Sts2.Core.Rooms;
 
 namespace SpireLens.Core.Patches;
 
@@ -15,7 +14,7 @@ namespace SpireLens.Core.Patches;
 public static class ChosenCheeseAfterCombatEndPatch
 {
     [HarmonyPrefix]
-    public static void Prefix(ChosenCheese __instance, CombatRoom room, out MaxHpState __state)
+    public static void Prefix(ChosenCheese __instance, out MaxHpState __state)
     {
         __state = default;
 

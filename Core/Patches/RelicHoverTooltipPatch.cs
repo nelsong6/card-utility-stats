@@ -525,6 +525,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is PaelsEye)
+            {
+                const string relicId = "RELIC.PAELS_EYE";
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+
+                var body = BuildPaelsEyeBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Pael's Eye", "SpireLens", body);
+                return;
+            }
+
             if (IsStrikeDummyStatsRelicModel(relicNode.Model))
             {
                 var agg = RunTracker.GetStrikeDummyAggregate();
@@ -1047,6 +1057,13 @@ public static class RelicHoverShowPatch
         {
             title = "Pael's Wing";
             body = BuildPaelsWingBodyBBCodeForFloor(agg, floorCount);
+            return true;
+        }
+
+        if (relicModel is PaelsEye)
+        {
+            title = "Pael's Eye";
+            body = BuildPaelsEyeBodyBBCode(agg);
             return true;
         }
 
@@ -1587,6 +1604,15 @@ public static class RelicHoverShowPatch
         var floorCount = floorCountOverride.GetValueOrDefault();
         var rate = floorCount <= 0 ? 0m : (decimal)agg.SacrificesMade / floorCount;
         Row3(sb, "Sacrifice rate", FormatDecimal(rate), "/floor");
+        return sb.ToString();
+    }
+
+    private static string BuildPaelsEyeBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, "Statuses exhausted", agg.StatusCardsExhausted.ToString(), "");
+        Row3(sb, "Curses exhausted", agg.CurseCardsExhausted.ToString(), "");
         return sb.ToString();
     }
 

@@ -109,6 +109,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `paels-wing-sacrifice-relic-run.json`
   Adds Pael's Wing sacrifice tracking: consumed card reward options split by
   common, uncommon, and rare, plus sacrifices made and skipped.
+- `paels-eye-relic-run.json`
+  Adds Pael's Eye activation tracking plus counts of status and curse cards
+  actually exhausted by its extra-turn callback.
 - `strike-dummy-relic-run.json`
   Adds Strike Dummy tracked Strike-card plays since pickup plus current
   permanent-deck counts for base Strikes and non-base Strike-tagged cards.

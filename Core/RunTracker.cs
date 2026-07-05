@@ -1554,6 +1554,8 @@ public static class RunTracker
         target.RareCardsConsumed += source.RareCardsConsumed;
         target.SacrificesMade += source.SacrificesMade;
         target.SacrificesSkipped += source.SacrificesSkipped;
+        target.StatusCardsExhausted += source.StatusCardsExhausted;
+        target.CurseCardsExhausted += source.CurseCardsExhausted;
 
         target.StrikeDummyStrikesPlayed += source.StrikeDummyStrikesPlayed;
         if (source.StrikeDummyBaseStrikesInDeck != 0 || target.StrikeDummyBaseStrikesInDeck == 0)
@@ -2193,6 +2195,7 @@ public static class RunTracker
     private const string PhylacteryUnboundRelicId = "RELIC.PHYLACTERY_UNBOUND";
     private const string ToolboxRelicId = "RELIC.TOOLBOX";
     private const string PaelsWingRelicId = "RELIC.PAELS_WING";
+    private const string PaelsEyeRelicId = "RELIC.PAELS_EYE";
     private const string StrikeDummyRelicId = "RELIC.STRIKE_DUMMY";
     private const string MiniatureCannonRelicId = "RELIC.MINIATURE_CANNON";
     private const string BookmarkRelicId = "RELIC.BOOKMARK";
@@ -4203,6 +4206,25 @@ public static class RunTracker
         }
     }
 
+    public static void RecordPaelsEyeActivation(int statusesExhausted, int cursesExhausted)
+    {
+        lock (_lock)
+        {
+            try
+            {
+                var persistDirectlyToRun = _pendingCombat == null;
+                var agg = GetOrCreateRelicAggregateForCurrentContextLocked(PaelsEyeRelicId);
+                RecordPaelsEyeActivationForTest(agg, statusesExhausted, cursesExhausted);
+                if (persistDirectlyToRun)
+                    SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPaelsEyeActivation failed: {e.Message}");
+            }
+        }
+    }
+
     private static void RecordBookmarkActivation(RelicAggregate agg, CardRarity rarity)
     {
         agg.Activations += 1;
@@ -4219,6 +4241,18 @@ public static class RunTracker
                 agg.BookmarkRareActivations += 1;
                 break;
         }
+    }
+
+    internal static void RecordPaelsEyeActivationForTest(
+        RelicAggregate agg,
+        int statusesExhausted,
+        int cursesExhausted)
+    {
+        if (agg == null) return;
+
+        agg.Activations += 1;
+        agg.StatusCardsExhausted += Math.Max(0, statusesExhausted);
+        agg.CurseCardsExhausted += Math.Max(0, cursesExhausted);
     }
 
     internal static void RecordLeesWafflePickupHpGainedForTest(RelicAggregate agg, decimal hpGained)

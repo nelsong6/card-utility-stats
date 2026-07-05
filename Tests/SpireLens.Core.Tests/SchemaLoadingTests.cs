@@ -1590,6 +1590,31 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsPaelsEyeRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("paels-eye-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.PAELS_EYE"];
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(4, relicAgg.StatusCardsExhausted);
+        Assert.Equal(2, relicAgg.CurseCardsExhausted);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsPaelsEyeRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("paels-eye-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.PAELS_EYE"];
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(4, relicAgg.StatusCardsExhausted);
+        Assert.Equal(2, relicAgg.CurseCardsExhausted);
+    }
+
+    [Fact]
     public void ResumableLoad_AcceptsTuningForkRelicFixture()
     {
         var resumed = RunStorage.LoadResumable(FixturePath("tuning-fork-relic-run.json"));
