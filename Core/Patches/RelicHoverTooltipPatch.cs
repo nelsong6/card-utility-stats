@@ -1802,21 +1802,34 @@ public static class RelicHoverShowPatch
     private static int VisibleTextLength(string bbcode)
     {
         var count = 0;
-        var inTag = false;
-        foreach (var c in bbcode)
+        for (var i = 0; i < bbcode.Length;)
         {
-            if (c == '[')
+            if (bbcode[i] == '[')
             {
-                inTag = true;
-                continue;
-            }
-            if (inTag)
-            {
-                if (c == ']') inTag = false;
+                var close = bbcode.IndexOf(']', i);
+                if (close < 0)
+                {
+                    count += 1;
+                    i += 1;
+                    continue;
+                }
+
+                var tag = bbcode.Substring(i + 1, close - i - 1).Trim();
+                if (tag.StartsWith("img", StringComparison.OrdinalIgnoreCase))
+                {
+                    var imageClose = bbcode.IndexOf("[/img]", close + 1, StringComparison.OrdinalIgnoreCase);
+                    i = imageClose >= 0
+                        ? imageClose + "[/img]".Length
+                        : close + 1;
+                    continue;
+                }
+
+                i = close + 1;
                 continue;
             }
 
             count += 1;
+            i += 1;
         }
 
         return count;
