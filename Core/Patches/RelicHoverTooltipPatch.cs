@@ -342,6 +342,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is PrecariousShears)
+            {
+                const string relicId = "RELIC.PRECARIOUS_SHEARS";
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+
+                var body = BuildPrecariousShearsBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Precarious Shears", "SpireLens", body);
+                return;
+            }
+
             if (IsRelicModel(relicNode.Model, "MegaCrit.Sts2.Core.Models.Relics.BloodVial"))
             {
                 const string relicId = "RELIC.BLOOD_VIAL";
@@ -702,6 +712,22 @@ public static class RelicHoverShowPatch
         var sb = new StringBuilder();
         Row3(sb, "Activations", agg.Activations.ToString(), "");
         AppendHealingStats(sb, agg);
+        return sb.ToString();
+    }
+
+    private static string BuildPrecariousShearsBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var cardsRemoved = (agg.CardsRemoved ?? new System.Collections.Generic.List<string>())
+            .Where(card => !string.IsNullOrWhiteSpace(card))
+            .ToList();
+
+        Row3(sb, "Cards removed", cardsRemoved.Count.ToString(), "");
+        foreach (var card in cardsRemoved)
+            Row3(sb, "Removed card", StatsTooltip.EscapeBbcode(card), "");
+
+        Row3(sb, "Starting max HP", FormatDecimal(agg.StartingMaxHp ?? 0m), "");
+        Row3(sb, "Resulting max HP", FormatDecimal(agg.ResultingMaxHp ?? 0m), "");
         return sb.ToString();
     }
 

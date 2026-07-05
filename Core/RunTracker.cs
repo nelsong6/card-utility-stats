@@ -81,6 +81,7 @@ public static class RunTracker
     private static readonly HashSet<PotionReward> _whiteBeastPotionRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, PendingPaelSacrificeReward> _paelSacrificeRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<Player, PendingRegalPillowRestHeal> _pendingRegalPillowRestHeals = new(ReferenceEqualityComparer.Instance);
+    private static readonly Dictionary<Player, PendingPrecariousShearsPickup> _pendingPrecariousShearsPickups = new(ReferenceEqualityComparer.Instance);
     private static bool _shivAvailableThisRun;
     private static CardModel? _shivDeckViewCard;
     private const decimal PoisonOwnershipEpsilon = 0.0001m;
@@ -882,6 +883,7 @@ public static class RunTracker
     {
         _paelSacrificeRewards.Clear();
         _pendingRegalPillowRestHeals.Clear();
+        _pendingPrecariousShearsPickups.Clear();
     }
 
     /// <summary>
@@ -1527,6 +1529,9 @@ public static class RunTracker
         target.DiscountsTaken += source.DiscountsTaken;
         target.EnergySavedByDiscount += source.EnergySavedByDiscount;
         target.CardsDiscarded += source.CardsDiscarded;
+        MergeCardsRemovedInto(target, source);
+        if (source.StartingMaxHp.HasValue) target.StartingMaxHp = source.StartingMaxHp;
+        if (source.ResultingMaxHp.HasValue) target.ResultingMaxHp = source.ResultingMaxHp;
         target.CardRewardsAffected += source.CardRewardsAffected;
         MergeCardRewardCategories(target.CardRewardCategories, source.CardRewardCategories);
     }
@@ -2118,6 +2123,7 @@ public static class RunTracker
     private const string BrilliantScarfRelicId = "RELIC.BRILLIANT_SCARF";
     private const string GamblingChipRelicId = "RELIC.GAMBLING_CHIP";
     private const string CentennialPuzzleRelicId = "RELIC.CENTENNIAL_PUZZLE";
+    private const string PrecariousShearsRelicId = "RELIC.PRECARIOUS_SHEARS";
 
     /// <summary>
     /// Record a Bag of Marbles combat-start Vulnerable application.
@@ -3290,6 +3296,65 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Arm Precarious Shears pickup attribution. The pickup is async: the game
+    /// prompts for cards, removes them from deck, then applies the max-HP cost.
+    /// </summary>
+    public static bool BeginPrecariousShearsPickup(RelicModel relic, out Player? player)
+    {
+        player = null;
+        if (relic?.Owner?.Creature == null) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic)) return false;
+                if (!IsTrackedPlayer(relic.Owner)) return false;
+
+                player = relic.Owner;
+                _pendingPrecariousShearsPickups[player] = new PendingPrecariousShearsPickup
+                {
+                    StartingMaxHp = player.Creature.MaxHp,
+                };
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"BeginPrecariousShearsPickup failed: {e.Message}");
+                player = null;
+                return false;
+            }
+        }
+    }
+
+    public static void CompletePrecariousShearsPickup(Player? player, bool succeeded)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_pendingPrecariousShearsPickups.Remove(player, out var pending)) return;
+                if (!succeeded) return;
+
+                decimal resultingMaxHp = player.Creature?.MaxHp ?? pending.StartingMaxHp;
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(PrecariousShearsRelicId);
+                RecordPrecariousShearsPickupForTest(
+                    agg,
+                    pending.CardsRemoved,
+                    pending.StartingMaxHp,
+                    resultingMaxHp);
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"CompletePrecariousShearsPickup failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Record Lee's Waffle's observed pickup HP gain. The relic first grants
     /// max HP, which itself heals, then heals to full; the full pickup delta is
     /// clearer than splitting those two game commands into separate attempts.
@@ -3429,6 +3494,28 @@ public static class RunTracker
         decimal otherLost = Math.Max(0m, bonusLost - fullHpLost);
         if (otherLost > 0m)
             AddHealingLostReasonLocked(agg, HealingLostOtherReasonId, "other/prevented", otherLost);
+    }
+
+    internal static void RecordPrecariousShearsPickupForTest(
+        RelicAggregate agg,
+        IEnumerable<string>? cardsRemoved,
+        decimal startingMaxHp,
+        decimal resultingMaxHp)
+    {
+        if (agg == null) return;
+
+        agg.CardsRemoved ??= new List<string>();
+        if (cardsRemoved != null)
+        {
+            foreach (var card in cardsRemoved)
+            {
+                if (!string.IsNullOrWhiteSpace(card))
+                    agg.CardsRemoved.Add(card);
+            }
+        }
+
+        agg.StartingMaxHp = Math.Max(0m, startingMaxHp);
+        agg.ResultingMaxHp = Math.Max(0m, resultingMaxHp);
     }
 
     internal static void RecordStrikeDummyStrikePlayedForTest(RelicAggregate agg)
@@ -4892,6 +4979,14 @@ public static class RunTracker
         }
     }
 
+    private static void MergeCardsRemovedInto(RelicAggregate target, RelicAggregate source)
+    {
+        if (source.CardsRemoved == null || source.CardsRemoved.Count == 0) return;
+
+        target.CardsRemoved ??= new List<string>();
+        target.CardsRemoved.AddRange(source.CardsRemoved.Where(card => !string.IsNullOrWhiteSpace(card)));
+    }
+
     private static void MergeCardRewardCategories(
         Dictionary<string, CardRewardCategoryAggregate> target,
         Dictionary<string, CardRewardCategoryAggregate>? source)
@@ -5027,6 +5122,7 @@ public static class RunTracker
     {
         lock (_lock)
         {
+            RecordPrecariousShearsCardRemovedLocked(card);
             if (_currentRun == null) return;
 
             // Non-assigning: if we haven't seen this card enter the deck,
@@ -5067,6 +5163,40 @@ public static class RunTracker
             // the I/O cost is negligible.
             RefreshStrikeDummyDeckCountsIfOwnedLocked();
             SaveCurrentRun();
+        }
+    }
+
+    private static void RecordPrecariousShearsCardRemovedLocked(CardModel card)
+    {
+        try
+        {
+            if (card == null) return;
+            var owner = card.Owner;
+            if (owner == null) return;
+            if (!_pendingPrecariousShearsPickups.TryGetValue(owner, out var pending)) return;
+
+            pending.CardsRemoved.Add(GetCardDisplayNameForStats(card));
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordPrecariousShearsCardRemovedLocked failed: {e.Message}");
+        }
+    }
+
+    private static string GetCardDisplayNameForStats(CardModel card)
+    {
+        try
+        {
+            var canonical = Canonical(card);
+            if (!string.IsNullOrWhiteSpace(canonical.Title))
+                return canonical.Title;
+
+            return FormatCardIdForDisplay(canonical.Id.ToString());
+        }
+        catch
+        {
+            try { return FormatCardIdForDisplay(card.Id.ToString()); }
+            catch { return "Unknown card"; }
         }
     }
 
@@ -7738,6 +7868,12 @@ internal sealed class PendingRegalPillowRestHeal
     public required decimal AttemptedBonusHealing { get; init; }
     public required decimal InitialCurrentHp { get; init; }
     public required decimal InitialMissingHp { get; init; }
+}
+
+internal sealed class PendingPrecariousShearsPickup
+{
+    public required decimal StartingMaxHp { get; init; }
+    public List<string> CardsRemoved { get; } = new();
 }
 
 internal sealed class PlayerPowerOwnershipShare

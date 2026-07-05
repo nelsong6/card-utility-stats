@@ -1,0 +1,55 @@
+{
+  "run_id": "precarious-shears-relic-fixture",
+  "started_at": "2026-07-05T00:00:00Z",
+  "updated_at": "2026-07-05T00:10:00Z",
+  "outcome": "in_progress",
+  "aggregates": {
+    "CARD.STRIKE_IRONCLAD#1": {
+      "plays": 2,
+      "removed": true,
+      "removed_at_floor": 6
+    },
+    "CARD.DEFEND_IRONCLAD#1": {
+      "plays": 1,
+      "removed": true,
+      "removed_at_floor": 6
+    }
+  },
+  "events": [
+    {
+      "t": "2026-07-05T00:05:00Z",
+      "type": "card_removed",
+      "card_id": "CARD.STRIKE_IRONCLAD#1",
+      "floor": 6
+    },
+    {
+      "t": "2026-07-05T00:05:01Z",
+      "type": "card_removed",
+      "card_id": "CARD.DEFEND_IRONCLAD#1",
+      "floor": 6
+    }
+  ],
+  "relic_aggregates": {
+    "RELIC.PRECARIOUS_SHEARS": {
+      "cards_removed": [
+        "Strike",
+        "Defend+"
+      ],
+      "starting_max_hp": 70,
+      "resulting_max_hp": 63
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.STRIKE_IRONCLAD": [
+      1
+    ],
+    "CARD.DEFEND_IRONCLAD": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.STRIKE_IRONCLAD": 1,
+    "CARD.DEFEND_IRONCLAD": 1
+  }
+}

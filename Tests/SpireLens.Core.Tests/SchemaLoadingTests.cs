@@ -1175,4 +1175,29 @@ public class SchemaLoadingTests
         Assert.Equal(3m, relicAgg.TotalHealingLost);
         Assert.Equal(3m, relicAgg.HealingLostReasons["full_hp"].Amount);
     }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsPrecariousShearsRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("precarious-shears-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.PRECARIOUS_SHEARS"];
+        Assert.Equal(new[] { "Strike", "Defend+" }, relicAgg.CardsRemoved);
+        Assert.Equal(70m, relicAgg.StartingMaxHp);
+        Assert.Equal(63m, relicAgg.ResultingMaxHp);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsPrecariousShearsRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("precarious-shears-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.PRECARIOUS_SHEARS"];
+        Assert.Equal(new[] { "Strike", "Defend+" }, relicAgg.CardsRemoved);
+        Assert.Equal(70m, relicAgg.StartingMaxHp);
+        Assert.Equal(63m, relicAgg.ResultingMaxHp);
+    }
 }

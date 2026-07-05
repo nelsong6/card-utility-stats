@@ -495,6 +495,13 @@ public class RelicAggregate
     // selection resolves.
     public int CardsDiscarded { get; set; }
 
+    // Cards actually removed while Precarious Shears' pickup effect resolves.
+    public List<string> CardsRemoved { get; set; } = new();
+
+    // Max HP snapshot around Precarious Shears' pickup cost.
+    public decimal? StartingMaxHp { get; set; }
+    public decimal? ResultingMaxHp { get; set; }
+
     // Total card rewards whose creation options were modified by this relic.
     // Used by Prismatic Gem.
     public int CardRewardsAffected { get; set; }
