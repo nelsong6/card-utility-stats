@@ -28,7 +28,7 @@ public static class HookAfterEnergyResetPrismaticGemPatch
             if (combatState == null || player == null) return;
             if (!player.Relics.Any(r => r is PrismaticGem)) return;
 
-            RunTracker.RecordPrismaticGemEnergyGenerated(combatState, 1);
+            RunTracker.RecordPrismaticGemEnergyGenerated(combatState, player, 1);
         }
         catch (Exception e)
         {

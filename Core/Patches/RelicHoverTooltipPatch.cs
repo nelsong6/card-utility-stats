@@ -262,6 +262,17 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is BloodSoakedRose)
+            {
+                var relicId = relicNode.Model.Id.ToString();
+                var agg = RelicAgg(relicId);
+                var curseAgg = RunTracker.GetEnthralledCurseAggregate();
+
+                var body = BuildBloodSoakedRoseBodyBBCode(agg, curseAgg);
+                StatsTooltip.Show(tree, __instance, "Blood-Soaked Rose", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is CloakClasp)
             {
                 const string relicId = "RELIC.CLOAK_CLASP";
@@ -568,14 +579,14 @@ public static class RelicHoverShowPatch
     private static string BuildHappyFlowerBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, EnergyLabel("Energy generated"), agg.EnergyGenerated.ToString(), "");
+        AppendEnergyGeneratedStats(sb, agg);
         return sb.ToString();
     }
 
     private static string BuildBoomingConchBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, EnergyLabel("Energy generated"), agg.EnergyGenerated.ToString(), "");
+        AppendEnergyGeneratedStats(sb, agg);
         Row3(sb, "Cards drawn", agg.AdditionalCardsDrawn.ToString(), "");
         return sb.ToString();
     }
@@ -584,7 +595,7 @@ public static class RelicHoverShowPatch
     {
         var sb = new StringBuilder();
         Row3(sb, "Activations", agg.Activations.ToString(), "");
-        Row3(sb, EnergyLabel("Energy generated"), agg.EnergyGenerated.ToString(), "");
+        AppendEnergyGeneratedStats(sb, agg);
         Row3(sb, "Cards drawn", agg.AdditionalCardsDrawn.ToString(), "");
         return sb.ToString();
     }
@@ -651,7 +662,7 @@ public static class RelicHoverShowPatch
     private static string BuildPrismaticGemBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, EnergyLabel("Energy generated"), agg.EnergyGenerated.ToString(), "");
+        AppendEnergyGeneratedStats(sb, agg);
         Row3(sb, "Card rewards affected", agg.CardRewardsAffected.ToString(), "");
         foreach (var category in agg.CardRewardCategories
             .Where(kvp => kvp.Value.Count > 0)
@@ -660,6 +671,24 @@ public static class RelicHoverShowPatch
         {
             Row3(sb, $"{StatsTooltip.EscapeBbcode(category.Value.DisplayName)} rewards", category.Value.Count.ToString(), "");
         }
+        return sb.ToString();
+    }
+
+    private static string BuildBloodSoakedRoseBodyBBCode(RelicAggregate agg, CardAggregate curseAgg)
+    {
+        var sb = new StringBuilder();
+        AppendEnergyGeneratedStats(
+            sb,
+            agg,
+            totalLabel: "Energy gained total",
+            includeAveragePerCombat: true);
+
+        curseAgg ??= new CardAggregate();
+        Row3(sb, "Enthralled combats", curseAgg.CombatsInDeck.ToString(), "");
+        Row3(sb, "Enthralled drawn", curseAgg.TimesDrawn.ToString(), "");
+        Row3(sb, "Enthralled discarded", curseAgg.TimesDiscarded.ToString(), "");
+        Row3(sb, "Enthralled played", curseAgg.Plays.ToString(), "");
+        Row3(sb, "Enthralled exhausted", curseAgg.TimesExhausted.ToString(), "");
         return sb.ToString();
     }
 
@@ -883,6 +912,22 @@ public static class RelicHoverShowPatch
                 : $"lost to {StatsTooltip.EscapeBbcode(reason.DisplayName)}";
             Row3(sb, label, FormatDecimal(reason.Amount), "");
         }
+    }
+
+    private static void AppendEnergyGeneratedStats(
+        StringBuilder sb,
+        RelicAggregate agg,
+        string totalLabel = "Energy generated",
+        bool includeAveragePerCombat = false,
+        string averageLabel = "Avg energy gained per combat")
+    {
+        Row3(sb, EnergyLabel(totalLabel), agg.EnergyGenerated.ToString(), "");
+        if (!includeAveragePerCombat) return;
+
+        var average = agg.Activations <= 0
+            ? 0m
+            : (decimal)agg.EnergyGenerated / agg.Activations;
+        Row3(sb, EnergyLabel(averageLabel), FormatDecimal(average), "");
     }
 
     private static string FormatDecimal(decimal value)

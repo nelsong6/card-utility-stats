@@ -42,6 +42,7 @@ namespace SpireLens.Core;
 /// </summary>
 public static class RunTracker
 {
+    private const string EnthralledDefinitionId = "CARD.ENTHRALLED";
     private const string ShivDefinitionId = "CARD.SHIV";
     private const string SovereignBladeLegacyDefinitionToken = "SOVEREIGN_BLADE";
     private const string SovereignBladeLegacyDefinitionId = "CARD.SOVEREIGN_BLADE";
@@ -75,7 +76,7 @@ public static class RunTracker
     private static readonly List<Creature> _pendingFestivePopperDamageAttributions = new();
     private static readonly List<Creature> _pendingMercuryHourglassDamageAttributions = new();
     private static readonly List<Creature> _pendingHornCleatBlockAttributions = new();
-    private static int? _lastPrismaticGemEnergyRoundNumber;
+    private static readonly Dictionary<string, int> _lastEnergyResetRoundByRelicAndPlayer = new();
     private static int _pendingWhiteBeastPotionRewards;
     private static int _pendingToolboxOfferScreens;
     private static readonly HashSet<PotionReward> _whiteBeastPotionRewards = new(ReferenceEqualityComparer.Instance);
@@ -293,24 +294,16 @@ public static class RunTracker
 
     private static CardAggregate? GetShivDeckViewAggregateLocked()
     {
-        CardAggregate? pooled = null;
+        return GetPooledEffectiveAggregateByDefinitionLocked(ShivDefinitionId);
+    }
 
-        if (_currentRun != null)
-            pooled = CardAggregatePooler.PoolByDefinition(_currentRun.Aggregates, ShivDefinitionId);
-
-        if (_pendingCombat != null)
+    public static CardAggregate GetEnthralledCurseAggregate()
+    {
+        lock (_lock)
         {
-            var pending = CardAggregatePooler.PoolByDefinition(
-                _pendingCombat.CombatAggregates,
-                ShivDefinitionId);
-            if (pending != null)
-            {
-                pooled ??= new CardAggregate();
-                CardAggregatePooler.MergeInto(pooled, pending);
-            }
+            return GetPooledEffectiveAggregateByDefinitionLocked(EnthralledDefinitionId)
+                   ?? new CardAggregate();
         }
-
-        return pooled;
     }
 
     public static bool IsSovereignBladeDeckViewCard(CardModel card)
@@ -330,6 +323,11 @@ public static class RunTracker
         var definitionId = GetSovereignBladeDefinitionIdLocked();
         if (string.IsNullOrWhiteSpace(definitionId)) return null;
 
+        return GetPooledEffectiveAggregateByDefinitionLocked(definitionId);
+    }
+
+    private static CardAggregate? GetPooledEffectiveAggregateByDefinitionLocked(string definitionId)
+    {
         CardAggregate? pooled = null;
 
         if (_currentRun != null)
@@ -862,7 +860,7 @@ public static class RunTracker
         _pendingFestivePopperDamageAttributions.Clear();
         _pendingMercuryHourglassDamageAttributions.Clear();
         _pendingHornCleatBlockAttributions.Clear();
-        _lastPrismaticGemEnergyRoundNumber = null;
+        _lastEnergyResetRoundByRelicAndPlayer.Clear();
         _pendingToolboxOfferScreens = 0;
         _pendingMakeItSoSummons.Clear();
         _pendingReplayExtraPlaySources.Clear();
@@ -2108,6 +2106,7 @@ public static class RunTracker
     private const string MercuryHourglassRelicId = "RELIC.MERCURY_HOURGLASS";
     private const string HornCleatRelicId = "RELIC.HORN_CLEAT";
     private const string PrismaticGemRelicId = "RELIC.PRISMATIC_GEM";
+    private const string BloodSoakedRoseRelicId = "RELIC.BLOOD_SOAKED_ROSE";
     private const string CloakClaspRelicId = "RELIC.CLOAK_CLASP";
     private const string ReptileTrinketRelicId = "RELIC.REPTILE_TRINKET";
     private const string GorgetRelicId = "RELIC.GORGET";
@@ -4492,26 +4491,80 @@ public static class RunTracker
     /// it, so this is tied to the actual reset hook instead of the modifier
     /// method to avoid counting UI/query calls as generated energy.
     /// </summary>
-    public static void RecordPrismaticGemEnergyGenerated(MegaCrit.Sts2.Core.Combat.ICombatState combatState, int amount)
+    public static void RecordPrismaticGemEnergyGenerated(
+        MegaCrit.Sts2.Core.Combat.ICombatState combatState,
+        Player player,
+        int amount)
     {
-        if (amount <= 0) return;
+        RecordEnergyResetRelicEnergyGenerated(
+            PrismaticGemRelicId,
+            combatState,
+            player,
+            amount,
+            countRoundOneCombat: false);
+    }
+
+    public static void RecordBloodSoakedRoseEnergyGenerated(
+        MegaCrit.Sts2.Core.Combat.ICombatState combatState,
+        Player player,
+        string? relicId,
+        int amount)
+    {
+        RecordEnergyResetRelicEnergyGenerated(
+            string.IsNullOrWhiteSpace(relicId) ? BloodSoakedRoseRelicId : relicId!,
+            combatState,
+            player,
+            amount,
+            countRoundOneCombat: true);
+    }
+
+    private static void RecordEnergyResetRelicEnergyGenerated(
+        string relicId,
+        MegaCrit.Sts2.Core.Combat.ICombatState combatState,
+        Player player,
+        int amount,
+        bool countRoundOneCombat)
+    {
+        if (amount <= 0 || combatState == null || player == null) return;
 
         lock (_lock)
         {
             try
             {
-                int roundNumber = combatState.RoundNumber;
-                if (_lastPrismaticGemEnergyRoundNumber == roundNumber) return;
-                _lastPrismaticGemEnergyRoundNumber = roundNumber;
+                if (!IsTrackedPlayer(player)) return;
 
-                var agg = GetOrCreateRelicAggregateLocked(PrismaticGemRelicId);
+                int roundNumber = combatState.RoundNumber;
+                var dedupeKey = $"{relicId}|{player.NetId}";
+                if (_lastEnergyResetRoundByRelicAndPlayer.TryGetValue(dedupeKey, out var lastRoundNumber)
+                    && lastRoundNumber == roundNumber)
+                {
+                    return;
+                }
+
+                _lastEnergyResetRoundByRelicAndPlayer[dedupeKey] = roundNumber;
+
+                var agg = GetOrCreateRelicAggregateLocked(relicId);
                 agg.EnergyGenerated += amount;
+                if (countRoundOneCombat && roundNumber == 1)
+                    agg.Activations += 1;
             }
             catch (Exception e)
             {
-                CoreMain.LogDebug($"RecordPrismaticGemEnergyGenerated failed: {e.Message}");
+                CoreMain.LogDebug($"RecordEnergyResetRelicEnergyGenerated failed: {e.Message}");
             }
         }
+    }
+
+    internal static void RecordEnergyResetRelicEnergyGeneratedForTest(
+        RelicAggregate agg,
+        int amount,
+        bool countCombat)
+    {
+        if (agg == null || amount <= 0) return;
+
+        agg.EnergyGenerated += amount;
+        if (countCombat)
+            agg.Activations += 1;
     }
 
     /// <summary>

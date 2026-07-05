@@ -1,0 +1,32 @@
+{
+  "run_id": "blood-soaked-rose-relic-fixture",
+  "started_at": "2026-07-05T00:00:00Z",
+  "updated_at": "2026-07-05T00:10:00Z",
+  "outcome": "in_progress",
+  "aggregates": {
+    "CARD.ENTHRALLED#1": {
+      "combats_in_deck": 3,
+      "plays": 1,
+      "times_drawn": 5,
+      "times_discarded": 2,
+      "times_exhausted": 1,
+      "initial_upgrade_level": 0
+    }
+  },
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.BLOOD_SOAKED_ROSE": {
+      "activations": 3,
+      "energy_generated": 9
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.ENTHRALLED": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.ENTHRALLED": 1
+  }
+}
