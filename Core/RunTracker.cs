@@ -1400,10 +1400,7 @@ public static class RunTracker
             _pendingCombat = new PendingCombat();
             ResetCombatContextState();
             RecordCombatsInDeckForCurrentDeckLocked();
-            RecordHappyFlowerCombatForTrackedPlayerLocked();
-            RecordBrilliantScarfCombatForTrackedPlayerLocked();
-            RecordMiniatureCannonCombatForTrackedPlayerLocked();
-            RecordBookmarkCombatForTrackedPlayerLocked();
+            RecordHeldCombatRelicBaselinesForTrackedPlayerLocked(requireActiveCombat: false, createPendingIfNeeded: false);
         }
     }
 
@@ -1449,6 +1446,7 @@ public static class RunTracker
     private static void PromotePendingCombatIntoRunLocked()
     {
         if (_pendingCombat == null || _currentRun == null) return;
+        RecordHeldCombatRelicBaselinesForTrackedPlayerLocked(requireActiveCombat: false, createPendingIfNeeded: false);
 
         // Surviving player block at combat end never absorbed future
         // damage, so treat any remaining ledger as wasted before
@@ -5809,6 +5807,8 @@ public static class RunTracker
     {
         lock (_lock)
         {
+            RecordHeldCombatRelicBaselinesForTrackedPlayerLocked();
+
             RelicAggregate? result = null;
 
             if (_currentRun != null && _currentRun.RelicAggregates.TryGetValue(relicId, out var committed))
@@ -5931,6 +5931,13 @@ public static class RunTracker
     }
 
     private static RelicAggregate GetOrCreateRelicAggregateLocked(string relicId)
+    {
+        _pendingCombat ??= new PendingCombat();
+        RecordHeldCombatRelicBaselinesForTrackedPlayerLocked();
+        return GetOrCreatePendingRelicAggregateLocked(relicId);
+    }
+
+    private static RelicAggregate GetOrCreatePendingRelicAggregateLocked(string relicId)
     {
         _pendingCombat ??= new PendingCombat();
         if (!_pendingCombat.RelicAggregates.TryGetValue(relicId, out var agg))
@@ -6058,13 +6065,8 @@ public static class RunTracker
     {
         if (_pendingCombat != null)
         {
-            if (!_pendingCombat.RelicAggregates.TryGetValue(relicId, out var pendingAgg))
-            {
-                pendingAgg = new RelicAggregate();
-                _pendingCombat.RelicAggregates[relicId] = pendingAgg;
-            }
-
-            return pendingAgg;
+            RecordHeldCombatRelicBaselinesForTrackedPlayerLocked();
+            return GetOrCreatePendingRelicAggregateLocked(relicId);
         }
 
         return GetOrCreateCurrentRunRelicAggregateLocked(relicId);
@@ -6298,6 +6300,33 @@ public static class RunTracker
         }
     }
 
+    private static void RecordHeldCombatRelicBaselinesForTrackedPlayerLocked(
+        bool requireActiveCombat = true,
+        bool createPendingIfNeeded = true)
+    {
+        try
+        {
+            if (requireActiveCombat && CombatManager.Instance?.IsInProgress != true) return;
+            if (_pendingCombat == null)
+            {
+                if (!createPendingIfNeeded) return;
+                _pendingCombat = new PendingCombat();
+            }
+
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+
+            RecordHappyFlowerCombatForPlayerLocked(player);
+            RecordBrilliantScarfCombatForPlayerLocked(player);
+            RecordMiniatureCannonCombatForPlayerLocked(player);
+            RecordBookmarkCombatForPlayerLocked(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordHeldCombatRelicBaselinesForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
     private static void RecordMiniatureCannonCombatForTrackedPlayerLocked()
     {
         try
@@ -6316,8 +6345,9 @@ public static class RunTracker
     {
         if (_pendingCombat == null) return;
         if (!PlayerHasMiniatureCannon(player)) return;
+        if (!_pendingCombat.MiniatureCannonCombatCountedPlayers.Add(player)) return;
 
-        var agg = GetOrCreateRelicAggregateLocked(MiniatureCannonRelicId);
+        var agg = GetOrCreatePendingRelicAggregateLocked(MiniatureCannonRelicId);
         agg.Activations += 1;
         RefreshMiniatureCannonDeckCountsIfOwnedLocked();
     }
@@ -6340,8 +6370,9 @@ public static class RunTracker
     {
         if (_pendingCombat == null) return;
         if (!PlayerHasHappyFlower(player)) return;
+        if (!_pendingCombat.HappyFlowerCombatCountedPlayers.Add(player)) return;
 
-        var agg = GetOrCreateRelicAggregateLocked(HappyFlowerRelicId);
+        var agg = GetOrCreatePendingRelicAggregateLocked(HappyFlowerRelicId);
         agg.EnergyGeneratedCombats += 1;
     }
 
@@ -6363,8 +6394,9 @@ public static class RunTracker
     {
         if (_pendingCombat == null) return;
         if (!PlayerHasBookmark(player)) return;
+        if (!_pendingCombat.BookmarkCombatCountedPlayers.Add(player)) return;
 
-        var agg = GetOrCreateRelicAggregateLocked(BookmarkRelicId);
+        var agg = GetOrCreatePendingRelicAggregateLocked(BookmarkRelicId);
         agg.BookmarkCombats += 1;
     }
 
@@ -6388,7 +6420,7 @@ public static class RunTracker
         if (!PlayerHasBrilliantScarf(player)) return;
         if (!_pendingCombat.BrilliantScarfCombatCountedPlayers.Add(player)) return;
 
-        var agg = GetOrCreateRelicAggregateLocked(BrilliantScarfRelicId);
+        var agg = GetOrCreatePendingRelicAggregateLocked(BrilliantScarfRelicId);
         agg.DiscountCombats += 1;
     }
 
@@ -9451,7 +9483,13 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, PendingBrilliantScarfDiscount> BrilliantScarfDiscountOffers { get; }
         = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> HappyFlowerCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> BrilliantScarfCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> MiniatureCannonCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> BookmarkCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> CandelabraSecondTurnExcessRecordedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
