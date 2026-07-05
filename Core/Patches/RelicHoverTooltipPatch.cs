@@ -332,6 +332,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is RegalPillow)
+            {
+                const string relicId = "RELIC.REGAL_PILLOW";
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+
+                var body = BuildRegalPillowBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Regal Pillow", "SpireLens", body);
+                return;
+            }
+
             if (IsRelicModel(relicNode.Model, "MegaCrit.Sts2.Core.Models.Relics.BloodVial"))
             {
                 const string relicId = "RELIC.BLOOD_VIAL";
@@ -684,6 +694,14 @@ public static class RelicHoverShowPatch
     {
         var sb = new StringBuilder();
         Row3(sb, "HP gained", FormatDecimal(agg.TotalHealingRestored), "");
+        return sb.ToString();
+    }
+
+    private static string BuildRegalPillowBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        AppendHealingStats(sb, agg);
         return sb.ToString();
     }
 

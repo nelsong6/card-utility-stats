@@ -97,6 +97,42 @@ public class HookPatchTargetTests
             target.GetParameters().Select(p => p.ParameterType.FullName).ToArray());
     }
 
+    [Fact]
+    [Trait("Category", "RequiresLiveGame")]
+    public void RegalPillowModifyHealPatch_ResolvesRestSiteHealModifier()
+    {
+        var target = InvokeTargetMethod(typeof(RegalPillowModifyRestSiteHealAmountPatch));
+
+        Assert.NotNull(target);
+        Assert.Equal("MegaCrit.Sts2.Core.Models.Relics.RegalPillow", target!.DeclaringType?.FullName);
+        Assert.Equal("ModifyRestSiteHealAmount", target.Name);
+        Assert.Equal(
+            new[]
+            {
+                "MegaCrit.Sts2.Core.Entities.Creatures.Creature",
+                "System.Decimal",
+            },
+            target.GetParameters().Select(p => p.ParameterType.FullName).ToArray());
+    }
+
+    [Fact]
+    [Trait("Category", "RequiresLiveGame")]
+    public void RegalPillowAfterRestHealPatch_ResolvesAfterRestSiteHeal()
+    {
+        var target = InvokeTargetMethod(typeof(RegalPillowAfterRestSiteHealPatch));
+
+        Assert.NotNull(target);
+        Assert.Equal("MegaCrit.Sts2.Core.Models.Relics.RegalPillow", target!.DeclaringType?.FullName);
+        Assert.Equal("AfterRestSiteHeal", target.Name);
+        Assert.Equal(
+            new[]
+            {
+                "MegaCrit.Sts2.Core.Entities.Players.Player",
+                "System.Boolean",
+            },
+            target.GetParameters().Select(p => p.ParameterType.FullName).ToArray());
+    }
+
     private static MethodBase? InvokeTargetMethod(Type patchType)
     {
         _ = Assembly.Load("sts2");

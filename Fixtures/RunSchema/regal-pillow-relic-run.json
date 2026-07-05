@@ -1,0 +1,36 @@
+{
+  "run_id": "regal-pillow-relic-fixture",
+  "started_at": "2026-07-05T00:00:00Z",
+  "updated_at": "2026-07-05T00:10:00Z",
+  "outcome": "in_progress",
+  "aggregates": {
+    "CARD.STRIKE_IRONCLAD#1": {
+      "plays": 2
+    }
+  },
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.REGAL_PILLOW": {
+      "activations": 2,
+      "total_healing_attempted": 12,
+      "total_healing_restored": 9,
+      "total_healing_lost": 3,
+      "healing_lost_reasons": {
+        "full_hp": {
+          "reason_id": "full_hp",
+          "display_name": "full HP",
+          "amount": 3
+        }
+      }
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.STRIKE_IRONCLAD": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.STRIKE_IRONCLAD": 1
+  }
+}

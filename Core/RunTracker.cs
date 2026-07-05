@@ -80,6 +80,7 @@ public static class RunTracker
     private static int _pendingToolboxOfferScreens;
     private static readonly HashSet<PotionReward> _whiteBeastPotionRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, PendingPaelSacrificeReward> _paelSacrificeRewards = new(ReferenceEqualityComparer.Instance);
+    private static readonly Dictionary<Player, PendingRegalPillowRestHeal> _pendingRegalPillowRestHeals = new(ReferenceEqualityComparer.Instance);
     private static bool _shivAvailableThisRun;
     private static CardModel? _shivDeckViewCard;
     private const decimal PoisonOwnershipEpsilon = 0.0001m;
@@ -880,6 +881,7 @@ public static class RunTracker
     private static void ResetRewardContextState()
     {
         _paelSacrificeRewards.Clear();
+        _pendingRegalPillowRestHeals.Clear();
     }
 
     /// <summary>
@@ -2106,6 +2108,7 @@ public static class RunTracker
     private const string BurningBloodRelicId = "RELIC.BURNING_BLOOD";
     private const string BloodVialRelicId = "RELIC.BLOOD_VIAL";
     private const string LeesWaffleRelicId = "RELIC.LEES_WAFFLE";
+    private const string RegalPillowRelicId = "RELIC.REGAL_PILLOW";
     private const string WhiteBeastStatueRelicId = "RELIC.WHITE_BEAST_STATUE";
     private const string BoundPhylacteryRelicId = "RELIC.BOUND_PHYLACTERY";
     private const string PhylacteryUnboundRelicId = "RELIC.PHYLACTERY_UNBOUND";
@@ -3231,6 +3234,62 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Remember Regal Pillow's bonus during rest-site heal amount calculation.
+    /// The game may query the modifier for UI, so stats are only committed by
+    /// <see cref="CommitRegalPillowRestHeal"/> when the actual rest heal
+    /// completes.
+    /// </summary>
+    public static void RememberRegalPillowRestHeal(Player player, decimal incomingHealAmount, decimal modifiedHealAmount)
+    {
+        if (player?.Creature == null) return;
+
+        var bonusHealing = modifiedHealAmount - incomingHealAmount;
+        if (bonusHealing <= 0m) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+
+                _pendingRegalPillowRestHeals[player] = new PendingRegalPillowRestHeal
+                {
+                    IncomingHealAmount = Math.Max(0m, incomingHealAmount),
+                    AttemptedBonusHealing = bonusHealing,
+                    InitialCurrentHp = player.Creature.CurrentHp,
+                    InitialMissingHp = Math.Max(0m, player.Creature.MaxHp - player.Creature.CurrentHp),
+                };
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RememberRegalPillowRestHeal failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void CommitRegalPillowRestHeal(Player player)
+    {
+        if (player?.Creature == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                if (!_pendingRegalPillowRestHeals.Remove(player, out var pending)) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(RegalPillowRelicId);
+                RecordRegalPillowRestHealForTest(agg, pending, player.Creature.CurrentHp);
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"CommitRegalPillowRestHeal failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Record Lee's Waffle's observed pickup HP gain. The relic first grants
     /// max HP, which itself heals, then heals to full; the full pickup delta is
     /// clearer than splitting those two game commands into separate attempts.
@@ -3318,6 +3377,58 @@ public static class RunTracker
 
         agg.Activations++;
         agg.TotalHealingRestored += hpGained;
+    }
+
+    internal static void RecordRegalPillowRestHealForTest(
+        RelicAggregate agg,
+        decimal incomingHealAmount,
+        decimal attemptedBonusHealing,
+        decimal initialCurrentHp,
+        decimal initialMissingHp,
+        decimal finalCurrentHp)
+    {
+        if (agg == null) return;
+        if (attemptedBonusHealing <= 0m) return;
+
+        RecordRegalPillowRestHealForTest(
+            agg,
+            new PendingRegalPillowRestHeal
+            {
+                IncomingHealAmount = Math.Max(0m, incomingHealAmount),
+                AttemptedBonusHealing = attemptedBonusHealing,
+                InitialCurrentHp = initialCurrentHp,
+                InitialMissingHp = Math.Max(0m, initialMissingHp),
+            },
+            finalCurrentHp);
+    }
+
+    private static void RecordRegalPillowRestHealForTest(
+        RelicAggregate agg,
+        PendingRegalPillowRestHeal pending,
+        decimal finalCurrentHp)
+    {
+        if (agg == null || pending.AttemptedBonusHealing <= 0m) return;
+
+        decimal observedTotalRestored = Math.Max(0m, finalCurrentHp - pending.InitialCurrentHp);
+        decimal baselineRestored = Math.Min(pending.InitialMissingHp, pending.IncomingHealAmount);
+        decimal bonusRestored = Math.Min(
+            pending.AttemptedBonusHealing,
+            Math.Max(0m, observedTotalRestored - baselineRestored));
+        decimal bonusLost = Math.Max(0m, pending.AttemptedBonusHealing - bonusRestored);
+
+        agg.Activations++;
+        agg.TotalHealingAttempted += pending.AttemptedBonusHealing;
+        agg.TotalHealingRestored += bonusRestored;
+        agg.TotalHealingLost += bonusLost;
+
+        decimal missingAfterBaseline = Math.Max(0m, pending.InitialMissingHp - pending.IncomingHealAmount);
+        decimal fullHpLost = Math.Min(bonusLost, Math.Max(0m, pending.AttemptedBonusHealing - missingAfterBaseline));
+        if (fullHpLost > 0m)
+            AddHealingLostReasonLocked(agg, HealingLostFullHpReasonId, "full HP", fullHpLost);
+
+        decimal otherLost = Math.Max(0m, bonusLost - fullHpLost);
+        if (otherLost > 0m)
+            AddHealingLostReasonLocked(agg, HealingLostOtherReasonId, "other/prevented", otherLost);
     }
 
     internal static void RecordStrikeDummyStrikePlayedForTest(RelicAggregate agg)
@@ -7619,6 +7730,14 @@ internal sealed class PendingRelicHealing
     public required decimal InitialMissingHp { get; init; }
     public bool PersistDirectlyToRun { get; init; }
     public decimal ActualRestored { get; set; }
+}
+
+internal sealed class PendingRegalPillowRestHeal
+{
+    public required decimal IncomingHealAmount { get; init; }
+    public required decimal AttemptedBonusHealing { get; init; }
+    public required decimal InitialCurrentHp { get; init; }
+    public required decimal InitialMissingHp { get; init; }
 }
 
 internal sealed class PlayerPowerOwnershipShare

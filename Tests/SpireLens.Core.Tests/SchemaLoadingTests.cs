@@ -1146,4 +1146,33 @@ public class SchemaLoadingTests
         Assert.Equal(4, relicAgg.Activations);
         Assert.Equal(11, relicAgg.AdditionalCardsDrawn);
     }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsRegalPillowRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("regal-pillow-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.REGAL_PILLOW"];
+        Assert.Equal(2, relicAgg.Activations);
+        Assert.Equal(12m, relicAgg.TotalHealingAttempted);
+        Assert.Equal(9m, relicAgg.TotalHealingRestored);
+        Assert.Equal(3m, relicAgg.TotalHealingLost);
+        Assert.Equal(3m, relicAgg.HealingLostReasons["full_hp"].Amount);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsRegalPillowRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("regal-pillow-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.REGAL_PILLOW"];
+        Assert.Equal(2, relicAgg.Activations);
+        Assert.Equal(12m, relicAgg.TotalHealingAttempted);
+        Assert.Equal(9m, relicAgg.TotalHealingRestored);
+        Assert.Equal(3m, relicAgg.TotalHealingLost);
+        Assert.Equal(3m, relicAgg.HealingLostReasons["full_hp"].Amount);
+    }
 }
