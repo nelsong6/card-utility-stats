@@ -1626,4 +1626,33 @@ public class SchemaLoadingTests
         Assert.Equal(10, relicAgg.MiniatureCannonUpgradedAttackPlays);
         Assert.Equal(17, relicAgg.MiniatureCannonUpgradedAttackHits);
     }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsBookmarkRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("bookmark-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.BOOKMARK"];
+        Assert.Equal(7, relicAgg.Activations);
+        Assert.Equal(4, relicAgg.BookmarkCombats);
+        Assert.Equal(2, relicAgg.BookmarkCommonActivations);
+        Assert.Equal(3, relicAgg.BookmarkUncommonActivations);
+        Assert.Equal(2, relicAgg.BookmarkRareActivations);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsBookmarkRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("bookmark-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.BOOKMARK"];
+        Assert.Equal(7, relicAgg.Activations);
+        Assert.Equal(4, relicAgg.BookmarkCombats);
+        Assert.Equal(2, relicAgg.BookmarkCommonActivations);
+        Assert.Equal(3, relicAgg.BookmarkUncommonActivations);
+        Assert.Equal(2, relicAgg.BookmarkRareActivations);
+    }
 }

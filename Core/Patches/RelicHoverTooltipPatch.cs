@@ -1064,6 +1064,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is Bookmark)
+        {
+            title = "Bookmark";
+            body = BuildBookmarkBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is BrilliantScarf)
         {
             title = "Brilliant Scarf";
@@ -1602,6 +1609,22 @@ public static class RelicHoverShowPatch
         Row3(sb, "Upgraded attack hits", agg.MiniatureCannonUpgradedAttackHits.ToString(), "");
         Row3(sb, "Avg plays per combat", FormatDecimal(averagePlays), "");
         Row3(sb, "Avg hits per combat", FormatDecimal(averageHits), "");
+        return sb.ToString();
+    }
+
+    private static string BuildBookmarkBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var averageActivations = agg.BookmarkCombats <= 0
+            ? 0m
+            : (decimal)agg.Activations / agg.BookmarkCombats;
+
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, "common activations", agg.BookmarkCommonActivations.ToString(), "");
+        Row3(sb, "uncommon activations", agg.BookmarkUncommonActivations.ToString(), "");
+        Row3(sb, "rare activations", agg.BookmarkRareActivations.ToString(), "");
+        Row3(sb, "Combats held", agg.BookmarkCombats.ToString(), "");
+        Row3(sb, "Avg activations per combat", FormatDecimal(averageActivations), "");
         return sb.ToString();
     }
 

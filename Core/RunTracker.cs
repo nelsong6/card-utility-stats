@@ -1402,6 +1402,7 @@ public static class RunTracker
             RecordCombatsInDeckForCurrentDeckLocked();
             RecordBrilliantScarfCombatForTrackedPlayerLocked();
             RecordMiniatureCannonCombatForTrackedPlayerLocked();
+            RecordBookmarkCombatForTrackedPlayerLocked();
         }
     }
 
@@ -1564,6 +1565,11 @@ public static class RunTracker
             target.MiniatureCannonUpgradedAttacksInDeck = source.MiniatureCannonUpgradedAttacksInDeck;
         target.MiniatureCannonUpgradedAttackPlays += source.MiniatureCannonUpgradedAttackPlays;
         target.MiniatureCannonUpgradedAttackHits += source.MiniatureCannonUpgradedAttackHits;
+
+        target.BookmarkCombats += source.BookmarkCombats;
+        target.BookmarkCommonActivations += source.BookmarkCommonActivations;
+        target.BookmarkUncommonActivations += source.BookmarkUncommonActivations;
+        target.BookmarkRareActivations += source.BookmarkRareActivations;
 
         target.DiscountCombats += source.DiscountCombats;
         target.DiscountsOffered += source.DiscountsOffered;
@@ -2189,6 +2195,7 @@ public static class RunTracker
     private const string PaelsWingRelicId = "RELIC.PAELS_WING";
     private const string StrikeDummyRelicId = "RELIC.STRIKE_DUMMY";
     private const string MiniatureCannonRelicId = "RELIC.MINIATURE_CANNON";
+    private const string BookmarkRelicId = "RELIC.BOOKMARK";
     private const string BrilliantScarfRelicId = "RELIC.BRILLIANT_SCARF";
     private const string JuzuBraceletRelicId = "RELIC.JUZU_BRACELET";
     private const string HeftyTabletRelicId = "RELIC.HEFTY_TABLET";
@@ -4177,6 +4184,43 @@ public static class RunTracker
         }
     }
 
+    public static void RecordBookmarkActivations(IEnumerable<CardRarity> rarities)
+    {
+        if (rarities == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(BookmarkRelicId);
+                foreach (var rarity in rarities)
+                    RecordBookmarkActivation(agg, rarity);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordBookmarkActivations failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void RecordBookmarkActivation(RelicAggregate agg, CardRarity rarity)
+    {
+        agg.Activations += 1;
+
+        switch (rarity)
+        {
+            case CardRarity.Common:
+                agg.BookmarkCommonActivations += 1;
+                break;
+            case CardRarity.Uncommon:
+                agg.BookmarkUncommonActivations += 1;
+                break;
+            case CardRarity.Rare:
+                agg.BookmarkRareActivations += 1;
+                break;
+        }
+    }
+
     internal static void RecordLeesWafflePickupHpGainedForTest(RelicAggregate agg, decimal hpGained)
     {
         if (agg == null || hpGained < 0m) return;
@@ -4346,6 +4390,18 @@ public static class RunTracker
     {
         if (agg == null) return;
         agg.MiniatureCannonUpgradedAttacksInDeck = Math.Max(0, upgradedAttacksInDeck);
+    }
+
+    internal static void RecordBookmarkCombatForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.BookmarkCombats += Math.Max(0, count);
+    }
+
+    internal static void RecordBookmarkActivationForTest(RelicAggregate agg, CardRarity rarity)
+    {
+        if (agg == null) return;
+        RecordBookmarkActivation(agg, rarity);
     }
 
     internal static void RecordShovelRelicAcquiredForTest(RelicAggregate agg, RelicRarity rarity)
@@ -6257,6 +6313,29 @@ public static class RunTracker
         RefreshMiniatureCannonDeckCountsIfOwnedLocked();
     }
 
+    private static void RecordBookmarkCombatForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordBookmarkCombatForPlayerLocked(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordBookmarkCombatForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordBookmarkCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasBookmark(player)) return;
+
+        var agg = GetOrCreateRelicAggregateLocked(BookmarkRelicId);
+        agg.BookmarkCombats += 1;
+    }
+
     private static void RecordBrilliantScarfCombatForTrackedPlayerLocked()
     {
         try
@@ -6286,6 +6365,18 @@ public static class RunTracker
         try
         {
             return player.Relics.Any(r => r is BrilliantScarf);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool PlayerHasBookmark(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is Bookmark);
         }
         catch
         {

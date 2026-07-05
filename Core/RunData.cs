@@ -516,6 +516,13 @@ public class RelicAggregate
     public int MiniatureCannonUpgradedAttackPlays { get; set; }
     public int MiniatureCannonUpgradedAttackHits { get; set; }
 
+    // Bookmark tracking. Activations is total cost-reduction activations;
+    // BookmarkCombats is the denominator for average activations per combat.
+    public int BookmarkCombats { get; set; }
+    public int BookmarkCommonActivations { get; set; }
+    public int BookmarkUncommonActivations { get; set; }
+    public int BookmarkRareActivations { get; set; }
+
     // Cost-discount tracking. Used by Brilliant Scarf.
     public int DiscountCombats { get; set; }
     public int DiscountsOffered { get; set; }
