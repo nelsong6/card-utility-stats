@@ -117,6 +117,8 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `precarious-shears-relic-run.json`
   Adds Precarious Shears pickup tracking: removed card names plus max HP before
   and after the relic's max-HP cost.
+- `sand-castle-relic-run.json`
+  Adds Sand Castle pickup tracking: the actual cards upgraded by the relic.
 
 Why these exist:
 

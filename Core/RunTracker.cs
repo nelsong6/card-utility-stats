@@ -82,6 +82,7 @@ public static class RunTracker
     private static readonly Dictionary<CardReward, PendingPaelSacrificeReward> _paelSacrificeRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<Player, PendingRegalPillowRestHeal> _pendingRegalPillowRestHeals = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<Player, PendingPrecariousShearsPickup> _pendingPrecariousShearsPickups = new(ReferenceEqualityComparer.Instance);
+    private static readonly Dictionary<Player, PendingSandCastlePickup> _pendingSandCastlePickups = new(ReferenceEqualityComparer.Instance);
     private static bool _shivAvailableThisRun;
     private static CardModel? _shivDeckViewCard;
     private const decimal PoisonOwnershipEpsilon = 0.0001m;
@@ -884,6 +885,7 @@ public static class RunTracker
         _paelSacrificeRewards.Clear();
         _pendingRegalPillowRestHeals.Clear();
         _pendingPrecariousShearsPickups.Clear();
+        _pendingSandCastlePickups.Clear();
     }
 
     /// <summary>
@@ -1488,6 +1490,7 @@ public static class RunTracker
         target.StrengthAdded += source.StrengthAdded;
         target.PlatingAdded += source.PlatingAdded;
         target.CardsUpgraded += source.CardsUpgraded;
+        MergeUpgradedCardsInto(target, source);
         target.BoneFluteTriggers += source.BoneFluteTriggers;
         target.TotalOstyHpSummoned += source.TotalOstyHpSummoned;
         target.TotalHealingAttempted += source.TotalHealingAttempted;
@@ -2124,6 +2127,7 @@ public static class RunTracker
     private const string GamblingChipRelicId = "RELIC.GAMBLING_CHIP";
     private const string CentennialPuzzleRelicId = "RELIC.CENTENNIAL_PUZZLE";
     private const string PrecariousShearsRelicId = "RELIC.PRECARIOUS_SHEARS";
+    private const string SandCastleRelicId = "RELIC.SAND_CASTLE";
 
     /// <summary>
     /// Record a Bag of Marbles combat-start Vulnerable application.
@@ -3355,6 +3359,57 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Arm Sand Castle pickup attribution. Actual upgraded cards are observed
+    /// from <see cref="RecordUpgrade"/> while the pickup task resolves.
+    /// </summary>
+    public static bool BeginSandCastlePickup(RelicModel relic, out Player? player)
+    {
+        player = null;
+        if (relic?.Owner == null) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic)) return false;
+                if (!IsTrackedPlayer(relic.Owner)) return false;
+
+                player = relic.Owner;
+                _pendingSandCastlePickups[player] = new PendingSandCastlePickup();
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"BeginSandCastlePickup failed: {e.Message}");
+                player = null;
+                return false;
+            }
+        }
+    }
+
+    public static void CompleteSandCastlePickup(Player? player, bool succeeded)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_pendingSandCastlePickups.Remove(player, out var pending)) return;
+                if (!succeeded) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(SandCastleRelicId);
+                RecordSandCastleUpgradesForTest(agg, pending.UpgradedCards);
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"CompleteSandCastlePickup failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Record Lee's Waffle's observed pickup HP gain. The relic first grants
     /// max HP, which itself heals, then heals to full; the full pickup delta is
     /// clearer than splitting those two game commands into separate attempts.
@@ -3516,6 +3571,29 @@ public static class RunTracker
 
         agg.StartingMaxHp = Math.Max(0m, startingMaxHp);
         agg.ResultingMaxHp = Math.Max(0m, resultingMaxHp);
+    }
+
+    internal static void RecordSandCastleUpgradesForTest(
+        RelicAggregate agg,
+        IEnumerable<string>? upgradedCards)
+    {
+        if (agg == null) return;
+
+        agg.UpgradedCards ??= new List<string>();
+        var added = 0;
+        if (upgradedCards != null)
+        {
+            foreach (var card in upgradedCards)
+            {
+                if (!string.IsNullOrWhiteSpace(card))
+                {
+                    agg.UpgradedCards.Add(card);
+                    added++;
+                }
+            }
+        }
+
+        agg.CardsUpgraded += added;
     }
 
     internal static void RecordStrikeDummyStrikePlayedForTest(RelicAggregate agg)
@@ -4987,6 +5065,14 @@ public static class RunTracker
         target.CardsRemoved.AddRange(source.CardsRemoved.Where(card => !string.IsNullOrWhiteSpace(card)));
     }
 
+    private static void MergeUpgradedCardsInto(RelicAggregate target, RelicAggregate source)
+    {
+        if (source.UpgradedCards == null || source.UpgradedCards.Count == 0) return;
+
+        target.UpgradedCards ??= new List<string>();
+        target.UpgradedCards.AddRange(source.UpgradedCards.Where(card => !string.IsNullOrWhiteSpace(card)));
+    }
+
     private static void MergeCardRewardCategories(
         Dictionary<string, CardRewardCategoryAggregate> target,
         Dictionary<string, CardRewardCategoryAggregate>? source)
@@ -5204,6 +5290,8 @@ public static class RunTracker
     {
         lock (_lock)
         {
+            RecordSandCastleCardUpgradedLocked(card);
+
             // Non-assigning: skip upgrades on cards we haven't seen enter
             // the deck. This is what fixes the "starters begin at #5" bug
             // — the game fires UpgradeInternal on template/preview cards
@@ -5270,6 +5358,23 @@ public static class RunTracker
             // OUTSIDE combat. Without saving here, the upgrade event lives
             // only in memory and is lost on F5 before the next CombatEnded.
             SaveCurrentRun();
+        }
+    }
+
+    private static void RecordSandCastleCardUpgradedLocked(CardModel card)
+    {
+        try
+        {
+            if (card == null) return;
+            var owner = card.Owner;
+            if (owner == null) return;
+            if (!_pendingSandCastlePickups.TryGetValue(owner, out var pending)) return;
+
+            pending.UpgradedCards.Add(GetCardDisplayNameForStats(card));
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordSandCastleCardUpgradedLocked failed: {e.Message}");
         }
     }
 
@@ -7874,6 +7979,11 @@ internal sealed class PendingPrecariousShearsPickup
 {
     public required decimal StartingMaxHp { get; init; }
     public List<string> CardsRemoved { get; } = new();
+}
+
+internal sealed class PendingSandCastlePickup
+{
+    public List<string> UpgradedCards { get; } = new();
 }
 
 internal sealed class PlayerPowerOwnershipShare

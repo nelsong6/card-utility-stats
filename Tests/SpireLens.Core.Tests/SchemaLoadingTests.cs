@@ -1200,4 +1200,27 @@ public class SchemaLoadingTests
         Assert.Equal(70m, relicAgg.StartingMaxHp);
         Assert.Equal(63m, relicAgg.ResultingMaxHp);
     }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsSandCastleRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("sand-castle-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.SAND_CASTLE"];
+        Assert.Equal(2, relicAgg.CardsUpgraded);
+        Assert.Equal(new[] { "Strike+", "Defend+" }, relicAgg.UpgradedCards);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsSandCastleRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("sand-castle-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.SAND_CASTLE"];
+        Assert.Equal(2, relicAgg.CardsUpgraded);
+        Assert.Equal(new[] { "Strike+", "Defend+" }, relicAgg.UpgradedCards);
+    }
 }

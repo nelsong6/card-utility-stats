@@ -401,6 +401,7 @@ public class RelicAggregate
 
     // Total cards this relic upgraded. Used by Stone Cracker.
     public int CardsUpgraded { get; set; }
+    public List<string> UpgradedCards { get; set; } = new();
 
     // Total times Bone Flute triggered from an owned Osty attack.
     public int BoneFluteTriggers { get; set; }
