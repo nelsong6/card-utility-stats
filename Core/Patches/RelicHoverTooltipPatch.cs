@@ -859,6 +859,7 @@ public static class RelicHoverShowPatch
         var averageDiscarded = agg.Activations <= 0
             ? 0m
             : (decimal)agg.CardsDiscarded / agg.Activations;
+        Row3(sb, "Combats held", agg.Activations.ToString(), "");
         Row3(sb, "Cards discarded", agg.CardsDiscarded.ToString(), "");
         Row3(sb, "Avg discarded per combat", FormatDecimal(averageDiscarded), "");
         return sb.ToString();

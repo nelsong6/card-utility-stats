@@ -75,6 +75,8 @@ public class GamblingChipStatsTests
             CardsDiscarded = 7,
         });
 
+        Assert.Contains("Combats held", body);
+        Assert.Contains("[b]3[/b]", body);
         Assert.Contains("Cards discarded", body);
         Assert.Contains("Avg discarded per combat", body);
         Assert.Contains("[b]7[/b]", body);
@@ -86,6 +88,7 @@ public class GamblingChipStatsTests
     {
         var body = BuildBody(new RelicAggregate());
 
+        Assert.Contains("Combats held", body);
         Assert.Contains("Cards discarded", body);
         Assert.Contains("Avg discarded per combat", body);
         Assert.Contains("[b]0[/b]", body);
