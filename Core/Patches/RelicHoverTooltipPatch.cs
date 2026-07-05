@@ -313,6 +313,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is Whetstone)
+            {
+                const string relicId = "RELIC.WHETSTONE";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildWhetstoneBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Whetstone", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is SandCastle)
             {
                 const string relicId = "RELIC.SAND_CASTLE";
@@ -736,6 +746,19 @@ public static class RelicHoverShowPatch
     private static string BuildSandCastleBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
+        AppendUpgradedCardStats(sb, agg);
+        return sb.ToString();
+    }
+
+    private static string BuildWhetstoneBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        AppendUpgradedCardStats(sb, agg);
+        return sb.ToString();
+    }
+
+    private static void AppendUpgradedCardStats(StringBuilder sb, RelicAggregate agg)
+    {
         var upgradedCards = (agg.UpgradedCards ?? new System.Collections.Generic.List<string>())
             .Where(card => !string.IsNullOrWhiteSpace(card))
             .ToList();
@@ -743,8 +766,6 @@ public static class RelicHoverShowPatch
         Row3(sb, "Cards upgraded", agg.CardsUpgraded.ToString(), "");
         foreach (var card in upgradedCards)
             Row3(sb, "Upgraded card", StatsTooltip.EscapeBbcode(card), "");
-
-        return sb.ToString();
     }
 
     private static string BuildMealTicketBodyBBCode(RelicAggregate agg)

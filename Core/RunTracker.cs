@@ -84,6 +84,7 @@ public static class RunTracker
     private static readonly Dictionary<Player, PendingRegalPillowRestHeal> _pendingRegalPillowRestHeals = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<Player, PendingPrecariousShearsPickup> _pendingPrecariousShearsPickups = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<Player, PendingSandCastlePickup> _pendingSandCastlePickups = new(ReferenceEqualityComparer.Instance);
+    private static readonly Dictionary<Player, PendingWhetstonePickup> _pendingWhetstonePickups = new(ReferenceEqualityComparer.Instance);
     private static bool _shivAvailableThisRun;
     private static CardModel? _shivDeckViewCard;
     private const decimal PoisonOwnershipEpsilon = 0.0001m;
@@ -884,6 +885,7 @@ public static class RunTracker
         _pendingRegalPillowRestHeals.Clear();
         _pendingPrecariousShearsPickups.Clear();
         _pendingSandCastlePickups.Clear();
+        _pendingWhetstonePickups.Clear();
     }
 
     /// <summary>
@@ -2111,6 +2113,7 @@ public static class RunTracker
     private const string ReptileTrinketRelicId = "RELIC.REPTILE_TRINKET";
     private const string GorgetRelicId = "RELIC.GORGET";
     private const string StoneCrackerRelicId = "RELIC.STONE_CRACKER";
+    private const string WhetstoneRelicId = "RELIC.WHETSTONE";
     private const string MealTicketRelicId = "RELIC.MEAL_TICKET";
     private const string BurningBloodRelicId = "RELIC.BURNING_BLOOD";
     private const string BloodVialRelicId = "RELIC.BLOOD_VIAL";
@@ -3420,6 +3423,57 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Arm Whetstone pickup attribution. Actual upgraded cards are observed
+    /// from <see cref="RecordUpgrade"/> while the pickup task resolves.
+    /// </summary>
+    public static bool BeginWhetstonePickup(RelicModel relic, out Player? player)
+    {
+        player = null;
+        if (relic?.Owner == null) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic)) return false;
+                if (!IsTrackedPlayer(relic.Owner)) return false;
+
+                player = relic.Owner;
+                _pendingWhetstonePickups[player] = new PendingWhetstonePickup();
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"BeginWhetstonePickup failed: {e.Message}");
+                player = null;
+                return false;
+            }
+        }
+    }
+
+    public static void CompleteWhetstonePickup(Player? player, bool succeeded)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_pendingWhetstonePickups.Remove(player, out var pending)) return;
+                if (!succeeded) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(WhetstoneRelicId);
+                RecordWhetstoneUpgradesForTest(agg, pending.UpgradedCards);
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"CompleteWhetstonePickup failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Record Lee's Waffle's observed pickup HP gain. The relic first grants
     /// max HP, which itself heals, then heals to full; the full pickup delta is
     /// clearer than splitting those two game commands into separate attempts.
@@ -3584,6 +3638,16 @@ public static class RunTracker
     }
 
     internal static void RecordSandCastleUpgradesForTest(
+        RelicAggregate agg,
+        IEnumerable<string>? upgradedCards)
+        => RecordRelicUpgradedCards(agg, upgradedCards);
+
+    internal static void RecordWhetstoneUpgradesForTest(
+        RelicAggregate agg,
+        IEnumerable<string>? upgradedCards)
+        => RecordRelicUpgradedCards(agg, upgradedCards);
+
+    private static void RecordRelicUpgradedCards(
         RelicAggregate agg,
         IEnumerable<string>? upgradedCards)
     {
@@ -5355,6 +5419,7 @@ public static class RunTracker
         lock (_lock)
         {
             RecordSandCastleCardUpgradedLocked(card);
+            RecordWhetstoneCardUpgradedLocked(card);
 
             // Non-assigning: skip upgrades on cards we haven't seen enter
             // the deck. This is what fixes the "starters begin at #5" bug
@@ -5439,6 +5504,23 @@ public static class RunTracker
         catch (Exception e)
         {
             CoreMain.LogDebug($"RecordSandCastleCardUpgradedLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordWhetstoneCardUpgradedLocked(CardModel card)
+    {
+        try
+        {
+            if (card == null) return;
+            var owner = card.Owner;
+            if (owner == null) return;
+            if (!_pendingWhetstonePickups.TryGetValue(owner, out var pending)) return;
+
+            pending.UpgradedCards.Add(GetCardDisplayNameForStats(card));
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordWhetstoneCardUpgradedLocked failed: {e.Message}");
         }
     }
 
@@ -8046,6 +8128,11 @@ internal sealed class PendingPrecariousShearsPickup
 }
 
 internal sealed class PendingSandCastlePickup
+{
+    public List<string> UpgradedCards { get; } = new();
+}
+
+internal sealed class PendingWhetstonePickup
 {
     public List<string> UpgradedCards { get; } = new();
 }

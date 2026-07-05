@@ -1,0 +1,52 @@
+{
+  "run_id": "whetstone-relic-fixture",
+  "started_at": "2026-07-05T00:00:00Z",
+  "updated_at": "2026-07-05T00:10:00Z",
+  "outcome": "in_progress",
+  "aggregates": {
+    "CARD.STRIKE_IRONCLAD#1": {
+      "initial_upgrade_level": 0
+    },
+    "CARD.POMMEL_STRIKE#1": {
+      "initial_upgrade_level": 0
+    }
+  },
+  "events": [
+    {
+      "t": "2026-07-05T00:05:00Z",
+      "type": "card_upgraded",
+      "card_id": "CARD.STRIKE_IRONCLAD#1",
+      "floor": 6,
+      "upgrade_level": 1
+    },
+    {
+      "t": "2026-07-05T00:05:01Z",
+      "type": "card_upgraded",
+      "card_id": "CARD.POMMEL_STRIKE#1",
+      "floor": 6,
+      "upgrade_level": 1
+    }
+  ],
+  "relic_aggregates": {
+    "RELIC.WHETSTONE": {
+      "cards_upgraded": 2,
+      "upgraded_cards": [
+        "Strike+",
+        "Pommel Strike+"
+      ]
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.STRIKE_IRONCLAD": [
+      1
+    ],
+    "CARD.POMMEL_STRIKE": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.STRIKE_IRONCLAD": 1,
+    "CARD.POMMEL_STRIKE": 1
+  }
+}

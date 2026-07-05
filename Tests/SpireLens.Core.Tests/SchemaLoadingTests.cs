@@ -1225,6 +1225,29 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsWhetstoneRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("whetstone-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.WHETSTONE"];
+        Assert.Equal(2, relicAgg.CardsUpgraded);
+        Assert.Equal(new[] { "Strike+", "Pommel Strike+" }, relicAgg.UpgradedCards);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsWhetstoneRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("whetstone-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.WHETSTONE"];
+        Assert.Equal(2, relicAgg.CardsUpgraded);
+        Assert.Equal(new[] { "Strike+", "Pommel Strike+" }, relicAgg.UpgradedCards);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsBloodSoakedRoseRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("blood-soaked-rose-relic-run.json"));

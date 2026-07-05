@@ -399,7 +399,8 @@ public class RelicAggregate
     // Total Plating this relic added. Used by Gorget.
     public decimal PlatingAdded { get; set; }
 
-    // Total cards this relic upgraded. Used by Stone Cracker.
+    // Total cards this relic upgraded. Used by Stone Cracker, Sand Castle,
+    // Whetstone, and other upgrade-granting relics.
     public int CardsUpgraded { get; set; }
     public List<string> UpgradedCards { get; set; } = new();
 
