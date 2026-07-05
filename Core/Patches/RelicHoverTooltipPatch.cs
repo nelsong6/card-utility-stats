@@ -795,8 +795,15 @@ public static class RelicHoverShowPatch
 
     private static bool IsRelicModel(object model, string typeName)
     {
-        var type = AccessTools.TypeByName(typeName);
-        return type != null && type.IsInstanceOfType(model);
+        for (var type = model.GetType(); type != null; type = type.BaseType)
+        {
+            if (string.Equals(type.FullName, typeName, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool IsAnchorStatsRelicModel(object model)
