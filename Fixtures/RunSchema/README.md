@@ -100,6 +100,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `bronze-scales-relic-run.json`
   Adds Bronze Scales Thorns damage tracking with observed damage, blocked
   damage, overkill, kills, and target count.
+- `candelabra-relic-run.json`
+  Adds Candelabra activation tracking, observed energy generated, and count of
+  second player turns that ended with excess energy while it was held.
 - `paels-wing-sacrifice-relic-run.json`
   Adds Pael's Wing sacrifice tracking: consumed card reward options split by
   common, uncommon, and rare, plus sacrifices made and skipped.

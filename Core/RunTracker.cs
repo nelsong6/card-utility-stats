@@ -1510,6 +1510,7 @@ public static class RunTracker
         target.DoomDeathTriggers += source.DoomDeathTriggers;
         target.DoomKills += source.DoomKills;
         target.EnergyGenerated += source.EnergyGenerated;
+        target.SecondTurnsEndedWithExcessEnergy += source.SecondTurnsEndedWithExcessEnergy;
         target.VigorGained += source.VigorGained;
         target.TotalDamageAttempted += source.TotalDamageAttempted;
         target.TotalDamageDealt += source.TotalDamageDealt;
@@ -2131,6 +2132,7 @@ public static class RunTracker
     private const string HappyFlowerRelicId = "RELIC.HAPPY_FLOWER";
     private const string BoomingConchRelicId = "RELIC.BOOMING_CONCH";
     private const string GremlinHornRelicId = "RELIC.GREMLIN_HORN";
+    private const string CandelabraRelicId = "RELIC.CANDELABRA";
     private const string PendulumRelicId = "RELIC.PENDULUM";
     private const string ParryingShieldRelicId = "RELIC.PARRYING_SHIELD";
     private const string FestivePopperRelicId = "RELIC.FESTIVE_POPPER";
@@ -4198,6 +4200,83 @@ public static class RunTracker
     /// </summary>
     public static void DisarmHappyFlowerEnergyAttribution()
     {
+    }
+
+    /// <summary>
+    /// Record Candelabra's owner-specific turn-2 activation and arm observed
+    /// energy attribution for its immediate gain.
+    /// </summary>
+    public static void RecordCandelabraActivationAndArmEnergyAttribution(Player? owner)
+    {
+        if (owner == null || !IsTrackedPlayer(owner)) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                _pendingCombat ??= new PendingCombat();
+                var agg = GetOrCreateRelicAggregateLocked(CandelabraRelicId);
+                agg.Activations += 1;
+                _pendingCombat.Windows.Arm(
+                    CandelabraRelicId,
+                    AttributionEventKind.PlayerEnergyGain,
+                    CurrentHistoryCountLocked(),
+                    ownerId: owner,
+                    maxHistoryAdvance: 0);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordCandelabraActivationAndArmEnergyAttribution failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Count player turn 2 ending with unspent energy while Candelabra is held.
+    /// Called from the global before-turn-end hook so the energy pool has not
+    /// been cleared yet.
+    /// </summary>
+    public static void RecordCandelabraSecondTurnEndedWithExcessEnergy(IEnumerable<Creature>? participants)
+    {
+        if (participants == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                foreach (var creature in participants)
+                {
+                    var player = creature?.Player;
+                    if (player == null || !IsTrackedPlayer(player)) continue;
+                    var combatState = player.PlayerCombatState;
+                    if (combatState == null || combatState.TurnNumber != 2) continue;
+                    if (combatState.Energy <= 0) continue;
+                    if (!PlayerHasCandelabra(player)) continue;
+
+                    _pendingCombat ??= new PendingCombat();
+                    if (!_pendingCombat.CandelabraSecondTurnExcessRecordedPlayers.Add(player)) continue;
+
+                    var agg = GetOrCreateRelicAggregateLocked(CandelabraRelicId);
+                    agg.SecondTurnsEndedWithExcessEnergy += 1;
+                }
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordCandelabraSecondTurnEndedWithExcessEnergy failed: {e.Message}");
+            }
+        }
+    }
+
+    private static bool PlayerHasCandelabra(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is Candelabra);
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     /// <summary>
@@ -8598,6 +8677,8 @@ internal class PendingCombat
     public Dictionary<Player, PendingBrilliantScarfDiscount> BrilliantScarfDiscountOffers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> BrilliantScarfCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> CandelabraSecondTurnExcessRecordedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> GamblingChipDiscardAttributionPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

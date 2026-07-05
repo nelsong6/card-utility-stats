@@ -24,6 +24,7 @@ public static class RelicHoverShowPatch
     private const string StarIconPath = "res://images/packed/sprite_fonts/star_icon.png";
     private const string VigorIconPath = "res://images/atlases/power_atlas.sprites/vigor_power.tres";
     private const int InlineIconSize = 16;
+    private const int MaxTableLabelVisibleChars = 28;
 
     [HarmonyPostfix]
     public static void Postfix(NRelicInventoryHolder __instance)
@@ -171,6 +172,16 @@ public static class RelicHoverShowPatch
 
                 var body = BuildHappyFlowerBodyBBCode(agg);
                 StatsTooltip.Show(tree, __instance, "Happy Flower", "SpireLens", body);
+                return;
+            }
+
+            if (relicNode.Model is Candelabra)
+            {
+                const string relicId = "RELIC.CANDELABRA";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildCandelabraBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Candelabra", "SpireLens", body);
                 return;
             }
 
@@ -663,6 +674,14 @@ public static class RelicHoverShowPatch
     {
         var sb = new StringBuilder();
         AppendEnergyGeneratedStats(sb, agg);
+        return sb.ToString();
+    }
+
+    private static string BuildCandelabraBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, "2nd turns ended with excess energy", agg.SecondTurnsEndedWithExcessEnergy.ToString(), "");
         return sb.ToString();
     }
 
@@ -1208,11 +1227,54 @@ public static class RelicHoverShowPatch
 
     private static void Row3(StringBuilder sb, string label, string value, string pct)
     {
+        if (VisibleTextLength(label) > MaxTableLabelVisibleChars)
+        {
+            RowFlow(sb, label, value, pct);
+            return;
+        }
+
         sb.Append("[table=3]");
         sb.Append($"[cell expand=4 padding=0,0,12,0][color=#e0e0e0]{label}[/color][/cell]");
         sb.Append($"[cell expand=1 padding=0,0,12,0][right][b]{value}[/b][/right][/cell]");
         sb.Append($"[cell expand=1 padding=0,0,4,0][right][color=#b5b5b5]{pct}[/color][/right][/cell]");
         sb.Append("[/table]\n");
+    }
+
+    private static void RowFlow(StringBuilder sb, string label, string value, string pct)
+    {
+        sb.Append($"[color=#e0e0e0]{label}[/color]");
+        if (!string.IsNullOrEmpty(value))
+        {
+            sb.Append($"  [b]{value}[/b]");
+        }
+        if (!string.IsNullOrEmpty(pct))
+        {
+            sb.Append($"  [color=#b5b5b5]{pct}[/color]");
+        }
+        sb.Append('\n');
+    }
+
+    private static int VisibleTextLength(string bbcode)
+    {
+        var count = 0;
+        var inTag = false;
+        foreach (var c in bbcode)
+        {
+            if (c == '[')
+            {
+                inTag = true;
+                continue;
+            }
+            if (inTag)
+            {
+                if (c == ']') inTag = false;
+                continue;
+            }
+
+            count += 1;
+        }
+
+        return count;
     }
 }
 

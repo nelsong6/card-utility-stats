@@ -1,0 +1,37 @@
+{
+  "run_id": "candelabra-relic-fixture",
+  "started_at": "2026-07-04T00:00:00Z",
+  "updated_at": "2026-07-04T00:10:00Z",
+  "outcome": "in_progress",
+  "aggregates": {
+    "CARD.STRIKE_IRONCLAD#1": {
+      "plays": 2,
+      "total_energy_spent": 2
+    },
+    "CARD.DEFEND_IRONCLAD#1": {
+      "plays": 1,
+      "total_energy_spent": 1
+    }
+  },
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.CANDELABRA": {
+      "activations": 4,
+      "energy_generated": 8,
+      "second_turns_ended_with_excess_energy": 2
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.STRIKE_IRONCLAD": [
+      1
+    ],
+    "CARD.DEFEND_IRONCLAD": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.STRIKE_IRONCLAD": 1,
+    "CARD.DEFEND_IRONCLAD": 1
+  }
+}

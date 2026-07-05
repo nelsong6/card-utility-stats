@@ -1078,6 +1078,31 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsCandelabraRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("candelabra-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.CANDELABRA"];
+        Assert.Equal(4, relicAgg.Activations);
+        Assert.Equal(8, relicAgg.EnergyGenerated);
+        Assert.Equal(2, relicAgg.SecondTurnsEndedWithExcessEnergy);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsCandelabraRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("candelabra-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.CANDELABRA"];
+        Assert.Equal(4, relicAgg.Activations);
+        Assert.Equal(8, relicAgg.EnergyGenerated);
+        Assert.Equal(2, relicAgg.SecondTurnsEndedWithExcessEnergy);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsPaelsWingSacrificeRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("paels-wing-sacrifice-relic-run.json"));
