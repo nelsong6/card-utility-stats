@@ -1,7 +1,9 @@
 using System;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using MegaCrit.Sts2.Core.Models.Relics;
 using SpireLens.Core;
 using SpireLens.Core.Patches;
 using Xunit;
@@ -15,6 +17,10 @@ public class StrikeDummyStatsTests
     private static readonly MethodInfo BuildStrikeDummyBodyMethod =
         typeof(RelicHoverShowPatch).GetMethod("BuildStrikeDummyBodyBBCode", BindingFlags.NonPublic | BindingFlags.Static)
         ?? throw new InvalidOperationException("BuildStrikeDummyBodyBBCode not found.");
+
+    private static readonly MethodInfo IsStrikeDummyStatsRelicModelMethod =
+        typeof(RelicHoverShowPatch).GetMethod("IsStrikeDummyStatsRelicModel", BindingFlags.NonPublic | BindingFlags.Static)
+        ?? throw new InvalidOperationException("IsStrikeDummyStatsRelicModel not found.");
 
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
@@ -74,6 +80,26 @@ public class StrikeDummyStatsTests
     }
 
     [Fact]
+    public void RunTracker_StrikeDummyStatsRelic_IncludesFakeStrikeDummy()
+    {
+        Assert.True(RunTracker.IsStrikeDummyStatsRelic(Uninitialized<StrikeDummy>()));
+        Assert.True(RunTracker.IsStrikeDummyStatsRelic(Uninitialized<FakeStrikeDummy>()));
+        Assert.False(RunTracker.IsStrikeDummyStatsRelic(null));
+    }
+
+    [Fact]
+    public void RelicTooltip_StrikeDummyModelRecognition_IncludesFakeStrikeDummy()
+    {
+        var real = (bool)(IsStrikeDummyStatsRelicModelMethod.Invoke(null, new object[] { Uninitialized<StrikeDummy>() })
+            ?? throw new InvalidOperationException("IsStrikeDummyStatsRelicModel returned null."));
+        var fake = (bool)(IsStrikeDummyStatsRelicModelMethod.Invoke(null, new object[] { Uninitialized<FakeStrikeDummy>() })
+            ?? throw new InvalidOperationException("IsStrikeDummyStatsRelicModel returned null."));
+
+        Assert.True(real);
+        Assert.True(fake);
+    }
+
+    [Fact]
     public void RelicTooltip_StrikeDummy_ShowsPlayAndDeckRows()
     {
         var agg = new RelicAggregate
@@ -92,5 +118,10 @@ public class StrikeDummyStatsTests
         Assert.Contains("[b]8[/b]", body);
         Assert.Contains("[b]4[/b]", body);
         Assert.Contains("[b]3[/b]", body);
+    }
+
+    private static T Uninitialized<T>() where T : class
+    {
+        return (T)RuntimeHelpers.GetUninitializedObject(typeof(T));
     }
 }

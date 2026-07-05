@@ -18,6 +18,9 @@ Treat SpireLens work as branch-based, pushed, live-validated development. Do not
    - Pull fast-forward only.
    - If main cannot be updated cleanly, stop and report the blocker.
 3. Branch from fresh `main`, using the `codex/` prefix unless the user asks otherwise.
+   - Do this when starting a new dev-work session, or after the current feature branch has been PR'd/merged and work is continuing.
+   - During an ongoing user session, expect the user may provide many related fixes in sequence. Keep stacking follow-up commits on the current live feature branch unless the user explicitly asks for a separate branch.
+   - Do not switch back to `main` or create sibling branches mid-session just because the user gives another issue. If the current branch feels unrelated to the new request, say so and ask before splitting.
    - Prefer a worktree for substantial work or anything likely to overlap with existing dirty state.
    - If staying in the current worktree, inspect dirty files and do not disturb unrelated user changes.
 

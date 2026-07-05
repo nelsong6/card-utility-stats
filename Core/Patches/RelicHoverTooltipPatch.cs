@@ -101,13 +101,14 @@ public static class RelicHoverShowPatch
                 return;
             }
 
-            if (IsRelicModel(relicNode.Model, "MegaCrit.Sts2.Core.Models.Relics.Anchor"))
+            if (IsAnchorStatsRelicModel(relicNode.Model))
             {
                 const string relicId = "RELIC.ANCHOR";
                 var agg = RelicAgg(relicId);
 
                 var body = BuildAnchorBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Anchor", "SpireLens", body);
+                var title = IsFakeAnchorRelicModel(relicNode.Model) ? "???" : "Anchor";
+                StatsTooltip.Show(tree, __instance, title, "SpireLens", body);
                 return;
             }
 
@@ -361,12 +362,13 @@ public static class RelicHoverShowPatch
                 return;
             }
 
-            if (IsRelicModel(relicNode.Model, "MegaCrit.Sts2.Core.Models.Relics.StrikeDummy"))
+            if (IsStrikeDummyStatsRelicModel(relicNode.Model))
             {
                 var agg = RunTracker.GetStrikeDummyAggregate();
 
                 var body = BuildStrikeDummyBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Strike Dummy", "SpireLens", body);
+                var title = IsFakeStrikeDummyRelicModel(relicNode.Model) ? "???" : "Strike Dummy";
+                StatsTooltip.Show(tree, __instance, title, "SpireLens", body);
                 return;
             }
 
@@ -793,8 +795,37 @@ public static class RelicHoverShowPatch
 
     private static bool IsRelicModel(object model, string typeName)
     {
-        var type = AccessTools.TypeByName(typeName);
-        return type != null && type.IsInstanceOfType(model);
+        for (var type = model.GetType(); type != null; type = type.BaseType)
+        {
+            if (string.Equals(type.FullName, typeName, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsAnchorStatsRelicModel(object model)
+    {
+        return IsRelicModel(model, "MegaCrit.Sts2.Core.Models.Relics.Anchor")
+            || IsFakeAnchorRelicModel(model);
+    }
+
+    private static bool IsFakeAnchorRelicModel(object model)
+    {
+        return IsRelicModel(model, "MegaCrit.Sts2.Core.Models.Relics.FakeAnchor");
+    }
+
+    private static bool IsStrikeDummyStatsRelicModel(object model)
+    {
+        return IsRelicModel(model, "MegaCrit.Sts2.Core.Models.Relics.StrikeDummy")
+            || IsFakeStrikeDummyRelicModel(model);
+    }
+
+    private static bool IsFakeStrikeDummyRelicModel(object model)
+    {
+        return IsRelicModel(model, "MegaCrit.Sts2.Core.Models.Relics.FakeStrikeDummy");
     }
 
     private static string NormalizeResourcePath(string path)
