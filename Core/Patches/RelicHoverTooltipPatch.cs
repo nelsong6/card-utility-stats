@@ -18,6 +18,8 @@ namespace SpireLens.Core.Patches;
 [HarmonyPatch(typeof(NRelicInventoryHolder), "OnFocus")]
 public static class RelicHoverShowPatch
 {
+    private const string EnthralledDefinitionId = "CARD.ENTHRALLED";
+    private const string GameOverScreenNamespace = "MegaCrit.Sts2.Core.Nodes.Screens.GameOverScreen";
     private const string VulnerableIconPath = "res://images/atlases/power_atlas.sprites/vulnerable_power.tres";
     private const string WeakIconPath = "res://images/atlases/power_atlas.sprites/weak_power.tres";
     private const string BlockIconPath = "res://images/ui/combat/block.png";
@@ -41,6 +43,12 @@ public static class RelicHoverShowPatch
 
             var tree = Engine.GetMainLoop() as SceneTree;
             if (tree == null) return;
+
+            if (TryBuildInventoryBodyBBCode(__instance, relicNode.Model, out var statsTitle, out var statsBody))
+            {
+                StatsTooltip.Show(tree, __instance, statsTitle, "SpireLens", statsBody);
+                return;
+            }
 
             RelicAggregate RelicAgg(string relicId) =>
                 RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
@@ -613,6 +621,53 @@ public static class RelicHoverShowPatch
         }
     }
 
+    internal static bool TryBuildInventoryBodyBBCode(
+        Node? hoverNode,
+        RelicModel relicModel,
+        out string title,
+        out string body)
+    {
+        title = "";
+        body = "";
+
+        var relicId = GetStatsAggregateId(relicModel);
+        var useEndedRun = IsGameOverScreenHover(hoverNode);
+
+        RelicAggregate? aggregate = null;
+        CardAggregate? bloodSoakedRoseCurseAgg = null;
+        int? floorCount = null;
+
+        if (useEndedRun)
+        {
+            RunTracker.TryLoadLastEndedRunForCurrentGameStartTime();
+            aggregate = RunTracker.GetLastEndedRelicAggregate(relicId);
+            floorCount = RunTracker.GetLastEndedFloorForRateStats();
+            if (relicModel is BloodSoakedRose)
+            {
+                bloodSoakedRoseCurseAgg =
+                    RunTracker.GetLastEndedPooledCardAggregateByDefinition(EnthralledDefinitionId)
+                    ?? new CardAggregate();
+            }
+        }
+
+        aggregate ??= IsStrikeDummyStatsRelicModel(relicModel)
+            ? RunTracker.GetStrikeDummyAggregate()
+            : RunTracker.GetRelicAggregate(relicId);
+
+        if (relicModel is BloodSoakedRose && bloodSoakedRoseCurseAgg == null)
+            bloodSoakedRoseCurseAgg = RunTracker.GetEnthralledCurseAggregate();
+
+        floorCount ??= RunTracker.GetCurrentFloorForRateStats();
+
+        return TryBuildBodyBBCode(
+            relicModel,
+            aggregate ?? new RelicAggregate(),
+            floorCount,
+            bloodSoakedRoseCurseAgg,
+            out title,
+            out body);
+    }
+
     internal static string GetStatsAggregateId(RelicModel relicModel)
     {
         if (IsAnchorStatsRelicModel(relicModel))
@@ -622,6 +677,21 @@ public static class RelicHoverShowPatch
             return "RELIC.STRIKE_DUMMY";
 
         return relicModel.Id.ToString();
+    }
+
+    private static bool IsGameOverScreenHover(Node? node)
+    {
+        for (var current = node; current != null; current = current.GetParent())
+        {
+            for (var type = current.GetType(); type != null; type = type.BaseType)
+            {
+                if (string.Equals(type.Namespace, GameOverScreenNamespace, StringComparison.Ordinal)
+                    && type.Name.StartsWith("NGameOverScreen", StringComparison.Ordinal))
+                    return true;
+            }
+        }
+
+        return false;
     }
 
     internal static bool TryBuildBodyBBCode(

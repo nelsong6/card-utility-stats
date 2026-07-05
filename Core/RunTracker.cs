@@ -59,6 +59,7 @@ public static class RunTracker
     // Re-derived from LocalContext.NetId on run start/adopt; never persisted.
     private static ulong? _trackedNetId;
     private static RunData? _currentRun;
+    private static RunData? _lastEndedRun;
     private static PendingCombat? _pendingCombat;
     private static CardPlay? _currentPlayerCardPlay;
     private static CardPlay? _recentCompletedPlayerCardPlay;
@@ -1288,6 +1289,7 @@ public static class RunTracker
             // Per-instance identity is per-run. Clear assignments so the next
             // run's Strike #1 is genuinely "this new run's first Strike,"
             // not a hangover from a previous run.
+            _lastEndedRun = null;
             _instanceNumbers.Clear();
             _defCounters.Clear();
             ResetCombatContextState();
@@ -1367,6 +1369,8 @@ public static class RunTracker
 
             CoreMain.Logger.Info($"RunEnded: {_currentRun.RunId} outcome={outcome} floor={_currentRun.FloorReached}");
             SaveCurrentRun();
+
+            _lastEndedRun = _currentRun;
 
             // Clear state so the next OnRunStarted sees a clean slate.
             _currentRun = null;
@@ -5649,6 +5653,78 @@ public static class RunTracker
             }
 
             return result;
+        }
+    }
+
+    internal static RelicAggregate? GetLastEndedRelicAggregate(string relicId)
+    {
+        lock (_lock)
+        {
+            if (_lastEndedRun == null) return null;
+            if (!_lastEndedRun.RelicAggregates.TryGetValue(relicId, out var saved)) return null;
+
+            var result = new RelicAggregate();
+            MergeRelicAggregateInto(result, saved);
+            return result;
+        }
+    }
+
+    internal static CardAggregate? GetLastEndedPooledCardAggregateByDefinition(string definitionId)
+    {
+        lock (_lock)
+        {
+            if (_lastEndedRun == null) return null;
+            return CardAggregatePooler.PoolByDefinition(_lastEndedRun.Aggregates, definitionId);
+        }
+    }
+
+    internal static int? GetLastEndedFloorForRateStats()
+    {
+        lock (_lock)
+        {
+            if (_lastEndedRun?.FloorReached == null) return null;
+            return Math.Max(1, _lastEndedRun.FloorReached.Value);
+        }
+    }
+
+    internal static bool TryLoadLastEndedRunForCurrentGameStartTime()
+    {
+        long gameStartTime;
+        try { gameStartTime = RunManager.Instance._startTime; }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"TryLoadLastEndedRunForCurrentGameStartTime: couldn't read _startTime: {e.Message}");
+            return false;
+        }
+
+        if (gameStartTime == 0) return false;
+
+        lock (_lock)
+        {
+            if (_lastEndedRun?.GameStartTime == gameStartTime
+                && _lastEndedRun.Outcome != "in_progress")
+                return true;
+        }
+
+        var loaded = RunStorage.FindHistoricalByGameStartTime(gameStartTime);
+        if (loaded?.Data == null || loaded.Data.Outcome == "in_progress")
+            return false;
+
+        lock (_lock)
+        {
+            _lastEndedRun = loaded.Data;
+        }
+
+        CoreMain.LogDebug(
+            $"TryLoadLastEndedRunForCurrentGameStartTime: loaded ended run '{loaded.Data.RunId}' for game_start_time={gameStartTime}");
+        return true;
+    }
+
+    internal static void SetLastEndedRunForTest(RunData? run)
+    {
+        lock (_lock)
+        {
+            _lastEndedRun = run;
         }
     }
 
