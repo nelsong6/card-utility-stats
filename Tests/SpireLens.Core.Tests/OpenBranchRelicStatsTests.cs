@@ -1,5 +1,6 @@
 using System;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using MegaCrit.Sts2.Core.Models.Relics;
@@ -170,9 +171,9 @@ public class OpenBranchRelicStatsTests
     [Fact]
     public void RelicTooltip_AnchorModelRecognition_IncludesFakeAnchor()
     {
-        var real = (bool)(IsAnchorStatsRelicModelMethod.Invoke(null, new object[] { new Anchor() })
+        var real = (bool)(IsAnchorStatsRelicModelMethod.Invoke(null, new object[] { Uninitialized<Anchor>() })
             ?? throw new InvalidOperationException("IsAnchorStatsRelicModel returned null."));
-        var fake = (bool)(IsAnchorStatsRelicModelMethod.Invoke(null, new object[] { new FakeAnchor() })
+        var fake = (bool)(IsAnchorStatsRelicModelMethod.Invoke(null, new object[] { Uninitialized<FakeAnchor>() })
             ?? throw new InvalidOperationException("IsAnchorStatsRelicModel returned null."));
 
         Assert.True(real);
@@ -285,5 +286,10 @@ public class OpenBranchRelicStatsTests
         Assert.NotNull(method);
         return (string)(method!.Invoke(null, new object[] { agg })
             ?? throw new InvalidOperationException($"{methodName} returned null."));
+    }
+
+    private static T Uninitialized<T>() where T : class
+    {
+        return (T)RuntimeHelpers.GetUninitializedObject(typeof(T));
     }
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using MegaCrit.Sts2.Core.Models.Relics;
@@ -81,17 +82,17 @@ public class StrikeDummyStatsTests
     [Fact]
     public void RunTracker_StrikeDummyStatsRelic_IncludesFakeStrikeDummy()
     {
-        Assert.True(RunTracker.IsStrikeDummyStatsRelic(new StrikeDummy()));
-        Assert.True(RunTracker.IsStrikeDummyStatsRelic(new FakeStrikeDummy()));
+        Assert.True(RunTracker.IsStrikeDummyStatsRelic(Uninitialized<StrikeDummy>()));
+        Assert.True(RunTracker.IsStrikeDummyStatsRelic(Uninitialized<FakeStrikeDummy>()));
         Assert.False(RunTracker.IsStrikeDummyStatsRelic(null));
     }
 
     [Fact]
     public void RelicTooltip_StrikeDummyModelRecognition_IncludesFakeStrikeDummy()
     {
-        var real = (bool)(IsStrikeDummyStatsRelicModelMethod.Invoke(null, new object[] { new StrikeDummy() })
+        var real = (bool)(IsStrikeDummyStatsRelicModelMethod.Invoke(null, new object[] { Uninitialized<StrikeDummy>() })
             ?? throw new InvalidOperationException("IsStrikeDummyStatsRelicModel returned null."));
-        var fake = (bool)(IsStrikeDummyStatsRelicModelMethod.Invoke(null, new object[] { new FakeStrikeDummy() })
+        var fake = (bool)(IsStrikeDummyStatsRelicModelMethod.Invoke(null, new object[] { Uninitialized<FakeStrikeDummy>() })
             ?? throw new InvalidOperationException("IsStrikeDummyStatsRelicModel returned null."));
 
         Assert.True(real);
@@ -117,5 +118,10 @@ public class StrikeDummyStatsTests
         Assert.Contains("[b]8[/b]", body);
         Assert.Contains("[b]4[/b]", body);
         Assert.Contains("[b]3[/b]", body);
+    }
+
+    private static T Uninitialized<T>() where T : class
+    {
+        return (T)RuntimeHelpers.GetUninitializedObject(typeof(T));
     }
 }
