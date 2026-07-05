@@ -369,6 +369,12 @@ across the full pickup callback when that is what the player experiences. Lee's
 Waffle records current-HP gained across `AfterObtained`, covering both its
 max-HP grant and the follow-up heal-to-full.
 
+Darkstone Periapt is owned by `DarkstonePeriapt.AfterCardChangedPiles`. Mirror
+the relic's own final-pile condition (`card.Pile.Type == Deck`, same owner,
+`CardType.Curse`), then record the actual max-HP delta after the async
+`GainMaxHp` command resolves. Count the curse acquisition from that same
+owner-specific match rather than from every generic curse card entry.
+
 Strike Dummy identifies eligible cards through the game's `CardTag.Strike`.
 Its damage modifier can run per damage evaluation, so count Strike cards played
 from finished card-play events while the relic is owned; use the modifier only

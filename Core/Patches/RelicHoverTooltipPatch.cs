@@ -373,6 +373,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is DarkstonePeriapt)
+            {
+                const string relicId = "RELIC.DARKSTONE_PERIAPT";
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+
+                var body = BuildDarkstonePeriaptBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Darkstone Periapt", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is RegalPillow)
             {
                 const string relicId = "RELIC.REGAL_PILLOW";
@@ -796,6 +806,14 @@ public static class RelicHoverShowPatch
     {
         var sb = new StringBuilder();
         Row3(sb, "HP gained", FormatDecimal(agg.TotalHealingRestored), "");
+        return sb.ToString();
+    }
+
+    private static string BuildDarkstonePeriaptBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Curses acquired", agg.CursesAcquired.ToString(), "");
+        Row3(sb, "Max HP gained", agg.TotalMaxHpGained.ToString(), "");
         return sb.ToString();
     }
 

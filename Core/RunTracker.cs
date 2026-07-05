@@ -1493,6 +1493,8 @@ public static class RunTracker
         MergeUpgradedCardsInto(target, source);
         target.BoneFluteTriggers += source.BoneFluteTriggers;
         target.TotalOstyHpSummoned += source.TotalOstyHpSummoned;
+        target.CursesAcquired += source.CursesAcquired;
+        target.TotalMaxHpGained += source.TotalMaxHpGained;
         target.TotalHealingAttempted += source.TotalHealingAttempted;
         target.TotalHealingRestored += source.TotalHealingRestored;
         target.TotalHealingLost += source.TotalHealingLost;
@@ -2119,6 +2121,7 @@ public static class RunTracker
     private const string BloodVialRelicId = "RELIC.BLOOD_VIAL";
     private const string PlanisphereRelicId = "RELIC.PLANISPHERE";
     private const string LeesWaffleRelicId = "RELIC.LEES_WAFFLE";
+    private const string DarkstonePeriaptRelicId = "RELIC.DARKSTONE_PERIAPT";
     private const string RegalPillowRelicId = "RELIC.REGAL_PILLOW";
     private const string WhiteBeastStatueRelicId = "RELIC.WHITE_BEAST_STATUE";
     private const string BoundPhylacteryRelicId = "RELIC.BOUND_PHYLACTERY";
@@ -3496,6 +3499,28 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Record Darkstone Periapt reacting to a successfully acquired curse.
+    /// The curse count comes from the relic's own post-pile-change condition;
+    /// max HP gained is the observed delta after the game's GainMaxHp command.
+    /// </summary>
+    public static void RecordDarkstonePeriaptCurseAcquired(int maxHpGained)
+    {
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(DarkstonePeriaptRelicId);
+                RecordDarkstonePeriaptCurseAcquiredForTest(agg, maxHpGained);
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordDarkstonePeriaptCurseAcquired failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Record that Strike Dummy was obtained, stamping the current permanent
     /// deck split between base Strikes and other Strike-tagged cards.
     /// </summary>
@@ -3668,6 +3693,15 @@ public static class RunTracker
         }
 
         agg.CardsUpgraded += added;
+    }
+
+    internal static void RecordDarkstonePeriaptCurseAcquiredForTest(RelicAggregate agg, int maxHpGained)
+    {
+        if (agg == null) return;
+
+        agg.Activations++;
+        agg.CursesAcquired++;
+        agg.TotalMaxHpGained += Math.Max(0, maxHpGained);
     }
 
     internal static void RecordStrikeDummyStrikePlayedForTest(RelicAggregate agg)

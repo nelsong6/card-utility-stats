@@ -104,6 +104,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `brilliant-scarf-relic-run.json`
   Adds Brilliant Scarf discount tracking: energy-discount offers, taken
   discounts, and energy saved by those taken discounts.
+- `darkstone-periapt-relic-run.json`
+  Adds Darkstone Periapt curse acquisition tracking plus observed max HP
+  gained from the relic's owner-specific curse-to-deck callback.
 - `gambling-chip-relic-run.json`
   Adds Gambling Chip combat-start discard tracking: combats triggered and
   cards actually discarded so the tooltip can show total and average discarded

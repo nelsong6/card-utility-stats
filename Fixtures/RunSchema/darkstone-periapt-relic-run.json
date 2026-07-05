@@ -1,0 +1,29 @@
+{
+  "run_id": "darkstone-periapt-relic-fixture",
+  "started_at": "2026-07-04T00:00:00Z",
+  "updated_at": "2026-07-04T00:10:00Z",
+  "outcome": "in_progress",
+  "aggregates": {
+    "CARD.PARASITE#1": {
+      "floor_added": 4,
+      "initial_upgrade_level": 0
+    }
+  },
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.DARKSTONE_PERIAPT": {
+      "activations": 3,
+      "curses_acquired": 3,
+      "total_max_hp_gained": 18
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.PARASITE": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.PARASITE": 1
+  }
+}

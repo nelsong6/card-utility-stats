@@ -1090,6 +1090,19 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsDarkstonePeriaptRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("darkstone-periapt-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.DARKSTONE_PERIAPT"];
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(3, relicAgg.CursesAcquired);
+        Assert.Equal(18, relicAgg.TotalMaxHpGained);
+    }
+
+    [Fact]
     public void ResumableLoad_AcceptsBrilliantScarfRelicFixture()
     {
         var resumed = RunStorage.LoadResumable(FixturePath("brilliant-scarf-relic-run.json"));
@@ -1099,6 +1112,18 @@ public class SchemaLoadingTests
         Assert.Equal(5, relicAgg.DiscountsOffered);
         Assert.Equal(3, relicAgg.DiscountsTaken);
         Assert.Equal(7, relicAgg.EnergySavedByDiscount);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsDarkstonePeriaptRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("darkstone-periapt-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.DARKSTONE_PERIAPT"];
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(3, relicAgg.CursesAcquired);
+        Assert.Equal(18, relicAgg.TotalMaxHpGained);
     }
 
     [Fact]

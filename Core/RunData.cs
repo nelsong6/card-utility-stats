@@ -411,6 +411,11 @@ public class RelicAggregate
     // Used by Bound Phylactery and Phylactery Unbound.
     public decimal TotalOstyHpSummoned { get; set; }
 
+    // Curse-triggered max HP tracking. Used by Darkstone Periapt when a
+    // curse successfully enters the owner's permanent deck.
+    public int CursesAcquired { get; set; }
+    public int TotalMaxHpGained { get; set; }
+
     // Healing attribution. Attempted is what the relic requested, restored is
     // observed HP actually gained, lost is the gap. Lost reasons keep the gap
     // explainable (full HP, prevention/modification, etc.). Used by Book
