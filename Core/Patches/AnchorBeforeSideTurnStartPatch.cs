@@ -1,8 +1,8 @@
 using System;
 using System.Reflection;
 using HarmonyLib;
-using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Hooks;
+using MegaCrit.Sts2.Core.Models;
 
 namespace SpireLens.Core.Patches;
 
@@ -11,27 +11,51 @@ namespace SpireLens.Core.Patches;
 /// actual block gained is observed by Hook.AfterBlockGained.
 /// </summary>
 [HarmonyPatch]
-public static class AnchorBeforeSideTurnStartPatch
+public static class AnchorBeforeCombatStartPatch
 {
     private static MethodBase? TargetMethod()
     {
         var t = AccessTools.TypeByName("MegaCrit.Sts2.Core.Models.Relics.Anchor");
-        return t == null ? null : AccessTools.Method(t, "BeforeSideTurnStart");
+        return t == null ? null : AccessTools.Method(t, "BeforeCombatStart");
     }
 
     [HarmonyPrefix]
-    public static void Prefix(CombatSide side, ICombatState combatState)
+    public static void Prefix(RelicModel __instance)
+    {
+        ArmIfTracked(__instance, nameof(AnchorBeforeCombatStartPatch));
+    }
+
+    internal static void ArmIfTracked(RelicModel? relic, string caller)
     {
         try
         {
-            if (side != CombatSide.Player) return;
-            if (combatState == null || combatState.RoundNumber != 1) return;
+            if (!RunTracker.IsTrackedRelic(relic)) return;
             RunTracker.ArmAnchorBlockAttribution();
         }
         catch (Exception e)
         {
-            CoreMain.LogDebug($"AnchorBeforeSideTurnStartPatch failed: {e.Message}");
+            CoreMain.LogDebug($"{caller} failed: {e.Message}");
         }
+    }
+}
+
+/// <summary>
+/// Fake Anchor grants a smaller combat-start block amount but otherwise uses
+/// the same observed Anchor stat bucket.
+/// </summary>
+[HarmonyPatch]
+public static class FakeAnchorBeforeCombatStartPatch
+{
+    private static MethodBase? TargetMethod()
+    {
+        var t = AccessTools.TypeByName("MegaCrit.Sts2.Core.Models.Relics.FakeAnchor");
+        return t == null ? null : AccessTools.Method(t, "BeforeCombatStart");
+    }
+
+    [HarmonyPrefix]
+    public static void Prefix(RelicModel __instance)
+    {
+        AnchorBeforeCombatStartPatch.ArmIfTracked(__instance, nameof(FakeAnchorBeforeCombatStartPatch));
     }
 }
 

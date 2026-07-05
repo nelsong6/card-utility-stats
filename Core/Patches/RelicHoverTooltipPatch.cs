@@ -101,13 +101,14 @@ public static class RelicHoverShowPatch
                 return;
             }
 
-            if (IsRelicModel(relicNode.Model, "MegaCrit.Sts2.Core.Models.Relics.Anchor"))
+            if (IsAnchorStatsRelicModel(relicNode.Model))
             {
                 const string relicId = "RELIC.ANCHOR";
                 var agg = RelicAgg(relicId);
 
                 var body = BuildAnchorBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Anchor", "SpireLens", body);
+                var title = IsFakeAnchorRelicModel(relicNode.Model) ? "???" : "Anchor";
+                StatsTooltip.Show(tree, __instance, title, "SpireLens", body);
                 return;
             }
 
@@ -795,6 +796,17 @@ public static class RelicHoverShowPatch
     {
         var type = AccessTools.TypeByName(typeName);
         return type != null && type.IsInstanceOfType(model);
+    }
+
+    private static bool IsAnchorStatsRelicModel(object model)
+    {
+        return IsRelicModel(model, "MegaCrit.Sts2.Core.Models.Relics.Anchor")
+            || IsFakeAnchorRelicModel(model);
+    }
+
+    private static bool IsFakeAnchorRelicModel(object model)
+    {
+        return IsRelicModel(model, "MegaCrit.Sts2.Core.Models.Relics.FakeAnchor");
     }
 
     private static string NormalizeResourcePath(string path)
