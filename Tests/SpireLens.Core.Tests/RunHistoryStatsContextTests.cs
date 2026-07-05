@@ -93,6 +93,7 @@ public class RunHistoryStatsContextTests
     {
         Assert.Equal("RELIC.ANCHOR", RelicHoverShowPatch.GetStatsAggregateId(Uninitialized<FakeAnchor>()));
         Assert.Equal("RELIC.STRIKE_DUMMY", RelicHoverShowPatch.GetStatsAggregateId(Uninitialized<FakeStrikeDummy>()));
+        Assert.Equal("RELIC.MINIATURE_CANNON", RelicHoverShowPatch.GetStatsAggregateId(Uninitialized<MiniatureCannon>()));
     }
 
     [Fact]

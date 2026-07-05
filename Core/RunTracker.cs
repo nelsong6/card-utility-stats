@@ -601,7 +601,10 @@ public static class RunTracker
             // identity for the tracked player's cards.
             if (!IsTrackedCard(card)) return;
             GetOrAssignNumber(card);
-            if (RefreshStrikeDummyDeckCountsIfOwnedLocked())
+            var deckCountsChanged =
+                RefreshStrikeDummyDeckCountsIfOwnedLocked()
+                | RefreshMiniatureCannonDeckCountsIfOwnedLocked();
+            if (deckCountsChanged)
                 SaveCurrentRun();
         }
     }
@@ -1044,6 +1047,7 @@ public static class RunTracker
             }
         }
         bool strikeDummyDeckCountsChanged = RefreshStrikeDummyDeckCountsIfOwnedLocked();
+        bool miniatureCannonDeckCountsChanged = RefreshMiniatureCannonDeckCountsIfOwnedLocked();
         int stillWaiting = _pendingRankRestores.Values.Sum(q => q.Count);
         int restored = seeded - stillWaiting;
         int unmatched = deckCards - restored;
@@ -1121,7 +1125,10 @@ public static class RunTracker
             CoreMain.Logger.Info(
                 $"{context}: repaired offensive damage aggregates for run_id={run.RunId}");
         }
-        if (repairedDamageAggregates || prunedGhosts > 0 || strikeDummyDeckCountsChanged)
+        if (repairedDamageAggregates
+            || prunedGhosts > 0
+            || strikeDummyDeckCountsChanged
+            || miniatureCannonDeckCountsChanged)
         {
             SaveCurrentRun();
         }
@@ -1394,6 +1401,7 @@ public static class RunTracker
             ResetCombatContextState();
             RecordCombatsInDeckForCurrentDeckLocked();
             RecordBrilliantScarfCombatForTrackedPlayerLocked();
+            RecordMiniatureCannonCombatForTrackedPlayerLocked();
         }
     }
 
@@ -1552,6 +1560,11 @@ public static class RunTracker
         if (source.StrikeDummyNonBaseStrikeCardsInDeck != 0 || target.StrikeDummyNonBaseStrikeCardsInDeck == 0)
             target.StrikeDummyNonBaseStrikeCardsInDeck = source.StrikeDummyNonBaseStrikeCardsInDeck;
 
+        if (source.MiniatureCannonUpgradedAttacksInDeck != 0 || target.MiniatureCannonUpgradedAttacksInDeck == 0)
+            target.MiniatureCannonUpgradedAttacksInDeck = source.MiniatureCannonUpgradedAttacksInDeck;
+        target.MiniatureCannonUpgradedAttackPlays += source.MiniatureCannonUpgradedAttackPlays;
+        target.MiniatureCannonUpgradedAttackHits += source.MiniatureCannonUpgradedAttackHits;
+
         target.DiscountCombats += source.DiscountCombats;
         target.DiscountsOffered += source.DiscountsOffered;
         target.DiscountsTaken += source.DiscountsTaken;
@@ -1709,6 +1722,7 @@ public static class RunTracker
             var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
             agg.Plays++;
             RecordStrikeDummyStrikePlayedIfOwnedLocked(cardPlay.Card);
+            RecordMiniatureCannonUpgradedAttackPlayedIfOwnedLocked(cardPlay.Card);
             if (IsReplayExtraPlay(cardPlay))
             {
                 agg.TimesReplayExtraPlayed++;
@@ -2174,6 +2188,7 @@ public static class RunTracker
     private const string ToolboxRelicId = "RELIC.TOOLBOX";
     private const string PaelsWingRelicId = "RELIC.PAELS_WING";
     private const string StrikeDummyRelicId = "RELIC.STRIKE_DUMMY";
+    private const string MiniatureCannonRelicId = "RELIC.MINIATURE_CANNON";
     private const string BrilliantScarfRelicId = "RELIC.BRILLIANT_SCARF";
     private const string JuzuBraceletRelicId = "RELIC.JUZU_BRACELET";
     private const string HeftyTabletRelicId = "RELIC.HEFTY_TABLET";
@@ -4068,6 +4083,30 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Record that Miniature Cannon was obtained, stamping the current
+    /// permanent-deck count of upgraded attacks.
+    /// </summary>
+    public static void RecordMiniatureCannonObtained(RelicModel relic, Player player)
+    {
+        if (!IsMiniatureCannonStatsRelic(relic) || player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(MiniatureCannonRelicId);
+                RefreshMiniatureCannonDeckCountsLocked(agg, player);
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordMiniatureCannonObtained failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Return Strike Dummy stats after refreshing the current permanent-deck
     /// composition. Used by the relic hover tooltip so hot reload/continue
     /// state catches up even if the pickup happened before this build.
@@ -4098,6 +4137,41 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"GetStrikeDummyAggregate failed: {e.Message}");
+                return new RelicAggregate();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Return Miniature Cannon stats after refreshing the current permanent-
+    /// deck upgraded-attack count.
+    /// </summary>
+    public static RelicAggregate GetMiniatureCannonAggregate()
+    {
+        lock (_lock)
+        {
+            try
+            {
+                RefreshMiniatureCannonDeckCountsIfOwnedLocked();
+
+                RelicAggregate? result = null;
+                if (_currentRun != null && _currentRun.RelicAggregates.TryGetValue(MiniatureCannonRelicId, out var committed))
+                {
+                    result = new RelicAggregate();
+                    MergeRelicAggregateInto(result, committed);
+                }
+
+                if (_pendingCombat != null && _pendingCombat.RelicAggregates.TryGetValue(MiniatureCannonRelicId, out var pending))
+                {
+                    result ??= new RelicAggregate();
+                    MergeRelicAggregateInto(result, pending);
+                }
+
+                return result ?? new RelicAggregate();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"GetMiniatureCannonAggregate failed: {e.Message}");
                 return new RelicAggregate();
             }
         }
@@ -4256,6 +4330,24 @@ public static class RunTracker
         agg.StrikeDummyNonBaseStrikeCardsInDeck = Math.Max(0, nonBaseStrikeCardsInDeck);
     }
 
+    internal static void RecordMiniatureCannonUpgradedAttackPlayedForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.MiniatureCannonUpgradedAttackPlays += Math.Max(0, count);
+    }
+
+    internal static void RecordMiniatureCannonUpgradedAttackHitForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.MiniatureCannonUpgradedAttackHits += Math.Max(0, count);
+    }
+
+    internal static void SetMiniatureCannonDeckCountForTest(RelicAggregate agg, int upgradedAttacksInDeck)
+    {
+        if (agg == null) return;
+        agg.MiniatureCannonUpgradedAttacksInDeck = Math.Max(0, upgradedAttacksInDeck);
+    }
+
     internal static void RecordShovelRelicAcquiredForTest(RelicAggregate agg, RelicRarity rarity)
     {
         if (agg == null) return;
@@ -4288,6 +4380,22 @@ public static class RunTracker
         try
         {
             return relic is StrikeDummy or FakeStrikeDummy;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    internal static bool IsMiniatureCannonStatsRelic(RelicModel? relic)
+    {
+        try
+        {
+            return relic is MiniatureCannon
+                || string.Equals(
+                    relic?.GetType().FullName,
+                    "MegaCrit.Sts2.Core.Models.Relics.MiniatureCannon",
+                    StringComparison.Ordinal);
         }
         catch
         {
@@ -5969,6 +6077,28 @@ public static class RunTracker
         agg.StrikeDummyStrikesPlayed += 1;
     }
 
+    private static void RecordMiniatureCannonUpgradedAttackPlayedIfOwnedLocked(CardModel card)
+    {
+        if (!IsMiniatureCannonUpgradedAttackCard(card)) return;
+
+        var owner = card.Owner;
+        if (owner == null || !IsTrackedPlayer(owner) || !PlayerHasMiniatureCannon(owner)) return;
+
+        var agg = GetOrCreateRelicAggregateForCurrentContextLocked(MiniatureCannonRelicId);
+        agg.MiniatureCannonUpgradedAttackPlays += 1;
+    }
+
+    private static void RecordMiniatureCannonUpgradedAttackHitIfOwnedLocked(CardModel card)
+    {
+        if (!IsMiniatureCannonUpgradedAttackCard(card)) return;
+
+        var owner = card.Owner;
+        if (owner == null || !IsTrackedPlayer(owner) || !PlayerHasMiniatureCannon(owner)) return;
+
+        var agg = GetOrCreateRelicAggregateLocked(MiniatureCannonRelicId);
+        agg.MiniatureCannonUpgradedAttackHits += 1;
+    }
+
     private static bool RefreshStrikeDummyDeckCountsIfOwnedLocked()
     {
         if (_currentRun == null) return false;
@@ -6013,6 +6143,41 @@ public static class RunTracker
         return changed;
     }
 
+    private static bool RefreshMiniatureCannonDeckCountsIfOwnedLocked()
+    {
+        if (_currentRun == null) return false;
+
+        var player = GetTrackedRunPlayerLocked();
+        if (player == null || !PlayerHasMiniatureCannon(player)) return false;
+
+        bool created = false;
+        if (!_currentRun.RelicAggregates.TryGetValue(MiniatureCannonRelicId, out var agg) || agg == null)
+        {
+            agg = new RelicAggregate();
+            _currentRun.RelicAggregates[MiniatureCannonRelicId] = agg;
+            created = true;
+        }
+
+        return RefreshMiniatureCannonDeckCountsLocked(agg, player) || created;
+    }
+
+    private static bool RefreshMiniatureCannonDeckCountsLocked(RelicAggregate agg, Player? player = null)
+    {
+        player ??= GetTrackedRunPlayerLocked();
+        if (player?.Deck?.Cards == null) return false;
+
+        int upgradedAttacks = 0;
+        foreach (var deckCard in player.Deck.Cards)
+        {
+            if (IsMiniatureCannonUpgradedAttackCard(deckCard))
+                upgradedAttacks++;
+        }
+
+        bool changed = agg.MiniatureCannonUpgradedAttacksInDeck != upgradedAttacks;
+        agg.MiniatureCannonUpgradedAttacksInDeck = upgradedAttacks;
+        return changed;
+    }
+
     private static Player? GetTrackedRunPlayerLocked()
     {
         try
@@ -6044,6 +6209,18 @@ public static class RunTracker
         }
     }
 
+    private static bool PlayerHasMiniatureCannon(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(IsMiniatureCannonStatsRelic);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static bool PlayerHasJuzuBracelet(Player player)
     {
         try
@@ -6054,6 +6231,30 @@ public static class RunTracker
         {
             return false;
         }
+    }
+
+    private static void RecordMiniatureCannonCombatForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordMiniatureCannonCombatForPlayerLocked(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordMiniatureCannonCombatForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordMiniatureCannonCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasMiniatureCannon(player)) return;
+
+        var agg = GetOrCreateRelicAggregateLocked(MiniatureCannonRelicId);
+        agg.Activations += 1;
+        RefreshMiniatureCannonDeckCountsIfOwnedLocked();
     }
 
     private static void RecordBrilliantScarfCombatForTrackedPlayerLocked()
@@ -6097,6 +6298,19 @@ public static class RunTracker
         try
         {
             return card?.Tags?.Contains(CardTag.Strike) == true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool IsMiniatureCannonUpgradedAttackCard(CardModel? card)
+    {
+        try
+        {
+            if (card == null || card.Type != CardType.Attack) return false;
+            return Canonical(card).CurrentUpgradeLevel > 0;
         }
         catch
         {
@@ -6412,6 +6626,7 @@ public static class RunTracker
             // removal and the next CombatEnded. Removals are infrequent so
             // the I/O cost is negligible.
             RefreshStrikeDummyDeckCountsIfOwnedLocked();
+            RefreshMiniatureCannonDeckCountsIfOwnedLocked();
             SaveCurrentRun();
         }
     }
@@ -6523,6 +6738,7 @@ public static class RunTracker
             // Save immediately — upgrades mostly happen at campfires,
             // OUTSIDE combat. Without saving here, the upgrade event lives
             // only in memory and is lost on F5 before the next CombatEnded.
+            RefreshMiniatureCannonDeckCountsIfOwnedLocked();
             SaveCurrentRun();
         }
     }
@@ -8372,6 +8588,7 @@ public static class RunTracker
                 agg.TotalOverkill += result.OverkillDamage;
                 agg.TotalEffective += damageTotals.EffectiveDamage;
                 if (result.WasTargetKilled) agg.Kills++;
+                RecordMiniatureCannonUpgradedAttackHitIfOwnedLocked(entry.CardSource!);
 
                 _pendingCombat.CombatEvents.Add(new CardEvent
                 {

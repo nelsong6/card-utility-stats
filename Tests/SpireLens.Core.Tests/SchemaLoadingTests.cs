@@ -1599,4 +1599,31 @@ public class SchemaLoadingTests
         Assert.Equal(2, relicAgg.CardsUpgraded);
         Assert.Equal(new[] { "Defend+", "Battle Trance+" }, relicAgg.UpgradedCards);
     }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsMiniatureCannonRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("miniature-cannon-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.MINIATURE_CANNON"];
+        Assert.Equal(4, relicAgg.Activations);
+        Assert.Equal(3, relicAgg.MiniatureCannonUpgradedAttacksInDeck);
+        Assert.Equal(10, relicAgg.MiniatureCannonUpgradedAttackPlays);
+        Assert.Equal(17, relicAgg.MiniatureCannonUpgradedAttackHits);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsMiniatureCannonRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("miniature-cannon-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.MINIATURE_CANNON"];
+        Assert.Equal(4, relicAgg.Activations);
+        Assert.Equal(3, relicAgg.MiniatureCannonUpgradedAttacksInDeck);
+        Assert.Equal(10, relicAgg.MiniatureCannonUpgradedAttackPlays);
+        Assert.Equal(17, relicAgg.MiniatureCannonUpgradedAttackHits);
+    }
 }

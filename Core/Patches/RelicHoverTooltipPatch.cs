@@ -652,6 +652,8 @@ public static class RelicHoverShowPatch
 
         aggregate ??= IsStrikeDummyStatsRelicModel(relicModel)
             ? RunTracker.GetStrikeDummyAggregate()
+            : IsMiniatureCannonStatsRelicModel(relicModel)
+                ? RunTracker.GetMiniatureCannonAggregate()
             : RunTracker.GetRelicAggregate(relicId);
 
         if (relicModel is BloodSoakedRose && bloodSoakedRoseCurseAgg == null)
@@ -675,6 +677,9 @@ public static class RelicHoverShowPatch
 
         if (IsStrikeDummyStatsRelicModel(relicModel))
             return "RELIC.STRIKE_DUMMY";
+
+        if (IsMiniatureCannonStatsRelicModel(relicModel))
+            return "RELIC.MINIATURE_CANNON";
 
         return relicModel.Id.ToString();
     }
@@ -1049,6 +1054,13 @@ public static class RelicHoverShowPatch
         {
             title = IsFakeStrikeDummyRelicModel(relicModel) ? "???" : "Strike Dummy";
             body = BuildStrikeDummyBodyBBCode(agg);
+            return true;
+        }
+
+        if (IsMiniatureCannonStatsRelicModel(relicModel))
+        {
+            title = "Miniature Cannon";
+            body = BuildMiniatureCannonBodyBBCode(agg);
             return true;
         }
 
@@ -1574,6 +1586,25 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
+    private static string BuildMiniatureCannonBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var averagePlays = agg.Activations <= 0
+            ? 0m
+            : (decimal)agg.MiniatureCannonUpgradedAttackPlays / agg.Activations;
+        var averageHits = agg.Activations <= 0
+            ? 0m
+            : (decimal)agg.MiniatureCannonUpgradedAttackHits / agg.Activations;
+
+        Row3(sb, "Combats held", agg.Activations.ToString(), "");
+        Row3(sb, "Upgraded attacks in deck", agg.MiniatureCannonUpgradedAttacksInDeck.ToString(), "");
+        Row3(sb, "Upgraded attack plays", agg.MiniatureCannonUpgradedAttackPlays.ToString(), "");
+        Row3(sb, "Upgraded attack hits", agg.MiniatureCannonUpgradedAttackHits.ToString(), "");
+        Row3(sb, "Avg plays per combat", FormatDecimal(averagePlays), "");
+        Row3(sb, "Avg hits per combat", FormatDecimal(averageHits), "");
+        return sb.ToString();
+    }
+
     private static string BuildBrilliantScarfBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
@@ -1826,6 +1857,11 @@ public static class RelicHoverShowPatch
     {
         return IsRelicModel(model, "MegaCrit.Sts2.Core.Models.Relics.StrikeDummy")
             || IsFakeStrikeDummyRelicModel(model);
+    }
+
+    private static bool IsMiniatureCannonStatsRelicModel(object model)
+    {
+        return IsRelicModel(model, "MegaCrit.Sts2.Core.Models.Relics.MiniatureCannon");
     }
 
     private static bool IsFakeStrikeDummyRelicModel(object model)

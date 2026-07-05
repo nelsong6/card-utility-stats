@@ -1,0 +1,39 @@
+{
+  "run_id": "miniature-cannon-relic-fixture",
+  "started_at": "2026-07-05T00:00:00Z",
+  "updated_at": "2026-07-05T00:10:00Z",
+  "outcome": "in_progress",
+  "aggregates": {
+    "CARD.STRIKE_IRONCLAD#1": {
+      "plays": 2,
+      "total_intended": 12,
+      "total_effective": 10,
+      "initial_upgrade_level": 1
+    },
+    "CARD.DEFEND_IRONCLAD#1": {
+      "plays": 0
+    }
+  },
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.MINIATURE_CANNON": {
+      "activations": 4,
+      "miniature_cannon_upgraded_attacks_in_deck": 3,
+      "miniature_cannon_upgraded_attack_plays": 10,
+      "miniature_cannon_upgraded_attack_hits": 17
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.STRIKE_IRONCLAD": [
+      1
+    ],
+    "CARD.DEFEND_IRONCLAD": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.STRIKE_IRONCLAD": 1,
+    "CARD.DEFEND_IRONCLAD": 1
+  }
+}

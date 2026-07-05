@@ -10,8 +10,9 @@ using MegaCrit.Sts2.Core.Models.Relics;
 namespace SpireLens.Core.Patches;
 
 /// <summary>
-/// Stamps Strike Dummy's deck-composition stats when the relic is obtained.
-/// The command path catches reward, shop, event, and direct relic grants.
+/// Stamps deck-composition stats for relics whose baseline depends on the
+/// current permanent deck. The command path catches reward, shop, event, and
+/// direct relic grants.
 /// </summary>
 [HarmonyPatch]
 public static class RelicCmdObtainStrikeDummyPatch
@@ -29,18 +30,18 @@ public static class RelicCmdObtainStrikeDummyPatch
     {
         try
         {
-            if (!RunTracker.IsStrikeDummyStatsRelic(relic)) return;
+            if (!IsTrackedDeckSnapshotRelic(relic)) return;
 
             if (__result == null)
             {
-                RunTracker.RecordStrikeDummyObtained(relic, player);
+                RecordDeckSnapshotRelicObtained(relic, player);
                 return;
             }
 
             if (__result.IsCompleted)
             {
                 if (!__result.IsCanceled && !__result.IsFaulted)
-                    RunTracker.RecordStrikeDummyObtained(__result.Result ?? relic, player);
+                    RecordDeckSnapshotRelicObtained(__result.Result ?? relic, player);
                 return;
             }
 
@@ -48,7 +49,7 @@ public static class RelicCmdObtainStrikeDummyPatch
                 task =>
                 {
                     if (!task.IsCanceled && !task.IsFaulted)
-                        RunTracker.RecordStrikeDummyObtained(task.Result ?? relic, player);
+                        RecordDeckSnapshotRelicObtained(task.Result ?? relic, player);
                 },
                 TaskScheduler.Default);
         }
@@ -56,5 +57,17 @@ public static class RelicCmdObtainStrikeDummyPatch
         {
             CoreMain.LogDebug($"RelicCmdObtainStrikeDummyPatch failed: {e.Message}");
         }
+    }
+
+    private static bool IsTrackedDeckSnapshotRelic(RelicModel relic)
+    {
+        return RunTracker.IsStrikeDummyStatsRelic(relic)
+            || RunTracker.IsMiniatureCannonStatsRelic(relic);
+    }
+
+    private static void RecordDeckSnapshotRelicObtained(RelicModel relic, Player player)
+    {
+        RunTracker.RecordStrikeDummyObtained(relic, player);
+        RunTracker.RecordMiniatureCannonObtained(relic, player);
     }
 }

@@ -510,6 +510,12 @@ public class RelicAggregate
     public int StrikeDummyBaseStrikesInDeck { get; set; }
     public int StrikeDummyNonBaseStrikeCardsInDeck { get; set; }
 
+    // Miniature Cannon tracking. Plays and hits are cumulative while the relic
+    // is held; deck count is the current permanent-deck snapshot.
+    public int MiniatureCannonUpgradedAttacksInDeck { get; set; }
+    public int MiniatureCannonUpgradedAttackPlays { get; set; }
+    public int MiniatureCannonUpgradedAttackHits { get; set; }
+
     // Cost-discount tracking. Used by Brilliant Scarf.
     public int DiscountCombats { get; set; }
     public int DiscountsOffered { get; set; }
