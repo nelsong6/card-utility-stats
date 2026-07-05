@@ -1,0 +1,36 @@
+{
+  "run_id": "centennial-puzzle-relic-fixture",
+  "started_at": "2026-07-05T00:00:00Z",
+  "updated_at": "2026-07-05T00:10:00Z",
+  "outcome": "in_progress",
+  "aggregates": {
+    "CARD.STRIKE_IRONCLAD#1": {
+      "plays": 2,
+      "times_drawn": 4
+    },
+    "CARD.DEFEND_IRONCLAD#1": {
+      "plays": 1,
+      "times_drawn": 3
+    }
+  },
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.CENTENNIAL_PUZZLE": {
+      "activations": 4,
+      "additional_cards_drawn": 11
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.STRIKE_IRONCLAD": [
+      1
+    ],
+    "CARD.DEFEND_IRONCLAD": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.STRIKE_IRONCLAD": 1,
+    "CARD.DEFEND_IRONCLAD": 1
+  }
+}

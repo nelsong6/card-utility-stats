@@ -108,6 +108,9 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds Gambling Chip combat-start discard tracking: combats triggered and
   cards actually discarded so the tooltip can show total and average discarded
   per combat.
+- `centennial-puzzle-relic-run.json`
+  Adds Centennial Puzzle activation tracking plus actual cards drawn so the
+  tooltip can show total and average cards drawn per combat.
 
 Why these exist:
 

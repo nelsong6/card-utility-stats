@@ -57,6 +57,46 @@ public class HookPatchTargetTests
             target.GetParameters().Select(p => p.ParameterType.FullName).ToArray());
     }
 
+    [Fact]
+    [Trait("Category", "RequiresLiveGame")]
+    public void CentennialPuzzlePatch_ResolvesAfterDamageReceived()
+    {
+        var target = InvokeTargetMethod(typeof(CentennialPuzzleAfterDamageReceivedPatch));
+
+        Assert.NotNull(target);
+        Assert.Equal("MegaCrit.Sts2.Core.Models.Relics.CentennialPuzzle", target!.DeclaringType?.FullName);
+        Assert.Equal("AfterDamageReceived", target.Name);
+        Assert.Equal(
+            new[]
+            {
+                "MegaCrit.Sts2.Core.GameActions.Multiplayer.PlayerChoiceContext",
+                "MegaCrit.Sts2.Core.Entities.Creatures.Creature",
+                "MegaCrit.Sts2.Core.Entities.Creatures.DamageResult",
+                "MegaCrit.Sts2.Core.ValueProps.ValueProp",
+                "MegaCrit.Sts2.Core.Entities.Creatures.Creature",
+                "MegaCrit.Sts2.Core.Models.CardModel",
+            },
+            target.GetParameters().Select(p => p.ParameterType.FullName).ToArray());
+    }
+
+    [Fact]
+    [Trait("Category", "RequiresLiveGame")]
+    public void CentennialPuzzleDrawPatch_ResolvesSingleCardDraw()
+    {
+        var target = InvokeTargetMethod(typeof(CentennialPuzzleCardPileDrawPatch));
+
+        Assert.NotNull(target);
+        Assert.Equal("MegaCrit.Sts2.Core.Commands.CardPileCmd", target!.DeclaringType?.FullName);
+        Assert.Equal("Draw", target.Name);
+        Assert.Equal(
+            new[]
+            {
+                "MegaCrit.Sts2.Core.GameActions.Multiplayer.PlayerChoiceContext",
+                "MegaCrit.Sts2.Core.Entities.Players.Player",
+            },
+            target.GetParameters().Select(p => p.ParameterType.FullName).ToArray());
+    }
+
     private static MethodBase? InvokeTargetMethod(Type patchType)
     {
         _ = Assembly.Load("sts2");

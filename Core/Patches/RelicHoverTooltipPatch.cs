@@ -392,6 +392,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is CentennialPuzzle)
+            {
+                const string relicId = "RELIC.CENTENNIAL_PUZZLE";
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+
+                var body = BuildCentennialPuzzleBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Centennial Puzzle", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is WhiteBeastStatue)
             {
                 const string relicId = "RELIC.WHITE_BEAST_STATUE";
@@ -736,6 +746,18 @@ public static class RelicHoverShowPatch
             : (decimal)agg.CardsDiscarded / agg.Activations;
         Row3(sb, "Cards discarded", agg.CardsDiscarded.ToString(), "");
         Row3(sb, "Avg discarded per combat", FormatDecimal(averageDiscarded), "");
+        return sb.ToString();
+    }
+
+    private static string BuildCentennialPuzzleBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var averageDrawn = agg.Activations <= 0
+            ? 0m
+            : (decimal)agg.AdditionalCardsDrawn / agg.Activations;
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, "Cards drawn total", agg.AdditionalCardsDrawn.ToString(), "");
+        Row3(sb, "Avg cards drawn per combat", FormatDecimal(averageDrawn), "");
         return sb.ToString();
     }
 

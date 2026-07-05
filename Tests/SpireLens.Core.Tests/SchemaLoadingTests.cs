@@ -1123,4 +1123,27 @@ public class SchemaLoadingTests
         Assert.Equal(3, relicAgg.Activations);
         Assert.Equal(7, relicAgg.CardsDiscarded);
     }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsCentennialPuzzleRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("centennial-puzzle-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.CENTENNIAL_PUZZLE"];
+        Assert.Equal(4, relicAgg.Activations);
+        Assert.Equal(11, relicAgg.AdditionalCardsDrawn);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsCentennialPuzzleRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("centennial-puzzle-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.CENTENNIAL_PUZZLE"];
+        Assert.Equal(4, relicAgg.Activations);
+        Assert.Equal(11, relicAgg.AdditionalCardsDrawn);
+    }
 }

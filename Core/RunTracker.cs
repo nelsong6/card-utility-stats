@@ -2114,6 +2114,7 @@ public static class RunTracker
     private const string StrikeDummyRelicId = "RELIC.STRIKE_DUMMY";
     private const string BrilliantScarfRelicId = "RELIC.BRILLIANT_SCARF";
     private const string GamblingChipRelicId = "RELIC.GAMBLING_CHIP";
+    private const string CentennialPuzzleRelicId = "RELIC.CENTENNIAL_PUZZLE";
 
     /// <summary>
     /// Record a Bag of Marbles combat-start Vulnerable application.
@@ -3773,6 +3774,112 @@ public static class RunTracker
                 CoreMain.LogDebug($"RecordPendulumCardsDrawn failed: {e.Message}");
             }
         }
+    }
+
+    /// <summary>
+    /// Record Centennial Puzzle's once-per-combat HP-loss activation. The
+    /// actual cards drawn are observed from the single-card draw command.
+    /// </summary>
+    public static void ArmCentennialPuzzleAttribution(Player owner, int expectedDraws)
+    {
+        if (owner == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(owner)) return;
+
+                _pendingCombat ??= new PendingCombat();
+                var agg = GetOrCreateRelicAggregateLocked(CentennialPuzzleRelicId);
+                agg.Activations += 1;
+
+                if (expectedDraws <= 0) return;
+                _pendingCombat.CentennialPuzzleDrawsRemaining[owner] =
+                    _pendingCombat.CentennialPuzzleDrawsRemaining.TryGetValue(owner, out var existing)
+                        ? existing + expectedDraws
+                        : expectedDraws;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"ArmCentennialPuzzleAttribution failed: {e.Message}");
+            }
+        }
+    }
+
+    public static bool TryConsumeCentennialPuzzleDrawAttribution(Player player)
+    {
+        if (player == null) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null) return false;
+                if (!_pendingCombat.CentennialPuzzleDrawsRemaining.TryGetValue(player, out var remaining)
+                    || remaining <= 0)
+                {
+                    return false;
+                }
+
+                remaining -= 1;
+                if (remaining <= 0)
+                    _pendingCombat.CentennialPuzzleDrawsRemaining.Remove(player);
+                else
+                    _pendingCombat.CentennialPuzzleDrawsRemaining[player] = remaining;
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"TryConsumeCentennialPuzzleDrawAttribution failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    public static void DisarmCentennialPuzzleAttribution(Player player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                _pendingCombat?.CentennialPuzzleDrawsRemaining.Remove(player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"DisarmCentennialPuzzleAttribution failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordCentennialPuzzleCardsDrawn(int cardsDrawn)
+    {
+        if (cardsDrawn <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(CentennialPuzzleRelicId);
+                agg.AdditionalCardsDrawn += cardsDrawn;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordCentennialPuzzleCardsDrawn failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordCentennialPuzzleStatsForTest(
+        RelicAggregate agg,
+        int activations,
+        int cardsDrawn)
+    {
+        if (agg == null) return;
+        agg.Activations += Math.Max(0, activations);
+        agg.AdditionalCardsDrawn += Math.Max(0, cardsDrawn);
     }
 
     /// <summary>
@@ -7447,6 +7554,8 @@ internal class PendingCombat
     public Dictionary<Player, PendingBrilliantScarfDiscount> BrilliantScarfDiscountOffers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> GamblingChipDiscardAttributionPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> CentennialPuzzleDrawsRemaining { get; }
         = new(ReferenceEqualityComparer.Instance);
     public RunMetaStats MetaStats { get; } = new();
 
