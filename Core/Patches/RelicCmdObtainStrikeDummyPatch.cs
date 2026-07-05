@@ -29,7 +29,7 @@ public static class RelicCmdObtainStrikeDummyPatch
     {
         try
         {
-            if (relic is not StrikeDummy) return;
+            if (!RunTracker.IsStrikeDummyStatsRelic(relic)) return;
 
             if (__result == null)
             {

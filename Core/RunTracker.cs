@@ -3205,7 +3205,7 @@ public static class RunTracker
     /// </summary>
     public static void RecordStrikeDummyObtained(RelicModel relic, Player player)
     {
-        if (relic is not StrikeDummy || player == null) return;
+        if (!IsStrikeDummyStatsRelic(relic) || player == null) return;
 
         lock (_lock)
         {
@@ -3281,6 +3281,18 @@ public static class RunTracker
         if (agg == null) return;
         agg.StrikeDummyBaseStrikesInDeck = Math.Max(0, baseStrikesInDeck);
         agg.StrikeDummyNonBaseStrikeCardsInDeck = Math.Max(0, nonBaseStrikeCardsInDeck);
+    }
+
+    internal static bool IsStrikeDummyStatsRelic(RelicModel? relic)
+    {
+        try
+        {
+            return relic is StrikeDummy or FakeStrikeDummy;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static void RecordRelicHealingTrigger(
@@ -4528,7 +4540,7 @@ public static class RunTracker
     {
         try
         {
-            return player.Relics.Any(r => r is StrikeDummy);
+            return player.Relics.Any(IsStrikeDummyStatsRelic);
         }
         catch
         {

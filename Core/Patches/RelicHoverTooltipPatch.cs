@@ -362,12 +362,13 @@ public static class RelicHoverShowPatch
                 return;
             }
 
-            if (IsRelicModel(relicNode.Model, "MegaCrit.Sts2.Core.Models.Relics.StrikeDummy"))
+            if (IsStrikeDummyStatsRelicModel(relicNode.Model))
             {
                 var agg = RunTracker.GetStrikeDummyAggregate();
 
                 var body = BuildStrikeDummyBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Strike Dummy", "SpireLens", body);
+                var title = IsFakeStrikeDummyRelicModel(relicNode.Model) ? "???" : "Strike Dummy";
+                StatsTooltip.Show(tree, __instance, title, "SpireLens", body);
                 return;
             }
 
@@ -807,6 +808,17 @@ public static class RelicHoverShowPatch
     private static bool IsFakeAnchorRelicModel(object model)
     {
         return IsRelicModel(model, "MegaCrit.Sts2.Core.Models.Relics.FakeAnchor");
+    }
+
+    private static bool IsStrikeDummyStatsRelicModel(object model)
+    {
+        return IsRelicModel(model, "MegaCrit.Sts2.Core.Models.Relics.StrikeDummy")
+            || IsFakeStrikeDummyRelicModel(model);
+    }
+
+    private static bool IsFakeStrikeDummyRelicModel(object model)
+    {
+        return IsRelicModel(model, "MegaCrit.Sts2.Core.Models.Relics.FakeStrikeDummy");
     }
 
     private static string NormalizeResourcePath(string path)
