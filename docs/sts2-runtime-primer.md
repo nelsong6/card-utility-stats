@@ -397,6 +397,15 @@ queried repeatedly for UI/playability, so count the offer from the counter
 transition and use the modifier only to measure energy saved by the card that
 later consumes the offer.
 
+Shovel adds `DigRestSiteOption` from `TryModifyRestSiteOptions`; the relic
+itself does not receive the obtained relic payload. Patch
+`DigRestSiteOption.OnSelect`, snapshot the owner's relic inventory before the
+async selection, and after a successful result record the newly present relic
+instances and their actual `RelicRarity`. To count missed Dig opportunities,
+inspect `RestSiteSynchronizer.BeforeLocalRestSiteExited`: at that point the
+local option list and chosen-option index still reveal whether a Dig option was
+available and whether the selected option was anything other than Dig.
+
 ## Generated And Supplemental Cards
 
 Not every visible card should become a permanent per-instance deck card.

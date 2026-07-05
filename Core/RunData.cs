@@ -475,6 +475,14 @@ public class RelicAggregate
     public int RarePotionsGained { get; set; }
     public int PotionsSkipped { get; set; }
 
+    // Total relics acquired from this relic, split by the obtained relic's
+    // actual rarity. Used by Shovel's Dig rest-site option.
+    public int RelicsAcquired { get; set; }
+    public int CommonRelicsAcquired { get; set; }
+    public int UncommonRelicsAcquired { get; set; }
+    public int RareRelicsAcquired { get; set; }
+    public int CampfiresNotDug { get; set; }
+
     // Total offered cards by rarity for relics that generate card-choice
     // screens. Used by Toolbox.
     public int UncommonCardsOffered { get; set; }

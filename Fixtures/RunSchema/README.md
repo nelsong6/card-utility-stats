@@ -109,6 +109,10 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `darkstone-periapt-relic-run.json`
   Adds Darkstone Periapt curse acquisition tracking plus observed max HP
   gained from the relic's owner-specific curse-to-deck callback.
+- `shovel-relic-run.json`
+  Adds Shovel Dig tracking: total relics acquired plus common, uncommon, and
+  rare rarity splits from the actual obtained relic instances, plus campfires
+  where Dig was available but not used.
 - `gambling-chip-relic-run.json`
   Adds Gambling Chip combat-start discard tracking: combats triggered and
   cards actually discarded so the tooltip can show total and average discarded

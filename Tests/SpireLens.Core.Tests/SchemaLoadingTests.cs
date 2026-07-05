@@ -1128,6 +1128,21 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsShovelRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("shovel-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.SHOVEL"];
+        Assert.Equal(4, relicAgg.RelicsAcquired);
+        Assert.Equal(1, relicAgg.CommonRelicsAcquired);
+        Assert.Equal(2, relicAgg.UncommonRelicsAcquired);
+        Assert.Equal(1, relicAgg.RareRelicsAcquired);
+        Assert.Equal(2, relicAgg.CampfiresNotDug);
+    }
+
+    [Fact]
     public void ResumableLoad_AcceptsBrilliantScarfRelicFixture()
     {
         var resumed = RunStorage.LoadResumable(FixturePath("brilliant-scarf-relic-run.json"));
@@ -1149,6 +1164,20 @@ public class SchemaLoadingTests
         Assert.Equal(3, relicAgg.Activations);
         Assert.Equal(3, relicAgg.CursesAcquired);
         Assert.Equal(18, relicAgg.TotalMaxHpGained);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsShovelRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("shovel-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.SHOVEL"];
+        Assert.Equal(4, relicAgg.RelicsAcquired);
+        Assert.Equal(1, relicAgg.CommonRelicsAcquired);
+        Assert.Equal(2, relicAgg.UncommonRelicsAcquired);
+        Assert.Equal(1, relicAgg.RareRelicsAcquired);
+        Assert.Equal(2, relicAgg.CampfiresNotDug);
     }
 
     [Fact]

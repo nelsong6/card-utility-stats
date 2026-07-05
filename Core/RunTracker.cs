@@ -9,6 +9,7 @@ using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Entities.Powers;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Entities.Potions;
+using MegaCrit.Sts2.Core.Entities.Relics;
 using MegaCrit.Sts2.Core.Hooks;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Enchantments;
@@ -1515,6 +1516,11 @@ public static class RunTracker
         target.UncommonPotionsGained += source.UncommonPotionsGained;
         target.RarePotionsGained += source.RarePotionsGained;
         target.PotionsSkipped += source.PotionsSkipped;
+        target.RelicsAcquired += source.RelicsAcquired;
+        target.CommonRelicsAcquired += source.CommonRelicsAcquired;
+        target.UncommonRelicsAcquired += source.UncommonRelicsAcquired;
+        target.RareRelicsAcquired += source.RareRelicsAcquired;
+        target.CampfiresNotDug += source.CampfiresNotDug;
         target.UncommonCardsOffered += source.UncommonCardsOffered;
         target.RareCardsOffered += source.RareCardsOffered;
         target.UncommonCardsTaken += source.UncommonCardsTaken;
@@ -2126,6 +2132,7 @@ public static class RunTracker
     private const string DarkstonePeriaptRelicId = "RELIC.DARKSTONE_PERIAPT";
     private const string RegalPillowRelicId = "RELIC.REGAL_PILLOW";
     private const string WhiteBeastStatueRelicId = "RELIC.WHITE_BEAST_STATUE";
+    private const string ShovelRelicId = "RELIC.SHOVEL";
     private const string BoundPhylacteryRelicId = "RELIC.BOUND_PHYLACTERY";
     private const string PhylacteryUnboundRelicId = "RELIC.PHYLACTERY_UNBOUND";
     private const string ToolboxRelicId = "RELIC.TOOLBOX";
@@ -2639,6 +2646,62 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordWhiteBeastPotionRewardSkipped failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record relics actually added to the player by Shovel's Dig option.
+    /// The patch observes the owner inventory after <c>DigRestSiteOption.OnSelect</c>
+    /// succeeds, so rarity comes from the obtained relic instance.
+    /// </summary>
+    public static void RecordShovelRelicsAcquired(Player owner, IEnumerable<RelicModel> relics)
+    {
+        if (owner == null || relics == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(owner)) return;
+
+                var acquired = relics.Where(r => r != null).ToList();
+                if (acquired.Count == 0) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(ShovelRelicId);
+                foreach (var relic in acquired)
+                    RecordShovelRelicAcquiredForTest(agg, relic.Rarity);
+
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordShovelRelicsAcquired failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record a rest site where Shovel's Dig option was available but the
+    /// local player left without selecting it.
+    /// </summary>
+    public static void RecordShovelCampfireNotDug(Player owner)
+    {
+        if (owner == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(owner)) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(ShovelRelicId);
+                RecordShovelCampfireNotDugForTest(agg);
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordShovelCampfireNotDug failed: {e.Message}");
             }
         }
     }
@@ -3757,6 +3820,33 @@ public static class RunTracker
         if (agg == null) return;
         agg.StrikeDummyBaseStrikesInDeck = Math.Max(0, baseStrikesInDeck);
         agg.StrikeDummyNonBaseStrikeCardsInDeck = Math.Max(0, nonBaseStrikeCardsInDeck);
+    }
+
+    internal static void RecordShovelRelicAcquiredForTest(RelicAggregate agg, RelicRarity rarity)
+    {
+        if (agg == null) return;
+
+        agg.Activations++;
+        agg.RelicsAcquired++;
+
+        switch (rarity)
+        {
+            case RelicRarity.Common:
+                agg.CommonRelicsAcquired++;
+                break;
+            case RelicRarity.Uncommon:
+                agg.UncommonRelicsAcquired++;
+                break;
+            case RelicRarity.Rare:
+                agg.RareRelicsAcquired++;
+                break;
+        }
+    }
+
+    internal static void RecordShovelCampfireNotDugForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.CampfiresNotDug += Math.Max(0, count);
     }
 
     internal static bool IsStrikeDummyStatsRelic(RelicModel? relic)

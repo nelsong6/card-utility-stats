@@ -493,6 +493,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is Shovel)
+            {
+                const string relicId = "RELIC.SHOVEL";
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+
+                var body = BuildShovelBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Shovel", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is BoundPhylactery)
             {
                 const string relicId = "RELIC.BOUND_PHYLACTERY";
@@ -942,6 +952,17 @@ public static class RelicHoverShowPatch
         Row3(sb, "common potions", agg.CommonPotionsGained.ToString(), "");
         Row3(sb, "uncommon potions", agg.UncommonPotionsGained.ToString(), "");
         Row3(sb, "rare potions", agg.RarePotionsGained.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildShovelBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Relics acquired", agg.RelicsAcquired.ToString(), "");
+        Row3(sb, "common relics", agg.CommonRelicsAcquired.ToString(), "");
+        Row3(sb, "uncommon relics", agg.UncommonRelicsAcquired.ToString(), "");
+        Row3(sb, "rare relics", agg.RareRelicsAcquired.ToString(), "");
+        Row3(sb, "Campfires not dug", agg.CampfiresNotDug.ToString(), "");
         return sb.ToString();
     }
 
