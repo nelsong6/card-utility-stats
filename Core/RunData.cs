@@ -413,7 +413,8 @@ public class RelicAggregate
     // Healing attribution. Attempted is what the relic requested, restored is
     // observed HP actually gained, lost is the gap. Lost reasons keep the gap
     // explainable (full HP, prevention/modification, etc.). Used by Book
-    // Repair Knife, Eternal Feather, Lee's Waffle, and other healing relics.
+    // Repair Knife, Eternal Feather, Planisphere, Lee's Waffle, and other
+    // healing relics.
     public decimal TotalHealingAttempted { get; set; }
     public decimal TotalHealingRestored { get; set; }
     public decimal TotalHealingLost { get; set; }

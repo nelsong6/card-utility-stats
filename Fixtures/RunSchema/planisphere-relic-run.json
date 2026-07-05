@@ -1,0 +1,26 @@
+{
+  "run_id": "planisphere-relic-fixture",
+  "started_at": "2026-07-05T00:00:00Z",
+  "updated_at": "2026-07-05T00:10:00Z",
+  "outcome": "in_progress",
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.PLANISPHERE": {
+      "activations": 3,
+      "total_healing_attempted": 15,
+      "total_healing_restored": 11,
+      "total_healing_lost": 4,
+      "healing_lost_reasons": {
+        "full_hp": {
+          "reason_id": "full_hp",
+          "display_name": "full HP",
+          "amount": 4
+        }
+      }
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

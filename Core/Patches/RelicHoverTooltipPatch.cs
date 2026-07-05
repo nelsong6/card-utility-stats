@@ -333,6 +333,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is Planisphere)
+            {
+                const string relicId = "RELIC.PLANISPHERE";
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+
+                var body = BuildPlanisphereBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Planisphere", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is BurningBlood)
             {
                 const string relicId = "RELIC.BURNING_BLOOD";
@@ -741,6 +751,14 @@ public static class RelicHoverShowPatch
     {
         var sb = new StringBuilder();
         Row3(sb, "Activations", agg.Activations.ToString(), "");
+        AppendHealingStats(sb, agg);
+        return sb.ToString();
+    }
+
+    private static string BuildPlanisphereBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "? floors gained", agg.Activations.ToString(), "");
         AppendHealingStats(sb, agg);
         return sb.ToString();
     }

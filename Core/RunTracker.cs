@@ -2114,6 +2114,7 @@ public static class RunTracker
     private const string MealTicketRelicId = "RELIC.MEAL_TICKET";
     private const string BurningBloodRelicId = "RELIC.BURNING_BLOOD";
     private const string BloodVialRelicId = "RELIC.BLOOD_VIAL";
+    private const string PlanisphereRelicId = "RELIC.PLANISPHERE";
     private const string LeesWaffleRelicId = "RELIC.LEES_WAFFLE";
     private const string RegalPillowRelicId = "RELIC.REGAL_PILLOW";
     private const string WhiteBeastStatueRelicId = "RELIC.WHITE_BEAST_STATUE";
@@ -3224,6 +3225,16 @@ public static class RunTracker
     public static void RecordBloodVialTrigger(Creature healedCreature, decimal attemptedHealing)
     {
         RecordRelicHealingTrigger(BloodVialRelicId, healedCreature, attemptedHealing, nameof(RecordBloodVialTrigger));
+    }
+
+    /// <summary>
+    /// Record Planisphere's ?-room heal and arm its observed healing window.
+    /// This happens outside combat, so it normally writes directly to the
+    /// committed run aggregate.
+    /// </summary>
+    public static void RecordPlanisphereTrigger(Creature healedCreature, decimal attemptedHealing)
+    {
+        RecordRelicHealingTrigger(PlanisphereRelicId, healedCreature, attemptedHealing, nameof(RecordPlanisphereTrigger));
     }
 
     /// <summary>

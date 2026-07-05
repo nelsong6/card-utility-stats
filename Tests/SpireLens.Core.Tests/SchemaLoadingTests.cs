@@ -1258,4 +1258,33 @@ public class SchemaLoadingTests
         Assert.Equal(1, curseAgg.Plays);
         Assert.Equal(1, curseAgg.TimesExhausted);
     }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsPlanisphereRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("planisphere-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.PLANISPHERE"];
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(15m, relicAgg.TotalHealingAttempted);
+        Assert.Equal(11m, relicAgg.TotalHealingRestored);
+        Assert.Equal(4m, relicAgg.TotalHealingLost);
+        Assert.Equal(4m, relicAgg.HealingLostReasons["full_hp"].Amount);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsPlanisphereRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("planisphere-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.PLANISPHERE"];
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(15m, relicAgg.TotalHealingAttempted);
+        Assert.Equal(11m, relicAgg.TotalHealingRestored);
+        Assert.Equal(4m, relicAgg.TotalHealingLost);
+        Assert.Equal(4m, relicAgg.HealingLostReasons["full_hp"].Amount);
+    }
 }
