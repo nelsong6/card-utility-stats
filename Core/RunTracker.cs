@@ -1524,6 +1524,7 @@ public static class RunTracker
         target.DiscountsOffered += source.DiscountsOffered;
         target.DiscountsTaken += source.DiscountsTaken;
         target.EnergySavedByDiscount += source.EnergySavedByDiscount;
+        target.CardsDiscarded += source.CardsDiscarded;
         target.CardRewardsAffected += source.CardRewardsAffected;
         MergeCardRewardCategories(target.CardRewardCategories, source.CardRewardCategories);
     }
@@ -2112,6 +2113,7 @@ public static class RunTracker
     private const string PaelsWingRelicId = "RELIC.PAELS_WING";
     private const string StrikeDummyRelicId = "RELIC.STRIKE_DUMMY";
     private const string BrilliantScarfRelicId = "RELIC.BRILLIANT_SCARF";
+    private const string GamblingChipRelicId = "RELIC.GAMBLING_CHIP";
 
     /// <summary>
     /// Record a Bag of Marbles combat-start Vulnerable application.
@@ -2809,6 +2811,56 @@ public static class RunTracker
         agg.DiscountsOffered += Math.Max(0, offers);
         agg.DiscountsTaken += Math.Max(0, taken);
         agg.EnergySavedByDiscount += Math.Max(0, energySaved);
+    }
+
+    /// <summary>
+    /// Record Gambling Chip's combat-start prompt and keep a narrow discard
+    /// attribution window open until its async prompt/draw sequence completes.
+    /// </summary>
+    public static void ArmGamblingChipDiscardAttribution(Player player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+
+                _pendingCombat ??= new PendingCombat();
+                var agg = GetOrCreateRelicAggregateLocked(GamblingChipRelicId);
+                agg.Activations += 1;
+                _pendingCombat.GamblingChipDiscardAttributionPlayers.Add(player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"ArmGamblingChipDiscardAttribution failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void DisarmGamblingChipDiscardAttribution(Player player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                _pendingCombat?.GamblingChipDiscardAttributionPlayers.Remove(player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"DisarmGamblingChipDiscardAttribution failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordGamblingChipDiscardForTest(RelicAggregate agg, int activations, int cardsDiscarded)
+    {
+        if (agg == null) return;
+        agg.Activations += Math.Max(0, activations);
+        agg.CardsDiscarded += Math.Max(0, cardsDiscarded);
     }
 
     private static int GetCardOwnerTurnNumber(CardModel card)
@@ -5009,6 +5061,14 @@ public static class RunTracker
             var instanceId = GetOrAssignInstanceId(card);
             var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
             agg.TimesDiscarded++;
+
+            if (card.Owner is Player player
+                && IsTrackedPlayer(player)
+                && _pendingCombat.GamblingChipDiscardAttributionPlayers.Contains(player))
+            {
+                var relicAgg = GetOrCreateRelicAggregateLocked(GamblingChipRelicId);
+                relicAgg.CardsDiscarded += 1;
+            }
         }
     }
 
@@ -7385,6 +7445,8 @@ internal class PendingCombat
     public Dictionary<Creature, PendingPoisonTick> PendingPoisonTicks { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, PendingBrilliantScarfDiscount> BrilliantScarfDiscountOffers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> GamblingChipDiscardAttributionPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public RunMetaStats MetaStats { get; } = new();
 

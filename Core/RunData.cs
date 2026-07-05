@@ -491,6 +491,10 @@ public class RelicAggregate
     public int DiscountsTaken { get; set; }
     public int EnergySavedByDiscount { get; set; }
 
+    // Total cards actually discarded while Gambling Chip's combat-start
+    // selection resolves.
+    public int CardsDiscarded { get; set; }
+
     // Total card rewards whose creation options were modified by this relic.
     // Used by Prismatic Gem.
     public int CardRewardsAffected { get; set; }

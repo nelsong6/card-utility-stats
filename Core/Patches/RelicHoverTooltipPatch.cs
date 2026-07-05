@@ -382,6 +382,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is GamblingChip)
+            {
+                const string relicId = "RELIC.GAMBLING_CHIP";
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+
+                var body = BuildGamblingChipBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Gambling Chip", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is WhiteBeastStatue)
             {
                 const string relicId = "RELIC.WHITE_BEAST_STATUE";
@@ -715,6 +725,17 @@ public static class RelicHoverShowPatch
         Row3(sb, "Discounts offered", agg.DiscountsOffered.ToString(), "");
         Row3(sb, "Discounts taken", agg.DiscountsTaken.ToString(), "");
         Row3(sb, EnergyLabel("Energy saved"), agg.EnergySavedByDiscount.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildGamblingChipBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var averageDiscarded = agg.Activations <= 0
+            ? 0m
+            : (decimal)agg.CardsDiscarded / agg.Activations;
+        Row3(sb, "Cards discarded", agg.CardsDiscarded.ToString(), "");
+        Row3(sb, "Avg discarded per combat", FormatDecimal(averageDiscarded), "");
         return sb.ToString();
     }
 

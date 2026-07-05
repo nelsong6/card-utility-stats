@@ -1100,4 +1100,27 @@ public class SchemaLoadingTests
         Assert.Equal(3, relicAgg.DiscountsTaken);
         Assert.Equal(7, relicAgg.EnergySavedByDiscount);
     }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsGamblingChipRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("gambling-chip-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.GAMBLING_CHIP"];
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(7, relicAgg.CardsDiscarded);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsGamblingChipRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("gambling-chip-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.GAMBLING_CHIP"];
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(7, relicAgg.CardsDiscarded);
+    }
 }

@@ -104,6 +104,10 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `brilliant-scarf-relic-run.json`
   Adds Brilliant Scarf discount tracking: energy-discount offers, taken
   discounts, and energy saved by those taken discounts.
+- `gambling-chip-relic-run.json`
+  Adds Gambling Chip combat-start discard tracking: combats triggered and
+  cards actually discarded so the tooltip can show total and average discarded
+  per combat.
 
 Why these exist:
 

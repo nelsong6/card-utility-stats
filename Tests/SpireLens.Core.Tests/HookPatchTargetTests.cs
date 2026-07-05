@@ -39,6 +39,24 @@ public class HookPatchTargetTests
         Assert.Empty(target.GetParameters());
     }
 
+    [Fact]
+    [Trait("Category", "RequiresLiveGame")]
+    public void GamblingChipPatch_ResolvesAfterPlayerTurnStart()
+    {
+        var target = InvokeTargetMethod(typeof(GamblingChipAfterPlayerTurnStartPatch));
+
+        Assert.NotNull(target);
+        Assert.Equal("MegaCrit.Sts2.Core.Models.Relics.GamblingChip", target!.DeclaringType?.FullName);
+        Assert.Equal("AfterPlayerTurnStart", target.Name);
+        Assert.Equal(
+            new[]
+            {
+                "MegaCrit.Sts2.Core.GameActions.Multiplayer.PlayerChoiceContext",
+                "MegaCrit.Sts2.Core.Entities.Players.Player",
+            },
+            target.GetParameters().Select(p => p.ParameterType.FullName).ToArray());
+    }
+
     private static MethodBase? InvokeTargetMethod(Type patchType)
     {
         _ = Assembly.Load("sts2");
