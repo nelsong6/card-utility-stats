@@ -463,6 +463,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is JuzuBracelet)
+            {
+                const string relicId = "RELIC.JUZU_BRACELET";
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+
+                var body = BuildJuzuBraceletBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Juzu Bracelet", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is GamblingChip)
             {
                 const string relicId = "RELIC.GAMBLING_CHIP";
@@ -917,6 +927,13 @@ public static class RelicHoverShowPatch
         Row3(sb, "Discounts offered", agg.DiscountsOffered.ToString(), "");
         Row3(sb, "Discounts taken", agg.DiscountsTaken.ToString(), "");
         Row3(sb, EnergyLabel("Energy saved"), agg.EnergySavedByDiscount.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildJuzuBraceletBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "? sites entered", agg.QuestionMarkSitesEntered.ToString(), "");
         return sb.ToString();
     }
 

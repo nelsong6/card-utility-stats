@@ -514,6 +514,9 @@ public class RelicAggregate
     // selection resolves.
     public int CardsDiscarded { get; set; }
 
+    // Total ? map points entered while the relic was held. Used by Juzu Bracelet.
+    public int QuestionMarkSitesEntered { get; set; }
+
     // Cards actually removed while Precarious Shears' pickup effect resolves.
     public List<string> CardsRemoved { get; set; } = new();
 

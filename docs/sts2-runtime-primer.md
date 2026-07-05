@@ -347,6 +347,12 @@ This is intentionally outcome-shaped but still simple. It assumes the relic appl
 
 Relic aggregates live in `RunData.RelicAggregates`, keyed by relic id. Fields are shared across relics; each relic uses only relevant fields.
 
+Juzu Bracelet is map-point based, not resolved-room based. Count
+`RunManager.EnterMapPointInternal` when the original `MapPointType` is
+`Unknown` and the player currently holds the relic. Do not infer this stat from
+`RoomType.Event` or `EventRoom`: a `?` can resolve into multiple room types, and
+later room transitions can happen after the map site was already entered.
+
 Pael's sacrifice reward option is owned by `PaelsWing`, not `PaelsFlesh`.
 `PaelsWing.TryModifyCardRewardAlternatives` adds the `SACRIFICE` card reward
 alternative and `PaelsWing.OnSacrifice` increments the saved sacrifice count.
@@ -531,6 +537,8 @@ Good hook surfaces already proven useful:
 - `CardPile.AddInternal` filtered to Deck: permanent card entry.
 - `CardPileCmd.RemoveFromDeck` prefix: permanent card removal.
 - `CardModel.UpgradeInternal` postfix: upgrades from all sources.
+- `RunManager.EnterMapPointInternal`: original map point entry, before `?`
+  points resolve into concrete room types.
 - Specific power/relic methods via `AccessTools.TypeByName`: useful when no public compile-time type is safe or when patching optional/specific models.
 
 ## Diagnostic Habits

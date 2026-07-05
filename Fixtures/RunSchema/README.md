@@ -113,6 +113,9 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds Shovel Dig tracking: total relics acquired plus common, uncommon, and
   rare rarity splits from the actual obtained relic instances, plus campfires
   where Dig was available but not used.
+- `juzu-bracelet-relic-run.json`
+  Adds Juzu Bracelet tracking for map `?` sites entered while the relic was
+  held.
 - `gambling-chip-relic-run.json`
   Adds Gambling Chip combat-start discard tracking: combats triggered and
   cards actually discarded so the tooltip can show total and average discarded

@@ -11,6 +11,7 @@ using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Entities.Potions;
 using MegaCrit.Sts2.Core.Entities.Relics;
 using MegaCrit.Sts2.Core.Hooks;
+using MegaCrit.Sts2.Core.Map;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Enchantments;
 using MegaCrit.Sts2.Core.Models.Cards;
@@ -1541,6 +1542,7 @@ public static class RunTracker
         target.DiscountsTaken += source.DiscountsTaken;
         target.EnergySavedByDiscount += source.EnergySavedByDiscount;
         target.CardsDiscarded += source.CardsDiscarded;
+        target.QuestionMarkSitesEntered += source.QuestionMarkSitesEntered;
         MergeCardsRemovedInto(target, source);
         if (source.StartingMaxHp.HasValue) target.StartingMaxHp = source.StartingMaxHp;
         if (source.ResultingMaxHp.HasValue) target.ResultingMaxHp = source.ResultingMaxHp;
@@ -2139,6 +2141,7 @@ public static class RunTracker
     private const string PaelsWingRelicId = "RELIC.PAELS_WING";
     private const string StrikeDummyRelicId = "RELIC.STRIKE_DUMMY";
     private const string BrilliantScarfRelicId = "RELIC.BRILLIANT_SCARF";
+    private const string JuzuBraceletRelicId = "RELIC.JUZU_BRACELET";
     private const string GamblingChipRelicId = "RELIC.GAMBLING_CHIP";
     private const string CentennialPuzzleRelicId = "RELIC.CENTENNIAL_PUZZLE";
     private const string PrecariousShearsRelicId = "RELIC.PRECARIOUS_SHEARS";
@@ -2896,6 +2899,39 @@ public static class RunTracker
         agg.DiscountsOffered += Math.Max(0, offers);
         agg.DiscountsTaken += Math.Max(0, taken);
         agg.EnergySavedByDiscount += Math.Max(0, energySaved);
+    }
+
+    /// <summary>
+    /// Record a map ? site entered while Juzu Bracelet is currently held.
+    /// Uses the original map point type, before the game resolves it into a
+    /// concrete room type, so event-combat transitions cannot double count.
+    /// </summary>
+    public static void RecordJuzuQuestionSiteEntered(MapPointType pointType, bool saveGame)
+    {
+        if (!saveGame || pointType != MapPointType.Unknown) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var player = GetTrackedRunPlayerLocked();
+                if (player == null || !PlayerHasJuzuBracelet(player)) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(JuzuBraceletRelicId);
+                RecordJuzuQuestionSiteEnteredForTest(agg);
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordJuzuQuestionSiteEntered failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordJuzuQuestionSiteEnteredForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null || count <= 0) return;
+        agg.QuestionMarkSitesEntered += count;
     }
 
     /// <summary>
@@ -5267,6 +5303,18 @@ public static class RunTracker
         try
         {
             return player.Relics.Any(IsStrikeDummyStatsRelic);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool PlayerHasJuzuBracelet(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is JuzuBracelet);
         }
         catch
         {

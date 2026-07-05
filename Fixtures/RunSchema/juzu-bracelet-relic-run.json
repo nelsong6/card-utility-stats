@@ -1,0 +1,27 @@
+{
+  "run_id": "juzu-bracelet-relic-fixture",
+  "started_at": "2026-07-04T00:00:00Z",
+  "updated_at": "2026-07-04T00:10:00Z",
+  "outcome": "in_progress",
+  "aggregates": {
+    "CARD.STRIKE_IRONCLAD#1": {
+      "plays": 1,
+      "total_energy_spent": 1
+    }
+  },
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.JUZU_BRACELET": {
+      "question_mark_sites_entered": 3
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.STRIKE_IRONCLAD": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.STRIKE_IRONCLAD": 1
+  }
+}

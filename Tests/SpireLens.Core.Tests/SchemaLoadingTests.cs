@@ -1143,6 +1143,17 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsJuzuBraceletRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("juzu-bracelet-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.JUZU_BRACELET"];
+        Assert.Equal(3, relicAgg.QuestionMarkSitesEntered);
+    }
+
+    [Fact]
     public void ResumableLoad_AcceptsBrilliantScarfRelicFixture()
     {
         var resumed = RunStorage.LoadResumable(FixturePath("brilliant-scarf-relic-run.json"));
@@ -1178,6 +1189,16 @@ public class SchemaLoadingTests
         Assert.Equal(2, relicAgg.UncommonRelicsAcquired);
         Assert.Equal(1, relicAgg.RareRelicsAcquired);
         Assert.Equal(2, relicAgg.CampfiresNotDug);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsJuzuBraceletRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("juzu-bracelet-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.JUZU_BRACELET"];
+        Assert.Equal(3, relicAgg.QuestionMarkSitesEntered);
     }
 
     [Fact]
