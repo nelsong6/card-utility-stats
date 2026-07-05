@@ -1047,6 +1047,37 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsBronzeScalesRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("bronze-scales-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.BRONZE_SCALES"];
+        Assert.Equal(4, relicAgg.Activations);
+        Assert.Equal(13, relicAgg.TotalDamageAttempted);
+        Assert.Equal(10, relicAgg.TotalDamageDealt);
+        Assert.Equal(2, relicAgg.TotalDamageBlocked);
+        Assert.Equal(1, relicAgg.TotalDamageOverkill);
+        Assert.Equal(1, relicAgg.Kills);
+        Assert.Equal(4, relicAgg.TotalTargets);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsBronzeScalesRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("bronze-scales-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.BRONZE_SCALES"];
+        Assert.Equal(4, relicAgg.Activations);
+        Assert.Equal(10, relicAgg.TotalDamageDealt);
+        Assert.Equal(2, relicAgg.TotalDamageBlocked);
+        Assert.Equal(1, relicAgg.TotalDamageOverkill);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsPaelsWingSacrificeRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("paels-wing-sacrifice-relic-run.json"));

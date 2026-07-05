@@ -97,6 +97,9 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds consolidated relic aggregates rescued from stale open branches: Anchor,
   Letter Opener, Blood Vial, Akabeko, Booming Conch, Pendulum, Parrying
   Shield, Horn Cleat, and Toolbox.
+- `bronze-scales-relic-run.json`
+  Adds Bronze Scales Thorns damage tracking with observed damage, blocked
+  damage, overkill, kills, and target count.
 - `paels-wing-sacrifice-relic-run.json`
   Adds Pael's Wing sacrifice tracking: consumed card reward options split by
   common, uncommon, and rare, plus sacrifices made and skipped.

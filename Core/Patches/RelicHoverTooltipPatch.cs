@@ -234,6 +234,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is BronzeScales)
+            {
+                const string relicId = "RELIC.BRONZE_SCALES";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildBronzeScalesBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Bronze Scales", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is PenNib)
             {
                 const string relicId = "RELIC.PEN_NIB";
@@ -611,6 +621,17 @@ public static class RelicHoverShowPatch
     {
         var sb = new StringBuilder();
         Row3(sb, VigorLabel("vigor gained"), agg.VigorGained.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildBronzeScalesBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Times triggered", agg.Activations.ToString(), "");
+        Row3(sb, "Damage dealt", agg.TotalDamageDealt.ToString(), "");
+        Row3(sb, "Damage blocked", agg.TotalDamageBlocked.ToString(), "");
+        Row3(sb, "Overkill", agg.TotalDamageOverkill.ToString(), "");
+        Row3(sb, "Kills", agg.Kills.ToString(), "");
         return sb.ToString();
     }
 

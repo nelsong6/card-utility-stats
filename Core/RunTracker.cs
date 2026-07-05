@@ -77,6 +77,8 @@ public static class RunTracker
     private static readonly List<Creature> _pendingParryingShieldDamageAttributions = new();
     private static readonly List<Creature> _pendingFestivePopperDamageAttributions = new();
     private static readonly List<Creature> _pendingMercuryHourglassDamageAttributions = new();
+    private static readonly Dictionary<PowerModel, int> _bronzeScalesThornsContributions = new(ReferenceEqualityComparer.Instance);
+    private static readonly List<PendingBronzeScalesDamageAttribution> _pendingBronzeScalesDamageAttributions = new();
     private static readonly List<Creature> _pendingHornCleatBlockAttributions = new();
     private static readonly Dictionary<string, int> _lastEnergyResetRoundByRelicAndPlayer = new();
     private static int _pendingWhiteBeastPotionRewards;
@@ -862,6 +864,8 @@ public static class RunTracker
         _pendingParryingShieldDamageAttributions.Clear();
         _pendingFestivePopperDamageAttributions.Clear();
         _pendingMercuryHourglassDamageAttributions.Clear();
+        _bronzeScalesThornsContributions.Clear();
+        _pendingBronzeScalesDamageAttributions.Clear();
         _pendingHornCleatBlockAttributions.Clear();
         _lastEnergyResetRoundByRelicAndPlayer.Clear();
         _pendingToolboxOfferScreens = 0;
@@ -2131,6 +2135,7 @@ public static class RunTracker
     private const string ParryingShieldRelicId = "RELIC.PARRYING_SHIELD";
     private const string FestivePopperRelicId = "RELIC.FESTIVE_POPPER";
     private const string MercuryHourglassRelicId = "RELIC.MERCURY_HOURGLASS";
+    private const string BronzeScalesRelicId = "RELIC.BRONZE_SCALES";
     private const string HornCleatRelicId = "RELIC.HORN_CLEAT";
     private const string PrismaticGemRelicId = "RELIC.PRISMATIC_GEM";
     private const string BloodSoakedRoseRelicId = "RELIC.BLOOD_SOAKED_ROSE";
@@ -4727,6 +4732,114 @@ public static class RunTracker
         }
     }
 
+    /// <summary>
+    /// Record the observed Thorns amount contributed by Bronze Scales after
+    /// the relic's room-entry application completes. The later Thorns damage
+    /// command reports one combined amount, so this per-power contribution is
+    /// used to credit only Bronze Scales' share if other Thorns sources stack.
+    /// </summary>
+    public static void RecordBronzeScalesThornsContribution(ThornsPower? thornsPower, int amount)
+    {
+        if (thornsPower == null || amount <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_bronzeScalesThornsContributions.TryAdd(thornsPower, amount))
+                    _bronzeScalesThornsContributions[thornsPower] += amount;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordBronzeScalesThornsContribution failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void ArmBronzeScalesThornsDamageAttribution(
+        ThornsPower? thornsPower,
+        Creature? thornsOwner,
+        Creature? damageTarget)
+    {
+        if (thornsPower == null || thornsOwner == null || damageTarget == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayerCreature(thornsOwner)) return;
+                if (!_bronzeScalesThornsContributions.TryGetValue(thornsPower, out int bronzeAmount)) return;
+                if (bronzeAmount <= 0 || thornsPower.Amount <= 0) return;
+
+                _pendingBronzeScalesDamageAttributions.Add(new PendingBronzeScalesDamageAttribution(
+                    thornsOwner,
+                    damageTarget,
+                    thornsPower.Amount,
+                    Math.Min(bronzeAmount, thornsPower.Amount)));
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"ArmBronzeScalesThornsDamageAttribution failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static bool TryConsumeBronzeScalesThornsDamageAttribution(
+        Creature? damageTarget,
+        decimal totalAmount,
+        Creature? thornsOwner,
+        out decimal attributedAmount)
+    {
+        attributedAmount = 0m;
+        if (damageTarget == null || thornsOwner == null || totalAmount <= 0m) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                for (int i = 0; i < _pendingBronzeScalesDamageAttributions.Count; i++)
+                {
+                    var pending = _pendingBronzeScalesDamageAttributions[i];
+                    if (!ReferenceEquals(pending.DamageTarget, damageTarget)) continue;
+                    if (!ReferenceEquals(pending.ThornsOwner, thornsOwner)) continue;
+                    if (!AreClose(pending.TotalAmount, totalAmount)) continue;
+
+                    _pendingBronzeScalesDamageAttributions.RemoveAt(i);
+                    attributedAmount = pending.AttributedAmount;
+                    return attributedAmount > 0m;
+                }
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"TryConsumeBronzeScalesThornsDamageAttribution failed: {e.Message}");
+            }
+        }
+
+        return false;
+    }
+
+    public static void RecordBronzeScalesDamage(
+        IEnumerable<DamageResult>? results,
+        decimal totalAmount,
+        decimal attributedAmount)
+    {
+        if (results == null || totalAmount <= 0m || attributedAmount <= 0m) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(BronzeScalesRelicId);
+                agg.Activations += 1;
+                AddAttributedRelicDamageResultsLocked(agg, results, totalAmount, attributedAmount);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordBronzeScalesDamage failed: {e.Message}");
+            }
+        }
+    }
+
     internal static void RecordFestivePopperDamageForTest(
         RelicAggregate agg,
         IEnumerable<(int BlockedDamage, int UnblockedDamage, int OverkillDamage, bool WasTargetKilled)> results)
@@ -4757,6 +4870,15 @@ public static class RunTracker
         }
     }
 
+    internal static void RecordBronzeScalesDamageForTest(
+        RelicAggregate agg,
+        IEnumerable<(int BlockedDamage, int UnblockedDamage, int OverkillDamage, bool WasTargetKilled)> results,
+        decimal totalAmount,
+        decimal attributedAmount)
+    {
+        AddAttributedRelicDamageResultPartsLocked(agg, results, totalAmount, attributedAmount);
+    }
+
     private static void AddRelicDamageResultsLocked(RelicAggregate agg, IEnumerable<DamageResult> results)
     {
         foreach (var result in results)
@@ -4769,6 +4891,76 @@ public static class RunTracker
                 result.OverkillDamage,
                 result.WasTargetKilled);
         }
+    }
+
+    private static void AddAttributedRelicDamageResultsLocked(
+        RelicAggregate agg,
+        IEnumerable<DamageResult> results,
+        decimal totalAmount,
+        decimal attributedAmount)
+    {
+        foreach (var result in results)
+        {
+            if (result == null) continue;
+            AddAttributedRelicDamageResultPartsLocked(
+                agg,
+                result.BlockedDamage,
+                result.UnblockedDamage,
+                result.OverkillDamage,
+                result.WasTargetKilled,
+                totalAmount,
+                attributedAmount);
+        }
+    }
+
+    private static void AddAttributedRelicDamageResultPartsLocked(
+        RelicAggregate agg,
+        IEnumerable<(int BlockedDamage, int UnblockedDamage, int OverkillDamage, bool WasTargetKilled)> results,
+        decimal totalAmount,
+        decimal attributedAmount)
+    {
+        foreach (var result in results)
+        {
+            AddAttributedRelicDamageResultPartsLocked(
+                agg,
+                result.BlockedDamage,
+                result.UnblockedDamage,
+                result.OverkillDamage,
+                result.WasTargetKilled,
+                totalAmount,
+                attributedAmount);
+        }
+    }
+
+    private static void AddAttributedRelicDamageResultPartsLocked(
+        RelicAggregate agg,
+        int blockedDamage,
+        int unblockedDamage,
+        int overkillDamage,
+        bool wasTargetKilled,
+        decimal totalAmount,
+        decimal attributedAmount)
+    {
+        if (totalAmount <= 0m || attributedAmount <= 0m) return;
+        if (attributedAmount >= totalAmount)
+        {
+            AddRelicDamageResultPartsLocked(agg, blockedDamage, unblockedDamage, overkillDamage, wasTargetKilled);
+            return;
+        }
+
+        decimal ratio = attributedAmount / totalAmount;
+        AddRelicDamageResultPartsLocked(
+            agg,
+            ScaleDamageComponent(blockedDamage, ratio),
+            ScaleDamageComponent(unblockedDamage, ratio),
+            ScaleDamageComponent(overkillDamage, ratio),
+            wasTargetKilled);
+    }
+
+    private static int ScaleDamageComponent(int amount, decimal ratio)
+    {
+        if (amount <= 0 || ratio <= 0m) return 0;
+        return (int)Math.Round(amount * ratio, MidpointRounding.AwayFromZero);
     }
 
     private static void AddRelicDamageResultPartsLocked(
@@ -8512,6 +8704,26 @@ internal sealed class PlayerPowerOwnershipShare
     public required string EffectId { get; init; }
     public required string DisplayName { get; init; }
     public string? IconPath { get; init; }
+}
+
+internal sealed class PendingBronzeScalesDamageAttribution
+{
+    public PendingBronzeScalesDamageAttribution(
+        Creature thornsOwner,
+        Creature damageTarget,
+        decimal totalAmount,
+        decimal attributedAmount)
+    {
+        ThornsOwner = thornsOwner;
+        DamageTarget = damageTarget;
+        TotalAmount = totalAmount;
+        AttributedAmount = attributedAmount;
+    }
+
+    public Creature ThornsOwner { get; }
+    public Creature DamageTarget { get; }
+    public decimal TotalAmount { get; }
+    public decimal AttributedAmount { get; }
 }
 
 internal readonly record struct PoisonOwnershipKey(string CardInstanceId, string EffectId);

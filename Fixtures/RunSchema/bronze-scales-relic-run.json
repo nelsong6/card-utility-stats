@@ -1,0 +1,32 @@
+{
+  "run_id": "bronze-scales-relic-fixture",
+  "started_at": "2026-07-04T00:00:00Z",
+  "updated_at": "2026-07-04T00:15:00Z",
+  "outcome": "in_progress",
+  "aggregates": {
+    "CARD.STRIKE_KIN#1": {
+      "plays": 1
+    }
+  },
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.BRONZE_SCALES": {
+      "activations": 4,
+      "total_damage_attempted": 13,
+      "total_damage_dealt": 10,
+      "total_damage_blocked": 2,
+      "total_damage_overkill": 1,
+      "kills": 1,
+      "total_targets": 4
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.STRIKE_KIN": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.STRIKE_KIN": 1
+  }
+}
