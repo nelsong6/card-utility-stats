@@ -105,7 +105,8 @@ New fixtures added going forward do not need a `v*-` prefix.
   permanent-deck counts for base Strikes and non-base Strike-tagged cards.
 - `brilliant-scarf-relic-run.json`
   Adds Brilliant Scarf discount tracking: energy-discount offers, taken
-  discounts, and energy saved by those taken discounts.
+  discounts, energy saved by those taken discounts, held combats, and
+  discounted card cost buckets including dynamic star costs.
 - `darkstone-periapt-relic-run.json`
   Adds Darkstone Periapt curse acquisition tracking plus observed max HP
   gained from the relic's owner-specific curse-to-deck callback.

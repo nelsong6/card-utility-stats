@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Godot;
@@ -20,6 +21,7 @@ public static class RelicHoverShowPatch
     private const string WeakIconPath = "res://images/atlases/power_atlas.sprites/weak_power.tres";
     private const string BlockIconPath = "res://images/ui/combat/block.png";
     private const string EnergyIconPath = "res://images/atlases/potion_atlas.sprites/energy_potion.tres";
+    private const string StarIconPath = "res://images/packed/sprite_fonts/star_icon.png";
     private const string VigorIconPath = "res://images/atlases/power_atlas.sprites/vigor_power.tres";
     private const int InlineIconSize = 16;
 
@@ -924,9 +926,37 @@ public static class RelicHoverShowPatch
     private static string BuildBrilliantScarfBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
+        var energySavedPerCombat = agg.DiscountCombats <= 0
+            ? 0m
+            : (decimal)agg.EnergySavedByDiscount / agg.DiscountCombats;
+        var energySavedPerUse = agg.DiscountsTaken <= 0
+            ? 0m
+            : (decimal)agg.EnergySavedByDiscount / agg.DiscountsTaken;
+        Row3(sb, "Combats held", agg.DiscountCombats.ToString(), "");
         Row3(sb, "Discounts offered", agg.DiscountsOffered.ToString(), "");
         Row3(sb, "Discounts taken", agg.DiscountsTaken.ToString(), "");
         Row3(sb, EnergyLabel("Energy saved"), agg.EnergySavedByDiscount.ToString(), "");
+        Row3(sb, EnergyLabel("saved / combat"), FormatDecimal(energySavedPerCombat), "");
+        Row3(sb, EnergyLabel("saved / use"), FormatDecimal(energySavedPerUse), "");
+
+        for (int energyCost = 0; energyCost <= 3; energyCost++)
+        {
+            Row3(
+                sb,
+                BrilliantScarfCostLabel(energyCost, starCost: 0),
+                BrilliantScarfCostCount(agg, energyCost, starCost: 0).ToString(),
+                "");
+        }
+
+        foreach (var bucket in DynamicBrilliantScarfCostBuckets(agg))
+        {
+            Row3(
+                sb,
+                BrilliantScarfCostLabel(bucket.EnergyCost, bucket.StarCost),
+                bucket.Count.ToString(),
+                "");
+        }
+
         return sb.ToString();
     }
 
@@ -1055,6 +1085,56 @@ public static class RelicHoverShowPatch
     {
         var path = NormalizeResourcePath(EnergyIconPath);
         return $"[img={InlineIconSize}x{InlineIconSize}]{path}[/img] {suffix}";
+    }
+
+    private static string BrilliantScarfCostLabel(int energyCost, int starCost)
+    {
+        var energyIcon = InlineIcon(EnergyIconPath);
+        if (starCost > 0)
+        {
+            var starIcon = InlineIcon(StarIconPath);
+            return $"{Math.Max(0, energyCost)} {energyIcon} {Math.Max(0, starCost)} {starIcon} cost reduced";
+        }
+
+        return $"{Math.Max(0, energyCost)} {energyIcon} cost reduced";
+    }
+
+    private static int BrilliantScarfCostCount(RelicAggregate agg, int energyCost, int starCost)
+    {
+        if (agg.DiscountedCardCosts == null) return 0;
+        return agg.DiscountedCardCosts.Values
+            .Where(b => b.EnergyCost == energyCost && b.StarCost == starCost)
+            .Sum(b => Math.Max(0, b.Count));
+    }
+
+    private static IEnumerable<DiscountedCardCostAggregate> DynamicBrilliantScarfCostBuckets(RelicAggregate agg)
+    {
+        if (agg.DiscountedCardCosts == null) return Enumerable.Empty<DiscountedCardCostAggregate>();
+
+        return agg.DiscountedCardCosts.Values
+            .Where(b => b.Count > 0)
+            .Select(b => new DiscountedCardCostAggregate
+            {
+                EnergyCost = Math.Max(0, b.EnergyCost),
+                StarCost = Math.Max(0, b.StarCost),
+                Count = Math.Max(0, b.Count),
+            })
+            .Where(b => b.StarCost > 0 || b.EnergyCost > 3)
+            .GroupBy(b => new { b.EnergyCost, b.StarCost })
+            .Select(g => new DiscountedCardCostAggregate
+            {
+                EnergyCost = g.Key.EnergyCost,
+                StarCost = g.Key.StarCost,
+                Count = g.Sum(b => b.Count),
+            })
+            .OrderBy(b => b.EnergyCost)
+            .ThenBy(b => b.StarCost);
+    }
+
+    private static string InlineIcon(string path)
+    {
+        var normalized = NormalizeResourcePath(path);
+        return $"[img={InlineIconSize}x{InlineIconSize}]{normalized}[/img]";
     }
 
     private static string VigorLabel(string suffix)

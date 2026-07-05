@@ -35,6 +35,31 @@ public static class BrilliantScarfTryModifyEnergyCostPatch
     }
 }
 
+[HarmonyPatch(typeof(BrilliantScarf), nameof(BrilliantScarf.TryModifyStarCost))]
+public static class BrilliantScarfTryModifyStarCostPatch
+{
+    [HarmonyPostfix]
+    public static void Postfix(
+        BrilliantScarf __instance,
+        CardModel card,
+        decimal originalCost,
+        ref decimal modifiedCost,
+        bool __result)
+    {
+        try
+        {
+            if (!__result) return;
+            if (!RunTracker.IsTrackedRelic(__instance)) return;
+
+            RunTracker.RecordBrilliantScarfPotentialStarSaving(card, originalCost, modifiedCost);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"BrilliantScarfTryModifyStarCostPatch failed: {e.Message}");
+        }
+    }
+}
+
 [HarmonyPatch(typeof(BrilliantScarf), nameof(BrilliantScarf.AfterCardPlayed))]
 public static class BrilliantScarfAfterCardPlayedPatch
 {

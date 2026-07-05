@@ -506,9 +506,11 @@ public class RelicAggregate
     public int StrikeDummyNonBaseStrikeCardsInDeck { get; set; }
 
     // Cost-discount tracking. Used by Brilliant Scarf.
+    public int DiscountCombats { get; set; }
     public int DiscountsOffered { get; set; }
     public int DiscountsTaken { get; set; }
     public int EnergySavedByDiscount { get; set; }
+    public Dictionary<string, DiscountedCardCostAggregate> DiscountedCardCosts { get; set; } = new();
 
     // Total cards actually discarded while Gambling Chip's combat-start
     // selection resolves.
@@ -537,6 +539,13 @@ public class RelicAggregate
 public class CardRewardCategoryAggregate
 {
     public string DisplayName { get; set; } = "";
+    public int Count { get; set; }
+}
+
+public class DiscountedCardCostAggregate
+{
+    public int EnergyCost { get; set; }
+    public int StarCost { get; set; }
     public int Count { get; set; }
 }
 

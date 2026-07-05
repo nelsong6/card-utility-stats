@@ -1109,9 +1109,13 @@ public class SchemaLoadingTests
         Assert.NotNull(loaded);
         Assert.True(loaded!.SupportsResume);
         var relicAgg = loaded.Data.RelicAggregates["RELIC.BRILLIANT_SCARF"];
+        Assert.Equal(2, relicAgg.DiscountCombats);
         Assert.Equal(5, relicAgg.DiscountsOffered);
         Assert.Equal(3, relicAgg.DiscountsTaken);
         Assert.Equal(7, relicAgg.EnergySavedByDiscount);
+        Assert.Equal(2, relicAgg.DiscountedCardCosts["energy:2|stars:0"].Count);
+        Assert.Equal(1, relicAgg.DiscountedCardCosts["energy:1|stars:2"].Count);
+        Assert.Equal(1, relicAgg.DiscountedCardCosts["energy:4|stars:0"].Count);
     }
 
     [Fact]
@@ -1160,9 +1164,13 @@ public class SchemaLoadingTests
 
         Assert.NotNull(resumed);
         var relicAgg = resumed!.RelicAggregates["RELIC.BRILLIANT_SCARF"];
+        Assert.Equal(2, relicAgg.DiscountCombats);
         Assert.Equal(5, relicAgg.DiscountsOffered);
         Assert.Equal(3, relicAgg.DiscountsTaken);
         Assert.Equal(7, relicAgg.EnergySavedByDiscount);
+        Assert.Equal(2, relicAgg.DiscountedCardCosts["energy:2|stars:0"].Count);
+        Assert.Equal(1, relicAgg.DiscountedCardCosts["energy:1|stars:2"].Count);
+        Assert.Equal(1, relicAgg.DiscountedCardCosts["energy:4|stars:0"].Count);
     }
 
     [Fact]

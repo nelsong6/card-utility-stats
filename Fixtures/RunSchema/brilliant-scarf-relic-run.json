@@ -16,9 +16,32 @@
   "events": [],
   "relic_aggregates": {
     "RELIC.BRILLIANT_SCARF": {
+      "discount_combats": 2,
       "discounts_offered": 5,
       "discounts_taken": 3,
-      "energy_saved_by_discount": 7
+      "energy_saved_by_discount": 7,
+      "discounted_card_costs": {
+        "energy:0|stars:0": {
+          "energy_cost": 0,
+          "star_cost": 0,
+          "count": 1
+        },
+        "energy:2|stars:0": {
+          "energy_cost": 2,
+          "star_cost": 0,
+          "count": 2
+        },
+        "energy:1|stars:2": {
+          "energy_cost": 1,
+          "star_cost": 2,
+          "count": 1
+        },
+        "energy:4|stars:0": {
+          "energy_cost": 4,
+          "star_cost": 0,
+          "count": 1
+        }
+      }
     }
   },
   "meta_stats": {},

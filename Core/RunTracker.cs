@@ -1381,6 +1381,7 @@ public static class RunTracker
             _pendingCombat = new PendingCombat();
             ResetCombatContextState();
             RecordCombatsInDeckForCurrentDeckLocked();
+            RecordBrilliantScarfCombatForTrackedPlayerLocked();
         }
     }
 
@@ -1538,9 +1539,11 @@ public static class RunTracker
         if (source.StrikeDummyNonBaseStrikeCardsInDeck != 0 || target.StrikeDummyNonBaseStrikeCardsInDeck == 0)
             target.StrikeDummyNonBaseStrikeCardsInDeck = source.StrikeDummyNonBaseStrikeCardsInDeck;
 
+        target.DiscountCombats += source.DiscountCombats;
         target.DiscountsOffered += source.DiscountsOffered;
         target.DiscountsTaken += source.DiscountsTaken;
         target.EnergySavedByDiscount += source.EnergySavedByDiscount;
+        MergeDiscountedCardCosts(target, source);
         target.CardsDiscarded += source.CardsDiscarded;
         target.QuestionMarkSitesEntered += source.QuestionMarkSitesEntered;
         MergeCardsRemovedInto(target, source);
@@ -1548,6 +1551,17 @@ public static class RunTracker
         if (source.ResultingMaxHp.HasValue) target.ResultingMaxHp = source.ResultingMaxHp;
         target.CardRewardsAffected += source.CardRewardsAffected;
         MergeCardRewardCategories(target.CardRewardCategories, source.CardRewardCategories);
+    }
+
+    private static void MergeDiscountedCardCosts(RelicAggregate target, RelicAggregate source)
+    {
+        target.DiscountedCardCosts ??= new Dictionary<string, DiscountedCardCostAggregate>();
+        if (source.DiscountedCardCosts == null) return;
+
+        foreach (var bucket in source.DiscountedCardCosts.Values)
+        {
+            AddDiscountedCardCost(target, bucket.EnergyCost, bucket.StarCost, bucket.Count);
+        }
     }
 
     // -------- Event observation (from CombatHistory.Add postfix) --------
@@ -2810,6 +2824,8 @@ public static class RunTracker
 
                 _pendingCombat ??= new PendingCombat();
                 var player = cardPlay.Card.Owner;
+                RecordBrilliantScarfCombatForPlayerLocked(player);
+
                 int turnNumber = GetCardOwnerTurnNumber(cardPlay.Card);
                 if (_pendingCombat.BrilliantScarfDiscountOffers.TryGetValue(player, out var existing)
                     && existing.TurnNumber == turnNumber)
@@ -2849,13 +2865,39 @@ public static class RunTracker
                 if (!_pendingCombat.BrilliantScarfDiscountOffers.TryGetValue(card.Owner, out var offer)) return;
                 if (offer.TurnNumber != GetCardOwnerTurnNumber(card)) return;
 
-                offer.EnergySavedByCard[card] = offer.EnergySavedByCard.TryGetValue(card, out var previous)
-                    ? Math.Max(previous, energySaved)
-                    : energySaved;
+                var saving = GetOrCreateBrilliantScarfCardSaving(offer, card);
+                saving.EnergySaved = Math.Max(saving.EnergySaved, energySaved);
             }
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordBrilliantScarfPotentialEnergySaving failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordBrilliantScarfPotentialStarSaving(CardModel card, decimal originalCost, decimal modifiedCost)
+    {
+        if (card?.Owner == null) return;
+        if (originalCost <= modifiedCost) return;
+
+        int starsSaved = (int)Math.Floor(originalCost - modifiedCost);
+        if (starsSaved <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null) return;
+                if (!IsTrackedCard(card)) return;
+                if (!_pendingCombat.BrilliantScarfDiscountOffers.TryGetValue(card.Owner, out var offer)) return;
+                if (offer.TurnNumber != GetCardOwnerTurnNumber(card)) return;
+
+                var saving = GetOrCreateBrilliantScarfCardSaving(offer, card);
+                saving.StarsSaved = Math.Max(saving.StarsSaved, starsSaved);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordBrilliantScarfPotentialStarSaving failed: {e.Message}");
             }
         }
     }
@@ -2877,10 +2919,16 @@ public static class RunTracker
                 _pendingCombat.BrilliantScarfDiscountOffers.Remove(player);
                 if (offer.TurnNumber != GetCardOwnerTurnNumber(cardPlay.Card)) return;
 
-                offer.EnergySavedByCard.TryGetValue(cardPlay.Card, out var energySaved);
+                offer.SavingsByCard.TryGetValue(cardPlay.Card, out var saving);
+                int energySaved = Math.Max(0, saving?.EnergySaved ?? 0);
+                int starsSaved = Math.Max(0, saving?.StarsSaved ?? 0);
                 var agg = GetOrCreateRelicAggregateLocked(BrilliantScarfRelicId);
                 agg.DiscountsTaken += 1;
-                agg.EnergySavedByDiscount += Math.Max(0, energySaved);
+                agg.EnergySavedByDiscount += energySaved;
+                AddDiscountedCardCost(
+                    agg,
+                    cardPlay.Resources.EnergySpent + energySaved,
+                    cardPlay.Resources.StarsSpent + starsSaved);
             }
             catch (Exception e)
             {
@@ -2893,12 +2941,77 @@ public static class RunTracker
         RelicAggregate agg,
         int offers,
         int taken,
-        int energySaved)
+        int energySaved,
+        int combats = 0)
     {
         if (agg == null) return;
+        agg.DiscountCombats += Math.Max(0, combats);
         agg.DiscountsOffered += Math.Max(0, offers);
         agg.DiscountsTaken += Math.Max(0, taken);
         agg.EnergySavedByDiscount += Math.Max(0, energySaved);
+    }
+
+    internal static void RecordBrilliantScarfDiscountCostForTest(
+        RelicAggregate agg,
+        int energyCost,
+        int starCost,
+        int count = 1)
+    {
+        if (agg == null) return;
+        AddDiscountedCardCost(agg, energyCost, starCost, count);
+    }
+
+    internal static string BrilliantScarfDiscountCostKeyForTest(int energyCost, int starCost)
+    {
+        return DiscountedCardCostKey(energyCost, starCost);
+    }
+
+    private static PendingBrilliantScarfCardSaving GetOrCreateBrilliantScarfCardSaving(
+        PendingBrilliantScarfDiscount offer,
+        CardModel card)
+    {
+        if (!offer.SavingsByCard.TryGetValue(card, out var saving))
+        {
+            saving = new PendingBrilliantScarfCardSaving();
+            offer.SavingsByCard[card] = saving;
+        }
+
+        return saving;
+    }
+
+    private static void AddDiscountedCardCost(
+        RelicAggregate agg,
+        int energyCost,
+        int starCost,
+        int count = 1)
+    {
+        if (agg == null || count <= 0) return;
+        agg.DiscountedCardCosts ??= new Dictionary<string, DiscountedCardCostAggregate>();
+
+        energyCost = Math.Max(0, energyCost);
+        starCost = Math.Max(0, starCost);
+        var key = DiscountedCardCostKey(energyCost, starCost);
+        if (!agg.DiscountedCardCosts.TryGetValue(key, out var bucket))
+        {
+            bucket = new DiscountedCardCostAggregate
+            {
+                EnergyCost = energyCost,
+                StarCost = starCost,
+            };
+            agg.DiscountedCardCosts[key] = bucket;
+        }
+        else
+        {
+            bucket.EnergyCost = energyCost;
+            bucket.StarCost = starCost;
+        }
+
+        bucket.Count += count;
+    }
+
+    private static string DiscountedCardCostKey(int energyCost, int starCost)
+    {
+        return $"energy:{Math.Max(0, energyCost)}|stars:{Math.Max(0, starCost)}";
     }
 
     /// <summary>
@@ -5315,6 +5428,42 @@ public static class RunTracker
         try
         {
             return player.Relics.Any(r => r is JuzuBracelet);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static void RecordBrilliantScarfCombatForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordBrilliantScarfCombatForPlayerLocked(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordBrilliantScarfCombatForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordBrilliantScarfCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasBrilliantScarf(player)) return;
+        if (!_pendingCombat.BrilliantScarfCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreateRelicAggregateLocked(BrilliantScarfRelicId);
+        agg.DiscountCombats += 1;
+    }
+
+    private static bool PlayerHasBrilliantScarf(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is BrilliantScarf);
         }
         catch
         {
@@ -8256,6 +8405,8 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, PendingBrilliantScarfDiscount> BrilliantScarfDiscountOffers { get; }
         = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> BrilliantScarfCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> GamblingChipDiscardAttributionPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> CentennialPuzzleDrawsRemaining { get; }
@@ -8270,7 +8421,14 @@ internal class PendingCombat
 internal sealed class PendingBrilliantScarfDiscount
 {
     public int TurnNumber { get; init; }
-    public Dictionary<CardModel, int> EnergySavedByCard { get; } = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<CardModel, PendingBrilliantScarfCardSaving> SavingsByCard { get; }
+        = new(ReferenceEqualityComparer.Instance);
+}
+
+internal sealed class PendingBrilliantScarfCardSaving
+{
+    public int EnergySaved { get; set; }
+    public int StarsSaved { get; set; }
 }
 
 internal sealed class EnemyStatusSourceFrame
