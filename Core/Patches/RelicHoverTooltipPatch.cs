@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using Godot;
 using HarmonyLib;
+using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Relics;
 using MegaCrit.Sts2.Core.Nodes.Relics;
 
@@ -612,6 +613,434 @@ public static class RelicHoverShowPatch
         }
     }
 
+    internal static string GetStatsAggregateId(RelicModel relicModel)
+    {
+        if (IsAnchorStatsRelicModel(relicModel))
+            return "RELIC.ANCHOR";
+
+        if (IsStrikeDummyStatsRelicModel(relicModel))
+            return "RELIC.STRIKE_DUMMY";
+
+        return relicModel.Id.ToString();
+    }
+
+    internal static bool TryBuildBodyBBCode(
+        RelicModel relicModel,
+        RelicAggregate agg,
+        int? floorCount,
+        out string title,
+        out string body)
+    {
+        return TryBuildBodyBBCode(relicModel, agg, floorCount, null, out title, out body);
+    }
+
+    internal static bool TryBuildBodyBBCode(
+        RelicModel relicModel,
+        RelicAggregate agg,
+        int? floorCount,
+        CardAggregate? bloodSoakedRoseCurseAgg,
+        out string title,
+        out string body)
+    {
+        title = "";
+        body = "";
+        agg ??= new RelicAggregate();
+
+        if (relicModel is BagOfMarbles)
+        {
+            title = "Bag of Marbles";
+            body = BuildBagOfMarblesBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is RedMask)
+        {
+            title = "Red Mask";
+            body = BuildRedMaskBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is Pocketwatch)
+        {
+            title = "Pocketwatch";
+            body = BuildPocketwatchBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is Orichalcum)
+        {
+            title = "Orichalcum";
+            body = BuildOrichalcumBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is Permafrost)
+        {
+            title = "Permafrost";
+            body = BuildPermafrostBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is Vambrace)
+        {
+            title = "Vambrace";
+            body = BuildVambraceBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is TuningFork)
+        {
+            title = "Tuning Fork";
+            body = BuildTuningForkBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is TheAbacus)
+        {
+            title = "The Abacus";
+            body = BuildTheAbacusBodyBBCode(agg);
+            return true;
+        }
+
+        if (IsAnchorStatsRelicModel(relicModel))
+        {
+            title = IsFakeAnchorRelicModel(relicModel) ? "???" : "Anchor";
+            body = BuildAnchorBodyBBCode(agg);
+            return true;
+        }
+
+        if (IsRelicModel(relicModel, "MegaCrit.Sts2.Core.Models.Relics.LetterOpener"))
+        {
+            title = "Letter Opener";
+            body = BuildLetterOpenerBodyBBCode(agg);
+            return true;
+        }
+
+        if (IsRelicModel(relicModel, "MegaCrit.Sts2.Core.Models.Relics.Akabeko"))
+        {
+            title = "Akabeko";
+            body = BuildAkabekoBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is BookRepairKnife)
+        {
+            title = "Book Repair Knife";
+            body = BuildBookRepairKnifeBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is EternalFeather)
+        {
+            title = "Eternal Feather";
+            body = BuildEternalFeatherBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is BoneFlute)
+        {
+            title = "Bone Flute";
+            body = BuildBoneFluteBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is HappyFlower)
+        {
+            title = "Happy Flower";
+            body = BuildHappyFlowerBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is Candelabra)
+        {
+            title = "Candelabra";
+            body = BuildCandelabraBodyBBCode(agg);
+            return true;
+        }
+
+        if (IsRelicModel(relicModel, "MegaCrit.Sts2.Core.Models.Relics.BoomingConch"))
+        {
+            title = "Booming Conch";
+            body = BuildBoomingConchBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is GremlinHorn)
+        {
+            title = "Gremlin Horn";
+            body = BuildGremlinHornBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is Pendulum)
+        {
+            title = "Pendulum";
+            body = BuildPendulumBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is MercuryHourglass)
+        {
+            title = "Mercury Hourglass";
+            body = BuildMercuryHourglassBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is ParryingShield)
+        {
+            title = "Parrying Shield";
+            body = BuildParryingShieldBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is FestivePopper)
+        {
+            title = "Festive Popper";
+            body = BuildFestivePopperBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is BronzeScales)
+        {
+            title = "Bronze Scales";
+            body = BuildBronzeScalesBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is PenNib)
+        {
+            title = "Pen Nib";
+            body = BuildPenNibBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is HornCleat)
+        {
+            title = "Horn Cleat";
+            body = BuildHornCleatBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is PrismaticGem)
+        {
+            title = "Prismatic Gem";
+            body = BuildPrismaticGemBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is BloodSoakedRose)
+        {
+            title = "Blood-Soaked Rose";
+            body = BuildBloodSoakedRoseBodyBBCode(agg, bloodSoakedRoseCurseAgg ?? new CardAggregate());
+            return true;
+        }
+
+        if (relicModel is CloakClasp)
+        {
+            title = "Cloak Clasp";
+            body = BuildCloakClaspBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is ReptileTrinket)
+        {
+            title = "Reptile Trinket";
+            body = BuildReptileTrinketBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is Gorget)
+        {
+            title = "Gorget";
+            body = BuildGorgetBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is StoneCracker)
+        {
+            title = "Stone Cracker";
+            body = BuildStoneCrackerBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is Whetstone)
+        {
+            title = "Whetstone";
+            body = BuildWhetstoneBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is WarPaint)
+        {
+            title = "War Paint";
+            body = BuildWarPaintBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is SandCastle)
+        {
+            title = "Sand Castle";
+            body = BuildSandCastleBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is MealTicket)
+        {
+            title = "Meal Ticket";
+            body = BuildMealTicketBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is Planisphere)
+        {
+            title = "Planisphere";
+            body = BuildPlanisphereBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is Pantograph)
+        {
+            title = "Pantograph";
+            body = BuildPantographBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is BurningBlood)
+        {
+            title = "Burning Blood";
+            body = BuildBurningBloodBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is LeesWaffle)
+        {
+            title = "Lee's Waffle";
+            body = BuildLeesWaffleBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is ChosenCheese)
+        {
+            title = "Chosen Cheese";
+            body = BuildChosenCheeseBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is DarkstonePeriapt)
+        {
+            title = "Darkstone Periapt";
+            body = BuildDarkstonePeriaptBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is RegalPillow)
+        {
+            title = "Regal Pillow";
+            body = BuildRegalPillowBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is PrecariousShears)
+        {
+            title = "Precarious Shears";
+            body = BuildPrecariousShearsBodyBBCode(agg);
+            return true;
+        }
+
+        if (IsRelicModel(relicModel, "MegaCrit.Sts2.Core.Models.Relics.BloodVial"))
+        {
+            title = "Blood Vial";
+            body = BuildBloodVialBodyBBCode(agg);
+            return true;
+        }
+
+        if (IsRelicModel(relicModel, "MegaCrit.Sts2.Core.Models.Relics.Toolbox"))
+        {
+            title = "Toolbox";
+            body = BuildToolboxBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is HeftyTablet)
+        {
+            title = "Hefty Tablet";
+            body = BuildHeftyTabletBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is PaelsWing)
+        {
+            title = "Pael's Wing";
+            body = BuildPaelsWingBodyBBCodeForFloor(agg, floorCount);
+            return true;
+        }
+
+        if (IsStrikeDummyStatsRelicModel(relicModel))
+        {
+            title = IsFakeStrikeDummyRelicModel(relicModel) ? "???" : "Strike Dummy";
+            body = BuildStrikeDummyBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is BrilliantScarf)
+        {
+            title = "Brilliant Scarf";
+            body = BuildBrilliantScarfBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is JuzuBracelet)
+        {
+            title = "Juzu Bracelet";
+            body = BuildJuzuBraceletBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is GamblingChip)
+        {
+            title = "Gambling Chip";
+            body = BuildGamblingChipBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is CentennialPuzzle)
+        {
+            title = "Centennial Puzzle";
+            body = BuildCentennialPuzzleBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is WhiteBeastStatue)
+        {
+            title = "White Beast Statue";
+            body = BuildWhiteBeastStatueBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is Shovel)
+        {
+            title = "Shovel";
+            body = BuildShovelBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is BoundPhylactery)
+        {
+            title = "Bound Phylactery";
+            body = BuildPhylacteryBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is PhylacteryUnbound)
+        {
+            title = "Phylactery Unbound";
+            body = BuildPhylacteryBodyBBCode(agg);
+            return true;
+        }
+
+        return false;
+    }
+
     private static string BuildBagOfMarblesBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
@@ -1049,13 +1478,18 @@ public static class RelicHoverShowPatch
 
     private static string BuildPaelsWingBodyBBCode(RelicAggregate agg)
     {
+        return BuildPaelsWingBodyBBCodeForFloor(agg, RunTracker.GetCurrentFloorForRateStats());
+    }
+
+    private static string BuildPaelsWingBodyBBCodeForFloor(RelicAggregate agg, int? floorCountOverride)
+    {
         var sb = new StringBuilder();
         Row3(sb, "common cards consumed", agg.CommonCardsConsumed.ToString(), "");
         Row3(sb, "uncommon cards consumed", agg.UncommonCardsConsumed.ToString(), "");
         Row3(sb, "rare cards consumed", agg.RareCardsConsumed.ToString(), "");
         Row3(sb, "Sacrifices made", agg.SacrificesMade.ToString(), "");
         Row3(sb, "Sacrifices skipped", agg.SacrificesSkipped.ToString(), "");
-        var floorCount = RunTracker.GetCurrentFloorForRateStats();
+        var floorCount = floorCountOverride.GetValueOrDefault();
         var rate = floorCount <= 0 ? 0m : (decimal)agg.SacrificesMade / floorCount;
         Row3(sb, "Sacrifice rate", FormatDecimal(rate), "/floor");
         return sb.ToString();

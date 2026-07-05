@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Godot;
@@ -161,13 +162,6 @@ public static class CardHoverShowPatch
             return sb.ToString();
         }
 
-        // Per-play averages — the actual "utility" signal. Guard against
-        // div-by-zero for the unplayed case.
-        float avgIntended = agg.Plays > 0 ? (float)agg.TotalIntended / agg.Plays : 0f;
-        float avgEffective = agg.Plays > 0 ? (float)agg.TotalEffective / agg.Plays : 0f;
-        float overkillPct = agg.TotalIntended > 0 ? 100f * agg.TotalOverkill / agg.TotalIntended : 0f;
-        float blockedPct = agg.TotalIntended > 0 ? 100f * agg.TotalBlocked / agg.TotalIntended : 0f;
-
         // Lineage: when/how the card entered the deck, and any upgrades
         // since. Label/value style matches the stats tables below — no
         // colons, bold numbers, subdued surrounding prose.
@@ -229,6 +223,81 @@ public static class CardHoverShowPatch
                 sb.Append("[color=#b5b5b5]Card not present in deck[/color]\n");
         }
 
+        AppendFullStatRows(sb, cardModel, agg, RunTracker.GetEffectiveMetaStats());
+
+        // No footer. Previously we rendered "A4 · DEFECT · this run" here
+        // as a mirror of SlayTheStats' filter-context footer — but they need
+        // that line because their data aggregates across many runs with
+        // configurable filters. Ours is scoped to one run by construction,
+        // so the line was repeating back run info the user already knows.
+        // Reintroduce a scope marker when/if we add cross-run lifetime stats.
+        _ = run;  // silence unused-variable warning; keeps RunTracker reference live for debug.
+
+        return sb.ToString();
+    }
+
+    internal static string BuildHistoricalBodyBBCode(
+        MegaCrit.Sts2.Core.Models.CardModel cardModel,
+        CardAggregate agg,
+        RunMetaStats? metaStats,
+        IEnumerable<CardEvent>? upgradeEvents = null,
+        bool compact = false)
+    {
+        agg ??= new CardAggregate();
+        metaStats ??= new RunMetaStats();
+
+        var sb = new StringBuilder();
+        if (compact)
+        {
+            AppendCompactBodyWithMetaStats(sb, cardModel, agg, metaStats);
+            return sb.ToString();
+        }
+
+        string floorStr = agg.FloorAdded.HasValue
+            ? $"floor [b]{agg.FloorAdded.Value}[/b]"
+            : "unknown floor";
+        if (agg.InitialUpgradeLevel > 0)
+            sb.Append($"[color=#b5b5b5]Received {floorStr}, came upgraded +[b]{agg.InitialUpgradeLevel}[/b][/color]\n");
+        else
+            sb.Append($"[color=#b5b5b5]Received {floorStr}[/color]\n");
+
+        if (upgradeEvents != null)
+        {
+            foreach (var ue in upgradeEvents)
+            {
+                string ufloor = ue.Floor.HasValue
+                    ? $"floor [b]{ue.Floor.Value}[/b]"
+                    : "?";
+                int level = ue.UpgradeLevel ?? 0;
+                sb.Append($"[color=#b5b5b5]Upgraded {ufloor} → +[b]{level}[/b][/color]\n");
+            }
+        }
+
+        if (agg.Removed)
+        {
+            string rfloor = agg.RemovedAtFloor.HasValue
+                ? $"floor [b]{agg.RemovedAtFloor.Value}[/b]"
+                : "[b]?[/b]";
+            sb.Append($"[color=#b5b5b5]Removed {rfloor}[/color]\n");
+        }
+
+        AppendFullStatRows(sb, cardModel, agg, metaStats);
+        return sb.ToString();
+    }
+
+    private static void AppendFullStatRows(
+        StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel cardModel,
+        CardAggregate agg,
+        RunMetaStats metaStats)
+    {
+        // Per-play averages — the actual "utility" signal. Guard against
+        // div-by-zero for the unplayed case.
+        float avgIntended = agg.Plays > 0 ? (float)agg.TotalIntended / agg.Plays : 0f;
+        float avgEffective = agg.Plays > 0 ? (float)agg.TotalEffective / agg.Plays : 0f;
+        float overkillPct = agg.TotalIntended > 0 ? 100f * agg.TotalOverkill / agg.TotalIntended : 0f;
+        float blockedPct = agg.TotalIntended > 0 ? 100f * agg.TotalBlocked / agg.TotalIntended : 0f;
+
         // All stat rows use the same 3-col table layout for visual
         // consistency: label | value | (optional percent). Rows without a
         // percentage get an empty 3rd cell so the label and value columns
@@ -254,7 +323,7 @@ public static class CardHoverShowPatch
 
         AppendMakeItSoStats(sb, cardModel, agg, compact: false);
         AppendUnleashStats(sb, cardModel, agg, compact: false);
-        AppendOstySummonStats(sb, cardModel, agg, RunTracker.GetEffectiveMetaStats(), compact: false);
+        AppendOstySummonStats(sb, cardModel, agg, metaStats, compact: false);
         AppendReplayStats(sb, agg);
 
         bool hasDedicatedPoison = AppendDedicatedPoisonStats(sb, agg, compact: false);
@@ -388,16 +457,6 @@ public static class CardHoverShowPatch
         // show as reduced HP loss, which is the true cost signal.
         if (agg.TotalHpLost > 0)
             Row3(sb, "HP lost", agg.TotalHpLost.ToString(), "");
-
-        // No footer. Previously we rendered "A4 · DEFECT · this run" here
-        // as a mirror of SlayTheStats' filter-context footer — but they need
-        // that line because their data aggregates across many runs with
-        // configurable filters. Ours is scoped to one run by construction,
-        // so the line was repeating back run info the user already knows.
-        // Reintroduce a scope marker when/if we add cross-run lifetime stats.
-        _ = run;  // silence unused-variable warning; keeps RunTracker reference live for debug.
-
-        return sb.ToString();
     }
 
     /// <summary>
@@ -410,7 +469,19 @@ public static class CardHoverShowPatch
     /// averages, overkill/blocked percentages. Everything uses the same
     /// 3-col layout as the full view for visual consistency.
     /// </summary>
-    private static void AppendCompactBody(StringBuilder sb, MegaCrit.Sts2.Core.Models.CardModel cardModel, CardAggregate agg)
+    private static void AppendCompactBody(
+        StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel cardModel,
+        CardAggregate agg)
+    {
+        AppendCompactBodyWithMetaStats(sb, cardModel, agg, RunTracker.GetEffectiveMetaStats());
+    }
+
+    private static void AppendCompactBodyWithMetaStats(
+        StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel cardModel,
+        CardAggregate agg,
+        RunMetaStats metaStats)
     {
         bool isAttack = cardModel.Type == CardType.Attack;
 
@@ -442,7 +513,7 @@ public static class CardHoverShowPatch
 
         AppendMakeItSoStats(sb, cardModel, agg, compact: true);
         AppendUnleashStats(sb, cardModel, agg, compact: true);
-        AppendOstySummonStats(sb, cardModel, agg, RunTracker.GetEffectiveMetaStats(), compact: true);
+        AppendOstySummonStats(sb, cardModel, agg, metaStats, compact: true);
         AppendReplayStats(sb, agg);
 
         bool showDamage = isAttack || agg.TotalIntended > 0;
