@@ -1530,4 +1530,27 @@ public class SchemaLoadingTests
         Assert.Equal("Adrenaline", relicAgg.CardsGranted["CARD.ADRENALINE"].DisplayName);
         Assert.Equal(1, relicAgg.CardChoicesSkipped);
     }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsVambraceRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("vambrace-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.VAMBRACE"];
+        Assert.Equal(2, relicAgg.Activations);
+        Assert.Equal(13, relicAgg.AdditionalBlockGained);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsVambraceRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("vambrace-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.VAMBRACE"];
+        Assert.Equal(2, relicAgg.Activations);
+        Assert.Equal(13, relicAgg.AdditionalBlockGained);
+    }
 }

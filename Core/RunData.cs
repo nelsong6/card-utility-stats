@@ -385,7 +385,7 @@ public class RelicAggregate
 
     // Total block gained from this relic across all combats.
     // Used by Orichalcum, Permafrost, The Abacus, Bone Flute, Cloak Clasp,
-    // Anchor, and Horn Cleat.
+    // Anchor, Horn Cleat, and Vambrace's extra block from its multiplier.
     public int AdditionalBlockGained { get; set; }
 
     // Total times this relic got its own trigger check but was blocked by

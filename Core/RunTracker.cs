@@ -2169,6 +2169,7 @@ public static class RunTracker
     private const string BrilliantScarfRelicId = "RELIC.BRILLIANT_SCARF";
     private const string JuzuBraceletRelicId = "RELIC.JUZU_BRACELET";
     private const string HeftyTabletRelicId = "RELIC.HEFTY_TABLET";
+    private const string VambraceRelicId = "RELIC.VAMBRACE";
     private const string GamblingChipRelicId = "RELIC.GAMBLING_CHIP";
     private const string CentennialPuzzleRelicId = "RELIC.CENTENNIAL_PUZZLE";
     private const string PrecariousShearsRelicId = "RELIC.PRECARIOUS_SHEARS";
@@ -2509,6 +2510,73 @@ public static class RunTracker
         var added = (int)decimal.Truncate(baseDamageAdded);
         if (added <= 0) return;
         agg.TotalDamageAttempted += added;
+    }
+
+    /// <summary>
+    /// Record the extra integer block Vambrace contributed to one modified
+    /// block packet. Because Vambrace's multiplier is 2x, the no-Vambrace
+    /// final amount would be half the observed final amount.
+    /// </summary>
+    public static void RecordVambraceExtraBlockGained(decimal modifiedAmount)
+    {
+        if (modifiedAmount <= 0m) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var added = ComputeVambraceExtraBlock(modifiedAmount);
+                if (added <= 0) return;
+
+                var agg = GetOrCreateRelicAggregateLocked(VambraceRelicId);
+                agg.AdditionalBlockGained += added;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordVambraceExtraBlockGained failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordVambraceActivation()
+    {
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(VambraceRelicId);
+                agg.Activations += 1;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordVambraceActivation failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordVambraceExtraBlockGainedForTest(RelicAggregate agg, decimal modifiedAmount)
+    {
+        var added = ComputeVambraceExtraBlock(modifiedAmount);
+        if (added > 0) agg.AdditionalBlockGained += added;
+    }
+
+    internal static int ComputeVambraceExtraBlockForTest(decimal modifiedAmount)
+        => ComputeVambraceExtraBlock(modifiedAmount);
+
+    private static int ComputeVambraceExtraBlock(decimal modifiedAmount)
+    {
+        if (modifiedAmount <= 0m) return 0;
+
+        var withVambrace = TruncateBlockAmount(modifiedAmount);
+        var withoutVambrace = TruncateBlockAmount(modifiedAmount / 2m);
+        return Math.Max(withVambrace - withoutVambrace, 0);
+    }
+
+    private static int TruncateBlockAmount(decimal amount)
+    {
+        if (amount <= 0m) return 0;
+        if (amount >= int.MaxValue) return int.MaxValue;
+        return (int)decimal.Truncate(amount);
     }
 
     /// <summary>

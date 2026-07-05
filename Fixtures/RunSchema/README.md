@@ -144,6 +144,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `hefty-tablet-relic-run.json`
   Adds Hefty Tablet rare-card choice tracking: cards granted by id/name and
   skipped pickup choices.
+- `vambrace-relic-run.json`
+  Adds Vambrace activation tracking plus extra block gained from the block
+  packets its 2x multiplier actually modified.
 
 Why these exist:
 

@@ -94,6 +94,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is Vambrace)
+            {
+                const string relicId = "RELIC.VAMBRACE";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildVambraceBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Vambrace", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is TheAbacus)
             {
                 const string relicId = "RELIC.THE_ABACUS";
@@ -621,6 +631,18 @@ public static class RelicHoverShowPatch
         Row3(sb, "Combats triggered", agg.Activations.ToString(), "");
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
         Row3(sb, BlockLabel("block gained per combat"), FormatDecimal(blockPerCombat), "");
+        return sb.ToString();
+    }
+
+    private static string BuildVambraceBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var blockPerActivation = agg.Activations <= 0
+            ? 0m
+            : (decimal)agg.AdditionalBlockGained / agg.Activations;
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, BlockLabel("extra block gained"), agg.AdditionalBlockGained.ToString(), "");
+        Row3(sb, BlockLabel("extra block per activation"), FormatDecimal(blockPerActivation), "");
         return sb.ToString();
     }
 
