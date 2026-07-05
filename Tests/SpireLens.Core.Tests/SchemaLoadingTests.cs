@@ -407,6 +407,20 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsChosenCheeseRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("chosen-cheese-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.CHOSEN_CHEESE"];
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(3m, relicAgg.MaxHpGained);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsWhiteBeastStatueRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("white-beast-statue-relic-run.json"));
@@ -819,6 +833,17 @@ public class SchemaLoadingTests
         Assert.Equal(9m, relicAgg.TotalHealingRestored);
         Assert.Equal(3m, relicAgg.TotalHealingLost);
         Assert.Equal(3m, relicAgg.HealingLostReasons["full_hp"].Amount);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsChosenCheeseRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("chosen-cheese-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.CHOSEN_CHEESE"];
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(3m, relicAgg.MaxHpGained);
     }
 
     [Fact]

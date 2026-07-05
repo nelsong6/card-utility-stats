@@ -375,6 +375,13 @@ the relic's own final-pile condition (`card.Pile.Type == Deck`, same owner,
 `GainMaxHp` command resolves. Count the curse acquisition from that same
 owner-specific match rather than from every generic curse card entry.
 
+Chosen Cheese gains max HP from `AfterCombatEnd`, then the game heals the same
+amount as part of `CreatureCmd.GainMaxHp`. Snapshot the owner's max HP before
+the async relic callback and record the actual max-HP delta after successful
+completion. Because the callback completes around combat teardown, route the
+aggregate to pending combat when it still exists and directly to the run
+otherwise.
+
 Strike Dummy identifies eligible cards through the game's `CardTag.Strike`.
 Its damage modifier can run per damage evaluation, so count Strike cards played
 from finished card-play events while the relic is owned; use the modifier only

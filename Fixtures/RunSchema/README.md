@@ -78,6 +78,8 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `burning-blood-relic-run.json`
   Adds Burning Blood combat-victory activation tracking and relic healing
   attribution, including restored healing and full-HP lost healing.
+- `chosen-cheese-relic-run.json`
+  Adds Chosen Cheese combat-end activation tracking plus observed max-HP gained.
 - `white-beast-statue-relic-run.json`
   Adds White Beast Statue potion-gained tracking with common, uncommon, and
   rare potion rarity splits, plus skipped White Beast potion reward tracking.

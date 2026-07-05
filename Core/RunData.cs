@@ -426,6 +426,9 @@ public class RelicAggregate
     public decimal TotalHealingLost { get; set; }
     public Dictionary<string, HealingLostReasonAggregate> HealingLostReasons { get; set; } = new();
 
+    // Total maximum HP gained from this relic. Used by Chosen Cheese.
+    public decimal MaxHpGained { get; set; }
+
     // Total times a relic triggered from one or more confirmed Doom deaths.
     // Used by Book Repair Knife.
     public int DoomDeathTriggers { get; set; }

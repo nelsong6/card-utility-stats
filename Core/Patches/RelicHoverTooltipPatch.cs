@@ -373,6 +373,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is ChosenCheese)
+            {
+                const string relicId = "RELIC.CHOSEN_CHEESE";
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+
+                var body = BuildChosenCheeseBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Chosen Cheese", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is DarkstonePeriapt)
             {
                 const string relicId = "RELIC.DARKSTONE_PERIAPT";
@@ -806,6 +816,14 @@ public static class RelicHoverShowPatch
     {
         var sb = new StringBuilder();
         Row3(sb, "HP gained", FormatDecimal(agg.TotalHealingRestored), "");
+        return sb.ToString();
+    }
+
+    private static string BuildChosenCheeseBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, "Max HP gained", FormatDecimal(agg.MaxHpGained), "");
         return sb.ToString();
     }
 

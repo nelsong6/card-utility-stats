@@ -1,0 +1,61 @@
+{
+  "schema_version": 33,
+  "run_id": "fixture-chosen-cheese-relic",
+  "started_at": "2026-07-04T18:00:00Z",
+  "updated_at": "2026-07-04T18:08:00Z",
+  "ended_at": null,
+  "character": "IRONCLAD",
+  "ascension": 5,
+  "floor_reached": 7,
+  "outcome": "in_progress",
+  "game_start_time": 1783191600,
+  "aggregates": {
+    "CARD.STRIKE_IRONCLAD#1": {
+      "plays": 2,
+      "total_intended": 12,
+      "total_blocked": 0,
+      "total_overkill": 0,
+      "total_effective": 12,
+      "kills": 0,
+      "total_energy_spent": 2,
+      "total_energy_generated": 0,
+      "total_stars_spent": 0,
+      "total_stars_generated": 0,
+      "total_forge_generated": 0,
+      "total_block_gained": 0,
+      "total_block_effective": 0,
+      "total_block_wasted": 0,
+      "times_drawn": 2,
+      "times_discarded": 0,
+      "times_placed_on_top_from_hand": 0,
+      "times_placed_on_top_from_discard": 0,
+      "times_exhausted_other_cards": 0,
+      "times_exhausted": 0,
+      "total_hp_lost": 0,
+      "times_cards_drawn": 0,
+      "times_cards_draw_attempted": 0,
+      "times_cards_draw_blocked": 0,
+      "blocked_draw_reasons": {},
+      "times_summoned_to_hand": 0,
+      "applied_effects": {},
+      "floor_added": 1,
+      "initial_upgrade_level": 0,
+      "removed": false
+    }
+  },
+  "relic_aggregates": {
+    "RELIC.CHOSEN_CHEESE": {
+      "activations": 3,
+      "max_hp_gained": 3
+    }
+  },
+  "events": [],
+  "instance_numbers_by_def": {
+    "CARD.STRIKE_IRONCLAD": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.STRIKE_IRONCLAD": 1
+  }
+}

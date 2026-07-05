@@ -1499,6 +1499,7 @@ public static class RunTracker
         target.TotalHealingRestored += source.TotalHealingRestored;
         target.TotalHealingLost += source.TotalHealingLost;
         MergeHealingLostReasonsInto(target, source);
+        target.MaxHpGained += source.MaxHpGained;
         target.DoomDeathTriggers += source.DoomDeathTriggers;
         target.DoomKills += source.DoomKills;
         target.EnergyGenerated += source.EnergyGenerated;
@@ -2121,6 +2122,7 @@ public static class RunTracker
     private const string BloodVialRelicId = "RELIC.BLOOD_VIAL";
     private const string PlanisphereRelicId = "RELIC.PLANISPHERE";
     private const string LeesWaffleRelicId = "RELIC.LEES_WAFFLE";
+    private const string ChosenCheeseRelicId = "RELIC.CHOSEN_CHEESE";
     private const string DarkstonePeriaptRelicId = "RELIC.DARKSTONE_PERIAPT";
     private const string RegalPillowRelicId = "RELIC.REGAL_PILLOW";
     private const string WhiteBeastStatueRelicId = "RELIC.WHITE_BEAST_STATUE";
@@ -3499,6 +3501,35 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Record Chosen Cheese's observed max-HP gain after its combat-end
+    /// callback completes. The callback can finish around combat promotion, so
+    /// route to pending combat when it still exists and otherwise save directly.
+    /// </summary>
+    public static void RecordChosenCheeseMaxHpGained(Creature creature, decimal maxHpGained)
+    {
+        if (creature?.Player == null || maxHpGained < 0m) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(creature.Player)) return;
+                if (_currentRun == null && _pendingCombat == null) return;
+
+                bool persistDirectlyToRun = _pendingCombat == null;
+                var agg = GetOrCreateRelicAggregateForCurrentContextLocked(ChosenCheeseRelicId);
+                RecordChosenCheeseMaxHpGainedForTest(agg, maxHpGained);
+                if (persistDirectlyToRun)
+                    SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordChosenCheeseMaxHpGained failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Record Darkstone Periapt reacting to a successfully acquired curse.
     /// The curse count comes from the relic's own post-pile-change condition;
     /// max HP gained is the observed delta after the game's GainMaxHp command.
@@ -3702,6 +3733,14 @@ public static class RunTracker
         agg.Activations++;
         agg.CursesAcquired++;
         agg.TotalMaxHpGained += Math.Max(0, maxHpGained);
+    }
+
+    internal static void RecordChosenCheeseMaxHpGainedForTest(RelicAggregate agg, decimal maxHpGained)
+    {
+        if (agg == null || maxHpGained < 0m) return;
+
+        agg.Activations++;
+        agg.MaxHpGained += maxHpGained;
     }
 
     internal static void RecordStrikeDummyStrikePlayedForTest(RelicAggregate agg)
