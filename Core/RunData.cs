@@ -361,7 +361,7 @@ public class ReplayExtraPlayReasonAggregate
 public class RelicAggregate
 {
     // Total times this relic's tracked effect activated.
-    // Used by room/trigger-based relics such as Meal Ticket.
+    // Used by room/trigger-based relics such as Meal Ticket and Tuning Fork.
     public int Activations { get; set; }
 
     // Total enemies across all combats this run that had a debuff applied
@@ -385,7 +385,8 @@ public class RelicAggregate
 
     // Total block gained from this relic across all combats.
     // Used by Orichalcum, Permafrost, The Abacus, Bone Flute, Cloak Clasp,
-    // Anchor, Horn Cleat, and Vambrace's extra block from its multiplier.
+    // Anchor, Horn Cleat, Tuning Fork, and Vambrace's extra block from its
+    // multiplier.
     public int AdditionalBlockGained { get; set; }
 
     // Total times this relic got its own trigger check but was blocked by
@@ -400,7 +401,7 @@ public class RelicAggregate
     public decimal PlatingAdded { get; set; }
 
     // Total cards this relic upgraded. Used by Stone Cracker, Sand Castle,
-    // Whetstone, and other upgrade-granting relics.
+    // Whetstone, War Paint, and other upgrade-granting relics.
     public int CardsUpgraded { get; set; }
     public List<string> UpgradedCards { get; set; } = new();
 

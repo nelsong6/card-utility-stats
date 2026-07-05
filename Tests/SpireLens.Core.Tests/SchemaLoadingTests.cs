@@ -1553,4 +1553,50 @@ public class SchemaLoadingTests
         Assert.Equal(2, relicAgg.Activations);
         Assert.Equal(13, relicAgg.AdditionalBlockGained);
     }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsTuningForkRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("tuning-fork-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.TUNING_FORK"];
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(18, relicAgg.AdditionalBlockGained);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsTuningForkRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("tuning-fork-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.TUNING_FORK"];
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(18, relicAgg.AdditionalBlockGained);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsWarPaintRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("war-paint-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.WAR_PAINT"];
+        Assert.Equal(2, relicAgg.CardsUpgraded);
+        Assert.Equal(new[] { "Defend+", "Battle Trance+" }, relicAgg.UpgradedCards);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsWarPaintRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("war-paint-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.WAR_PAINT"];
+        Assert.Equal(2, relicAgg.CardsUpgraded);
+        Assert.Equal(new[] { "Defend+", "Battle Trance+" }, relicAgg.UpgradedCards);
+    }
 }

@@ -1,0 +1,38 @@
+{
+  "run_id": "war-paint-relic-fixture",
+  "started_at": "2026-07-05T00:00:00Z",
+  "updated_at": "2026-07-05T00:09:00Z",
+  "outcome": "in_progress",
+  "aggregates": {
+    "CARD.DEFEND_IRONCLAD#1": {
+      "plays": 1,
+      "total_block_gained": 5
+    },
+    "CARD.BATTLE_TRANCE#1": {
+      "plays": 1
+    }
+  },
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.WAR_PAINT": {
+      "cards_upgraded": 2,
+      "upgraded_cards": [
+        "Defend+",
+        "Battle Trance+"
+      ]
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.DEFEND_IRONCLAD": [
+      1
+    ],
+    "CARD.BATTLE_TRANCE": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.DEFEND_IRONCLAD": 1,
+    "CARD.BATTLE_TRANCE": 1
+  }
+}

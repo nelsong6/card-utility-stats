@@ -90,6 +90,7 @@ public static class RunTracker
     private static readonly Dictionary<Player, PendingPrecariousShearsPickup> _pendingPrecariousShearsPickups = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<Player, PendingSandCastlePickup> _pendingSandCastlePickups = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<Player, PendingWhetstonePickup> _pendingWhetstonePickups = new(ReferenceEqualityComparer.Instance);
+    private static readonly Dictionary<Player, PendingWarPaintPickup> _pendingWarPaintPickups = new(ReferenceEqualityComparer.Instance);
     private static bool _shivAvailableThisRun;
     private static CardModel? _shivDeckViewCard;
     private const decimal PoisonOwnershipEpsilon = 0.0001m;
@@ -894,6 +895,7 @@ public static class RunTracker
         _pendingPrecariousShearsPickups.Clear();
         _pendingSandCastlePickups.Clear();
         _pendingWhetstonePickups.Clear();
+        _pendingWarPaintPickups.Clear();
     }
 
     /// <summary>
@@ -2122,6 +2124,7 @@ public static class RunTracker
     private const string PocketwatchRelicId = "RELIC.POCKETWATCH";
     private const string OrichalcumRelicId = "RELIC.ORICHALCUM";
     private const string PermafrostRelicId = "RELIC.PERMAFROST";
+    private const string TuningForkRelicId = "RELIC.TUNING_FORK";
     private const string AnchorRelicId = "RELIC.ANCHOR";
     private const string TheAbacusRelicId = "RELIC.THE_ABACUS";
     private const string LetterOpenerRelicId = "RELIC.LETTER_OPENER";
@@ -2150,6 +2153,7 @@ public static class RunTracker
     private const string GorgetRelicId = "RELIC.GORGET";
     private const string StoneCrackerRelicId = "RELIC.STONE_CRACKER";
     private const string WhetstoneRelicId = "RELIC.WHETSTONE";
+    private const string WarPaintRelicId = "RELIC.WAR_PAINT";
     private const string MealTicketRelicId = "RELIC.MEAL_TICKET";
     private const string BurningBloodRelicId = "RELIC.BURNING_BLOOD";
     private const string BloodVialRelicId = "RELIC.BLOOD_VIAL";
@@ -2313,6 +2317,41 @@ public static class RunTracker
         lock (_lock)
         {
             _pendingCombat?.Windows.Disarm(PermafrostRelicId, AttributionEventKind.PlayerBlockGain);
+        }
+    }
+
+    /// <summary>
+    /// Record Tuning Fork's every-N-skills trigger and arm observed block
+    /// attribution. The actual block amount is observed by
+    /// <see cref="Patches.HookAfterBlockGainedPatch"/>.
+    /// </summary>
+    public static void RecordTuningForkActivationAndArmBlockAttribution()
+    {
+        lock (_lock)
+        {
+            try
+            {
+                _pendingCombat ??= new PendingCombat();
+                var agg = GetOrCreateRelicAggregateLocked(TuningForkRelicId);
+                agg.Activations += 1;
+                _pendingCombat.Windows.Arm(
+                    TuningForkRelicId,
+                    AttributionEventKind.PlayerBlockGain,
+                    CurrentHistoryCountLocked(),
+                    maxHistoryAdvance: -1);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordTuningForkActivationAndArmBlockAttribution failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void DisarmTuningForkBlockAttribution()
+    {
+        lock (_lock)
+        {
+            _pendingCombat?.Windows.Disarm(TuningForkRelicId, AttributionEventKind.PlayerBlockGain);
         }
     }
 
@@ -3877,6 +3916,57 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Arm War Paint pickup attribution. Actual upgraded cards are observed
+    /// from <see cref="RecordUpgrade"/> while the pickup task resolves.
+    /// </summary>
+    public static bool BeginWarPaintPickup(RelicModel relic, out Player? player)
+    {
+        player = null;
+        if (relic?.Owner == null) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic)) return false;
+                if (!IsTrackedPlayer(relic.Owner)) return false;
+
+                player = relic.Owner;
+                _pendingWarPaintPickups[player] = new PendingWarPaintPickup();
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"BeginWarPaintPickup failed: {e.Message}");
+                player = null;
+                return false;
+            }
+        }
+    }
+
+    public static void CompleteWarPaintPickup(Player? player, bool succeeded)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_pendingWarPaintPickups.Remove(player, out var pending)) return;
+                if (!succeeded) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(WarPaintRelicId);
+                RecordWarPaintUpgradesForTest(agg, pending.UpgradedCards);
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"CompleteWarPaintPickup failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Record Lee's Waffle's observed pickup HP gain. The relic first grants
     /// max HP, which itself heals, then heals to full; the full pickup delta is
     /// clearer than splitting those two game commands into separate attempts.
@@ -4097,6 +4187,11 @@ public static class RunTracker
         => RecordRelicUpgradedCards(agg, upgradedCards);
 
     internal static void RecordWhetstoneUpgradesForTest(
+        RelicAggregate agg,
+        IEnumerable<string>? upgradedCards)
+        => RecordRelicUpgradedCards(agg, upgradedCards);
+
+    internal static void RecordWarPaintUpgradesForTest(
         RelicAggregate agg,
         IEnumerable<string>? upgradedCards)
         => RecordRelicUpgradedCards(agg, upgradedCards);
@@ -6285,6 +6380,7 @@ public static class RunTracker
         {
             RecordSandCastleCardUpgradedLocked(card);
             RecordWhetstoneCardUpgradedLocked(card);
+            RecordWarPaintCardUpgradedLocked(card);
 
             // Non-assigning: skip upgrades on cards we haven't seen enter
             // the deck. This is what fixes the "starters begin at #5" bug
@@ -6386,6 +6482,23 @@ public static class RunTracker
         catch (Exception e)
         {
             CoreMain.LogDebug($"RecordWhetstoneCardUpgradedLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordWarPaintCardUpgradedLocked(CardModel card)
+    {
+        try
+        {
+            if (card == null) return;
+            var owner = card.Owner;
+            if (owner == null) return;
+            if (!_pendingWarPaintPickups.TryGetValue(owner, out var pending)) return;
+
+            pending.UpgradedCards.Add(GetCardDisplayNameForStats(card));
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordWarPaintCardUpgradedLocked failed: {e.Message}");
         }
     }
 
@@ -9009,6 +9122,11 @@ internal sealed class PendingSandCastlePickup
 }
 
 internal sealed class PendingWhetstonePickup
+{
+    public List<string> UpgradedCards { get; } = new();
+}
+
+internal sealed class PendingWarPaintPickup
 {
     public List<string> UpgradedCards { get; } = new();
 }

@@ -104,6 +104,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is TuningFork)
+            {
+                const string relicId = "RELIC.TUNING_FORK";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildTuningForkBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Tuning Fork", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is TheAbacus)
             {
                 const string relicId = "RELIC.THE_ABACUS";
@@ -353,6 +363,16 @@ public static class RelicHoverShowPatch
 
                 var body = BuildWhetstoneBodyBBCode(agg);
                 StatsTooltip.Show(tree, __instance, "Whetstone", "SpireLens", body);
+                return;
+            }
+
+            if (relicNode.Model is WarPaint)
+            {
+                const string relicId = "RELIC.WAR_PAINT";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildWarPaintBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "War Paint", "SpireLens", body);
                 return;
             }
 
@@ -646,6 +666,14 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
+    private static string BuildTuningForkBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
+        return sb.ToString();
+    }
+
     private static string BuildTheAbacusBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
@@ -875,6 +903,13 @@ public static class RelicHoverShowPatch
     }
 
     private static string BuildWhetstoneBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        AppendUpgradedCardStats(sb, agg);
+        return sb.ToString();
+    }
+
+    private static string BuildWarPaintBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
         AppendUpgradedCardStats(sb, agg);

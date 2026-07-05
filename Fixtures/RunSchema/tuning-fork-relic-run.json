@@ -1,0 +1,33 @@
+{
+  "run_id": "tuning-fork-relic-fixture",
+  "started_at": "2026-07-04T00:00:00Z",
+  "updated_at": "2026-07-04T00:11:00Z",
+  "outcome": "in_progress",
+  "character": "CHAR.IRONCLAD",
+  "ascension": 0,
+  "floor_reached": 6,
+  "game_start_time": 1783210410,
+  "aggregates": {
+    "CARD.DEFEND_IRONCLAD#1": {
+      "plays": 3,
+      "floor_added": 1,
+      "initial_upgrade_level": 0
+    }
+  },
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.TUNING_FORK": {
+      "activations": 3,
+      "additional_block_gained": 18
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.DEFEND_IRONCLAD": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.DEFEND_IRONCLAD": 1
+  }
+}

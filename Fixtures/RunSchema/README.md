@@ -147,6 +147,10 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `vambrace-relic-run.json`
   Adds Vambrace activation tracking plus extra block gained from the block
   packets its 2x multiplier actually modified.
+- `tuning-fork-relic-run.json`
+  Adds Tuning Fork trigger count and observed block gained tracking.
+- `war-paint-relic-run.json`
+  Adds War Paint pickup tracking: the actual skill cards upgraded by the relic.
 
 Why these exist:
 
