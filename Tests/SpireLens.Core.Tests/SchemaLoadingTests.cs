@@ -437,6 +437,20 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsPearRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("pear-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.PEAR"];
+        Assert.Equal(1, relicAgg.Activations);
+        Assert.Equal(10m, relicAgg.MaxHpGained);
+        Assert.Equal(70m, relicAgg.OriginalMaxHp);
+        Assert.Equal(80m, relicAgg.NewMaxHp);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsWhiteBeastStatueRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("white-beast-statue-relic-run.json"));
@@ -898,6 +912,19 @@ public class SchemaLoadingTests
         Assert.Equal(7m, relicAgg.MaxHpGained);
         Assert.Equal(70m, relicAgg.OriginalMaxHp);
         Assert.Equal(77m, relicAgg.NewMaxHp);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsPearRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("pear-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.PEAR"];
+        Assert.Equal(1, relicAgg.Activations);
+        Assert.Equal(10m, relicAgg.MaxHpGained);
+        Assert.Equal(70m, relicAgg.OriginalMaxHp);
+        Assert.Equal(80m, relicAgg.NewMaxHp);
     }
 
     [Fact]

@@ -155,6 +155,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `strawberry-relic-run.json`
   Adds Strawberry pickup tracking: activations, observed max HP gained, and
   original/new max-HP snapshots.
+- `pear-relic-run.json`
+  Adds Pear pickup tracking: activations, observed max HP gained, and
+  original/new max-HP snapshots.
 - `sand-castle-relic-run.json`
   Adds Sand Castle pickup tracking: the actual cards upgraded by the relic.
 - `hefty-tablet-relic-run.json`
