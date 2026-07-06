@@ -223,7 +223,12 @@ public static class CardHoverShowPatch
                 sb.Append("[color=#b5b5b5]Card not present in deck[/color]\n");
         }
 
-        AppendFullStatRows(sb, cardModel, agg, RunTracker.GetEffectiveMetaStats());
+        AppendFullStatRows(
+            sb,
+            cardModel,
+            agg,
+            RunTracker.GetEffectiveMetaStats(),
+            RunTracker.GetEtherealCardsPlayedThisCombat());
 
         // No footer. Previously we rendered "A4 · DEFECT · this run" here
         // as a mirror of SlayTheStats' filter-context footer — but they need
@@ -289,7 +294,8 @@ public static class CardHoverShowPatch
         StringBuilder sb,
         MegaCrit.Sts2.Core.Models.CardModel cardModel,
         CardAggregate agg,
-        RunMetaStats metaStats)
+        RunMetaStats metaStats,
+        int? etherealCardsPlayedThisCombat = null)
     {
         // Per-play averages — the actual "utility" signal. Guard against
         // div-by-zero for the unplayed case.
@@ -321,6 +327,8 @@ public static class CardHoverShowPatch
 
         Row3(sb, "Combats in deck", agg.CombatsInDeck.ToString(), "");
 
+        if (etherealCardsPlayedThisCombat.HasValue)
+            AppendPullFromBelowStats(sb, cardModel, etherealCardsPlayedThisCombat.Value);
         AppendMakeItSoStats(sb, cardModel, agg, compact: false);
         AppendUnleashStats(sb, cardModel, agg, compact: false);
         AppendOstySummonStats(sb, cardModel, agg, metaStats, compact: false);
@@ -474,14 +482,20 @@ public static class CardHoverShowPatch
         MegaCrit.Sts2.Core.Models.CardModel cardModel,
         CardAggregate agg)
     {
-        AppendCompactBodyWithMetaStats(sb, cardModel, agg, RunTracker.GetEffectiveMetaStats());
+        AppendCompactBodyWithMetaStats(
+            sb,
+            cardModel,
+            agg,
+            RunTracker.GetEffectiveMetaStats(),
+            RunTracker.GetEtherealCardsPlayedThisCombat());
     }
 
     private static void AppendCompactBodyWithMetaStats(
         StringBuilder sb,
         MegaCrit.Sts2.Core.Models.CardModel cardModel,
         CardAggregate agg,
-        RunMetaStats metaStats)
+        RunMetaStats metaStats,
+        int? etherealCardsPlayedThisCombat = null)
     {
         bool isAttack = cardModel.Type == CardType.Attack;
 
@@ -511,6 +525,8 @@ public static class CardHoverShowPatch
         if (agg.TotalForgeGenerated > 0m)
             Row3(sb, GetForgeStatLabel("gained"), FormatDecimal(agg.TotalForgeGenerated), "");
 
+        if (etherealCardsPlayedThisCombat.HasValue)
+            AppendPullFromBelowStats(sb, cardModel, etherealCardsPlayedThisCombat.Value);
         AppendMakeItSoStats(sb, cardModel, agg, compact: true);
         AppendUnleashStats(sb, cardModel, agg, compact: true);
         AppendOstySummonStats(sb, cardModel, agg, metaStats, compact: true);
@@ -868,6 +884,17 @@ public static class CardHoverShowPatch
         if (!compact && agg.TimesSummonedToHand > 0)
             Row3(sb, "Times triggered", agg.TimesSummonedToHand.ToString(), "");
     }
+
+    private static void AppendPullFromBelowStats(
+        StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel cardModel,
+        int etherealCardsPlayedThisCombat)
+    {
+        if (cardModel is not PullFromBelow) return;
+
+        Row3(sb, "Ethereal cards played this combat", etherealCardsPlayedThisCombat.ToString(), "");
+    }
+
     private static string GetInlineIconStatLabel(string iconPath, string suffix)
     {
         var normalizedPath = NormalizeResourcePath(iconPath);

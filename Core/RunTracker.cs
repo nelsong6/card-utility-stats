@@ -256,6 +256,14 @@ public static class RunTracker
         }
     }
 
+    public static int? GetEtherealCardsPlayedThisCombat()
+    {
+        lock (_lock)
+        {
+            return _pendingCombat?.EtherealCardsPlayed;
+        }
+    }
+
     /// <summary>
     /// The instance number for a card for UI display purposes — derived from
     /// the card's position in the player's deck among other cards of the same
@@ -1731,6 +1739,8 @@ public static class RunTracker
 
             var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
             agg.Plays++;
+            if (IsEtherealCard(cardPlay.Card))
+                _pendingCombat.EtherealCardsPlayed++;
             RecordStrikeDummyStrikePlayedIfOwnedLocked(cardPlay.Card);
             RecordMiniatureCannonUpgradedAttackPlayedIfOwnedLocked(cardPlay.Card);
             if (IsReplayExtraPlay(cardPlay))
@@ -6596,6 +6606,18 @@ public static class RunTracker
         }
     }
 
+    private static bool IsEtherealCard(CardModel? card)
+    {
+        try
+        {
+            return card?.Keywords?.Contains(CardKeyword.Ethereal) == true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static bool IsBaseStrikeForStrikeDummy(CardModel? card)
     {
         return card != null && IsStrikeDummyStrikeCard(card) && card.IsBasicStrikeOrDefend;
@@ -9577,6 +9599,7 @@ internal sealed class PendingPaelSacrificeReward
 /// </summary>
 internal class PendingCombat
 {
+    public int EtherealCardsPlayed { get; set; }
     public Dictionary<string, CardAggregate> CombatAggregates { get; } = new();
     public List<CardEvent> CombatEvents { get; } = new();
     public Dictionary<string, RelicAggregate> RelicAggregates { get; } = new();
