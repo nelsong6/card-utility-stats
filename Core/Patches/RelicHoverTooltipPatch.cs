@@ -1492,10 +1492,26 @@ public static class RelicHoverShowPatch
         var averageDrawn = agg.IronClubCombats <= 0
             ? 0m
             : (decimal)agg.AdditionalCardsDrawn / agg.IronClubCombats;
+        var chargeSamples =
+            agg.IronClubCombatsEndedOn0Charges
+            + agg.IronClubCombatsEndedOn1Charges
+            + agg.IronClubCombatsEndedOn2Charges
+            + agg.IronClubCombatsEndedOn3Charges;
+        var chargeTotal =
+            agg.IronClubCombatsEndedOn1Charges
+            + (agg.IronClubCombatsEndedOn2Charges * 2)
+            + (agg.IronClubCombatsEndedOn3Charges * 3);
+        var averageEndCharge = chargeSamples <= 0
+            ? 0m
+            : (decimal)chargeTotal / chargeSamples;
 
         Row3(sb, "Cards drawn total", agg.AdditionalCardsDrawn.ToString(), "");
         Row3(sb, "Avg cards drawn per combat", FormatDecimal(averageDrawn), "");
+        Row3(sb, "Combats ended on 0 charges", agg.IronClubCombatsEndedOn0Charges.ToString(), "");
+        Row3(sb, "Combats ended on 1 charge", agg.IronClubCombatsEndedOn1Charges.ToString(), "");
+        Row3(sb, "Combats ended on 2 charges", agg.IronClubCombatsEndedOn2Charges.ToString(), "");
         Row3(sb, "Combats ended on 3 charges", agg.IronClubCombatsEndedOn3Charges.ToString(), "");
+        Row3(sb, "Avg charge at combat end", FormatDecimal(averageEndCharge), "");
         return sb.ToString();
     }
 

@@ -1613,6 +1613,9 @@ public static class RunTracker
         target.NunchakuCombatsEndedOn9Charges += source.NunchakuCombatsEndedOn9Charges;
         target.NunchakuCombatEndChargeTotal += source.NunchakuCombatEndChargeTotal;
         target.IronClubCombats += source.IronClubCombats;
+        target.IronClubCombatsEndedOn0Charges += source.IronClubCombatsEndedOn0Charges;
+        target.IronClubCombatsEndedOn1Charges += source.IronClubCombatsEndedOn1Charges;
+        target.IronClubCombatsEndedOn2Charges += source.IronClubCombatsEndedOn2Charges;
         target.IronClubCombatsEndedOn3Charges += source.IronClubCombatsEndedOn3Charges;
 
         target.DiscountCombats += source.DiscountCombats;
@@ -5421,20 +5424,40 @@ public static class RunTracker
         RelicAggregate agg,
         int combats,
         int cardsDrawn,
+        int combatsEndedOn0Charges,
+        int combatsEndedOn1Charges,
+        int combatsEndedOn2Charges,
         int combatsEndedOn3Charges)
     {
         if (agg == null) return;
         agg.IronClubCombats += Math.Max(0, combats);
         agg.AdditionalCardsDrawn += Math.Max(0, cardsDrawn);
+        agg.IronClubCombatsEndedOn0Charges += Math.Max(0, combatsEndedOn0Charges);
+        agg.IronClubCombatsEndedOn1Charges += Math.Max(0, combatsEndedOn1Charges);
+        agg.IronClubCombatsEndedOn2Charges += Math.Max(0, combatsEndedOn2Charges);
         agg.IronClubCombatsEndedOn3Charges += Math.Max(0, combatsEndedOn3Charges);
     }
 
     internal static void RecordIronClubCombatEndChargeForTest(RelicAggregate agg, int charge)
     {
         if (agg == null) return;
+        if (charge < 0) return;
 
-        if (Math.Max(0, charge) == 3)
-            agg.IronClubCombatsEndedOn3Charges += 1;
+        switch (charge)
+        {
+            case 0:
+                agg.IronClubCombatsEndedOn0Charges += 1;
+                break;
+            case 1:
+                agg.IronClubCombatsEndedOn1Charges += 1;
+                break;
+            case 2:
+                agg.IronClubCombatsEndedOn2Charges += 1;
+                break;
+            case 3:
+                agg.IronClubCombatsEndedOn3Charges += 1;
+                break;
+        }
     }
 
     /// <summary>

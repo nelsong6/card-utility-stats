@@ -559,8 +559,11 @@ public class RelicAggregate
     public int NunchakuCombatEndChargeTotal { get; set; }
 
     // Iron Club tracking. Cards drawn is stored in AdditionalCardsDrawn; this
-    // stores the held-combat denominator and combat-end charge snapshot.
+    // stores the held-combat denominator and combat-end charge buckets.
     public int IronClubCombats { get; set; }
+    public int IronClubCombatsEndedOn0Charges { get; set; }
+    public int IronClubCombatsEndedOn1Charges { get; set; }
+    public int IronClubCombatsEndedOn2Charges { get; set; }
     public int IronClubCombatsEndedOn3Charges { get; set; }
 
     // Cost-discount tracking. Used by Brilliant Scarf.

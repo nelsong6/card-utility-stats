@@ -18,6 +18,9 @@
     "RELIC.IRON_CLUB": {
       "additional_cards_drawn": 7,
       "iron_club_combats": 4,
+      "iron_club_combats_ended_on0_charges": 1,
+      "iron_club_combats_ended_on1_charges": 1,
+      "iron_club_combats_ended_on2_charges": 0,
       "iron_club_combats_ended_on3_charges": 2
     }
   },

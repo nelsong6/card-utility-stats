@@ -804,6 +804,9 @@ public class SchemaLoadingTests
         var relicAgg = loaded.Data.RelicAggregates["RELIC.IRON_CLUB"];
         Assert.Equal(7, relicAgg.AdditionalCardsDrawn);
         Assert.Equal(4, relicAgg.IronClubCombats);
+        Assert.Equal(1, relicAgg.IronClubCombatsEndedOn0Charges);
+        Assert.Equal(1, relicAgg.IronClubCombatsEndedOn1Charges);
+        Assert.Equal(0, relicAgg.IronClubCombatsEndedOn2Charges);
         Assert.Equal(2, relicAgg.IronClubCombatsEndedOn3Charges);
     }
 
@@ -816,6 +819,9 @@ public class SchemaLoadingTests
         var relicAgg = resumed!.RelicAggregates["RELIC.IRON_CLUB"];
         Assert.Equal(7, relicAgg.AdditionalCardsDrawn);
         Assert.Equal(4, relicAgg.IronClubCombats);
+        Assert.Equal(1, relicAgg.IronClubCombatsEndedOn0Charges);
+        Assert.Equal(1, relicAgg.IronClubCombatsEndedOn1Charges);
+        Assert.Equal(0, relicAgg.IronClubCombatsEndedOn2Charges);
         Assert.Equal(2, relicAgg.IronClubCombatsEndedOn3Charges);
     }
 
