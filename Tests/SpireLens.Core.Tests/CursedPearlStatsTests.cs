@@ -97,7 +97,7 @@ public class CursedPearlStatsTests
         Assert.Contains("Greed combats", body);
         Assert.Contains("Greed drawn", body);
         Assert.Contains("Greed discarded", body);
-        Assert.Contains("Greed played", body);
+        Assert.DoesNotContain("Greed played", body);
         Assert.Contains("Greed exhausted", body);
         Assert.Contains("[b]0[/b]", body);
     }
@@ -125,8 +125,8 @@ public class CursedPearlStatsTests
         Assert.Contains("[b]4[/b]", body);
         Assert.Contains("[b]8[/b]", body);
         Assert.Contains("[b]3[/b]", body);
-        Assert.Contains("[b]1[/b]", body);
         Assert.Contains("[b]2[/b]", body);
+        Assert.DoesNotContain("Greed played", body);
     }
 
     private static string BuildBody(RelicAggregate relicAgg, CardAggregate curseAgg)

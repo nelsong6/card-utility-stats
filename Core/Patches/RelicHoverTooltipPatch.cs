@@ -1582,17 +1582,22 @@ public static class RelicHoverShowPatch
             "Floors ascended before first shop",
             (agg.FloorsAscendedBeforeFirstShop ?? 0).ToString(),
             "");
-        AppendRelatedCurseCardStats(sb, "Greed", curseAgg);
+        AppendRelatedCurseCardStats(sb, "Greed", curseAgg, includePlayed: false);
         return sb.ToString();
     }
 
-    private static void AppendRelatedCurseCardStats(StringBuilder sb, string displayName, CardAggregate curseAgg)
+    private static void AppendRelatedCurseCardStats(
+        StringBuilder sb,
+        string displayName,
+        CardAggregate curseAgg,
+        bool includePlayed = true)
     {
         curseAgg ??= new CardAggregate();
         Row3(sb, $"{displayName} combats", curseAgg.CombatsInDeck.ToString(), "");
         Row3(sb, $"{displayName} drawn", curseAgg.TimesDrawn.ToString(), "");
         Row3(sb, $"{displayName} discarded", curseAgg.TimesDiscarded.ToString(), "");
-        Row3(sb, $"{displayName} played", curseAgg.Plays.ToString(), "");
+        if (includePlayed)
+            Row3(sb, $"{displayName} played", curseAgg.Plays.ToString(), "");
         Row3(sb, $"{displayName} exhausted", curseAgg.TimesExhausted.ToString(), "");
     }
 
