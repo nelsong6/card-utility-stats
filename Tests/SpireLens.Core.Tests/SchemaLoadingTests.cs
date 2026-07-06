@@ -839,6 +839,8 @@ public class SchemaLoadingTests
         Assert.Equal(1, relicAgg.IronClubCombatsEndedOn1Charges);
         Assert.Equal(0, relicAgg.IronClubCombatsEndedOn2Charges);
         Assert.Equal(2, relicAgg.IronClubCombatsEndedOn3Charges);
+        Assert.Equal(7, relicAgg.IronClubCombatEndChargeTotal);
+        Assert.Equal(4, relicAgg.IronClubCombatEndChargeCount);
     }
 
     [Fact]
@@ -854,6 +856,8 @@ public class SchemaLoadingTests
         Assert.Equal(1, relicAgg.IronClubCombatsEndedOn1Charges);
         Assert.Equal(0, relicAgg.IronClubCombatsEndedOn2Charges);
         Assert.Equal(2, relicAgg.IronClubCombatsEndedOn3Charges);
+        Assert.Equal(7, relicAgg.IronClubCombatEndChargeTotal);
+        Assert.Equal(4, relicAgg.IronClubCombatEndChargeCount);
     }
 
     [Fact]

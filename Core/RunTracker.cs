@@ -1624,6 +1624,8 @@ public static class RunTracker
         target.IronClubCombatsEndedOn1Charges += source.IronClubCombatsEndedOn1Charges;
         target.IronClubCombatsEndedOn2Charges += source.IronClubCombatsEndedOn2Charges;
         target.IronClubCombatsEndedOn3Charges += source.IronClubCombatsEndedOn3Charges;
+        target.IronClubCombatEndChargeTotal += source.IronClubCombatEndChargeTotal;
+        target.IronClubCombatEndChargeCount += source.IronClubCombatEndChargeCount;
 
         target.DiscountCombats += source.DiscountCombats;
         target.DiscountsOffered += source.DiscountsOffered;
@@ -5579,18 +5581,35 @@ public static class RunTracker
         int combatsEndedOn3Charges)
     {
         if (agg == null) return;
+        var charge0Combats = Math.Max(0, combatsEndedOn0Charges);
+        var charge1Combats = Math.Max(0, combatsEndedOn1Charges);
+        var charge2Combats = Math.Max(0, combatsEndedOn2Charges);
+        var charge3Combats = Math.Max(0, combatsEndedOn3Charges);
+
         agg.IronClubCombats += Math.Max(0, combats);
         agg.AdditionalCardsDrawn += Math.Max(0, cardsDrawn);
-        agg.IronClubCombatsEndedOn0Charges += Math.Max(0, combatsEndedOn0Charges);
-        agg.IronClubCombatsEndedOn1Charges += Math.Max(0, combatsEndedOn1Charges);
-        agg.IronClubCombatsEndedOn2Charges += Math.Max(0, combatsEndedOn2Charges);
-        agg.IronClubCombatsEndedOn3Charges += Math.Max(0, combatsEndedOn3Charges);
+        agg.IronClubCombatsEndedOn0Charges += charge0Combats;
+        agg.IronClubCombatsEndedOn1Charges += charge1Combats;
+        agg.IronClubCombatsEndedOn2Charges += charge2Combats;
+        agg.IronClubCombatsEndedOn3Charges += charge3Combats;
+        agg.IronClubCombatEndChargeTotal +=
+            charge1Combats
+            + (charge2Combats * 2)
+            + (charge3Combats * 3);
+        agg.IronClubCombatEndChargeCount +=
+            charge0Combats
+            + charge1Combats
+            + charge2Combats
+            + charge3Combats;
     }
 
     internal static void RecordIronClubCombatEndChargeForTest(RelicAggregate agg, int charge)
     {
         if (agg == null) return;
-        if (charge < 0) return;
+        if (charge < 0 || charge > 3) return;
+
+        agg.IronClubCombatEndChargeTotal += charge;
+        agg.IronClubCombatEndChargeCount += 1;
 
         switch (charge)
         {

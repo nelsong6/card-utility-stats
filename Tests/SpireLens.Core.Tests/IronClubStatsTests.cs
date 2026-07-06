@@ -33,6 +33,8 @@ public class IronClubStatsTests
         Assert.Equal(0, agg.IronClubCombatsEndedOn1Charges);
         Assert.Equal(0, agg.IronClubCombatsEndedOn2Charges);
         Assert.Equal(0, agg.IronClubCombatsEndedOn3Charges);
+        Assert.Equal(0, agg.IronClubCombatEndChargeTotal);
+        Assert.Equal(0, agg.IronClubCombatEndChargeCount);
     }
 
     [Fact]
@@ -47,6 +49,8 @@ public class IronClubStatsTests
             IronClubCombatsEndedOn1Charges = 1,
             IronClubCombatsEndedOn2Charges = 0,
             IronClubCombatsEndedOn3Charges = 2,
+            IronClubCombatEndChargeTotal = 7,
+            IronClubCombatEndChargeCount = 4,
         };
 
         var json = JsonSerializer.Serialize(run, SerializerOptions);
@@ -57,6 +61,8 @@ public class IronClubStatsTests
         Assert.Contains("iron_club_combats_ended_on1_charges", json);
         Assert.Contains("iron_club_combats_ended_on2_charges", json);
         Assert.Contains("iron_club_combats_ended_on3_charges", json);
+        Assert.Contains("iron_club_combat_end_charge_total", json);
+        Assert.Contains("iron_club_combat_end_charge_count", json);
 
         var restored = JsonSerializer.Deserialize<RunData>(json, SerializerOptions);
 
@@ -68,6 +74,8 @@ public class IronClubStatsTests
         Assert.Equal(1, agg.IronClubCombatsEndedOn1Charges);
         Assert.Equal(0, agg.IronClubCombatsEndedOn2Charges);
         Assert.Equal(2, agg.IronClubCombatsEndedOn3Charges);
+        Assert.Equal(7, agg.IronClubCombatEndChargeTotal);
+        Assert.Equal(4, agg.IronClubCombatEndChargeCount);
     }
 
     [Fact]
@@ -104,6 +112,8 @@ public class IronClubStatsTests
         Assert.Equal(2, agg.IronClubCombatsEndedOn1Charges);
         Assert.Equal(1, agg.IronClubCombatsEndedOn2Charges);
         Assert.Equal(3, agg.IronClubCombatsEndedOn3Charges);
+        Assert.Equal(13, agg.IronClubCombatEndChargeTotal);
+        Assert.Equal(8, agg.IronClubCombatEndChargeCount);
     }
 
     [Fact]
@@ -117,14 +127,16 @@ public class IronClubStatsTests
             IronClubCombatsEndedOn1Charges = 1,
             IronClubCombatsEndedOn2Charges = 0,
             IronClubCombatsEndedOn3Charges = 2,
+            IronClubCombatEndChargeTotal = 7,
+            IronClubCombatEndChargeCount = 4,
         });
 
         Assert.Contains("Cards drawn total", body);
         Assert.Contains("Avg cards drawn per combat", body);
-        Assert.Contains("Combats ended on 0 charges", body);
-        Assert.Contains("Combats ended on 1 charge", body);
-        Assert.Contains("Combats ended on 2 charges", body);
-        Assert.Contains("Combats ended on 3 charges", body);
+        Assert.Contains("Combat ends at 0 charges", body);
+        Assert.Contains("Combat ends at 1 charge", body);
+        Assert.Contains("Combat ends at 2 charges", body);
+        Assert.Contains("Combat ends at 3 charges", body);
         Assert.Contains("Avg charge at combat end", body);
         Assert.Contains("[b]7[/b]", body);
         Assert.Contains("[b]1.75[/b]", body);
@@ -140,12 +152,27 @@ public class IronClubStatsTests
 
         Assert.Contains("Cards drawn total", body);
         Assert.Contains("Avg cards drawn per combat", body);
-        Assert.Contains("Combats ended on 0 charges", body);
-        Assert.Contains("Combats ended on 1 charge", body);
-        Assert.Contains("Combats ended on 2 charges", body);
-        Assert.Contains("Combats ended on 3 charges", body);
+        Assert.Contains("Combat ends at 0 charges", body);
+        Assert.Contains("Combat ends at 1 charge", body);
+        Assert.Contains("Combat ends at 2 charges", body);
+        Assert.Contains("Combat ends at 3 charges", body);
         Assert.Contains("Avg charge at combat end", body);
         Assert.Equal(7, CountOccurrences(body, "[b]0[/b]"));
+    }
+
+    [Fact]
+    public void RelicTooltip_IronClub_ReconstructsAverageForBucketOnlyRuns()
+    {
+        var body = BuildBody(new RelicAggregate
+        {
+            IronClubCombatsEndedOn0Charges = 1,
+            IronClubCombatsEndedOn1Charges = 1,
+            IronClubCombatsEndedOn2Charges = 0,
+            IronClubCombatsEndedOn3Charges = 2,
+        });
+
+        Assert.Contains("Avg charge at combat end", body);
+        Assert.Contains("[b]1.75[/b]", body);
     }
 
     private static string BuildBody(RelicAggregate agg)

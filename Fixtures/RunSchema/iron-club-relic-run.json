@@ -21,7 +21,9 @@
       "iron_club_combats_ended_on0_charges": 1,
       "iron_club_combats_ended_on1_charges": 1,
       "iron_club_combats_ended_on2_charges": 0,
-      "iron_club_combats_ended_on3_charges": 2
+      "iron_club_combats_ended_on3_charges": 2,
+      "iron_club_combat_end_charge_total": 7,
+      "iron_club_combat_end_charge_count": 4
     }
   },
   "meta_stats": {},
