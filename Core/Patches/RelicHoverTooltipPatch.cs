@@ -1641,8 +1641,8 @@ public static class RelicHoverShowPatch
     private static string BuildChosenCheeseBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
-        AppendMaxHpChangeRows(sb, agg, "Max HP gained", agg.MaxHpGained);
+        Row3(sb, "Starting max HP", FormatDecimal(OriginalMaxHp(agg)), "");
+        Row3(sb, "Max HP gained", FormatDecimal(Math.Max(0m, agg.MaxHpGained)), "");
         return sb.ToString();
     }
 

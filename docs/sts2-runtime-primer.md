@@ -388,10 +388,13 @@ owner-specific match rather than from every generic curse card entry.
 
 Chosen Cheese gains max HP from `AfterCombatEnd`, then the game heals the same
 amount as part of `CreatureCmd.GainMaxHp`. Snapshot the owner's max HP before
-the async relic callback and record the actual max-HP delta after successful
-completion. Because the callback completes around combat teardown, route the
-aggregate to pending combat when it still exists and directly to the run
-otherwise.
+the async relic callback and record only the actual max-HP delta after
+successful completion. Its baseline max HP comes from the `RelicCmd.Obtain`
+pickup boundary. Do not display or store a Chosen Cheese "resulting max HP":
+other max-HP effects can interleave between its later gains, so the only durable
+run-level facts are pickup-time starting max HP and total max HP gained. Because
+the combat-end callback can complete around combat promotion, route the gained
+amount to pending combat when it still exists and directly to the run otherwise.
 
 Strike Dummy identifies eligible cards through the game's `CardTag.Strike`.
 Its damage modifier can run per damage evaluation, so count Strike cards played

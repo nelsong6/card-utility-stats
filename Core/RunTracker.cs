@@ -4102,15 +4102,37 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Record Chosen Cheese's max HP at the pickup boundary. This value is
+    /// displayed as the relic's starting max HP and is kept separate from later
+    /// combat-end gains because unrelated max-HP changes can happen in between.
+    /// </summary>
+    public static void RecordChosenCheeseObtained(RelicModel relic, Player player, decimal startingMaxHp)
+    {
+        if (!IsChosenCheeseStatsRelic(relic) || player == null || startingMaxHp < 0m) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(ChosenCheeseRelicId);
+                RecordChosenCheeseStartingMaxHpForTest(agg, startingMaxHp);
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordChosenCheeseObtained failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Record Chosen Cheese's observed max-HP gain after its combat-end
     /// callback completes. The callback can finish around combat promotion, so
-    /// route to pending combat when it still exists and otherwise save directly.
+    /// route the gained amount to pending combat when it still exists and
+    /// otherwise save directly.
     /// </summary>
-    public static void RecordChosenCheeseMaxHpGained(
-        Creature creature,
-        decimal maxHpGained,
-        decimal? originalMaxHp = null,
-        decimal? newMaxHp = null)
+    public static void RecordChosenCheeseMaxHpGained(Creature creature, decimal maxHpGained)
     {
         if (creature?.Player == null || maxHpGained < 0m) return;
 
@@ -4123,7 +4145,7 @@ public static class RunTracker
 
                 bool persistDirectlyToRun = _pendingCombat == null;
                 var agg = GetOrCreateRelicAggregateForCurrentContextLocked(ChosenCheeseRelicId);
-                RecordChosenCheeseMaxHpGainedForTest(agg, maxHpGained, originalMaxHp, newMaxHp);
+                RecordChosenCheeseMaxHpGainedForTest(agg, maxHpGained);
                 if (persistDirectlyToRun)
                     SaveCurrentRun();
             }
@@ -4708,15 +4730,18 @@ public static class RunTracker
 
     internal static void RecordChosenCheeseMaxHpGainedForTest(
         RelicAggregate agg,
-        decimal maxHpGained,
-        decimal? originalMaxHp = null,
-        decimal? newMaxHp = null)
+        decimal maxHpGained)
     {
         if (agg == null || maxHpGained < 0m) return;
 
-        agg.Activations++;
         agg.MaxHpGained += maxHpGained;
-        RecordRelicMaxHpChangeForTest(agg, originalMaxHp, newMaxHp);
+    }
+
+    internal static void RecordChosenCheeseStartingMaxHpForTest(RelicAggregate agg, decimal startingMaxHp)
+    {
+        if (agg == null || startingMaxHp < 0m) return;
+
+        agg.OriginalMaxHp ??= startingMaxHp;
     }
 
     internal static void RecordLeafyPoulticeMaxHpChangedForTest(
@@ -4870,6 +4895,22 @@ public static class RunTracker
                 || string.Equals(
                     relic?.GetType().FullName,
                     "MegaCrit.Sts2.Core.Models.Relics.MiniatureCannon",
+                    StringComparison.Ordinal);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    internal static bool IsChosenCheeseStatsRelic(RelicModel? relic)
+    {
+        try
+        {
+            return relic is ChosenCheese
+                || string.Equals(
+                    relic?.GetType().FullName,
+                    "MegaCrit.Sts2.Core.Models.Relics.ChosenCheese",
                     StringComparison.Ordinal);
         }
         catch

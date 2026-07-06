@@ -416,10 +416,9 @@ public class SchemaLoadingTests
         Assert.True(loaded.HasPerInstanceIdentity);
         Assert.Null(loaded.CompatibilityNote);
         var relicAgg = loaded.Data.RelicAggregates["RELIC.CHOSEN_CHEESE"];
-        Assert.Equal(3, relicAgg.Activations);
         Assert.Equal(3m, relicAgg.MaxHpGained);
         Assert.Equal(70m, relicAgg.OriginalMaxHp);
-        Assert.Equal(73m, relicAgg.NewMaxHp);
+        Assert.Null(relicAgg.NewMaxHp);
     }
 
     [Fact]
@@ -895,10 +894,9 @@ public class SchemaLoadingTests
 
         Assert.NotNull(resumed);
         var relicAgg = resumed!.RelicAggregates["RELIC.CHOSEN_CHEESE"];
-        Assert.Equal(3, relicAgg.Activations);
         Assert.Equal(3m, relicAgg.MaxHpGained);
         Assert.Equal(70m, relicAgg.OriginalMaxHp);
-        Assert.Equal(73m, relicAgg.NewMaxHp);
+        Assert.Null(relicAgg.NewMaxHp);
     }
 
     [Fact]

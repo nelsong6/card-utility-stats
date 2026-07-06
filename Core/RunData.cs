@@ -433,6 +433,9 @@ public class RelicAggregate
     // Shared max-HP before/after snapshot for relics that add or remove max HP.
     // Original is the first observed value before the relic changed max HP; New
     // is the latest observed value after its max-HP change resolved.
+    // For Chosen Cheese, Original stores pickup-time starting max HP and New is
+    // intentionally unused because other max-HP effects can interleave between
+    // later Chosen Cheese gains.
     public decimal? OriginalMaxHp { get; set; }
     public decimal? NewMaxHp { get; set; }
 

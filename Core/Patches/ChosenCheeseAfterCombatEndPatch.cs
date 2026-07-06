@@ -7,8 +7,10 @@ using MegaCrit.Sts2.Core.Models.Relics;
 namespace SpireLens.Core.Patches;
 
 /// <summary>
-/// Records Chosen Cheese's owner-specific combat-end max-HP gain by observing
-/// the owner's actual max HP after the async relic callback finishes.
+/// Records Chosen Cheese's owner-specific combat-end max-HP gain by measuring
+/// only the delta around its async relic callback. The final max HP after a
+/// gain is intentionally not stored because unrelated max-HP effects may
+/// interleave across the relic's lifetime.
 /// </summary>
 [HarmonyPatch(typeof(ChosenCheese), nameof(ChosenCheese.AfterCombatEnd))]
 public static class ChosenCheeseAfterCombatEndPatch
@@ -67,7 +69,7 @@ public static class ChosenCheeseAfterCombatEndPatch
             if (creature == null) return;
 
             var maxHpGained = creature.MaxHp - state.InitialMaxHp;
-            RunTracker.RecordChosenCheeseMaxHpGained(creature, maxHpGained, state.InitialMaxHp, creature.MaxHp);
+            RunTracker.RecordChosenCheeseMaxHpGained(creature, maxHpGained);
         }
         catch (Exception e)
         {
