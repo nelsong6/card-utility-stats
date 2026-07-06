@@ -1609,6 +1609,8 @@ public static class RunTracker
             target.MiniatureCannonUpgradedAttacksInDeck = source.MiniatureCannonUpgradedAttacksInDeck;
         target.MiniatureCannonUpgradedAttackPlays += source.MiniatureCannonUpgradedAttackPlays;
         target.MiniatureCannonUpgradedAttackHits += source.MiniatureCannonUpgradedAttackHits;
+        target.VajraAttacksPlayed += source.VajraAttacksPlayed;
+        target.VajraAttackHits += source.VajraAttackHits;
 
         target.BookmarkCombats += source.BookmarkCombats;
         target.BookmarkCommonActivations += source.BookmarkCommonActivations;
@@ -1791,6 +1793,7 @@ public static class RunTracker
             RecordStrikeDummyStrikePlayedIfOwnedLocked(cardPlay.Card);
             RecordNutritiousSoupEnchantedStrikePlayedIfOwnedLocked(cardPlay.Card);
             RecordMiniatureCannonUpgradedAttackPlayedIfOwnedLocked(cardPlay.Card);
+            RecordVajraAttackPlayedIfOwnedLocked(cardPlay.Card);
             if (IsReplayExtraPlay(cardPlay))
             {
                 agg.TimesReplayExtraPlayed++;
@@ -2268,6 +2271,7 @@ public static class RunTracker
     private const string StrikeDummyRelicId = "RELIC.STRIKE_DUMMY";
     private const string NutritiousSoupRelicId = "RELIC.NUTRITIOUS_SOUP";
     private const string MiniatureCannonRelicId = "RELIC.MINIATURE_CANNON";
+    private const string VajraRelicId = "RELIC.VAJRA";
     private const string BookmarkRelicId = "RELIC.BOOKMARK";
     private const string BrilliantScarfRelicId = "RELIC.BRILLIANT_SCARF";
     private const string JuzuBraceletRelicId = "RELIC.JUZU_BRACELET";
@@ -5133,6 +5137,18 @@ public static class RunTracker
         agg.MiniatureCannonUpgradedAttacksInDeck = Math.Max(0, upgradedAttacksInDeck);
     }
 
+    internal static void RecordVajraAttackPlayedForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.VajraAttacksPlayed += Math.Max(0, count);
+    }
+
+    internal static void RecordVajraAttackHitForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.VajraAttackHits += Math.Max(0, count);
+    }
+
     internal static void RecordBookmarkCombatForTest(RelicAggregate agg, int count = 1)
     {
         if (agg == null) return;
@@ -7231,6 +7247,28 @@ public static class RunTracker
         agg.MiniatureCannonUpgradedAttackHits += 1;
     }
 
+    private static void RecordVajraAttackPlayedIfOwnedLocked(CardModel card)
+    {
+        if (card.Type != CardType.Attack) return;
+
+        var owner = card.Owner;
+        if (owner == null || !IsTrackedPlayer(owner) || !PlayerHasVajra(owner)) return;
+
+        var agg = GetOrCreateRelicAggregateForCurrentContextLocked(VajraRelicId);
+        RecordVajraAttackPlayedForTest(agg);
+    }
+
+    private static void RecordVajraAttackHitIfOwnedLocked(CardModel card)
+    {
+        if (card.Type != CardType.Attack) return;
+
+        var owner = card.Owner;
+        if (owner == null || !IsTrackedPlayer(owner) || !PlayerHasVajra(owner)) return;
+
+        var agg = GetOrCreateRelicAggregateLocked(VajraRelicId);
+        RecordVajraAttackHitForTest(agg);
+    }
+
     private static bool RefreshStrikeDummyDeckCountsIfOwnedLocked()
     {
         if (_currentRun == null) return false;
@@ -7370,6 +7408,18 @@ public static class RunTracker
         try
         {
             return player.Relics.Any(IsMiniatureCannonStatsRelic);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool PlayerHasVajra(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is Vajra);
         }
         catch
         {
@@ -10286,6 +10336,7 @@ public static class RunTracker
                 agg.TotalEffective += damageTotals.EffectiveDamage;
                 if (result.WasTargetKilled) agg.Kills++;
                 RecordMiniatureCannonUpgradedAttackHitIfOwnedLocked(entry.CardSource!);
+                RecordVajraAttackHitIfOwnedLocked(entry.CardSource!);
 
                 _pendingCombat.CombatEvents.Add(new CardEvent
                 {

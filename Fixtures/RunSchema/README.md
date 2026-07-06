@@ -137,6 +137,9 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds Nutritious Soup tracking for combats held plus finished plays of basic
   Strike-tagged cards carrying the Tezcataras Ember enchantment while the relic
   was held.
+- `vajra-relic-run.json`
+  Adds Vajra tracking for attack cards played while held plus actual enemy
+  damage hits from those attacks, with multi-hit attacks counted per hit.
 - `brilliant-scarf-relic-run.json`
   Adds Brilliant Scarf discount tracking: energy-discount offers, taken
   discounts, energy saved by those taken discounts, held combats, and

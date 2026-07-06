@@ -1,0 +1,38 @@
+{
+  "run_id": "vajra-relic-fixture",
+  "started_at": "2026-07-06T19:00:00Z",
+  "updated_at": "2026-07-06T19:08:00Z",
+  "outcome": "in_progress",
+  "aggregates": {
+    "CARD.STRIKE_IRONCLAD#1": {
+      "plays": 2,
+      "total_intended": 12,
+      "total_effective": 10
+    },
+    "CARD.TWIN_STRIKE#1": {
+      "plays": 1,
+      "total_intended": 10,
+      "total_effective": 9
+    }
+  },
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.VAJRA": {
+      "vajra_attacks_played": 6,
+      "vajra_attack_hits": 11
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.STRIKE_IRONCLAD": [
+      1
+    ],
+    "CARD.TWIN_STRIKE": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.STRIKE_IRONCLAD": 1,
+    "CARD.TWIN_STRIKE": 1
+  }
+}

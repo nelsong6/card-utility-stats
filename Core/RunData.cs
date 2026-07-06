@@ -552,6 +552,12 @@ public class RelicAggregate
     public int MiniatureCannonUpgradedAttackPlays { get; set; }
     public int MiniatureCannonUpgradedAttackHits { get; set; }
 
+    // Vajra tracking. Counts attack cards played while held, and actual enemy
+    // damage hits from those attacks. Multi-hit attacks increment hits per
+    // resolved damage entry.
+    public int VajraAttacksPlayed { get; set; }
+    public int VajraAttackHits { get; set; }
+
     // Bookmark tracking. Activations is total cost-reduction activations;
     // BookmarkCombats is the denominator for average activations per combat.
     public int BookmarkCombats { get; set; }

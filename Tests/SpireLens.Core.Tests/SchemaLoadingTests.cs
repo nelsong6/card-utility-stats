@@ -1972,6 +1972,29 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsVajraRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("vajra-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.VAJRA"];
+        Assert.Equal(6, relicAgg.VajraAttacksPlayed);
+        Assert.Equal(11, relicAgg.VajraAttackHits);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsVajraRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("vajra-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.VAJRA"];
+        Assert.Equal(6, relicAgg.VajraAttacksPlayed);
+        Assert.Equal(11, relicAgg.VajraAttackHits);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsBookmarkRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("bookmark-relic-run.json"));

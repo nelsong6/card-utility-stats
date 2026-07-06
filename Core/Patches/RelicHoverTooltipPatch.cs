@@ -227,6 +227,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is Vajra)
+            {
+                const string relicId = "RELIC.VAJRA";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildVajraBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Vajra", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is Candelabra)
             {
                 const string relicId = "RELIC.CANDELABRA";
@@ -941,6 +951,13 @@ public static class RelicHoverShowPatch
         {
             title = "Iron Club";
             body = BuildIronClubBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is Vajra)
+        {
+            title = "Vajra";
+            body = BuildVajraBodyBBCode(agg);
             return true;
         }
 
@@ -2026,6 +2043,14 @@ public static class RelicHoverShowPatch
         Row3(sb, "Upgraded attack hits", agg.MiniatureCannonUpgradedAttackHits.ToString(), "");
         Row3(sb, "Avg plays per combat", FormatDecimal(averagePlays), "");
         Row3(sb, "Avg hits per combat", FormatDecimal(averageHits), "");
+        return sb.ToString();
+    }
+
+    private static string BuildVajraBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Attacks played", agg.VajraAttacksPlayed.ToString(), "");
+        Row3(sb, "Attack hits", agg.VajraAttackHits.ToString(), "");
         return sb.ToString();
     }
 
