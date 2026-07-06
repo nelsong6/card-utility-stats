@@ -1563,6 +1563,11 @@ public static class RunTracker
         target.EnergyGeneratedCombats += source.EnergyGeneratedCombats;
         target.SecondTurnsEndedWithExcessEnergy += source.SecondTurnsEndedWithExcessEnergy;
         target.VigorGained += source.VigorGained;
+        target.PenNibAttacksPlayed += source.PenNibAttacksPlayed;
+        target.PenNibTurnsEndedOn8Charges += source.PenNibTurnsEndedOn8Charges;
+        target.PenNibTurnsEndedOn9Charges += source.PenNibTurnsEndedOn9Charges;
+        target.PenNibTurnEndChargeTotal += source.PenNibTurnEndChargeTotal;
+        target.PenNibTurnEndChargeCount += source.PenNibTurnEndChargeCount;
         target.TotalDamageAttempted += source.TotalDamageAttempted;
         target.TotalDamageDealt += source.TotalDamageDealt;
         target.TotalDamageBlocked += source.TotalDamageBlocked;
@@ -2671,8 +2676,93 @@ public static class RunTracker
         }
     }
 
+    /// <summary>
+    /// Record a Pen Nib-owned attack play. Mirrors Pen Nib.BeforeCardPlayed's
+    /// owner/type checks so the total matches the relic's own charge counter.
+    /// </summary>
+    public static void RecordPenNibAttackPlayed(PenNib relic, CardPlay cardPlay)
+    {
+        if (relic?.Owner == null || cardPlay?.Card == null) return;
+        if (cardPlay.Card.Type != CardType.Attack) return;
+        if (!ReferenceEquals(cardPlay.Card.Owner, relic.Owner)) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic)) return;
+                if (!IsTrackedPlayer(relic.Owner)) return;
+
+                var agg = GetOrCreateRelicAggregateLocked(PenNibRelicId);
+                RecordPenNibAttackPlayedForTest(agg);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPenNibAttackPlayed failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Snapshot Pen Nib's live charge at the end of each tracked player turn.
+    /// </summary>
+    public static void RecordPenNibTurnEnded(IEnumerable<Creature>? participants)
+    {
+        if (participants == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                _pendingCombat ??= new PendingCombat();
+
+                foreach (var creature in participants)
+                {
+                    var player = creature?.Player;
+                    if (player == null || !IsTrackedPlayer(player)) continue;
+                    if (!TryGetPenNib(player, out var penNib) || penNib == null) continue;
+
+                    var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+                    if (turnNumber <= 0) continue;
+                    if (_pendingCombat.PenNibTurnEndChargeRecordedTurns.TryGetValue(player, out var recordedTurn)
+                        && recordedTurn == turnNumber)
+                    {
+                        continue;
+                    }
+
+                    _pendingCombat.PenNibTurnEndChargeRecordedTurns[player] = turnNumber;
+                    var agg = GetOrCreatePendingRelicAggregateLocked(PenNibRelicId);
+                    RecordPenNibTurnEndChargeForTest(agg, penNib.AttacksPlayed);
+                }
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPenNibTurnEnded failed: {e.Message}");
+            }
+        }
+    }
+
     internal static void RecordPenNibBaseDamageAddedForTest(RelicAggregate agg, decimal baseDamageAdded)
         => AddPenNibBaseDamageAdded(agg, baseDamageAdded);
+
+    internal static void RecordPenNibAttackPlayedForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.PenNibAttacksPlayed += Math.Max(0, count);
+    }
+
+    internal static void RecordPenNibTurnEndChargeForTest(RelicAggregate agg, int charge)
+    {
+        if (agg == null || charge < 0) return;
+
+        charge %= 10;
+        agg.PenNibTurnEndChargeTotal += charge;
+        agg.PenNibTurnEndChargeCount += 1;
+        if (charge == 8)
+            agg.PenNibTurnsEndedOn8Charges += 1;
+        else if (charge == 9)
+            agg.PenNibTurnsEndedOn9Charges += 1;
+    }
 
     private static void AddPenNibBaseDamageAdded(RelicAggregate agg, decimal baseDamageAdded)
     {
@@ -7625,6 +7715,22 @@ public static class RunTracker
         return TryGetNunchaku(player, out _);
     }
 
+    private static bool TryGetPenNib(Player player, out PenNib? penNib)
+    {
+        penNib = null;
+
+        try
+        {
+            penNib = player?.Relics?.OfType<PenNib>().FirstOrDefault();
+            return penNib != null;
+        }
+        catch
+        {
+            penNib = null;
+            return false;
+        }
+    }
+
     private static bool TryGetNunchaku(Player player, out Nunchaku? nunchaku)
     {
         nunchaku = null;
@@ -10964,6 +11070,8 @@ internal class PendingCombat
     public HashSet<Player> PaelsEyeActivationStartedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> CandelabraSecondTurnExcessRecordedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> PenNibTurnEndChargeRecordedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> GamblingChipDiscardAttributionPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

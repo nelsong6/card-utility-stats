@@ -38,6 +38,11 @@ public class OpenBranchRelicStatsTests
         Assert.Equal(0, agg.RareCardsOffered);
         Assert.Equal(0, agg.UncommonCardsTaken);
         Assert.Equal(0, agg.RareCardsTaken);
+        Assert.Equal(0, agg.PenNibAttacksPlayed);
+        Assert.Equal(0, agg.PenNibTurnsEndedOn8Charges);
+        Assert.Equal(0, agg.PenNibTurnsEndedOn9Charges);
+        Assert.Equal(0, agg.PenNibTurnEndChargeTotal);
+        Assert.Equal(0, agg.PenNibTurnEndChargeCount);
     }
 
     [Fact]
@@ -77,6 +82,11 @@ public class OpenBranchRelicStatsTests
         run.RelicAggregates["RELIC.PEN_NIB"] = new RelicAggregate
         {
             TotalDamageAttempted = 27,
+            PenNibAttacksPlayed = 9,
+            PenNibTurnsEndedOn8Charges = 2,
+            PenNibTurnsEndedOn9Charges = 1,
+            PenNibTurnEndChargeTotal = 34,
+            PenNibTurnEndChargeCount = 5,
         };
         run.RelicAggregates["RELIC.HORN_CLEAT"] = new RelicAggregate
         {
@@ -97,6 +107,11 @@ public class OpenBranchRelicStatsTests
         Assert.Contains("total_damage_blocked", json);
         Assert.Contains("total_damage_overkill", json);
         Assert.Contains("kills", json);
+        Assert.Contains("pen_nib_attacks_played", json);
+        Assert.Contains("pen_nib_turns_ended_on8_charges", json);
+        Assert.Contains("pen_nib_turns_ended_on9_charges", json);
+        Assert.Contains("pen_nib_turn_end_charge_total", json);
+        Assert.Contains("pen_nib_turn_end_charge_count", json);
 
         var restored = JsonSerializer.Deserialize<RunData>(json, SerializerOptions);
 
@@ -120,6 +135,11 @@ public class OpenBranchRelicStatsTests
         Assert.Equal(1, restored.RelicAggregates["RELIC.PARRYING_SHIELD"].Kills);
         Assert.Equal(2, restored.RelicAggregates["RELIC.PARRYING_SHIELD"].TotalTargets);
         Assert.Equal(27, restored.RelicAggregates["RELIC.PEN_NIB"].TotalDamageAttempted);
+        Assert.Equal(9, restored.RelicAggregates["RELIC.PEN_NIB"].PenNibAttacksPlayed);
+        Assert.Equal(2, restored.RelicAggregates["RELIC.PEN_NIB"].PenNibTurnsEndedOn8Charges);
+        Assert.Equal(1, restored.RelicAggregates["RELIC.PEN_NIB"].PenNibTurnsEndedOn9Charges);
+        Assert.Equal(34, restored.RelicAggregates["RELIC.PEN_NIB"].PenNibTurnEndChargeTotal);
+        Assert.Equal(5, restored.RelicAggregates["RELIC.PEN_NIB"].PenNibTurnEndChargeCount);
         Assert.Equal(2, restored.RelicAggregates["RELIC.HORN_CLEAT"].Activations);
         Assert.Equal(24, restored.RelicAggregates["RELIC.HORN_CLEAT"].AdditionalBlockGained);
     }
@@ -135,6 +155,25 @@ public class OpenBranchRelicStatsTests
         RunTracker.RecordPenNibBaseDamageAddedForTest(agg, -5m);
 
         Assert.Equal(15, agg.TotalDamageAttempted);
+    }
+
+    [Fact]
+    public void RunTracker_RecordPenNibChargeStats_TracksAttackAndTurnEndBuckets()
+    {
+        var agg = new RelicAggregate();
+
+        RunTracker.RecordPenNibAttackPlayedForTest(agg, 3);
+        RunTracker.RecordPenNibAttackPlayedForTest(agg, -2);
+        RunTracker.RecordPenNibTurnEndChargeForTest(agg, 8);
+        RunTracker.RecordPenNibTurnEndChargeForTest(agg, 9);
+        RunTracker.RecordPenNibTurnEndChargeForTest(agg, 12);
+        RunTracker.RecordPenNibTurnEndChargeForTest(agg, -1);
+
+        Assert.Equal(3, agg.PenNibAttacksPlayed);
+        Assert.Equal(1, agg.PenNibTurnsEndedOn8Charges);
+        Assert.Equal(1, agg.PenNibTurnsEndedOn9Charges);
+        Assert.Equal(19, agg.PenNibTurnEndChargeTotal);
+        Assert.Equal(3, agg.PenNibTurnEndChargeCount);
     }
 
     [Fact]
@@ -267,9 +306,24 @@ public class OpenBranchRelicStatsTests
 
         var penNibBody = InvokeTooltipBuilder(
             "BuildPenNibBodyBBCode",
-            new RelicAggregate { TotalDamageAttempted = 27 });
+            new RelicAggregate
+            {
+                TotalDamageAttempted = 27,
+                PenNibAttacksPlayed = 9,
+                PenNibTurnsEndedOn8Charges = 2,
+                PenNibTurnsEndedOn9Charges = 1,
+                PenNibTurnEndChargeTotal = 34,
+                PenNibTurnEndChargeCount = 5,
+            });
         Assert.Contains("Base damage added", penNibBody);
+        Assert.Contains("Avg base damage added per attack", penNibBody);
+        Assert.Contains("Attacks played", penNibBody);
+        Assert.Contains("Turns ended on 8 charges", penNibBody);
+        Assert.Contains("Turns ended on 9 charges", penNibBody);
+        Assert.Contains("Avg charge at turn end", penNibBody);
         Assert.Contains("[b]27[/b]", penNibBody);
+        Assert.Contains("[b]9[/b]", penNibBody);
+        Assert.Contains("[b]6.8[/b]", penNibBody);
 
         var hornCleatBody = InvokeTooltipBuilder(
             "BuildHornCleatBodyBBCode",

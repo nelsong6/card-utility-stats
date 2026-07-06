@@ -1,0 +1,21 @@
+{
+  "run_id": "pen-nib-relic-fixture",
+  "started_at": "2026-07-06T18:00:00Z",
+  "updated_at": "2026-07-06T18:10:00Z",
+  "outcome": "in_progress",
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.PEN_NIB": {
+      "total_damage_attempted": 27,
+      "pen_nib_attacks_played": 9,
+      "pen_nib_turns_ended_on8_charges": 2,
+      "pen_nib_turns_ended_on9_charges": 1,
+      "pen_nib_turn_end_charge_total": 34,
+      "pen_nib_turn_end_charge_count": 5
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

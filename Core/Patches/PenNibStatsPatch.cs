@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Threading;
 using HarmonyLib;
+using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
@@ -90,6 +92,71 @@ public static class PenNibModifyDamageMultiplicativePatch
     }
 
     private readonly record struct DamageFrame(CardModel? CardSource, CardPlay? CardPlay, decimal Amount);
+}
+
+/// <summary>
+/// Counts every Pen Nib-owned attack play before the relic advances its live
+/// charge counter.
+/// </summary>
+[HarmonyPatch(typeof(PenNib), nameof(PenNib.BeforeCardPlayed))]
+public static class PenNibBeforeCardPlayedStatsPatch
+{
+    [HarmonyPrefix]
+    public static void Prefix(PenNib __instance, CardPlay cardPlay)
+    {
+        try
+        {
+            if (__instance == null || !RunTracker.IsTrackedRelic(__instance)) return;
+            RunTracker.RecordPenNibAttackPlayed(__instance, cardPlay);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"PenNibBeforeCardPlayedStatsPatch failed: {e.Message}");
+        }
+    }
+}
+
+/// <summary>
+/// Snapshots Pen Nib's charge at the end of each player turn while held.
+/// Bound by runtime lookup so a game hook rename does not break build.
+/// </summary>
+[HarmonyPatch]
+public static class HookBeforeSideTurnEndPenNibPatch
+{
+    private static MethodBase? TargetMethod()
+    {
+        var hookType = Sts2CoreAssembly()?.GetType("MegaCrit.Sts2.Core.Hooks.Hook", throwOnError: false);
+        if (hookType == null) return null;
+
+        return AccessTools.Method(hookType, "BeforeSideTurnEnd")
+            ?? AccessTools.Method(hookType, "BeforeTurnEnd");
+    }
+
+    private static Assembly? Sts2CoreAssembly()
+    {
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            if (assembly.GetName().Name == "sts2") return assembly;
+        }
+
+        return null;
+    }
+
+    private static bool Prepare() => TargetMethod() != null;
+
+    [HarmonyPrefix]
+    public static void Prefix(CombatSide side, IEnumerable<Creature> participants)
+    {
+        try
+        {
+            if (side != CombatSide.Player) return;
+            RunTracker.RecordPenNibTurnEnded(participants);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"HookBeforeSideTurnEndPenNibPatch failed: {e.Message}");
+        }
+    }
 }
 
 /// <summary>

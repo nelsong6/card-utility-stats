@@ -1640,7 +1640,19 @@ public static class RelicHoverShowPatch
     private static string BuildPenNibBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
+        var averageBaseDamage = agg.PenNibAttacksPlayed <= 0
+            ? 0m
+            : (decimal)agg.TotalDamageAttempted / agg.PenNibAttacksPlayed;
+        var averageEndCharge = agg.PenNibTurnEndChargeCount <= 0
+            ? 0m
+            : (decimal)agg.PenNibTurnEndChargeTotal / agg.PenNibTurnEndChargeCount;
+
         Row3(sb, "Base damage added", agg.TotalDamageAttempted.ToString(), "");
+        Row3(sb, "Avg base damage added per attack", FormatDecimal(averageBaseDamage), "");
+        Row3(sb, "Attacks played", agg.PenNibAttacksPlayed.ToString(), "");
+        Row3(sb, "Turns ended on 8 charges", agg.PenNibTurnsEndedOn8Charges.ToString(), "");
+        Row3(sb, "Turns ended on 9 charges", agg.PenNibTurnsEndedOn9Charges.ToString(), "");
+        Row3(sb, "Avg charge at turn end", FormatDecimal(averageEndCharge), "");
         return sb.ToString();
     }
 

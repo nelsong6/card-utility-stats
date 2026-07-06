@@ -112,6 +112,10 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds Nunchaku tracking: attacks played, observed energy gained, completed
   combats held for averages, combat-end 8/9 charge counts, and combat-end
   charge total for average charge.
+- `pen-nib-relic-run.json`
+  Adds Pen Nib tracking: total base damage added, attack-play count for the
+  average base damage per attack, turn-end 8/9 charge counts, and turn-end
+  charge samples for average charge.
 - `iron-club-relic-run.json`
   Adds Iron Club tracking: actual cards drawn, completed combats held for the
   average cards-drawn rate, and combat-end 0/1/2/3 charge counts.

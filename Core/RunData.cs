@@ -471,6 +471,14 @@ public class RelicAggregate
     // Total Vigor applied by Akabeko's combat-start effect.
     public int VigorGained { get; set; }
 
+    // Pen Nib tracking. TotalDamageAttempted stores base damage added; these
+    // fields store the attack-play denominator and turn-end charge snapshots.
+    public int PenNibAttacksPlayed { get; set; }
+    public int PenNibTurnsEndedOn8Charges { get; set; }
+    public int PenNibTurnsEndedOn9Charges { get; set; }
+    public int PenNibTurnEndChargeTotal { get; set; }
+    public int PenNibTurnEndChargeCount { get; set; }
+
     // Total attempted/base damage from relic effects whose actual damage is not
     // source-attributed by the game's damage entries. Used by Letter Opener
     // and observed-damage relics such as Parrying Shield, Festive Popper, and

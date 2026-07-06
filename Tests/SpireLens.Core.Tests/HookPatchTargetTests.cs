@@ -99,6 +99,21 @@ public class HookPatchTargetTests
 
     [Fact]
     [Trait("Category", "RequiresLiveGame")]
+    public void PenNibTurnEndPatch_ResolvesBeforeSideTurnEnd()
+    {
+        var target = InvokeTargetMethod(typeof(HookBeforeSideTurnEndPenNibPatch));
+
+        Assert.NotNull(target);
+        Assert.Equal("MegaCrit.Sts2.Core.Hooks.Hook", target!.DeclaringType?.FullName);
+        Assert.Contains(target.Name, new[] { "BeforeSideTurnEnd", "BeforeTurnEnd" });
+
+        var sideParameter = target.GetParameters().SingleOrDefault(p => p.Name == "side");
+        Assert.NotNull(sideParameter);
+        Assert.Equal("MegaCrit.Sts2.Core.Combat.CombatSide", sideParameter!.ParameterType.FullName);
+    }
+
+    [Fact]
+    [Trait("Category", "RequiresLiveGame")]
     public void RegalPillowModifyHealPatch_ResolvesRestSiteHealModifier()
     {
         var target = InvokeTargetMethod(typeof(RegalPillowModifyRestSiteHealAmountPatch));
