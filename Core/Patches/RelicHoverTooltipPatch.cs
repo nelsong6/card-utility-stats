@@ -1186,6 +1186,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is NutritiousSoup)
+        {
+            title = "Nutritious Soup";
+            body = BuildNutritiousSoupBodyBBCode(agg);
+            return true;
+        }
+
         if (IsMiniatureCannonStatsRelicModel(relicModel))
         {
             title = "Miniature Cannon";
@@ -1864,6 +1871,13 @@ public static class RelicHoverShowPatch
         Row3(sb, "Strikes played", agg.StrikeDummyStrikesPlayed.ToString(), "");
         Row3(sb, "Base Strikes in deck", agg.StrikeDummyBaseStrikesInDeck.ToString(), "");
         Row3(sb, "Non-base Strike cards in deck", agg.StrikeDummyNonBaseStrikeCardsInDeck.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildNutritiousSoupBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Enchanted Strikes played", agg.NutritiousSoupEnchantedStrikesPlayed.ToString(), "");
         return sb.ToString();
     }
 

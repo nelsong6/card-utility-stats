@@ -530,6 +530,10 @@ public class RelicAggregate
     public int StrikeDummyBaseStrikesInDeck { get; set; }
     public int StrikeDummyNonBaseStrikeCardsInDeck { get; set; }
 
+    // Nutritious Soup tracking. Counts finished plays of basic Strike-tagged
+    // cards carrying the Tezcataras Ember enchantment while the relic is held.
+    public int NutritiousSoupEnchantedStrikesPlayed { get; set; }
+
     // Miniature Cannon tracking. Plays and hits are cumulative while the relic
     // is held; deck count is the current permanent-deck snapshot.
     public int MiniatureCannonUpgradedAttacksInDeck { get; set; }

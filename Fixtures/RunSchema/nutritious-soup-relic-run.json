@@ -1,0 +1,27 @@
+{
+  "run_id": "nutritious-soup-relic-fixture",
+  "started_at": "2026-07-05T00:00:00Z",
+  "updated_at": "2026-07-05T00:10:00Z",
+  "outcome": "in_progress",
+  "aggregates": {
+    "CARD.STRIKE_IRONCLAD#1": {
+      "plays": 4,
+      "initial_upgrade_level": 0
+    }
+  },
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.NUTRITIOUS_SOUP": {
+      "nutritious_soup_enchanted_strikes_played": 4
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.STRIKE_IRONCLAD": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.STRIKE_IRONCLAD": 1
+  }
+}

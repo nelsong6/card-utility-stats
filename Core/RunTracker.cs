@@ -1592,6 +1592,8 @@ public static class RunTracker
         if (source.StrikeDummyNonBaseStrikeCardsInDeck != 0 || target.StrikeDummyNonBaseStrikeCardsInDeck == 0)
             target.StrikeDummyNonBaseStrikeCardsInDeck = source.StrikeDummyNonBaseStrikeCardsInDeck;
 
+        target.NutritiousSoupEnchantedStrikesPlayed += source.NutritiousSoupEnchantedStrikesPlayed;
+
         if (source.MiniatureCannonUpgradedAttacksInDeck != 0 || target.MiniatureCannonUpgradedAttacksInDeck == 0)
             target.MiniatureCannonUpgradedAttacksInDeck = source.MiniatureCannonUpgradedAttacksInDeck;
         target.MiniatureCannonUpgradedAttackPlays += source.MiniatureCannonUpgradedAttackPlays;
@@ -1769,6 +1771,7 @@ public static class RunTracker
             if (IsEtherealCard(cardPlay.Card))
                 _pendingCombat.EtherealCardsPlayed++;
             RecordStrikeDummyStrikePlayedIfOwnedLocked(cardPlay.Card);
+            RecordNutritiousSoupEnchantedStrikePlayedIfOwnedLocked(cardPlay.Card);
             RecordMiniatureCannonUpgradedAttackPlayedIfOwnedLocked(cardPlay.Card);
             if (IsReplayExtraPlay(cardPlay))
             {
@@ -2242,6 +2245,7 @@ public static class RunTracker
     private const string PaelsWingRelicId = "RELIC.PAELS_WING";
     private const string PaelsEyeRelicId = "RELIC.PAELS_EYE";
     private const string StrikeDummyRelicId = "RELIC.STRIKE_DUMMY";
+    private const string NutritiousSoupRelicId = "RELIC.NUTRITIOUS_SOUP";
     private const string MiniatureCannonRelicId = "RELIC.MINIATURE_CANNON";
     private const string BookmarkRelicId = "RELIC.BOOKMARK";
     private const string BrilliantScarfRelicId = "RELIC.BRILLIANT_SCARF";
@@ -4878,6 +4882,12 @@ public static class RunTracker
         agg.StrikeDummyStrikesPlayed += 1;
     }
 
+    internal static void RecordNutritiousSoupEnchantedStrikePlayedForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null || count <= 0) return;
+        agg.NutritiousSoupEnchantedStrikesPlayed += count;
+    }
+
     internal static void SetStrikeDummyDeckCountsForTest(
         RelicAggregate agg,
         int baseStrikesInDeck,
@@ -6811,6 +6821,17 @@ public static class RunTracker
         agg.StrikeDummyStrikesPlayed += 1;
     }
 
+    private static void RecordNutritiousSoupEnchantedStrikePlayedIfOwnedLocked(CardModel card)
+    {
+        if (!IsNutritiousSoupEnchantedStrikeCard(card)) return;
+
+        var owner = card.Owner;
+        if (owner == null || !IsTrackedPlayer(owner) || !PlayerHasNutritiousSoup(owner)) return;
+
+        var agg = GetOrCreateRelicAggregateForCurrentContextLocked(NutritiousSoupRelicId);
+        RecordNutritiousSoupEnchantedStrikePlayedForTest(agg);
+    }
+
     private static void RecordMiniatureCannonUpgradedAttackPlayedIfOwnedLocked(CardModel card)
     {
         if (!IsMiniatureCannonUpgradedAttackCard(card)) return;
@@ -6936,6 +6957,18 @@ public static class RunTracker
         try
         {
             return player.Relics.Any(IsStrikeDummyStatsRelic);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool PlayerHasNutritiousSoup(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is NutritiousSoup);
         }
         catch
         {
@@ -7261,6 +7294,22 @@ public static class RunTracker
         try
         {
             return card?.Tags?.Contains(CardTag.Strike) == true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool IsNutritiousSoupEnchantedStrikeCard(CardModel? card)
+    {
+        try
+        {
+            if (card == null) return false;
+            var canonical = Canonical(card);
+            return canonical.Rarity == CardRarity.Basic
+                && canonical.Tags.Contains(CardTag.Strike)
+                && (canonical.Enchantment is TezcatarasEmber || card.Enchantment is TezcatarasEmber);
         }
         catch
         {

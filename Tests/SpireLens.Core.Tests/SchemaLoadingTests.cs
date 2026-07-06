@@ -1268,6 +1268,27 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsNutritiousSoupRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("nutritious-soup-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.NUTRITIOUS_SOUP"];
+        Assert.Equal(4, relicAgg.NutritiousSoupEnchantedStrikesPlayed);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsNutritiousSoupRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("nutritious-soup-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.NUTRITIOUS_SOUP"];
+        Assert.Equal(4, relicAgg.NutritiousSoupEnchantedStrikesPlayed);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsBrilliantScarfRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("brilliant-scarf-relic-run.json"));
