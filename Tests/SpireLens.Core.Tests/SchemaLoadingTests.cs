@@ -795,6 +795,31 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsIronClubRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("iron-club-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.IRON_CLUB"];
+        Assert.Equal(7, relicAgg.AdditionalCardsDrawn);
+        Assert.Equal(4, relicAgg.IronClubCombats);
+        Assert.Equal(2, relicAgg.IronClubCombatsEndedOn3Charges);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsIronClubRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("iron-club-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.IRON_CLUB"];
+        Assert.Equal(7, relicAgg.AdditionalCardsDrawn);
+        Assert.Equal(4, relicAgg.IronClubCombats);
+        Assert.Equal(2, relicAgg.IronClubCombatsEndedOn3Charges);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsV20CloakClaspFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("v20-cloak-clasp-run.json"));

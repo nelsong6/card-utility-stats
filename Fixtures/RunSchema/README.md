@@ -112,6 +112,9 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds Nunchaku tracking: attacks played, observed energy gained, completed
   combats held for averages, combat-end 8/9 charge counts, and combat-end
   charge total for average charge.
+- `iron-club-relic-run.json`
+  Adds Iron Club tracking: actual cards drawn, completed combats held for the
+  average cards-drawn rate, and combat-end 3-charge counts.
 - `paels-wing-sacrifice-relic-run.json`
   Adds Pael's Wing sacrifice tracking: consumed card reward options split by
   common, uncommon, and rare, plus sacrifices made and skipped.

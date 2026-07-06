@@ -217,6 +217,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is IronClub)
+            {
+                const string relicId = "RELIC.IRON_CLUB";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildIronClubBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Iron Club", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is Candelabra)
             {
                 const string relicId = "RELIC.CANDELABRA";
@@ -917,6 +927,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is IronClub)
+        {
+            title = "Iron Club";
+            body = BuildIronClubBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is Candelabra)
         {
             title = "Candelabra";
@@ -1466,6 +1483,19 @@ public static class RelicHoverShowPatch
         Row3(sb, "Combats ended on 8 charges", agg.NunchakuCombatsEndedOn8Charges.ToString(), "");
         Row3(sb, "Combats ended on 9 charges", agg.NunchakuCombatsEndedOn9Charges.ToString(), "");
         Row3(sb, "Avg charge at combat end", FormatDecimal(averageEndCharge), "");
+        return sb.ToString();
+    }
+
+    private static string BuildIronClubBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var averageDrawn = agg.IronClubCombats <= 0
+            ? 0m
+            : (decimal)agg.AdditionalCardsDrawn / agg.IronClubCombats;
+
+        Row3(sb, "Cards drawn total", agg.AdditionalCardsDrawn.ToString(), "");
+        Row3(sb, "Avg cards drawn per combat", FormatDecimal(averageDrawn), "");
+        Row3(sb, "Combats ended on 3 charges", agg.IronClubCombatsEndedOn3Charges.ToString(), "");
         return sb.ToString();
     }
 

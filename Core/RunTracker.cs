@@ -1473,6 +1473,7 @@ public static class RunTracker
         RecordHeldCombatRelicBaselinesForTrackedPlayerLocked(requireActiveCombat: false, createPendingIfNeeded: false);
         RecordPaelsEyeCombatsWithoutActivationForTrackedPlayerLocked();
         RecordNunchakuCombatEndChargeForTrackedPlayerLocked();
+        RecordIronClubCombatEndChargeForTrackedPlayerLocked();
 
         // Surviving player block at combat end never absorbed future
         // damage, so treat any remaining ledger as wasted before
@@ -1611,6 +1612,8 @@ public static class RunTracker
         target.NunchakuCombatsEndedOn8Charges += source.NunchakuCombatsEndedOn8Charges;
         target.NunchakuCombatsEndedOn9Charges += source.NunchakuCombatsEndedOn9Charges;
         target.NunchakuCombatEndChargeTotal += source.NunchakuCombatEndChargeTotal;
+        target.IronClubCombats += source.IronClubCombats;
+        target.IronClubCombatsEndedOn3Charges += source.IronClubCombatsEndedOn3Charges;
 
         target.DiscountCombats += source.DiscountCombats;
         target.DiscountsOffered += source.DiscountsOffered;
@@ -2212,6 +2215,7 @@ public static class RunTracker
     private const string BoomingConchRelicId = "RELIC.BOOMING_CONCH";
     private const string GremlinHornRelicId = "RELIC.GREMLIN_HORN";
     private const string NunchakuRelicId = "RELIC.NUNCHAKU";
+    private const string IronClubRelicId = "RELIC.IRON_CLUB";
     private const string CandelabraRelicId = "RELIC.CANDELABRA";
     private const string PendulumRelicId = "RELIC.PENDULUM";
     private const string ParryingShieldRelicId = "RELIC.PARRYING_SHIELD";
@@ -5311,6 +5315,129 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Arm Iron Club's immediate draw attribution when the next owner card play
+    /// will wrap its live counter. The actual cards drawn are measured from the
+    /// draw command result.
+    /// </summary>
+    public static void ArmIronClubDrawAttribution(IronClub relic, CardPlay cardPlay)
+    {
+        if (relic?.Owner == null || cardPlay?.Card == null) return;
+
+        var owner = relic.Owner;
+        if (!ReferenceEquals(cardPlay.Card.Owner, owner)) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic)) return;
+                if (!IsTrackedPlayer(owner)) return;
+                if (CombatManager.Instance?.IsInProgress != true) return;
+
+                var cardsPerTrigger = IronClubCardsPerTrigger(relic);
+                if (cardsPerTrigger <= 0) return;
+                if ((relic.CardsPlayed + 1) % cardsPerTrigger != 0) return;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordIronClubCombatForPlayerLocked(owner);
+                _pendingCombat.IronClubDrawsRemaining[owner] =
+                    _pendingCombat.IronClubDrawsRemaining.TryGetValue(owner, out var existing)
+                        ? existing + 1
+                        : 1;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"ArmIronClubDrawAttribution failed: {e.Message}");
+            }
+        }
+    }
+
+    public static bool TryConsumeIronClubDrawAttribution(Player player)
+    {
+        if (player == null) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null) return false;
+                if (!_pendingCombat.IronClubDrawsRemaining.TryGetValue(player, out var remaining)
+                    || remaining <= 0)
+                {
+                    return false;
+                }
+
+                remaining -= 1;
+                if (remaining <= 0)
+                    _pendingCombat.IronClubDrawsRemaining.Remove(player);
+                else
+                    _pendingCombat.IronClubDrawsRemaining[player] = remaining;
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"TryConsumeIronClubDrawAttribution failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    public static void DisarmIronClubDrawAttribution(Player player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                _pendingCombat?.IronClubDrawsRemaining.Remove(player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"DisarmIronClubDrawAttribution failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordIronClubCardsDrawn(int cardsDrawn)
+    {
+        if (cardsDrawn <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(IronClubRelicId);
+                agg.AdditionalCardsDrawn += cardsDrawn;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordIronClubCardsDrawn failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordIronClubStatsForTest(
+        RelicAggregate agg,
+        int combats,
+        int cardsDrawn,
+        int combatsEndedOn3Charges)
+    {
+        if (agg == null) return;
+        agg.IronClubCombats += Math.Max(0, combats);
+        agg.AdditionalCardsDrawn += Math.Max(0, cardsDrawn);
+        agg.IronClubCombatsEndedOn3Charges += Math.Max(0, combatsEndedOn3Charges);
+    }
+
+    internal static void RecordIronClubCombatEndChargeForTest(RelicAggregate agg, int charge)
+    {
+        if (agg == null) return;
+
+        if (Math.Max(0, charge) == 3)
+            agg.IronClubCombatsEndedOn3Charges += 1;
+    }
+
+    /// <summary>
     /// Record Candelabra's owner-specific turn-2 activation and arm observed
     /// energy attribution for its immediate gain.
     /// </summary>
@@ -7101,6 +7228,7 @@ public static class RunTracker
 
             RecordHappyFlowerCombatForPlayerLocked(player);
             RecordNunchakuCombatForPlayerLocked(player);
+            RecordIronClubCombatForPlayerLocked(player);
             RecordBrilliantScarfCombatForPlayerLocked(player);
             RecordNutritiousSoupCombatForPlayerLocked(player);
             RecordUnsettlingLampCombatForPlayerLocked(player);
@@ -7230,6 +7358,55 @@ public static class RunTracker
         RecordNunchakuCombatForPlayerLocked(player);
         var agg = GetOrCreatePendingRelicAggregateLocked(NunchakuRelicId);
         RecordNunchakuCombatEndChargeForTest(agg, nunchaku.AttacksPlayed);
+    }
+
+    private static void RecordIronClubCombatForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordIronClubCombatForPlayerLocked(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordIronClubCombatForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordIronClubCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasIronClub(player)) return;
+        if (!_pendingCombat.IronClubCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(IronClubRelicId);
+        agg.IronClubCombats += 1;
+    }
+
+    private static void RecordIronClubCombatEndChargeForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordIronClubCombatEndChargeForPlayerLocked(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordIronClubCombatEndChargeForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordIronClubCombatEndChargeForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!TryGetIronClub(player, out var ironClub) || ironClub == null) return;
+        if (!_pendingCombat.IronClubCombatEndChargeRecordedPlayers.Add(player)) return;
+
+        RecordIronClubCombatForPlayerLocked(player);
+        var agg = GetOrCreatePendingRelicAggregateLocked(IronClubRelicId);
+        RecordIronClubCombatEndChargeForTest(agg, IronClubCharge(ironClub));
     }
 
     private static void RecordBookmarkCombatForTrackedPlayerLocked()
@@ -7379,6 +7556,46 @@ public static class RunTracker
         {
             nunchaku = null;
             return false;
+        }
+    }
+
+    private static bool PlayerHasIronClub(Player player)
+    {
+        return TryGetIronClub(player, out _);
+    }
+
+    private static bool TryGetIronClub(Player player, out IronClub? ironClub)
+    {
+        ironClub = null;
+
+        try
+        {
+            ironClub = player?.Relics?.OfType<IronClub>().FirstOrDefault();
+            return ironClub != null;
+        }
+        catch
+        {
+            ironClub = null;
+            return false;
+        }
+    }
+
+    private static int IronClubCharge(IronClub relic)
+    {
+        var cardsPerTrigger = IronClubCardsPerTrigger(relic);
+        if (cardsPerTrigger <= 0) return 0;
+        return Math.Max(0, relic.CardsPlayed) % cardsPerTrigger;
+    }
+
+    private static int IronClubCardsPerTrigger(IronClub relic)
+    {
+        try
+        {
+            return Math.Max(1, relic.DynamicVars["Cards"].IntValue);
+        }
+        catch
+        {
+            return 4;
         }
     }
 
@@ -10628,6 +10845,10 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> NunchakuCombatEndChargeRecordedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> IronClubCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> IronClubCombatEndChargeRecordedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> BrilliantScarfCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> NutritiousSoupCombatCountedPlayers { get; }
@@ -10647,6 +10868,8 @@ internal class PendingCombat
     public HashSet<Player> GamblingChipDiscardAttributionPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> CentennialPuzzleDrawsRemaining { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> IronClubDrawsRemaining { get; }
         = new(ReferenceEqualityComparer.Instance);
     public RunMetaStats MetaStats { get; } = new();
 
