@@ -1648,6 +1648,29 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsFragrantMushroomRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("fragrant-mushroom-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.FRAGRANT_MUSHROOM"];
+        Assert.Equal(2, relicAgg.CardsUpgraded);
+        Assert.Equal(new[] { "Strike+", "Defend+" }, relicAgg.UpgradedCards);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsFragrantMushroomRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("fragrant-mushroom-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.FRAGRANT_MUSHROOM"];
+        Assert.Equal(2, relicAgg.CardsUpgraded);
+        Assert.Equal(new[] { "Strike+", "Defend+" }, relicAgg.UpgradedCards);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsWhetstoneRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("whetstone-relic-run.json"));

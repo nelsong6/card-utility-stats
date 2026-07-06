@@ -408,6 +408,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is FragrantMushroom)
+            {
+                const string relicId = "RELIC.FRAGRANT_MUSHROOM";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildFragrantMushroomBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Fragrant Mushroom", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is SandCastle)
             {
                 const string relicId = "RELIC.SAND_CASTLE";
@@ -1074,6 +1084,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is FragrantMushroom)
+        {
+            title = "Fragrant Mushroom";
+            body = BuildFragrantMushroomBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is SandCastle)
         {
             title = "Sand Castle";
@@ -1736,6 +1753,13 @@ public static class RelicHoverShowPatch
     }
 
     private static string BuildWarPaintBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        AppendUpgradedCardStats(sb, agg);
+        return sb.ToString();
+    }
+
+    private static string BuildFragrantMushroomBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
         AppendUpgradedCardStats(sb, agg);

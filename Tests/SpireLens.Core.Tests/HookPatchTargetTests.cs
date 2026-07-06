@@ -154,6 +154,18 @@ public class HookPatchTargetTests
             target.GetParameters().Select(p => p.ParameterType.FullName).ToArray());
     }
 
+    [Fact]
+    [Trait("Category", "RequiresLiveGame")]
+    public void FragrantMushroomPatch_ResolvesAfterObtained()
+    {
+        var target = InvokeTargetMethod(typeof(FragrantMushroomAfterObtainedPatch));
+
+        Assert.NotNull(target);
+        Assert.Equal("MegaCrit.Sts2.Core.Models.Relics.FragrantMushroom", target!.DeclaringType?.FullName);
+        Assert.Equal("AfterObtained", target.Name);
+        Assert.Empty(target.GetParameters());
+    }
+
     private static MethodBase? InvokeTargetMethod(Type patchType)
     {
         _ = Assembly.Load("sts2");

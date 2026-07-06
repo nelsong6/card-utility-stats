@@ -1,0 +1,52 @@
+{
+  "run_id": "fragrant-mushroom-relic-fixture",
+  "started_at": "2026-07-06T17:00:00Z",
+  "updated_at": "2026-07-06T17:10:00Z",
+  "outcome": "in_progress",
+  "aggregates": {
+    "CARD.STRIKE_IRONCLAD#1": {
+      "initial_upgrade_level": 0
+    },
+    "CARD.DEFEND_IRONCLAD#1": {
+      "initial_upgrade_level": 0
+    }
+  },
+  "events": [
+    {
+      "t": "2026-07-06T17:05:00Z",
+      "type": "card_upgraded",
+      "card_id": "CARD.STRIKE_IRONCLAD#1",
+      "floor": 6,
+      "upgrade_level": 1
+    },
+    {
+      "t": "2026-07-06T17:05:01Z",
+      "type": "card_upgraded",
+      "card_id": "CARD.DEFEND_IRONCLAD#1",
+      "floor": 6,
+      "upgrade_level": 1
+    }
+  ],
+  "relic_aggregates": {
+    "RELIC.FRAGRANT_MUSHROOM": {
+      "cards_upgraded": 2,
+      "upgraded_cards": [
+        "Strike+",
+        "Defend+"
+      ]
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.STRIKE_IRONCLAD": [
+      1
+    ],
+    "CARD.DEFEND_IRONCLAD": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.STRIKE_IRONCLAD": 1,
+    "CARD.DEFEND_IRONCLAD": 1
+  }
+}
