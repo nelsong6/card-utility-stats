@@ -90,6 +90,7 @@ public static class RunTracker
     private static readonly Dictionary<CardReward, PendingPaelSacrificeReward> _paelSacrificeRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<Player, PendingRegalPillowRestHeal> _pendingRegalPillowRestHeals = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<Player, PendingPrecariousShearsPickup> _pendingPrecariousShearsPickups = new(ReferenceEqualityComparer.Instance);
+    private static readonly HashSet<Player> _pendingLeafyPoulticePickups = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<Player, PendingSandCastlePickup> _pendingSandCastlePickups = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<Player, PendingWhetstonePickup> _pendingWhetstonePickups = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<Player, PendingWarPaintPickup> _pendingWarPaintPickups = new(ReferenceEqualityComparer.Instance);
@@ -907,6 +908,7 @@ public static class RunTracker
         _paelSacrificeRewards.Clear();
         _pendingRegalPillowRestHeals.Clear();
         _pendingPrecariousShearsPickups.Clear();
+        _pendingLeafyPoulticePickups.Clear();
         _pendingSandCastlePickups.Clear();
         _pendingWhetstonePickups.Clear();
         _pendingWarPaintPickups.Clear();
@@ -1603,6 +1605,7 @@ public static class RunTracker
         MergeCardRewardCategories(target.CardRewardCategories, source.CardRewardCategories);
         MergeRelicCardsGranted(target.CardsGranted, source.CardsGranted);
         target.CardChoicesSkipped += source.CardChoicesSkipped;
+        MergeRelicCardTransformations(target, source);
     }
 
     private static void MergeDiscountedCardCosts(RelicAggregate target, RelicAggregate source)
@@ -4099,6 +4102,150 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Arm Leafy Poultice pickup attribution. The pickup loses max HP and then
+    /// transforms up to two basic cards through <c>CardCmd.Transform</c>.
+    /// </summary>
+    public static bool BeginLeafyPoulticePickup(RelicModel relic, out Player? player)
+    {
+        player = null;
+        if (relic?.Owner?.Creature == null) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic)) return false;
+                if (!IsTrackedPlayer(relic.Owner)) return false;
+
+                player = relic.Owner;
+                _pendingLeafyPoulticePickups.Add(player);
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"BeginLeafyPoulticePickup failed: {e.Message}");
+                player = null;
+                return false;
+            }
+        }
+    }
+
+    public static void CompleteLeafyPoulticePickup(
+        Player? player,
+        bool succeeded,
+        decimal originalMaxHp,
+        decimal newMaxHp)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                _pendingLeafyPoulticePickups.Remove(player);
+                if (!succeeded) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(LeafyPoulticeRelicId);
+                RecordLeafyPoulticeMaxHpChangedForTest(agg, originalMaxHp, newMaxHp);
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"CompleteLeafyPoulticePickup failed: {e.Message}");
+            }
+        }
+    }
+
+    public static bool TryCaptureLeafyPoulticeTransformSources(
+        ref IEnumerable<CardTransformation> transformations,
+        out IReadOnlyList<CardModel>? orderedSources)
+    {
+        orderedSources = null;
+
+        lock (_lock)
+        {
+            try
+            {
+                var transformationsArray = transformations?.ToArray() ?? Array.Empty<CardTransformation>();
+                transformations = transformationsArray;
+                if (transformationsArray.Length == 0) return false;
+
+                var owner = transformationsArray
+                    .Select(t => t.Original?.Owner)
+                    .FirstOrDefault(p => p != null);
+                if (owner == null || !_pendingLeafyPoulticePickups.Contains(owner)) return false;
+
+                orderedSources = transformationsArray
+                    .Where(t => t.Original?.Owner != null && ReferenceEquals(t.Original.Owner, owner))
+                    .Select((t, index) => new
+                    {
+                        Source = t.Original,
+                        InputIndex = index,
+                        PileType = TryGetPileTypeSortValue(t.Original),
+                        PileIndex = TryGetPileIndex(t.Original),
+                    })
+                    .OrderBy(t => t.PileType)
+                    .ThenBy(t => t.PileIndex)
+                    .ThenBy(t => t.InputIndex)
+                    .Select(t => t.Source)
+                    .ToList();
+                return orderedSources.Count > 0;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"TryCaptureLeafyPoulticeTransformSources failed: {e.Message}");
+                orderedSources = null;
+                return false;
+            }
+        }
+    }
+
+    public static void RecordLeafyPoulticeTransformResults(
+        IReadOnlyList<CardModel>? orderedSources,
+        IEnumerable<CardPileAddResult>? results)
+    {
+        if (orderedSources == null || orderedSources.Count == 0 || results == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var owner = orderedSources
+                    .Select(c => c?.Owner)
+                    .FirstOrDefault(p => p != null);
+                if (owner == null || !_pendingLeafyPoulticePickups.Contains(owner)) return;
+
+                var resultList = results.ToList();
+                var count = Math.Min(orderedSources.Count, resultList.Count);
+                if (count <= 0) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(LeafyPoulticeRelicId);
+                var recorded = 0;
+                for (var i = 0; i < count; i++)
+                {
+                    var result = resultList[i];
+                    if (!result.success || result.cardAdded == null) continue;
+
+                    RecordRelicCardTransformationForTest(
+                        agg,
+                        GetCardIdForStats(orderedSources[i]),
+                        GetCardDisplayNameForStats(orderedSources[i]),
+                        GetCardIdForStats(result.cardAdded),
+                        GetCardDisplayNameForStats(result.cardAdded));
+                    recorded++;
+                }
+
+                if (recorded > 0)
+                    SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordLeafyPoulticeTransformResults failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Record Leafy Poultice's observed pickup max-HP loss after its async
     /// pickup effect resolves.
     /// </summary>
@@ -4497,6 +4644,40 @@ public static class RunTracker
 
         agg.Activations++;
         RecordRelicMaxHpChangeForTest(agg, originalMaxHp, newMaxHp);
+    }
+
+    internal static void RecordRelicCardTransformationForTest(
+        RelicAggregate agg,
+        string? sourceCardId,
+        string? sourceDisplayName,
+        string? resultCardId,
+        string? resultDisplayName)
+    {
+        if (agg == null) return;
+
+        sourceCardId = sourceCardId ?? "";
+        resultCardId = resultCardId ?? "";
+        if (string.IsNullOrWhiteSpace(sourceCardId)
+            && string.IsNullOrWhiteSpace(sourceDisplayName)
+            && string.IsNullOrWhiteSpace(resultCardId)
+            && string.IsNullOrWhiteSpace(resultDisplayName))
+            return;
+
+        sourceDisplayName = string.IsNullOrWhiteSpace(sourceDisplayName)
+            ? FormatCardIdForDisplay(sourceCardId)
+            : sourceDisplayName;
+        resultDisplayName = string.IsNullOrWhiteSpace(resultDisplayName)
+            ? FormatCardIdForDisplay(resultCardId)
+            : resultDisplayName;
+
+        agg.CardTransformations ??= new List<RelicCardTransformationAggregate>();
+        agg.CardTransformations.Add(new RelicCardTransformationAggregate
+        {
+            SourceCardId = sourceCardId,
+            SourceDisplayName = sourceDisplayName ?? "",
+            ResultCardId = resultCardId,
+            ResultDisplayName = resultDisplayName ?? "",
+        });
     }
 
     internal static void RecordRelicMaxHpChangeForTest(
@@ -6903,6 +7084,30 @@ public static class RunTracker
         }
     }
 
+    private static void MergeRelicCardTransformations(RelicAggregate target, RelicAggregate source)
+    {
+        if (source.CardTransformations == null || source.CardTransformations.Count == 0) return;
+
+        target.CardTransformations ??= new List<RelicCardTransformationAggregate>();
+        foreach (var transformation in source.CardTransformations)
+        {
+            if (transformation == null) continue;
+            if (string.IsNullOrWhiteSpace(transformation.SourceCardId)
+                && string.IsNullOrWhiteSpace(transformation.SourceDisplayName)
+                && string.IsNullOrWhiteSpace(transformation.ResultCardId)
+                && string.IsNullOrWhiteSpace(transformation.ResultDisplayName))
+                continue;
+
+            target.CardTransformations.Add(new RelicCardTransformationAggregate
+            {
+                SourceCardId = transformation.SourceCardId,
+                SourceDisplayName = transformation.SourceDisplayName,
+                ResultCardId = transformation.ResultCardId,
+                ResultDisplayName = transformation.ResultDisplayName,
+            });
+        }
+    }
+
     private static void AddRelicCardGranted(
         Dictionary<string, RelicCardAggregate> cards,
         string cardId,
@@ -7117,6 +7322,40 @@ public static class RunTracker
             try { return FormatCardIdForDisplay(card.Id.ToString()); }
             catch { return "Unknown card"; }
         }
+    }
+
+    private static string GetCardIdForStats(CardModel card)
+    {
+        try { return Canonical(card).Id.ToString(); }
+        catch
+        {
+            try { return card.Id.ToString(); }
+            catch { return ""; }
+        }
+    }
+
+    private static int TryGetPileTypeSortValue(CardModel card)
+    {
+        try { return card.Pile == null ? int.MaxValue : (int)card.Pile.Type; }
+        catch { return int.MaxValue; }
+    }
+
+    private static int TryGetPileIndex(CardModel card)
+    {
+        try
+        {
+            var cards = card.Pile?.Cards;
+            if (cards == null) return int.MaxValue;
+
+            for (var i = 0; i < cards.Count; i++)
+            {
+                if (ReferenceEquals(cards[i], card))
+                    return i;
+            }
+
+            return int.MaxValue;
+        }
+        catch { return int.MaxValue; }
     }
 
     public static void RecordUpgrade(CardModel card)

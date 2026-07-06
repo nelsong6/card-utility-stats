@@ -1593,6 +1593,7 @@ public static class RelicHoverShowPatch
         var sb = new StringBuilder();
         Row3(sb, "Activations", agg.Activations.ToString(), "");
         AppendMaxHpChangeRows(sb, agg, "Max HP lost", MaxHpLost(agg));
+        AppendCardTransformationRows(sb, agg, expectedCount: 2);
         return sb.ToString();
     }
 
@@ -1911,6 +1912,32 @@ public static class RelicHoverShowPatch
         Row3(sb, "Original max HP", FormatDecimal(OriginalMaxHp(agg)), "");
         Row3(sb, "New max HP", FormatDecimal(NewMaxHp(agg)), "");
         Row3(sb, deltaLabel, FormatDecimal(Math.Max(0m, delta)), "");
+    }
+
+    private static void AppendCardTransformationRows(StringBuilder sb, RelicAggregate agg, int expectedCount)
+    {
+        var transformations = agg.CardTransformations ?? new List<RelicCardTransformationAggregate>();
+        for (var i = 0; i < expectedCount; i++)
+        {
+            var transformation = i < transformations.Count ? transformations[i] : null;
+            Row3(sb, $"Transform {i + 1} source", CardTransformationDisplay(
+                transformation?.SourceDisplayName,
+                transformation?.SourceCardId), "");
+            Row3(sb, $"Transform {i + 1} result", CardTransformationDisplay(
+                transformation?.ResultDisplayName,
+                transformation?.ResultCardId), "");
+        }
+    }
+
+    private static string CardTransformationDisplay(string? displayName, string? cardId)
+    {
+        if (!string.IsNullOrWhiteSpace(displayName))
+            return StatsTooltip.EscapeBbcode(displayName);
+
+        if (!string.IsNullOrWhiteSpace(cardId))
+            return StatsTooltip.EscapeBbcode(RunTracker.FormatCardIdForDisplay(cardId));
+
+        return "0";
     }
 
     private static decimal OriginalMaxHp(RelicAggregate agg)

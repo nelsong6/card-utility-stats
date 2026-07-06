@@ -9,7 +9,21 @@
     "RELIC.LEAFY_POULTICE": {
       "activations": 1,
       "original_max_hp": 70,
-      "new_max_hp": 58
+      "new_max_hp": 58,
+      "card_transformations": [
+        {
+          "source_card_id": "CARD.STRIKE_IRONCLAD",
+          "source_display_name": "Strike",
+          "result_card_id": "CARD.BASH",
+          "result_display_name": "Bash"
+        },
+        {
+          "source_card_id": "CARD.DEFEND_IRONCLAD",
+          "source_display_name": "Defend",
+          "result_card_id": "CARD.SHRUG_IT_OFF",
+          "result_display_name": "Shrug It Off"
+        }
+      ]
     }
   },
   "meta_stats": {},

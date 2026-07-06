@@ -151,7 +151,7 @@ New fixtures added going forward do not need a `v*-` prefix.
   format as well as the legacy field names.
 - `leafy-poultice-relic-run.json`
   Adds Leafy Poultice pickup tracking: original/new max HP after the relic's
-  max-HP loss resolves.
+  max-HP loss resolves, plus the two source/result card transform pairs.
 - `sand-castle-relic-run.json`
   Adds Sand Castle pickup tracking: the actual cards upgraded by the relic.
 - `hefty-tablet-relic-run.json`

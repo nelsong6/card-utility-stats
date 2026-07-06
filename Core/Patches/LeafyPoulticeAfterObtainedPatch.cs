@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Threading.Tasks;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Entities.Creatures;
+using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Models.Relics;
 
 namespace SpireLens.Core.Patches;
@@ -27,12 +28,12 @@ public static class LeafyPoulticeAfterObtainedPatch
 
         try
         {
-            if (__instance == null || !RunTracker.IsTrackedRelic(__instance)) return;
-
+            if (__instance == null) return;
             var creature = __instance.Owner?.Creature;
             if (creature == null || creature.IsDead) return;
+            if (!RunTracker.BeginLeafyPoulticePickup(__instance, out var player)) return;
 
-            __state = new PickupState(creature, creature.MaxHp);
+            __state = new PickupState(player, creature, creature.MaxHp);
         }
         catch (Exception e)
         {
@@ -49,23 +50,18 @@ public static class LeafyPoulticeAfterObtainedPatch
 
             if (__result == null)
             {
-                ObservePickup(__state);
+                CompletePickup(__state, succeeded: true);
                 return;
             }
 
             if (__result.IsCompleted)
             {
-                if (!__result.IsCanceled && !__result.IsFaulted)
-                    ObservePickup(__state);
+                CompletePickup(__state, succeeded: !__result.IsCanceled && !__result.IsFaulted);
                 return;
             }
 
             __result.ContinueWith(
-                task =>
-                {
-                    if (!task.IsCanceled && !task.IsFaulted)
-                        ObservePickup(__state);
-                },
+                task => CompletePickup(__state, succeeded: !task.IsCanceled && !task.IsFaulted),
                 TaskScheduler.Default);
         }
         catch (Exception e)
@@ -74,19 +70,23 @@ public static class LeafyPoulticeAfterObtainedPatch
         }
     }
 
-    private static void ObservePickup(PickupState state)
+    private static void CompletePickup(PickupState state, bool succeeded)
     {
         try
         {
             if (state.Creature == null) return;
 
-            RunTracker.RecordLeafyPoulticeMaxHpChanged(state.InitialMaxHp, state.Creature.MaxHp);
+            RunTracker.CompleteLeafyPoulticePickup(
+                state.Player,
+                succeeded,
+                state.InitialMaxHp,
+                state.Creature.MaxHp);
         }
         catch (Exception e)
         {
-            CoreMain.LogDebug($"LeafyPoulticeAfterObtainedPatch.ObservePickup failed: {e.Message}");
+            CoreMain.LogDebug($"LeafyPoulticeAfterObtainedPatch.CompletePickup failed: {e.Message}");
         }
     }
 
-    public readonly record struct PickupState(Creature? Creature, decimal InitialMaxHp);
+    public readonly record struct PickupState(Player? Player, Creature? Creature, decimal InitialMaxHp);
 }

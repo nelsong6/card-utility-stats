@@ -575,6 +575,10 @@ public class RelicAggregate
 
     // Times a relic-owned card choice was skipped. Used by Hefty Tablet.
     public int CardChoicesSkipped { get; set; }
+
+    // Actual card transformations caused by relic-owned effects. Used by Leafy
+    // Poultice to show the two basic cards it transformed and their results.
+    public List<RelicCardTransformationAggregate> CardTransformations { get; set; } = new();
 }
 
 public class CardRewardCategoryAggregate
@@ -588,6 +592,14 @@ public class RelicCardAggregate
     public string CardId { get; set; } = "";
     public string DisplayName { get; set; } = "";
     public int Count { get; set; }
+}
+
+public class RelicCardTransformationAggregate
+{
+    public string SourceCardId { get; set; } = "";
+    public string SourceDisplayName { get; set; } = "";
+    public string ResultCardId { get; set; } = "";
+    public string ResultDisplayName { get; set; } = "";
 }
 
 public class DiscountedCardCostAggregate

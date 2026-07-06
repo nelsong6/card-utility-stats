@@ -1307,6 +1307,7 @@ public class SchemaLoadingTests
         Assert.Equal(1, relicAgg.Activations);
         Assert.Equal(70m, relicAgg.OriginalMaxHp);
         Assert.Equal(58m, relicAgg.NewMaxHp);
+        AssertLeafyPoulticeTransformations(relicAgg);
     }
 
     [Fact]
@@ -1319,6 +1320,7 @@ public class SchemaLoadingTests
         Assert.Equal(1, relicAgg.Activations);
         Assert.Equal(70m, relicAgg.OriginalMaxHp);
         Assert.Equal(58m, relicAgg.NewMaxHp);
+        AssertLeafyPoulticeTransformations(relicAgg);
     }
 
     [Fact]
@@ -1741,5 +1743,18 @@ public class SchemaLoadingTests
         Assert.Equal(2, relicAgg.BookmarkCommonActivations);
         Assert.Equal(3, relicAgg.BookmarkUncommonActivations);
         Assert.Equal(2, relicAgg.BookmarkRareActivations);
+    }
+
+    private static void AssertLeafyPoulticeTransformations(RelicAggregate relicAgg)
+    {
+        Assert.Equal(2, relicAgg.CardTransformations.Count);
+        Assert.Equal("CARD.STRIKE_IRONCLAD", relicAgg.CardTransformations[0].SourceCardId);
+        Assert.Equal("Strike", relicAgg.CardTransformations[0].SourceDisplayName);
+        Assert.Equal("CARD.BASH", relicAgg.CardTransformations[0].ResultCardId);
+        Assert.Equal("Bash", relicAgg.CardTransformations[0].ResultDisplayName);
+        Assert.Equal("CARD.DEFEND_IRONCLAD", relicAgg.CardTransformations[1].SourceCardId);
+        Assert.Equal("Defend", relicAgg.CardTransformations[1].SourceDisplayName);
+        Assert.Equal("CARD.SHRUG_IT_OFF", relicAgg.CardTransformations[1].ResultCardId);
+        Assert.Equal("Shrug It Off", relicAgg.CardTransformations[1].ResultDisplayName);
     }
 }
