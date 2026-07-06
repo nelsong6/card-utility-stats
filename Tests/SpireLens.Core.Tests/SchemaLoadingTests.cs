@@ -423,6 +423,20 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsStrawberryRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("strawberry-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.STRAWBERRY"];
+        Assert.Equal(1, relicAgg.Activations);
+        Assert.Equal(7m, relicAgg.MaxHpGained);
+        Assert.Equal(70m, relicAgg.OriginalMaxHp);
+        Assert.Equal(77m, relicAgg.NewMaxHp);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsWhiteBeastStatueRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("white-beast-statue-relic-run.json"));
@@ -871,6 +885,19 @@ public class SchemaLoadingTests
         Assert.Equal(3m, relicAgg.MaxHpGained);
         Assert.Equal(70m, relicAgg.OriginalMaxHp);
         Assert.Equal(73m, relicAgg.NewMaxHp);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsStrawberryRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("strawberry-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.STRAWBERRY"];
+        Assert.Equal(1, relicAgg.Activations);
+        Assert.Equal(7m, relicAgg.MaxHpGained);
+        Assert.Equal(70m, relicAgg.OriginalMaxHp);
+        Assert.Equal(77m, relicAgg.NewMaxHp);
     }
 
     [Fact]

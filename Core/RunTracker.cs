@@ -2208,6 +2208,7 @@ public static class RunTracker
     private const string PantographRelicId = "RELIC.PANTOGRAPH";
     private const string PlanisphereRelicId = "RELIC.PLANISPHERE";
     private const string LeesWaffleRelicId = "RELIC.LEES_WAFFLE";
+    private const string StrawberryRelicId = "RELIC.STRAWBERRY";
     private const string ChosenCheeseRelicId = "RELIC.CHOSEN_CHEESE";
     private const string DarkstonePeriaptRelicId = "RELIC.DARKSTONE_PERIAPT";
     private const string LeafyPoulticeRelicId = "RELIC.LEAFY_POULTICE";
@@ -4044,6 +4045,34 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Record Strawberry's observed pickup max-HP gain after its async pickup
+    /// effect resolves.
+    /// </summary>
+    public static void RecordStrawberryMaxHpGained(
+        Creature creature,
+        decimal maxHpGained,
+        decimal? originalMaxHp = null,
+        decimal? newMaxHp = null)
+    {
+        if (creature?.Player == null || maxHpGained < 0m) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(creature.Player)) return;
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(StrawberryRelicId);
+                RecordStrawberryMaxHpGainedForTest(agg, maxHpGained, originalMaxHp, newMaxHp);
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordStrawberryMaxHpGained failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Record Chosen Cheese's observed max-HP gain after its combat-end
     /// callback completes. The callback can finish around combat promotion, so
     /// route to pending combat when it still exists and otherwise save directly.
@@ -4492,6 +4521,19 @@ public static class RunTracker
 
         agg.Activations++;
         agg.TotalHealingRestored += hpGained;
+        RecordRelicMaxHpChangeForTest(agg, originalMaxHp, newMaxHp);
+    }
+
+    internal static void RecordStrawberryMaxHpGainedForTest(
+        RelicAggregate agg,
+        decimal maxHpGained,
+        decimal? originalMaxHp = null,
+        decimal? newMaxHp = null)
+    {
+        if (agg == null || maxHpGained < 0m) return;
+
+        agg.Activations++;
+        agg.MaxHpGained += maxHpGained;
         RecordRelicMaxHpChangeForTest(agg, originalMaxHp, newMaxHp);
     }
 

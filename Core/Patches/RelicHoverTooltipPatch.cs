@@ -447,6 +447,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is Strawberry)
+            {
+                const string relicId = "RELIC.STRAWBERRY";
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+
+                var body = BuildStrawberryBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Strawberry", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is ChosenCheese)
             {
                 const string relicId = "RELIC.CHOSEN_CHEESE";
@@ -1036,6 +1046,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is Strawberry)
+        {
+            title = "Strawberry";
+            body = BuildStrawberryBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is ChosenCheese)
         {
             title = "Chosen Cheese";
@@ -1585,6 +1602,14 @@ public static class RelicHoverShowPatch
         var sb = new StringBuilder();
         AppendMaxHpChangeRows(sb, agg, "Max HP gained", MaxHpGained(agg));
         Row3(sb, "HP gained", FormatDecimal(agg.TotalHealingRestored), "");
+        return sb.ToString();
+    }
+
+    private static string BuildStrawberryBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        AppendMaxHpChangeRows(sb, agg, "Max HP gained", agg.MaxHpGained);
         return sb.ToString();
     }
 
