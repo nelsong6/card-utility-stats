@@ -118,6 +118,8 @@ public class PaelsEyeStatsTests
         var body = BuildBody(new RelicAggregate());
 
         Assert.Contains("Activations", body);
+        Assert.Contains("Activated this combat", body);
+        Assert.Contains("[b]false[/b]", body);
         Assert.Contains("Combats without activation", body);
         Assert.Contains("Statuses exhausted", body);
         Assert.Contains("Curses exhausted", body);
@@ -136,6 +138,8 @@ public class PaelsEyeStatsTests
         });
 
         Assert.Contains("Activations", body);
+        Assert.Contains("Activated this combat", body);
+        Assert.Contains("[b]false[/b]", body);
         Assert.Contains("Combats without activation", body);
         Assert.Contains("Statuses exhausted", body);
         Assert.Contains("Curses exhausted", body);
@@ -145,9 +149,18 @@ public class PaelsEyeStatsTests
         Assert.Contains("[b]5[/b]", body);
     }
 
-    private static string BuildBody(RelicAggregate agg)
+    [Fact]
+    public void RelicTooltip_PaelsEye_CanShowActivatedThisCombatTrue()
     {
-        return (string)(BuildPaelsEyeBodyMethod.Invoke(null, new object?[] { agg })
+        var body = BuildBody(new RelicAggregate(), activatedThisCombat: true);
+
+        Assert.Contains("Activated this combat", body);
+        Assert.Contains("[b]true[/b]", body);
+    }
+
+    private static string BuildBody(RelicAggregate agg, bool activatedThisCombat = false)
+    {
+        return (string)(BuildPaelsEyeBodyMethod.Invoke(null, new object?[] { agg, activatedThisCombat })
             ?? throw new InvalidOperationException("BuildPaelsEyeBodyBBCode returned null."));
     }
 

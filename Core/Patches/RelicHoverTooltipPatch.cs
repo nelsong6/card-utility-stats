@@ -525,12 +525,12 @@ public static class RelicHoverShowPatch
                 return;
             }
 
-            if (relicNode.Model is PaelsEye)
+            if (relicNode.Model is PaelsEye paelsEye)
             {
                 const string relicId = "RELIC.PAELS_EYE";
                 var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
 
-                var body = BuildPaelsEyeBodyBBCode(agg);
+                var body = BuildPaelsEyeBodyBBCode(agg, paelsEye.UsedThisCombat);
                 StatsTooltip.Show(tree, __instance, "Pael's Eye", "SpireLens", body);
                 return;
             }
@@ -1060,10 +1060,10 @@ public static class RelicHoverShowPatch
             return true;
         }
 
-        if (relicModel is PaelsEye)
+        if (relicModel is PaelsEye paelsEye)
         {
             title = "Pael's Eye";
-            body = BuildPaelsEyeBodyBBCode(agg);
+            body = BuildPaelsEyeBodyBBCode(agg, paelsEye.UsedThisCombat);
             return true;
         }
 
@@ -1607,10 +1607,11 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
-    private static string BuildPaelsEyeBodyBBCode(RelicAggregate agg)
+    private static string BuildPaelsEyeBodyBBCode(RelicAggregate agg, bool activatedThisCombat = false)
     {
         var sb = new StringBuilder();
         Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, "Activated this combat", activatedThisCombat ? "true" : "false", "");
         Row3(sb, "Combats without activation", agg.CombatsWithoutActivation.ToString(), "");
         Row3(sb, "Statuses exhausted", agg.StatusCardsExhausted.ToString(), "");
         Row3(sb, "Curses exhausted", agg.CurseCardsExhausted.ToString(), "");
