@@ -1,0 +1,18 @@
+{
+  "run_id": "leafy-poultice-relic-fixture",
+  "started_at": "2026-07-05T01:00:00Z",
+  "updated_at": "2026-07-05T01:05:00Z",
+  "outcome": "in_progress",
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.LEAFY_POULTICE": {
+      "activations": 1,
+      "original_max_hp": 70,
+      "new_max_hp": 58
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

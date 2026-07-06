@@ -86,7 +86,7 @@ public static class DarkstonePeriaptAfterCardChangedPilesPatch
             if (state.Creature == null) return;
 
             int maxHpGained = Math.Max(0, state.Creature.MaxHp - state.InitialMaxHp);
-            RunTracker.RecordDarkstonePeriaptCurseAcquired(maxHpGained);
+            RunTracker.RecordDarkstonePeriaptCurseAcquired(maxHpGained, state.InitialMaxHp, state.Creature.MaxHp);
         }
         catch (Exception e)
         {

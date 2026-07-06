@@ -29,6 +29,8 @@ public class LeesWaffleStatsTests
 
         Assert.Equal(0, agg.Activations);
         Assert.Equal(0m, agg.TotalHealingRestored);
+        Assert.Null(agg.OriginalMaxHp);
+        Assert.Null(agg.NewMaxHp);
     }
 
     [Fact]
@@ -39,12 +41,16 @@ public class LeesWaffleStatsTests
         {
             Activations = 1,
             TotalHealingRestored = 23m,
+            OriginalMaxHp = 70m,
+            NewMaxHp = 77m,
         };
 
         var json = JsonSerializer.Serialize(run, SerializerOptions);
 
         Assert.Contains("activations", json);
         Assert.Contains("total_healing_restored", json);
+        Assert.Contains("original_max_hp", json);
+        Assert.Contains("new_max_hp", json);
 
         var restored = JsonSerializer.Deserialize<RunData>(json, SerializerOptions);
 
@@ -52,6 +58,8 @@ public class LeesWaffleStatsTests
         var restoredAgg = restored!.RelicAggregates[LeesWaffleRelicId];
         Assert.Equal(1, restoredAgg.Activations);
         Assert.Equal(23m, restoredAgg.TotalHealingRestored);
+        Assert.Equal(70m, restoredAgg.OriginalMaxHp);
+        Assert.Equal(77m, restoredAgg.NewMaxHp);
     }
 
     [Fact]
@@ -59,12 +67,14 @@ public class LeesWaffleStatsTests
     {
         var agg = new RelicAggregate();
 
-        RunTracker.RecordLeesWafflePickupHpGainedForTest(agg, 23m);
-        RunTracker.RecordLeesWafflePickupHpGainedForTest(agg, 7m);
+        RunTracker.RecordLeesWafflePickupHpGainedForTest(agg, 23m, 70m, 77m);
+        RunTracker.RecordLeesWafflePickupHpGainedForTest(agg, 7m, 77m, 84m);
         RunTracker.RecordLeesWafflePickupHpGainedForTest(agg, -5m);
 
         Assert.Equal(2, agg.Activations);
         Assert.Equal(30m, agg.TotalHealingRestored);
+        Assert.Equal(70m, agg.OriginalMaxHp);
+        Assert.Equal(84m, agg.NewMaxHp);
     }
 
     [Fact]
@@ -74,13 +84,21 @@ public class LeesWaffleStatsTests
         {
             Activations = 1,
             TotalHealingRestored = 23m,
+            OriginalMaxHp = 70m,
+            NewMaxHp = 77m,
         };
 
         var body = (string)(BuildLeesWaffleBodyMethod.Invoke(null, new object?[] { agg })
             ?? throw new InvalidOperationException("BuildLeesWaffleBodyBBCode returned null."));
 
+        Assert.Contains("Original max HP", body);
+        Assert.Contains("New max HP", body);
+        Assert.Contains("Max HP gained", body);
         Assert.Contains("HP gained", body);
         Assert.Contains("[b]23[/b]", body);
+        Assert.Contains("[b]70[/b]", body);
+        Assert.Contains("[b]77[/b]", body);
+        Assert.Contains("[b]7[/b]", body);
         Assert.DoesNotContain("HP healed", body);
     }
 }

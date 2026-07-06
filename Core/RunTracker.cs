@@ -1534,6 +1534,10 @@ public static class RunTracker
         target.TotalHealingLost += source.TotalHealingLost;
         MergeHealingLostReasonsInto(target, source);
         target.MaxHpGained += source.MaxHpGained;
+        if (source.OriginalMaxHp.HasValue && !target.OriginalMaxHp.HasValue)
+            target.OriginalMaxHp = source.OriginalMaxHp;
+        if (source.NewMaxHp.HasValue)
+            target.NewMaxHp = source.NewMaxHp;
         target.DoomDeathTriggers += source.DoomDeathTriggers;
         target.DoomKills += source.DoomKills;
         target.EnergyGenerated += source.EnergyGenerated;
@@ -2203,6 +2207,7 @@ public static class RunTracker
     private const string LeesWaffleRelicId = "RELIC.LEES_WAFFLE";
     private const string ChosenCheeseRelicId = "RELIC.CHOSEN_CHEESE";
     private const string DarkstonePeriaptRelicId = "RELIC.DARKSTONE_PERIAPT";
+    private const string LeafyPoulticeRelicId = "RELIC.LEAFY_POULTICE";
     private const string RegalPillowRelicId = "RELIC.REGAL_PILLOW";
     private const string WhiteBeastStatueRelicId = "RELIC.WHITE_BEAST_STATUE";
     private const string ShovelRelicId = "RELIC.SHOVEL";
@@ -4015,14 +4020,17 @@ public static class RunTracker
     /// max HP, which itself heals, then heals to full; the full pickup delta is
     /// clearer than splitting those two game commands into separate attempts.
     /// </summary>
-    public static void RecordLeesWafflePickupHpGained(decimal hpGained)
+    public static void RecordLeesWafflePickupHpGained(
+        decimal hpGained,
+        decimal? originalMaxHp = null,
+        decimal? newMaxHp = null)
     {
         lock (_lock)
         {
             try
             {
                 var agg = GetOrCreateCurrentRunRelicAggregateLocked(LeesWaffleRelicId);
-                RecordLeesWafflePickupHpGainedForTest(agg, hpGained);
+                RecordLeesWafflePickupHpGainedForTest(agg, hpGained, originalMaxHp, newMaxHp);
                 SaveCurrentRun();
             }
             catch (Exception e)
@@ -4037,7 +4045,11 @@ public static class RunTracker
     /// callback completes. The callback can finish around combat promotion, so
     /// route to pending combat when it still exists and otherwise save directly.
     /// </summary>
-    public static void RecordChosenCheeseMaxHpGained(Creature creature, decimal maxHpGained)
+    public static void RecordChosenCheeseMaxHpGained(
+        Creature creature,
+        decimal maxHpGained,
+        decimal? originalMaxHp = null,
+        decimal? newMaxHp = null)
     {
         if (creature?.Player == null || maxHpGained < 0m) return;
 
@@ -4050,7 +4062,7 @@ public static class RunTracker
 
                 bool persistDirectlyToRun = _pendingCombat == null;
                 var agg = GetOrCreateRelicAggregateForCurrentContextLocked(ChosenCheeseRelicId);
-                RecordChosenCheeseMaxHpGainedForTest(agg, maxHpGained);
+                RecordChosenCheeseMaxHpGainedForTest(agg, maxHpGained, originalMaxHp, newMaxHp);
                 if (persistDirectlyToRun)
                     SaveCurrentRun();
             }
@@ -4066,19 +4078,43 @@ public static class RunTracker
     /// The curse count comes from the relic's own post-pile-change condition;
     /// max HP gained is the observed delta after the game's GainMaxHp command.
     /// </summary>
-    public static void RecordDarkstonePeriaptCurseAcquired(int maxHpGained)
+    public static void RecordDarkstonePeriaptCurseAcquired(
+        int maxHpGained,
+        decimal? originalMaxHp = null,
+        decimal? newMaxHp = null)
     {
         lock (_lock)
         {
             try
             {
                 var agg = GetOrCreateCurrentRunRelicAggregateLocked(DarkstonePeriaptRelicId);
-                RecordDarkstonePeriaptCurseAcquiredForTest(agg, maxHpGained);
+                RecordDarkstonePeriaptCurseAcquiredForTest(agg, maxHpGained, originalMaxHp, newMaxHp);
                 SaveCurrentRun();
             }
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordDarkstonePeriaptCurseAcquired failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record Leafy Poultice's observed pickup max-HP loss after its async
+    /// pickup effect resolves.
+    /// </summary>
+    public static void RecordLeafyPoulticeMaxHpChanged(decimal originalMaxHp, decimal newMaxHp)
+    {
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(LeafyPoulticeRelicId);
+                RecordLeafyPoulticeMaxHpChangedForTest(agg, originalMaxHp, newMaxHp);
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordLeafyPoulticeMaxHpChanged failed: {e.Message}");
             }
         }
     }
@@ -4299,12 +4335,17 @@ public static class RunTracker
         agg.CombatsWithoutActivation += Math.Max(0, count);
     }
 
-    internal static void RecordLeesWafflePickupHpGainedForTest(RelicAggregate agg, decimal hpGained)
+    internal static void RecordLeesWafflePickupHpGainedForTest(
+        RelicAggregate agg,
+        decimal hpGained,
+        decimal? originalMaxHp = null,
+        decimal? newMaxHp = null)
     {
         if (agg == null || hpGained < 0m) return;
 
         agg.Activations++;
         agg.TotalHealingRestored += hpGained;
+        RecordRelicMaxHpChangeForTest(agg, originalMaxHp, newMaxHp);
     }
 
     internal static void RecordRegalPillowRestHealForTest(
@@ -4379,6 +4420,7 @@ public static class RunTracker
 
         agg.StartingMaxHp = Math.Max(0m, startingMaxHp);
         agg.ResultingMaxHp = Math.Max(0m, resultingMaxHp);
+        RecordRelicMaxHpChangeForTest(agg, startingMaxHp, resultingMaxHp);
     }
 
     internal static void RecordSandCastleUpgradesForTest(
@@ -4419,21 +4461,55 @@ public static class RunTracker
         agg.CardsUpgraded += added;
     }
 
-    internal static void RecordDarkstonePeriaptCurseAcquiredForTest(RelicAggregate agg, int maxHpGained)
+    internal static void RecordDarkstonePeriaptCurseAcquiredForTest(
+        RelicAggregate agg,
+        int maxHpGained,
+        decimal? originalMaxHp = null,
+        decimal? newMaxHp = null)
     {
         if (agg == null) return;
 
         agg.Activations++;
         agg.CursesAcquired++;
         agg.TotalMaxHpGained += Math.Max(0, maxHpGained);
+        RecordRelicMaxHpChangeForTest(agg, originalMaxHp, newMaxHp);
     }
 
-    internal static void RecordChosenCheeseMaxHpGainedForTest(RelicAggregate agg, decimal maxHpGained)
+    internal static void RecordChosenCheeseMaxHpGainedForTest(
+        RelicAggregate agg,
+        decimal maxHpGained,
+        decimal? originalMaxHp = null,
+        decimal? newMaxHp = null)
     {
         if (agg == null || maxHpGained < 0m) return;
 
         agg.Activations++;
         agg.MaxHpGained += maxHpGained;
+        RecordRelicMaxHpChangeForTest(agg, originalMaxHp, newMaxHp);
+    }
+
+    internal static void RecordLeafyPoulticeMaxHpChangedForTest(
+        RelicAggregate agg,
+        decimal originalMaxHp,
+        decimal newMaxHp)
+    {
+        if (agg == null) return;
+
+        agg.Activations++;
+        RecordRelicMaxHpChangeForTest(agg, originalMaxHp, newMaxHp);
+    }
+
+    internal static void RecordRelicMaxHpChangeForTest(
+        RelicAggregate agg,
+        decimal? originalMaxHp,
+        decimal? newMaxHp)
+    {
+        if (agg == null || !originalMaxHp.HasValue || !newMaxHp.HasValue) return;
+
+        var original = Math.Max(0m, originalMaxHp.Value);
+        var current = Math.Max(0m, newMaxHp.Value);
+        agg.OriginalMaxHp ??= original;
+        agg.NewMaxHp = current;
     }
 
     internal static void RecordStrikeDummyStrikePlayedForTest(RelicAggregate agg)

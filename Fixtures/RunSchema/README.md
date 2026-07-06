@@ -82,7 +82,8 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds Burning Blood combat-victory activation tracking and relic healing
   attribution, including restored healing and full-HP lost healing.
 - `chosen-cheese-relic-run.json`
-  Adds Chosen Cheese combat-end activation tracking plus observed max-HP gained.
+  Adds Chosen Cheese combat-end activation tracking plus observed max-HP gained
+  and original/new max-HP snapshots.
 - `white-beast-statue-relic-run.json`
   Adds White Beast Statue potion-gained tracking with common, uncommon, and
   rare potion rarity splits, plus skipped White Beast potion reward tracking.
@@ -122,7 +123,8 @@ New fixtures added going forward do not need a `v*-` prefix.
   discounted card cost buckets including dynamic star costs.
 - `darkstone-periapt-relic-run.json`
   Adds Darkstone Periapt curse acquisition tracking plus observed max HP
-  gained from the relic's owner-specific curse-to-deck callback.
+  gained from the relic's owner-specific curse-to-deck callback, and
+  original/new max-HP snapshots.
 - `shovel-relic-run.json`
   Adds Shovel Dig tracking: total relics acquired plus common, uncommon, and
   rare rarity splits from the actual obtained relic instances, plus campfires
@@ -145,7 +147,11 @@ New fixtures added going forward do not need a `v*-` prefix.
   healed, and healing wasted to full HP.
 - `precarious-shears-relic-run.json`
   Adds Precarious Shears pickup tracking: removed card names plus max HP before
-  and after the relic's max-HP cost.
+  and after the relic's max-HP cost, stored in the common original/new max-HP
+  format as well as the legacy field names.
+- `leafy-poultice-relic-run.json`
+  Adds Leafy Poultice pickup tracking: original/new max HP after the relic's
+  max-HP loss resolves.
 - `sand-castle-relic-run.json`
   Adds Sand Castle pickup tracking: the actual cards upgraded by the relic.
 - `hefty-tablet-relic-run.json`

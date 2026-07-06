@@ -430,6 +430,12 @@ public class RelicAggregate
     // Total maximum HP gained from this relic. Used by Chosen Cheese.
     public decimal MaxHpGained { get; set; }
 
+    // Shared max-HP before/after snapshot for relics that add or remove max HP.
+    // Original is the first observed value before the relic changed max HP; New
+    // is the latest observed value after its max-HP change resolved.
+    public decimal? OriginalMaxHp { get; set; }
+    public decimal? NewMaxHp { get; set; }
+
     // Total times a relic triggered from one or more confirmed Doom deaths.
     // Used by Book Repair Knife.
     public int DoomDeathTriggers { get; set; }
@@ -549,7 +555,8 @@ public class RelicAggregate
     // Cards actually removed while Precarious Shears' pickup effect resolves.
     public List<string> CardsRemoved { get; set; } = new();
 
-    // Max HP snapshot around Precarious Shears' pickup cost.
+    // Legacy max-HP snapshot around Precarious Shears' pickup cost. New max-HP
+    // changing relics should write OriginalMaxHp/NewMaxHp instead.
     public decimal? StartingMaxHp { get; set; }
     public decimal? ResultingMaxHp { get; set; }
 

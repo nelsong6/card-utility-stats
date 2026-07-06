@@ -418,6 +418,8 @@ public class SchemaLoadingTests
         var relicAgg = loaded.Data.RelicAggregates["RELIC.CHOSEN_CHEESE"];
         Assert.Equal(3, relicAgg.Activations);
         Assert.Equal(3m, relicAgg.MaxHpGained);
+        Assert.Equal(70m, relicAgg.OriginalMaxHp);
+        Assert.Equal(73m, relicAgg.NewMaxHp);
     }
 
     [Fact]
@@ -867,6 +869,8 @@ public class SchemaLoadingTests
         var relicAgg = resumed!.RelicAggregates["RELIC.CHOSEN_CHEESE"];
         Assert.Equal(3, relicAgg.Activations);
         Assert.Equal(3m, relicAgg.MaxHpGained);
+        Assert.Equal(70m, relicAgg.OriginalMaxHp);
+        Assert.Equal(73m, relicAgg.NewMaxHp);
     }
 
     [Fact]
@@ -1208,6 +1212,8 @@ public class SchemaLoadingTests
         Assert.Equal(3, relicAgg.Activations);
         Assert.Equal(3, relicAgg.CursesAcquired);
         Assert.Equal(18, relicAgg.TotalMaxHpGained);
+        Assert.Equal(70m, relicAgg.OriginalMaxHp);
+        Assert.Equal(88m, relicAgg.NewMaxHp);
     }
 
     [Fact]
@@ -1262,6 +1268,8 @@ public class SchemaLoadingTests
         Assert.Equal(3, relicAgg.Activations);
         Assert.Equal(3, relicAgg.CursesAcquired);
         Assert.Equal(18, relicAgg.TotalMaxHpGained);
+        Assert.Equal(70m, relicAgg.OriginalMaxHp);
+        Assert.Equal(88m, relicAgg.NewMaxHp);
     }
 
     [Fact]
@@ -1286,6 +1294,31 @@ public class SchemaLoadingTests
         Assert.NotNull(resumed);
         var relicAgg = resumed!.RelicAggregates["RELIC.JUZU_BRACELET"];
         Assert.Equal(3, relicAgg.QuestionMarkSitesEntered);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsLeafyPoulticeRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("leafy-poultice-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.LEAFY_POULTICE"];
+        Assert.Equal(1, relicAgg.Activations);
+        Assert.Equal(70m, relicAgg.OriginalMaxHp);
+        Assert.Equal(58m, relicAgg.NewMaxHp);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsLeafyPoulticeRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("leafy-poultice-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.LEAFY_POULTICE"];
+        Assert.Equal(1, relicAgg.Activations);
+        Assert.Equal(70m, relicAgg.OriginalMaxHp);
+        Assert.Equal(58m, relicAgg.NewMaxHp);
     }
 
     [Fact]
@@ -1372,6 +1405,8 @@ public class SchemaLoadingTests
         Assert.True(loaded!.SupportsResume);
         var relicAgg = loaded.Data.RelicAggregates["RELIC.PRECARIOUS_SHEARS"];
         Assert.Equal(new[] { "Strike", "Defend+" }, relicAgg.CardsRemoved);
+        Assert.Equal(70m, relicAgg.OriginalMaxHp);
+        Assert.Equal(63m, relicAgg.NewMaxHp);
         Assert.Equal(70m, relicAgg.StartingMaxHp);
         Assert.Equal(63m, relicAgg.ResultingMaxHp);
     }
@@ -1384,6 +1419,8 @@ public class SchemaLoadingTests
         Assert.NotNull(resumed);
         var relicAgg = resumed!.RelicAggregates["RELIC.PRECARIOUS_SHEARS"];
         Assert.Equal(new[] { "Strike", "Defend+" }, relicAgg.CardsRemoved);
+        Assert.Equal(70m, relicAgg.OriginalMaxHp);
+        Assert.Equal(63m, relicAgg.NewMaxHp);
         Assert.Equal(70m, relicAgg.StartingMaxHp);
         Assert.Equal(63m, relicAgg.ResultingMaxHp);
     }

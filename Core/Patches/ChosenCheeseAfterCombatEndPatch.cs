@@ -67,7 +67,7 @@ public static class ChosenCheeseAfterCombatEndPatch
             if (creature == null) return;
 
             var maxHpGained = creature.MaxHp - state.InitialMaxHp;
-            RunTracker.RecordChosenCheeseMaxHpGained(creature, maxHpGained);
+            RunTracker.RecordChosenCheeseMaxHpGained(creature, maxHpGained, state.InitialMaxHp, creature.MaxHp);
         }
         catch (Exception e)
         {

@@ -467,6 +467,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is LeafyPoultice)
+            {
+                const string relicId = "RELIC.LEAFY_POULTICE";
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+
+                var body = BuildLeafyPoulticeBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Leafy Poultice", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is RegalPillow)
             {
                 const string relicId = "RELIC.REGAL_PILLOW";
@@ -1027,6 +1037,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is LeafyPoultice)
+        {
+            title = "Leafy Poultice";
+            body = BuildLeafyPoulticeBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is RegalPillow)
         {
             title = "Regal Pillow";
@@ -1550,6 +1567,7 @@ public static class RelicHoverShowPatch
     private static string BuildLeesWaffleBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
+        AppendMaxHpChangeRows(sb, agg, "Max HP gained", MaxHpGained(agg));
         Row3(sb, "HP gained", FormatDecimal(agg.TotalHealingRestored), "");
         return sb.ToString();
     }
@@ -1558,7 +1576,7 @@ public static class RelicHoverShowPatch
     {
         var sb = new StringBuilder();
         Row3(sb, "Activations", agg.Activations.ToString(), "");
-        Row3(sb, "Max HP gained", FormatDecimal(agg.MaxHpGained), "");
+        AppendMaxHpChangeRows(sb, agg, "Max HP gained", agg.MaxHpGained);
         return sb.ToString();
     }
 
@@ -1566,7 +1584,15 @@ public static class RelicHoverShowPatch
     {
         var sb = new StringBuilder();
         Row3(sb, "Curses acquired", agg.CursesAcquired.ToString(), "");
-        Row3(sb, "Max HP gained", agg.TotalMaxHpGained.ToString(), "");
+        AppendMaxHpChangeRows(sb, agg, "Max HP gained", agg.TotalMaxHpGained);
+        return sb.ToString();
+    }
+
+    private static string BuildLeafyPoulticeBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        AppendMaxHpChangeRows(sb, agg, "Max HP lost", MaxHpLost(agg));
         return sb.ToString();
     }
 
@@ -1589,8 +1615,7 @@ public static class RelicHoverShowPatch
         foreach (var card in cardsRemoved)
             Row3(sb, "Removed card", StatsTooltip.EscapeBbcode(card), "");
 
-        Row3(sb, "Starting max HP", FormatDecimal(agg.StartingMaxHp ?? 0m), "");
-        Row3(sb, "Resulting max HP", FormatDecimal(agg.ResultingMaxHp ?? 0m), "");
+        AppendMaxHpChangeRows(sb, agg, "Max HP lost", MaxHpLost(agg));
         return sb.ToString();
     }
 
@@ -1876,6 +1901,29 @@ public static class RelicHoverShowPatch
             ? value.ToString("0")
             : value.ToString("0.##");
     }
+
+    private static void AppendMaxHpChangeRows(
+        StringBuilder sb,
+        RelicAggregate agg,
+        string deltaLabel,
+        decimal delta)
+    {
+        Row3(sb, "Original max HP", FormatDecimal(OriginalMaxHp(agg)), "");
+        Row3(sb, "New max HP", FormatDecimal(NewMaxHp(agg)), "");
+        Row3(sb, deltaLabel, FormatDecimal(Math.Max(0m, delta)), "");
+    }
+
+    private static decimal OriginalMaxHp(RelicAggregate agg)
+        => agg.OriginalMaxHp ?? agg.StartingMaxHp ?? 0m;
+
+    private static decimal NewMaxHp(RelicAggregate agg)
+        => agg.NewMaxHp ?? agg.ResultingMaxHp ?? 0m;
+
+    private static decimal MaxHpGained(RelicAggregate agg)
+        => Math.Max(0m, NewMaxHp(agg) - OriginalMaxHp(agg));
+
+    private static decimal MaxHpLost(RelicAggregate agg)
+        => Math.Max(0m, OriginalMaxHp(agg) - NewMaxHp(agg));
 
     private static string EnergyLabel(string suffix)
     {

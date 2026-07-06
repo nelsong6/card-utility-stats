@@ -35,6 +35,8 @@
         "Strike",
         "Defend+"
       ],
+      "original_max_hp": 70,
+      "new_max_hp": 63,
       "starting_max_hp": 70,
       "resulting_max_hp": 63
     }

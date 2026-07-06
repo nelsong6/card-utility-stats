@@ -8,20 +8,20 @@ using MegaCrit.Sts2.Core.Models.Relics;
 namespace SpireLens.Core.Patches;
 
 /// <summary>
-/// Records Lee's Waffle pickup HP as the observed current-HP delta across the
-/// full pickup effect, including the max-HP grant and the follow-up heal.
+/// Records Leafy Poultice's pickup max-HP loss by observing the owner's max HP
+/// before and after the async pickup effect resolves.
 /// </summary>
 [HarmonyPatch]
-public static class LeesWaffleAfterObtainedPatch
+public static class LeafyPoulticeAfterObtainedPatch
 {
     private static MethodBase? TargetMethod()
     {
-        var t = AccessTools.TypeByName("MegaCrit.Sts2.Core.Models.Relics.LeesWaffle");
+        var t = AccessTools.TypeByName("MegaCrit.Sts2.Core.Models.Relics.LeafyPoultice");
         return t == null ? null : AccessTools.Method(t, "AfterObtained");
     }
 
     [HarmonyPrefix]
-    public static void Prefix(LeesWaffle __instance, out PickupState __state)
+    public static void Prefix(LeafyPoultice __instance, out PickupState __state)
     {
         __state = default;
 
@@ -32,11 +32,11 @@ public static class LeesWaffleAfterObtainedPatch
             var creature = __instance.Owner?.Creature;
             if (creature == null || creature.IsDead) return;
 
-            __state = new PickupState(creature, creature.CurrentHp, creature.MaxHp);
+            __state = new PickupState(creature, creature.MaxHp);
         }
         catch (Exception e)
         {
-            CoreMain.LogDebug($"LeesWaffleAfterObtainedPatch.Prefix failed: {e.Message}");
+            CoreMain.LogDebug($"LeafyPoulticeAfterObtainedPatch.Prefix failed: {e.Message}");
         }
     }
 
@@ -70,7 +70,7 @@ public static class LeesWaffleAfterObtainedPatch
         }
         catch (Exception e)
         {
-            CoreMain.LogDebug($"LeesWaffleAfterObtainedPatch.Postfix failed: {e.Message}");
+            CoreMain.LogDebug($"LeafyPoulticeAfterObtainedPatch.Postfix failed: {e.Message}");
         }
     }
 
@@ -80,17 +80,13 @@ public static class LeesWaffleAfterObtainedPatch
         {
             if (state.Creature == null) return;
 
-            decimal hpGained = Math.Max(0m, state.Creature.CurrentHp - state.InitialCurrentHp);
-            RunTracker.RecordLeesWafflePickupHpGained(
-                hpGained,
-                state.InitialMaxHp,
-                state.Creature.MaxHp);
+            RunTracker.RecordLeafyPoulticeMaxHpChanged(state.InitialMaxHp, state.Creature.MaxHp);
         }
         catch (Exception e)
         {
-            CoreMain.LogDebug($"LeesWaffleAfterObtainedPatch.ObservePickup failed: {e.Message}");
+            CoreMain.LogDebug($"LeafyPoulticeAfterObtainedPatch.ObservePickup failed: {e.Message}");
         }
     }
 
-    public readonly record struct PickupState(Creature? Creature, decimal InitialCurrentHp, decimal InitialMaxHp);
+    public readonly record struct PickupState(Creature? Creature, decimal InitialMaxHp);
 }

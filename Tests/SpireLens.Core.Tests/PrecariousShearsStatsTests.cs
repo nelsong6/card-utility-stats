@@ -28,6 +28,8 @@ public class PrecariousShearsStatsTests
         var agg = new RelicAggregate();
 
         Assert.Empty(agg.CardsRemoved);
+        Assert.Null(agg.OriginalMaxHp);
+        Assert.Null(agg.NewMaxHp);
         Assert.Null(agg.StartingMaxHp);
         Assert.Null(agg.ResultingMaxHp);
     }
@@ -39,6 +41,8 @@ public class PrecariousShearsStatsTests
         run.RelicAggregates[PrecariousShearsRelicId] = new RelicAggregate
         {
             CardsRemoved = { "Strike", "Defend+" },
+            OriginalMaxHp = 70m,
+            NewMaxHp = 63m,
             StartingMaxHp = 70m,
             ResultingMaxHp = 63m,
         };
@@ -46,6 +50,8 @@ public class PrecariousShearsStatsTests
         var json = JsonSerializer.Serialize(run, SerializerOptions);
 
         Assert.Contains("cards_removed", json);
+        Assert.Contains("original_max_hp", json);
+        Assert.Contains("new_max_hp", json);
         Assert.Contains("starting_max_hp", json);
         Assert.Contains("resulting_max_hp", json);
 
@@ -54,6 +60,8 @@ public class PrecariousShearsStatsTests
         Assert.NotNull(restored);
         var agg = restored!.RelicAggregates[PrecariousShearsRelicId];
         Assert.Equal(new[] { "Strike", "Defend+" }, agg.CardsRemoved);
+        Assert.Equal(70m, agg.OriginalMaxHp);
+        Assert.Equal(63m, agg.NewMaxHp);
         Assert.Equal(70m, agg.StartingMaxHp);
         Assert.Equal(63m, agg.ResultingMaxHp);
     }
@@ -70,6 +78,8 @@ public class PrecariousShearsStatsTests
             resultingMaxHp: 63m);
 
         Assert.Equal(new[] { "Strike", "Defend+" }, agg.CardsRemoved);
+        Assert.Equal(70m, agg.OriginalMaxHp);
+        Assert.Equal(63m, agg.NewMaxHp);
         Assert.Equal(70m, agg.StartingMaxHp);
         Assert.Equal(63m, agg.ResultingMaxHp);
     }
@@ -88,11 +98,13 @@ public class PrecariousShearsStatsTests
         Assert.Contains("Removed card", body);
         Assert.Contains("Strike", body);
         Assert.Contains("Defend+", body);
-        Assert.Contains("Starting max HP", body);
-        Assert.Contains("Resulting max HP", body);
+        Assert.Contains("Original max HP", body);
+        Assert.Contains("New max HP", body);
+        Assert.Contains("Max HP lost", body);
         Assert.Contains("[b]2[/b]", body);
         Assert.Contains("[b]70[/b]", body);
         Assert.Contains("[b]63[/b]", body);
+        Assert.Contains("[b]7[/b]", body);
     }
 
     [Fact]
@@ -101,8 +113,9 @@ public class PrecariousShearsStatsTests
         var body = BuildBody(new RelicAggregate());
 
         Assert.Contains("Cards removed", body);
-        Assert.Contains("Starting max HP", body);
-        Assert.Contains("Resulting max HP", body);
+        Assert.Contains("Original max HP", body);
+        Assert.Contains("New max HP", body);
+        Assert.Contains("Max HP lost", body);
         Assert.Contains("[b]0[/b]", body);
     }
 

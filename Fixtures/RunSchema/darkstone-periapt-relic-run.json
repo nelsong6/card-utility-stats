@@ -14,7 +14,9 @@
     "RELIC.DARKSTONE_PERIAPT": {
       "activations": 3,
       "curses_acquired": 3,
-      "total_max_hp_gained": 18
+      "total_max_hp_gained": 18,
+      "original_max_hp": 70,
+      "new_max_hp": 88
     }
   },
   "meta_stats": {},

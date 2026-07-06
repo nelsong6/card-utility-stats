@@ -46,7 +46,9 @@
   "relic_aggregates": {
     "RELIC.CHOSEN_CHEESE": {
       "activations": 3,
-      "max_hp_gained": 3
+      "max_hp_gained": 3,
+      "original_max_hp": 70,
+      "new_max_hp": 73
     }
   },
   "events": [],
