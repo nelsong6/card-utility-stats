@@ -92,8 +92,8 @@ public class PaelsWingStatsTests
         Assert.Contains("rare cards consumed", body);
         Assert.Contains("Sacrifices made", body);
         Assert.Contains("Sacrifices skipped", body);
-        Assert.Contains("Sacrifice rate", body);
-        Assert.Contains("/floor", body);
+        Assert.DoesNotContain("Sacrifice rate", body);
+        Assert.DoesNotContain("/floor", body);
         Assert.Contains("[b]5[/b]", body);
         Assert.Contains("[b]3[/b]", body);
         Assert.Contains("[b]2[/b]", body);
@@ -113,6 +113,23 @@ public class PaelsWingStatsTests
 
         Assert.Contains("Sacrifice rate", body);
         Assert.Contains("[b]0.75[/b]", body);
+        Assert.DoesNotContain("[b]0.38[/b]", body);
+    }
+
+    [Fact]
+    public void RelicTooltip_PaelsWingRate_HidesRateWithoutObtainedFloor()
+    {
+        var agg = new RelicAggregate
+        {
+            SacrificesMade = 3,
+        };
+
+        var body = (string)(BuildPaelsWingBodyForFloorMethod.Invoke(null, new object?[] { agg, 8, null })
+            ?? throw new InvalidOperationException("BuildPaelsWingBodyBBCodeForFloor returned null."));
+
+        Assert.Contains("Sacrifices made", body);
+        Assert.DoesNotContain("Sacrifice rate", body);
+        Assert.DoesNotContain("/floor", body);
         Assert.DoesNotContain("[b]0.38[/b]", body);
     }
 

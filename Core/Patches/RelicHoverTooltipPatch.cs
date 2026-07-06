@@ -1693,21 +1693,26 @@ public static class RelicHoverShowPatch
         Row3(sb, "rare cards consumed", agg.RareCardsConsumed.ToString(), "");
         Row3(sb, "Sacrifices made", agg.SacrificesMade.ToString(), "");
         Row3(sb, "Sacrifices skipped", agg.SacrificesSkipped.ToString(), "");
-        var floorCount = FloorCountSinceRelicObtained(floorReached, floorAdded);
-        var rate = floorCount <= 0 ? 0m : (decimal)agg.SacrificesMade / floorCount;
-        Row3(sb, "Sacrifice rate", FormatDecimal(rate), "/floor");
+        if (TryFloorCountSinceRelicObtained(floorReached, floorAdded, out var floorCount))
+        {
+            var rate = (decimal)agg.SacrificesMade / floorCount;
+            Row3(sb, "Sacrifice rate", FormatDecimal(rate), "/floor");
+        }
+
         return sb.ToString();
     }
 
-    private static int FloorCountSinceRelicObtained(int? floorReached, int? floorAdded)
+    private static bool TryFloorCountSinceRelicObtained(int? floorReached, int? floorAdded, out int floorCount)
     {
+        floorCount = 0;
         var reached = floorReached.GetValueOrDefault();
-        if (reached <= 0) return 0;
+        if (reached <= 0) return false;
 
         var added = floorAdded.GetValueOrDefault();
-        if (added <= 0) return Math.Max(1, reached);
+        if (added <= 0 || reached < added) return false;
 
-        return Math.Max(1, reached - added + 1);
+        floorCount = reached - added + 1;
+        return true;
     }
 
     private static string BuildPaelsEyeBodyBBCode(RelicAggregate agg, bool activatedThisCombat = false)
