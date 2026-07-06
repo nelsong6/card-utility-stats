@@ -16,6 +16,10 @@ public class PaelsWingStatsTests
         typeof(RelicHoverShowPatch).GetMethod("BuildPaelsWingBodyBBCode", BindingFlags.NonPublic | BindingFlags.Static)
         ?? throw new InvalidOperationException("BuildPaelsWingBodyBBCode not found.");
 
+    private static readonly MethodInfo BuildPaelsWingBodyForFloorMethod =
+        typeof(RelicHoverShowPatch).GetMethod("BuildPaelsWingBodyBBCodeForFloor", BindingFlags.NonPublic | BindingFlags.Static)
+        ?? throw new InvalidOperationException("BuildPaelsWingBodyBBCodeForFloor not found.");
+
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
@@ -94,6 +98,22 @@ public class PaelsWingStatsTests
         Assert.Contains("[b]3[/b]", body);
         Assert.Contains("[b]2[/b]", body);
         Assert.Contains("[b]1[/b]", body);
+    }
+
+    [Fact]
+    public void RelicTooltip_PaelsWingRate_UsesFloorsSinceRelicWasObtained()
+    {
+        var agg = new RelicAggregate
+        {
+            SacrificesMade = 3,
+        };
+
+        var body = (string)(BuildPaelsWingBodyForFloorMethod.Invoke(null, new object?[] { agg, 8, 5 })
+            ?? throw new InvalidOperationException("BuildPaelsWingBodyBBCodeForFloor returned null."));
+
+        Assert.Contains("Sacrifice rate", body);
+        Assert.Contains("[b]0.75[/b]", body);
+        Assert.DoesNotContain("[b]0.38[/b]", body);
     }
 
     [Fact]

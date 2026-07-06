@@ -706,6 +706,19 @@ public static class RelicHoverShowPatch
         return relicModel.Id.ToString();
     }
 
+    private static int? RelicFloorAddedToDeck(RelicModel relicModel)
+    {
+        try
+        {
+            var floor = relicModel.FloorAddedToDeck;
+            return floor > 0 ? floor : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private static bool IsGameOverScreenHover(Node? node)
     {
         for (var current = node; current != null; current = current.GetParent())
@@ -1082,7 +1095,10 @@ public static class RelicHoverShowPatch
         if (relicModel is PaelsWing)
         {
             title = "Pael's Wing";
-            body = BuildPaelsWingBodyBBCodeForFloor(agg, floorCount);
+            body = BuildPaelsWingBodyBBCodeForFloor(
+                agg,
+                floorCount,
+                RelicFloorAddedToDeck(relicModel));
             return true;
         }
 
@@ -1663,10 +1679,13 @@ public static class RelicHoverShowPatch
 
     private static string BuildPaelsWingBodyBBCode(RelicAggregate agg)
     {
-        return BuildPaelsWingBodyBBCodeForFloor(agg, RunTracker.GetCurrentFloorForRateStats());
+        return BuildPaelsWingBodyBBCodeForFloor(agg, RunTracker.GetCurrentFloorForRateStats(), floorAdded: null);
     }
 
-    private static string BuildPaelsWingBodyBBCodeForFloor(RelicAggregate agg, int? floorCountOverride)
+    private static string BuildPaelsWingBodyBBCodeForFloor(
+        RelicAggregate agg,
+        int? floorReached,
+        int? floorAdded)
     {
         var sb = new StringBuilder();
         Row3(sb, "common cards consumed", agg.CommonCardsConsumed.ToString(), "");
@@ -1674,10 +1693,21 @@ public static class RelicHoverShowPatch
         Row3(sb, "rare cards consumed", agg.RareCardsConsumed.ToString(), "");
         Row3(sb, "Sacrifices made", agg.SacrificesMade.ToString(), "");
         Row3(sb, "Sacrifices skipped", agg.SacrificesSkipped.ToString(), "");
-        var floorCount = floorCountOverride.GetValueOrDefault();
+        var floorCount = FloorCountSinceRelicObtained(floorReached, floorAdded);
         var rate = floorCount <= 0 ? 0m : (decimal)agg.SacrificesMade / floorCount;
         Row3(sb, "Sacrifice rate", FormatDecimal(rate), "/floor");
         return sb.ToString();
+    }
+
+    private static int FloorCountSinceRelicObtained(int? floorReached, int? floorAdded)
+    {
+        var reached = floorReached.GetValueOrDefault();
+        if (reached <= 0) return 0;
+
+        var added = floorAdded.GetValueOrDefault();
+        if (added <= 0) return Math.Max(1, reached);
+
+        return Math.Max(1, reached - added + 1);
     }
 
     private static string BuildPaelsEyeBodyBBCode(RelicAggregate agg, bool activatedThisCombat = false)
