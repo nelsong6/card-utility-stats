@@ -106,10 +106,13 @@ public class BronzeScalesStatsTests
         var body = BuildBody(new RelicAggregate());
 
         Assert.Contains("Times triggered", body);
+        Assert.Contains("Damage attempted", body);
         Assert.Contains("Damage dealt", body);
         Assert.Contains("Damage blocked", body);
         Assert.Contains("Overkill", body);
         Assert.Contains("Kills", body);
+        Assert.Contains("Targets hit", body);
+        Assert.Contains("Damage per trigger", body);
         Assert.Contains("[b]0[/b]", body);
     }
 

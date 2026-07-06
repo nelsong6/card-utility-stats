@@ -260,6 +260,8 @@ public class OpenBranchRelicStatsTests
         Assert.Contains("Damage blocked", parryingShieldBody);
         Assert.Contains("Overkill", parryingShieldBody);
         Assert.Contains("Kills", parryingShieldBody);
+        Assert.Contains("Targets hit", parryingShieldBody);
+        Assert.Contains("Damage per activation", parryingShieldBody);
         Assert.Contains("[b]17[/b]", parryingShieldBody);
         Assert.Contains("[b]11[/b]", parryingShieldBody);
 

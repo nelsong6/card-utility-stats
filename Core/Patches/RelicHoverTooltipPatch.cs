@@ -871,6 +871,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is MrStruggles)
+        {
+            title = "Mr. Struggles";
+            body = BuildMrStrugglesBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is ParryingShield)
         {
             title = "Parrying Shield";
@@ -1243,11 +1250,12 @@ public static class RelicHoverShowPatch
     private static string BuildBronzeScalesBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Times triggered", agg.Activations.ToString(), "");
-        Row3(sb, "Damage dealt", agg.TotalDamageDealt.ToString(), "");
-        Row3(sb, "Damage blocked", agg.TotalDamageBlocked.ToString(), "");
-        Row3(sb, "Overkill", agg.TotalDamageOverkill.ToString(), "");
-        Row3(sb, "Kills", agg.Kills.ToString(), "");
+        AppendRelicDamageStats(
+            sb,
+            agg,
+            triggerLabel: "Times triggered",
+            averageLabel: "Damage per trigger",
+            averageDenominator: agg.Activations);
         return sb.ToString();
     }
 
@@ -1324,37 +1332,73 @@ public static class RelicHoverShowPatch
     private static string BuildMercuryHourglassBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        var damagePerCombat = agg.Activations <= 0
-            ? 0m
-            : (decimal)agg.TotalDamageDealt / agg.Activations;
-        Row3(sb, "Combats triggered", agg.Activations.ToString(), "");
-        Row3(sb, "Damage dealt", agg.TotalDamageDealt.ToString(), "");
-        Row3(sb, "Damage per combat", FormatDecimal(damagePerCombat), "");
+        AppendRelicDamageStats(
+            sb,
+            agg,
+            triggerLabel: "Combats triggered",
+            averageLabel: "Damage per combat",
+            averageDenominator: agg.Activations);
+        return sb.ToString();
+    }
+
+    private static string BuildMrStrugglesBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        AppendRelicDamageStats(
+            sb,
+            agg,
+            triggerLabel: "Activations",
+            averageLabel: "Damage per activation",
+            averageDenominator: agg.Activations);
         return sb.ToString();
     }
 
     private static string BuildParryingShieldBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
-        Row3(sb, "Damage attempted", agg.TotalDamageAttempted.ToString(), "");
-        Row3(sb, "Damage dealt", agg.TotalDamageDealt.ToString(), "");
-        Row3(sb, "Damage blocked", agg.TotalDamageBlocked.ToString(), "");
-        Row3(sb, "Overkill", agg.TotalDamageOverkill.ToString(), "");
-        Row3(sb, "Kills", agg.Kills.ToString(), "");
+        AppendRelicDamageStats(
+            sb,
+            agg,
+            triggerLabel: "Activations",
+            averageLabel: "Damage per activation",
+            averageDenominator: agg.Activations);
         return sb.ToString();
     }
 
     private static string BuildFestivePopperBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        var damagePerCombat = agg.Activations <= 0
-            ? 0m
-            : (decimal)agg.TotalDamageDealt / agg.Activations;
-        Row3(sb, "Combats triggered", agg.Activations.ToString(), "");
-        Row3(sb, "Damage dealt", agg.TotalDamageDealt.ToString(), "");
-        Row3(sb, "Damage per combat", FormatDecimal(damagePerCombat), "");
+        AppendRelicDamageStats(
+            sb,
+            agg,
+            triggerLabel: "Combats triggered",
+            averageLabel: "Damage per combat",
+            averageDenominator: agg.Activations);
         return sb.ToString();
+    }
+
+    private static void AppendRelicDamageStats(
+        StringBuilder sb,
+        RelicAggregate agg,
+        string triggerLabel,
+        string? averageLabel = null,
+        int averageDenominator = 0)
+    {
+        Row3(sb, triggerLabel, agg.Activations.ToString(), "");
+        Row3(sb, "Damage attempted", agg.TotalDamageAttempted.ToString(), "");
+        Row3(sb, "Damage dealt", agg.TotalDamageDealt.ToString(), "");
+        Row3(sb, "Damage blocked", agg.TotalDamageBlocked.ToString(), "");
+        Row3(sb, "Overkill", agg.TotalDamageOverkill.ToString(), "");
+        Row3(sb, "Kills", agg.Kills.ToString(), "");
+        Row3(sb, "Targets hit", agg.TotalTargets.ToString(), "");
+
+        if (!string.IsNullOrWhiteSpace(averageLabel))
+        {
+            var average = averageDenominator <= 0
+                ? 0m
+                : (decimal)agg.TotalDamageDealt / averageDenominator;
+            Row3(sb, averageLabel, FormatDecimal(average), "");
+        }
     }
 
     private static string BuildPenNibBodyBBCode(RelicAggregate agg)

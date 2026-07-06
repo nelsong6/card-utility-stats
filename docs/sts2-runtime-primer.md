@@ -364,6 +364,11 @@ For relics that grant block after a specific owner-owned condition, arm a narrow
 
 For relics that emit damage commands, prefer the relic-owned callback plus the resolved `CreatureCmd.Damage` result. Mercury Hourglass arms from `MercuryHourglass.AfterPlayerTurnStart`, records the actual multi-target damage split from the command result on each turn, and counts the combat once so damage per combat is not confused with damage per turn-start trigger.
 
+Mr. Struggles follows the same owner-specific turn-start pattern, but its
+damage amount is the current turn number, so it uses the multi-target
+`CreatureCmd.Damage` overload with a decimal amount plus `ValueProp` rather
+than the `DamageVar` overload used by Mercury Hourglass and Festive Popper.
+
 Pen Nib is detected at its `ModifyDamageMultiplicative` hook when the relic
 returns `2` for the actual `CardPlay`, but the amount recorded comes from the
 raw per-hit value passed into `CreatureCmd.Damage` before hook modifiers run.

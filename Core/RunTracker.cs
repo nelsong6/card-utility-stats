@@ -78,6 +78,7 @@ public static class RunTracker
     private static readonly List<Creature> _pendingParryingShieldDamageAttributions = new();
     private static readonly List<Creature> _pendingFestivePopperDamageAttributions = new();
     private static readonly List<Creature> _pendingMercuryHourglassDamageAttributions = new();
+    private static readonly List<Creature> _pendingMrStrugglesDamageAttributions = new();
     private static readonly Dictionary<PowerModel, int> _bronzeScalesThornsContributions = new(ReferenceEqualityComparer.Instance);
     private static readonly List<PendingBronzeScalesDamageAttribution> _pendingBronzeScalesDamageAttributions = new();
     private static readonly List<Creature> _pendingHornCleatBlockAttributions = new();
@@ -878,6 +879,7 @@ public static class RunTracker
         _pendingParryingShieldDamageAttributions.Clear();
         _pendingFestivePopperDamageAttributions.Clear();
         _pendingMercuryHourglassDamageAttributions.Clear();
+        _pendingMrStrugglesDamageAttributions.Clear();
         _bronzeScalesThornsContributions.Clear();
         _pendingBronzeScalesDamageAttributions.Clear();
         _pendingHornCleatBlockAttributions.Clear();
@@ -2182,6 +2184,7 @@ public static class RunTracker
     private const string ParryingShieldRelicId = "RELIC.PARRYING_SHIELD";
     private const string FestivePopperRelicId = "RELIC.FESTIVE_POPPER";
     private const string MercuryHourglassRelicId = "RELIC.MERCURY_HOURGLASS";
+    private const string MrStrugglesRelicId = "RELIC.MR_STRUGGLES";
     private const string BronzeScalesRelicId = "RELIC.BRONZE_SCALES";
     private const string HornCleatRelicId = "RELIC.HORN_CLEAT";
     private const string PrismaticGemRelicId = "RELIC.PRISMATIC_GEM";
@@ -5299,6 +5302,48 @@ public static class RunTracker
         }
     }
 
+    /// <summary>
+    /// Record Mr. Struggles's owner-specific turn-start activation. The damage
+    /// amount scales with turn number; the result split still comes from the
+    /// resolved damage command.
+    /// </summary>
+    public static void ArmMrStrugglesAttribution(Creature dealer)
+    {
+        if (dealer == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(MrStrugglesRelicId);
+                agg.Activations += 1;
+                _pendingMrStrugglesDamageAttributions.Add(dealer);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"ArmMrStrugglesAttribution failed: {e.Message}");
+            }
+        }
+    }
+
+    public static bool TryConsumeMrStrugglesDamageAttribution(Creature dealer)
+    {
+        if (dealer == null) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                return ConsumePendingCreatureAttribution(_pendingMrStrugglesDamageAttributions, dealer);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"TryConsumeMrStrugglesDamageAttribution failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
     public static void RecordFestivePopperDamage(IEnumerable<DamageResult>? results)
     {
         if (results == null) return;
@@ -5313,6 +5358,24 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordFestivePopperDamage failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordMrStrugglesDamage(IEnumerable<DamageResult>? results)
+    {
+        if (results == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(MrStrugglesRelicId);
+                AddRelicDamageResultsLocked(agg, results);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordMrStrugglesDamage failed: {e.Message}");
             }
         }
     }
@@ -5459,6 +5522,21 @@ public static class RunTracker
     }
 
     internal static void RecordMercuryHourglassDamageForTest(
+        RelicAggregate agg,
+        IEnumerable<(int BlockedDamage, int UnblockedDamage, int OverkillDamage, bool WasTargetKilled)> results)
+    {
+        foreach (var result in results)
+        {
+            AddRelicDamageResultPartsLocked(
+                agg,
+                result.BlockedDamage,
+                result.UnblockedDamage,
+                result.OverkillDamage,
+                result.WasTargetKilled);
+        }
+    }
+
+    internal static void RecordMrStrugglesDamageForTest(
         RelicAggregate agg,
         IEnumerable<(int BlockedDamage, int UnblockedDamage, int OverkillDamage, bool WasTargetKilled)> results)
     {

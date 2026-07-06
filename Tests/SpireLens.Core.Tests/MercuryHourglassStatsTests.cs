@@ -88,13 +88,24 @@ public class MercuryHourglassStatsTests
         var body = BuildBody(new RelicAggregate
         {
             Activations = 2,
+            TotalDamageAttempted = 33,
             TotalDamageDealt = 25,
+            TotalDamageBlocked = 5,
+            TotalDamageOverkill = 3,
+            TotalTargets = 4,
+            Kills = 1,
         });
 
         Assert.Contains("Combats triggered", body);
+        Assert.Contains("Damage attempted", body);
         Assert.Contains("Damage dealt", body);
+        Assert.Contains("Damage blocked", body);
+        Assert.Contains("Overkill", body);
+        Assert.Contains("Kills", body);
+        Assert.Contains("Targets hit", body);
         Assert.Contains("Damage per combat", body);
         Assert.Contains("[b]2[/b]", body);
+        Assert.Contains("[b]33[/b]", body);
         Assert.Contains("[b]25[/b]", body);
         Assert.Contains("[b]12.5[/b]", body);
     }
