@@ -19,6 +19,7 @@ namespace SpireLens.Core.Patches;
 public static class RelicHoverShowPatch
 {
     private const string EnthralledDefinitionId = "CARD.ENTHRALLED";
+    private const string CursedPearlCurseDefinitionId = "CARD.GREED";
     private const string GameOverScreenNamespace = "MegaCrit.Sts2.Core.Nodes.Screens.GameOverScreen";
     private const string VulnerableIconPath = "res://images/atlases/power_atlas.sprites/vulnerable_power.tres";
     private const string WeakIconPath = "res://images/atlases/power_atlas.sprites/weak_power.tres";
@@ -687,6 +688,7 @@ public static class RelicHoverShowPatch
 
         RelicAggregate? aggregate = null;
         CardAggregate? bloodSoakedRoseCurseAgg = null;
+        CardAggregate? cursedPearlCurseAgg = null;
         int? floorCount = null;
 
         if (useEndedRun)
@@ -700,6 +702,12 @@ public static class RelicHoverShowPatch
                     RunTracker.GetLastEndedPooledCardAggregateByDefinition(EnthralledDefinitionId)
                     ?? new CardAggregate();
             }
+            else if (relicModel is CursedPearl)
+            {
+                cursedPearlCurseAgg =
+                    RunTracker.GetLastEndedPooledCardAggregateByDefinition(CursedPearlCurseDefinitionId)
+                    ?? new CardAggregate();
+            }
         }
 
         aggregate ??= IsStrikeDummyStatsRelicModel(relicModel)
@@ -710,6 +718,8 @@ public static class RelicHoverShowPatch
 
         if (relicModel is BloodSoakedRose && bloodSoakedRoseCurseAgg == null)
             bloodSoakedRoseCurseAgg = RunTracker.GetEnthralledCurseAggregate();
+        if (relicModel is CursedPearl && cursedPearlCurseAgg == null)
+            cursedPearlCurseAgg = RunTracker.GetCursedPearlCurseAggregate();
 
         floorCount ??= RunTracker.GetCurrentFloorForRateStats();
 
@@ -718,6 +728,7 @@ public static class RelicHoverShowPatch
             aggregate ?? new RelicAggregate(),
             floorCount,
             bloodSoakedRoseCurseAgg,
+            cursedPearlCurseAgg,
             out title,
             out body);
     }
@@ -771,7 +782,7 @@ public static class RelicHoverShowPatch
         out string title,
         out string body)
     {
-        return TryBuildBodyBBCode(relicModel, agg, floorCount, null, out title, out body);
+        return TryBuildBodyBBCode(relicModel, agg, floorCount, null, null, out title, out body);
     }
 
     internal static bool TryBuildBodyBBCode(
@@ -779,6 +790,7 @@ public static class RelicHoverShowPatch
         RelicAggregate agg,
         int? floorCount,
         CardAggregate? bloodSoakedRoseCurseAgg,
+        CardAggregate? cursedPearlCurseAgg,
         out string title,
         out string body)
     {
@@ -986,6 +998,13 @@ public static class RelicHoverShowPatch
         {
             title = "Blood-Soaked Rose";
             body = BuildBloodSoakedRoseBodyBBCode(agg, bloodSoakedRoseCurseAgg ?? new CardAggregate());
+            return true;
+        }
+
+        if (relicModel is CursedPearl)
+        {
+            title = "Cursed Pearl";
+            body = BuildCursedPearlBodyBBCode(agg, cursedPearlCurseAgg ?? new CardAggregate());
             return true;
         }
 
@@ -1551,13 +1570,30 @@ public static class RelicHoverShowPatch
             totalLabel: "Energy gained total",
             includeAveragePerCombat: true);
 
-        curseAgg ??= new CardAggregate();
-        Row3(sb, "Enthralled combats", curseAgg.CombatsInDeck.ToString(), "");
-        Row3(sb, "Enthralled drawn", curseAgg.TimesDrawn.ToString(), "");
-        Row3(sb, "Enthralled discarded", curseAgg.TimesDiscarded.ToString(), "");
-        Row3(sb, "Enthralled played", curseAgg.Plays.ToString(), "");
-        Row3(sb, "Enthralled exhausted", curseAgg.TimesExhausted.ToString(), "");
+        AppendRelatedCurseCardStats(sb, "Enthralled", curseAgg);
         return sb.ToString();
+    }
+
+    private static string BuildCursedPearlBodyBBCode(RelicAggregate agg, CardAggregate curseAgg)
+    {
+        var sb = new StringBuilder();
+        Row3(
+            sb,
+            "Floors ascended before first shop",
+            (agg.FloorsAscendedBeforeFirstShop ?? 0).ToString(),
+            "");
+        AppendRelatedCurseCardStats(sb, "Greed", curseAgg);
+        return sb.ToString();
+    }
+
+    private static void AppendRelatedCurseCardStats(StringBuilder sb, string displayName, CardAggregate curseAgg)
+    {
+        curseAgg ??= new CardAggregate();
+        Row3(sb, $"{displayName} combats", curseAgg.CombatsInDeck.ToString(), "");
+        Row3(sb, $"{displayName} drawn", curseAgg.TimesDrawn.ToString(), "");
+        Row3(sb, $"{displayName} discarded", curseAgg.TimesDiscarded.ToString(), "");
+        Row3(sb, $"{displayName} played", curseAgg.Plays.ToString(), "");
+        Row3(sb, $"{displayName} exhausted", curseAgg.TimesExhausted.ToString(), "");
     }
 
     private static string BuildCloakClaspBodyBBCode(RelicAggregate agg)

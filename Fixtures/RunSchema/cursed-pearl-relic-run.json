@@ -1,0 +1,31 @@
+{
+  "run_id": "cursed-pearl-relic-fixture",
+  "started_at": "2026-07-05T00:00:00Z",
+  "updated_at": "2026-07-05T00:10:00Z",
+  "outcome": "in_progress",
+  "aggregates": {
+    "CARD.GREED#1": {
+      "combats_in_deck": 4,
+      "plays": 1,
+      "times_drawn": 8,
+      "times_discarded": 3,
+      "times_exhausted": 2,
+      "initial_upgrade_level": 0
+    }
+  },
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.CURSED_PEARL": {
+      "floors_ascended_before_first_shop": 6
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.GREED": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.GREED": 1
+  }
+}

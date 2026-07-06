@@ -6,22 +6,22 @@ using MegaCrit.Sts2.Core.Runs;
 namespace SpireLens.Core.Patches;
 
 /// <summary>
-/// Counts ? map points entered while Juzu Bracelet is held. The original
-/// MapPointType.Unknown is the stable signal; resolved RoomType.Event is not.
+/// Captures original map-point entries for relics whose stats depend on the
+/// unresolved point type.
 /// </summary>
 [HarmonyPatch(typeof(RunManager), nameof(RunManager.EnterMapPointInternal))]
-public static class RunManagerJuzuBraceletStatsPatch
+public static class RunManagerMapPointStatsPatch
 {
     [HarmonyPrefix]
     public static void Prefix(MapPointType pointType, bool saveGame)
     {
         try
         {
-            RunTracker.RecordJuzuQuestionSiteEntered(pointType, saveGame);
+            RunTracker.RecordMapPointEntered(pointType, saveGame);
         }
         catch (Exception e)
         {
-            CoreMain.LogDebug($"RunManagerJuzuBraceletStatsPatch failed: {e.Message}");
+            CoreMain.LogDebug($"RunManagerMapPointStatsPatch failed: {e.Message}");
         }
     }
 }

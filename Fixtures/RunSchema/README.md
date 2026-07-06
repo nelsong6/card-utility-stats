@@ -137,6 +137,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `juzu-bracelet-relic-run.json`
   Adds Juzu Bracelet tracking for map `?` sites entered while the relic was
   held.
+- `cursed-pearl-relic-run.json`
+  Adds Cursed Pearl tracking for floors ascended before the first shop while
+  held, plus the stats for the Greed curse granted by the relic.
 - `gambling-chip-relic-run.json`
   Adds Gambling Chip combat-start discard tracking: combats triggered and
   cards actually discarded so the tooltip can show total and average discarded

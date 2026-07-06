@@ -1380,6 +1380,39 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsCursedPearlRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("cursed-pearl-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.CURSED_PEARL"];
+        var curseAgg = loaded.Data.Aggregates["CARD.GREED#1"];
+        Assert.Equal(6, relicAgg.FloorsAscendedBeforeFirstShop);
+        Assert.Equal(4, curseAgg.CombatsInDeck);
+        Assert.Equal(8, curseAgg.TimesDrawn);
+        Assert.Equal(3, curseAgg.TimesDiscarded);
+        Assert.Equal(1, curseAgg.Plays);
+        Assert.Equal(2, curseAgg.TimesExhausted);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsCursedPearlRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("cursed-pearl-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.CURSED_PEARL"];
+        var curseAgg = resumed.Aggregates["CARD.GREED#1"];
+        Assert.Equal(6, relicAgg.FloorsAscendedBeforeFirstShop);
+        Assert.Equal(4, curseAgg.CombatsInDeck);
+        Assert.Equal(8, curseAgg.TimesDrawn);
+        Assert.Equal(3, curseAgg.TimesDiscarded);
+        Assert.Equal(1, curseAgg.Plays);
+        Assert.Equal(2, curseAgg.TimesExhausted);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsLeafyPoulticeRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("leafy-poultice-relic-run.json"));

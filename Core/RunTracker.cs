@@ -45,6 +45,7 @@ namespace SpireLens.Core;
 public static class RunTracker
 {
     private const string EnthralledDefinitionId = "CARD.ENTHRALLED";
+    private const string CursedPearlCurseDefinitionId = "CARD.GREED";
     private const string ShivDefinitionId = "CARD.SHIV";
     private const string SovereignBladeLegacyDefinitionToken = "SOVEREIGN_BLADE";
     private const string SovereignBladeLegacyDefinitionId = "CARD.SOVEREIGN_BLADE";
@@ -320,6 +321,15 @@ public static class RunTracker
         lock (_lock)
         {
             return GetPooledEffectiveAggregateByDefinitionLocked(EnthralledDefinitionId)
+                   ?? new CardAggregate();
+        }
+    }
+
+    public static CardAggregate GetCursedPearlCurseAggregate()
+    {
+        lock (_lock)
+        {
+            return GetPooledEffectiveAggregateByDefinitionLocked(CursedPearlCurseDefinitionId)
                    ?? new CardAggregate();
         }
     }
@@ -1604,6 +1614,8 @@ public static class RunTracker
         MergeDiscountedCardCosts(target, source);
         target.CardsDiscarded += source.CardsDiscarded;
         target.QuestionMarkSitesEntered += source.QuestionMarkSitesEntered;
+        if (source.FloorsAscendedBeforeFirstShop.HasValue && !target.FloorsAscendedBeforeFirstShop.HasValue)
+            target.FloorsAscendedBeforeFirstShop = source.FloorsAscendedBeforeFirstShop;
         MergeCardsRemovedInto(target, source);
         if (source.StartingMaxHp.HasValue) target.StartingMaxHp = source.StartingMaxHp;
         if (source.ResultingMaxHp.HasValue) target.ResultingMaxHp = source.ResultingMaxHp;
@@ -2203,6 +2215,7 @@ public static class RunTracker
     private const string HornCleatRelicId = "RELIC.HORN_CLEAT";
     private const string PrismaticGemRelicId = "RELIC.PRISMATIC_GEM";
     private const string BloodSoakedRoseRelicId = "RELIC.BLOOD_SOAKED_ROSE";
+    private const string CursedPearlRelicId = "RELIC.CURSED_PEARL";
     private const string CloakClaspRelicId = "RELIC.CLOAK_CLASP";
     private const string ReptileTrinketRelicId = "RELIC.REPTILE_TRINKET";
     private const string GorgetRelicId = "RELIC.GORGET";
@@ -3222,10 +3235,60 @@ public static class RunTracker
         }
     }
 
+    /// <summary>
+    /// Record map-point stats from the original point type before the game
+    /// resolves it into a concrete room. This keeps Juzu's ? count and Cursed
+    /// Pearl's first-shop floor count tied to the visible map node.
+    /// </summary>
+    public static void RecordMapPointEntered(MapPointType pointType, bool saveGame)
+    {
+        if (!saveGame) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var player = GetTrackedRunPlayerLocked();
+                if (player == null) return;
+
+                var changed = false;
+                if (pointType == MapPointType.Unknown && PlayerHasJuzuBracelet(player))
+                {
+                    var agg = GetOrCreateCurrentRunRelicAggregateLocked(JuzuBraceletRelicId);
+                    RecordJuzuQuestionSiteEnteredForTest(agg);
+                    changed = true;
+                }
+
+                if (pointType == MapPointType.Shop && PlayerHasCursedPearl(player))
+                {
+                    var agg = GetOrCreateCurrentRunRelicAggregateLocked(CursedPearlRelicId);
+                    changed |= RecordCursedPearlFloorsBeforeFirstShopForTest(
+                        agg,
+                        CurrentRunFloorLocked() ?? 0);
+                }
+
+                if (changed)
+                    SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordMapPointEntered failed: {e.Message}");
+            }
+        }
+    }
+
     internal static void RecordJuzuQuestionSiteEnteredForTest(RelicAggregate agg, int count = 1)
     {
         if (agg == null || count <= 0) return;
         agg.QuestionMarkSitesEntered += count;
+    }
+
+    internal static bool RecordCursedPearlFloorsBeforeFirstShopForTest(RelicAggregate agg, int floorsAscended)
+    {
+        if (agg == null || agg.FloorsAscendedBeforeFirstShop.HasValue) return false;
+
+        agg.FloorsAscendedBeforeFirstShop = Math.Max(0, floorsAscended);
+        return true;
     }
 
     public static void ArmHeftyTabletChoice(Player owner)
@@ -6897,6 +6960,18 @@ public static class RunTracker
         try
         {
             return player.Relics.Any(r => r is JuzuBracelet);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool PlayerHasCursedPearl(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is CursedPearl);
         }
         catch
         {

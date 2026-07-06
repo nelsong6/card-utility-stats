@@ -115,6 +115,7 @@ public class RunHistoryStatsContextTests
                 Plays = 1,
                 TimesExhausted = 2,
             },
+            null,
             out var title,
             out var body);
 

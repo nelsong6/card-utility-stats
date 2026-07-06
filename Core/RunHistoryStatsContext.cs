@@ -16,6 +16,7 @@ namespace SpireLens.Core;
 internal static class RunHistoryStatsContext
 {
     private const string EnthralledDefinitionId = "CARD.ENTHRALLED";
+    private const string CursedPearlCurseDefinitionId = "CARD.GREED";
 
     private static readonly FieldInfo? DeckHistoryAmountField =
         AccessTools.Field(typeof(NDeckHistoryEntry), "_amount");
@@ -126,12 +127,16 @@ internal static class RunHistoryStatsContext
         var bloodSoakedRoseCurseAgg = relicModel is BloodSoakedRose
             ? CardAggregatePooler.PoolByDefinition(run.Aggregates, EnthralledDefinitionId) ?? new CardAggregate()
             : null;
+        var cursedPearlCurseAgg = relicModel is CursedPearl
+            ? CardAggregatePooler.PoolByDefinition(run.Aggregates, CursedPearlCurseDefinitionId) ?? new CardAggregate()
+            : null;
 
         return RelicHoverShowPatch.TryBuildBodyBBCode(
             relicModel,
             aggregate,
             run.FloorReached,
             bloodSoakedRoseCurseAgg,
+            cursedPearlCurseAgg,
             out title,
             out body);
     }
