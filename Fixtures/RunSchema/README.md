@@ -122,6 +122,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `strike-dummy-relic-run.json`
   Adds Strike Dummy tracked Strike-card plays since pickup plus current
   permanent-deck counts for base Strikes and non-base Strike-tagged cards.
+- `unsettling-lamp-relic-run.json`
+  Adds Unsettling Lamp debuff tracking: combats held, fixed Vulnerable and
+  Weak totals, and dynamic per-effect buckets for other debuffs it doubles.
 - `nutritious-soup-relic-run.json`
   Adds Nutritious Soup tracking for combats held plus finished plays of basic
   Strike-tagged cards carrying the Tezcataras Ember enchantment while the relic

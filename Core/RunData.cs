@@ -376,6 +376,10 @@ public class RelicAggregate
     // Used by Red Mask (1 Weak per enemy at combat start).
     public int WeakApplied { get; set; }
 
+    // Dynamic effect/power tracking credited to this relic. Used by Unsettling
+    // Lamp for debuffs beyond the fixed Vulnerable/Weak rows.
+    public Dictionary<string, AppliedEffectAggregate> AppliedEffects { get; set; } = new();
+
     // Total additional cards drawn by this relic across the run.
     // Used by Pocketwatch (draws 3 extra cards when 3 or fewer cards were
     // played last turn), Gremlin Horn (draws after enemy death), Pendulum

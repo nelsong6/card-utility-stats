@@ -1268,6 +1268,33 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsUnsettlingLampRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("unsettling-lamp-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.UNSETTLING_LAMP"];
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(4, relicAgg.VulnerableApplied);
+        Assert.Equal(2, relicAgg.WeakApplied);
+        Assert.Equal(6m, relicAgg.AppliedEffects["POWER.POISON"].TotalAmountApplied);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsUnsettlingLampRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("unsettling-lamp-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.UNSETTLING_LAMP"];
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(4, relicAgg.VulnerableApplied);
+        Assert.Equal(2, relicAgg.WeakApplied);
+        Assert.Equal(6m, relicAgg.AppliedEffects["POWER.POISON"].TotalAmountApplied);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsNutritiousSoupRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("nutritious-soup-relic-run.json"));

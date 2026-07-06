@@ -812,6 +812,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is UnsettlingLamp)
+        {
+            title = "Unsettling Lamp";
+            body = BuildUnsettlingLampBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is Pocketwatch)
         {
             title = "Pocketwatch";
@@ -1278,6 +1285,35 @@ public static class RelicHoverShowPatch
         var sb = new StringBuilder();
         Row3(sb, WeakLabel("enemies affected"), agg.EnemiesAffected.ToString(), "");
         Row3(sb, WeakLabel("weak applied"), agg.WeakApplied.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildUnsettlingLampBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var combats = agg.Activations;
+        var vulnerablePerCombat = combats <= 0
+            ? 0m
+            : (decimal)agg.VulnerableApplied / combats;
+        var weakPerCombat = combats <= 0
+            ? 0m
+            : (decimal)agg.WeakApplied / combats;
+
+        Row3(sb, "Combats held", combats.ToString(), "");
+        Row3(sb, VulnerableLabel("vulnerable applied"), agg.VulnerableApplied.ToString(), "");
+        Row3(sb, VulnerableLabel("avg vulnerable/combat"), FormatDecimal(vulnerablePerCombat), "");
+        Row3(sb, WeakLabel("weak applied"), agg.WeakApplied.ToString(), "");
+        Row3(sb, WeakLabel("avg weak/combat"), FormatDecimal(weakPerCombat), "");
+
+        foreach (var effect in OtherUnsettlingLampDebuffs(agg))
+        {
+            var average = combats <= 0
+                ? 0m
+                : effect.TotalAmountApplied / combats;
+            Row3(sb, RelicEffectLabel(effect, "applied"), FormatDecimal(effect.TotalAmountApplied), "");
+            Row3(sb, RelicEffectLabel(effect, "avg/combat"), FormatDecimal(average), "");
+        }
+
         return sb.ToString();
     }
 
@@ -2030,6 +2066,29 @@ public static class RelicHoverShowPatch
     {
         var path = NormalizeResourcePath(WeakIconPath);
         return $"[img={InlineIconSize}x{InlineIconSize}]{path}[/img] {suffix}";
+    }
+
+    private static IEnumerable<AppliedEffectAggregate> OtherUnsettlingLampDebuffs(RelicAggregate agg)
+    {
+        if (agg.AppliedEffects == null) return Enumerable.Empty<AppliedEffectAggregate>();
+
+        return agg.AppliedEffects.Values
+            .Where(effect => effect != null
+                && effect.TotalAmountApplied > 0m
+                && !RunTracker.IsVulnerableEffect(effect.EffectId, effect.DisplayName)
+                && !RunTracker.IsWeakEffect(effect.EffectId, effect.DisplayName))
+            .OrderBy(effect => string.IsNullOrWhiteSpace(effect.DisplayName) ? effect.EffectId : effect.DisplayName);
+    }
+
+    private static string RelicEffectLabel(AppliedEffectAggregate effect, string suffix)
+    {
+        var displayName = string.IsNullOrWhiteSpace(effect.DisplayName)
+            ? effect.EffectId
+            : effect.DisplayName;
+        var label = $"{displayName} {suffix}";
+        return string.IsNullOrWhiteSpace(effect.IconPath)
+            ? label
+            : $"{InlineIcon(effect.IconPath)} {label}";
     }
 
     private static string BlockLabel(string suffix)

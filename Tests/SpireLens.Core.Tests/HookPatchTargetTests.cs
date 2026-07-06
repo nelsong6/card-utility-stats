@@ -133,6 +133,27 @@ public class HookPatchTargetTests
             target.GetParameters().Select(p => p.ParameterType.FullName).ToArray());
     }
 
+    [Fact]
+    [Trait("Category", "RequiresLiveGame")]
+    public void UnsettlingLampPatch_ResolvesModifyPowerAmountGivenMultiplicative()
+    {
+        var target = InvokeTargetMethod(typeof(UnsettlingLampModifyPowerAmountGivenPatch));
+
+        Assert.NotNull(target);
+        Assert.Equal("MegaCrit.Sts2.Core.Models.Relics.UnsettlingLamp", target!.DeclaringType?.FullName);
+        Assert.Equal("ModifyPowerAmountGivenMultiplicative", target.Name);
+        Assert.Equal(
+            new[]
+            {
+                "MegaCrit.Sts2.Core.Models.PowerModel",
+                "MegaCrit.Sts2.Core.Entities.Creatures.Creature",
+                "System.Decimal",
+                "MegaCrit.Sts2.Core.Entities.Creatures.Creature",
+                "MegaCrit.Sts2.Core.Models.CardModel",
+            },
+            target.GetParameters().Select(p => p.ParameterType.FullName).ToArray());
+    }
+
     private static MethodBase? InvokeTargetMethod(Type patchType)
     {
         _ = Assembly.Load("sts2");

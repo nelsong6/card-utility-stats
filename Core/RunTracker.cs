@@ -70,6 +70,7 @@ public static class RunTracker
     private static CardModel? _pendingEffectSourceCard;
     private static int _pendingEffectSourceHistoryCount;
     private static readonly List<PendingPowerChangeAttempt> _pendingPowerChangeAttempts = new();
+    private static readonly List<PendingUnsettlingLampDebuff> _pendingUnsettlingLampDebuffs = new();
     private static readonly System.Threading.AsyncLocal<EnemyStatusSourceFrame?> _enemyStatusSourceFrame = new();
     private static int _pendingPlayerBlockClearAmount;
     private static bool _pendingPlayerBlockClearArmed;
@@ -879,6 +880,7 @@ public static class RunTracker
         _pendingEffectSourceCard = null;
         _pendingEffectSourceHistoryCount = 0;
         _pendingPowerChangeAttempts.Clear();
+        _pendingUnsettlingLampDebuffs.Clear();
         _pendingPlayerBlockClearAmount = 0;
         _pendingPlayerBlockClearArmed = false;
         // Ported windows (Orichalcum, Anchor, Abacus, BoneFlute, CloakClasp,
@@ -1531,6 +1533,7 @@ public static class RunTracker
         target.EnemiesAffected += source.EnemiesAffected;
         target.VulnerableApplied += source.VulnerableApplied;
         target.WeakApplied += source.WeakApplied;
+        MergeAppliedEffectsInto(target.AppliedEffects, source.AppliedEffects);
         target.AdditionalCardsDrawn += source.AdditionalCardsDrawn;
         target.AdditionalBlockGained += source.AdditionalBlockGained;
         target.BlockedTriggers += source.BlockedTriggers;
@@ -2189,6 +2192,7 @@ public static class RunTracker
 
     private const string BagOfMarblesRelicId = "RELIC.BAG_OF_MARBLES";
     private const string RedMaskRelicId = "RELIC.RED_MASK";
+    private const string UnsettlingLampRelicId = "RELIC.UNSETTLING_LAMP";
     private const string PocketwatchRelicId = "RELIC.POCKETWATCH";
     private const string OrichalcumRelicId = "RELIC.ORICHALCUM";
     private const string PermafrostRelicId = "RELIC.PERMAFROST";
@@ -2313,6 +2317,44 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordRedMaskApplication failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordUnsettlingLampDebuffMultiplier(
+        RelicModel relic,
+        PowerModel power,
+        Creature giver,
+        decimal amountBeforeMultiplier,
+        Creature? target,
+        CardModel? cardSource,
+        decimal multiplier)
+    {
+        if (relic == null || power == null || giver == null || target == null) return;
+        if (amountBeforeMultiplier <= 0m || multiplier <= 1m) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic)) return;
+                if (!IsTrackedPlayer(relic.Owner)) return;
+                if (target.IsPlayer) return;
+                if (power.GetTypeForAmount(amountBeforeMultiplier) != PowerType.Debuff) return;
+
+                _pendingCombat ??= new PendingCombat();
+                _pendingUnsettlingLampDebuffs.Add(new PendingUnsettlingLampDebuff
+                {
+                    Power = power,
+                    Target = target,
+                    Applier = giver,
+                    CardSource = cardSource != null ? Canonical(cardSource) : null,
+                    ExtraAmount = amountBeforeMultiplier * (multiplier - 1m),
+                });
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordUnsettlingLampDebuffMultiplier failed: {e.Message}");
             }
         }
     }
@@ -4888,6 +4930,23 @@ public static class RunTracker
         agg.NutritiousSoupEnchantedStrikesPlayed += count;
     }
 
+    internal static void RecordUnsettlingLampCombatForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.Activations += Math.Max(0, count);
+    }
+
+    internal static void RecordUnsettlingLampDebuffForTest(
+        RelicAggregate agg,
+        string effectId,
+        string displayName,
+        decimal amount,
+        string? iconPath = null)
+    {
+        if (agg == null || string.IsNullOrWhiteSpace(effectId) || amount <= 0m) return;
+        RecordUnsettlingLampDebuffApplied(agg, effectId, displayName, iconPath, amount);
+    }
+
     internal static void SetStrikeDummyDeckCountsForTest(
         RelicAggregate agg,
         int baseStrikesInDeck,
@@ -6976,6 +7035,18 @@ public static class RunTracker
         }
     }
 
+    private static bool PlayerHasUnsettlingLamp(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is UnsettlingLamp);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static bool PlayerHasMiniatureCannon(Player player)
     {
         try
@@ -7032,6 +7103,7 @@ public static class RunTracker
             RecordNunchakuCombatForPlayerLocked(player);
             RecordBrilliantScarfCombatForPlayerLocked(player);
             RecordNutritiousSoupCombatForPlayerLocked(player);
+            RecordUnsettlingLampCombatForPlayerLocked(player);
             RecordMiniatureCannonCombatForPlayerLocked(player);
             RecordBookmarkCombatForPlayerLocked(player);
             RecordPaelsEyeCombatForPlayerLocked(player);
@@ -7074,6 +7146,16 @@ public static class RunTracker
         if (!_pendingCombat.NutritiousSoupCombatCountedPlayers.Add(player)) return;
 
         var agg = GetOrCreatePendingRelicAggregateLocked(NutritiousSoupRelicId);
+        agg.Activations += 1;
+    }
+
+    private static void RecordUnsettlingLampCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasUnsettlingLamp(player)) return;
+        if (!_pendingCombat.UnsettlingLampCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(UnsettlingLampRelicId);
         agg.Activations += 1;
     }
 
@@ -8756,6 +8838,83 @@ public static class RunTracker
         effect.TotalAmountBlockedByArtifact += amount;
     }
 
+    private static void RecordUnsettlingLampPowerReceivedLocked(
+        PowerModel power,
+        Creature target,
+        Creature? applier,
+        decimal receivedAmount)
+    {
+        if (_pendingCombat == null || receivedAmount <= 0m) return;
+
+        var pending = TakePendingUnsettlingLampDebuff(power, target, applier);
+        if (pending == null) return;
+
+        var amount = Math.Min(pending.ExtraAmount, receivedAmount);
+        if (amount <= 0m) return;
+
+        var agg = GetOrCreateRelicAggregateLocked(UnsettlingLampRelicId);
+        RecordUnsettlingLampDebuffApplied(agg, power, amount);
+    }
+
+    private static PendingUnsettlingLampDebuff? TakePendingUnsettlingLampDebuff(
+        PowerModel power,
+        Creature target,
+        Creature? applier)
+    {
+        for (var i = _pendingUnsettlingLampDebuffs.Count - 1; i >= 0; i--)
+        {
+            var pending = _pendingUnsettlingLampDebuffs[i];
+            if (!IsSamePower(pending.Power, power)) continue;
+            if (!ReferenceEquals(pending.Target, target)) continue;
+            if (!ReferenceEquals(pending.Applier, applier)) continue;
+
+            _pendingUnsettlingLampDebuffs.RemoveAt(i);
+            return pending;
+        }
+
+        for (var i = _pendingUnsettlingLampDebuffs.Count - 1; i >= 0; i--)
+        {
+            var pending = _pendingUnsettlingLampDebuffs[i];
+            if (!IsSamePower(pending.Power, power)) continue;
+            if (!ReferenceEquals(pending.Target, target)) continue;
+
+            _pendingUnsettlingLampDebuffs.RemoveAt(i);
+            return pending;
+        }
+
+        return null;
+    }
+
+    private static void RecordUnsettlingLampDebuffApplied(RelicAggregate agg, PowerModel power, decimal amount)
+    {
+        RecordUnsettlingLampDebuffApplied(
+            agg,
+            power.Id.ToString(),
+            GetPowerDisplayName(power),
+            GetPowerIconPath(power),
+            amount);
+    }
+
+    private static void RecordUnsettlingLampDebuffApplied(
+        RelicAggregate agg,
+        string effectId,
+        string displayName,
+        string? iconPath,
+        decimal amount)
+    {
+        if (agg == null || amount <= 0m) return;
+
+        var effect = GetOrCreateAppliedEffect(agg, effectId, displayName, iconPath);
+        effect.TimesApplied++;
+        effect.TotalAmountApplied += amount;
+
+        var roundedAmount = (int)Math.Round(amount, MidpointRounding.AwayFromZero);
+        if (IsVulnerableEffect(effectId, displayName))
+            agg.VulnerableApplied += roundedAmount;
+        else if (IsWeakEffect(effectId, displayName))
+            agg.WeakApplied += roundedAmount;
+    }
+
     private static void RecordPoisonApplicationLocked(Creature target, string instanceId, PowerModel power, decimal amount)
     {
         if (target.IsPlayer || amount <= 0m) return;
@@ -9149,6 +9308,9 @@ public static class RunTracker
             try
             {
                 var target = TryResolvePowerReceivedTarget(entry);
+                if (target != null && entry.Amount > 0m)
+                    RecordUnsettlingLampPowerReceivedLocked(entry.Power, target, entry.Applier, entry.Amount);
+
                 var causingPlay = FindCurrentlyResolvingCardPlay();
                 if (causingPlay?.Card == null)
                 {
@@ -10121,6 +10283,12 @@ public static class RunTracker
         return GetOrCreateAppliedEffect(agg, effectId, GetPowerDisplayName(power), GetPowerIconPath(power));
     }
 
+    private static AppliedEffectAggregate GetOrCreateAppliedEffect(RelicAggregate agg, PowerModel power)
+    {
+        var effectId = power.Id.ToString();
+        return GetOrCreateAppliedEffect(agg, effectId, GetPowerDisplayName(power), GetPowerIconPath(power));
+    }
+
     private static AppliedEffectAggregate GetOrCreateAppliedEffect(
         CardAggregate agg,
         string effectId,
@@ -10145,6 +10313,50 @@ public static class RunTracker
                 effect.IconPath = iconPath;
         }
         return effect;
+    }
+
+    private static AppliedEffectAggregate GetOrCreateAppliedEffect(
+        RelicAggregate agg,
+        string effectId,
+        string displayName,
+        string? iconPath)
+    {
+        if (!agg.AppliedEffects.TryGetValue(effectId, out var effect))
+        {
+            effect = new AppliedEffectAggregate
+            {
+                EffectId = effectId,
+                DisplayName = displayName,
+                IconPath = iconPath,
+            };
+            agg.AppliedEffects[effectId] = effect;
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(effect.DisplayName) && !string.IsNullOrWhiteSpace(displayName))
+                effect.DisplayName = displayName;
+            if (string.IsNullOrWhiteSpace(effect.IconPath) && !string.IsNullOrWhiteSpace(iconPath))
+                effect.IconPath = iconPath;
+        }
+        return effect;
+    }
+
+    private static bool IsSamePower(PowerModel left, PowerModel right)
+    {
+        return ReferenceEquals(left, right)
+            || string.Equals(left.Id.ToString(), right.Id.ToString(), StringComparison.Ordinal);
+    }
+
+    internal static bool IsVulnerableEffect(string effectId, string? displayName)
+    {
+        return effectId.Contains("VULNERABLE", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(displayName, "Vulnerable", StringComparison.OrdinalIgnoreCase);
+    }
+
+    internal static bool IsWeakEffect(string effectId, string? displayName)
+    {
+        return effectId.Contains("WEAK", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(displayName, "Weak", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string GetPowerDisplayName(PowerModel power)
@@ -10420,6 +10632,8 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> NutritiousSoupCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> UnsettlingLampCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> MiniatureCannonCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> BookmarkCombatCountedPlayers { get; }
@@ -10474,6 +10688,15 @@ internal sealed class PendingPowerChangeAttempt
     public Creature? Applier { get; init; }
     public required decimal RequestedAmount { get; init; }
     public CardModel? CardSource { get; init; }
+}
+
+internal sealed class PendingUnsettlingLampDebuff
+{
+    public required PowerModel Power { get; init; }
+    public required Creature Target { get; init; }
+    public required Creature Applier { get; init; }
+    public CardModel? CardSource { get; init; }
+    public required decimal ExtraAmount { get; init; }
 }
 
 internal sealed class PendingDrawAttempt
