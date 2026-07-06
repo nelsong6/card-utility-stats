@@ -92,6 +92,8 @@ public class VambraceStatsTests
         });
 
         Assert.Contains("Activations", body);
+        Assert.Contains("Used this combat", body);
+        Assert.Contains("[b]false[/b]", body);
         Assert.Contains("[img=16x16]res://images/ui/combat/block.png[/img] extra block gained", body);
         Assert.Contains("[img=16x16]res://images/ui/combat/block.png[/img] extra block per activation", body);
         Assert.Contains("[b]2[/b]", body);
@@ -105,12 +107,23 @@ public class VambraceStatsTests
         var body = BuildBody(new RelicAggregate());
 
         Assert.Contains("Activations", body);
+        Assert.Contains("Used this combat", body);
+        Assert.Contains("[b]false[/b]", body);
         Assert.Contains("extra block gained", body);
         Assert.Contains("extra block per activation", body);
         Assert.Contains("[b]0[/b]", body);
     }
 
-    private static string BuildBody(RelicAggregate agg)
-        => (string)(BuildVambraceBodyMethod.Invoke(null, new object?[] { agg })
+    [Fact]
+    public void RelicTooltip_Vambrace_CanShowUsedThisCombatTrue()
+    {
+        var body = BuildBody(new RelicAggregate(), usedThisCombat: true);
+
+        Assert.Contains("Used this combat", body);
+        Assert.Contains("[b]true[/b]", body);
+    }
+
+    private static string BuildBody(RelicAggregate agg, bool usedThisCombat = false)
+        => (string)(BuildVambraceBodyMethod.Invoke(null, new object?[] { agg, usedThisCombat })
             ?? throw new InvalidOperationException("BuildVambraceBodyBBCode returned null."));
 }

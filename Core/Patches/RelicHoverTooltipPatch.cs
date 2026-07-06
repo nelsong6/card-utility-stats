@@ -28,6 +28,8 @@ public static class RelicHoverShowPatch
     private const string VigorIconPath = "res://images/atlases/power_atlas.sprites/vigor_power.tres";
     private const int InlineIconSize = 16;
     private const int MaxTableLabelVisibleChars = 28;
+    private static readonly System.Reflection.FieldInfo? VambraceBlockGainedThisCombatField =
+        AccessTools.Field(typeof(Vambrace), "_blockGainedThisCombat");
 
     [HarmonyPostfix]
     public static void Postfix(NRelicInventoryHolder __instance)
@@ -103,12 +105,12 @@ public static class RelicHoverShowPatch
                 return;
             }
 
-            if (relicNode.Model is Vambrace)
+            if (relicNode.Model is Vambrace vambrace)
             {
                 const string relicId = "RELIC.VAMBRACE";
                 var agg = RelicAgg(relicId);
 
-                var body = BuildVambraceBodyBBCode(agg);
+                var body = BuildVambraceBodyBBCode(agg, IsVambraceUsedThisCombat(vambrace));
                 StatsTooltip.Show(tree, __instance, "Vambrace", "SpireLens", body);
                 return;
             }
@@ -766,10 +768,10 @@ public static class RelicHoverShowPatch
             return true;
         }
 
-        if (relicModel is Vambrace)
+        if (relicModel is Vambrace vambrace)
         {
             title = "Vambrace";
-            body = BuildVambraceBodyBBCode(agg);
+            body = BuildVambraceBodyBBCode(agg, IsVambraceUsedThisCombat(vambrace));
             return true;
         }
 
@@ -1196,13 +1198,14 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
-    private static string BuildVambraceBodyBBCode(RelicAggregate agg)
+    private static string BuildVambraceBodyBBCode(RelicAggregate agg, bool usedThisCombat = false)
     {
         var sb = new StringBuilder();
         var blockPerActivation = agg.Activations <= 0
             ? 0m
             : (decimal)agg.AdditionalBlockGained / agg.Activations;
         Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, "Used this combat", usedThisCombat ? "true" : "false", "");
         Row3(sb, BlockLabel("extra block gained"), agg.AdditionalBlockGained.ToString(), "");
         Row3(sb, BlockLabel("extra block per activation"), FormatDecimal(blockPerActivation), "");
         return sb.ToString();
@@ -1947,6 +1950,18 @@ public static class RelicHoverShowPatch
         }
 
         return false;
+    }
+
+    private static bool IsVambraceUsedThisCombat(Vambrace relic)
+    {
+        try
+        {
+            return VambraceBlockGainedThisCombatField?.GetValue(relic) is bool used && used;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static bool IsAnchorStatsRelicModel(object model)
