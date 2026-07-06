@@ -108,6 +108,10 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `candelabra-relic-run.json`
   Adds Candelabra activation tracking, observed energy generated, and count of
   second player turns that ended with excess energy while it was held.
+- `nunchaku-relic-run.json`
+  Adds Nunchaku tracking: attacks played, observed energy gained, completed
+  combats held for averages, combat-end 8/9 charge counts, and combat-end
+  charge total for average charge.
 - `paels-wing-sacrifice-relic-run.json`
   Adds Pael's Wing sacrifice tracking: consumed card reward options split by
   common, uncommon, and rare, plus sacrifices made and skipped.

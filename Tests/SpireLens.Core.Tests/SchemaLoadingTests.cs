@@ -764,6 +764,37 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsNunchakuRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("nunchaku-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.NUNCHAKU"];
+        Assert.Equal(18, relicAgg.NunchakuAttacksPlayed);
+        Assert.Equal(3, relicAgg.EnergyGenerated);
+        Assert.Equal(4, relicAgg.EnergyGeneratedCombats);
+        Assert.Equal(2, relicAgg.NunchakuCombatsEndedOn8Charges);
+        Assert.Equal(1, relicAgg.NunchakuCombatsEndedOn9Charges);
+        Assert.Equal(34, relicAgg.NunchakuCombatEndChargeTotal);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsNunchakuRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("nunchaku-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.NUNCHAKU"];
+        Assert.Equal(18, relicAgg.NunchakuAttacksPlayed);
+        Assert.Equal(3, relicAgg.EnergyGenerated);
+        Assert.Equal(4, relicAgg.EnergyGeneratedCombats);
+        Assert.Equal(2, relicAgg.NunchakuCombatsEndedOn8Charges);
+        Assert.Equal(1, relicAgg.NunchakuCombatsEndedOn9Charges);
+        Assert.Equal(34, relicAgg.NunchakuCombatEndChargeTotal);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsV20CloakClaspFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("v20-cloak-clasp-run.json"));

@@ -1460,6 +1460,7 @@ public static class RunTracker
         if (_pendingCombat == null || _currentRun == null) return;
         RecordHeldCombatRelicBaselinesForTrackedPlayerLocked(requireActiveCombat: false, createPendingIfNeeded: false);
         RecordPaelsEyeCombatsWithoutActivationForTrackedPlayerLocked();
+        RecordNunchakuCombatEndChargeForTrackedPlayerLocked();
 
         // Surviving player block at combat end never absorbed future
         // damage, so treat any remaining ledger as wasted before
@@ -1590,6 +1591,11 @@ public static class RunTracker
         target.BookmarkCommonActivations += source.BookmarkCommonActivations;
         target.BookmarkUncommonActivations += source.BookmarkUncommonActivations;
         target.BookmarkRareActivations += source.BookmarkRareActivations;
+
+        target.NunchakuAttacksPlayed += source.NunchakuAttacksPlayed;
+        target.NunchakuCombatsEndedOn8Charges += source.NunchakuCombatsEndedOn8Charges;
+        target.NunchakuCombatsEndedOn9Charges += source.NunchakuCombatsEndedOn9Charges;
+        target.NunchakuCombatEndChargeTotal += source.NunchakuCombatEndChargeTotal;
 
         target.DiscountCombats += source.DiscountCombats;
         target.DiscountsOffered += source.DiscountsOffered;
@@ -2186,6 +2192,7 @@ public static class RunTracker
     private const string HappyFlowerRelicId = "RELIC.HAPPY_FLOWER";
     private const string BoomingConchRelicId = "RELIC.BOOMING_CONCH";
     private const string GremlinHornRelicId = "RELIC.GREMLIN_HORN";
+    private const string NunchakuRelicId = "RELIC.NUNCHAKU";
     private const string CandelabraRelicId = "RELIC.CANDELABRA";
     private const string PendulumRelicId = "RELIC.PENDULUM";
     private const string ParryingShieldRelicId = "RELIC.PARRYING_SHIELD";
@@ -5112,6 +5119,66 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Record a Nunchaku-owned attack play and arm energy attribution if the
+    /// relic's live counter is one attack away from its energy trigger.
+    /// </summary>
+    public static void RecordNunchakuAttackPlayedAndArmEnergyAttribution(Nunchaku relic, CardPlay cardPlay)
+    {
+        if (relic?.Owner == null || cardPlay?.Card == null) return;
+        if (cardPlay.Card.Type != CardType.Attack) return;
+
+        var owner = relic.Owner;
+        if (cardPlay.Card.Owner != null && !ReferenceEquals(cardPlay.Card.Owner, owner)) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic)) return;
+                if (!IsTrackedPlayer(owner)) return;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordNunchakuCombatForPlayerLocked(owner);
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(NunchakuRelicId);
+                RecordNunchakuAttackPlayedForTest(agg);
+
+                if (relic.AttacksPlayed >= 9)
+                {
+                    _pendingCombat.Windows.Arm(
+                        NunchakuRelicId,
+                        AttributionEventKind.PlayerEnergyGain,
+                        CurrentHistoryCountLocked(),
+                        ownerId: owner,
+                        maxHistoryAdvance: 0);
+                }
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordNunchakuAttackPlayedAndArmEnergyAttribution failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordNunchakuAttackPlayedForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.NunchakuAttacksPlayed += Math.Max(0, count);
+    }
+
+    internal static void RecordNunchakuCombatEndChargeForTest(RelicAggregate agg, int charge)
+    {
+        if (agg == null) return;
+
+        charge = Math.Max(0, charge);
+        agg.NunchakuCombatEndChargeTotal += charge;
+        if (charge == 8)
+            agg.NunchakuCombatsEndedOn8Charges += 1;
+        else if (charge == 9)
+            agg.NunchakuCombatsEndedOn9Charges += 1;
+    }
+
+    /// <summary>
     /// Record Candelabra's owner-specific turn-2 activation and arm observed
     /// energy attribution for its immediate gain.
     /// </summary>
@@ -5318,7 +5385,9 @@ public static class RunTracker
                 if (key != null)
                 {
                     var agg = GetOrCreateRelicAggregateLocked(key);
-                    agg.EnergyGenerated += amount; // GremlinHorn/HappyFlower/BoomingConch all use EnergyGenerated
+                    // Relic energy windows all use EnergyGenerated; the window
+                    // key identifies the specific relic aggregate.
+                    agg.EnergyGenerated += amount;
                     return;
                 }
                 // No relic window: credit the resolving card play as before.
@@ -6852,6 +6921,7 @@ public static class RunTracker
             if (player == null) return;
 
             RecordHappyFlowerCombatForPlayerLocked(player);
+            RecordNunchakuCombatForPlayerLocked(player);
             RecordBrilliantScarfCombatForPlayerLocked(player);
             RecordMiniatureCannonCombatForPlayerLocked(player);
             RecordBookmarkCombatForPlayerLocked(player);
@@ -6910,6 +6980,55 @@ public static class RunTracker
 
         var agg = GetOrCreatePendingRelicAggregateLocked(HappyFlowerRelicId);
         agg.EnergyGeneratedCombats += 1;
+    }
+
+    private static void RecordNunchakuCombatForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordNunchakuCombatForPlayerLocked(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordNunchakuCombatForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordNunchakuCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasNunchaku(player)) return;
+        if (!_pendingCombat.NunchakuCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(NunchakuRelicId);
+        agg.EnergyGeneratedCombats += 1;
+    }
+
+    private static void RecordNunchakuCombatEndChargeForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordNunchakuCombatEndChargeForPlayerLocked(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordNunchakuCombatEndChargeForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordNunchakuCombatEndChargeForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!TryGetNunchaku(player, out var nunchaku) || nunchaku == null) return;
+        if (!_pendingCombat.NunchakuCombatEndChargeRecordedPlayers.Add(player)) return;
+
+        RecordNunchakuCombatForPlayerLocked(player);
+        var agg = GetOrCreatePendingRelicAggregateLocked(NunchakuRelicId);
+        RecordNunchakuCombatEndChargeForTest(agg, nunchaku.AttacksPlayed);
     }
 
     private static void RecordBookmarkCombatForTrackedPlayerLocked()
@@ -7037,6 +7156,27 @@ public static class RunTracker
         }
         catch
         {
+            return false;
+        }
+    }
+
+    private static bool PlayerHasNunchaku(Player player)
+    {
+        return TryGetNunchaku(player, out _);
+    }
+
+    private static bool TryGetNunchaku(Player player, out Nunchaku? nunchaku)
+    {
+        nunchaku = null;
+
+        try
+        {
+            nunchaku = player?.Relics?.OfType<Nunchaku>().FirstOrDefault();
+            return nunchaku != null;
+        }
+        catch
+        {
+            nunchaku = null;
             return false;
         }
     }
@@ -10136,6 +10276,10 @@ internal class PendingCombat
     public Dictionary<Player, PendingBrilliantScarfDiscount> BrilliantScarfDiscountOffers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> HappyFlowerCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> NunchakuCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> NunchakuCombatEndChargeRecordedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> BrilliantScarfCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

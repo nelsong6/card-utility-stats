@@ -206,6 +206,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is Nunchaku)
+            {
+                const string relicId = "RELIC.NUNCHAKU";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildNunchakuBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Nunchaku", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is Candelabra)
             {
                 const string relicId = "RELIC.CANDELABRA";
@@ -881,6 +891,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is Nunchaku)
+        {
+            title = "Nunchaku";
+            body = BuildNunchakuBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is Candelabra)
         {
             title = "Candelabra";
@@ -1363,6 +1380,30 @@ public static class RelicHoverShowPatch
             averageLabel: "Avg energy generated per combat",
             combatCount: agg.EnergyGeneratedCombats,
             includeCombatsHeld: true);
+        return sb.ToString();
+    }
+
+    private static string BuildNunchakuBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var combats = agg.EnergyGeneratedCombats;
+        var averageAttacks = combats <= 0
+            ? 0m
+            : (decimal)agg.NunchakuAttacksPlayed / combats;
+        var averageEnergy = combats <= 0
+            ? 0m
+            : (decimal)agg.EnergyGenerated / combats;
+        var averageEndCharge = combats <= 0
+            ? 0m
+            : (decimal)agg.NunchakuCombatEndChargeTotal / combats;
+
+        Row3(sb, "Attacks played", agg.NunchakuAttacksPlayed.ToString(), "");
+        Row3(sb, "Avg attacks played per combat", FormatDecimal(averageAttacks), "");
+        Row3(sb, EnergyLabel("Energy gained total"), agg.EnergyGenerated.ToString(), "");
+        Row3(sb, EnergyLabel("Avg energy gained per combat"), FormatDecimal(averageEnergy), "");
+        Row3(sb, "Combats ended on 8 charges", agg.NunchakuCombatsEndedOn8Charges.ToString(), "");
+        Row3(sb, "Combats ended on 9 charges", agg.NunchakuCombatsEndedOn9Charges.ToString(), "");
+        Row3(sb, "Avg charge at combat end", FormatDecimal(averageEndCharge), "");
         return sb.ToString();
     }
 

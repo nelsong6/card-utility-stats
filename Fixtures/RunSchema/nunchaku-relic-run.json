@@ -1,0 +1,21 @@
+{
+  "run_id": "nunchaku-relic-fixture",
+  "started_at": "2026-07-06T03:00:00Z",
+  "updated_at": "2026-07-06T03:05:00Z",
+  "outcome": "in_progress",
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.NUNCHAKU": {
+      "nunchaku_attacks_played": 18,
+      "energy_generated": 3,
+      "energy_generated_combats": 4,
+      "nunchaku_combats_ended_on8_charges": 2,
+      "nunchaku_combats_ended_on9_charges": 1,
+      "nunchaku_combat_end_charge_total": 34
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

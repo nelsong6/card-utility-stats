@@ -452,10 +452,12 @@ public class RelicAggregate
     // (gains after enemy death), Booming Conch (gains at Elite combat start),
     // Candelabra (gains energy at the start of turn 2), Prismatic Gem, and
     // Blood-Soaked Rose (max-energy relics counted once per player energy reset).
+    // Also used by Nunchaku, whose gained energy is attributed from the
+    // observed PlayerCombatState.GainEnergy delta.
     public int EnergyGenerated { get; set; }
 
     // Combats held for relics whose energy-generation tooltip reports a
-    // per-combat average. Used by Happy Flower.
+    // per-combat average. Used by Happy Flower and Nunchaku.
     public int EnergyGeneratedCombats { get; set; }
 
     // Total second player turns that ended with unspent energy while
@@ -540,6 +542,13 @@ public class RelicAggregate
     public int BookmarkCommonActivations { get; set; }
     public int BookmarkUncommonActivations { get; set; }
     public int BookmarkRareActivations { get; set; }
+
+    // Nunchaku tracking. Attacks and energy are cumulative while held; combat
+    // end charge stats snapshot the relic's in-game counter at promotion time.
+    public int NunchakuAttacksPlayed { get; set; }
+    public int NunchakuCombatsEndedOn8Charges { get; set; }
+    public int NunchakuCombatsEndedOn9Charges { get; set; }
+    public int NunchakuCombatEndChargeTotal { get; set; }
 
     // Cost-discount tracking. Used by Brilliant Scarf.
     public int DiscountCombats { get; set; }
