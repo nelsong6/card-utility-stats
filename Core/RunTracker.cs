@@ -7031,6 +7031,7 @@ public static class RunTracker
             RecordHappyFlowerCombatForPlayerLocked(player);
             RecordNunchakuCombatForPlayerLocked(player);
             RecordBrilliantScarfCombatForPlayerLocked(player);
+            RecordNutritiousSoupCombatForPlayerLocked(player);
             RecordMiniatureCannonCombatForPlayerLocked(player);
             RecordBookmarkCombatForPlayerLocked(player);
             RecordPaelsEyeCombatForPlayerLocked(player);
@@ -7064,6 +7065,16 @@ public static class RunTracker
         var agg = GetOrCreatePendingRelicAggregateLocked(MiniatureCannonRelicId);
         agg.Activations += 1;
         RefreshMiniatureCannonDeckCountsIfOwnedLocked();
+    }
+
+    private static void RecordNutritiousSoupCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasNutritiousSoup(player)) return;
+        if (!_pendingCombat.NutritiousSoupCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(NutritiousSoupRelicId);
+        agg.Activations += 1;
     }
 
     private static void RecordHappyFlowerCombatForTrackedPlayerLocked()
@@ -10406,6 +10417,8 @@ internal class PendingCombat
     public HashSet<Player> NunchakuCombatEndChargeRecordedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> BrilliantScarfCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> NutritiousSoupCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> MiniatureCannonCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

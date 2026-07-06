@@ -12,6 +12,7 @@
   "events": [],
   "relic_aggregates": {
     "RELIC.NUTRITIOUS_SOUP": {
+      "activations": 2,
       "nutritious_soup_enchanted_strikes_played": 4
     }
   },

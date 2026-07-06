@@ -1275,6 +1275,7 @@ public class SchemaLoadingTests
         Assert.NotNull(loaded);
         Assert.True(loaded!.SupportsResume);
         var relicAgg = loaded.Data.RelicAggregates["RELIC.NUTRITIOUS_SOUP"];
+        Assert.Equal(2, relicAgg.Activations);
         Assert.Equal(4, relicAgg.NutritiousSoupEnchantedStrikesPlayed);
     }
 
@@ -1285,6 +1286,7 @@ public class SchemaLoadingTests
 
         Assert.NotNull(resumed);
         var relicAgg = resumed!.RelicAggregates["RELIC.NUTRITIOUS_SOUP"];
+        Assert.Equal(2, relicAgg.Activations);
         Assert.Equal(4, relicAgg.NutritiousSoupEnchantedStrikesPlayed);
     }
 

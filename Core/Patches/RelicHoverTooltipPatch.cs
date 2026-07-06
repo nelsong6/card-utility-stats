@@ -1877,7 +1877,13 @@ public static class RelicHoverShowPatch
     private static string BuildNutritiousSoupBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
+        var averagePlays = agg.Activations <= 0
+            ? 0m
+            : (decimal)agg.NutritiousSoupEnchantedStrikesPlayed / agg.Activations;
+
+        Row3(sb, "Combats held", agg.Activations.ToString(), "");
         Row3(sb, "Enchanted Strikes played", agg.NutritiousSoupEnchantedStrikesPlayed.ToString(), "");
+        Row3(sb, "Avg Enchanted Strikes/combat", FormatDecimal(averagePlays), "");
         return sb.ToString();
     }
 

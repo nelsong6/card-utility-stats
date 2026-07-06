@@ -36,17 +36,20 @@ public class NutritiousSoupStatsTests
         var run = new RunData();
         run.RelicAggregates[NutritiousSoupRelicId] = new RelicAggregate
         {
+            Activations = 2,
             NutritiousSoupEnchantedStrikesPlayed = 7,
         };
 
         var json = JsonSerializer.Serialize(run, SerializerOptions);
 
+        Assert.Contains("activations", json);
         Assert.Contains("nutritious_soup_enchanted_strikes_played", json);
 
         var restored = JsonSerializer.Deserialize<RunData>(json, SerializerOptions);
 
         Assert.NotNull(restored);
         var restoredAgg = restored!.RelicAggregates[NutritiousSoupRelicId];
+        Assert.Equal(2, restoredAgg.Activations);
         Assert.Equal(7, restoredAgg.NutritiousSoupEnchantedStrikesPlayed);
     }
 
@@ -67,16 +70,23 @@ public class NutritiousSoupStatsTests
     {
         var emptyBody = BuildBody(new RelicAggregate());
 
+        Assert.Contains("Combats held", emptyBody);
         Assert.Contains("Enchanted Strikes played", emptyBody);
+        Assert.Contains("Avg Enchanted Strikes/combat", emptyBody);
         Assert.Contains("[b]0[/b]", emptyBody);
 
         var body = BuildBody(new RelicAggregate
         {
+            Activations = 2,
             NutritiousSoupEnchantedStrikesPlayed = 5,
         });
 
+        Assert.Contains("Combats held", body);
         Assert.Contains("Enchanted Strikes played", body);
+        Assert.Contains("Avg Enchanted Strikes/combat", body);
+        Assert.Contains("[b]2[/b]", body);
         Assert.Contains("[b]5[/b]", body);
+        Assert.Contains("[b]2.5[/b]", body);
     }
 
     private static string BuildBody(RelicAggregate agg)

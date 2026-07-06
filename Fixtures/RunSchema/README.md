@@ -123,8 +123,9 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds Strike Dummy tracked Strike-card plays since pickup plus current
   permanent-deck counts for base Strikes and non-base Strike-tagged cards.
 - `nutritious-soup-relic-run.json`
-  Adds Nutritious Soup tracking for finished plays of basic Strike-tagged
-  cards carrying the Tezcataras Ember enchantment while the relic was held.
+  Adds Nutritious Soup tracking for combats held plus finished plays of basic
+  Strike-tagged cards carrying the Tezcataras Ember enchantment while the relic
+  was held.
 - `brilliant-scarf-relic-run.json`
   Adds Brilliant Scarf discount tracking: energy-discount offers, taken
   discounts, energy saved by those taken discounts, held combats, and
