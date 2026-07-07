@@ -74,6 +74,19 @@ public class UnmovableStatsTests
 
     [Trait("Category", "RequiresLiveGame")]
     [Fact]
+    public void Tooltip_UnmovablePowerStats_ShowsZeroOnUnmovable()
+    {
+        var sb = new StringBuilder();
+
+        _ = AppendUnmovablePowerStatsMethod.Invoke(null, new object?[] { sb, new Unmovable(), new RunMetaStats() });
+        var body = sb.ToString();
+
+        Assert.Contains("Extra block gained from unmovable's power", body);
+        Assert.Contains("[b]0[/b]", body);
+    }
+
+    [Trait("Category", "RequiresLiveGame")]
+    [Fact]
     public void Tooltip_UnmovablePowerStats_DoesNotShowOnOtherCards()
     {
         var sb = new StringBuilder();

@@ -645,7 +645,6 @@ public static class CardHoverShowPatch
         RunMetaStats metaStats)
     {
         metaStats ??= new RunMetaStats();
-        if (metaStats.ExtraBlockGainedFromUnmovablePower <= 0m) return;
         if (card is not Unmovable && !IsCardId(card, "CARD.UNMOVABLE")) return;
 
         Row3(
