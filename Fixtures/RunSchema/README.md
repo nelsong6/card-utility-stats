@@ -147,6 +147,10 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `vajra-relic-run.json`
   Adds Vajra tracking for attack cards played while held plus actual enemy
   damage hits from those attacks, with multi-hit attacks counted per hit.
+- `paper-phrog-relic-run.json`
+  Adds Paper Phrog tracking for bonus damage added by its Vulnerable multiplier,
+  vulnerable-enhanced attack counts, and held combat/turn denominators for
+  average rows.
 - `brilliant-scarf-relic-run.json`
   Adds Brilliant Scarf discount tracking: energy-discount offers, taken
   discounts, energy saved by those taken discounts, held combats, and

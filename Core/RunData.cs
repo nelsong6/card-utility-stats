@@ -574,6 +574,14 @@ public class RelicAggregate
     public int VajraAttacksPlayed { get; set; }
     public int VajraAttackHits { get; set; }
 
+    // Paper Phrog tracking. Damage added is the actual current damage amount
+    // multiplied by Paper Phrog's extra Vulnerable multiplier. Enhanced attacks
+    // count each real damage activation where the relic increased Vulnerable.
+    public decimal PaperPhrogDamageAdded { get; set; }
+    public int PaperPhrogEnhancedAttacks { get; set; }
+    public int PaperPhrogCombats { get; set; }
+    public int PaperPhrogTurns { get; set; }
+
     // Bookmark tracking. Activations is total cost-reduction activations;
     // BookmarkCombats is the denominator for average activations per combat.
     public int BookmarkCombats { get; set; }

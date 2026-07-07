@@ -1017,6 +1017,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is PaperPhrog)
+        {
+            title = "Paper Phrog";
+            body = BuildPaperPhrogBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is Lantern)
         {
             title = "Lantern";
@@ -2302,6 +2309,31 @@ public static class RelicHoverShowPatch
         var sb = new StringBuilder();
         Row3(sb, "Attacks played", agg.VajraAttacksPlayed.ToString(), "");
         Row3(sb, "Attack hits", agg.VajraAttackHits.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildPaperPhrogBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var averageDamagePerCombat = agg.PaperPhrogCombats <= 0
+            ? 0m
+            : agg.PaperPhrogDamageAdded / agg.PaperPhrogCombats;
+        var averageDamagePerTurn = agg.PaperPhrogTurns <= 0
+            ? 0m
+            : agg.PaperPhrogDamageAdded / agg.PaperPhrogTurns;
+        var averageAttacksPerCombat = agg.PaperPhrogCombats <= 0
+            ? 0m
+            : (decimal)agg.PaperPhrogEnhancedAttacks / agg.PaperPhrogCombats;
+        var averageAttacksPerTurn = agg.PaperPhrogTurns <= 0
+            ? 0m
+            : (decimal)agg.PaperPhrogEnhancedAttacks / agg.PaperPhrogTurns;
+
+        Row3(sb, "Damage added", FormatDecimal(agg.PaperPhrogDamageAdded), "");
+        Row3(sb, "Avg damage added per combat", FormatDecimal(averageDamagePerCombat), "");
+        Row3(sb, "Avg damage added per turn", FormatDecimal(averageDamagePerTurn), "");
+        Row3(sb, "Vulnerable-enhanced attacks", agg.PaperPhrogEnhancedAttacks.ToString(), "");
+        Row3(sb, "Avg enhanced attacks per combat", FormatDecimal(averageAttacksPerCombat), "");
+        Row3(sb, "Avg enhanced attacks per turn", FormatDecimal(averageAttacksPerTurn), "");
         return sb.ToString();
     }
 

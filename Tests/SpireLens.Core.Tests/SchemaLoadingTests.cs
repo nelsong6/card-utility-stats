@@ -2176,6 +2176,33 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsPaperPhrogRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("paper-phrog-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.PAPER_PHROG"];
+        Assert.Equal(18.75m, relicAgg.PaperPhrogDamageAdded);
+        Assert.Equal(6, relicAgg.PaperPhrogEnhancedAttacks);
+        Assert.Equal(3, relicAgg.PaperPhrogCombats);
+        Assert.Equal(5, relicAgg.PaperPhrogTurns);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsPaperPhrogRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("paper-phrog-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.PAPER_PHROG"];
+        Assert.Equal(18.75m, relicAgg.PaperPhrogDamageAdded);
+        Assert.Equal(6, relicAgg.PaperPhrogEnhancedAttacks);
+        Assert.Equal(3, relicAgg.PaperPhrogCombats);
+        Assert.Equal(5, relicAgg.PaperPhrogTurns);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsBookmarkRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("bookmark-relic-run.json"));

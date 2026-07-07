@@ -1,0 +1,37 @@
+{
+  "run_id": "paper-phrog-relic-fixture",
+  "started_at": "2026-07-07T00:00:00Z",
+  "updated_at": "2026-07-07T00:05:00Z",
+  "character": "IRONCLAD",
+  "ascension": 10,
+  "floor_reached": 8,
+  "outcome": "in_progress",
+  "game_start_time": 1783382400,
+  "aggregates": {
+    "CARD.STRIKE_IRONCLAD#1": {
+      "combats_in_deck": 3,
+      "plays": 4,
+      "total_intended": 42,
+      "total_effective": 31
+    }
+  },
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.PAPER_PHROG": {
+      "paper_phrog_damage_added": 18.75,
+      "paper_phrog_enhanced_attacks": 6,
+      "paper_phrog_combats": 3,
+      "paper_phrog_turns": 5
+    }
+  },
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.STRIKE_IRONCLAD": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.STRIKE_IRONCLAD": 1
+  }
+}

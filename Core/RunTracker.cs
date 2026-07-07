@@ -1485,6 +1485,7 @@ public static class RunTracker
         if (_pendingCombat == null || _currentRun == null) return;
         RecordHeldCombatRelicBaselinesForTrackedPlayerLocked(requireActiveCombat: false, createPendingIfNeeded: false);
         RecordLetterOpenerTurnForTrackedPlayerLocked();
+        RecordPaperPhrogTurnForTrackedPlayerLocked();
         RecordPaelsEyeCombatsWithoutActivationForTrackedPlayerLocked();
         RecordTurnEnergyRelicCombatsWithoutEnergyForTrackedPlayerLocked();
         RecordNunchakuCombatEndChargeForTrackedPlayerLocked();
@@ -1632,6 +1633,10 @@ public static class RunTracker
         target.MiniatureCannonUpgradedAttackHits += source.MiniatureCannonUpgradedAttackHits;
         target.VajraAttacksPlayed += source.VajraAttacksPlayed;
         target.VajraAttackHits += source.VajraAttackHits;
+        target.PaperPhrogDamageAdded += source.PaperPhrogDamageAdded;
+        target.PaperPhrogEnhancedAttacks += source.PaperPhrogEnhancedAttacks;
+        target.PaperPhrogCombats += source.PaperPhrogCombats;
+        target.PaperPhrogTurns += source.PaperPhrogTurns;
 
         target.BookmarkCombats += source.BookmarkCombats;
         target.BookmarkCommonActivations += source.BookmarkCommonActivations;
@@ -2297,6 +2302,7 @@ public static class RunTracker
     private const string NutritiousSoupRelicId = "RELIC.NUTRITIOUS_SOUP";
     private const string MiniatureCannonRelicId = "RELIC.MINIATURE_CANNON";
     private const string VajraRelicId = "RELIC.VAJRA";
+    private const string PaperPhrogRelicId = "RELIC.PAPER_PHROG";
     private const string BookmarkRelicId = "RELIC.BOOKMARK";
     private const string BrilliantScarfRelicId = "RELIC.BRILLIANT_SCARF";
     private const string JuzuBraceletRelicId = "RELIC.JUZU_BRACELET";
@@ -5643,6 +5649,76 @@ public static class RunTracker
         agg.VajraAttackHits += Math.Max(0, count);
     }
 
+    public static void RecordPaperPhrogVulnerableBonus(
+        PaperPhrog relic,
+        decimal damageAdded,
+        int enhancedAttacks = 1)
+    {
+        if (relic?.Owner == null || damageAdded <= 0m || enhancedAttacks <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic)) return;
+                if (!IsTrackedPlayer(relic.Owner)) return;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordPaperPhrogCombatForPlayerLocked(relic.Owner);
+                RecordPaperPhrogTurnForPlayerLocked(relic.Owner);
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(PaperPhrogRelicId);
+                RecordPaperPhrogVulnerableBonusForTest(agg, damageAdded, enhancedAttacks);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPaperPhrogVulnerableBonus failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordPaperPhrogTurnStarted(Player player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                _pendingCombat ??= new PendingCombat();
+                RecordPaperPhrogTurnForPlayerLocked(player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPaperPhrogTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordPaperPhrogVulnerableBonusForTest(
+        RelicAggregate agg,
+        decimal damageAdded,
+        int enhancedAttacks = 1)
+    {
+        if (agg == null) return;
+        if (damageAdded <= 0m || enhancedAttacks <= 0) return;
+        agg.PaperPhrogDamageAdded += damageAdded;
+        agg.PaperPhrogEnhancedAttacks += Math.Max(0, enhancedAttacks);
+    }
+
+    internal static void RecordPaperPhrogCombatForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.PaperPhrogCombats += Math.Max(0, count);
+    }
+
+    internal static void RecordPaperPhrogTurnForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.PaperPhrogTurns += Math.Max(0, count);
+    }
+
     internal static void RecordBookmarkCombatForTest(RelicAggregate agg, int count = 1)
     {
         if (agg == null) return;
@@ -8054,6 +8130,18 @@ public static class RunTracker
         }
     }
 
+    private static bool PlayerHasPaperPhrog(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is PaperPhrog);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static bool PlayerHasJuzuBracelet(Player player)
     {
         try
@@ -8104,6 +8192,7 @@ public static class RunTracker
             RecordMiniatureCannonCombatForPlayerLocked(player);
             RecordBookmarkCombatForPlayerLocked(player);
             RecordPaelsEyeCombatForPlayerLocked(player);
+            RecordPaperPhrogCombatForPlayerLocked(player);
         }
         catch (Exception e)
         {
@@ -8183,6 +8272,50 @@ public static class RunTracker
         var agg = GetOrCreatePendingRelicAggregateLocked(MiniatureCannonRelicId);
         agg.Activations += 1;
         RefreshMiniatureCannonDeckCountsIfOwnedLocked();
+    }
+
+    private static void RecordPaperPhrogCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasPaperPhrog(player)) return;
+        if (!_pendingCombat.PaperPhrogCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(PaperPhrogRelicId);
+        RecordPaperPhrogCombatForTest(agg);
+    }
+
+    private static void RecordPaperPhrogTurnForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordPaperPhrogTurnForPlayerLocked(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordPaperPhrogTurnForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordPaperPhrogTurnForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasPaperPhrog(player)) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.PaperPhrogTurnCountedTurns.TryGetValue(player, out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.PaperPhrogTurnCountedTurns[player] = turnNumber;
+        RecordPaperPhrogCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(PaperPhrogRelicId);
+        RecordPaperPhrogTurnForTest(agg);
     }
 
     private static void RecordNutritiousSoupCombatForPlayerLocked(Player player)
@@ -11924,6 +12057,10 @@ internal class PendingCombat
     public HashSet<Player> MiniatureCannonCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> BookmarkCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> PaperPhrogCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> PaperPhrogTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> PaelsEyeCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
