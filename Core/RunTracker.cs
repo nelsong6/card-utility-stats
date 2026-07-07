@@ -1473,6 +1473,7 @@ public static class RunTracker
     {
         if (_pendingCombat == null || _currentRun == null) return;
         RecordHeldCombatRelicBaselinesForTrackedPlayerLocked(requireActiveCombat: false, createPendingIfNeeded: false);
+        RecordLetterOpenerTurnForTrackedPlayerLocked();
         RecordPaelsEyeCombatsWithoutActivationForTrackedPlayerLocked();
         RecordNunchakuCombatEndChargeForTrackedPlayerLocked();
         RecordIronClubCombatEndChargeForTrackedPlayerLocked();
@@ -1574,6 +1575,11 @@ public static class RunTracker
         target.TotalDamageOverkill += source.TotalDamageOverkill;
         target.Kills += source.Kills;
         target.TotalTargets += source.TotalTargets;
+        target.LetterOpenerSkillsPlayed += source.LetterOpenerSkillsPlayed;
+        target.LetterOpenerCombats += source.LetterOpenerCombats;
+        target.LetterOpenerTurns += source.LetterOpenerTurns;
+        target.LetterOpenerTurnsEndedAt1Charge += source.LetterOpenerTurnsEndedAt1Charge;
+        target.LetterOpenerTurnsEndedAt2Charges += source.LetterOpenerTurnsEndedAt2Charges;
         target.PotionsGained += source.PotionsGained;
         target.CommonPotionsGained += source.CommonPotionsGained;
         target.UncommonPotionsGained += source.UncommonPotionsGained;
@@ -2624,16 +2630,26 @@ public static class RunTracker
         if (cardPlay?.Card == null) return;
         if (cardPlay.Card.Type != CardType.Skill) return;
         if (activationThreshold <= 0) return;
-        if (skillsPlayedIncludingThis <= 0 || skillsPlayedIncludingThis % activationThreshold != 0) return;
 
         lock (_lock)
         {
             try
             {
+                var owner = cardPlay.Card.Owner;
+                if (owner == null || !IsTrackedPlayer(owner)) return;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordLetterOpenerCombatForPlayerLocked(owner);
+                RecordLetterOpenerTurnForPlayerLocked(owner);
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(LetterOpenerRelicId);
+                RecordLetterOpenerSkillPlayedForTest(agg);
+
+                if (skillsPlayedIncludingThis <= 0 || skillsPlayedIncludingThis % activationThreshold != 0) return;
+
                 int targetCount = CountLetterOpenerTargets(cardPlay.Card.CombatState);
                 if (targetCount <= 0) return;
 
-                var agg = GetOrCreateRelicAggregateLocked(LetterOpenerRelicId);
                 agg.Activations += 1;
                 agg.TotalTargets += targetCount;
                 agg.TotalDamageAttempted += LetterOpenerDamagePerTarget * targetCount;
@@ -2643,6 +2659,77 @@ public static class RunTracker
                 CoreMain.LogDebug($"RecordLetterOpenerBeforeCardPlayed failed: {e.Message}");
             }
         }
+    }
+
+    /// <summary>
+    /// Snapshot Letter Opener's live charge at the end of each tracked player
+    /// turn while held.
+    /// </summary>
+    public static void RecordLetterOpenerTurnEnded(IEnumerable<Creature>? participants)
+    {
+        if (participants == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                _pendingCombat ??= new PendingCombat();
+
+                foreach (var creature in participants)
+                {
+                    var player = creature?.Player;
+                    if (player == null || !IsTrackedPlayer(player)) continue;
+                    if (!TryGetLetterOpener(player, out var letterOpener) || letterOpener == null) continue;
+
+                    var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+                    if (turnNumber <= 0) continue;
+
+                    RecordLetterOpenerTurnForPlayerLocked(player);
+
+                    if (_pendingCombat.LetterOpenerTurnEndChargeRecordedTurns.TryGetValue(player, out var recordedTurn)
+                        && recordedTurn == turnNumber)
+                    {
+                        continue;
+                    }
+
+                    _pendingCombat.LetterOpenerTurnEndChargeRecordedTurns[player] = turnNumber;
+                    var agg = GetOrCreatePendingRelicAggregateLocked(LetterOpenerRelicId);
+                    RecordLetterOpenerTurnEndChargeForTest(agg, LetterOpenerCharge(letterOpener));
+                }
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordLetterOpenerTurnEnded failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordLetterOpenerSkillPlayedForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.LetterOpenerSkillsPlayed += Math.Max(0, count);
+    }
+
+    internal static void RecordLetterOpenerCombatForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.LetterOpenerCombats += Math.Max(0, count);
+    }
+
+    internal static void RecordLetterOpenerTurnForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.LetterOpenerTurns += Math.Max(0, count);
+    }
+
+    internal static void RecordLetterOpenerTurnEndChargeForTest(RelicAggregate agg, int charge)
+    {
+        if (agg == null || charge < 0) return;
+
+        if (charge == 1)
+            agg.LetterOpenerTurnsEndedAt1Charge += 1;
+        else if (charge == 2)
+            agg.LetterOpenerTurnsEndedAt2Charges += 1;
     }
 
     private static int CountLetterOpenerTargets(ICombatState? combatState)
@@ -7467,6 +7554,7 @@ public static class RunTracker
             var player = GetTrackedRunPlayerLocked();
             if (player == null) return;
 
+            RecordLetterOpenerCombatForPlayerLocked(player);
             RecordHappyFlowerCombatForPlayerLocked(player);
             RecordNunchakuCombatForPlayerLocked(player);
             RecordIronClubCombatForPlayerLocked(player);
@@ -7481,6 +7569,50 @@ public static class RunTracker
         {
             CoreMain.LogDebug($"RecordHeldCombatRelicBaselinesForTrackedPlayerLocked failed: {e.Message}");
         }
+    }
+
+    private static void RecordLetterOpenerCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasLetterOpener(player)) return;
+        if (!_pendingCombat.LetterOpenerCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(LetterOpenerRelicId);
+        RecordLetterOpenerCombatForTest(agg);
+    }
+
+    private static void RecordLetterOpenerTurnForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordLetterOpenerTurnForPlayerLocked(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordLetterOpenerTurnForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordLetterOpenerTurnForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasLetterOpener(player)) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.LetterOpenerTurnCountedTurns.TryGetValue(player, out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.LetterOpenerTurnCountedTurns[player] = turnNumber;
+        RecordLetterOpenerCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(LetterOpenerRelicId);
+        RecordLetterOpenerTurnForTest(agg);
     }
 
     private static void RecordMiniatureCannonCombatForTrackedPlayerLocked()
@@ -7782,6 +7914,46 @@ public static class RunTracker
     private static bool PlayerHasNunchaku(Player player)
     {
         return TryGetNunchaku(player, out _);
+    }
+
+    private static bool PlayerHasLetterOpener(Player player)
+    {
+        return TryGetLetterOpener(player, out _);
+    }
+
+    private static bool TryGetLetterOpener(Player player, out LetterOpener? letterOpener)
+    {
+        letterOpener = null;
+
+        try
+        {
+            letterOpener = player?.Relics?.OfType<LetterOpener>().FirstOrDefault();
+            return letterOpener != null;
+        }
+        catch
+        {
+            letterOpener = null;
+            return false;
+        }
+    }
+
+    private static int LetterOpenerCharge(LetterOpener relic)
+    {
+        var threshold = LetterOpenerActivationThreshold(relic);
+        if (threshold <= 0) return 0;
+        return Math.Max(0, relic.SkillsPlayedThisTurn) % threshold;
+    }
+
+    private static int LetterOpenerActivationThreshold(LetterOpener relic)
+    {
+        try
+        {
+            return Math.Max(1, relic.DynamicVars.Cards.IntValue);
+        }
+        catch
+        {
+            return 3;
+        }
     }
 
     private static bool TryGetPenNib(Player player, out PenNib? penNib)
@@ -11114,6 +11286,12 @@ internal class PendingCombat
     public Dictionary<Creature, PendingPoisonTick> PendingPoisonTicks { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, PendingBrilliantScarfDiscount> BrilliantScarfDiscountOffers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> LetterOpenerCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> LetterOpenerTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> LetterOpenerTurnEndChargeRecordedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> HappyFlowerCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

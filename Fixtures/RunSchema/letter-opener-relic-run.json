@@ -1,0 +1,23 @@
+{
+  "run_id": "letter-opener-relic-fixture",
+  "started_at": "2026-07-06T19:00:00Z",
+  "updated_at": "2026-07-06T19:10:00Z",
+  "outcome": "in_progress",
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.LETTER_OPENER": {
+      "activations": 3,
+      "total_damage_attempted": 45,
+      "total_targets": 9,
+      "letter_opener_skills_played": 9,
+      "letter_opener_combats": 3,
+      "letter_opener_turns": 6,
+      "letter_opener_turns_ended_at1_charge": 2,
+      "letter_opener_turns_ended_at2_charges": 3
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

@@ -499,6 +499,15 @@ public class RelicAggregate
     // Letter Opener, Parrying Shield, Festive Popper, and Mercury Hourglass.
     public int TotalTargets { get; set; }
 
+    // Letter Opener tracking. TotalDamageAttempted stores the attempted AoE
+    // damage, TotalTargets stores live enemy targets at activation time, and
+    // these fields provide average denominators plus turn-end charge buckets.
+    public int LetterOpenerSkillsPlayed { get; set; }
+    public int LetterOpenerCombats { get; set; }
+    public int LetterOpenerTurns { get; set; }
+    public int LetterOpenerTurnsEndedAt1Charge { get; set; }
+    public int LetterOpenerTurnsEndedAt2Charges { get; set; }
+
     // Total potions gained from this relic, split by the potion rarity that
     // was actually claimed. Used by White Beast Statue.
     public int PotionsGained { get; set; }

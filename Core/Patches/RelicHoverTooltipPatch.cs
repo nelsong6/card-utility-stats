@@ -1434,9 +1434,24 @@ public static class RelicHoverShowPatch
     private static string BuildLetterOpenerBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
+        var averageDamagePerCombat = agg.LetterOpenerCombats <= 0
+            ? 0m
+            : (decimal)agg.TotalDamageAttempted / agg.LetterOpenerCombats;
+        var averageDamagePerTurn = agg.LetterOpenerTurns <= 0
+            ? 0m
+            : (decimal)agg.TotalDamageAttempted / agg.LetterOpenerTurns;
+        var averageDamagePerSkill = agg.LetterOpenerSkillsPlayed <= 0
+            ? 0m
+            : (decimal)agg.TotalDamageAttempted / agg.LetterOpenerSkillsPlayed;
+
         Row3(sb, "Activations", agg.Activations.ToString(), "");
         Row3(sb, "Damage attempted", agg.TotalDamageAttempted.ToString(), "");
         Row3(sb, "Targets hit", agg.TotalTargets.ToString(), "");
+        Row3(sb, "Avg damage per combat", FormatDecimal(averageDamagePerCombat), "");
+        Row3(sb, "Avg damage per turn", FormatDecimal(averageDamagePerTurn), "");
+        Row3(sb, "Turns ended at 1 charge", agg.LetterOpenerTurnsEndedAt1Charge.ToString(), "");
+        Row3(sb, "Turns ended at 2 charges", agg.LetterOpenerTurnsEndedAt2Charges.ToString(), "");
+        Row3(sb, "Avg damage per skill played", FormatDecimal(averageDamagePerSkill), "");
         return sb.ToString();
     }
 

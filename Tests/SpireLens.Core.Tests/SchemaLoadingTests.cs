@@ -1223,6 +1223,41 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsLetterOpenerRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("letter-opener-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.LETTER_OPENER"];
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(45, relicAgg.TotalDamageAttempted);
+        Assert.Equal(9, relicAgg.TotalTargets);
+        Assert.Equal(9, relicAgg.LetterOpenerSkillsPlayed);
+        Assert.Equal(3, relicAgg.LetterOpenerCombats);
+        Assert.Equal(6, relicAgg.LetterOpenerTurns);
+        Assert.Equal(2, relicAgg.LetterOpenerTurnsEndedAt1Charge);
+        Assert.Equal(3, relicAgg.LetterOpenerTurnsEndedAt2Charges);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsLetterOpenerRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("letter-opener-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.LETTER_OPENER"];
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(45, relicAgg.TotalDamageAttempted);
+        Assert.Equal(9, relicAgg.TotalTargets);
+        Assert.Equal(9, relicAgg.LetterOpenerSkillsPlayed);
+        Assert.Equal(3, relicAgg.LetterOpenerCombats);
+        Assert.Equal(6, relicAgg.LetterOpenerTurns);
+        Assert.Equal(2, relicAgg.LetterOpenerTurnsEndedAt1Charge);
+        Assert.Equal(3, relicAgg.LetterOpenerTurnsEndedAt2Charges);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsBronzeScalesRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("bronze-scales-relic-run.json"));

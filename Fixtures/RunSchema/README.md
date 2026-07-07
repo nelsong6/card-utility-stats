@@ -102,6 +102,9 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds consolidated relic aggregates rescued from stale open branches: Anchor,
   Letter Opener, Blood Vial, Akabeko, Booming Conch, Pendulum, Parrying
   Shield, Horn Cleat, and Toolbox.
+- `letter-opener-relic-run.json`
+  Adds Letter Opener combat, turn, and skill-play denominators for average
+  attempted damage, plus turn-end 1/2 charge buckets.
 - `bronze-scales-relic-run.json`
   Adds Bronze Scales Thorns damage tracking with observed damage, blocked
   damage, overkill, kills, and target count.
