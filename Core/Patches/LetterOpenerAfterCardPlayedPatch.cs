@@ -39,6 +39,42 @@ public static class LetterOpenerAfterCardPlayedPatch
 }
 
 /// <summary>
+/// Fallback snapshot for Letter Opener's prior-turn charge immediately before
+/// the relic resets its per-turn skill counter at the next player turn start.
+/// </summary>
+[HarmonyPatch(typeof(LetterOpener), nameof(LetterOpener.AfterSideTurnStart))]
+public static class LetterOpenerAfterSideTurnStartPatch
+{
+    [HarmonyPrefix]
+    public static void Prefix(
+        LetterOpener __instance,
+        CombatSide side,
+        IReadOnlyList<Creature> participants,
+        ICombatState combatState)
+    {
+        try
+        {
+            if (__instance == null || !RunTracker.IsTrackedRelic(__instance)) return;
+            if (side != CombatSide.Player) return;
+
+            var owner = __instance.Owner;
+            var ownerCreature = owner?.Creature;
+            if (owner == null || ownerCreature == null) return;
+            if (participants == null || !participants.Contains(ownerCreature)) return;
+
+            var turnNumber = owner.PlayerCombatState?.TurnNumber ?? 0;
+            if (turnNumber <= 1) return;
+
+            RunTracker.RecordLetterOpenerPreviousTurnChargeBeforeReset(__instance, turnNumber - 1);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"LetterOpenerAfterSideTurnStartPatch failed: {e.Message}");
+        }
+    }
+}
+
+/// <summary>
 /// Snapshots Letter Opener's charge at the end of each player turn while held.
 /// Bound by runtime lookup so a game hook rename does not break build.
 /// </summary>
@@ -67,12 +103,12 @@ public static class HookBeforeSideTurnEndLetterOpenerPatch
     private static bool Prepare() => TargetMethod() != null;
 
     [HarmonyPrefix]
-    public static void Prefix(CombatSide side, IEnumerable<Creature> participants)
+    public static void Prefix(ICombatState combatState, CombatSide side, IEnumerable<Creature> participants)
     {
         try
         {
             if (side != CombatSide.Player) return;
-            RunTracker.RecordLetterOpenerTurnEnded(participants);
+            RunTracker.RecordLetterOpenerTurnEnded(combatState, participants);
         }
         catch (Exception e)
         {

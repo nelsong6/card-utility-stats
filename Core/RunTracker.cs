@@ -2685,43 +2685,94 @@ public static class RunTracker
     /// Snapshot Letter Opener's live charge at the end of each tracked player
     /// turn while held.
     /// </summary>
-    public static void RecordLetterOpenerTurnEnded(IEnumerable<Creature>? participants)
+    public static void RecordLetterOpenerTurnEnded(ICombatState? combatState, IEnumerable<Creature>? participants)
     {
-        if (participants == null) return;
-
         lock (_lock)
         {
             try
             {
                 _pendingCombat ??= new PendingCombat();
+                var recordedParticipant = false;
 
-                foreach (var creature in participants)
+                if (participants != null)
                 {
-                    var player = creature?.Player;
-                    if (player == null || !IsTrackedPlayer(player)) continue;
-                    if (!TryGetLetterOpener(player, out var letterOpener) || letterOpener == null) continue;
-
-                    var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
-                    if (turnNumber <= 0) continue;
-
-                    RecordLetterOpenerTurnForPlayerLocked(player);
-
-                    if (_pendingCombat.LetterOpenerTurnEndChargeRecordedTurns.TryGetValue(player, out var recordedTurn)
-                        && recordedTurn == turnNumber)
+                    foreach (var creature in participants)
                     {
-                        continue;
-                    }
+                        var player = creature?.Player;
+                        if (player == null || !IsTrackedPlayer(player)) continue;
 
-                    _pendingCombat.LetterOpenerTurnEndChargeRecordedTurns[player] = turnNumber;
-                    var agg = GetOrCreatePendingRelicAggregateLocked(LetterOpenerRelicId);
-                    RecordLetterOpenerTurnEndChargeForTest(agg, LetterOpenerCharge(letterOpener));
+                        recordedParticipant |= RecordLetterOpenerTurnEndChargeForPlayerLocked(
+                            player,
+                            player.PlayerCombatState?.TurnNumber ?? 0);
+                    }
                 }
+
+                if (recordedParticipant) return;
+
+                var trackedPlayer = GetTrackedRunPlayerLocked();
+                if (trackedPlayer == null) return;
+                RecordLetterOpenerTurnEndChargeForPlayerLocked(
+                    trackedPlayer,
+                    trackedPlayer.PlayerCombatState?.TurnNumber ?? 0);
             }
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordLetterOpenerTurnEnded failed: {e.Message}");
             }
         }
+    }
+
+    /// <summary>
+    /// Capture Letter Opener's previous-turn charge before its own
+    /// AfterSideTurnStart callback resets SkillsPlayedThisTurn.
+    /// </summary>
+    public static void RecordLetterOpenerPreviousTurnChargeBeforeReset(LetterOpener? relic, int endedTurnNumber)
+    {
+        if (relic?.Owner == null || endedTurnNumber <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic)) return;
+                if (!IsTrackedPlayer(relic.Owner)) return;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordLetterOpenerTurnEndChargeForPlayerLocked(relic.Owner, endedTurnNumber, relic);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordLetterOpenerPreviousTurnChargeBeforeReset failed: {e.Message}");
+            }
+        }
+    }
+
+    private static bool RecordLetterOpenerTurnEndChargeForPlayerLocked(
+        Player player,
+        int turnNumber,
+        LetterOpener? letterOpener = null)
+    {
+        if (_pendingCombat == null) return false;
+        if (player == null || !IsTrackedPlayer(player)) return false;
+        letterOpener ??= TryGetLetterOpener(player, out var foundRelic) ? foundRelic : null;
+        if (letterOpener == null) return false;
+        if (turnNumber <= 0) return false;
+
+        RecordLetterOpenerTurnForPlayerLocked(player, turnNumber);
+
+        var charge = LetterOpenerCharge(letterOpener);
+        if (charge != 1 && charge != 2) return true;
+
+        if (_pendingCombat.LetterOpenerTurnEndChargeRecordedTurns.TryGetValue(player, out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return true;
+        }
+
+        _pendingCombat.LetterOpenerTurnEndChargeRecordedTurns[player] = turnNumber;
+        var agg = GetOrCreatePendingRelicAggregateLocked(LetterOpenerRelicId);
+        RecordLetterOpenerTurnEndChargeForTest(agg, charge);
+        return true;
     }
 
     internal static void RecordLetterOpenerSkillPlayedForTest(RelicAggregate agg, int count = 1)
@@ -8086,11 +8137,16 @@ public static class RunTracker
 
     private static void RecordLetterOpenerTurnForPlayerLocked(Player player)
     {
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        RecordLetterOpenerTurnForPlayerLocked(player, turnNumber);
+    }
+
+    private static void RecordLetterOpenerTurnForPlayerLocked(Player player, int turnNumber)
+    {
         if (_pendingCombat == null) return;
         if (!PlayerHasLetterOpener(player)) return;
-
-        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
         if (turnNumber <= 0) return;
+
         if (_pendingCombat.LetterOpenerTurnCountedTurns.TryGetValue(player, out var recordedTurn)
             && recordedTurn == turnNumber)
         {

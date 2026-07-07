@@ -121,10 +121,42 @@ public class HookPatchTargetTests
         Assert.NotNull(target);
         Assert.Equal("MegaCrit.Sts2.Core.Hooks.Hook", target!.DeclaringType?.FullName);
         Assert.Contains(target.Name, new[] { "BeforeSideTurnEnd", "BeforeTurnEnd" });
+        Assert.Equal(
+            new[]
+            {
+                "combatState",
+                "side",
+                "participants",
+            },
+            target.GetParameters().Select(p => p.Name).ToArray());
 
         var sideParameter = target.GetParameters().SingleOrDefault(p => p.Name == "side");
         Assert.NotNull(sideParameter);
         Assert.Equal("MegaCrit.Sts2.Core.Combat.CombatSide", sideParameter!.ParameterType.FullName);
+    }
+
+    [Fact]
+    [Trait("Category", "RequiresLiveGame")]
+    public void LetterOpenerTurnStartFallbackPatch_HasExactPrefixShape()
+    {
+        var prefix = typeof(LetterOpenerAfterSideTurnStartPatch).GetMethod("Prefix");
+
+        Assert.NotNull(prefix);
+        var parameters = prefix!.GetParameters();
+        Assert.Equal(
+            new[]
+            {
+                "MegaCrit.Sts2.Core.Models.Relics.LetterOpener",
+                "MegaCrit.Sts2.Core.Combat.CombatSide",
+                "System.Collections.Generic.IReadOnlyList`1",
+                "MegaCrit.Sts2.Core.Combat.ICombatState",
+            },
+            parameters.Select(p => p.ParameterType.IsGenericType
+                ? p.ParameterType.GetGenericTypeDefinition().FullName
+                : p.ParameterType.FullName).ToArray());
+        Assert.Equal(
+            "MegaCrit.Sts2.Core.Entities.Creatures.Creature",
+            parameters[2].ParameterType.GenericTypeArguments.Single().FullName);
     }
 
     [Fact]
