@@ -1879,6 +1879,37 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsLizardTailRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("lizard-tail-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.LIZARD_TAIL"];
+        Assert.Equal(1, relicAgg.Activations);
+        Assert.Equal(7, relicAgg.FloorAcquired);
+        Assert.Equal(19, relicAgg.FloorActivated);
+        Assert.Equal(36m, relicAgg.TotalHealingAttempted);
+        Assert.Equal(36m, relicAgg.TotalHealingRestored);
+        Assert.Equal(0m, relicAgg.TotalHealingLost);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsLizardTailRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("lizard-tail-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.LIZARD_TAIL"];
+        Assert.Equal(1, relicAgg.Activations);
+        Assert.Equal(7, relicAgg.FloorAcquired);
+        Assert.Equal(19, relicAgg.FloorActivated);
+        Assert.Equal(36m, relicAgg.TotalHealingAttempted);
+        Assert.Equal(36m, relicAgg.TotalHealingRestored);
+        Assert.Equal(0m, relicAgg.TotalHealingLost);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsPantographRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("pantograph-relic-run.json"));

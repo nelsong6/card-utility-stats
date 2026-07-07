@@ -179,6 +179,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `regal-pillow-relic-run.json`
   Adds Regal Pillow rest-site bonus healing tracking: activations, effective
   bonus HP healed, and bonus healing lost to full HP.
+- `lizard-tail-relic-run.json`
+  Adds Lizard Tail pickup and activation floor tracking plus observed HP healed
+  by the one-shot revive.
 - `pantograph-relic-run.json`
   Adds Pantograph boss-combat healing tracking: activations, effective HP
   healed, and healing wasted to full HP.

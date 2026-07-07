@@ -87,6 +87,7 @@ public static class RelicCmdObtainStatsPatch
     {
         return RunTracker.IsStrikeDummyStatsRelic(relic)
             || RunTracker.IsMiniatureCannonStatsRelic(relic)
+            || RunTracker.IsLizardTailStatsRelic(relic)
             || RunTracker.IsChosenCheeseStatsRelic(relic);
     }
 
@@ -94,6 +95,7 @@ public static class RelicCmdObtainStatsPatch
     {
         RunTracker.RecordStrikeDummyObtained(relic, player);
         RunTracker.RecordMiniatureCannonObtained(relic, player);
+        RunTracker.RecordLizardTailObtained(relic, player);
 
         if (chosenCheeseState.Player != null)
             RunTracker.RecordChosenCheeseObtained(relic, player, chosenCheeseState.StartingMaxHp);

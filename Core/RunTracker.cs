@@ -1566,6 +1566,10 @@ public static class RunTracker
         target.TotalHealingRestored += source.TotalHealingRestored;
         target.TotalHealingLost += source.TotalHealingLost;
         MergeHealingLostReasonsInto(target, source);
+        if (source.FloorAcquired.HasValue && !target.FloorAcquired.HasValue)
+            target.FloorAcquired = source.FloorAcquired;
+        if (source.FloorActivated.HasValue)
+            target.FloorActivated = source.FloorActivated;
         target.MaxHpGained += source.MaxHpGained;
         if (source.OriginalMaxHp.HasValue && !target.OriginalMaxHp.HasValue)
             target.OriginalMaxHp = source.OriginalMaxHp;
@@ -2282,6 +2286,7 @@ public static class RunTracker
     private const string BloodVialRelicId = "RELIC.BLOOD_VIAL";
     private const string PantographRelicId = "RELIC.PANTOGRAPH";
     private const string PlanisphereRelicId = "RELIC.PLANISPHERE";
+    private const string LizardTailRelicId = "RELIC.LIZARD_TAIL";
     private const string LeesWaffleRelicId = "RELIC.LEES_WAFFLE";
     private const string StrawberryRelicId = "RELIC.STRAWBERRY";
     private const string PearRelicId = "RELIC.PEAR";
@@ -4459,6 +4464,29 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Record Lizard Tail's one-shot death prevention heal and activation
+    /// floor. The pickup floor is restamped only when it was not already saved
+    /// at obtain time.
+    /// </summary>
+    public static void RecordLizardTailTrigger(LizardTail relic, Creature healedCreature, decimal attemptedHealing)
+    {
+        if (!IsLizardTailStatsRelic(relic) || healedCreature == null) return;
+        if (!ReferenceEquals(healedCreature, relic.Owner?.Creature)) return;
+        if (!IsTrackedRelic(relic)) return;
+
+        RecordRelicHealingTrigger(
+            LizardTailRelicId,
+            healedCreature,
+            attemptedHealing,
+            nameof(RecordLizardTailTrigger),
+            configureAggregate: agg =>
+            {
+                RecordRelicFloorAcquiredForTest(agg, RelicFloorAddedToDeck(relic) ?? CurrentRunFloorLocked());
+                RecordRelicFloorActivatedForTest(agg, CurrentRunFloorLocked());
+            });
+    }
+
+    /// <summary>
     /// Record Eternal Feather's rest-site activation and attempted heal. This
     /// happens outside combat, so the aggregate is written directly to the
     /// committed run data instead of the pending combat buffer.
@@ -4900,6 +4928,31 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Record Lizard Tail's pickup floor as soon as the relic enters the run,
+    /// so a never-used tail still has durable run-history context.
+    /// </summary>
+    public static void RecordLizardTailObtained(RelicModel relic, Player player)
+    {
+        if (!IsLizardTailStatsRelic(relic) || player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(LizardTailRelicId);
+                RecordRelicFloorAcquiredForTest(agg, RelicFloorAddedToDeck(relic) ?? CurrentRunFloorLocked());
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordLizardTailObtained failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Record Chosen Cheese's observed max-HP gain after its combat-end
     /// callback completes. The callback can finish around combat promotion, so
     /// route the gained amount to pending combat when it still exists and
@@ -5333,6 +5386,18 @@ public static class RunTracker
         if (agg == null) return;
 
         agg.CombatsWithoutActivation += Math.Max(0, count);
+    }
+
+    internal static void RecordRelicFloorAcquiredForTest(RelicAggregate agg, int? floor)
+    {
+        if (agg == null || !floor.HasValue || floor.Value <= 0) return;
+        agg.FloorAcquired ??= floor.Value;
+    }
+
+    internal static void RecordRelicFloorActivatedForTest(RelicAggregate agg, int? floor)
+    {
+        if (agg == null || !floor.HasValue || floor.Value <= 0) return;
+        agg.FloorActivated = floor.Value;
     }
 
     internal static void RecordLeesWafflePickupHpGainedForTest(
@@ -5813,6 +5878,22 @@ public static class RunTracker
         }
     }
 
+    internal static bool IsLizardTailStatsRelic(RelicModel? relic)
+    {
+        try
+        {
+            return relic is LizardTail
+                || string.Equals(
+                    relic?.GetType().FullName,
+                    "MegaCrit.Sts2.Core.Models.Relics.LizardTail",
+                    StringComparison.Ordinal);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     internal static bool IsChosenCheeseStatsRelic(RelicModel? relic)
     {
         try
@@ -5835,7 +5916,8 @@ public static class RunTracker
         decimal attemptedHealing,
         string callerName,
         bool forceDirectRunPersistence = false,
-        bool allowZeroAttempt = false)
+        bool allowZeroAttempt = false,
+        Action<RelicAggregate>? configureAggregate = null)
     {
         if (healedCreature == null) return;
         if (attemptedHealing < 0m || (!allowZeroAttempt && attemptedHealing <= 0m)) return;
@@ -5848,6 +5930,7 @@ public static class RunTracker
                 var agg = persistDirectlyToRun
                     ? GetOrCreateCurrentRunRelicAggregateLocked(relicId)
                     : GetOrCreateRelicAggregateLocked(relicId);
+                configureAggregate?.Invoke(agg);
                 agg.Activations++;
 
                 if (attemptedHealing <= 0m)
@@ -7904,6 +7987,19 @@ public static class RunTracker
         }
 
         return _currentRun?.FloorReached;
+    }
+
+    private static int? RelicFloorAddedToDeck(RelicModel relic)
+    {
+        try
+        {
+            var floor = relic.FloorAddedToDeck;
+            return floor > 0 ? floor : null;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static void RecordStrikeDummyStrikePlayedIfOwnedLocked(CardModel card)

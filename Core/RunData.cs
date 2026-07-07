@@ -432,6 +432,11 @@ public class RelicAggregate
     public decimal TotalHealingLost { get; set; }
     public Dictionary<string, HealingLostReasonAggregate> HealingLostReasons { get; set; } = new();
 
+    // Relic lifecycle floor snapshots. Used by Lizard Tail to show where it
+    // was acquired and where its one-shot revive fired.
+    public int? FloorAcquired { get; set; }
+    public int? FloorActivated { get; set; }
+
     // Total maximum HP gained from this relic. Used by Chosen Cheese.
     public decimal MaxHpGained { get; set; }
 

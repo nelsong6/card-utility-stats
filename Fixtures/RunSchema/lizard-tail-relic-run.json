@@ -1,0 +1,22 @@
+{
+  "run_id": "lizard-tail-relic-fixture",
+  "started_at": "2026-07-06T00:00:00Z",
+  "updated_at": "2026-07-06T00:10:00Z",
+  "outcome": "in_progress",
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.LIZARD_TAIL": {
+      "activations": 1,
+      "floor_acquired": 7,
+      "floor_activated": 19,
+      "total_healing_attempted": 36,
+      "total_healing_restored": 36,
+      "total_healing_lost": 0,
+      "healing_lost_reasons": {}
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

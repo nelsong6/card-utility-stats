@@ -478,6 +478,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is LizardTail)
+            {
+                const string relicId = "RELIC.LIZARD_TAIL";
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+
+                var body = BuildLizardTailBodyBBCode(agg, RelicFloorAddedToDeck(relicNode.Model));
+                StatsTooltip.Show(tree, __instance, "Lizard Tail", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is Pantograph)
             {
                 const string relicId = "RELIC.PANTOGRAPH";
@@ -1210,6 +1220,13 @@ public static class RelicHoverShowPatch
         {
             title = "Planisphere";
             body = BuildPlanisphereBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is LizardTail)
+        {
+            title = "Lizard Tail";
+            body = BuildLizardTailBodyBBCode(agg, RelicFloorAddedToDeck(relicModel));
             return true;
         }
 
@@ -2034,6 +2051,19 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
+    private static string BuildLizardTailBodyBBCode(RelicAggregate agg, int? floorAcquiredFallback = null)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Floor acquired", FormatFloor(agg.FloorAcquired ?? floorAcquiredFallback), "");
+        Row3(
+            sb,
+            "Floor activated",
+            agg.FloorActivated.HasValue ? FormatFloor(agg.FloorActivated) : "none yet",
+            "");
+        Row3(sb, "HP healed", FormatDecimal(agg.TotalHealingRestored), "");
+        return sb.ToString();
+    }
+
     private static string BuildPantographBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
@@ -2542,6 +2572,13 @@ public static class RelicHoverShowPatch
         return decimal.Truncate(value) == value
             ? value.ToString("0")
             : value.ToString("0.##");
+    }
+
+    private static string FormatFloor(int? floor)
+    {
+        return floor.HasValue && floor.Value > 0
+            ? floor.Value.ToString()
+            : "0";
     }
 
     private static void AppendMaxHpChangeRows(
