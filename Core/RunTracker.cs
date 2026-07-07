@@ -2921,6 +2921,37 @@ public static class RunTracker
         }
     }
 
+    /// <summary>
+    /// Record the extra block contributed by Unmovable's power. This is a
+    /// run-level mechanic stat, not attribution back to the physical Unmovable
+    /// card instance that created the power.
+    /// </summary>
+    public static void RecordUnmovablePowerExtraBlock(Creature? target, decimal extraBlock)
+    {
+        if (target == null || !target.IsPlayer || extraBlock <= 0m) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayerCreature(target)) return;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordUnmovablePowerExtraBlockForTest(_pendingCombat.MetaStats, extraBlock);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordUnmovablePowerExtraBlock failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordUnmovablePowerExtraBlockForTest(RunMetaStats metaStats, decimal extraBlock)
+    {
+        if (metaStats == null || extraBlock <= 0m) return;
+        metaStats.ExtraBlockGainedFromUnmovablePower += extraBlock;
+    }
+
     internal static void RecordVambraceExtraBlockGainedForTest(RelicAggregate agg, decimal modifiedAmount)
     {
         var added = ComputeVambraceExtraBlock(modifiedAmount);
@@ -11292,6 +11323,7 @@ public static class RunTracker
 
         target.TotalOstyHpSummoned += source.TotalOstyHpSummoned;
         target.TotalOstyDamageAbsorbed += source.TotalOstyDamageAbsorbed;
+        target.ExtraBlockGainedFromUnmovablePower += source.ExtraBlockGainedFromUnmovablePower;
     }
 
     private static void MergeBlockedDrawReasonsInto(

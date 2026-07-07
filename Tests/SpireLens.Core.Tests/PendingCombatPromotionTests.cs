@@ -108,6 +108,7 @@ public class PendingCombatPromotionTests
             DamageBlocked = 5,
         };
         pending.MetaStats.TotalOstyDamageAbsorbed = 4;
+        pending.MetaStats.ExtraBlockGainedFromUnmovablePower = 9;
 
         var run = new RunData();
         RunTracker.PromotePendingCombatIntoRun(pending, run);
@@ -118,5 +119,6 @@ public class PendingCombatPromotionTests
         Assert.Equal(11, enemy.DamageDealt);
         Assert.Equal(5, enemy.DamageBlocked);
         Assert.Equal(4, run.MetaStats.TotalOstyDamageAbsorbed);
+        Assert.Equal(9, run.MetaStats.ExtraBlockGainedFromUnmovablePower);
     }
 }

@@ -2153,6 +2153,27 @@ public class SchemaLoadingTests
         Assert.Equal(2, relicAgg.BookmarkRareActivations);
     }
 
+    [Fact]
+    public void HistoricalLoad_AcceptsUnmovablePowerMetaFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("unmovable-power-meta-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        Assert.Equal(24m, loaded.Data.MetaStats.ExtraBlockGainedFromUnmovablePower);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsUnmovablePowerMetaFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("unmovable-power-meta-run.json"));
+
+        Assert.NotNull(resumed);
+        Assert.Equal(24m, resumed!.MetaStats.ExtraBlockGainedFromUnmovablePower);
+    }
+
     private static void AssertLeafyPoulticeTransformations(RelicAggregate relicAgg)
     {
         Assert.Equal(2, relicAgg.CardTransformations.Count);

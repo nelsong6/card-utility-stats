@@ -208,6 +208,10 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds Tuning Fork trigger count and observed block gained tracking.
 - `war-paint-relic-run.json`
   Adds War Paint pickup tracking: the actual skill cards upgraded by the relic.
+- `unmovable-power-meta-run.json`
+  Adds run-level Unmovable power tracking for the extra block produced by the
+  power's block multiplier, surfaced on Unmovable card tooltips rather than
+  attributed to one physical card instance.
 
 Why these exist:
 

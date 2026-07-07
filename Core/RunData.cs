@@ -289,6 +289,7 @@ public class RunMetaStats
 {
     public decimal TotalOstyHpSummoned { get; set; }
     public decimal TotalOstyDamageAbsorbed { get; set; }
+    public decimal ExtraBlockGainedFromUnmovablePower { get; set; }
 }
 
 public class EnemyAggregate

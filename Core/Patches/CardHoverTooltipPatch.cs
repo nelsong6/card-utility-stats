@@ -332,6 +332,7 @@ public static class CardHoverShowPatch
         AppendMakeItSoStats(sb, cardModel, agg, compact: false);
         AppendUnleashStats(sb, cardModel, agg, compact: false);
         AppendOstySummonStats(sb, cardModel, agg, metaStats, compact: false);
+        AppendUnmovablePowerStats(sb, cardModel, metaStats);
         AppendReplayStats(sb, agg);
 
         bool hasDedicatedPoison = AppendDedicatedPoisonStats(sb, agg, compact: false);
@@ -530,6 +531,7 @@ public static class CardHoverShowPatch
         AppendMakeItSoStats(sb, cardModel, agg, compact: true);
         AppendUnleashStats(sb, cardModel, agg, compact: true);
         AppendOstySummonStats(sb, cardModel, agg, metaStats, compact: true);
+        AppendUnmovablePowerStats(sb, cardModel, metaStats);
         AppendReplayStats(sb, agg);
 
         bool showDamage = isAttack || agg.TotalIntended > 0;
@@ -635,6 +637,22 @@ public static class CardHoverShowPatch
             || agg.TotalOstyHpSummoned > 0m
             || card is SummonForth
             || IsCardId(card, "CARD.SUMMON_FORTH");
+    }
+
+    private static void AppendUnmovablePowerStats(
+        StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel card,
+        RunMetaStats metaStats)
+    {
+        metaStats ??= new RunMetaStats();
+        if (metaStats.ExtraBlockGainedFromUnmovablePower <= 0m) return;
+        if (card is not Unmovable && !IsCardId(card, "CARD.UNMOVABLE")) return;
+
+        Row3(
+            sb,
+            "Extra block gained from unmovable's power",
+            FormatDecimal(metaStats.ExtraBlockGainedFromUnmovablePower),
+            "");
     }
 
     private static bool IsCardId(MegaCrit.Sts2.Core.Models.CardModel? card, string id)
