@@ -388,6 +388,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is Regalite)
+            {
+                const string relicId = "RELIC.REGALITE";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildRegaliteBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Regalite", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is CloakClasp)
             {
                 const string relicId = "RELIC.CLOAK_CLASP";
@@ -1156,6 +1166,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is Regalite)
+        {
+            title = "Regalite";
+            body = BuildRegaliteBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is CursedPearl)
         {
             title = "Cursed Pearl";
@@ -1893,6 +1910,23 @@ public static class RelicHoverShowPatch
             includeAveragePerCombat: true);
 
         AppendRelatedCurseCardStats(sb, "Enthralled", curseAgg);
+        return sb.ToString();
+    }
+
+    private static string BuildRegaliteBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var blockPerTurn = agg.RegaliteTurns <= 0
+            ? 0m
+            : (decimal)agg.AdditionalBlockGained / agg.RegaliteTurns;
+        var blockPerCombat = agg.RegaliteCombats <= 0
+            ? 0m
+            : (decimal)agg.AdditionalBlockGained / agg.RegaliteCombats;
+
+        Row3(sb, "Cards created", agg.RegaliteCardsCreated.ToString(), "");
+        Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
+        Row3(sb, BlockLabel("avg block per turn"), FormatDecimal(blockPerTurn), "");
+        Row3(sb, BlockLabel("avg block per combat"), FormatDecimal(blockPerCombat), "");
         return sb.ToString();
     }
 

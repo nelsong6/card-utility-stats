@@ -2094,6 +2094,33 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsRegaliteRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("regalite-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.REGALITE"];
+        Assert.Equal(6, relicAgg.RegaliteCardsCreated);
+        Assert.Equal(12, relicAgg.AdditionalBlockGained);
+        Assert.Equal(4, relicAgg.RegaliteTurns);
+        Assert.Equal(2, relicAgg.RegaliteCombats);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsRegaliteRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("regalite-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.REGALITE"];
+        Assert.Equal(6, relicAgg.RegaliteCardsCreated);
+        Assert.Equal(12, relicAgg.AdditionalBlockGained);
+        Assert.Equal(4, relicAgg.RegaliteTurns);
+        Assert.Equal(2, relicAgg.RegaliteCombats);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsTuningForkRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("tuning-fork-relic-run.json"));

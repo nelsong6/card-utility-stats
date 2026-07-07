@@ -1641,6 +1641,9 @@ public static class RunTracker
         target.PaperPhrogEnhancedAttacks += source.PaperPhrogEnhancedAttacks;
         target.PaperPhrogCombats += source.PaperPhrogCombats;
         target.PaperPhrogTurns += source.PaperPhrogTurns;
+        target.RegaliteCardsCreated += source.RegaliteCardsCreated;
+        target.RegaliteCombats += source.RegaliteCombats;
+        target.RegaliteTurns += source.RegaliteTurns;
 
         target.BookmarkCombats += source.BookmarkCombats;
         target.BookmarkCommonActivations += source.BookmarkCommonActivations;
@@ -2309,6 +2312,7 @@ public static class RunTracker
     private const string MiniatureCannonRelicId = "RELIC.MINIATURE_CANNON";
     private const string VajraRelicId = "RELIC.VAJRA";
     private const string PaperPhrogRelicId = "RELIC.PAPER_PHROG";
+    private const string RegaliteRelicId = "RELIC.REGALITE";
     private const string BookmarkRelicId = "RELIC.BOOKMARK";
     private const string BrilliantScarfRelicId = "RELIC.BRILLIANT_SCARF";
     private const string JuzuBraceletRelicId = "RELIC.JUZU_BRACELET";
@@ -5762,6 +5766,56 @@ public static class RunTracker
         }
     }
 
+    public static void RecordRegaliteCardCreatedAndArmBlockAttribution(Regalite relic, Player creator)
+    {
+        if (relic?.Owner == null || creator == null) return;
+        if (!ReferenceEquals(relic.Owner, creator)) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic)) return;
+                if (!IsTrackedPlayer(creator)) return;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordRegaliteCombatForPlayerLocked(creator);
+                RecordRegaliteTurnForPlayerLocked(creator);
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(RegaliteRelicId);
+                RecordRegaliteCardCreatedForTest(agg);
+                _pendingCombat.Windows.Arm(
+                    RegaliteRelicId,
+                    AttributionEventKind.PlayerBlockGain,
+                    CurrentHistoryCountLocked(),
+                    maxHistoryAdvance: -1);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordRegaliteCardCreatedAndArmBlockAttribution failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordRegaliteTurnStarted(Player player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                _pendingCombat ??= new PendingCombat();
+                RecordRegaliteTurnForPlayerLocked(player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordRegaliteTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
     internal static void RecordPaperPhrogVulnerableBonusForTest(
         RelicAggregate agg,
         decimal damageAdded,
@@ -5783,6 +5837,24 @@ public static class RunTracker
     {
         if (agg == null) return;
         agg.PaperPhrogTurns += Math.Max(0, count);
+    }
+
+    internal static void RecordRegaliteCardCreatedForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.RegaliteCardsCreated += Math.Max(0, count);
+    }
+
+    internal static void RecordRegaliteCombatForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.RegaliteCombats += Math.Max(0, count);
+    }
+
+    internal static void RecordRegaliteTurnForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.RegaliteTurns += Math.Max(0, count);
     }
 
     internal static void RecordBookmarkCombatForTest(RelicAggregate agg, int count = 1)
@@ -8253,6 +8325,18 @@ public static class RunTracker
         }
     }
 
+    private static bool PlayerHasRegalite(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is Regalite);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static bool PlayerHasJuzuBracelet(Player player)
     {
         try
@@ -8304,6 +8388,7 @@ public static class RunTracker
             RecordBookmarkCombatForPlayerLocked(player);
             RecordPaelsEyeCombatForPlayerLocked(player);
             RecordPaperPhrogCombatForPlayerLocked(player);
+            RecordRegaliteCombatForPlayerLocked(player);
         }
         catch (Exception e)
         {
@@ -8427,6 +8512,36 @@ public static class RunTracker
 
         var agg = GetOrCreatePendingRelicAggregateLocked(PaperPhrogRelicId);
         RecordPaperPhrogTurnForTest(agg);
+    }
+
+    private static void RecordRegaliteCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasRegalite(player)) return;
+        if (!_pendingCombat.RegaliteCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(RegaliteRelicId);
+        RecordRegaliteCombatForTest(agg);
+    }
+
+    private static void RecordRegaliteTurnForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasRegalite(player)) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.RegaliteTurnCountedTurns.TryGetValue(player, out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.RegaliteTurnCountedTurns[player] = turnNumber;
+        RecordRegaliteCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(RegaliteRelicId);
+        RecordRegaliteTurnForTest(agg);
     }
 
     private static void RecordNutritiousSoupCombatForPlayerLocked(Player player)
@@ -12172,6 +12287,10 @@ internal class PendingCombat
     public HashSet<Player> PaperPhrogCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> PaperPhrogTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> RegaliteCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> RegaliteTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> PaelsEyeCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
