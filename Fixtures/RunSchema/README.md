@@ -196,6 +196,8 @@ New fixtures added going forward do not need a `v*-` prefix.
   skipped pickup choices.
 - `arcane-scroll-relic-run.json`
   Adds Arcane Scroll rare-card grant tracking: the rare card added by id/name.
+- `large-capsule-relic-run.json`
+  Adds Large Capsule relic grant tracking: relics added by id/name.
 - `vambrace-relic-run.json`
   Adds Vambrace activation tracking plus extra block gained from the block
   packets its 2x multiplier actually modified.

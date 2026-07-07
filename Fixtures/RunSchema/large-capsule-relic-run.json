@@ -1,0 +1,38 @@
+{
+  "run_id": "large-capsule-relic-fixture",
+  "started_at": "2026-07-07T01:00:00Z",
+  "updated_at": "2026-07-07T01:05:00Z",
+  "outcome": "in_progress",
+  "aggregates": {
+    "CARD.STRIKE_IRONCLAD#1": {
+      "plays": 1,
+      "total_energy_spent": 1
+    }
+  },
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.LARGE_CAPSULE": {
+      "relics_granted": {
+        "RELIC.DATA_DISK": {
+          "relic_id": "RELIC.DATA_DISK",
+          "display_name": "Data Disk",
+          "count": 1
+        },
+        "RELIC.BAG_OF_PREPARATION": {
+          "relic_id": "RELIC.BAG_OF_PREPARATION",
+          "display_name": "Bag of Preparation",
+          "count": 1
+        }
+      }
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.STRIKE_IRONCLAD": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.STRIKE_IRONCLAD": 1
+  }
+}

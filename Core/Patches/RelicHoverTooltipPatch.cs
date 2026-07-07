@@ -598,6 +598,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is LargeCapsule)
+            {
+                const string relicId = "RELIC.LARGE_CAPSULE";
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+
+                var body = BuildLargeCapsuleBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Large Capsule", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is PaelsWing)
             {
                 const string relicId = "RELIC.PAELS_WING";
@@ -1234,6 +1244,13 @@ public static class RelicHoverShowPatch
         {
             title = "Arcane Scroll";
             body = BuildArcaneScrollBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is LargeCapsule)
+        {
+            title = "Large Capsule";
+            body = BuildLargeCapsuleBodyBBCode(agg);
             return true;
         }
 
@@ -2010,6 +2027,30 @@ public static class RelicHoverShowPatch
                 : card.DisplayName);
             var value = card.Count == 1 ? displayName : $"{displayName} x{card.Count}";
             Row3(sb, "Rare received", value, "");
+        }
+
+        return sb.ToString();
+    }
+
+    private static string BuildLargeCapsuleBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var relics = agg.RelicsGranted.Values
+            .Where(relic => relic.Count > 0)
+            .OrderByDescending(relic => relic.Count)
+            .ThenBy(relic => relic.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var total = relics.Sum(relic => Math.Max(0, relic.Count));
+
+        Row3(sb, "Relics obtained", total.ToString(), "");
+
+        foreach (var relic in relics)
+        {
+            var displayName = StatsTooltip.EscapeBbcode(string.IsNullOrWhiteSpace(relic.DisplayName)
+                ? RunTracker.FormatRelicIdForDisplay(relic.RelicId)
+                : relic.DisplayName);
+            var value = relic.Count == 1 ? displayName : $"{displayName} x{relic.Count}";
+            Row3(sb, "Obtained", value, "");
         }
 
         return sb.ToString();

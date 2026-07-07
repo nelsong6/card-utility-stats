@@ -1907,6 +1907,33 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsLargeCapsuleRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("large-capsule-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.LARGE_CAPSULE"];
+        Assert.Equal(1, relicAgg.RelicsGranted["RELIC.DATA_DISK"].Count);
+        Assert.Equal("Data Disk", relicAgg.RelicsGranted["RELIC.DATA_DISK"].DisplayName);
+        Assert.Equal(1, relicAgg.RelicsGranted["RELIC.BAG_OF_PREPARATION"].Count);
+        Assert.Equal("Bag of Preparation", relicAgg.RelicsGranted["RELIC.BAG_OF_PREPARATION"].DisplayName);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsLargeCapsuleRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("large-capsule-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.LARGE_CAPSULE"];
+        Assert.Equal(1, relicAgg.RelicsGranted["RELIC.DATA_DISK"].Count);
+        Assert.Equal("Data Disk", relicAgg.RelicsGranted["RELIC.DATA_DISK"].DisplayName);
+        Assert.Equal(1, relicAgg.RelicsGranted["RELIC.BAG_OF_PREPARATION"].Count);
+        Assert.Equal("Bag of Preparation", relicAgg.RelicsGranted["RELIC.BAG_OF_PREPARATION"].DisplayName);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsVambraceRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("vambrace-relic-run.json"));

@@ -524,6 +524,10 @@ public class RelicAggregate
     public int RareRelicsAcquired { get; set; }
     public int CampfiresNotDug { get; set; }
 
+    // Specific relics granted by relic-owned effects. Used by Large Capsule
+    // to show which relics were obtained.
+    public Dictionary<string, RelicGrantedAggregate> RelicsGranted { get; set; } = new();
+
     // Total offered cards by rarity for relics that generate card-choice
     // screens. Used by Toolbox.
     public int UncommonCardsOffered { get; set; }
@@ -649,6 +653,13 @@ public class CardRewardCategoryAggregate
 public class RelicCardAggregate
 {
     public string CardId { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public int Count { get; set; }
+}
+
+public class RelicGrantedAggregate
+{
+    public string RelicId { get; set; } = "";
     public string DisplayName { get; set; } = "";
     public int Count { get; set; }
 }

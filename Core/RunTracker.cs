@@ -1590,6 +1590,7 @@ public static class RunTracker
         target.UncommonRelicsAcquired += source.UncommonRelicsAcquired;
         target.RareRelicsAcquired += source.RareRelicsAcquired;
         target.CampfiresNotDug += source.CampfiresNotDug;
+        MergeRelicsGranted(target.RelicsGranted, source.RelicsGranted);
         target.UncommonCardsOffered += source.UncommonCardsOffered;
         target.RareCardsOffered += source.RareCardsOffered;
         target.UncommonCardsTaken += source.UncommonCardsTaken;
@@ -2269,6 +2270,7 @@ public static class RunTracker
     private const string RegalPillowRelicId = "RELIC.REGAL_PILLOW";
     private const string WhiteBeastStatueRelicId = "RELIC.WHITE_BEAST_STATUE";
     private const string ShovelRelicId = "RELIC.SHOVEL";
+    private const string LargeCapsuleRelicId = "RELIC.LARGE_CAPSULE";
     private const string BoundPhylacteryRelicId = "RELIC.BOUND_PHYLACTERY";
     private const string PhylacteryUnboundRelicId = "RELIC.PHYLACTERY_UNBOUND";
     private const string ToolboxRelicId = "RELIC.TOOLBOX";
@@ -3132,6 +3134,72 @@ public static class RunTracker
         }
     }
 
+    public static bool BeginLargeCapsulePickup(
+        LargeCapsule relic,
+        out Player? player,
+        out IReadOnlyCollection<RelicModel>? relicsBeforePickup)
+    {
+        player = null;
+        relicsBeforePickup = null;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic)) return false;
+                if (!IsTrackedPlayer(relic.Owner)) return false;
+
+                player = relic.Owner;
+                relicsBeforePickup = SnapshotRelics(player);
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"BeginLargeCapsulePickup failed: {e.Message}");
+                player = null;
+                relicsBeforePickup = null;
+                return false;
+            }
+        }
+    }
+
+    public static void CompleteLargeCapsulePickup(
+        Player? player,
+        IReadOnlyCollection<RelicModel>? relicsBeforePickup,
+        bool succeeded)
+    {
+        if (player == null || relicsBeforePickup == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!succeeded || !IsTrackedPlayer(player)) return;
+
+                var before = relicsBeforePickup as HashSet<RelicModel>
+                    ?? new HashSet<RelicModel>(relicsBeforePickup, ReferenceEqualityComparer.Instance);
+                var relicsGranted = NewRelicsSince(player, before).ToList();
+                if (relicsGranted.Count == 0) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(LargeCapsuleRelicId);
+                foreach (var grantedRelic in relicsGranted)
+                {
+                    RecordLargeCapsuleRelicObtainedForTest(
+                        agg,
+                        grantedRelic.Id.ToString(),
+                        GetRelicDisplayName(grantedRelic));
+                }
+
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"CompleteLargeCapsulePickup failed: {e.Message}");
+            }
+        }
+    }
+
     /// <summary>
     /// Record a rest site where Shovel's Dig option was available but the
     /// local player left without selecting it.
@@ -3739,6 +3807,46 @@ public static class RunTracker
         }
 
         return cards;
+    }
+
+    private static IReadOnlyCollection<RelicModel> SnapshotRelics(Player player)
+    {
+        var relics = new HashSet<RelicModel>(ReferenceEqualityComparer.Instance);
+
+        try
+        {
+            foreach (var relic in player.Relics)
+            {
+                if (relic != null)
+                    relics.Add(relic);
+            }
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"SnapshotRelics failed: {e.Message}");
+        }
+
+        return relics;
+    }
+
+    private static IReadOnlyList<RelicModel> NewRelicsSince(Player player, HashSet<RelicModel> relicsBefore)
+    {
+        var relics = new List<RelicModel>();
+
+        try
+        {
+            foreach (var relic in player.Relics)
+            {
+                if (relic != null && !relicsBefore.Contains(relic))
+                    relics.Add(relic);
+            }
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"NewRelicsSince failed: {e.Message}");
+        }
+
+        return relics;
     }
 
     /// <summary>
@@ -5382,6 +5490,15 @@ public static class RunTracker
                 agg.RareRelicsAcquired++;
                 break;
         }
+    }
+
+    internal static void RecordLargeCapsuleRelicObtainedForTest(
+        RelicAggregate agg,
+        string? relicId,
+        string? displayName)
+    {
+        if (agg == null || string.IsNullOrWhiteSpace(relicId)) return;
+        AddRelicGranted(agg.RelicsGranted, relicId, displayName ?? "", 1);
     }
 
     internal static void RecordShovelCampfireNotDugForTest(RelicAggregate agg, int count = 1)
@@ -7333,6 +7450,20 @@ public static class RunTracker
                 : char.ToUpperInvariant(part[0]) + part[1..].ToLowerInvariant()));
     }
 
+    internal static string FormatRelicIdForDisplay(string relicId)
+    {
+        var value = relicId;
+        const string prefix = "RELIC.";
+        if (value.StartsWith(prefix, StringComparison.Ordinal))
+            value = value[prefix.Length..];
+
+        return string.Join(" ", value
+            .Split('_', StringSplitOptions.RemoveEmptyEntries)
+            .Select(part => part.Length == 0
+                ? part
+                : char.ToUpperInvariant(part[0]) + part[1..].ToLowerInvariant()));
+    }
+
     private static RelicAggregate GetOrCreateRelicAggregateForCurrentContextLocked(string relicId)
     {
         if (_pendingCombat != null)
@@ -8327,6 +8458,21 @@ public static class RunTracker
         }
     }
 
+    private static void MergeRelicsGranted(
+        Dictionary<string, RelicGrantedAggregate> target,
+        Dictionary<string, RelicGrantedAggregate>? source)
+    {
+        if (source == null || source.Count == 0) return;
+
+        foreach (var kvp in source)
+        {
+            var relic = kvp.Value;
+            if (relic.Count <= 0) continue;
+            var relicId = string.IsNullOrWhiteSpace(relic.RelicId) ? kvp.Key : relic.RelicId;
+            AddRelicGranted(target, relicId, relic.DisplayName, relic.Count);
+        }
+    }
+
     private static void MergeRelicCardTransformations(RelicAggregate target, RelicAggregate source)
     {
         if (source.CardTransformations == null || source.CardTransformations.Count == 0) return;
@@ -8377,6 +8523,32 @@ public static class RunTracker
         agg.Count += count;
     }
 
+    private static void AddRelicGranted(
+        Dictionary<string, RelicGrantedAggregate> relics,
+        string relicId,
+        string displayName,
+        int count)
+    {
+        if (count <= 0 || string.IsNullOrWhiteSpace(relicId)) return;
+
+        if (!relics.TryGetValue(relicId, out var agg))
+        {
+            agg = new RelicGrantedAggregate
+            {
+                RelicId = relicId,
+                DisplayName = string.IsNullOrWhiteSpace(displayName) ? FormatRelicIdForDisplay(relicId) : displayName,
+            };
+            relics[relicId] = agg;
+        }
+
+        if (string.IsNullOrWhiteSpace(agg.RelicId))
+            agg.RelicId = relicId;
+        if (string.IsNullOrWhiteSpace(agg.DisplayName))
+            agg.DisplayName = string.IsNullOrWhiteSpace(displayName) ? FormatRelicIdForDisplay(relicId) : displayName;
+
+        agg.Count += count;
+    }
+
     private static string GetCardDisplayName(CardModel card)
     {
         try
@@ -8389,6 +8561,31 @@ public static class RunTracker
         }
 
         return FormatCardIdForDisplay(card.Id.ToString());
+    }
+
+    private static string GetRelicDisplayName(RelicModel relic)
+    {
+        try
+        {
+            var title = relic.Title.GetFormattedText();
+            if (!string.IsNullOrWhiteSpace(title))
+                return title;
+        }
+        catch
+        {
+        }
+
+        try
+        {
+            var title = relic.Title.GetRawText();
+            if (!string.IsNullOrWhiteSpace(title))
+                return title;
+        }
+        catch
+        {
+        }
+
+        return FormatRelicIdForDisplay(relic.Id.ToString());
     }
 
     private static string ToDisplayName(string key)
