@@ -10,11 +10,21 @@ namespace SpireLens.Core.Tests;
 
 public class CandelabraStatsTests
 {
+    private const string LanternRelicId = "RELIC.LANTERN";
     private const string CandelabraRelicId = "RELIC.CANDELABRA";
+    private const string ChandelierRelicId = "RELIC.CHANDELIER";
+
+    private static readonly MethodInfo BuildLanternBodyMethod =
+        typeof(RelicHoverShowPatch).GetMethod("BuildLanternBodyBBCode", BindingFlags.NonPublic | BindingFlags.Static)
+        ?? throw new InvalidOperationException("BuildLanternBodyBBCode not found.");
 
     private static readonly MethodInfo BuildCandelabraBodyMethod =
         typeof(RelicHoverShowPatch).GetMethod("BuildCandelabraBodyBBCode", BindingFlags.NonPublic | BindingFlags.Static)
         ?? throw new InvalidOperationException("BuildCandelabraBodyBBCode not found.");
+
+    private static readonly MethodInfo BuildChandelierBodyMethod =
+        typeof(RelicHoverShowPatch).GetMethod("BuildChandelierBodyBBCode", BindingFlags.NonPublic | BindingFlags.Static)
+        ?? throw new InvalidOperationException("BuildChandelierBodyBBCode not found.");
 
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
@@ -23,74 +33,130 @@ public class CandelabraStatsTests
     };
 
     [Fact]
-    public void RelicAggregate_CandelabraFields_DefaultToZero()
+    public void RelicAggregate_TurnEnergyRelicFields_DefaultToZero()
     {
         var agg = new RelicAggregate();
 
         Assert.Equal(0, agg.Activations);
         Assert.Equal(0, agg.EnergyGenerated);
+        Assert.Equal(0, agg.FirstTurnsEndedWithExcessEnergy);
         Assert.Equal(0, agg.SecondTurnsEndedWithExcessEnergy);
+        Assert.Equal(0, agg.ThirdTurnsEndedWithExcessEnergy);
+        Assert.Equal(0, agg.CombatsWithoutActivation);
     }
 
     [Fact]
-    public void RelicAggregate_CandelabraFields_JsonRoundtrip_PreservesFields()
+    public void RelicAggregate_TurnEnergyRelicFields_JsonRoundtrip_PreservesFields()
     {
         var run = new RunData();
+        run.RelicAggregates[LanternRelicId] = new RelicAggregate
+        {
+            Activations = 2,
+            EnergyGenerated = 2,
+            FirstTurnsEndedWithExcessEnergy = 1,
+        };
         run.RelicAggregates[CandelabraRelicId] = new RelicAggregate
         {
             Activations = 4,
             EnergyGenerated = 8,
             SecondTurnsEndedWithExcessEnergy = 2,
+            CombatsWithoutActivation = 1,
+        };
+        run.RelicAggregates[ChandelierRelicId] = new RelicAggregate
+        {
+            Activations = 3,
+            EnergyGenerated = 9,
+            ThirdTurnsEndedWithExcessEnergy = 1,
+            CombatsWithoutActivation = 2,
         };
 
         var json = JsonSerializer.Serialize(run, SerializerOptions);
 
         Assert.Contains("activations", json);
         Assert.Contains("energy_generated", json);
+        Assert.Contains("first_turns_ended_with_excess_energy", json);
         Assert.Contains("second_turns_ended_with_excess_energy", json);
+        Assert.Contains("third_turns_ended_with_excess_energy", json);
+        Assert.Contains("combats_without_activation", json);
 
         var restored = JsonSerializer.Deserialize<RunData>(json, SerializerOptions);
 
         Assert.NotNull(restored);
-        var agg = restored!.RelicAggregates[CandelabraRelicId];
-        Assert.Equal(4, agg.Activations);
-        Assert.Equal(8, agg.EnergyGenerated);
-        Assert.Equal(2, agg.SecondTurnsEndedWithExcessEnergy);
+        var lantern = restored!.RelicAggregates[LanternRelicId];
+        Assert.Equal(2, lantern.Activations);
+        Assert.Equal(2, lantern.EnergyGenerated);
+        Assert.Equal(1, lantern.FirstTurnsEndedWithExcessEnergy);
+
+        var candelabra = restored.RelicAggregates[CandelabraRelicId];
+        Assert.Equal(4, candelabra.Activations);
+        Assert.Equal(8, candelabra.EnergyGenerated);
+        Assert.Equal(2, candelabra.SecondTurnsEndedWithExcessEnergy);
+        Assert.Equal(1, candelabra.CombatsWithoutActivation);
+
+        var chandelier = restored.RelicAggregates[ChandelierRelicId];
+        Assert.Equal(3, chandelier.Activations);
+        Assert.Equal(9, chandelier.EnergyGenerated);
+        Assert.Equal(1, chandelier.ThirdTurnsEndedWithExcessEnergy);
+        Assert.Equal(2, chandelier.CombatsWithoutActivation);
     }
 
     [Fact]
-    public void MergeRelicAggregateInto_CandelabraFields_Accumulates()
+    public void MergeRelicAggregateInto_TurnEnergyRelicFields_Accumulates()
     {
         var target = new RelicAggregate
         {
             Activations = 1,
             EnergyGenerated = 2,
+            FirstTurnsEndedWithExcessEnergy = 1,
             SecondTurnsEndedWithExcessEnergy = 1,
+            ThirdTurnsEndedWithExcessEnergy = 0,
+            CombatsWithoutActivation = 1,
         };
         var source = new RelicAggregate
         {
             Activations = 3,
             EnergyGenerated = 6,
+            FirstTurnsEndedWithExcessEnergy = 2,
             SecondTurnsEndedWithExcessEnergy = 2,
+            ThirdTurnsEndedWithExcessEnergy = 4,
+            CombatsWithoutActivation = 2,
         };
 
         RunTracker.MergeRelicAggregateInto(target, source);
 
         Assert.Equal(4, target.Activations);
         Assert.Equal(8, target.EnergyGenerated);
+        Assert.Equal(3, target.FirstTurnsEndedWithExcessEnergy);
         Assert.Equal(3, target.SecondTurnsEndedWithExcessEnergy);
+        Assert.Equal(4, target.ThirdTurnsEndedWithExcessEnergy);
+        Assert.Equal(3, target.CombatsWithoutActivation);
+    }
+
+    [Fact]
+    public void RelicTooltip_Lantern_ShowsRequestedRowsAndZeroValues()
+    {
+        var body = BuildBody(BuildLanternBodyMethod, new RelicAggregate());
+
+        Assert.Contains("Activations", body);
+        Assert.Contains("Energy generated", body);
+        Assert.Contains("1st turns ended with excess energy", body);
+        Assert.Contains("[b]0[/b]", body);
+        Assert.Contains("1st turns ended with excess energy[/color]  [b]0[/b]", body);
+        Assert.DoesNotContain("Combats with energy not gained", body);
     }
 
     [Fact]
     public void RelicTooltip_Candelabra_ShowsRequestedRowsAndZeroValues()
     {
-        var body = (string)(BuildCandelabraBodyMethod.Invoke(null, new object?[] { new RelicAggregate() })
-            ?? throw new InvalidOperationException("BuildCandelabraBodyBBCode returned null."));
+        var body = BuildBody(BuildCandelabraBodyMethod, new RelicAggregate());
 
         Assert.Contains("Activations", body);
+        Assert.Contains("Energy generated", body);
         Assert.Contains("2nd turns ended with excess energy", body);
+        Assert.Contains("Combats with energy not gained", body);
+        Assert.Contains("[b]0[/b]", body);
         Assert.Contains("2nd turns ended with excess energy[/color]  [b]0[/b]", body);
-        Assert.Equal(2, CountOccurrences(body, "[b]0[/b]"));
+        Assert.Contains("Combats with energy not gained[/color]  [b]0[/b]", body);
     }
 
     [Fact]
@@ -99,21 +165,45 @@ public class CandelabraStatsTests
         var agg = new RelicAggregate
         {
             Activations = 4,
+            EnergyGenerated = 8,
             SecondTurnsEndedWithExcessEnergy = 2,
+            CombatsWithoutActivation = 1,
         };
 
-        var body = (string)(BuildCandelabraBodyMethod.Invoke(null, new object?[] { agg })
-            ?? throw new InvalidOperationException("BuildCandelabraBodyBBCode returned null."));
+        var body = BuildBody(BuildCandelabraBodyMethod, agg);
 
         Assert.Contains("Activations", body);
+        Assert.Contains("Energy generated", body);
         Assert.Contains("2nd turns ended with excess energy", body);
         Assert.Contains("2nd turns ended with excess energy[/color]  [b]2[/b]", body);
+        Assert.Contains("Combats with energy not gained[/color]  [b]1[/b]", body);
         Assert.Contains("[b]4[/b]", body);
+        Assert.Contains("[b]8[/b]", body);
         Assert.Contains("[b]2[/b]", body);
     }
 
     [Fact]
-    public void RunData_OlderShapeWithoutCandelabraFields_DeserializesWithZeroDefaults()
+    public void RelicTooltip_Chandelier_ShowsRequestedRowsAndTrackedCounts()
+    {
+        var agg = new RelicAggregate
+        {
+            Activations = 3,
+            EnergyGenerated = 9,
+            ThirdTurnsEndedWithExcessEnergy = 1,
+            CombatsWithoutActivation = 2,
+        };
+
+        var body = BuildBody(BuildChandelierBodyMethod, agg);
+
+        Assert.Contains("Activations", body);
+        Assert.Contains("Energy generated", body);
+        Assert.Contains("[b]9[/b]", body);
+        Assert.Contains("3rd turns ended with excess energy[/color]  [b]1[/b]", body);
+        Assert.Contains("Combats with energy not gained[/color]  [b]2[/b]", body);
+    }
+
+    [Fact]
+    public void RunData_OlderShapeWithoutTurnEnergyRelicFields_DeserializesWithZeroDefaults()
     {
         const string json = """
             {
@@ -137,19 +227,13 @@ public class CandelabraStatsTests
         var agg = run!.RelicAggregates[CandelabraRelicId];
         Assert.Equal(0, agg.Activations);
         Assert.Equal(0, agg.EnergyGenerated);
+        Assert.Equal(0, agg.FirstTurnsEndedWithExcessEnergy);
         Assert.Equal(0, agg.SecondTurnsEndedWithExcessEnergy);
+        Assert.Equal(0, agg.ThirdTurnsEndedWithExcessEnergy);
+        Assert.Equal(0, agg.CombatsWithoutActivation);
     }
 
-    private static int CountOccurrences(string haystack, string needle)
-    {
-        var count = 0;
-        var start = 0;
-        while (true)
-        {
-            var index = haystack.IndexOf(needle, start, StringComparison.Ordinal);
-            if (index < 0) return count;
-            count += 1;
-            start = index + needle.Length;
-        }
-    }
+    private static string BuildBody(MethodInfo method, RelicAggregate agg)
+        => (string)(method.Invoke(null, new object?[] { agg })
+            ?? throw new InvalidOperationException($"{method.Name} returned null."));
 }

@@ -237,6 +237,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is Lantern)
+            {
+                const string relicId = "RELIC.LANTERN";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildLanternBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Lantern", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is Candelabra)
             {
                 const string relicId = "RELIC.CANDELABRA";
@@ -244,6 +254,16 @@ public static class RelicHoverShowPatch
 
                 var body = BuildCandelabraBodyBBCode(agg);
                 StatsTooltip.Show(tree, __instance, "Candelabra", "SpireLens", body);
+                return;
+            }
+
+            if (relicNode.Model is Chandelier)
+            {
+                const string relicId = "RELIC.CHANDELIER";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildChandelierBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Chandelier", "SpireLens", body);
                 return;
             }
 
@@ -997,10 +1017,24 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is Lantern)
+        {
+            title = "Lantern";
+            body = BuildLanternBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is Candelabra)
         {
             title = "Candelabra";
             body = BuildCandelabraBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is Chandelier)
+        {
+            title = "Chandelier";
+            body = BuildChandelierBodyBBCode(agg);
             return true;
         }
 
@@ -1626,11 +1660,39 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
+    private static string BuildLanternBodyBBCode(RelicAggregate agg)
+        => BuildTurnEnergyRelicBodyBBCode(
+            agg,
+            "1st turns ended with excess energy",
+            agg.FirstTurnsEndedWithExcessEnergy,
+            includeCombatsWithEnergyNotGained: false);
+
     private static string BuildCandelabraBodyBBCode(RelicAggregate agg)
+        => BuildTurnEnergyRelicBodyBBCode(
+            agg,
+            "2nd turns ended with excess energy",
+            agg.SecondTurnsEndedWithExcessEnergy,
+            includeCombatsWithEnergyNotGained: true);
+
+    private static string BuildChandelierBodyBBCode(RelicAggregate agg)
+        => BuildTurnEnergyRelicBodyBBCode(
+            agg,
+            "3rd turns ended with excess energy",
+            agg.ThirdTurnsEndedWithExcessEnergy,
+            includeCombatsWithEnergyNotGained: true);
+
+    private static string BuildTurnEnergyRelicBodyBBCode(
+        RelicAggregate agg,
+        string excessEnergyLabel,
+        int turnsEndedWithExcessEnergy,
+        bool includeCombatsWithEnergyNotGained)
     {
         var sb = new StringBuilder();
         Row3(sb, "Activations", agg.Activations.ToString(), "");
-        Row3(sb, "2nd turns ended with excess energy", agg.SecondTurnsEndedWithExcessEnergy.ToString(), "");
+        AppendEnergyGeneratedStats(sb, agg);
+        Row3(sb, excessEnergyLabel, turnsEndedWithExcessEnergy.ToString(), "");
+        if (includeCombatsWithEnergyNotGained)
+            Row3(sb, "Combats with energy not gained", agg.CombatsWithoutActivation.ToString(), "");
         return sb.ToString();
     }
 

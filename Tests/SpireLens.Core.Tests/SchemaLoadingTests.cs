@@ -1314,6 +1314,57 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsTurnEnergyRelicsFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("turn-energy-relics-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+
+        var lanternAgg = loaded.Data.RelicAggregates["RELIC.LANTERN"];
+        Assert.Equal(2, lanternAgg.Activations);
+        Assert.Equal(2, lanternAgg.EnergyGenerated);
+        Assert.Equal(1, lanternAgg.FirstTurnsEndedWithExcessEnergy);
+
+        var candelabraAgg = loaded.Data.RelicAggregates["RELIC.CANDELABRA"];
+        Assert.Equal(4, candelabraAgg.Activations);
+        Assert.Equal(8, candelabraAgg.EnergyGenerated);
+        Assert.Equal(2, candelabraAgg.SecondTurnsEndedWithExcessEnergy);
+        Assert.Equal(1, candelabraAgg.CombatsWithoutActivation);
+
+        var chandelierAgg = loaded.Data.RelicAggregates["RELIC.CHANDELIER"];
+        Assert.Equal(3, chandelierAgg.Activations);
+        Assert.Equal(9, chandelierAgg.EnergyGenerated);
+        Assert.Equal(1, chandelierAgg.ThirdTurnsEndedWithExcessEnergy);
+        Assert.Equal(2, chandelierAgg.CombatsWithoutActivation);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsTurnEnergyRelicsFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("turn-energy-relics-run.json"));
+
+        Assert.NotNull(resumed);
+
+        var lanternAgg = resumed!.RelicAggregates["RELIC.LANTERN"];
+        Assert.Equal(2, lanternAgg.Activations);
+        Assert.Equal(2, lanternAgg.EnergyGenerated);
+        Assert.Equal(1, lanternAgg.FirstTurnsEndedWithExcessEnergy);
+
+        var candelabraAgg = resumed.RelicAggregates["RELIC.CANDELABRA"];
+        Assert.Equal(4, candelabraAgg.Activations);
+        Assert.Equal(8, candelabraAgg.EnergyGenerated);
+        Assert.Equal(2, candelabraAgg.SecondTurnsEndedWithExcessEnergy);
+        Assert.Equal(1, candelabraAgg.CombatsWithoutActivation);
+
+        var chandelierAgg = resumed.RelicAggregates["RELIC.CHANDELIER"];
+        Assert.Equal(3, chandelierAgg.Activations);
+        Assert.Equal(9, chandelierAgg.EnergyGenerated);
+        Assert.Equal(1, chandelierAgg.ThirdTurnsEndedWithExcessEnergy);
+        Assert.Equal(2, chandelierAgg.CombatsWithoutActivation);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsPaelsWingSacrificeRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("paels-wing-sacrifice-relic-run.json"));

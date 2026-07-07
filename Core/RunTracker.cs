@@ -1486,6 +1486,7 @@ public static class RunTracker
         RecordHeldCombatRelicBaselinesForTrackedPlayerLocked(requireActiveCombat: false, createPendingIfNeeded: false);
         RecordLetterOpenerTurnForTrackedPlayerLocked();
         RecordPaelsEyeCombatsWithoutActivationForTrackedPlayerLocked();
+        RecordTurnEnergyRelicCombatsWithoutEnergyForTrackedPlayerLocked();
         RecordNunchakuCombatEndChargeForTrackedPlayerLocked();
         RecordIronClubCombatEndChargeForTrackedPlayerLocked();
 
@@ -1573,7 +1574,9 @@ public static class RunTracker
         target.DoomKills += source.DoomKills;
         target.EnergyGenerated += source.EnergyGenerated;
         target.EnergyGeneratedCombats += source.EnergyGeneratedCombats;
+        target.FirstTurnsEndedWithExcessEnergy += source.FirstTurnsEndedWithExcessEnergy;
         target.SecondTurnsEndedWithExcessEnergy += source.SecondTurnsEndedWithExcessEnergy;
+        target.ThirdTurnsEndedWithExcessEnergy += source.ThirdTurnsEndedWithExcessEnergy;
         target.VigorGained += source.VigorGained;
         target.PenNibAttacksPlayed += source.PenNibAttacksPlayed;
         target.PenNibTurnsEndedOn8Charges += source.PenNibTurnsEndedOn8Charges;
@@ -2249,7 +2252,9 @@ public static class RunTracker
     private const string GremlinHornRelicId = "RELIC.GREMLIN_HORN";
     private const string NunchakuRelicId = "RELIC.NUNCHAKU";
     private const string IronClubRelicId = "RELIC.IRON_CLUB";
+    private const string LanternRelicId = "RELIC.LANTERN";
     private const string CandelabraRelicId = "RELIC.CANDELABRA";
+    private const string ChandelierRelicId = "RELIC.CHANDELIER";
     private const string PendulumRelicId = "RELIC.PENDULUM";
     private const string ParryingShieldRelicId = "RELIC.PARRYING_SHIELD";
     private const string FestivePopperRelicId = "RELIC.FESTIVE_POPPER";
@@ -6110,11 +6115,12 @@ public static class RunTracker
     }
 
     /// <summary>
-    /// Record Candelabra's owner-specific turn-2 activation and arm observed
-    /// energy attribution for its immediate gain.
+    /// Record a Lantern/Candelabra/Chandelier owner-specific activation and
+    /// arm observed energy attribution for its immediate gain.
     /// </summary>
-    public static void RecordCandelabraActivationAndArmEnergyAttribution(Player? owner)
+    public static void RecordTurnEnergyRelicActivationAndArmEnergyAttribution(string relicId, Player? owner)
     {
+        if (!IsTurnEnergyRelicId(relicId)) return;
         if (owner == null || !IsTrackedPlayer(owner)) return;
 
         lock (_lock)
@@ -6122,10 +6128,10 @@ public static class RunTracker
             try
             {
                 _pendingCombat ??= new PendingCombat();
-                var agg = GetOrCreateRelicAggregateLocked(CandelabraRelicId);
+                var agg = GetOrCreateRelicAggregateLocked(relicId);
                 agg.Activations += 1;
                 _pendingCombat.Windows.Arm(
-                    CandelabraRelicId,
+                    relicId,
                     AttributionEventKind.PlayerEnergyGain,
                     CurrentHistoryCountLocked(),
                     ownerId: owner,
@@ -6133,17 +6139,18 @@ public static class RunTracker
             }
             catch (Exception e)
             {
-                CoreMain.LogDebug($"RecordCandelabraActivationAndArmEnergyAttribution failed: {e.Message}");
+                CoreMain.LogDebug($"RecordTurnEnergyRelicActivationAndArmEnergyAttribution failed: {e.Message}");
             }
         }
     }
 
     /// <summary>
-    /// Count player turn 2 ending with unspent energy while Candelabra is held.
+    /// Count player turns ending with unspent energy while the matching
+    /// Lantern/Candelabra/Chandelier relic is held.
     /// Called from the global before-turn-end hook so the energy pool has not
     /// been cleared yet.
     /// </summary>
-    public static void RecordCandelabraSecondTurnEndedWithExcessEnergy(IEnumerable<Creature>? participants)
+    public static void RecordTurnEnergyRelicTurnEndedWithExcessEnergy(IEnumerable<Creature>? participants)
     {
         if (participants == null) return;
 
@@ -6156,21 +6163,99 @@ public static class RunTracker
                     var player = creature?.Player;
                     if (player == null || !IsTrackedPlayer(player)) continue;
                     var combatState = player.PlayerCombatState;
-                    if (combatState == null || combatState.TurnNumber != 2) continue;
+                    if (combatState == null) continue;
                     if (combatState.Energy <= 0) continue;
-                    if (!PlayerHasCandelabra(player)) continue;
 
-                    _pendingCombat ??= new PendingCombat();
-                    if (!_pendingCombat.CandelabraSecondTurnExcessRecordedPlayers.Add(player)) continue;
-
-                    var agg = GetOrCreateRelicAggregateLocked(CandelabraRelicId);
-                    agg.SecondTurnsEndedWithExcessEnergy += 1;
+                    switch (combatState.TurnNumber)
+                    {
+                        case 1 when PlayerHasLantern(player):
+                            RecordTurnEnergyRelicExcessEnergyForPlayerLocked(LanternRelicId, player);
+                            break;
+                        case 2 when PlayerHasCandelabra(player):
+                            RecordTurnEnergyRelicExcessEnergyForPlayerLocked(CandelabraRelicId, player);
+                            break;
+                        case 3 when PlayerHasChandelier(player):
+                            RecordTurnEnergyRelicExcessEnergyForPlayerLocked(ChandelierRelicId, player);
+                            break;
+                    }
                 }
             }
             catch (Exception e)
             {
-                CoreMain.LogDebug($"RecordCandelabraSecondTurnEndedWithExcessEnergy failed: {e.Message}");
+                CoreMain.LogDebug($"RecordTurnEnergyRelicTurnEndedWithExcessEnergy failed: {e.Message}");
             }
+        }
+    }
+
+    private static void RecordTurnEnergyRelicExcessEnergyForPlayerLocked(string relicId, Player player)
+    {
+        _pendingCombat ??= new PendingCombat();
+
+        var recorded = relicId switch
+        {
+            LanternRelicId => _pendingCombat.LanternFirstTurnExcessRecordedPlayers.Add(player),
+            CandelabraRelicId => _pendingCombat.CandelabraSecondTurnExcessRecordedPlayers.Add(player),
+            ChandelierRelicId => _pendingCombat.ChandelierThirdTurnExcessRecordedPlayers.Add(player),
+            _ => false,
+        };
+        if (!recorded) return;
+
+        var agg = GetOrCreateRelicAggregateLocked(relicId);
+        switch (relicId)
+        {
+            case LanternRelicId:
+                agg.FirstTurnsEndedWithExcessEnergy += 1;
+                break;
+            case CandelabraRelicId:
+                agg.SecondTurnsEndedWithExcessEnergy += 1;
+                break;
+            case ChandelierRelicId:
+                agg.ThirdTurnsEndedWithExcessEnergy += 1;
+                break;
+        }
+    }
+
+    private static void RecordTurnEnergyRelicCombatsWithoutEnergyForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+
+            RecordTurnEnergyRelicCombatWithoutEnergyForPlayerLocked(player, CandelabraRelicId, PlayerHasCandelabra(player));
+            RecordTurnEnergyRelicCombatWithoutEnergyForPlayerLocked(player, ChandelierRelicId, PlayerHasChandelier(player));
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordTurnEnergyRelicCombatsWithoutEnergyForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordTurnEnergyRelicCombatWithoutEnergyForPlayerLocked(Player player, string relicId, bool held)
+    {
+        if (_pendingCombat == null || !held) return;
+
+        var gainedEnergy = _pendingCombat.RelicAggregates.TryGetValue(relicId, out var agg)
+            && agg.EnergyGenerated > 0;
+        if (gainedEnergy) return;
+
+        GetOrCreatePendingRelicAggregateLocked(relicId).CombatsWithoutActivation += 1;
+    }
+
+    private static bool IsTurnEnergyRelicId(string relicId)
+        => relicId == LanternRelicId
+            || relicId == CandelabraRelicId
+            || relicId == ChandelierRelicId;
+
+    private static bool PlayerHasLantern(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is Lantern);
+        }
+        catch
+        {
+            return false;
         }
     }
 
@@ -6179,6 +6264,18 @@ public static class RunTracker
         try
         {
             return player.Relics.Any(r => r is Candelabra);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool PlayerHasChandelier(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is Chandelier);
         }
         catch
         {
@@ -11776,7 +11873,11 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> PaelsEyeActivationStartedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> LanternFirstTurnExcessRecordedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> CandelabraSecondTurnExcessRecordedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> ChandelierThirdTurnExcessRecordedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> PenNibTurnEndChargeRecordedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
