@@ -20,6 +20,11 @@
       "energy_generated": 2,
       "first_turns_ended_with_excess_energy": 1
     },
+    "RELIC.VERY_HOT_COCOA": {
+      "activations": 3,
+      "energy_generated": 3,
+      "first_turns_ended_with_excess_energy": 2
+    },
     "RELIC.CANDELABRA": {
       "activations": 4,
       "energy_generated": 8,

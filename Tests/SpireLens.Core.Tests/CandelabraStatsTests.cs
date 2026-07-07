@@ -11,12 +11,17 @@ namespace SpireLens.Core.Tests;
 public class CandelabraStatsTests
 {
     private const string LanternRelicId = "RELIC.LANTERN";
+    private const string VeryHotCocoaRelicId = "RELIC.VERY_HOT_COCOA";
     private const string CandelabraRelicId = "RELIC.CANDELABRA";
     private const string ChandelierRelicId = "RELIC.CHANDELIER";
 
     private static readonly MethodInfo BuildLanternBodyMethod =
         typeof(RelicHoverShowPatch).GetMethod("BuildLanternBodyBBCode", BindingFlags.NonPublic | BindingFlags.Static)
         ?? throw new InvalidOperationException("BuildLanternBodyBBCode not found.");
+
+    private static readonly MethodInfo BuildVeryHotCocoaBodyMethod =
+        typeof(RelicHoverShowPatch).GetMethod("BuildVeryHotCocoaBodyBBCode", BindingFlags.NonPublic | BindingFlags.Static)
+        ?? throw new InvalidOperationException("BuildVeryHotCocoaBodyBBCode not found.");
 
     private static readonly MethodInfo BuildCandelabraBodyMethod =
         typeof(RelicHoverShowPatch).GetMethod("BuildCandelabraBodyBBCode", BindingFlags.NonPublic | BindingFlags.Static)
@@ -55,6 +60,12 @@ public class CandelabraStatsTests
             EnergyGenerated = 2,
             FirstTurnsEndedWithExcessEnergy = 1,
         };
+        run.RelicAggregates[VeryHotCocoaRelicId] = new RelicAggregate
+        {
+            Activations = 3,
+            EnergyGenerated = 3,
+            FirstTurnsEndedWithExcessEnergy = 2,
+        };
         run.RelicAggregates[CandelabraRelicId] = new RelicAggregate
         {
             Activations = 4,
@@ -86,6 +97,11 @@ public class CandelabraStatsTests
         Assert.Equal(2, lantern.Activations);
         Assert.Equal(2, lantern.EnergyGenerated);
         Assert.Equal(1, lantern.FirstTurnsEndedWithExcessEnergy);
+
+        var veryHotCocoa = restored.RelicAggregates[VeryHotCocoaRelicId];
+        Assert.Equal(3, veryHotCocoa.Activations);
+        Assert.Equal(3, veryHotCocoa.EnergyGenerated);
+        Assert.Equal(2, veryHotCocoa.FirstTurnsEndedWithExcessEnergy);
 
         var candelabra = restored.RelicAggregates[CandelabraRelicId];
         Assert.Equal(4, candelabra.Activations);
@@ -142,6 +158,38 @@ public class CandelabraStatsTests
         Assert.Contains("1st turns ended with excess energy", body);
         Assert.Contains("[b]0[/b]", body);
         Assert.Contains("1st turns ended with excess energy[/color]  [b]0[/b]", body);
+        Assert.DoesNotContain("Combats with energy not gained", body);
+    }
+
+    [Fact]
+    public void RelicTooltip_VeryHotCocoa_ShowsLanternStyleRowsAndZeroValues()
+    {
+        var body = BuildBody(BuildVeryHotCocoaBodyMethod, new RelicAggregate());
+
+        Assert.Contains("Activations", body);
+        Assert.Contains("Energy generated", body);
+        Assert.Contains("1st turns ended with excess energy", body);
+        Assert.Contains("[b]0[/b]", body);
+        Assert.Contains("1st turns ended with excess energy[/color]  [b]0[/b]", body);
+        Assert.DoesNotContain("Combats with energy not gained", body);
+    }
+
+    [Fact]
+    public void RelicTooltip_VeryHotCocoa_ShowsTrackedCounts()
+    {
+        var agg = new RelicAggregate
+        {
+            Activations = 3,
+            EnergyGenerated = 3,
+            FirstTurnsEndedWithExcessEnergy = 2,
+        };
+
+        var body = BuildBody(BuildVeryHotCocoaBodyMethod, agg);
+
+        Assert.Contains("Activations", body);
+        Assert.Contains("Energy generated", body);
+        Assert.Contains("[b]3[/b]", body);
+        Assert.Contains("1st turns ended with excess energy[/color]  [b]2[/b]", body);
         Assert.DoesNotContain("Combats with energy not gained", body);
     }
 

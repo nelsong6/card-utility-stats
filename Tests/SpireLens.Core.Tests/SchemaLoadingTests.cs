@@ -1326,6 +1326,11 @@ public class SchemaLoadingTests
         Assert.Equal(2, lanternAgg.EnergyGenerated);
         Assert.Equal(1, lanternAgg.FirstTurnsEndedWithExcessEnergy);
 
+        var veryHotCocoaAgg = loaded.Data.RelicAggregates["RELIC.VERY_HOT_COCOA"];
+        Assert.Equal(3, veryHotCocoaAgg.Activations);
+        Assert.Equal(3, veryHotCocoaAgg.EnergyGenerated);
+        Assert.Equal(2, veryHotCocoaAgg.FirstTurnsEndedWithExcessEnergy);
+
         var candelabraAgg = loaded.Data.RelicAggregates["RELIC.CANDELABRA"];
         Assert.Equal(4, candelabraAgg.Activations);
         Assert.Equal(8, candelabraAgg.EnergyGenerated);
@@ -1350,6 +1355,11 @@ public class SchemaLoadingTests
         Assert.Equal(2, lanternAgg.Activations);
         Assert.Equal(2, lanternAgg.EnergyGenerated);
         Assert.Equal(1, lanternAgg.FirstTurnsEndedWithExcessEnergy);
+
+        var veryHotCocoaAgg = resumed.RelicAggregates["RELIC.VERY_HOT_COCOA"];
+        Assert.Equal(3, veryHotCocoaAgg.Activations);
+        Assert.Equal(3, veryHotCocoaAgg.EnergyGenerated);
+        Assert.Equal(2, veryHotCocoaAgg.FirstTurnsEndedWithExcessEnergy);
 
         var candelabraAgg = resumed.RelicAggregates["RELIC.CANDELABRA"];
         Assert.Equal(4, candelabraAgg.Activations);

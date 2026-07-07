@@ -2262,6 +2262,7 @@ public static class RunTracker
     private const string NunchakuRelicId = "RELIC.NUNCHAKU";
     private const string IronClubRelicId = "RELIC.IRON_CLUB";
     private const string LanternRelicId = "RELIC.LANTERN";
+    private const string VeryHotCocoaRelicId = "RELIC.VERY_HOT_COCOA";
     private const string CandelabraRelicId = "RELIC.CANDELABRA";
     private const string ChandelierRelicId = "RELIC.CHANDELIER";
     private const string PendulumRelicId = "RELIC.PENDULUM";
@@ -6325,8 +6326,8 @@ public static class RunTracker
     }
 
     /// <summary>
-    /// Record a Lantern/Candelabra/Chandelier owner-specific activation and
-    /// arm observed energy attribution for its immediate gain.
+    /// Record a Lantern/Very Hot Cocoa/Candelabra/Chandelier owner-specific
+    /// activation and arm observed energy attribution for its immediate gain.
     /// </summary>
     public static void RecordTurnEnergyRelicActivationAndArmEnergyAttribution(string relicId, Player? owner)
     {
@@ -6356,7 +6357,7 @@ public static class RunTracker
 
     /// <summary>
     /// Count player turns ending with unspent energy while the matching
-    /// Lantern/Candelabra/Chandelier relic is held.
+    /// Lantern/Very Hot Cocoa/Candelabra/Chandelier relic is held.
     /// Called from the global before-turn-end hook so the energy pool has not
     /// been cleared yet.
     /// </summary>
@@ -6376,17 +6377,20 @@ public static class RunTracker
                     if (combatState == null) continue;
                     if (combatState.Energy <= 0) continue;
 
-                    switch (combatState.TurnNumber)
+                    if (combatState.TurnNumber == 1)
                     {
-                        case 1 when PlayerHasLantern(player):
+                        if (PlayerHasLantern(player))
                             RecordTurnEnergyRelicExcessEnergyForPlayerLocked(LanternRelicId, player);
-                            break;
-                        case 2 when PlayerHasCandelabra(player):
-                            RecordTurnEnergyRelicExcessEnergyForPlayerLocked(CandelabraRelicId, player);
-                            break;
-                        case 3 when PlayerHasChandelier(player):
-                            RecordTurnEnergyRelicExcessEnergyForPlayerLocked(ChandelierRelicId, player);
-                            break;
+                        if (PlayerHasVeryHotCocoa(player))
+                            RecordTurnEnergyRelicExcessEnergyForPlayerLocked(VeryHotCocoaRelicId, player);
+                    }
+                    else if (combatState.TurnNumber == 2 && PlayerHasCandelabra(player))
+                    {
+                        RecordTurnEnergyRelicExcessEnergyForPlayerLocked(CandelabraRelicId, player);
+                    }
+                    else if (combatState.TurnNumber == 3 && PlayerHasChandelier(player))
+                    {
+                        RecordTurnEnergyRelicExcessEnergyForPlayerLocked(ChandelierRelicId, player);
                     }
                 }
             }
@@ -6404,6 +6408,7 @@ public static class RunTracker
         var recorded = relicId switch
         {
             LanternRelicId => _pendingCombat.LanternFirstTurnExcessRecordedPlayers.Add(player),
+            VeryHotCocoaRelicId => _pendingCombat.VeryHotCocoaFirstTurnExcessRecordedPlayers.Add(player),
             CandelabraRelicId => _pendingCombat.CandelabraSecondTurnExcessRecordedPlayers.Add(player),
             ChandelierRelicId => _pendingCombat.ChandelierThirdTurnExcessRecordedPlayers.Add(player),
             _ => false,
@@ -6414,6 +6419,7 @@ public static class RunTracker
         switch (relicId)
         {
             case LanternRelicId:
+            case VeryHotCocoaRelicId:
                 agg.FirstTurnsEndedWithExcessEnergy += 1;
                 break;
             case CandelabraRelicId:
@@ -6454,6 +6460,7 @@ public static class RunTracker
 
     private static bool IsTurnEnergyRelicId(string relicId)
         => relicId == LanternRelicId
+            || relicId == VeryHotCocoaRelicId
             || relicId == CandelabraRelicId
             || relicId == ChandelierRelicId;
 
@@ -6462,6 +6469,18 @@ public static class RunTracker
         try
         {
             return player.Relics.Any(r => r is Lantern);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool PlayerHasVeryHotCocoa(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is VeryHotCocoa);
         }
         catch
         {
@@ -12163,6 +12182,8 @@ internal class PendingCombat
     public HashSet<Player> PaelsEyeActivationStartedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> LanternFirstTurnExcessRecordedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> VeryHotCocoaFirstTurnExcessRecordedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> CandelabraSecondTurnExcessRecordedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

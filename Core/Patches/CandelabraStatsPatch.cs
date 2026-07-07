@@ -35,6 +35,34 @@ public static class LanternAfterSideTurnStartPatch
 }
 
 /// <summary>
+/// Records Very Hot Cocoa when its owner-specific turn-1 callback is about to
+/// grant energy. The actual energy delta is observed by PlayerCombatState.
+/// </summary>
+[HarmonyPatch(typeof(VeryHotCocoa), nameof(VeryHotCocoa.AfterSideTurnStart))]
+public static class VeryHotCocoaAfterSideTurnStartPatch
+{
+    [HarmonyPrefix]
+    public static void Prefix(
+        VeryHotCocoa __instance,
+        CombatSide side,
+        IReadOnlyList<Creature> participants,
+        ICombatState combatState)
+    {
+        try
+        {
+            if (!TurnEnergyRelicPatchHelpers.TryGetTrackedOwnerOnPlayerTurn(__instance, side, participants, out var owner)) return;
+            if (owner.PlayerCombatState?.TurnNumber > 1) return;
+
+            RunTracker.RecordTurnEnergyRelicActivationAndArmEnergyAttribution("RELIC.VERY_HOT_COCOA", owner);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"VeryHotCocoaAfterSideTurnStartPatch failed: {e.Message}");
+        }
+    }
+}
+
+/// <summary>
 /// Records Candelabra when its owner-specific turn-2 callback is about to
 /// grant energy. The actual energy delta is observed by PlayerCombatState.
 /// </summary>
@@ -84,8 +112,8 @@ public static class ChandelierAfterSideTurnStartPatch
 
 /// <summary>
 /// Counts player turns that end with unspent energy while the matching
-/// Lantern/Candelabra/Chandelier turn-energy relic is held. Bound by runtime
-/// lookup so a game hook rename does not break build.
+/// Lantern/Very Hot Cocoa/Candelabra/Chandelier turn-energy relic is held.
+/// Bound by runtime lookup so a game hook rename does not break build.
 /// </summary>
 [HarmonyPatch]
 public static class HookBeforeSideTurnEndTurnEnergyRelicsPatch

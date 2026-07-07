@@ -1,6 +1,8 @@
 using System;
 using System.Linq;
 using System.Reflection;
+using HarmonyLib;
+using MegaCrit.Sts2.Core.Models.Relics;
 using SpireLens.Core.Patches;
 using Xunit;
 
@@ -172,6 +174,30 @@ public class HookPatchTargetTests
         var sideParameter = target.GetParameters().SingleOrDefault(p => p.Name == "side");
         Assert.NotNull(sideParameter);
         Assert.Equal("MegaCrit.Sts2.Core.Combat.CombatSide", sideParameter!.ParameterType.FullName);
+    }
+
+    [Fact]
+    [Trait("Category", "RequiresLiveGame")]
+    public void VeryHotCocoaPatch_ResolvesAfterSideTurnStart()
+    {
+        var target = AccessTools.Method(typeof(VeryHotCocoa), nameof(VeryHotCocoa.AfterSideTurnStart));
+
+        Assert.NotNull(target);
+        Assert.Equal("MegaCrit.Sts2.Core.Models.Relics.VeryHotCocoa", target!.DeclaringType?.FullName);
+        Assert.Equal("AfterSideTurnStart", target.Name);
+        Assert.Equal(
+            new[]
+            {
+                "MegaCrit.Sts2.Core.Combat.CombatSide",
+                "System.Collections.Generic.IReadOnlyList`1",
+                "MegaCrit.Sts2.Core.Combat.ICombatState",
+            },
+            target.GetParameters().Select(p => p.ParameterType.IsGenericType
+                ? p.ParameterType.GetGenericTypeDefinition().FullName
+                : p.ParameterType.FullName).ToArray());
+        Assert.Equal(
+            "MegaCrit.Sts2.Core.Entities.Creatures.Creature",
+            target.GetParameters()[1].ParameterType.GenericTypeArguments.Single().FullName);
     }
 
     [Fact]

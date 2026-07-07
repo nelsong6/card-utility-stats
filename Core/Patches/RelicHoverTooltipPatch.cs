@@ -247,6 +247,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is VeryHotCocoa)
+            {
+                const string relicId = "RELIC.VERY_HOT_COCOA";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildVeryHotCocoaBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Very Hot Cocoa", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is Candelabra)
             {
                 const string relicId = "RELIC.CANDELABRA";
@@ -1041,6 +1051,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is VeryHotCocoa)
+        {
+            title = "Very Hot Cocoa";
+            body = BuildVeryHotCocoaBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is Candelabra)
         {
             title = "Candelabra";
@@ -1685,6 +1702,13 @@ public static class RelicHoverShowPatch
     }
 
     private static string BuildLanternBodyBBCode(RelicAggregate agg)
+        => BuildTurnEnergyRelicBodyBBCode(
+            agg,
+            "1st turns ended with excess energy",
+            agg.FirstTurnsEndedWithExcessEnergy,
+            includeCombatsWithEnergyNotGained: false);
+
+    private static string BuildVeryHotCocoaBodyBBCode(RelicAggregate agg)
         => BuildTurnEnergyRelicBodyBBCode(
             agg,
             "1st turns ended with excess energy",

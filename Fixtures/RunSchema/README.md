@@ -112,9 +112,10 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds Candelabra activation tracking, observed energy generated, and count of
   second player turns that ended with excess energy while it was held.
 - `turn-energy-relics-run.json`
-  Adds shared Lantern, Candelabra, and Chandelier turn-energy relic tracking:
-  activations, observed energy generated, matching turn-end excess-energy
-  counts, and missed-energy combat counts for the turn-2/turn-3 relics.
+  Adds shared Lantern, Very Hot Cocoa, Candelabra, and Chandelier turn-energy
+  relic tracking: activations, observed energy generated, matching turn-end
+  excess-energy counts, and missed-energy combat counts for the turn-2/turn-3
+  relics.
 - `nunchaku-relic-run.json`
   Adds Nunchaku tracking: attacks played, observed energy gained, completed
   combats held for averages, combat-end 8/9 charge counts, and combat-end
