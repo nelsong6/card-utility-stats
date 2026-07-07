@@ -198,6 +198,9 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds Arcane Scroll rare-card grant tracking: the rare card added by id/name.
 - `large-capsule-relic-run.json`
   Adds Large Capsule relic grant tracking: relics added by id/name.
+- `neows-bones-relic-run.json`
+  Adds Neow's Bones tracking: the two relics obtained by id/name plus the
+  random curse added by id/name and its card stats.
 - `vambrace-relic-run.json`
   Adds Vambrace activation tracking plus extra block gained from the block
   packets its 2x multiplier actually modified.

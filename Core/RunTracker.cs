@@ -336,6 +336,17 @@ public static class RunTracker
         }
     }
 
+    public static CardAggregate GetPooledCardAggregateByDefinition(string definitionId)
+    {
+        if (string.IsNullOrWhiteSpace(definitionId)) return new CardAggregate();
+
+        lock (_lock)
+        {
+            return GetPooledEffectiveAggregateByDefinitionLocked(definitionId)
+                   ?? new CardAggregate();
+        }
+    }
+
     public static bool IsSovereignBladeDeckViewCard(CardModel card)
     {
         if (card == null) return false;
@@ -2271,6 +2282,7 @@ public static class RunTracker
     private const string WhiteBeastStatueRelicId = "RELIC.WHITE_BEAST_STATUE";
     private const string ShovelRelicId = "RELIC.SHOVEL";
     private const string LargeCapsuleRelicId = "RELIC.LARGE_CAPSULE";
+    private const string NeowsBonesRelicId = "RELIC.NEOWS_BONES";
     private const string BoundPhylacteryRelicId = "RELIC.BOUND_PHYLACTERY";
     private const string PhylacteryUnboundRelicId = "RELIC.PHYLACTERY_UNBOUND";
     private const string ToolboxRelicId = "RELIC.TOOLBOX";
@@ -3196,6 +3208,91 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"CompleteLargeCapsulePickup failed: {e.Message}");
+            }
+        }
+    }
+
+    public static bool BeginNeowsBonesPickup(
+        NeowsBones relic,
+        out Player? player,
+        out IReadOnlyCollection<RelicModel>? relicsBeforePickup,
+        out IReadOnlyCollection<CardModel>? deckBeforePickup)
+    {
+        player = null;
+        relicsBeforePickup = null;
+        deckBeforePickup = null;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic)) return false;
+                if (!IsTrackedPlayer(relic.Owner)) return false;
+
+                player = relic.Owner;
+                relicsBeforePickup = SnapshotRelics(player);
+                deckBeforePickup = SnapshotDeckCards(player);
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"BeginNeowsBonesPickup failed: {e.Message}");
+                player = null;
+                relicsBeforePickup = null;
+                deckBeforePickup = null;
+                return false;
+            }
+        }
+    }
+
+    public static void CompleteNeowsBonesPickup(
+        Player? player,
+        IReadOnlyCollection<RelicModel>? relicsBeforePickup,
+        IReadOnlyCollection<CardModel>? deckBeforePickup,
+        bool succeeded)
+    {
+        if (player == null || relicsBeforePickup == null || deckBeforePickup == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!succeeded || !IsTrackedPlayer(player)) return;
+
+                var relicsBefore = relicsBeforePickup as HashSet<RelicModel>
+                    ?? new HashSet<RelicModel>(relicsBeforePickup, ReferenceEqualityComparer.Instance);
+                var deckBefore = deckBeforePickup as HashSet<CardModel>
+                    ?? new HashSet<CardModel>(deckBeforePickup, ReferenceEqualityComparer.Instance);
+
+                var relicsGranted = NewRelicsSince(player, relicsBefore).ToList();
+                var cursesGranted = NewDeckCardsSince(player, deckBefore)
+                    .Where(card => card.Type == CardType.Curse)
+                    .ToList();
+                if (relicsGranted.Count == 0 && cursesGranted.Count == 0) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(NeowsBonesRelicId);
+                foreach (var grantedRelic in relicsGranted)
+                {
+                    RecordNeowsBonesRelicObtainedForTest(
+                        agg,
+                        grantedRelic.Id.ToString(),
+                        GetRelicDisplayName(grantedRelic));
+                }
+
+                foreach (var curse in cursesGranted)
+                {
+                    RecordNeowsBonesCurseGrantedForTest(
+                        agg,
+                        curse.Id.ToString(),
+                        GetCardDisplayName(curse));
+                }
+
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"CompleteNeowsBonesPickup failed: {e.Message}");
             }
         }
     }
@@ -5499,6 +5596,24 @@ public static class RunTracker
     {
         if (agg == null || string.IsNullOrWhiteSpace(relicId)) return;
         AddRelicGranted(agg.RelicsGranted, relicId, displayName ?? "", 1);
+    }
+
+    internal static void RecordNeowsBonesRelicObtainedForTest(
+        RelicAggregate agg,
+        string? relicId,
+        string? displayName)
+    {
+        if (agg == null || string.IsNullOrWhiteSpace(relicId)) return;
+        AddRelicGranted(agg.RelicsGranted, relicId, displayName ?? "", 1);
+    }
+
+    internal static void RecordNeowsBonesCurseGrantedForTest(
+        RelicAggregate agg,
+        string? cardId,
+        string? displayName)
+    {
+        if (agg == null || string.IsNullOrWhiteSpace(cardId)) return;
+        AddRelicCardGranted(agg.CardsGranted, cardId, displayName ?? "", 1);
     }
 
     internal static void RecordShovelCampfireNotDugForTest(RelicAggregate agg, int count = 1)

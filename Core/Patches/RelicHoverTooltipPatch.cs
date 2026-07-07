@@ -739,6 +739,7 @@ public static class RelicHoverShowPatch
         RelicAggregate? aggregate = null;
         CardAggregate? bloodSoakedRoseCurseAgg = null;
         CardAggregate? cursedPearlCurseAgg = null;
+        IReadOnlyDictionary<string, CardAggregate>? neowsBonesCurseAggs = null;
         int? floorCount = null;
 
         if (useEndedRun)
@@ -758,6 +759,13 @@ public static class RelicHoverShowPatch
                     RunTracker.GetLastEndedPooledCardAggregateByDefinition(CursedPearlCurseDefinitionId)
                     ?? new CardAggregate();
             }
+            else if (relicModel is NeowsBones && aggregate != null)
+            {
+                neowsBonesCurseAggs = BuildGrantedCurseAggregates(
+                    aggregate,
+                    definitionId => RunTracker.GetLastEndedPooledCardAggregateByDefinition(definitionId)
+                                    ?? new CardAggregate());
+            }
         }
 
         aggregate ??= IsStrikeDummyStatsRelicModel(relicModel)
@@ -770,6 +778,12 @@ public static class RelicHoverShowPatch
             bloodSoakedRoseCurseAgg = RunTracker.GetEnthralledCurseAggregate();
         if (relicModel is CursedPearl && cursedPearlCurseAgg == null)
             cursedPearlCurseAgg = RunTracker.GetCursedPearlCurseAggregate();
+        if (relicModel is NeowsBones && neowsBonesCurseAggs == null)
+        {
+            neowsBonesCurseAggs = BuildGrantedCurseAggregates(
+                aggregate ?? new RelicAggregate(),
+                RunTracker.GetPooledCardAggregateByDefinition);
+        }
 
         floorCount ??= RunTracker.GetCurrentFloorForRateStats();
 
@@ -779,6 +793,7 @@ public static class RelicHoverShowPatch
             floorCount,
             bloodSoakedRoseCurseAgg,
             cursedPearlCurseAgg,
+            neowsBonesCurseAggs,
             out title,
             out body);
     }
@@ -832,7 +847,7 @@ public static class RelicHoverShowPatch
         out string title,
         out string body)
     {
-        return TryBuildBodyBBCode(relicModel, agg, floorCount, null, null, out title, out body);
+        return TryBuildBodyBBCode(relicModel, agg, floorCount, null, null, null, out title, out body);
     }
 
     internal static bool TryBuildBodyBBCode(
@@ -841,6 +856,7 @@ public static class RelicHoverShowPatch
         int? floorCount,
         CardAggregate? bloodSoakedRoseCurseAgg,
         CardAggregate? cursedPearlCurseAgg,
+        IReadOnlyDictionary<string, CardAggregate>? neowsBonesCurseAggs,
         out string title,
         out string body)
     {
@@ -1076,6 +1092,13 @@ public static class RelicHoverShowPatch
         {
             title = "Cursed Pearl";
             body = BuildCursedPearlBodyBBCode(agg, cursedPearlCurseAgg ?? new CardAggregate());
+            return true;
+        }
+
+        if (relicModel is NeowsBones)
+        {
+            title = "Neow's Bones";
+            body = BuildNeowsBonesBodyBBCode(agg, neowsBonesCurseAggs);
             return true;
         }
 
@@ -1775,6 +1798,58 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
+    private static string BuildNeowsBonesBodyBBCode(
+        RelicAggregate agg,
+        IReadOnlyDictionary<string, CardAggregate>? curseAggregates)
+    {
+        var sb = new StringBuilder();
+        var relics = agg.RelicsGranted.Values
+            .Where(relic => relic.Count > 0)
+            .OrderByDescending(relic => relic.Count)
+            .ThenBy(relic => relic.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var relicTotal = relics.Sum(relic => Math.Max(0, relic.Count));
+
+        Row3(sb, "Neow relics obtained", relicTotal.ToString(), "");
+        foreach (var relic in relics)
+        {
+            var displayName = StatsTooltip.EscapeBbcode(string.IsNullOrWhiteSpace(relic.DisplayName)
+                ? RunTracker.FormatRelicIdForDisplay(relic.RelicId)
+                : relic.DisplayName);
+            var value = relic.Count == 1 ? displayName : $"{displayName} x{relic.Count}";
+            Row3(sb, "Neow relic", value, "");
+        }
+
+        var curses = agg.CardsGranted.Values
+            .Where(card => card.Count > 0)
+            .OrderByDescending(card => card.Count)
+            .ThenBy(card => card.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var curseTotal = curses.Sum(card => Math.Max(0, card.Count));
+
+        Row3(sb, "Curses added", curseTotal.ToString(), "");
+        if (curses.Count == 0)
+        {
+            AppendRelatedCurseCardStats(sb, "Curse", new CardAggregate());
+            return sb.ToString();
+        }
+
+        foreach (var curse in curses)
+        {
+            var displayName = StatsTooltip.EscapeBbcode(string.IsNullOrWhiteSpace(curse.DisplayName)
+                ? RunTracker.FormatCardIdForDisplay(curse.CardId)
+                : curse.DisplayName);
+            var value = curse.Count == 1 ? displayName : $"{displayName} x{curse.Count}";
+            Row3(sb, "Curse added", value, "");
+
+            CardAggregate? curseAgg = null;
+            curseAggregates?.TryGetValue(curse.CardId, out curseAgg);
+            AppendRelatedCurseCardStats(sb, displayName, curseAgg ?? new CardAggregate());
+        }
+
+        return sb.ToString();
+    }
+
     private static void AppendRelatedCurseCardStats(
         StringBuilder sb,
         string displayName,
@@ -1788,6 +1863,20 @@ public static class RelicHoverShowPatch
         if (includePlayed)
             Row3(sb, $"{displayName} played", curseAgg.Plays.ToString(), "");
         Row3(sb, $"{displayName} exhausted", curseAgg.TimesExhausted.ToString(), "");
+    }
+
+    private static IReadOnlyDictionary<string, CardAggregate> BuildGrantedCurseAggregates(
+        RelicAggregate agg,
+        Func<string, CardAggregate> aggregateForDefinition)
+    {
+        var result = new Dictionary<string, CardAggregate>(StringComparer.Ordinal);
+        foreach (var card in agg.CardsGranted.Values)
+        {
+            if (card.Count <= 0 || string.IsNullOrWhiteSpace(card.CardId)) continue;
+            result[card.CardId] = aggregateForDefinition(card.CardId) ?? new CardAggregate();
+        }
+
+        return result;
     }
 
     private static string BuildCloakClaspBodyBBCode(RelicAggregate agg)

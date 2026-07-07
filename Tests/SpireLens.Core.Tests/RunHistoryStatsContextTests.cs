@@ -116,6 +116,7 @@ public class RunHistoryStatsContextTests
                 TimesExhausted = 2,
             },
             null,
+            null,
             out var title,
             out var body);
 

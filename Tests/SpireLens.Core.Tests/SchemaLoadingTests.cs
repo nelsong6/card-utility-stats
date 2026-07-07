@@ -1934,6 +1934,51 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsNeowsBonesRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("neows-bones-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.NEOWS_BONES"];
+        Assert.Equal(1, relicAgg.RelicsGranted["RELIC.NEOWS_TALISMAN"].Count);
+        Assert.Equal("Neow's Talisman", relicAgg.RelicsGranted["RELIC.NEOWS_TALISMAN"].DisplayName);
+        Assert.Equal(1, relicAgg.RelicsGranted["RELIC.NEOWS_TORMENT"].Count);
+        Assert.Equal("Neow's Torment", relicAgg.RelicsGranted["RELIC.NEOWS_TORMENT"].DisplayName);
+        Assert.Equal(1, relicAgg.CardsGranted["CARD.INJURY"].Count);
+        Assert.Equal("Injury", relicAgg.CardsGranted["CARD.INJURY"].DisplayName);
+
+        var curseAgg = loaded.Data.Aggregates["CARD.INJURY#1"];
+        Assert.Equal(3, curseAgg.CombatsInDeck);
+        Assert.Equal(5, curseAgg.TimesDrawn);
+        Assert.Equal(2, curseAgg.TimesDiscarded);
+        Assert.Equal(1, curseAgg.Plays);
+        Assert.Equal(2, curseAgg.TimesExhausted);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsNeowsBonesRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("neows-bones-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.NEOWS_BONES"];
+        Assert.Equal(1, relicAgg.RelicsGranted["RELIC.NEOWS_TALISMAN"].Count);
+        Assert.Equal("Neow's Talisman", relicAgg.RelicsGranted["RELIC.NEOWS_TALISMAN"].DisplayName);
+        Assert.Equal(1, relicAgg.RelicsGranted["RELIC.NEOWS_TORMENT"].Count);
+        Assert.Equal("Neow's Torment", relicAgg.RelicsGranted["RELIC.NEOWS_TORMENT"].DisplayName);
+        Assert.Equal(1, relicAgg.CardsGranted["CARD.INJURY"].Count);
+        Assert.Equal("Injury", relicAgg.CardsGranted["CARD.INJURY"].DisplayName);
+
+        var curseAgg = resumed.Aggregates["CARD.INJURY#1"];
+        Assert.Equal(3, curseAgg.CombatsInDeck);
+        Assert.Equal(5, curseAgg.TimesDrawn);
+        Assert.Equal(2, curseAgg.TimesDiscarded);
+        Assert.Equal(1, curseAgg.Plays);
+        Assert.Equal(2, curseAgg.TimesExhausted);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsVambraceRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("vambrace-relic-run.json"));

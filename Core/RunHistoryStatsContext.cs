@@ -130,6 +130,19 @@ internal static class RunHistoryStatsContext
         var cursedPearlCurseAgg = relicModel is CursedPearl
             ? CardAggregatePooler.PoolByDefinition(run.Aggregates, CursedPearlCurseDefinitionId) ?? new CardAggregate()
             : null;
+        IReadOnlyDictionary<string, CardAggregate>? neowsBonesCurseAggs = null;
+        if (relicModel is NeowsBones)
+        {
+            var curseAggs = new Dictionary<string, CardAggregate>(StringComparer.Ordinal);
+            foreach (var card in aggregate.CardsGranted.Values)
+            {
+                if (card.Count <= 0 || string.IsNullOrWhiteSpace(card.CardId)) continue;
+                curseAggs[card.CardId] =
+                    CardAggregatePooler.PoolByDefinition(run.Aggregates, card.CardId) ?? new CardAggregate();
+            }
+
+            neowsBonesCurseAggs = curseAggs;
+        }
 
         return RelicHoverShowPatch.TryBuildBodyBBCode(
             relicModel,
@@ -137,6 +150,7 @@ internal static class RunHistoryStatsContext
             run.FloorReached,
             bloodSoakedRoseCurseAgg,
             cursedPearlCurseAgg,
+            neowsBonesCurseAggs,
             out title,
             out body);
     }

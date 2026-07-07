@@ -220,6 +220,18 @@ public class HookPatchTargetTests
         Assert.Empty(target.GetParameters());
     }
 
+    [Fact]
+    [Trait("Category", "RequiresLiveGame")]
+    public void NeowsBonesPatch_ResolvesAfterObtained()
+    {
+        var target = InvokeTargetMethod(typeof(NeowsBonesAfterObtainedPatch));
+
+        Assert.NotNull(target);
+        Assert.Equal("MegaCrit.Sts2.Core.Models.Relics.NeowsBones", target!.DeclaringType?.FullName);
+        Assert.Equal("AfterObtained", target.Name);
+        Assert.Empty(target.GetParameters());
+    }
+
     private static MethodBase? InvokeTargetMethod(Type patchType)
     {
         _ = Assembly.Load("sts2");

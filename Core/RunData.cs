@@ -525,7 +525,7 @@ public class RelicAggregate
     public int CampfiresNotDug { get; set; }
 
     // Specific relics granted by relic-owned effects. Used by Large Capsule
-    // to show which relics were obtained.
+    // and Neow's Bones to show which relics were obtained.
     public Dictionary<string, RelicGrantedAggregate> RelicsGranted { get; set; } = new();
 
     // Total offered cards by rarity for relics that generate card-choice
@@ -632,8 +632,8 @@ public class RelicAggregate
     public Dictionary<string, CardRewardCategoryAggregate> CardRewardCategories { get; set; } = new();
 
     // Specific cards granted by relic-owned effects. Used by Hefty Tablet to
-    // show which rare card was picked from its pickup screen and Arcane Scroll
-    // to show the rare card it added.
+    // show which rare card was picked from its pickup screen, Arcane Scroll to
+    // show the rare card it added, and Neow's Bones to show the curse it added.
     public Dictionary<string, RelicCardAggregate> CardsGranted { get; set; } = new();
 
     // Times a relic-owned card choice was skipped. Used by Hefty Tablet.
