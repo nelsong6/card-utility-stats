@@ -1884,6 +1884,29 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsArcaneScrollRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("arcane-scroll-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.ARCANE_SCROLL"];
+        Assert.Equal(1, relicAgg.CardsGranted["CARD.ADRENALINE"].Count);
+        Assert.Equal("Adrenaline", relicAgg.CardsGranted["CARD.ADRENALINE"].DisplayName);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsArcaneScrollRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("arcane-scroll-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.ARCANE_SCROLL"];
+        Assert.Equal(1, relicAgg.CardsGranted["CARD.ADRENALINE"].Count);
+        Assert.Equal("Adrenaline", relicAgg.CardsGranted["CARD.ADRENALINE"].DisplayName);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsVambraceRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("vambrace-relic-run.json"));

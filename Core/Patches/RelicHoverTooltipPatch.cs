@@ -588,6 +588,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is ArcaneScroll)
+            {
+                const string relicId = "RELIC.ARCANE_SCROLL";
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+
+                var body = BuildArcaneScrollBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Arcane Scroll", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is PaelsWing)
             {
                 const string relicId = "RELIC.PAELS_WING";
@@ -1217,6 +1227,13 @@ public static class RelicHoverShowPatch
         {
             title = "Hefty Tablet";
             body = BuildHeftyTabletBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is ArcaneScroll)
+        {
+            title = "Arcane Scroll";
+            body = BuildArcaneScrollBodyBBCode(agg);
             return true;
         }
 
@@ -1966,6 +1983,33 @@ public static class RelicHoverShowPatch
                 : card.DisplayName);
             var value = card.Count == 1 ? displayName : $"{displayName} x{card.Count}";
             Row3(sb, "Granted", value, "");
+        }
+
+        return sb.ToString();
+    }
+
+    private static string BuildArcaneScrollBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var cards = agg.CardsGranted.Values
+            .Where(card => card.Count > 0)
+            .OrderByDescending(card => card.Count)
+            .ThenBy(card => card.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (cards.Count == 0)
+        {
+            Row3(sb, "Rare received", "0", "");
+            return sb.ToString();
+        }
+
+        foreach (var card in cards)
+        {
+            var displayName = StatsTooltip.EscapeBbcode(string.IsNullOrWhiteSpace(card.DisplayName)
+                ? RunTracker.FormatCardIdForDisplay(card.CardId)
+                : card.DisplayName);
+            var value = card.Count == 1 ? displayName : $"{displayName} x{card.Count}";
+            Row3(sb, "Rare received", value, "");
         }
 
         return sb.ToString();

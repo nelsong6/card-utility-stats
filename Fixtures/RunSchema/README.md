@@ -194,6 +194,8 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `hefty-tablet-relic-run.json`
   Adds Hefty Tablet rare-card choice tracking: cards granted by id/name and
   skipped pickup choices.
+- `arcane-scroll-relic-run.json`
+  Adds Arcane Scroll rare-card grant tracking: the rare card added by id/name.
 - `vambrace-relic-run.json`
   Adds Vambrace activation tracking plus extra block gained from the block
   packets its 2x multiplier actually modified.

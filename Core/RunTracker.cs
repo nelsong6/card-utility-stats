@@ -2282,6 +2282,7 @@ public static class RunTracker
     private const string BrilliantScarfRelicId = "RELIC.BRILLIANT_SCARF";
     private const string JuzuBraceletRelicId = "RELIC.JUZU_BRACELET";
     private const string HeftyTabletRelicId = "RELIC.HEFTY_TABLET";
+    private const string ArcaneScrollRelicId = "RELIC.ARCANE_SCROLL";
     private const string VambraceRelicId = "RELIC.VAMBRACE";
     private const string GamblingChipRelicId = "RELIC.GAMBLING_CHIP";
     private const string CentennialPuzzleRelicId = "RELIC.CENTENNIAL_PUZZLE";
@@ -3624,6 +3625,120 @@ public static class RunTracker
         }
 
         AddRelicCardGranted(agg.CardsGranted, cardId, displayName ?? "", 1);
+    }
+
+    public static bool BeginArcaneScrollPickup(
+        ArcaneScroll relic,
+        out Player? player,
+        out IReadOnlyCollection<CardModel>? deckBeforePickup)
+    {
+        player = null;
+        deckBeforePickup = null;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic)) return false;
+                if (!IsTrackedPlayer(relic.Owner)) return false;
+
+                player = relic.Owner;
+                deckBeforePickup = SnapshotDeckCards(player);
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"BeginArcaneScrollPickup failed: {e.Message}");
+                player = null;
+                deckBeforePickup = null;
+                return false;
+            }
+        }
+    }
+
+    public static void CompleteArcaneScrollPickup(
+        Player? player,
+        IReadOnlyCollection<CardModel>? deckBeforePickup,
+        bool succeeded)
+    {
+        if (player == null || deckBeforePickup == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!succeeded || !IsTrackedPlayer(player)) return;
+
+                var before = deckBeforePickup as HashSet<CardModel>
+                    ?? new HashSet<CardModel>(deckBeforePickup, ReferenceEqualityComparer.Instance);
+                var grantedRareCards = NewDeckCardsSince(player, before)
+                    .Where(card => card.Rarity == CardRarity.Rare)
+                    .ToList();
+                if (grantedRareCards.Count == 0) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(ArcaneScrollRelicId);
+                foreach (var card in grantedRareCards)
+                {
+                    RecordArcaneScrollRareReceivedForTest(
+                        agg,
+                        card.Id.ToString(),
+                        GetCardDisplayName(card));
+                }
+
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"CompleteArcaneScrollPickup failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordArcaneScrollRareReceivedForTest(RelicAggregate agg, string? cardId, string? displayName)
+    {
+        if (agg == null || string.IsNullOrWhiteSpace(cardId)) return;
+        AddRelicCardGranted(agg.CardsGranted, cardId, displayName ?? "", 1);
+    }
+
+    private static IReadOnlyCollection<CardModel> SnapshotDeckCards(Player player)
+    {
+        var cards = new HashSet<CardModel>(ReferenceEqualityComparer.Instance);
+
+        try
+        {
+            foreach (var card in player.Deck.Cards)
+            {
+                if (card != null)
+                    cards.Add(card);
+            }
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"SnapshotDeckCards failed: {e.Message}");
+        }
+
+        return cards;
+    }
+
+    private static IReadOnlyList<CardModel> NewDeckCardsSince(Player player, HashSet<CardModel> deckBefore)
+    {
+        var cards = new List<CardModel>();
+
+        try
+        {
+            foreach (var card in player.Deck.Cards)
+            {
+                if (card != null && !deckBefore.Contains(card))
+                    cards.Add(card);
+            }
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"NewDeckCardsSince failed: {e.Message}");
+        }
+
+        return cards;
     }
 
     /// <summary>
