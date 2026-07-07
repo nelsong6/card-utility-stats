@@ -149,6 +149,21 @@ public class CandelabraStatsTests
     }
 
     [Fact]
+    public void RunTracker_TurnEnergyRelicExcessBuckets_AreKeyedByCombatRound()
+    {
+        Assert.True(RunTracker.IsTurnEnergyRelicExcessRoundForTest(LanternRelicId, 1));
+        Assert.True(RunTracker.IsTurnEnergyRelicExcessRoundForTest(VeryHotCocoaRelicId, 1));
+        Assert.True(RunTracker.IsTurnEnergyRelicExcessRoundForTest(CandelabraRelicId, 2));
+        Assert.True(RunTracker.IsTurnEnergyRelicExcessRoundForTest(ChandelierRelicId, 3));
+
+        Assert.False(RunTracker.IsTurnEnergyRelicExcessRoundForTest(VeryHotCocoaRelicId, 0));
+        Assert.False(RunTracker.IsTurnEnergyRelicExcessRoundForTest(VeryHotCocoaRelicId, 2));
+        Assert.False(RunTracker.IsTurnEnergyRelicExcessRoundForTest(CandelabraRelicId, 1));
+        Assert.False(RunTracker.IsTurnEnergyRelicExcessRoundForTest(ChandelierRelicId, 2));
+        Assert.False(RunTracker.IsTurnEnergyRelicExcessRoundForTest("RELIC.UNKNOWN", 1));
+    }
+
+    [Fact]
     public void RelicTooltip_Lantern_ShowsRequestedRowsAndZeroValues()
     {
         var body = BuildBody(BuildLanternBodyMethod, new RelicAggregate());

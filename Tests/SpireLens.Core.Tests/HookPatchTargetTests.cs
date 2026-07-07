@@ -171,19 +171,31 @@ public class HookPatchTargetTests
         Assert.Equal("MegaCrit.Sts2.Core.Hooks.Hook", target!.DeclaringType?.FullName);
         Assert.Contains(target.Name, new[] { "BeforeSideTurnEnd", "BeforeTurnEnd" });
 
+        Assert.Equal(
+            new[] { "combatState", "side", "participants" },
+            target.GetParameters().Select(p => p.Name).ToArray());
+
+        var combatStateParameter = target.GetParameters().SingleOrDefault(p => p.Name == "combatState");
+        Assert.NotNull(combatStateParameter);
+        Assert.Equal("MegaCrit.Sts2.Core.Combat.ICombatState", combatStateParameter!.ParameterType.FullName);
+
         var sideParameter = target.GetParameters().SingleOrDefault(p => p.Name == "side");
         Assert.NotNull(sideParameter);
         Assert.Equal("MegaCrit.Sts2.Core.Combat.CombatSide", sideParameter!.ParameterType.FullName);
     }
 
-    [Fact]
+    [Theory]
     [Trait("Category", "RequiresLiveGame")]
-    public void VeryHotCocoaPatch_ResolvesAfterSideTurnStart()
+    [InlineData(typeof(Lantern), "MegaCrit.Sts2.Core.Models.Relics.Lantern")]
+    [InlineData(typeof(VeryHotCocoa), "MegaCrit.Sts2.Core.Models.Relics.VeryHotCocoa")]
+    [InlineData(typeof(Candelabra), "MegaCrit.Sts2.Core.Models.Relics.Candelabra")]
+    [InlineData(typeof(Chandelier), "MegaCrit.Sts2.Core.Models.Relics.Chandelier")]
+    public void TurnEnergyRelicPatches_ResolveAfterSideTurnStart(Type relicType, string declaringTypeName)
     {
-        var target = AccessTools.Method(typeof(VeryHotCocoa), nameof(VeryHotCocoa.AfterSideTurnStart));
+        var target = AccessTools.Method(relicType, "AfterSideTurnStart");
 
         Assert.NotNull(target);
-        Assert.Equal("MegaCrit.Sts2.Core.Models.Relics.VeryHotCocoa", target!.DeclaringType?.FullName);
+        Assert.Equal(declaringTypeName, target!.DeclaringType?.FullName);
         Assert.Equal("AfterSideTurnStart", target.Name);
         Assert.Equal(
             new[]

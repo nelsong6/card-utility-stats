@@ -6356,42 +6356,39 @@ public static class RunTracker
     }
 
     /// <summary>
-    /// Count player turns ending with unspent energy while the matching
+    /// Count player rounds ending with unspent energy while the matching
     /// Lantern/Very Hot Cocoa/Candelabra/Chandelier relic is held.
     /// Called from the global before-turn-end hook so the energy pool has not
     /// been cleared yet.
     /// </summary>
-    public static void RecordTurnEnergyRelicTurnEndedWithExcessEnergy(IEnumerable<Creature>? participants)
+    public static void RecordTurnEnergyRelicTurnEndedWithExcessEnergy(ICombatState? combatState, IEnumerable<Creature>? participants)
     {
+        if (combatState == null) return;
         if (participants == null) return;
 
         lock (_lock)
         {
             try
             {
+                var roundNumber = combatState.RoundNumber;
+                if (roundNumber <= 0) return;
+
                 foreach (var creature in participants)
                 {
                     var player = creature?.Player;
                     if (player == null || !IsTrackedPlayer(player)) continue;
-                    var combatState = player.PlayerCombatState;
-                    if (combatState == null) continue;
-                    if (combatState.Energy <= 0) continue;
+                    var playerCombatState = player.PlayerCombatState;
+                    if (playerCombatState == null) continue;
+                    if (playerCombatState.Energy <= 0) continue;
 
-                    if (combatState.TurnNumber == 1)
-                    {
-                        if (PlayerHasLantern(player))
-                            RecordTurnEnergyRelicExcessEnergyForPlayerLocked(LanternRelicId, player);
-                        if (PlayerHasVeryHotCocoa(player))
-                            RecordTurnEnergyRelicExcessEnergyForPlayerLocked(VeryHotCocoaRelicId, player);
-                    }
-                    else if (combatState.TurnNumber == 2 && PlayerHasCandelabra(player))
-                    {
+                    if (IsTurnEnergyRelicExcessRound(LanternRelicId, roundNumber) && PlayerHasLantern(player))
+                        RecordTurnEnergyRelicExcessEnergyForPlayerLocked(LanternRelicId, player);
+                    if (IsTurnEnergyRelicExcessRound(VeryHotCocoaRelicId, roundNumber) && PlayerHasVeryHotCocoa(player))
+                        RecordTurnEnergyRelicExcessEnergyForPlayerLocked(VeryHotCocoaRelicId, player);
+                    if (IsTurnEnergyRelicExcessRound(CandelabraRelicId, roundNumber) && PlayerHasCandelabra(player))
                         RecordTurnEnergyRelicExcessEnergyForPlayerLocked(CandelabraRelicId, player);
-                    }
-                    else if (combatState.TurnNumber == 3 && PlayerHasChandelier(player))
-                    {
+                    if (IsTurnEnergyRelicExcessRound(ChandelierRelicId, roundNumber) && PlayerHasChandelier(player))
                         RecordTurnEnergyRelicExcessEnergyForPlayerLocked(ChandelierRelicId, player);
-                    }
                 }
             }
             catch (Exception e)
@@ -6464,47 +6461,46 @@ public static class RunTracker
             || relicId == CandelabraRelicId
             || relicId == ChandelierRelicId;
 
+    internal static bool IsTurnEnergyRelicExcessRoundForTest(string relicId, int roundNumber)
+        => IsTurnEnergyRelicExcessRound(relicId, roundNumber);
+
+    private static bool IsTurnEnergyRelicExcessRound(string relicId, int roundNumber)
+        => relicId switch
+        {
+            LanternRelicId => roundNumber == 1,
+            VeryHotCocoaRelicId => roundNumber == 1,
+            CandelabraRelicId => roundNumber == 2,
+            ChandelierRelicId => roundNumber == 3,
+            _ => false,
+        };
+
     private static bool PlayerHasLantern(Player player)
     {
-        try
-        {
-            return player.Relics.Any(r => r is Lantern);
-        }
-        catch
-        {
-            return false;
-        }
+        return PlayerHasRelic(player, LanternRelicId, r => r is Lantern);
     }
 
     private static bool PlayerHasVeryHotCocoa(Player player)
     {
-        try
-        {
-            return player.Relics.Any(r => r is VeryHotCocoa);
-        }
-        catch
-        {
-            return false;
-        }
+        return PlayerHasRelic(player, VeryHotCocoaRelicId, r => r is VeryHotCocoa);
     }
 
     private static bool PlayerHasCandelabra(Player player)
     {
-        try
-        {
-            return player.Relics.Any(r => r is Candelabra);
-        }
-        catch
-        {
-            return false;
-        }
+        return PlayerHasRelic(player, CandelabraRelicId, r => r is Candelabra);
     }
 
     private static bool PlayerHasChandelier(Player player)
     {
+        return PlayerHasRelic(player, ChandelierRelicId, r => r is Chandelier);
+    }
+
+    private static bool PlayerHasRelic(Player player, string relicId, Func<RelicModel, bool> typeMatch)
+    {
         try
         {
-            return player.Relics.Any(r => r is Chandelier);
+            return player.Relics.Any(r =>
+                r != null
+                && (typeMatch(r) || string.Equals(r.Id.ToString(), relicId, StringComparison.Ordinal)));
         }
         catch
         {

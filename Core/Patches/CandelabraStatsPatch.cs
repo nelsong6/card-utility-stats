@@ -11,19 +11,19 @@ using MegaCrit.Sts2.Core.Models.Relics;
 namespace SpireLens.Core.Patches;
 
 /// <summary>
-/// Records Lantern when its owner-specific turn-1 callback is about to grant
+/// Records Lantern when its owner-specific round-1 callback is about to grant
 /// energy. The actual energy delta is observed by PlayerCombatState.
 /// </summary>
 [HarmonyPatch(typeof(Lantern), nameof(Lantern.AfterSideTurnStart))]
 public static class LanternAfterSideTurnStartPatch
 {
     [HarmonyPrefix]
-    public static void Prefix(Lantern __instance, CombatSide side, IReadOnlyList<Creature> participants)
+    public static void Prefix(Lantern __instance, CombatSide side, IReadOnlyList<Creature> participants, ICombatState combatState)
     {
         try
         {
             if (!TurnEnergyRelicPatchHelpers.TryGetTrackedOwnerOnPlayerTurn(__instance, side, participants, out var owner)) return;
-            if (owner.PlayerCombatState?.TurnNumber > 1) return;
+            if (combatState?.RoundNumber != 1) return;
 
             RunTracker.RecordTurnEnergyRelicActivationAndArmEnergyAttribution("RELIC.LANTERN", owner);
         }
@@ -35,7 +35,7 @@ public static class LanternAfterSideTurnStartPatch
 }
 
 /// <summary>
-/// Records Very Hot Cocoa when its owner-specific turn-1 callback is about to
+/// Records Very Hot Cocoa when its owner-specific round-1 callback is about to
 /// grant energy. The actual energy delta is observed by PlayerCombatState.
 /// </summary>
 [HarmonyPatch(typeof(VeryHotCocoa), nameof(VeryHotCocoa.AfterSideTurnStart))]
@@ -51,7 +51,7 @@ public static class VeryHotCocoaAfterSideTurnStartPatch
         try
         {
             if (!TurnEnergyRelicPatchHelpers.TryGetTrackedOwnerOnPlayerTurn(__instance, side, participants, out var owner)) return;
-            if (owner.PlayerCombatState?.TurnNumber > 1) return;
+            if (combatState?.RoundNumber != 1) return;
 
             RunTracker.RecordTurnEnergyRelicActivationAndArmEnergyAttribution("RELIC.VERY_HOT_COCOA", owner);
         }
@@ -63,19 +63,19 @@ public static class VeryHotCocoaAfterSideTurnStartPatch
 }
 
 /// <summary>
-/// Records Candelabra when its owner-specific turn-2 callback is about to
+/// Records Candelabra when its owner-specific round-2 callback is about to
 /// grant energy. The actual energy delta is observed by PlayerCombatState.
 /// </summary>
 [HarmonyPatch(typeof(Candelabra), nameof(Candelabra.AfterSideTurnStart))]
 public static class CandelabraAfterSideTurnStartPatch
 {
     [HarmonyPrefix]
-    public static void Prefix(Candelabra __instance, CombatSide side, IReadOnlyList<Creature> participants)
+    public static void Prefix(Candelabra __instance, CombatSide side, IReadOnlyList<Creature> participants, ICombatState combatState)
     {
         try
         {
             if (!TurnEnergyRelicPatchHelpers.TryGetTrackedOwnerOnPlayerTurn(__instance, side, participants, out var owner)) return;
-            if (owner.PlayerCombatState?.TurnNumber != 2) return;
+            if (combatState?.RoundNumber != 2) return;
 
             RunTracker.RecordTurnEnergyRelicActivationAndArmEnergyAttribution("RELIC.CANDELABRA", owner);
         }
@@ -87,19 +87,19 @@ public static class CandelabraAfterSideTurnStartPatch
 }
 
 /// <summary>
-/// Records Chandelier when its owner-specific turn-3 callback is about to
+/// Records Chandelier when its owner-specific round-3 callback is about to
 /// grant energy. The actual energy delta is observed by PlayerCombatState.
 /// </summary>
 [HarmonyPatch(typeof(Chandelier), nameof(Chandelier.AfterSideTurnStart))]
 public static class ChandelierAfterSideTurnStartPatch
 {
     [HarmonyPrefix]
-    public static void Prefix(Chandelier __instance, CombatSide side, IReadOnlyList<Creature> participants)
+    public static void Prefix(Chandelier __instance, CombatSide side, IReadOnlyList<Creature> participants, ICombatState combatState)
     {
         try
         {
             if (!TurnEnergyRelicPatchHelpers.TryGetTrackedOwnerOnPlayerTurn(__instance, side, participants, out var owner)) return;
-            if (owner.PlayerCombatState?.TurnNumber != 3) return;
+            if (combatState?.RoundNumber != 3) return;
 
             RunTracker.RecordTurnEnergyRelicActivationAndArmEnergyAttribution("RELIC.CHANDELIER", owner);
         }
@@ -111,7 +111,7 @@ public static class ChandelierAfterSideTurnStartPatch
 }
 
 /// <summary>
-/// Counts player turns that end with unspent energy while the matching
+/// Counts player rounds that end with unspent energy while the matching
 /// Lantern/Very Hot Cocoa/Candelabra/Chandelier turn-energy relic is held.
 /// Bound by runtime lookup so a game hook rename does not break build.
 /// </summary>
@@ -140,12 +140,12 @@ public static class HookBeforeSideTurnEndTurnEnergyRelicsPatch
     private static bool Prepare() => TargetMethod() != null;
 
     [HarmonyPrefix]
-    public static void Prefix(CombatSide side, IEnumerable<Creature> participants)
+    public static void Prefix(ICombatState combatState, CombatSide side, IEnumerable<Creature> participants)
     {
         try
         {
             if (side != CombatSide.Player) return;
-            RunTracker.RecordTurnEnergyRelicTurnEndedWithExcessEnergy(participants);
+            RunTracker.RecordTurnEnergyRelicTurnEndedWithExcessEnergy(combatState, participants);
         }
         catch (Exception e)
         {
