@@ -26,6 +26,7 @@ public class BoomingConchStatsTests
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
 
+    [Trait("Category", "RequiresLiveGame")]
     [Fact]
     public void EnergyPatch_TargetsAfterSideTurnStart()
     {
