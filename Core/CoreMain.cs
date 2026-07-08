@@ -137,6 +137,7 @@ public static class CoreMain
         // the user would see the checkbox disappear until they close and
         // reopen the deck view.
         Patches.ViewStatsInjectorPatch.ReinjectIntoActiveDeckView();
+        Patches.RelicCompendiumStatsSignals.ReattachToActiveEntries();
 
         // Visible confirmation on screen so hot reload has immediate feedback.
         // Kept in Core (not Loader) so toast text/style can be tweaked and
@@ -169,6 +170,9 @@ public static class CoreMain
         // later cleanup. A half-cleaned state is better than a no-cleaned state.
         try { ViewStatsInjectorPatch.TeardownInjectedUI(); }
         catch (Exception e) { Logger.Error($"Shutdown: UI teardown failed: {e}"); }
+
+        try { RelicCompendiumStatsSignals.TeardownAttachedSignals(); }
+        catch (Exception e) { Logger.Error($"Shutdown: relic compendium signal teardown failed: {e}"); }
 
         try { StatsTooltip.Destroy(); }
         catch (Exception e) { Logger.Error($"Shutdown: StatsTooltip teardown failed: {e}"); }

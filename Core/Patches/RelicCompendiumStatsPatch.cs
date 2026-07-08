@@ -21,27 +21,25 @@ namespace SpireLens.Core.Patches;
 [HarmonyPatch(typeof(NRelicCollectionEntry), "OnFocus")]
 public static class RelicCompendiumStatsShowPatch
 {
-    private static readonly FieldInfo? RelicField =
-        AccessTools.Field(typeof(NRelicCollectionEntry), "relic");
-
     [HarmonyPostfix]
     public static void Postfix(NRelicCollectionEntry __instance)
     {
         PatchGuard.Run(nameof(RelicCompendiumStatsShowPatch), () =>
         {
-            if (!CompendiumRelicStatsContext.ShouldShowStatsForVisibility(__instance.ModelVisibility))
-                return;
+            CompendiumRelicStatsContext.ShowForEntry(__instance);
+        });
+    }
+}
 
-            if (RelicField?.GetValue(__instance) is not RelicModel relicModel)
-                return;
-
-            var tree = Engine.GetMainLoop() as SceneTree;
-            if (tree == null) return;
-
-            if (!CompendiumRelicStatsContext.TryBuildRelicTooltip(relicModel, out var title, out var body))
-                return;
-
-            StatsTooltip.Show(tree, __instance, title, "SpireLens", body);
+[HarmonyPatch(typeof(NRelicCollectionEntry), "_Ready")]
+public static class RelicCompendiumStatsReadyPatch
+{
+    [HarmonyPostfix]
+    public static void Postfix(NRelicCollectionEntry __instance)
+    {
+        PatchGuard.Run(nameof(RelicCompendiumStatsReadyPatch), () =>
+        {
+            RelicCompendiumStatsSignals.Attach(__instance);
         });
     }
 }
@@ -86,9 +84,26 @@ internal static class CompendiumRelicStatsContext
 {
     private const string EnthralledDefinitionId = "CARD.ENTHRALLED";
     private const string CursedPearlCurseDefinitionId = "CARD.GREED";
+    private static readonly FieldInfo? RelicField =
+        AccessTools.Field(typeof(NRelicCollectionEntry), "relic");
 
     public static bool ShouldShowStatsForVisibility(ModelVisibility visibility)
         => visibility == ModelVisibility.Visible;
+
+    public static void ShowForEntry(NRelicCollectionEntry? entry)
+    {
+        if (entry == null || !GodotObject.IsInstanceValid(entry)) return;
+        if (!ShouldShowStatsForVisibility(entry.ModelVisibility)) return;
+        if (RelicField?.GetValue(entry) is not RelicModel relicModel) return;
+
+        var tree = Engine.GetMainLoop() as SceneTree;
+        if (tree == null) return;
+
+        if (!TryBuildRelicTooltip(relicModel, out var title, out var body))
+            return;
+
+        StatsTooltip.Show(tree, entry, title, "SpireLens", body);
+    }
 
     public static bool TryBuildRelicTooltip(
         RelicModel relicModel,
@@ -165,6 +180,151 @@ internal static class CompendiumRelicStatsContext
         }
 
         return result;
+    }
+}
+
+internal static class RelicCompendiumStatsSignals
+{
+    private static readonly List<AttachedHandlers> AttachedEntries = new();
+
+    public static void Attach(NRelicCollectionEntry? entry)
+    {
+        if (entry == null || !GodotObject.IsInstanceValid(entry)) return;
+        CleanupInvalidHandlers();
+
+        foreach (var handlers in AttachedEntries)
+        {
+            if (handlers.IsFor(entry))
+                return;
+        }
+
+        var attached = new AttachedHandlers(entry);
+        attached.Attach();
+        AttachedEntries.Add(attached);
+    }
+
+    public static void Detach(NRelicCollectionEntry? entry)
+    {
+        if (entry == null) return;
+
+        for (var i = AttachedEntries.Count - 1; i >= 0; i--)
+        {
+            var handlers = AttachedEntries[i];
+            if (!handlers.IsFor(entry)) continue;
+
+            handlers.Detach();
+            AttachedEntries.RemoveAt(i);
+        }
+    }
+
+    public static void ReattachToActiveEntries()
+    {
+        try
+        {
+            var tree = Engine.GetMainLoop() as SceneTree;
+            if (tree == null) return;
+
+            foreach (var entry in FindEntries(tree.Root))
+                Attach(entry);
+        }
+        catch (Exception e)
+        {
+            CoreMain.Logger.Error($"RelicCompendiumStatsSignals.ReattachToActiveEntries failed: {e}");
+        }
+    }
+
+    public static void TeardownAttachedSignals()
+    {
+        foreach (var handlers in AttachedEntries.ToArray())
+            handlers.Detach();
+        AttachedEntries.Clear();
+    }
+
+    private static void CleanupInvalidHandlers()
+    {
+        for (var i = AttachedEntries.Count - 1; i >= 0; i--)
+        {
+            if (AttachedEntries[i].IsValid) continue;
+            AttachedEntries[i].Detach();
+            AttachedEntries.RemoveAt(i);
+        }
+    }
+
+    private static IEnumerable<NRelicCollectionEntry> FindEntries(Node? node)
+    {
+        if (node == null) yield break;
+        if (node is NRelicCollectionEntry entry && GodotObject.IsInstanceValid(entry))
+            yield return entry;
+
+        var count = node.GetChildCount();
+        for (var i = 0; i < count; i++)
+        {
+            foreach (var childEntry in FindEntries(node.GetChild(i)))
+                yield return childEntry;
+        }
+    }
+
+    private sealed class AttachedHandlers
+    {
+        private readonly NRelicCollectionEntry _entry;
+        private bool _attached;
+
+        public AttachedHandlers(NRelicCollectionEntry entry)
+        {
+            _entry = entry;
+        }
+
+        public bool IsValid => GodotObject.IsInstanceValid(_entry);
+
+        public bool IsFor(NRelicCollectionEntry entry) => ReferenceEquals(_entry, entry);
+
+        public void Attach()
+        {
+            if (_attached || !IsValid) return;
+
+            _entry.MouseEntered += OnMouseEntered;
+            _entry.MouseExited += OnMouseExited;
+            _entry.TreeExiting += OnTreeExiting;
+            _attached = true;
+        }
+
+        public void Detach()
+        {
+            if (!_attached) return;
+            _attached = false;
+
+            if (!IsValid) return;
+            try { _entry.MouseEntered -= OnMouseEntered; }
+            catch { }
+            try { _entry.MouseExited -= OnMouseExited; }
+            catch { }
+            try { _entry.TreeExiting -= OnTreeExiting; }
+            catch { }
+        }
+
+        private void OnMouseEntered()
+        {
+            PatchGuard.Run("RelicCompendiumStatsSignals.MouseEntered", () =>
+            {
+                CompendiumRelicStatsContext.ShowForEntry(_entry);
+            });
+        }
+
+        private void OnMouseExited()
+        {
+            PatchGuard.Run("RelicCompendiumStatsSignals.MouseExited", () =>
+            {
+                StatsTooltip.HideIfAnchoredTo(_entry);
+            });
+        }
+
+        private void OnTreeExiting()
+        {
+            PatchGuard.Run("RelicCompendiumStatsSignals.TreeExiting", () =>
+            {
+                RelicCompendiumStatsSignals.Detach(_entry);
+            });
+        }
     }
 }
 
