@@ -2310,6 +2310,7 @@ public static class RunTracker
     private const string OrichalcumRelicId = "RELIC.ORICHALCUM";
     private const string PermafrostRelicId = "RELIC.PERMAFROST";
     private const string TuningForkRelicId = "RELIC.TUNING_FORK";
+    private const string RippleBasinRelicId = "RELIC.RIPPLE_BASIN";
     private const string AnchorRelicId = "RELIC.ANCHOR";
     private const string TheAbacusRelicId = "RELIC.THE_ABACUS";
     private const string LetterOpenerRelicId = "RELIC.LETTER_OPENER";
@@ -2598,6 +2599,41 @@ public static class RunTracker
         lock (_lock)
         {
             _pendingCombat?.Windows.Disarm(TuningForkRelicId, AttributionEventKind.PlayerBlockGain);
+        }
+    }
+
+    /// <summary>
+    /// Record Ripple Basin's no-attack turn-end trigger and arm observed
+    /// block attribution. The actual block amount is observed by
+    /// <see cref="Patches.HookAfterBlockGainedPatch"/>.
+    /// </summary>
+    public static void RecordRippleBasinActivationAndArmBlockAttribution()
+    {
+        lock (_lock)
+        {
+            try
+            {
+                _pendingCombat ??= new PendingCombat();
+                var agg = GetOrCreateRelicAggregateLocked(RippleBasinRelicId);
+                agg.Activations += 1;
+                _pendingCombat.Windows.Arm(
+                    RippleBasinRelicId,
+                    AttributionEventKind.PlayerBlockGain,
+                    CurrentHistoryCountLocked(),
+                    maxHistoryAdvance: -1);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordRippleBasinActivationAndArmBlockAttribution failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void DisarmRippleBasinBlockAttribution()
+    {
+        lock (_lock)
+        {
+            _pendingCombat?.Windows.Disarm(RippleBasinRelicId, AttributionEventKind.PlayerBlockGain);
         }
     }
 

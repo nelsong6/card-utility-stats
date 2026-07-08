@@ -131,6 +131,29 @@ public class HookPatchTargetTests
 
     [Fact]
     [Trait("Category", "RequiresLiveGame")]
+    public void RippleBasinPatch_ResolvesBeforeSideTurnEnd()
+    {
+        var target = AccessTools.Method(typeof(RippleBasin), nameof(RippleBasin.BeforeSideTurnEnd));
+
+        Assert.NotNull(target);
+        Assert.Equal("MegaCrit.Sts2.Core.Models.Relics.RippleBasin", target!.DeclaringType?.FullName);
+        Assert.Equal("BeforeSideTurnEnd", target.Name);
+        Assert.Equal(
+            new[]
+            {
+                "choiceContext",
+                "side",
+                "participants",
+            },
+            target.GetParameters().Select(p => p.Name).ToArray());
+
+        var sideParameter = target.GetParameters().SingleOrDefault(p => p.Name == "side");
+        Assert.NotNull(sideParameter);
+        Assert.Equal("MegaCrit.Sts2.Core.Combat.CombatSide", sideParameter!.ParameterType.FullName);
+    }
+
+    [Fact]
+    [Trait("Category", "RequiresLiveGame")]
     public void LetterOpenerTurnEndPatch_ResolvesBeforeSideTurnEnd()
     {
         var target = InvokeTargetMethod(typeof(HookBeforeSideTurnEndLetterOpenerPatch));

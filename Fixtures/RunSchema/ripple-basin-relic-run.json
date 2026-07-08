@@ -1,0 +1,17 @@
+{
+  "run_id": "ripple-basin-relic-fixture",
+  "started_at": "2026-07-08T19:00:00Z",
+  "updated_at": "2026-07-08T19:04:00Z",
+  "outcome": "in_progress",
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.RIPPLE_BASIN": {
+      "activations": 3,
+      "additional_block_gained": 12
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

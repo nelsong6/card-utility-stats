@@ -126,6 +126,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is RippleBasin)
+            {
+                const string relicId = "RELIC.RIPPLE_BASIN";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildRippleBasinBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Ripple Basin", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is TheAbacus)
             {
                 const string relicId = "RELIC.THE_ABACUS";
@@ -983,6 +993,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is RippleBasin)
+        {
+            title = "Ripple Basin";
+            body = BuildRippleBasinBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is TheAbacus)
         {
             title = "The Abacus";
@@ -1582,6 +1599,19 @@ public static class RelicHoverShowPatch
         var sb = new StringBuilder();
         Row3(sb, "Activations", agg.Activations.ToString(), "");
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildRippleBasinBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var blockPerActivation = agg.Activations <= 0
+            ? 0m
+            : (decimal)agg.AdditionalBlockGained / agg.Activations;
+
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
+        Row3(sb, BlockLabel("block gained per activation"), FormatDecimal(blockPerActivation), "");
         return sb.ToString();
     }
 

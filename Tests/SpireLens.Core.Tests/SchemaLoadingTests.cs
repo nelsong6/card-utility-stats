@@ -2133,6 +2133,18 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsRippleBasinRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("ripple-basin-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.RIPPLE_BASIN"];
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(12, relicAgg.AdditionalBlockGained);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsPaelsEyeRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("paels-eye-relic-run.json"));
@@ -2168,6 +2180,17 @@ public class SchemaLoadingTests
         var relicAgg = resumed!.RelicAggregates["RELIC.TUNING_FORK"];
         Assert.Equal(3, relicAgg.Activations);
         Assert.Equal(18, relicAgg.AdditionalBlockGained);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsRippleBasinRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("ripple-basin-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.RIPPLE_BASIN"];
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(12, relicAgg.AdditionalBlockGained);
     }
 
     [Fact]
