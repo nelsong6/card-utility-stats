@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using Godot;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Entities.UI;
@@ -51,6 +52,33 @@ public static class RelicCompendiumFilterCollectionOpenedPatch
     }
 }
 
+[HarmonyPatch(typeof(NRelicCollection), "AddRelics")]
+public static class RelicCompendiumFilterCollectionAddRelicsPatch
+{
+    [HarmonyPostfix]
+    public static void Postfix(NRelicCollection __instance)
+    {
+        PatchGuard.Run(nameof(RelicCompendiumFilterCollectionAddRelicsPatch), () =>
+        {
+            RelicCompendiumFilterUi.ApplyLayoutToCollection(__instance);
+            RelicCompendiumFilterUi.ApplyToActiveEntries();
+        });
+    }
+}
+
+[HarmonyPatch(typeof(NRelicCollection), "ClearRelics")]
+public static class RelicCompendiumFilterCollectionClearRelicsPatch
+{
+    [HarmonyPrefix]
+    public static void Prefix(NRelicCollection __instance)
+    {
+        PatchGuard.Run(nameof(RelicCompendiumFilterCollectionClearRelicsPatch), () =>
+        {
+            RelicCompendiumFilterUi.RestoreCollectionLayout(__instance);
+        });
+    }
+}
+
 internal static class RelicCompendiumFilterContext
 {
     public static CompendiumRelicEntryVisualAction GetVisualAction(
@@ -79,15 +107,41 @@ internal static class RelicCompendiumFilterContext
 internal static class RelicCompendiumFilterUi
 {
     private const string PanelName = "SpireLensRelicFilterPanel";
+    private const string FlatGridName = "SpireLensFlatRelicGrid";
     private const float DimmedAlpha = 0.5f;
+    private const int FallbackFlatGridColumns = 8;
+    private static readonly string[] CategoryFieldNames =
+    [
+        "_starter",
+        "_common",
+        "_uncommon",
+        "_rare",
+        "_shop",
+        "_ancient",
+        "_event",
+    ];
+
+    private static readonly FieldInfo[] CategoryFields = CategoryFieldNames
+        .Select(name => AccessTools.Field(typeof(NRelicCollection), name))
+        .Where(field => field != null)
+        .Cast<FieldInfo>()
+        .ToArray();
+
+    private static readonly FieldInfo? CategoryRelicsContainerField =
+        AccessTools.Field(typeof(NRelicCollectionCategory), "_relicsContainer");
+
+    private static readonly FieldInfo? CategorySubCategoriesField =
+        AccessTools.Field(typeof(NRelicCollectionCategory), "_subCategories");
 
     private static readonly List<InjectedPanel> InjectedPanels = new();
     private static readonly List<EntryOriginalVisual> EntryOriginals = new();
+    private static readonly List<FlatCollectionLayout> FlatLayouts = new();
     private static readonly HashSet<string> SelectedCategoryIds =
         new(RelicTaxonomy.Categories.Select(c => c.Id), StringComparer.OrdinalIgnoreCase);
 
     private static CompendiumRelicFilterMode _mode = CompendiumRelicFilterMode.Off;
     private static bool _showUndiscoveredRelics = true;
+    private static bool _useSingleRelicGrid;
     private static bool _syncingControls;
 
     public static void Inject(NRelicCollection? collection)
@@ -100,6 +154,7 @@ internal static class RelicCompendiumFilterUi
             if (existing.IsFor(collection))
             {
                 SyncPanelControls(existing);
+                ApplyLayoutToCollection(collection);
                 return;
             }
         }
@@ -111,6 +166,7 @@ internal static class RelicCompendiumFilterUi
         var injectedPanel = panel with { Collection = collection };
         InjectedPanels.Add(injectedPanel);
         SyncPanelControls(injectedPanel);
+        ApplyLayoutToCollection(collection);
         CoreMain.Logger.Info("RelicCompendiumFilter: injected filter panel");
     }
 
@@ -122,7 +178,10 @@ internal static class RelicCompendiumFilterUi
             if (tree == null) return;
 
             foreach (var collection in FindRelicCollections(tree.Root))
+            {
                 Inject(collection);
+                ApplyLayoutToCollection(collection);
+            }
             ApplyToActiveEntries();
         }
         catch (Exception e)
@@ -133,6 +192,7 @@ internal static class RelicCompendiumFilterUi
 
     public static void TeardownInjectedUI()
     {
+        RestoreAllCollectionLayouts();
         RestoreAllEntries();
 
         foreach (var panel in InjectedPanels.ToArray())
@@ -184,6 +244,7 @@ internal static class RelicCompendiumFilterUi
     {
         _mode = CompendiumRelicFilterMode.Off;
         _showUndiscoveredRelics = true;
+        _useSingleRelicGrid = false;
         SelectedCategoryIds.Clear();
         foreach (var category in RelicTaxonomy.Categories)
             SelectedCategoryIds.Add(category.Id);
@@ -259,7 +320,20 @@ internal static class RelicCompendiumFilterUi
             Callable.From<bool>(OnShowUndiscoveredToggled));
         vbox.AddChild(showUndiscovered);
 
-        var categoriesLabel = NewLabel("Categories", 13, new Color(0.78f, 0.73f, 0.64f, 1f));
+        var singleRelicGrid = new CheckBox
+        {
+            Name = "SingleRelicGrid",
+            Text = "Single relic grid",
+            MouseFilter = Control.MouseFilterEnum.Stop,
+            SizeFlagsHorizontal = Control.SizeFlags.Fill | Control.SizeFlags.Expand,
+        };
+        singleRelicGrid.AddThemeFontSizeOverride("font_size", 14);
+        singleRelicGrid.Connect(
+            BaseButton.SignalName.Toggled,
+            Callable.From<bool>(OnSingleRelicGridToggled));
+        vbox.AddChild(singleRelicGrid);
+
+        var categoriesLabel = NewLabel("SpireLens categories", 13, new Color(0.78f, 0.73f, 0.64f, 1f));
         vbox.AddChild(categoriesLabel);
 
         var checkboxByCategory = new Dictionary<string, CheckBox>(StringComparer.OrdinalIgnoreCase);
@@ -297,7 +371,13 @@ internal static class RelicCompendiumFilterUi
         clearAll.Connect(BaseButton.SignalName.Pressed, Callable.From(ClearAllCategories));
         buttons.AddChild(clearAll);
 
-        return new InjectedPanel(null, root, modeDropdown, showUndiscovered, checkboxByCategory);
+        return new InjectedPanel(
+            null,
+            root,
+            modeDropdown,
+            showUndiscovered,
+            singleRelicGrid,
+            checkboxByCategory);
     }
 
     private static Label NewLabel(string text, int fontSize, Color color)
@@ -359,6 +439,15 @@ internal static class RelicCompendiumFilterUi
         ApplyToActiveEntries();
     }
 
+    private static void OnSingleRelicGridToggled(bool selected)
+    {
+        if (_syncingControls) return;
+
+        _useSingleRelicGrid = selected;
+        ApplyLayoutToActiveCollections();
+        ApplyToActiveEntries();
+    }
+
     private static void SelectAllCategories()
     {
         foreach (var category in RelicTaxonomy.Categories)
@@ -398,6 +487,229 @@ internal static class RelicCompendiumFilterUi
         finally
         {
             _syncingControls = false;
+        }
+    }
+
+    public static void ApplyLayoutToCollection(NRelicCollection? collection)
+    {
+        if (collection == null || !GodotObject.IsInstanceValid(collection)) return;
+
+        try
+        {
+            if (_useSingleRelicGrid)
+                FlattenCollectionLayout(collection);
+            else
+                RestoreCollectionLayout(collection);
+        }
+        catch (Exception e)
+        {
+            CoreMain.Logger.Error($"RelicCompendiumFilter.ApplyLayoutToCollection failed: {e}");
+        }
+    }
+
+    public static void RestoreCollectionLayout(NRelicCollection? collection)
+    {
+        if (collection == null) return;
+
+        for (var i = FlatLayouts.Count - 1; i >= 0; i--)
+        {
+            var layout = FlatLayouts[i];
+            if (!layout.IsFor(collection)) continue;
+
+            layout.Restore();
+            FlatLayouts.RemoveAt(i);
+        }
+    }
+
+    private static void ApplyLayoutToActiveCollections()
+    {
+        try
+        {
+            var tree = Engine.GetMainLoop() as SceneTree;
+            if (tree == null) return;
+
+            foreach (var collection in FindRelicCollections(tree.Root))
+                ApplyLayoutToCollection(collection);
+            CleanupInvalidFlatLayouts();
+        }
+        catch (Exception e)
+        {
+            CoreMain.Logger.Error($"RelicCompendiumFilter.ApplyLayoutToActiveCollections failed: {e}");
+        }
+    }
+
+    private static void FlattenCollectionLayout(NRelicCollection collection)
+    {
+        CleanupInvalidFlatLayouts();
+
+        foreach (var existing in FlatLayouts)
+        {
+            if (existing.IsFor(collection) && existing.IsValid)
+                return;
+        }
+
+        RestoreCollectionLayout(collection);
+
+        var categories = GetBuiltInCategories(collection).ToList();
+        if (categories.Count == 0) return;
+
+        var firstCategory = categories.FirstOrDefault(category => category.GetParent() != null);
+        var hostParent = firstCategory?.GetParent();
+        if (hostParent == null || !GodotObject.IsInstanceValid(hostParent)) return;
+
+        RemoveExistingFlatGrid(hostParent);
+
+        var entries = GetEntriesForCategories(categories);
+        if (entries.Count == 0) return;
+
+        var firstIndex = firstCategory != null
+            ? GetChildIndex(hostParent, firstCategory)
+            : hostParent.GetChildCount();
+
+        var flatGrid = new GridContainer
+        {
+            Name = FlatGridName,
+            Columns = GetFlatGridColumns(categories),
+            MouseFilter = Control.MouseFilterEnum.Pass,
+            SizeFlagsHorizontal = Control.SizeFlags.Fill | Control.SizeFlags.Expand,
+            SizeFlagsVertical = Control.SizeFlags.Fill,
+        };
+        hostParent.AddChild(flatGrid);
+        hostParent.MoveChild(flatGrid, Math.Clamp(firstIndex, 0, hostParent.GetChildCount() - 1));
+
+        var categoryStates = categories
+            .Select(category => new OriginalCategoryState(category, category.Visible))
+            .ToList();
+        var entryStates = new List<OriginalEntryState>();
+
+        foreach (var entry in entries)
+        {
+            var parent = entry.GetParent();
+            if (parent == null || !GodotObject.IsInstanceValid(parent)) continue;
+
+            entryStates.Add(new OriginalEntryState(entry, parent, GetChildIndex(parent, entry)));
+            parent.RemoveChild(entry);
+            flatGrid.AddChild(entry);
+        }
+
+        if (entryStates.Count == 0)
+        {
+            flatGrid.QueueFree();
+            return;
+        }
+
+        foreach (var categoryState in categoryStates)
+            categoryState.Category.Visible = false;
+
+        FlatLayouts.Add(new FlatCollectionLayout(collection, flatGrid, categoryStates, entryStates));
+        CoreMain.Logger.Info($"RelicCompendiumFilter: flattened {entryStates.Count} relic entries");
+    }
+
+    private static void RestoreAllCollectionLayouts()
+    {
+        foreach (var layout in FlatLayouts.ToArray())
+            layout.Restore();
+        FlatLayouts.Clear();
+    }
+
+    private static IEnumerable<NRelicCollectionCategory> GetBuiltInCategories(NRelicCollection collection)
+    {
+        var seen = new HashSet<NRelicCollectionCategory>(ReferenceEqualityComparer.Instance);
+        foreach (var field in CategoryFields)
+        {
+            if (field.GetValue(collection) is not NRelicCollectionCategory category) continue;
+
+            foreach (var found in GetCategoryAndSubcategories(category))
+            {
+                if (seen.Add(found))
+                    yield return found;
+            }
+        }
+    }
+
+    private static IEnumerable<NRelicCollectionCategory> GetCategoryAndSubcategories(
+        NRelicCollectionCategory category)
+    {
+        if (!GodotObject.IsInstanceValid(category)) yield break;
+
+        yield return category;
+
+        if (CategorySubCategoriesField?.GetValue(category) is not IEnumerable<NRelicCollectionCategory> subCategories)
+            yield break;
+
+        foreach (var subCategory in subCategories)
+        {
+            foreach (var found in GetCategoryAndSubcategories(subCategory))
+                yield return found;
+        }
+    }
+
+    private static List<NRelicCollectionEntry> GetEntriesForCategories(
+        IEnumerable<NRelicCollectionCategory> categories)
+    {
+        var result = new List<NRelicCollectionEntry>();
+        var seen = new HashSet<NRelicCollectionEntry>(ReferenceEqualityComparer.Instance);
+
+        foreach (var category in categories)
+        {
+            if (CategoryRelicsContainerField?.GetValue(category) is not GridContainer relicsContainer)
+                continue;
+
+            foreach (var entry in FindEntries(relicsContainer))
+            {
+                if (!GodotObject.IsInstanceValid(entry) || !seen.Add(entry)) continue;
+                result.Add(entry);
+            }
+        }
+
+        return result;
+    }
+
+    private static int GetFlatGridColumns(IEnumerable<NRelicCollectionCategory> categories)
+    {
+        foreach (var category in categories)
+        {
+            if (CategoryRelicsContainerField?.GetValue(category) is GridContainer relicsContainer
+                && relicsContainer.Columns > 0)
+            {
+                return relicsContainer.Columns;
+            }
+        }
+
+        return FallbackFlatGridColumns;
+    }
+
+    private static void RemoveExistingFlatGrid(Node hostParent)
+    {
+        for (var i = hostParent.GetChildCount() - 1; i >= 0; i--)
+        {
+            var child = hostParent.GetChild(i);
+            if (!string.Equals(child.Name.ToString(), FlatGridName, StringComparison.Ordinal))
+                continue;
+
+            hostParent.RemoveChild(child);
+            child.QueueFree();
+        }
+    }
+
+    private static int GetChildIndex(Node parent, Node child)
+    {
+        var count = parent.GetChildCount();
+        for (var i = 0; i < count; i++)
+        {
+            if (ReferenceEquals(parent.GetChild(i), child))
+                return i;
+        }
+
+        return count;
+    }
+
+    private static void CleanupInvalidFlatLayouts()
+    {
+        for (var i = FlatLayouts.Count - 1; i >= 0; i--)
+        {
+            if (FlatLayouts[i].IsValid) continue;
+            FlatLayouts.RemoveAt(i);
         }
     }
 
@@ -522,6 +834,7 @@ internal static class RelicCompendiumFilterUi
         PanelContainer Root,
         OptionButton ModeDropdown,
         CheckBox ShowUndiscoveredCheckbox,
+        CheckBox SingleRelicGridCheckbox,
         IReadOnlyDictionary<string, CheckBox> Checkboxes)
     {
         public bool IsValid =>
@@ -552,6 +865,9 @@ internal static class RelicCompendiumFilterUi
 
             if (ShowUndiscoveredCheckbox != null && GodotObject.IsInstanceValid(ShowUndiscoveredCheckbox))
                 ShowUndiscoveredCheckbox.SetPressedNoSignal(_showUndiscoveredRelics);
+
+            if (SingleRelicGridCheckbox != null && GodotObject.IsInstanceValid(SingleRelicGridCheckbox))
+                SingleRelicGridCheckbox.SetPressedNoSignal(_useSingleRelicGrid);
 
             foreach (var (categoryId, checkbox) in Checkboxes)
             {
@@ -585,6 +901,91 @@ internal static class RelicCompendiumFilterUi
             if (!IsValid) return;
             _entry.Modulate = Modulate;
             _entry.Visible = Visible;
+        }
+    }
+
+    private sealed class FlatCollectionLayout
+    {
+        private readonly NRelicCollection _collection;
+        private readonly GridContainer _flatGrid;
+        private readonly IReadOnlyList<OriginalCategoryState> _categories;
+        private readonly IReadOnlyList<OriginalEntryState> _entries;
+
+        public FlatCollectionLayout(
+            NRelicCollection collection,
+            GridContainer flatGrid,
+            IReadOnlyList<OriginalCategoryState> categories,
+            IReadOnlyList<OriginalEntryState> entries)
+        {
+            _collection = collection;
+            _flatGrid = flatGrid;
+            _categories = categories;
+            _entries = entries;
+        }
+
+        public bool IsValid => GodotObject.IsInstanceValid(_collection);
+
+        public bool IsFor(NRelicCollection collection) => ReferenceEquals(_collection, collection);
+
+        public void Restore()
+        {
+            foreach (var category in _categories)
+                category.Restore();
+
+            foreach (var entry in _entries)
+                entry.Restore();
+
+            if (GodotObject.IsInstanceValid(_flatGrid))
+                _flatGrid.QueueFree();
+        }
+    }
+
+    private sealed class OriginalCategoryState
+    {
+        public OriginalCategoryState(NRelicCollectionCategory category, bool visible)
+        {
+            Category = category;
+            Visible = visible;
+        }
+
+        public NRelicCollectionCategory Category { get; }
+
+        private bool Visible { get; }
+
+        public void Restore()
+        {
+            if (!GodotObject.IsInstanceValid(Category)) return;
+            Category.Visible = Visible;
+        }
+    }
+
+    private sealed class OriginalEntryState
+    {
+        private readonly NRelicCollectionEntry _entry;
+        private readonly Node _parent;
+        private readonly int _index;
+
+        public OriginalEntryState(NRelicCollectionEntry entry, Node parent, int index)
+        {
+            _entry = entry;
+            _parent = parent;
+            _index = index;
+        }
+
+        public void Restore()
+        {
+            if (!GodotObject.IsInstanceValid(_entry) || !GodotObject.IsInstanceValid(_parent))
+                return;
+
+            var currentParent = _entry.GetParent();
+            if (!ReferenceEquals(currentParent, _parent))
+            {
+                currentParent?.RemoveChild(_entry);
+                _parent.AddChild(_entry);
+            }
+
+            var targetIndex = Math.Clamp(_index, 0, Math.Max(0, _parent.GetChildCount() - 1));
+            _parent.MoveChild(_entry, targetIndex);
         }
     }
 }
