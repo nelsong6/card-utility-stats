@@ -19,16 +19,31 @@ public class RelicCompendiumFilterTests
     }
 
     [Fact]
-    public void ChargeTaxonomy_IncludesIncrementingRelics()
+    public void ChargeAcrossTurnsTaxonomy_IncludesPersistentIncrementingRelics()
     {
-        var charge = RelicTaxonomy.Categories.Single(c => c.Id == RelicTaxonomy.ChargeCategoryId);
+        var charge = RelicTaxonomy.Categories.Single(c => c.Id == RelicTaxonomy.ChargeAcrossTurnsCategoryId);
 
         Assert.Contains("RELIC.PEN_NIB", charge.RelicIds);
-        Assert.Contains("RELIC.LETTER_OPENER", charge.RelicIds);
         Assert.Contains("RELIC.NUNCHAKU", charge.RelicIds);
         Assert.Contains("RELIC.IRON_CLUB", charge.RelicIds);
         Assert.Contains("RELIC.HAPPY_FLOWER", charge.RelicIds);
         Assert.Contains("RELIC.WINGED_BOOTS", charge.RelicIds);
+        Assert.DoesNotContain("RELIC.LETTER_OPENER", charge.RelicIds);
+        Assert.DoesNotContain("RELIC.VELVET_CHOKER", charge.RelicIds);
+    }
+
+    [Fact]
+    public void ChargeResetsEachTurnTaxonomy_IncludesTurnLocalIncrementingRelics()
+    {
+        var charge = RelicTaxonomy.Categories.Single(c => c.Id == RelicTaxonomy.ChargeResetsEachTurnCategoryId);
+
+        Assert.Contains("RELIC.LETTER_OPENER", charge.RelicIds);
+        Assert.Contains("RELIC.KUNAI", charge.RelicIds);
+        Assert.Contains("RELIC.SHURIKEN", charge.RelicIds);
+        Assert.Contains("RELIC.BRILLIANT_SCARF", charge.RelicIds);
+        Assert.Contains("RELIC.VELVET_CHOKER", charge.RelicIds);
+        Assert.DoesNotContain("RELIC.PEN_NIB", charge.RelicIds);
+        Assert.DoesNotContain("RELIC.NUNCHAKU", charge.RelicIds);
     }
 
     [Fact]
@@ -48,11 +63,15 @@ public class RelicCompendiumFilterTests
 
         Assert.True(RelicTaxonomy.IsRelicInAnySelectedCategory(
             "RELIC.PEN_NIB",
-            new[] { RelicTaxonomy.ChargeCategoryId }));
+            new[] { RelicTaxonomy.ChargeAcrossTurnsCategoryId }));
+
+        Assert.True(RelicTaxonomy.IsRelicInAnySelectedCategory(
+            "RELIC.LETTER_OPENER",
+            new[] { RelicTaxonomy.ChargeResetsEachTurnCategoryId }));
 
         Assert.False(RelicTaxonomy.IsRelicInAnySelectedCategory(
             "RELIC.PEN_NIB",
-            new[] { RelicTaxonomy.EnergyCategoryId }));
+            new[] { RelicTaxonomy.ChargeResetsEachTurnCategoryId }));
     }
 
     [Fact]
