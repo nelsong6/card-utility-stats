@@ -137,6 +137,7 @@ public static class CoreMain
         // the user would see the checkbox disappear until they close and
         // reopen the deck view.
         Patches.ViewStatsInjectorPatch.ReinjectIntoActiveDeckView();
+        Patches.RelicCompendiumFilterUi.ReinjectIntoActiveCollections();
         Patches.RelicCompendiumStatsSignals.ReattachToActiveEntries();
 
         // Visible confirmation on screen so hot reload has immediate feedback.
@@ -173,6 +174,9 @@ public static class CoreMain
 
         try { RelicCompendiumStatsSignals.TeardownAttachedSignals(); }
         catch (Exception e) { Logger.Error($"Shutdown: relic compendium signal teardown failed: {e}"); }
+
+        try { RelicCompendiumFilterUi.TeardownInjectedUI(); }
+        catch (Exception e) { Logger.Error($"Shutdown: relic compendium filter teardown failed: {e}"); }
 
         try { StatsTooltip.Destroy(); }
         catch (Exception e) { Logger.Error($"Shutdown: StatsTooltip teardown failed: {e}"); }

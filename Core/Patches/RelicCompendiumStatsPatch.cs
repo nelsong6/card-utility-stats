@@ -40,6 +40,7 @@ public static class RelicCompendiumStatsReadyPatch
         PatchGuard.Run(nameof(RelicCompendiumStatsReadyPatch), () =>
         {
             RelicCompendiumStatsSignals.Attach(__instance);
+            RelicCompendiumFilterUi.ApplyToEntry(__instance);
         });
     }
 }
@@ -94,7 +95,7 @@ internal static class CompendiumRelicStatsContext
     {
         if (entry == null || !GodotObject.IsInstanceValid(entry)) return;
         if (!ShouldShowStatsForVisibility(entry.ModelVisibility)) return;
-        if (RelicField?.GetValue(entry) is not RelicModel relicModel) return;
+        if (!TryGetRelicModel(entry, out var relicModel)) return;
 
         var tree = Engine.GetMainLoop() as SceneTree;
         if (tree == null) return;
@@ -103,6 +104,18 @@ internal static class CompendiumRelicStatsContext
             return;
 
         StatsTooltip.Show(tree, entry, title, "SpireLens", body);
+    }
+
+    internal static bool TryGetRelicModel(
+        NRelicCollectionEntry? entry,
+        out RelicModel relicModel)
+    {
+        relicModel = null!;
+        if (entry == null || !GodotObject.IsInstanceValid(entry)) return false;
+        if (RelicField?.GetValue(entry) is not RelicModel found) return false;
+
+        relicModel = found;
+        return true;
     }
 
     public static bool TryBuildRelicTooltip(
