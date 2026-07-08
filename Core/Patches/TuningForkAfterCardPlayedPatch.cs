@@ -1,8 +1,11 @@
 using System;
+using System.Collections.Generic;
+using System.Reflection;
 using System.Threading.Tasks;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Entities.Cards;
+using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
 using MegaCrit.Sts2.Core.Models.Relics;
 
@@ -27,8 +30,7 @@ public static class TuningForkAfterCardPlayedPatch
 
         try
         {
-            if (!ShouldArm(__instance, cardPlay)) return;
-            RunTracker.RecordTuningForkActivationAndArmBlockAttribution();
+            if (!RunTracker.RecordTuningForkSkillPlayedAndShouldArmBlockAttribution(__instance, cardPlay)) return;
             __state = true;
         }
         catch (Exception e)
@@ -58,15 +60,48 @@ public static class TuningForkAfterCardPlayedPatch
             CoreMain.LogDebug($"TuningForkAfterCardPlayedPatch.Postfix failed: {e.Message}");
         }
     }
+}
 
-    private static bool ShouldArm(TuningFork relic, CardPlay cardPlay)
+/// <summary>
+/// Snapshots Tuning Fork's persistent Skill counter at the end of each player
+/// turn while held. Bound by runtime lookup so a game hook rename does not
+/// break build.
+/// </summary>
+[HarmonyPatch]
+public static class HookBeforeSideTurnEndTuningForkPatch
+{
+    private static MethodBase? TargetMethod()
     {
-        if (relic?.Owner == null || cardPlay?.Card == null) return false;
-        if (!RunTracker.IsTrackedRelic(relic)) return false;
-        if (!CombatManager.Instance.IsInProgress) return false;
-        if (!ReferenceEquals(cardPlay.Card.Owner, relic.Owner)) return false;
-        if (cardPlay.Card.Type != CardType.Skill) return false;
+        var hookType = Sts2CoreAssembly()?.GetType("MegaCrit.Sts2.Core.Hooks.Hook", throwOnError: false);
+        if (hookType == null) return null;
 
-        return relic.SkillsPlayed + 1 >= relic.SkillsThreshold;
+        return AccessTools.Method(hookType, "BeforeSideTurnEnd")
+            ?? AccessTools.Method(hookType, "BeforeTurnEnd");
+    }
+
+    private static Assembly? Sts2CoreAssembly()
+    {
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            if (assembly.GetName().Name == "sts2") return assembly;
+        }
+
+        return null;
+    }
+
+    private static bool Prepare() => TargetMethod() != null;
+
+    [HarmonyPrefix]
+    public static void Prefix(CombatSide side, IEnumerable<Creature> participants)
+    {
+        try
+        {
+            if (side != CombatSide.Player) return;
+            RunTracker.RecordTuningForkTurnEnded(participants);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"HookBeforeSideTurnEndTuningForkPatch failed: {e.Message}");
+        }
     }
 }

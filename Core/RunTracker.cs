@@ -1518,6 +1518,7 @@ public static class RunTracker
         if (_pendingCombat == null || _currentRun == null) return;
         RecordHeldCombatRelicBaselinesForTrackedPlayerLocked(requireActiveCombat: false, createPendingIfNeeded: false);
         RecordLetterOpenerTurnForTrackedPlayerLocked();
+        RecordTuningForkTurnForTrackedPlayerLocked();
         RecordPaperPhrogTurnForTrackedPlayerLocked();
         RecordPaelsEyeCombatsWithoutActivationForTrackedPlayerLocked();
         RecordTurnEnergyRelicCombatsWithoutEnergyForTrackedPlayerLocked();
@@ -1632,6 +1633,13 @@ public static class RunTracker
         target.LetterOpenerTurns += source.LetterOpenerTurns;
         target.LetterOpenerTurnsEndedAt1Charge += source.LetterOpenerTurnsEndedAt1Charge;
         target.LetterOpenerTurnsEndedAt2Charges += source.LetterOpenerTurnsEndedAt2Charges;
+        target.TuningForkSkillsPlayed += source.TuningForkSkillsPlayed;
+        target.TuningForkCombats += source.TuningForkCombats;
+        target.TuningForkTurns += source.TuningForkTurns;
+        target.TuningForkTurnsEndedOn8Charges += source.TuningForkTurnsEndedOn8Charges;
+        target.TuningForkTurnsEndedOn9Charges += source.TuningForkTurnsEndedOn9Charges;
+        target.TuningForkTurnEndChargeTotal += source.TuningForkTurnEndChargeTotal;
+        target.TuningForkTurnEndChargeCount += source.TuningForkTurnEndChargeCount;
         target.PotionsGained += source.PotionsGained;
         target.CommonPotionsGained += source.CommonPotionsGained;
         target.UncommonPotionsGained += source.UncommonPotionsGained;
@@ -2568,28 +2576,47 @@ public static class RunTracker
     }
 
     /// <summary>
-    /// Record Tuning Fork's every-N-skills trigger and arm observed block
-    /// attribution. The actual block amount is observed by
-    /// <see cref="Patches.HookAfterBlockGainedPatch"/>.
+    /// Record a Tuning Fork-owned Skill play and arm observed block attribution
+    /// if this play will cross the relic's threshold. The actual block amount
+    /// is observed by <see cref="Patches.HookAfterBlockGainedPatch"/>.
     /// </summary>
-    public static void RecordTuningForkActivationAndArmBlockAttribution()
+    public static bool RecordTuningForkSkillPlayedAndShouldArmBlockAttribution(TuningFork relic, CardPlay cardPlay)
     {
+        if (relic?.Owner == null || cardPlay?.Card == null) return false;
+        if (cardPlay.Card.Type != CardType.Skill) return false;
+        if (!ReferenceEquals(cardPlay.Card.Owner, relic.Owner)) return false;
+
         lock (_lock)
         {
             try
             {
+                if (!IsTrackedRelic(relic)) return false;
+                if (!IsTrackedPlayer(relic.Owner)) return false;
+                if (!CombatManager.Instance.IsInProgress) return false;
+
                 _pendingCombat ??= new PendingCombat();
-                var agg = GetOrCreateRelicAggregateLocked(TuningForkRelicId);
+                RecordTuningForkCombatForPlayerLocked(relic.Owner);
+                RecordTuningForkTurnForPlayerLocked(relic.Owner);
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(TuningForkRelicId);
+                RecordTuningForkSkillPlayedForTest(agg);
+
+                var threshold = TuningForkCardsPerActivation(relic);
+                if (threshold <= 0) return false;
+                if (Math.Max(0, relic.SkillsPlayed) + 1 < threshold) return false;
+
                 agg.Activations += 1;
                 _pendingCombat.Windows.Arm(
                     TuningForkRelicId,
                     AttributionEventKind.PlayerBlockGain,
                     CurrentHistoryCountLocked(),
                     maxHistoryAdvance: -1);
+                return true;
             }
             catch (Exception e)
             {
-                CoreMain.LogDebug($"RecordTuningForkActivationAndArmBlockAttribution failed: {e.Message}");
+                CoreMain.LogDebug($"RecordTuningForkSkillPlayedAndShouldArmBlockAttribution failed: {e.Message}");
+                return false;
             }
         }
     }
@@ -2600,6 +2627,103 @@ public static class RunTracker
         {
             _pendingCombat?.Windows.Disarm(TuningForkRelicId, AttributionEventKind.PlayerBlockGain);
         }
+    }
+
+    /// <summary>
+    /// Snapshot Tuning Fork's persistent Skill counter at the end of each
+    /// tracked player turn while held.
+    /// </summary>
+    public static void RecordTuningForkTurnEnded(IEnumerable<Creature>? participants)
+    {
+        lock (_lock)
+        {
+            try
+            {
+                _pendingCombat ??= new PendingCombat();
+                var recordedParticipant = false;
+
+                if (participants != null)
+                {
+                    foreach (var creature in participants)
+                    {
+                        var player = creature?.Player;
+                        if (player == null || !IsTrackedPlayer(player)) continue;
+
+                        recordedParticipant |= RecordTuningForkTurnEndChargeForPlayerLocked(
+                            player,
+                            player.PlayerCombatState?.TurnNumber ?? 0);
+                    }
+                }
+
+                if (recordedParticipant) return;
+
+                var trackedPlayer = GetTrackedRunPlayerLocked();
+                if (trackedPlayer == null) return;
+                RecordTuningForkTurnEndChargeForPlayerLocked(
+                    trackedPlayer,
+                    trackedPlayer.PlayerCombatState?.TurnNumber ?? 0);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordTuningForkTurnEnded failed: {e.Message}");
+            }
+        }
+    }
+
+    private static bool RecordTuningForkTurnEndChargeForPlayerLocked(
+        Player player,
+        int turnNumber,
+        TuningFork? tuningFork = null)
+    {
+        if (_pendingCombat == null) return false;
+        if (player == null || !IsTrackedPlayer(player)) return false;
+        tuningFork ??= TryGetTuningFork(player, out var foundRelic) ? foundRelic : null;
+        if (tuningFork == null) return false;
+        if (turnNumber <= 0) return false;
+
+        RecordTuningForkTurnForPlayerLocked(player, turnNumber);
+
+        if (_pendingCombat.TuningForkTurnEndChargeRecordedTurns.TryGetValue(player, out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return true;
+        }
+
+        _pendingCombat.TuningForkTurnEndChargeRecordedTurns[player] = turnNumber;
+        var agg = GetOrCreatePendingRelicAggregateLocked(TuningForkRelicId);
+        RecordTuningForkTurnEndChargeForTest(agg, TuningForkCharge(tuningFork));
+        return true;
+    }
+
+    internal static void RecordTuningForkSkillPlayedForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.TuningForkSkillsPlayed += Math.Max(0, count);
+    }
+
+    internal static void RecordTuningForkCombatForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.TuningForkCombats += Math.Max(0, count);
+    }
+
+    internal static void RecordTuningForkTurnForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.TuningForkTurns += Math.Max(0, count);
+    }
+
+    internal static void RecordTuningForkTurnEndChargeForTest(RelicAggregate agg, int charge)
+    {
+        if (agg == null || charge < 0) return;
+
+        charge %= 10;
+        agg.TuningForkTurnEndChargeTotal += charge;
+        agg.TuningForkTurnEndChargeCount += 1;
+        if (charge == 8)
+            agg.TuningForkTurnsEndedOn8Charges += 1;
+        else if (charge == 9)
+            agg.TuningForkTurnsEndedOn9Charges += 1;
     }
 
     /// <summary>
@@ -8644,6 +8768,7 @@ public static class RunTracker
             if (player == null) return;
 
             RecordLetterOpenerCombatForPlayerLocked(player);
+            RecordTuningForkCombatForPlayerLocked(player);
             RecordHappyFlowerCombatForPlayerLocked(player);
             RecordNunchakuCombatForPlayerLocked(player);
             RecordIronClubCombatForPlayerLocked(player);
@@ -8670,6 +8795,16 @@ public static class RunTracker
 
         var agg = GetOrCreatePendingRelicAggregateLocked(LetterOpenerRelicId);
         RecordLetterOpenerCombatForTest(agg);
+    }
+
+    private static void RecordTuningForkCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasTuningFork(player)) return;
+        if (!_pendingCombat.TuningForkCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(TuningForkRelicId);
+        RecordTuningForkCombatForTest(agg);
     }
 
     private static void RecordLetterOpenerTurnForTrackedPlayerLocked()
@@ -8709,6 +8844,45 @@ public static class RunTracker
 
         var agg = GetOrCreatePendingRelicAggregateLocked(LetterOpenerRelicId);
         RecordLetterOpenerTurnForTest(agg);
+    }
+
+    private static void RecordTuningForkTurnForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordTuningForkTurnForPlayerLocked(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordTuningForkTurnForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordTuningForkTurnForPlayerLocked(Player player)
+    {
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        RecordTuningForkTurnForPlayerLocked(player, turnNumber);
+    }
+
+    private static void RecordTuningForkTurnForPlayerLocked(Player player, int turnNumber)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasTuningFork(player)) return;
+        if (turnNumber <= 0) return;
+
+        if (_pendingCombat.TuningForkTurnCountedTurns.TryGetValue(player, out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.TuningForkTurnCountedTurns[player] = turnNumber;
+        RecordTuningForkCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(TuningForkRelicId);
+        RecordTuningForkTurnForTest(agg);
     }
 
     private static void RecordMiniatureCannonCombatForTrackedPlayerLocked()
@@ -9078,6 +9252,46 @@ public static class RunTracker
         catch
         {
             return false;
+        }
+    }
+
+    private static bool PlayerHasTuningFork(Player player)
+    {
+        return TryGetTuningFork(player, out _);
+    }
+
+    private static bool TryGetTuningFork(Player player, out TuningFork? tuningFork)
+    {
+        tuningFork = null;
+
+        try
+        {
+            tuningFork = player?.Relics?.OfType<TuningFork>().FirstOrDefault();
+            return tuningFork != null;
+        }
+        catch
+        {
+            tuningFork = null;
+            return false;
+        }
+    }
+
+    private static int TuningForkCharge(TuningFork relic)
+    {
+        var threshold = TuningForkCardsPerActivation(relic);
+        if (threshold <= 0) return 0;
+        return Math.Max(0, relic.SkillsPlayed) % threshold;
+    }
+
+    private static int TuningForkCardsPerActivation(TuningFork relic)
+    {
+        try
+        {
+            return Math.Max(1, relic.DynamicVars.Cards.IntValue);
+        }
+        catch
+        {
+            return 10;
         }
     }
 
@@ -12624,6 +12838,12 @@ internal class PendingCombat
     public Dictionary<Player, int> LetterOpenerTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> LetterOpenerTurnEndChargeRecordedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> TuningForkCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> TuningForkTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> TuningForkTurnEndChargeRecordedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> HappyFlowerCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

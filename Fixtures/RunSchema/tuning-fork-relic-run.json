@@ -17,8 +17,15 @@
   "events": [],
   "relic_aggregates": {
     "RELIC.TUNING_FORK": {
+      "tuning_fork_skills_played": 27,
       "activations": 3,
-      "additional_block_gained": 18
+      "additional_block_gained": 18,
+      "tuning_fork_combats": 2,
+      "tuning_fork_turns": 7,
+      "tuning_fork_turns_ended_on8_charges": 2,
+      "tuning_fork_turns_ended_on9_charges": 1,
+      "tuning_fork_turn_end_charge_total": 31,
+      "tuning_fork_turn_end_charge_count": 5
     }
   },
   "meta_stats": {},

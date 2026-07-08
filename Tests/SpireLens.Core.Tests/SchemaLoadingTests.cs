@@ -2128,8 +2128,15 @@ public class SchemaLoadingTests
         Assert.NotNull(loaded);
         Assert.True(loaded!.SupportsResume);
         var relicAgg = loaded.Data.RelicAggregates["RELIC.TUNING_FORK"];
+        Assert.Equal(27, relicAgg.TuningForkSkillsPlayed);
         Assert.Equal(3, relicAgg.Activations);
         Assert.Equal(18, relicAgg.AdditionalBlockGained);
+        Assert.Equal(2, relicAgg.TuningForkCombats);
+        Assert.Equal(7, relicAgg.TuningForkTurns);
+        Assert.Equal(2, relicAgg.TuningForkTurnsEndedOn8Charges);
+        Assert.Equal(1, relicAgg.TuningForkTurnsEndedOn9Charges);
+        Assert.Equal(31, relicAgg.TuningForkTurnEndChargeTotal);
+        Assert.Equal(5, relicAgg.TuningForkTurnEndChargeCount);
     }
 
     [Fact]
@@ -2178,8 +2185,15 @@ public class SchemaLoadingTests
 
         Assert.NotNull(resumed);
         var relicAgg = resumed!.RelicAggregates["RELIC.TUNING_FORK"];
+        Assert.Equal(27, relicAgg.TuningForkSkillsPlayed);
         Assert.Equal(3, relicAgg.Activations);
         Assert.Equal(18, relicAgg.AdditionalBlockGained);
+        Assert.Equal(2, relicAgg.TuningForkCombats);
+        Assert.Equal(7, relicAgg.TuningForkTurns);
+        Assert.Equal(2, relicAgg.TuningForkTurnsEndedOn8Charges);
+        Assert.Equal(1, relicAgg.TuningForkTurnsEndedOn9Charges);
+        Assert.Equal(31, relicAgg.TuningForkTurnEndChargeTotal);
+        Assert.Equal(5, relicAgg.TuningForkTurnEndChargeCount);
     }
 
     [Fact]

@@ -1597,8 +1597,28 @@ public static class RelicHoverShowPatch
     private static string BuildTuningForkBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
+        var blockPerActivation = agg.Activations <= 0
+            ? 0m
+            : (decimal)agg.AdditionalBlockGained / agg.Activations;
+        var skillsPerCombat = agg.TuningForkCombats <= 0
+            ? 0m
+            : (decimal)agg.TuningForkSkillsPlayed / agg.TuningForkCombats;
+        var skillsPerTurn = agg.TuningForkTurns <= 0
+            ? 0m
+            : (decimal)agg.TuningForkSkillsPlayed / agg.TuningForkTurns;
+        var averageEndCharge = agg.TuningForkTurnEndChargeCount <= 0
+            ? 0m
+            : (decimal)agg.TuningForkTurnEndChargeTotal / agg.TuningForkTurnEndChargeCount;
+
+        Row3(sb, "Skills played", agg.TuningForkSkillsPlayed.ToString(), "");
         Row3(sb, "Activations", agg.Activations.ToString(), "");
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
+        Row3(sb, BlockLabel("block gained per activation"), FormatDecimal(blockPerActivation), "");
+        Row3(sb, "Avg skills played per combat", FormatDecimal(skillsPerCombat), "");
+        Row3(sb, "Avg skills played per turn", FormatDecimal(skillsPerTurn), "");
+        Row3(sb, "Turns ended on 8 charges", agg.TuningForkTurnsEndedOn8Charges.ToString(), "");
+        Row3(sb, "Turns ended on 9 charges", agg.TuningForkTurnsEndedOn9Charges.ToString(), "");
+        Row3(sb, "Avg charge at turn end", FormatDecimal(averageEndCharge), "");
         return sb.ToString();
     }
 
