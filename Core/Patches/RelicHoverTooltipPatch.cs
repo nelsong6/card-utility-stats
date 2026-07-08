@@ -859,6 +859,9 @@ public static class RelicHoverShowPatch
         if (IsMiniatureCannonStatsRelicModel(relicModel))
             return "RELIC.MINIATURE_CANNON";
 
+        if (IsMrStrugglesStatsRelicModel(relicModel))
+            return "RELIC.MR_STRUGGLES";
+
         return relicModel.Id.ToString();
     }
 
@@ -2795,6 +2798,11 @@ public static class RelicHoverShowPatch
     private static bool IsMiniatureCannonStatsRelicModel(object model)
     {
         return IsRelicModel(model, "MegaCrit.Sts2.Core.Models.Relics.MiniatureCannon");
+    }
+
+    private static bool IsMrStrugglesStatsRelicModel(object model)
+    {
+        return IsRelicModel(model, "MegaCrit.Sts2.Core.Models.Relics.MrStruggles");
     }
 
     private static bool IsFakeStrikeDummyRelicModel(object model)
