@@ -1670,6 +1670,12 @@ public static class RunTracker
         target.MiniatureCannonUpgradedAttackHits += source.MiniatureCannonUpgradedAttackHits;
         target.VajraAttacksPlayed += source.VajraAttacksPlayed;
         target.VajraAttackHits += source.VajraAttackHits;
+        target.KunaiAttacksPlayed += source.KunaiAttacksPlayed;
+        target.KunaiDexterityGained += source.KunaiDexterityGained;
+        target.KunaiTurnsEndedAt1Charge += source.KunaiTurnsEndedAt1Charge;
+        target.KunaiTurnsEndedAt2Charges += source.KunaiTurnsEndedAt2Charges;
+        target.KunaiTurnEndChargeTotal += source.KunaiTurnEndChargeTotal;
+        target.KunaiTurnEndChargeCount += source.KunaiTurnEndChargeCount;
         target.PaperPhrogDamageAdded += source.PaperPhrogDamageAdded;
         target.PaperPhrogEnhancedAttacks += source.PaperPhrogEnhancedAttacks;
         target.PaperPhrogCombats += source.PaperPhrogCombats;
@@ -2367,6 +2373,7 @@ public static class RunTracker
     private const string NutritiousSoupRelicId = "RELIC.NUTRITIOUS_SOUP";
     private const string MiniatureCannonRelicId = "RELIC.MINIATURE_CANNON";
     private const string VajraRelicId = "RELIC.VAJRA";
+    private const string KunaiRelicId = "RELIC.KUNAI";
     private const string PaperPhrogRelicId = "RELIC.PAPER_PHROG";
     private const string RegaliteRelicId = "RELIC.REGALITE";
     private const string BookmarkRelicId = "RELIC.BOOKMARK";
@@ -5782,6 +5789,139 @@ public static class RunTracker
         agg.VajraAttackHits += Math.Max(0, count);
     }
 
+    /// <summary>
+    /// Record a Kunai-owned attack play and return whether that play is expected
+    /// to activate the relic. The postfix observes the actual Dexterity delta.
+    /// </summary>
+    public static bool RecordKunaiAttackPlayedAndShouldObserveActivation(
+        Kunai relic,
+        CardPlay cardPlay,
+        out Creature? ownerCreature,
+        out int dexterityBefore)
+    {
+        ownerCreature = null;
+        dexterityBefore = 0;
+
+        if (relic?.Owner == null || cardPlay?.Card == null) return false;
+        if (cardPlay.Card.Type != CardType.Attack) return false;
+
+        var owner = relic.Owner;
+        if (cardPlay.Card.Owner != null && !ReferenceEquals(cardPlay.Card.Owner, owner)) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic)) return false;
+                if (!IsTrackedPlayer(owner)) return false;
+
+                _pendingCombat ??= new PendingCombat();
+                var agg = GetOrCreatePendingRelicAggregateLocked(KunaiRelicId);
+                RecordKunaiAttackPlayedForTest(agg);
+
+                var cardsPerActivation = KunaiCardsPerActivation(relic);
+                if (cardsPerActivation <= 0) return false;
+
+                var chargeBefore = KunaiCharge(relic);
+                if (chargeBefore + 1 < cardsPerActivation) return false;
+
+                ownerCreature = owner.Creature;
+                if (ownerCreature == null) return false;
+                dexterityBefore = CurrentDexterity(ownerCreature);
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordKunaiAttackPlayedAndShouldObserveActivation failed: {e.Message}");
+                ownerCreature = null;
+                dexterityBefore = 0;
+                return false;
+            }
+        }
+    }
+
+    public static void RecordKunaiActivation(int dexterityGained)
+    {
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateForCurrentContextLocked(KunaiRelicId);
+                RecordKunaiActivationForTest(agg, dexterityGained);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordKunaiActivation failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Snapshot Kunai's live attack counter at the end of each tracked player
+    /// turn before the relic resets it at the next player turn start.
+    /// </summary>
+    public static void RecordKunaiTurnEnded(IEnumerable<Creature>? participants)
+    {
+        if (participants == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                _pendingCombat ??= new PendingCombat();
+
+                foreach (var creature in participants)
+                {
+                    var player = creature?.Player;
+                    if (player == null || !IsTrackedPlayer(player)) continue;
+                    if (!TryGetKunai(player, out var kunai) || kunai == null) continue;
+
+                    var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+                    if (turnNumber <= 0) continue;
+                    if (_pendingCombat.KunaiTurnEndChargeRecordedTurns.TryGetValue(player, out var recordedTurn)
+                        && recordedTurn == turnNumber)
+                    {
+                        continue;
+                    }
+
+                    _pendingCombat.KunaiTurnEndChargeRecordedTurns[player] = turnNumber;
+                    var agg = GetOrCreatePendingRelicAggregateLocked(KunaiRelicId);
+                    RecordKunaiTurnEndChargeForTest(agg, KunaiCharge(kunai));
+                }
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordKunaiTurnEnded failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordKunaiAttackPlayedForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.KunaiAttacksPlayed += Math.Max(0, count);
+    }
+
+    internal static void RecordKunaiActivationForTest(RelicAggregate agg, int dexterityGained)
+    {
+        if (agg == null) return;
+        agg.Activations += 1;
+        agg.KunaiDexterityGained += Math.Max(0, dexterityGained);
+    }
+
+    internal static void RecordKunaiTurnEndChargeForTest(RelicAggregate agg, int charge)
+    {
+        if (agg == null || charge < 0) return;
+
+        charge %= 3;
+        agg.KunaiTurnEndChargeTotal += charge;
+        agg.KunaiTurnEndChargeCount += 1;
+        if (charge == 1)
+            agg.KunaiTurnsEndedAt1Charge += 1;
+        else if (charge == 2)
+            agg.KunaiTurnsEndedAt2Charges += 1;
+    }
+
     public static void RecordPaperPhrogVulnerableBonus(
         PaperPhrog relic,
         decimal damageAdded,
@@ -8902,6 +9042,53 @@ public static class RunTracker
         catch
         {
             return false;
+        }
+    }
+
+    private static bool TryGetKunai(Player player, out Kunai? kunai)
+    {
+        kunai = null;
+
+        try
+        {
+            kunai = player?.Relics?.OfType<Kunai>().FirstOrDefault();
+            return kunai != null;
+        }
+        catch
+        {
+            kunai = null;
+            return false;
+        }
+    }
+
+    private static int KunaiCharge(Kunai relic)
+    {
+        var threshold = KunaiCardsPerActivation(relic);
+        if (threshold <= 0) return 0;
+        return Math.Max(0, relic.AttacksPlayedThisTurn) % threshold;
+    }
+
+    private static int KunaiCardsPerActivation(Kunai relic)
+    {
+        try
+        {
+            return Math.Max(1, relic.DynamicVars.Cards.IntValue);
+        }
+        catch
+        {
+            return 3;
+        }
+    }
+
+    private static int CurrentDexterity(Creature creature)
+    {
+        try
+        {
+            return creature.GetPower<DexterityPower>()?.Amount ?? 0;
+        }
+        catch
+        {
+            return 0;
         }
     }
 
@@ -12443,6 +12630,8 @@ internal class PendingCombat
     public HashSet<Player> ChandelierThirdTurnExcessRecordedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> PenNibTurnEndChargeRecordedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> KunaiTurnEndChargeRecordedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> GamblingChipDiscardAttributionPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

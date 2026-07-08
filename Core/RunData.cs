@@ -580,6 +580,15 @@ public class RelicAggregate
     public int VajraAttacksPlayed { get; set; }
     public int VajraAttackHits { get; set; }
 
+    // Kunai tracking. Counts owner attack plays, actual Dexterity gained from
+    // activation resolution, and player-turn-end charge snapshots.
+    public int KunaiAttacksPlayed { get; set; }
+    public int KunaiDexterityGained { get; set; }
+    public int KunaiTurnsEndedAt1Charge { get; set; }
+    public int KunaiTurnsEndedAt2Charges { get; set; }
+    public int KunaiTurnEndChargeTotal { get; set; }
+    public int KunaiTurnEndChargeCount { get; set; }
+
     // Paper Phrog tracking. Damage added is the actual current damage amount
     // multiplied by Paper Phrog's extra Vulnerable multiplier. Enhanced attacks
     // count each real damage activation where the relic increased Vulnerable.

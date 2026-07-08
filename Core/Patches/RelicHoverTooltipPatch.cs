@@ -237,6 +237,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is Kunai)
+            {
+                const string relicId = "RELIC.KUNAI";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildKunaiBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Kunai", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is Lantern)
             {
                 const string relicId = "RELIC.LANTERN";
@@ -1047,6 +1057,13 @@ public static class RelicHoverShowPatch
         {
             title = "Vajra";
             body = BuildVajraBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is Kunai)
+        {
+            title = "Kunai";
+            body = BuildKunaiBodyBBCode(agg);
             return true;
         }
 
@@ -2400,6 +2417,22 @@ public static class RelicHoverShowPatch
         var sb = new StringBuilder();
         Row3(sb, "Attacks played", agg.VajraAttacksPlayed.ToString(), "");
         Row3(sb, "Attack hits", agg.VajraAttackHits.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildKunaiBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var averageEndCharge = agg.KunaiTurnEndChargeCount <= 0
+            ? 0m
+            : (decimal)agg.KunaiTurnEndChargeTotal / agg.KunaiTurnEndChargeCount;
+
+        Row3(sb, "Attacks played", agg.KunaiAttacksPlayed.ToString(), "");
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, "Dexterity gained", agg.KunaiDexterityGained.ToString(), "");
+        Row3(sb, "Turns ended at 1 charge", agg.KunaiTurnsEndedAt1Charge.ToString(), "");
+        Row3(sb, "Turns ended at 2 charges", agg.KunaiTurnsEndedAt2Charges.ToString(), "");
+        Row3(sb, "Avg charge at turn end", FormatDecimal(averageEndCharge), "");
         return sb.ToString();
     }
 

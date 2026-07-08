@@ -2244,6 +2244,39 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsKunaiRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("kunai-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.KUNAI"];
+        Assert.Equal(14, relicAgg.KunaiAttacksPlayed);
+        Assert.Equal(4, relicAgg.Activations);
+        Assert.Equal(4, relicAgg.KunaiDexterityGained);
+        Assert.Equal(2, relicAgg.KunaiTurnsEndedAt1Charge);
+        Assert.Equal(3, relicAgg.KunaiTurnsEndedAt2Charges);
+        Assert.Equal(11, relicAgg.KunaiTurnEndChargeTotal);
+        Assert.Equal(7, relicAgg.KunaiTurnEndChargeCount);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsKunaiRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("kunai-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.KUNAI"];
+        Assert.Equal(14, relicAgg.KunaiAttacksPlayed);
+        Assert.Equal(4, relicAgg.Activations);
+        Assert.Equal(4, relicAgg.KunaiDexterityGained);
+        Assert.Equal(2, relicAgg.KunaiTurnsEndedAt1Charge);
+        Assert.Equal(3, relicAgg.KunaiTurnsEndedAt2Charges);
+        Assert.Equal(11, relicAgg.KunaiTurnEndChargeTotal);
+        Assert.Equal(7, relicAgg.KunaiTurnEndChargeCount);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsPaperPhrogRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("paper-phrog-relic-run.json"));
