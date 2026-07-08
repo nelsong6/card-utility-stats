@@ -19,6 +19,19 @@ public class RelicCompendiumFilterTests
     }
 
     [Fact]
+    public void ChargeTaxonomy_IncludesIncrementingRelics()
+    {
+        var charge = RelicTaxonomy.Categories.Single(c => c.Id == RelicTaxonomy.ChargeCategoryId);
+
+        Assert.Contains("RELIC.PEN_NIB", charge.RelicIds);
+        Assert.Contains("RELIC.LETTER_OPENER", charge.RelicIds);
+        Assert.Contains("RELIC.NUNCHAKU", charge.RelicIds);
+        Assert.Contains("RELIC.IRON_CLUB", charge.RelicIds);
+        Assert.Contains("RELIC.HAPPY_FLOWER", charge.RelicIds);
+        Assert.Contains("RELIC.WINGED_BOOTS", charge.RelicIds);
+    }
+
+    [Fact]
     public void IsRelicInAnySelectedCategory_UsesSelectedCategories()
     {
         Assert.True(RelicTaxonomy.IsRelicInAnySelectedCategory(
@@ -32,6 +45,14 @@ public class RelicCompendiumFilterTests
         Assert.False(RelicTaxonomy.IsRelicInAnySelectedCategory(
             "RELIC.LANTERN",
             Enumerable.Empty<string>()));
+
+        Assert.True(RelicTaxonomy.IsRelicInAnySelectedCategory(
+            "RELIC.PEN_NIB",
+            new[] { RelicTaxonomy.ChargeCategoryId }));
+
+        Assert.False(RelicTaxonomy.IsRelicInAnySelectedCategory(
+            "RELIC.PEN_NIB",
+            new[] { RelicTaxonomy.EnergyCategoryId }));
     }
 
     [Fact]

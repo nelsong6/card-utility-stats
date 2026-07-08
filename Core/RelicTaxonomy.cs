@@ -12,6 +12,7 @@ internal sealed record RelicTaxonomyCategory(
 internal static class RelicTaxonomy
 {
     public const string EnergyCategoryId = "energy";
+    public const string ChargeCategoryId = "charge";
 
     private static readonly RelicTaxonomyCategory EnergyCategory = new(
         EnergyCategoryId,
@@ -42,9 +43,53 @@ internal static class RelicTaxonomy
             "RELIC.VERY_HOT_COCOA",
         });
 
+    private static readonly RelicTaxonomyCategory ChargeCategory = new(
+        ChargeCategoryId,
+        "Charge relics",
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "RELIC.BOOK_OF_FIVE_RINGS",
+            "RELIC.BRILLIANT_SCARF",
+            "RELIC.DIAMOND_DIADEM",
+            "RELIC.FAKE_HAPPY_FLOWER",
+            "RELIC.FISHING_ROD",
+            "RELIC.GALACTIC_DUST",
+            "RELIC.GIRYA",
+            "RELIC.HAPPY_FLOWER",
+            "RELIC.IRON_CLUB",
+            "RELIC.JOSS_PAPER",
+            "RELIC.KUNAI",
+            "RELIC.KUSARIGAMA",
+            "RELIC.LASTING_CANDY",
+            "RELIC.LETTER_OPENER",
+            "RELIC.METRONOME",
+            "RELIC.NUNCHAKU",
+            "RELIC.ORNAMENTAL_FAN",
+            "RELIC.PAELS_FLESH",
+            "RELIC.PAELS_LEGION",
+            "RELIC.PAELS_TOOTH",
+            "RELIC.PAELS_WING",
+            "RELIC.PENDULUM",
+            "RELIC.PEN_NIB",
+            "RELIC.POCKETWATCH",
+            "RELIC.POLLINOUS_CORE",
+            "RELIC.PUMPKIN_CANDLE",
+            "RELIC.RAINBOW_RING",
+            "RELIC.SHURIKEN",
+            "RELIC.SILVER_CRUCIBLE",
+            "RELIC.STONE_CALENDAR",
+            "RELIC.SWORD_OF_STONE",
+            "RELIC.TOY_BOX",
+            "RELIC.TUNING_FORK",
+            "RELIC.VELVET_CHOKER",
+            "RELIC.WINGED_BOOTS",
+            "RELIC.WONGOS_MYSTERY_TICKET",
+        });
+
     public static IReadOnlyList<RelicTaxonomyCategory> Categories { get; } =
     [
         EnergyCategory,
+        ChargeCategory,
     ];
 
     public static bool IsRelicInAnySelectedCategory(
