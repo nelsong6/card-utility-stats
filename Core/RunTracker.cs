@@ -6644,21 +6644,48 @@ public static class RunTracker
     }
 
     /// <summary>
-    /// No-op arm/disarm pair kept wired for Booming Conch's Elite combat-start
-    /// energy. The energy-gain consumer that once read the armed flag was
-    /// already unreachable, so Booming Conch's energy attribution is currently
-    /// non-functional (a known bug: it never routed to the registry). Fixing
-    /// it — arm a PlayerEnergyGain window and credit EnergyGenerated, mirroring
-    /// Happy Flower — is a separate, live-verified change; these seams stay so
-    /// it has a home. (Its card-draw stat via RecordBoomingConchDraw still
-    /// works.)
+    /// Arm Booming Conch's owner-specific Elite combat-start energy
+    /// attribution. The actual energy delta is observed later at
+    /// PlayerCombatState.GainEnergy.
     /// </summary>
-    public static void ArmBoomingConchEnergyAttribution()
+    public static void ArmBoomingConchEnergyAttribution(Player owner)
     {
+        if (owner == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(owner)) return;
+
+                _pendingCombat ??= new PendingCombat();
+                _pendingCombat.Windows.Arm(
+                    BoomingConchRelicId,
+                    AttributionEventKind.PlayerEnergyGain,
+                    CurrentHistoryCountLocked(),
+                    ownerId: owner,
+                    maxHistoryAdvance: -1);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"ArmBoomingConchEnergyAttribution failed: {e.Message}");
+            }
+        }
     }
 
     public static void DisarmBoomingConchEnergyAttribution()
     {
+        lock (_lock)
+        {
+            try
+            {
+                _pendingCombat?.Windows.Disarm(BoomingConchRelicId, AttributionEventKind.PlayerEnergyGain);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"DisarmBoomingConchEnergyAttribution failed: {e.Message}");
+            }
+        }
     }
 
     public static void RecordBoomingConchDraw(int cardsDrawn)

@@ -1,8 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Combat;
+using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Hooks;
+using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Rooms;
 
 namespace SpireLens.Core.Patches;
 
@@ -11,26 +15,32 @@ namespace SpireLens.Core.Patches;
 /// energy gained is measured by PlayerCombatState.GainEnergy.
 /// </summary>
 [HarmonyPatch]
-public static class BoomingConchBeforeSideTurnStartPatch
+public static class BoomingConchAfterSideTurnStartPatch
 {
     private static MethodBase? TargetMethod()
     {
         var t = AccessTools.TypeByName("MegaCrit.Sts2.Core.Models.Relics.BoomingConch");
-        return t == null ? null : AccessTools.Method(t, "BeforeSideTurnStart");
+        return t == null ? null : AccessTools.Method(t, "AfterSideTurnStart");
     }
 
     [HarmonyPrefix]
-    public static void Prefix(CombatSide side, ICombatState combatState)
+    public static void Prefix(
+        RelicModel __instance,
+        CombatSide side,
+        IReadOnlyList<Creature> participants,
+        ICombatState combatState)
     {
         try
         {
-            if (side != CombatSide.Player) return;
-            if (combatState == null || combatState.RoundNumber != 1) return;
-            RunTracker.ArmBoomingConchEnergyAttribution();
+            if (!TurnEnergyRelicPatchHelpers.TryGetTrackedOwnerOnPlayerTurn(__instance, side, participants, out var owner)) return;
+            if (owner.PlayerCombatState == null || owner.PlayerCombatState.TurnNumber > 1) return;
+            if (combatState?.RunState?.CurrentRoom?.RoomType != RoomType.Elite) return;
+
+            RunTracker.ArmBoomingConchEnergyAttribution(owner);
         }
         catch (Exception e)
         {
-            CoreMain.LogDebug($"BoomingConchBeforeSideTurnStartPatch failed: {e.Message}");
+            CoreMain.LogDebug($"BoomingConchAfterSideTurnStartPatch failed: {e.Message}");
         }
     }
 }
