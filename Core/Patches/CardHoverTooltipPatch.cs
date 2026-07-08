@@ -7,6 +7,7 @@ using HarmonyLib;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Models.Cards;
 using MegaCrit.Sts2.Core.Nodes.Cards.Holders;
+using MegaCrit.Sts2.Core.Nodes.Screens.CardSelection;
 
 namespace SpireLens.Core.Patches;
 
@@ -51,6 +52,12 @@ public static class CardHoverShowPatch
 
         if (__instance is NHandCardHolder && !RuntimeOptionsProvider.Current.ShowHandTooltips)
             return;
+
+        if (IsCardRewardSelectionSurface(__instance))
+        {
+            StatsTooltip.Hide();
+            return;
+        }
 
         // Gate on our checkbox state. If it's not even injected yet (no deck
         // view opened this session) or unchecked, do nothing.
@@ -114,6 +121,22 @@ public static class CardHoverShowPatch
         {
             CoreMain.Logger.Error($"CardHoverShow failed: {e.Message}");
         }
+    }
+
+    private static bool IsCardRewardSelectionSurface(Node? node)
+    {
+        for (var current = node; current != null; current = current.GetParent())
+        {
+            if (IsCardRewardSelectionSurfaceType(current.GetType()))
+                return true;
+        }
+
+        return false;
+    }
+
+    internal static bool IsCardRewardSelectionSurfaceType(Type? nodeType)
+    {
+        return nodeType != null && typeof(NCardRewardSelectionScreen).IsAssignableFrom(nodeType);
     }
 
     /// <summary>
