@@ -79,21 +79,33 @@ public class RelicCompendiumFilterTests
     {
         Assert.Equal(
             CompendiumRelicEntryVisualAction.Normal,
-            RelicCompendiumFilterContext.GetVisualAction(CompendiumRelicFilterMode.Off, true, false));
+            RelicCompendiumFilterContext.GetVisualAction(CompendiumRelicFilterMode.Off, true, true, false));
         Assert.Equal(
             CompendiumRelicEntryVisualAction.Normal,
-            RelicCompendiumFilterContext.GetVisualAction(CompendiumRelicFilterMode.Compare, true, true));
+            RelicCompendiumFilterContext.GetVisualAction(CompendiumRelicFilterMode.Off, false, false, false));
+        Assert.Equal(
+            CompendiumRelicEntryVisualAction.Normal,
+            RelicCompendiumFilterContext.GetVisualAction(CompendiumRelicFilterMode.Compare, true, true, true));
         Assert.Equal(
             CompendiumRelicEntryVisualAction.Dim,
-            RelicCompendiumFilterContext.GetVisualAction(CompendiumRelicFilterMode.Compare, true, false));
+            RelicCompendiumFilterContext.GetVisualAction(CompendiumRelicFilterMode.Compare, true, true, false));
         Assert.Equal(
             CompendiumRelicEntryVisualAction.Normal,
-            RelicCompendiumFilterContext.GetVisualAction(CompendiumRelicFilterMode.Filter, true, true));
+            RelicCompendiumFilterContext.GetVisualAction(CompendiumRelicFilterMode.Compare, false, true, false));
         Assert.Equal(
             CompendiumRelicEntryVisualAction.Hidden,
-            RelicCompendiumFilterContext.GetVisualAction(CompendiumRelicFilterMode.Filter, true, false));
+            RelicCompendiumFilterContext.GetVisualAction(CompendiumRelicFilterMode.Compare, false, false, false));
         Assert.Equal(
             CompendiumRelicEntryVisualAction.Normal,
-            RelicCompendiumFilterContext.GetVisualAction(CompendiumRelicFilterMode.Filter, false, false));
+            RelicCompendiumFilterContext.GetVisualAction(CompendiumRelicFilterMode.Filter, true, true, true));
+        Assert.Equal(
+            CompendiumRelicEntryVisualAction.Hidden,
+            RelicCompendiumFilterContext.GetVisualAction(CompendiumRelicFilterMode.Filter, true, true, false));
+        Assert.Equal(
+            CompendiumRelicEntryVisualAction.Normal,
+            RelicCompendiumFilterContext.GetVisualAction(CompendiumRelicFilterMode.Filter, false, true, false));
+        Assert.Equal(
+            CompendiumRelicEntryVisualAction.Hidden,
+            RelicCompendiumFilterContext.GetVisualAction(CompendiumRelicFilterMode.Filter, false, false, false));
     }
 }

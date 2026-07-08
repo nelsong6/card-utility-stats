@@ -55,11 +55,17 @@ internal static class RelicCompendiumFilterContext
 {
     public static CompendiumRelicEntryVisualAction GetVisualAction(
         CompendiumRelicFilterMode mode,
-        bool canApplyCategoryVisuals,
+        bool isVisibleRelic,
+        bool showUndiscoveredRelics,
         bool matchesSelectedCategories)
     {
-        if (!canApplyCategoryVisuals || mode == CompendiumRelicFilterMode.Off)
+        if (mode == CompendiumRelicFilterMode.Off)
             return CompendiumRelicEntryVisualAction.Normal;
+
+        if (!isVisibleRelic)
+            return showUndiscoveredRelics
+                ? CompendiumRelicEntryVisualAction.Normal
+                : CompendiumRelicEntryVisualAction.Hidden;
 
         if (matchesSelectedCategories)
             return CompendiumRelicEntryVisualAction.Normal;
@@ -81,6 +87,7 @@ internal static class RelicCompendiumFilterUi
         new(RelicTaxonomy.Categories.Select(c => c.Id), StringComparer.OrdinalIgnoreCase);
 
     private static CompendiumRelicFilterMode _mode = CompendiumRelicFilterMode.Off;
+    private static bool _showUndiscoveredRelics = true;
     private static bool _syncingControls;
 
     public static void Inject(NRelicCollection? collection)
@@ -138,9 +145,9 @@ internal static class RelicCompendiumFilterUi
         if (entry == null || !GodotObject.IsInstanceValid(entry)) return;
         RememberOriginal(entry);
 
-        var canApplyCategoryVisuals = entry.ModelVisibility == ModelVisibility.Visible;
+        var isVisibleRelic = entry.ModelVisibility == ModelVisibility.Visible;
         var matches = false;
-        if (canApplyCategoryVisuals
+        if (isVisibleRelic
             && CompendiumRelicStatsContext.TryGetRelicModel(entry, out var relicModel))
         {
             var relicId = GetRelicId(relicModel);
@@ -149,7 +156,8 @@ internal static class RelicCompendiumFilterUi
 
         var action = RelicCompendiumFilterContext.GetVisualAction(
             _mode,
-            canApplyCategoryVisuals,
+            isVisibleRelic,
+            _showUndiscoveredRelics,
             matches);
 
         ApplyVisualAction(entry, action);
@@ -175,6 +183,7 @@ internal static class RelicCompendiumFilterUi
     internal static void ResetForTests()
     {
         _mode = CompendiumRelicFilterMode.Off;
+        _showUndiscoveredRelics = true;
         SelectedCategoryIds.Clear();
         foreach (var category in RelicTaxonomy.Categories)
             SelectedCategoryIds.Add(category.Id);
@@ -237,6 +246,19 @@ internal static class RelicCompendiumFilterUi
             Callable.From<long>(index => OnModeSelected(modeDropdown, index)));
         vbox.AddChild(modeDropdown);
 
+        var showUndiscovered = new CheckBox
+        {
+            Name = "ShowUndiscovered",
+            Text = "Show undiscovered",
+            MouseFilter = Control.MouseFilterEnum.Stop,
+            SizeFlagsHorizontal = Control.SizeFlags.Fill | Control.SizeFlags.Expand,
+        };
+        showUndiscovered.AddThemeFontSizeOverride("font_size", 14);
+        showUndiscovered.Connect(
+            BaseButton.SignalName.Toggled,
+            Callable.From<bool>(OnShowUndiscoveredToggled));
+        vbox.AddChild(showUndiscovered);
+
         var categoriesLabel = NewLabel("Categories", 13, new Color(0.78f, 0.73f, 0.64f, 1f));
         vbox.AddChild(categoriesLabel);
 
@@ -275,7 +297,7 @@ internal static class RelicCompendiumFilterUi
         clearAll.Connect(BaseButton.SignalName.Pressed, Callable.From(ClearAllCategories));
         buttons.AddChild(clearAll);
 
-        return new InjectedPanel(null, root, modeDropdown, checkboxByCategory);
+        return new InjectedPanel(null, root, modeDropdown, showUndiscovered, checkboxByCategory);
     }
 
     private static Label NewLabel(string text, int fontSize, Color color)
@@ -326,6 +348,14 @@ internal static class RelicCompendiumFilterUi
         else
             SelectedCategoryIds.Remove(categoryId);
 
+        ApplyToActiveEntries();
+    }
+
+    private static void OnShowUndiscoveredToggled(bool selected)
+    {
+        if (_syncingControls) return;
+
+        _showUndiscoveredRelics = selected;
         ApplyToActiveEntries();
     }
 
@@ -491,6 +521,7 @@ internal static class RelicCompendiumFilterUi
         NRelicCollection? Collection,
         PanelContainer Root,
         OptionButton ModeDropdown,
+        CheckBox ShowUndiscoveredCheckbox,
         IReadOnlyDictionary<string, CheckBox> Checkboxes)
     {
         public bool IsValid =>
@@ -518,6 +549,9 @@ internal static class RelicCompendiumFilterUi
                 break;
             }
             ModeDropdown.Selected = selectedIndex;
+
+            if (ShowUndiscoveredCheckbox != null && GodotObject.IsInstanceValid(ShowUndiscoveredCheckbox))
+                ShowUndiscoveredCheckbox.SetPressedNoSignal(_showUndiscoveredRelics);
 
             foreach (var (categoryId, checkbox) in Checkboxes)
             {
