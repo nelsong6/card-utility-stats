@@ -126,6 +126,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is RippleBasin)
+            {
+                const string relicId = "RELIC.RIPPLE_BASIN";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildRippleBasinBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Ripple Basin", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is TheAbacus)
             {
                 const string relicId = "RELIC.THE_ABACUS";
@@ -234,6 +244,16 @@ public static class RelicHoverShowPatch
 
                 var body = BuildVajraBodyBBCode(agg);
                 StatsTooltip.Show(tree, __instance, "Vajra", "SpireLens", body);
+                return;
+            }
+
+            if (relicNode.Model is Kunai)
+            {
+                const string relicId = "RELIC.KUNAI";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildKunaiBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Kunai", "SpireLens", body);
                 return;
             }
 
@@ -973,6 +993,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is RippleBasin)
+        {
+            title = "Ripple Basin";
+            body = BuildRippleBasinBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is TheAbacus)
         {
             title = "The Abacus";
@@ -1047,6 +1074,13 @@ public static class RelicHoverShowPatch
         {
             title = "Vajra";
             body = BuildVajraBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is Kunai)
+        {
+            title = "Kunai";
+            body = BuildKunaiBodyBBCode(agg);
             return true;
         }
 
@@ -1563,8 +1597,41 @@ public static class RelicHoverShowPatch
     private static string BuildTuningForkBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
+        var blockPerActivation = agg.Activations <= 0
+            ? 0m
+            : (decimal)agg.AdditionalBlockGained / agg.Activations;
+        var skillsPerCombat = agg.TuningForkCombats <= 0
+            ? 0m
+            : (decimal)agg.TuningForkSkillsPlayed / agg.TuningForkCombats;
+        var skillsPerTurn = agg.TuningForkTurns <= 0
+            ? 0m
+            : (decimal)agg.TuningForkSkillsPlayed / agg.TuningForkTurns;
+        var averageEndCharge = agg.TuningForkTurnEndChargeCount <= 0
+            ? 0m
+            : (decimal)agg.TuningForkTurnEndChargeTotal / agg.TuningForkTurnEndChargeCount;
+
+        Row3(sb, "Skills played", agg.TuningForkSkillsPlayed.ToString(), "");
         Row3(sb, "Activations", agg.Activations.ToString(), "");
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
+        Row3(sb, BlockLabel("block gained per activation"), FormatDecimal(blockPerActivation), "");
+        Row3(sb, "Avg skills played per combat", FormatDecimal(skillsPerCombat), "");
+        Row3(sb, "Avg skills played per turn", FormatDecimal(skillsPerTurn), "");
+        Row3(sb, "Turns ended on 8 charges", agg.TuningForkTurnsEndedOn8Charges.ToString(), "");
+        Row3(sb, "Turns ended on 9 charges", agg.TuningForkTurnsEndedOn9Charges.ToString(), "");
+        Row3(sb, "Avg charge at turn end", FormatDecimal(averageEndCharge), "");
+        return sb.ToString();
+    }
+
+    private static string BuildRippleBasinBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var blockPerActivation = agg.Activations <= 0
+            ? 0m
+            : (decimal)agg.AdditionalBlockGained / agg.Activations;
+
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
+        Row3(sb, BlockLabel("block gained per activation"), FormatDecimal(blockPerActivation), "");
         return sb.ToString();
     }
 
@@ -2400,6 +2467,22 @@ public static class RelicHoverShowPatch
         var sb = new StringBuilder();
         Row3(sb, "Attacks played", agg.VajraAttacksPlayed.ToString(), "");
         Row3(sb, "Attack hits", agg.VajraAttackHits.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildKunaiBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var averageEndCharge = agg.KunaiTurnEndChargeCount <= 0
+            ? 0m
+            : (decimal)agg.KunaiTurnEndChargeTotal / agg.KunaiTurnEndChargeCount;
+
+        Row3(sb, "Attacks played", agg.KunaiAttacksPlayed.ToString(), "");
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, "Dexterity gained", agg.KunaiDexterityGained.ToString(), "");
+        Row3(sb, "Turns ended at 1 charge", agg.KunaiTurnsEndedAt1Charge.ToString(), "");
+        Row3(sb, "Turns ended at 2 charges", agg.KunaiTurnsEndedAt2Charges.ToString(), "");
+        Row3(sb, "Avg charge at turn end", FormatDecimal(averageEndCharge), "");
         return sb.ToString();
     }
 

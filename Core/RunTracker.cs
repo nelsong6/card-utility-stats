@@ -1518,6 +1518,7 @@ public static class RunTracker
         if (_pendingCombat == null || _currentRun == null) return;
         RecordHeldCombatRelicBaselinesForTrackedPlayerLocked(requireActiveCombat: false, createPendingIfNeeded: false);
         RecordLetterOpenerTurnForTrackedPlayerLocked();
+        RecordTuningForkTurnForTrackedPlayerLocked();
         RecordPaperPhrogTurnForTrackedPlayerLocked();
         RecordPaelsEyeCombatsWithoutActivationForTrackedPlayerLocked();
         RecordTurnEnergyRelicCombatsWithoutEnergyForTrackedPlayerLocked();
@@ -1632,6 +1633,13 @@ public static class RunTracker
         target.LetterOpenerTurns += source.LetterOpenerTurns;
         target.LetterOpenerTurnsEndedAt1Charge += source.LetterOpenerTurnsEndedAt1Charge;
         target.LetterOpenerTurnsEndedAt2Charges += source.LetterOpenerTurnsEndedAt2Charges;
+        target.TuningForkSkillsPlayed += source.TuningForkSkillsPlayed;
+        target.TuningForkCombats += source.TuningForkCombats;
+        target.TuningForkTurns += source.TuningForkTurns;
+        target.TuningForkTurnsEndedOn8Charges += source.TuningForkTurnsEndedOn8Charges;
+        target.TuningForkTurnsEndedOn9Charges += source.TuningForkTurnsEndedOn9Charges;
+        target.TuningForkTurnEndChargeTotal += source.TuningForkTurnEndChargeTotal;
+        target.TuningForkTurnEndChargeCount += source.TuningForkTurnEndChargeCount;
         target.PotionsGained += source.PotionsGained;
         target.CommonPotionsGained += source.CommonPotionsGained;
         target.UncommonPotionsGained += source.UncommonPotionsGained;
@@ -1670,6 +1678,12 @@ public static class RunTracker
         target.MiniatureCannonUpgradedAttackHits += source.MiniatureCannonUpgradedAttackHits;
         target.VajraAttacksPlayed += source.VajraAttacksPlayed;
         target.VajraAttackHits += source.VajraAttackHits;
+        target.KunaiAttacksPlayed += source.KunaiAttacksPlayed;
+        target.KunaiDexterityGained += source.KunaiDexterityGained;
+        target.KunaiTurnsEndedAt1Charge += source.KunaiTurnsEndedAt1Charge;
+        target.KunaiTurnsEndedAt2Charges += source.KunaiTurnsEndedAt2Charges;
+        target.KunaiTurnEndChargeTotal += source.KunaiTurnEndChargeTotal;
+        target.KunaiTurnEndChargeCount += source.KunaiTurnEndChargeCount;
         target.PaperPhrogDamageAdded += source.PaperPhrogDamageAdded;
         target.PaperPhrogEnhancedAttacks += source.PaperPhrogEnhancedAttacks;
         target.PaperPhrogCombats += source.PaperPhrogCombats;
@@ -2304,6 +2318,7 @@ public static class RunTracker
     private const string OrichalcumRelicId = "RELIC.ORICHALCUM";
     private const string PermafrostRelicId = "RELIC.PERMAFROST";
     private const string TuningForkRelicId = "RELIC.TUNING_FORK";
+    private const string RippleBasinRelicId = "RELIC.RIPPLE_BASIN";
     private const string AnchorRelicId = "RELIC.ANCHOR";
     private const string TheAbacusRelicId = "RELIC.THE_ABACUS";
     private const string LetterOpenerRelicId = "RELIC.LETTER_OPENER";
@@ -2367,6 +2382,7 @@ public static class RunTracker
     private const string NutritiousSoupRelicId = "RELIC.NUTRITIOUS_SOUP";
     private const string MiniatureCannonRelicId = "RELIC.MINIATURE_CANNON";
     private const string VajraRelicId = "RELIC.VAJRA";
+    private const string KunaiRelicId = "RELIC.KUNAI";
     private const string PaperPhrogRelicId = "RELIC.PAPER_PHROG";
     private const string RegaliteRelicId = "RELIC.REGALITE";
     private const string BookmarkRelicId = "RELIC.BOOKMARK";
@@ -2560,28 +2576,47 @@ public static class RunTracker
     }
 
     /// <summary>
-    /// Record Tuning Fork's every-N-skills trigger and arm observed block
-    /// attribution. The actual block amount is observed by
-    /// <see cref="Patches.HookAfterBlockGainedPatch"/>.
+    /// Record a Tuning Fork-owned Skill play and arm observed block attribution
+    /// if this play will cross the relic's threshold. The actual block amount
+    /// is observed by <see cref="Patches.HookAfterBlockGainedPatch"/>.
     /// </summary>
-    public static void RecordTuningForkActivationAndArmBlockAttribution()
+    public static bool RecordTuningForkSkillPlayedAndShouldArmBlockAttribution(TuningFork relic, CardPlay cardPlay)
     {
+        if (relic?.Owner == null || cardPlay?.Card == null) return false;
+        if (cardPlay.Card.Type != CardType.Skill) return false;
+        if (!ReferenceEquals(cardPlay.Card.Owner, relic.Owner)) return false;
+
         lock (_lock)
         {
             try
             {
+                if (!IsTrackedRelic(relic)) return false;
+                if (!IsTrackedPlayer(relic.Owner)) return false;
+                if (!CombatManager.Instance.IsInProgress) return false;
+
                 _pendingCombat ??= new PendingCombat();
-                var agg = GetOrCreateRelicAggregateLocked(TuningForkRelicId);
+                RecordTuningForkCombatForPlayerLocked(relic.Owner);
+                RecordTuningForkTurnForPlayerLocked(relic.Owner);
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(TuningForkRelicId);
+                RecordTuningForkSkillPlayedForTest(agg);
+
+                var threshold = TuningForkCardsPerActivation(relic);
+                if (threshold <= 0) return false;
+                if (Math.Max(0, relic.SkillsPlayed) + 1 < threshold) return false;
+
                 agg.Activations += 1;
                 _pendingCombat.Windows.Arm(
                     TuningForkRelicId,
                     AttributionEventKind.PlayerBlockGain,
                     CurrentHistoryCountLocked(),
                     maxHistoryAdvance: -1);
+                return true;
             }
             catch (Exception e)
             {
-                CoreMain.LogDebug($"RecordTuningForkActivationAndArmBlockAttribution failed: {e.Message}");
+                CoreMain.LogDebug($"RecordTuningForkSkillPlayedAndShouldArmBlockAttribution failed: {e.Message}");
+                return false;
             }
         }
     }
@@ -2591,6 +2626,138 @@ public static class RunTracker
         lock (_lock)
         {
             _pendingCombat?.Windows.Disarm(TuningForkRelicId, AttributionEventKind.PlayerBlockGain);
+        }
+    }
+
+    /// <summary>
+    /// Snapshot Tuning Fork's persistent Skill counter at the end of each
+    /// tracked player turn while held.
+    /// </summary>
+    public static void RecordTuningForkTurnEnded(IEnumerable<Creature>? participants)
+    {
+        lock (_lock)
+        {
+            try
+            {
+                _pendingCombat ??= new PendingCombat();
+                var recordedParticipant = false;
+
+                if (participants != null)
+                {
+                    foreach (var creature in participants)
+                    {
+                        var player = creature?.Player;
+                        if (player == null || !IsTrackedPlayer(player)) continue;
+
+                        recordedParticipant |= RecordTuningForkTurnEndChargeForPlayerLocked(
+                            player,
+                            player.PlayerCombatState?.TurnNumber ?? 0);
+                    }
+                }
+
+                if (recordedParticipant) return;
+
+                var trackedPlayer = GetTrackedRunPlayerLocked();
+                if (trackedPlayer == null) return;
+                RecordTuningForkTurnEndChargeForPlayerLocked(
+                    trackedPlayer,
+                    trackedPlayer.PlayerCombatState?.TurnNumber ?? 0);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordTuningForkTurnEnded failed: {e.Message}");
+            }
+        }
+    }
+
+    private static bool RecordTuningForkTurnEndChargeForPlayerLocked(
+        Player player,
+        int turnNumber,
+        TuningFork? tuningFork = null)
+    {
+        if (_pendingCombat == null) return false;
+        if (player == null || !IsTrackedPlayer(player)) return false;
+        tuningFork ??= TryGetTuningFork(player, out var foundRelic) ? foundRelic : null;
+        if (tuningFork == null) return false;
+        if (turnNumber <= 0) return false;
+
+        RecordTuningForkTurnForPlayerLocked(player, turnNumber);
+
+        if (_pendingCombat.TuningForkTurnEndChargeRecordedTurns.TryGetValue(player, out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return true;
+        }
+
+        _pendingCombat.TuningForkTurnEndChargeRecordedTurns[player] = turnNumber;
+        var agg = GetOrCreatePendingRelicAggregateLocked(TuningForkRelicId);
+        RecordTuningForkTurnEndChargeForTest(agg, TuningForkCharge(tuningFork));
+        return true;
+    }
+
+    internal static void RecordTuningForkSkillPlayedForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.TuningForkSkillsPlayed += Math.Max(0, count);
+    }
+
+    internal static void RecordTuningForkCombatForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.TuningForkCombats += Math.Max(0, count);
+    }
+
+    internal static void RecordTuningForkTurnForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.TuningForkTurns += Math.Max(0, count);
+    }
+
+    internal static void RecordTuningForkTurnEndChargeForTest(RelicAggregate agg, int charge)
+    {
+        if (agg == null || charge < 0) return;
+
+        charge %= 10;
+        agg.TuningForkTurnEndChargeTotal += charge;
+        agg.TuningForkTurnEndChargeCount += 1;
+        if (charge == 8)
+            agg.TuningForkTurnsEndedOn8Charges += 1;
+        else if (charge == 9)
+            agg.TuningForkTurnsEndedOn9Charges += 1;
+    }
+
+    /// <summary>
+    /// Record Ripple Basin's no-attack turn-end trigger and arm observed
+    /// block attribution. The actual block amount is observed by
+    /// <see cref="Patches.HookAfterBlockGainedPatch"/>.
+    /// </summary>
+    public static void RecordRippleBasinActivationAndArmBlockAttribution()
+    {
+        lock (_lock)
+        {
+            try
+            {
+                _pendingCombat ??= new PendingCombat();
+                var agg = GetOrCreateRelicAggregateLocked(RippleBasinRelicId);
+                agg.Activations += 1;
+                _pendingCombat.Windows.Arm(
+                    RippleBasinRelicId,
+                    AttributionEventKind.PlayerBlockGain,
+                    CurrentHistoryCountLocked(),
+                    maxHistoryAdvance: -1);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordRippleBasinActivationAndArmBlockAttribution failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void DisarmRippleBasinBlockAttribution()
+    {
+        lock (_lock)
+        {
+            _pendingCombat?.Windows.Disarm(RippleBasinRelicId, AttributionEventKind.PlayerBlockGain);
         }
     }
 
@@ -5782,6 +5949,139 @@ public static class RunTracker
         agg.VajraAttackHits += Math.Max(0, count);
     }
 
+    /// <summary>
+    /// Record a Kunai-owned attack play and return whether that play is expected
+    /// to activate the relic. The postfix observes the actual Dexterity delta.
+    /// </summary>
+    public static bool RecordKunaiAttackPlayedAndShouldObserveActivation(
+        Kunai relic,
+        CardPlay cardPlay,
+        out Creature? ownerCreature,
+        out int dexterityBefore)
+    {
+        ownerCreature = null;
+        dexterityBefore = 0;
+
+        if (relic?.Owner == null || cardPlay?.Card == null) return false;
+        if (cardPlay.Card.Type != CardType.Attack) return false;
+
+        var owner = relic.Owner;
+        if (cardPlay.Card.Owner != null && !ReferenceEquals(cardPlay.Card.Owner, owner)) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic)) return false;
+                if (!IsTrackedPlayer(owner)) return false;
+
+                _pendingCombat ??= new PendingCombat();
+                var agg = GetOrCreatePendingRelicAggregateLocked(KunaiRelicId);
+                RecordKunaiAttackPlayedForTest(agg);
+
+                var cardsPerActivation = KunaiCardsPerActivation(relic);
+                if (cardsPerActivation <= 0) return false;
+
+                var chargeBefore = KunaiCharge(relic);
+                if (chargeBefore + 1 < cardsPerActivation) return false;
+
+                ownerCreature = owner.Creature;
+                if (ownerCreature == null) return false;
+                dexterityBefore = CurrentDexterity(ownerCreature);
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordKunaiAttackPlayedAndShouldObserveActivation failed: {e.Message}");
+                ownerCreature = null;
+                dexterityBefore = 0;
+                return false;
+            }
+        }
+    }
+
+    public static void RecordKunaiActivation(int dexterityGained)
+    {
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateForCurrentContextLocked(KunaiRelicId);
+                RecordKunaiActivationForTest(agg, dexterityGained);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordKunaiActivation failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Snapshot Kunai's live attack counter at the end of each tracked player
+    /// turn before the relic resets it at the next player turn start.
+    /// </summary>
+    public static void RecordKunaiTurnEnded(IEnumerable<Creature>? participants)
+    {
+        if (participants == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                _pendingCombat ??= new PendingCombat();
+
+                foreach (var creature in participants)
+                {
+                    var player = creature?.Player;
+                    if (player == null || !IsTrackedPlayer(player)) continue;
+                    if (!TryGetKunai(player, out var kunai) || kunai == null) continue;
+
+                    var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+                    if (turnNumber <= 0) continue;
+                    if (_pendingCombat.KunaiTurnEndChargeRecordedTurns.TryGetValue(player, out var recordedTurn)
+                        && recordedTurn == turnNumber)
+                    {
+                        continue;
+                    }
+
+                    _pendingCombat.KunaiTurnEndChargeRecordedTurns[player] = turnNumber;
+                    var agg = GetOrCreatePendingRelicAggregateLocked(KunaiRelicId);
+                    RecordKunaiTurnEndChargeForTest(agg, KunaiCharge(kunai));
+                }
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordKunaiTurnEnded failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordKunaiAttackPlayedForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.KunaiAttacksPlayed += Math.Max(0, count);
+    }
+
+    internal static void RecordKunaiActivationForTest(RelicAggregate agg, int dexterityGained)
+    {
+        if (agg == null) return;
+        agg.Activations += 1;
+        agg.KunaiDexterityGained += Math.Max(0, dexterityGained);
+    }
+
+    internal static void RecordKunaiTurnEndChargeForTest(RelicAggregate agg, int charge)
+    {
+        if (agg == null || charge < 0) return;
+
+        charge %= 3;
+        agg.KunaiTurnEndChargeTotal += charge;
+        agg.KunaiTurnEndChargeCount += 1;
+        if (charge == 1)
+            agg.KunaiTurnsEndedAt1Charge += 1;
+        else if (charge == 2)
+            agg.KunaiTurnsEndedAt2Charges += 1;
+    }
+
     public static void RecordPaperPhrogVulnerableBonus(
         PaperPhrog relic,
         decimal damageAdded,
@@ -8468,6 +8768,7 @@ public static class RunTracker
             if (player == null) return;
 
             RecordLetterOpenerCombatForPlayerLocked(player);
+            RecordTuningForkCombatForPlayerLocked(player);
             RecordHappyFlowerCombatForPlayerLocked(player);
             RecordNunchakuCombatForPlayerLocked(player);
             RecordIronClubCombatForPlayerLocked(player);
@@ -8494,6 +8795,16 @@ public static class RunTracker
 
         var agg = GetOrCreatePendingRelicAggregateLocked(LetterOpenerRelicId);
         RecordLetterOpenerCombatForTest(agg);
+    }
+
+    private static void RecordTuningForkCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasTuningFork(player)) return;
+        if (!_pendingCombat.TuningForkCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(TuningForkRelicId);
+        RecordTuningForkCombatForTest(agg);
     }
 
     private static void RecordLetterOpenerTurnForTrackedPlayerLocked()
@@ -8533,6 +8844,45 @@ public static class RunTracker
 
         var agg = GetOrCreatePendingRelicAggregateLocked(LetterOpenerRelicId);
         RecordLetterOpenerTurnForTest(agg);
+    }
+
+    private static void RecordTuningForkTurnForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordTuningForkTurnForPlayerLocked(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordTuningForkTurnForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordTuningForkTurnForPlayerLocked(Player player)
+    {
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        RecordTuningForkTurnForPlayerLocked(player, turnNumber);
+    }
+
+    private static void RecordTuningForkTurnForPlayerLocked(Player player, int turnNumber)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasTuningFork(player)) return;
+        if (turnNumber <= 0) return;
+
+        if (_pendingCombat.TuningForkTurnCountedTurns.TryGetValue(player, out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.TuningForkTurnCountedTurns[player] = turnNumber;
+        RecordTuningForkCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(TuningForkRelicId);
+        RecordTuningForkTurnForTest(agg);
     }
 
     private static void RecordMiniatureCannonCombatForTrackedPlayerLocked()
@@ -8902,6 +9252,93 @@ public static class RunTracker
         catch
         {
             return false;
+        }
+    }
+
+    private static bool PlayerHasTuningFork(Player player)
+    {
+        return TryGetTuningFork(player, out _);
+    }
+
+    private static bool TryGetTuningFork(Player player, out TuningFork? tuningFork)
+    {
+        tuningFork = null;
+
+        try
+        {
+            tuningFork = player?.Relics?.OfType<TuningFork>().FirstOrDefault();
+            return tuningFork != null;
+        }
+        catch
+        {
+            tuningFork = null;
+            return false;
+        }
+    }
+
+    private static int TuningForkCharge(TuningFork relic)
+    {
+        var threshold = TuningForkCardsPerActivation(relic);
+        if (threshold <= 0) return 0;
+        return Math.Max(0, relic.SkillsPlayed) % threshold;
+    }
+
+    private static int TuningForkCardsPerActivation(TuningFork relic)
+    {
+        try
+        {
+            return Math.Max(1, relic.DynamicVars.Cards.IntValue);
+        }
+        catch
+        {
+            return 10;
+        }
+    }
+
+    private static bool TryGetKunai(Player player, out Kunai? kunai)
+    {
+        kunai = null;
+
+        try
+        {
+            kunai = player?.Relics?.OfType<Kunai>().FirstOrDefault();
+            return kunai != null;
+        }
+        catch
+        {
+            kunai = null;
+            return false;
+        }
+    }
+
+    private static int KunaiCharge(Kunai relic)
+    {
+        var threshold = KunaiCardsPerActivation(relic);
+        if (threshold <= 0) return 0;
+        return Math.Max(0, relic.AttacksPlayedThisTurn) % threshold;
+    }
+
+    private static int KunaiCardsPerActivation(Kunai relic)
+    {
+        try
+        {
+            return Math.Max(1, relic.DynamicVars.Cards.IntValue);
+        }
+        catch
+        {
+            return 3;
+        }
+    }
+
+    private static int CurrentDexterity(Creature creature)
+    {
+        try
+        {
+            return creature.GetPower<DexterityPower>()?.Amount ?? 0;
+        }
+        catch
+        {
+            return 0;
         }
     }
 
@@ -12402,6 +12839,12 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> LetterOpenerTurnEndChargeRecordedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> TuningForkCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> TuningForkTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> TuningForkTurnEndChargeRecordedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> HappyFlowerCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> NunchakuCombatCountedPlayers { get; }
@@ -12443,6 +12886,8 @@ internal class PendingCombat
     public HashSet<Player> ChandelierThirdTurnExcessRecordedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> PenNibTurnEndChargeRecordedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> KunaiTurnEndChargeRecordedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> GamblingChipDiscardAttributionPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

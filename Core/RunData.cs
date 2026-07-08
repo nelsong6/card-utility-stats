@@ -517,6 +517,17 @@ public class RelicAggregate
     public int LetterOpenerTurnsEndedAt1Charge { get; set; }
     public int LetterOpenerTurnsEndedAt2Charges { get; set; }
 
+    // Tuning Fork tracking. Counts owner Skill plays, held combats/turns for
+    // averages, and player-turn-end charge snapshots for near-activation
+    // pressure on its persistent 10-Skill counter.
+    public int TuningForkSkillsPlayed { get; set; }
+    public int TuningForkCombats { get; set; }
+    public int TuningForkTurns { get; set; }
+    public int TuningForkTurnsEndedOn8Charges { get; set; }
+    public int TuningForkTurnsEndedOn9Charges { get; set; }
+    public int TuningForkTurnEndChargeTotal { get; set; }
+    public int TuningForkTurnEndChargeCount { get; set; }
+
     // Total potions gained from this relic, split by the potion rarity that
     // was actually claimed. Used by White Beast Statue.
     public int PotionsGained { get; set; }
@@ -579,6 +590,15 @@ public class RelicAggregate
     // resolved damage entry.
     public int VajraAttacksPlayed { get; set; }
     public int VajraAttackHits { get; set; }
+
+    // Kunai tracking. Counts owner attack plays, actual Dexterity gained from
+    // activation resolution, and player-turn-end charge snapshots.
+    public int KunaiAttacksPlayed { get; set; }
+    public int KunaiDexterityGained { get; set; }
+    public int KunaiTurnsEndedAt1Charge { get; set; }
+    public int KunaiTurnsEndedAt2Charges { get; set; }
+    public int KunaiTurnEndChargeTotal { get; set; }
+    public int KunaiTurnEndChargeCount { get; set; }
 
     // Paper Phrog tracking. Damage added is the actual current damage amount
     // multiplied by Paper Phrog's extra Vulnerable multiplier. Enhanced attacks

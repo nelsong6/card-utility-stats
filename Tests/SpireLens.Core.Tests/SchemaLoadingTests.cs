@@ -2128,8 +2128,27 @@ public class SchemaLoadingTests
         Assert.NotNull(loaded);
         Assert.True(loaded!.SupportsResume);
         var relicAgg = loaded.Data.RelicAggregates["RELIC.TUNING_FORK"];
+        Assert.Equal(27, relicAgg.TuningForkSkillsPlayed);
         Assert.Equal(3, relicAgg.Activations);
         Assert.Equal(18, relicAgg.AdditionalBlockGained);
+        Assert.Equal(2, relicAgg.TuningForkCombats);
+        Assert.Equal(7, relicAgg.TuningForkTurns);
+        Assert.Equal(2, relicAgg.TuningForkTurnsEndedOn8Charges);
+        Assert.Equal(1, relicAgg.TuningForkTurnsEndedOn9Charges);
+        Assert.Equal(31, relicAgg.TuningForkTurnEndChargeTotal);
+        Assert.Equal(5, relicAgg.TuningForkTurnEndChargeCount);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsRippleBasinRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("ripple-basin-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.RIPPLE_BASIN"];
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(12, relicAgg.AdditionalBlockGained);
     }
 
     [Fact]
@@ -2166,8 +2185,26 @@ public class SchemaLoadingTests
 
         Assert.NotNull(resumed);
         var relicAgg = resumed!.RelicAggregates["RELIC.TUNING_FORK"];
+        Assert.Equal(27, relicAgg.TuningForkSkillsPlayed);
         Assert.Equal(3, relicAgg.Activations);
         Assert.Equal(18, relicAgg.AdditionalBlockGained);
+        Assert.Equal(2, relicAgg.TuningForkCombats);
+        Assert.Equal(7, relicAgg.TuningForkTurns);
+        Assert.Equal(2, relicAgg.TuningForkTurnsEndedOn8Charges);
+        Assert.Equal(1, relicAgg.TuningForkTurnsEndedOn9Charges);
+        Assert.Equal(31, relicAgg.TuningForkTurnEndChargeTotal);
+        Assert.Equal(5, relicAgg.TuningForkTurnEndChargeCount);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsRippleBasinRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("ripple-basin-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.RIPPLE_BASIN"];
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(12, relicAgg.AdditionalBlockGained);
     }
 
     [Fact]
@@ -2241,6 +2278,39 @@ public class SchemaLoadingTests
         var relicAgg = resumed!.RelicAggregates["RELIC.VAJRA"];
         Assert.Equal(6, relicAgg.VajraAttacksPlayed);
         Assert.Equal(11, relicAgg.VajraAttackHits);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsKunaiRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("kunai-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.KUNAI"];
+        Assert.Equal(14, relicAgg.KunaiAttacksPlayed);
+        Assert.Equal(4, relicAgg.Activations);
+        Assert.Equal(4, relicAgg.KunaiDexterityGained);
+        Assert.Equal(2, relicAgg.KunaiTurnsEndedAt1Charge);
+        Assert.Equal(3, relicAgg.KunaiTurnsEndedAt2Charges);
+        Assert.Equal(11, relicAgg.KunaiTurnEndChargeTotal);
+        Assert.Equal(7, relicAgg.KunaiTurnEndChargeCount);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsKunaiRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("kunai-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.KUNAI"];
+        Assert.Equal(14, relicAgg.KunaiAttacksPlayed);
+        Assert.Equal(4, relicAgg.Activations);
+        Assert.Equal(4, relicAgg.KunaiDexterityGained);
+        Assert.Equal(2, relicAgg.KunaiTurnsEndedAt1Charge);
+        Assert.Equal(3, relicAgg.KunaiTurnsEndedAt2Charges);
+        Assert.Equal(11, relicAgg.KunaiTurnEndChargeTotal);
+        Assert.Equal(7, relicAgg.KunaiTurnEndChargeCount);
     }
 
     [Fact]

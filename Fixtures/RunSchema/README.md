@@ -219,8 +219,15 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `regalite-relic-run.json`
   Adds Regalite tracking for owner-created combat cards, observed block gained,
   and held turn/combat denominators for average block rows.
+- `kunai-relic-run.json`
+  Adds Kunai attack-counter tracking: owner attack plays, activations, observed
+  Dexterity gained, and 1/2 charge turn-end buckets with average charge samples.
 - `tuning-fork-relic-run.json`
-  Adds Tuning Fork trigger count and observed block gained tracking.
+  Adds Tuning Fork owner Skill-play count, trigger count, observed block
+  gained, held combat/turn denominators, and turn-end charge buckets.
+- `ripple-basin-relic-run.json`
+  Adds Ripple Basin no-attack turn-end activation tracking plus observed block
+  gained.
 - `war-paint-relic-run.json`
   Adds War Paint pickup tracking: the actual skill cards upgraded by the relic.
 - `unmovable-power-meta-run.json`
