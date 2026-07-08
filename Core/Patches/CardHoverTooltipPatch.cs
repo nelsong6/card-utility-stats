@@ -46,6 +46,9 @@ public static class CardHoverShowPatch
         // we stack above instead.
 
         RuntimeOptionsProvider.Refresh();
+        if (RunTracker.AreCardStatsDisabledForActiveCombat())
+            return;
+
         if (__instance is NHandCardHolder && !RuntimeOptionsProvider.Current.ShowHandTooltips)
             return;
 

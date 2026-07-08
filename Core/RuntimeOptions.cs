@@ -11,6 +11,7 @@ public sealed class RuntimeOptions
     public bool ShowRemovedCardsInDeckView { get; set; } = true;
     public bool ShowHandTooltips { get; set; } = true;
     public bool UseVerboseHandStats { get; set; }
+    public bool DisableCardStatsDuringCombat { get; set; }
     public bool EnableDebugLogging { get; set; }
     public string BuildTimeZoneId { get; set; } = "America/Los_Angeles";
 }

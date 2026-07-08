@@ -15,6 +15,9 @@ public sealed class SpireLensConfig : SimpleModConfig
 
     public static bool UseVerboseHandStats { get; set; }
 
+    [ConfigSection("Performance")]
+    public static bool DisableCardStatsDuringCombat { get; set; }
+
     [ConfigSection("Diagnostics")]
     public static bool EnableDebugLogging { get; set; }
 
