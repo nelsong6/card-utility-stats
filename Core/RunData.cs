@@ -390,8 +390,8 @@ public class RelicAggregate
 
     // Total block gained from this relic across all combats.
     // Used by Orichalcum, Permafrost, The Abacus, Bone Flute, Cloak Clasp,
-    // Anchor, Horn Cleat, Tuning Fork, and Vambrace's extra block from its
-    // multiplier.
+    // Anchor, Horn Cleat, Tuning Fork, Regalite, and Vambrace's extra block
+    // from its multiplier.
     public int AdditionalBlockGained { get; set; }
 
     // Total times this relic got its own trigger check but was blocked by
@@ -587,6 +587,13 @@ public class RelicAggregate
     public int PaperPhrogEnhancedAttacks { get; set; }
     public int PaperPhrogCombats { get; set; }
     public int PaperPhrogTurns { get; set; }
+
+    // Regalite tracking. Cards created counts owner-created combat cards while
+    // the relic is held; combats and turns are held denominators for block
+    // averages.
+    public int RegaliteCardsCreated { get; set; }
+    public int RegaliteCombats { get; set; }
+    public int RegaliteTurns { get; set; }
 
     // Bookmark tracking. Activations is total cost-reduction activations;
     // BookmarkCombats is the denominator for average activations per combat.

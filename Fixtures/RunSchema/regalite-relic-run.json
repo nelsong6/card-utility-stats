@@ -1,0 +1,30 @@
+{
+  "run_id": "regalite-relic-fixture",
+  "started_at": "2026-07-07T00:00:00Z",
+  "updated_at": "2026-07-07T00:08:00Z",
+  "outcome": "in_progress",
+  "aggregates": {
+    "CARD.SHIV#1": {
+      "plays": 2,
+      "total_block_gained": 0
+    }
+  },
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.REGALITE": {
+      "regalite_cards_created": 6,
+      "additional_block_gained": 12,
+      "regalite_turns": 4,
+      "regalite_combats": 2
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.SHIV": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.SHIV": 1
+  }
+}

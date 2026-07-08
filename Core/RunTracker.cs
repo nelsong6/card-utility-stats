@@ -179,6 +179,31 @@ public static class RunTracker
         get { lock (_lock) return _currentRun; }
     }
 
+    public static bool AreCardStatsDisabledForActiveCombat()
+    {
+        lock (_lock)
+        {
+            return !ShouldTrackCardStatsDuringCombatLocked();
+        }
+    }
+
+    private static bool ShouldTrackCardStatsDuringCombatLocked()
+    {
+        return ShouldTrackCardStatsDuringCombat(
+            RuntimeOptionsProvider.Current.DisableCardStatsDuringCombat,
+            _pendingCombat != null || CombatManager.Instance?.IsInProgress == true);
+    }
+
+    internal static bool ShouldTrackCardStatsDuringCombatForTest(
+        bool disableCardStatsDuringCombat,
+        bool combatActive)
+        => ShouldTrackCardStatsDuringCombat(disableCardStatsDuringCombat, combatActive);
+
+    private static bool ShouldTrackCardStatsDuringCombat(
+        bool disableCardStatsDuringCombat,
+        bool combatActive)
+        => !disableCardStatsDuringCombat || !combatActive;
+
     /// <summary>
     /// Serialize the current run to JSON in the canonical on-disk wire format
     /// (snake_case, WhenWritingNull, IncludeFields) UNDER the lock, so external
@@ -1432,11 +1457,19 @@ public static class RunTracker
     {
         lock (_lock)
         {
+            RuntimeOptionsProvider.Refresh();
             // Fresh pending buffer for this combat. Anything accumulated from a prior
             // combat that didn't get a CombatEnded (shouldn't happen but defensive) is dropped.
             _pendingCombat = new PendingCombat();
             ResetCombatContextState();
-            RecordCombatsInDeckForCurrentDeckLocked();
+            if (ShouldTrackCardStatsDuringCombatLocked())
+            {
+                RecordCombatsInDeckForCurrentDeckLocked();
+            }
+            else
+            {
+                CoreMain.Logger.Info("SpireLens card combat stats are disabled for this combat.");
+            }
             RecordHeldCombatRelicBaselinesForTrackedPlayerLocked(requireActiveCombat: false, createPendingIfNeeded: false);
         }
     }
@@ -1641,6 +1674,9 @@ public static class RunTracker
         target.PaperPhrogEnhancedAttacks += source.PaperPhrogEnhancedAttacks;
         target.PaperPhrogCombats += source.PaperPhrogCombats;
         target.PaperPhrogTurns += source.PaperPhrogTurns;
+        target.RegaliteCardsCreated += source.RegaliteCardsCreated;
+        target.RegaliteCombats += source.RegaliteCombats;
+        target.RegaliteTurns += source.RegaliteTurns;
 
         target.BookmarkCombats += source.BookmarkCombats;
         target.BookmarkCommonActivations += source.BookmarkCommonActivations;
@@ -1717,11 +1753,17 @@ public static class RunTracker
             // and the backing counter was the one tracker static mutated
             // outside _lock, so it was removed.)
             CoreMain.LogDebug($"Observe #{n}: {entry.GetType().Name}");
+            bool trackCardStats;
+            lock (_lock)
+            {
+                trackCardStats = ShouldTrackCardStatsDuringCombatLocked();
+            }
 
             switch (entry)
             {
                 case CardPlayStartedEntry cps when cps.CardPlay != null:
-                    NoteCardPlayStarted(cps.CardPlay);
+                    if (trackCardStats)
+                        NoteCardPlayStarted(cps.CardPlay);
                     break;
                 case CardPlayFinishedEntry cpf:
                     var card = cpf.CardPlay?.Card;
@@ -1731,23 +1773,26 @@ public static class RunTracker
                     CoreMain.LogDebug($"  -> RecordCardPlay '{card?.Title ?? "?"}' hash={card?.GetHashCode()} canonicalHash={(card == null ? 0 : Canonical(card).GetHashCode())}");
                     if (cpf.CardPlay != null)
                     {
-                        NoteCardPlayFinished(cpf.CardPlay);
+                        if (trackCardStats)
+                            NoteCardPlayFinished(cpf.CardPlay);
                         RecordCardPlay(cpf.CardPlay);
                     }
                     break;
                 case CardDrawnEntry cde:
                     // Draw-hook validation is complete; keep the trace debug-gated.
                     CoreMain.LogDebug($"CardDrawnEntry card='{cde.Card?.Title ?? "null"}' fromHandDraw={cde.FromHandDraw}");
-                    if (cde.Card != null) RecordCardDrawn(cde);
+                    if (trackCardStats && cde.Card != null) RecordCardDrawn(cde);
                     break;
                 case CardDiscardedEntry cdisc when cdisc.Card != null:
                     RecordCardDiscarded(cdisc.Card);
                     break;
                 case CardExhaustedEntry cex when cex.Card != null:
-                    RecordCardExhausted(cex.Card);
+                    if (trackCardStats)
+                        RecordCardExhausted(cex.Card);
                     break;
                 case BlockGainedEntry bge:
-                    RecordBlockGainedEntry(bge);
+                    if (trackCardStats)
+                        RecordBlockGainedEntry(bge);
                     break;
                 case DamageReceivedEntry dre:
                     // Remember the result ref so the combat-ending capture
@@ -1757,17 +1802,19 @@ public static class RunTracker
 
                     if (dre.Receiver.IsPlayer)
                     {
-                        RecordPlayerBlockedDamage(dre);
+                        if (trackCardStats)
+                            RecordPlayerBlockedDamage(dre);
                     }
 
                     RecordEnemyDamage(dre);
 
                     if (dre.CardSource != null)
                     {
-                        CoreMain.LogDebug($"  -> RecordDamage from '{dre.CardSource.Title}' intended={dre.Result.BlockedDamage + dre.Result.UnblockedDamage} canonicalHash={Canonical(dre.CardSource).GetHashCode()}");
+                        if (trackCardStats)
+                            CoreMain.LogDebug($"  -> RecordDamage from '{dre.CardSource.Title}' intended={dre.Result.BlockedDamage + dre.Result.UnblockedDamage} canonicalHash={Canonical(dre.CardSource).GetHashCode()}");
                         RecordDamageFromCard(dre);
                     }
-                    else if (!dre.Receiver.IsPlayer && TryRecordPoisonTickDamage(dre))
+                    else if (trackCardStats && !dre.Receiver.IsPlayer && TryRecordPoisonTickDamage(dre))
                     {
                         break;
                     }
@@ -1812,6 +1859,14 @@ public static class RunTracker
             // Defensive: if CombatSetUp never fired (unusual), allocate lazily.
             _pendingCombat ??= new PendingCombat();
 
+            RecordStrikeDummyStrikePlayedIfOwnedLocked(cardPlay.Card);
+            RecordNutritiousSoupEnchantedStrikePlayedIfOwnedLocked(cardPlay.Card);
+            RecordMiniatureCannonUpgradedAttackPlayedIfOwnedLocked(cardPlay.Card);
+            RecordVajraAttackPlayedIfOwnedLocked(cardPlay.Card);
+            RecordBrilliantScarfDiscountTaken(cardPlay);
+
+            if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+
             // Per-instance tracking: each physical card in the deck gets its
             // own aggregates bucket. First play assigns its instance id.
             var instanceId = GetOrAssignInstanceId(cardPlay.Card);
@@ -1820,10 +1875,6 @@ public static class RunTracker
             agg.Plays++;
             if (IsEtherealCard(cardPlay.Card))
                 _pendingCombat.EtherealCardsPlayed++;
-            RecordStrikeDummyStrikePlayedIfOwnedLocked(cardPlay.Card);
-            RecordNutritiousSoupEnchantedStrikePlayedIfOwnedLocked(cardPlay.Card);
-            RecordMiniatureCannonUpgradedAttackPlayedIfOwnedLocked(cardPlay.Card);
-            RecordVajraAttackPlayedIfOwnedLocked(cardPlay.Card);
             if (IsReplayExtraPlay(cardPlay))
             {
                 agg.TimesReplayExtraPlayed++;
@@ -1842,7 +1893,6 @@ public static class RunTracker
             // actually cost me on average" analysis.
             agg.TotalEnergySpent += cardPlay.Resources.EnergySpent;
             agg.TotalStarsSpent += cardPlay.Resources.StarsSpent;
-            RecordBrilliantScarfDiscountTaken(cardPlay);
 
             _pendingCombat.CombatEvents.Add(new CardEvent
             {
@@ -1869,6 +1919,7 @@ public static class RunTracker
 
         lock (_lock)
         {
+            if (!ShouldTrackCardStatsDuringCombatLocked()) return;
             EnqueueReplayExtraPlaySourceLocked(glam.Card, "enchantment:GLAM", "Glam", extra);
         }
     }
@@ -1886,6 +1937,7 @@ public static class RunTracker
 
         lock (_lock)
         {
+            if (!ShouldTrackCardStatsDuringCombatLocked()) return;
             foreach (var modifier in modifyingModels)
             {
                 if (modifier == null || remaining <= 0) break;
@@ -1906,6 +1958,7 @@ public static class RunTracker
         int count)
     {
         if (card == null || count <= 0) return;
+        if (!ShouldTrackCardStatsDuringCombatLocked()) return;
 
         var key = Canonical(card);
         if (_pendingReplayExtraPlaySeriesStarted.Remove(key))
@@ -2126,6 +2179,8 @@ public static class RunTracker
         {
             try
             {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+
                 var causingPlay = FindCurrentlyResolvingCardPlay();
                 if (causingPlay?.Card == null) return;
 
@@ -2168,6 +2223,8 @@ public static class RunTracker
         {
             try
             {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+
                 var causingPlay = FindCurrentlyResolvingCardPlay();
                 if (causingPlay?.Card == null) return;
 
@@ -2210,6 +2267,8 @@ public static class RunTracker
         {
             try
             {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+
                 if (source is not CardModel sourceCard) return;
                 if (forger != null && sourceCard.Owner != null
                     && !ReferenceEquals(sourceCard.Owner, forger))
@@ -2309,6 +2368,7 @@ public static class RunTracker
     private const string MiniatureCannonRelicId = "RELIC.MINIATURE_CANNON";
     private const string VajraRelicId = "RELIC.VAJRA";
     private const string PaperPhrogRelicId = "RELIC.PAPER_PHROG";
+    private const string RegaliteRelicId = "RELIC.REGALITE";
     private const string BookmarkRelicId = "RELIC.BOOKMARK";
     private const string BrilliantScarfRelicId = "RELIC.BRILLIANT_SCARF";
     private const string JuzuBraceletRelicId = "RELIC.JUZU_BRACELET";
@@ -3003,6 +3063,7 @@ public static class RunTracker
             try
             {
                 if (!IsTrackedPlayerCreature(target)) return;
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
 
                 _pendingCombat ??= new PendingCombat();
                 RecordUnmovablePowerExtraBlockForTest(_pendingCombat.MetaStats, extraBlock);
@@ -4199,6 +4260,8 @@ public static class RunTracker
         {
             try
             {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+
                 _pendingCombat ??= new PendingCombat();
                 var instanceId = GetOrAssignInstanceId(card);
                 var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
@@ -4226,6 +4289,8 @@ public static class RunTracker
         {
             try
             {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+
                 _pendingCombat ??= new PendingCombat();
                 var instanceId = GetOrAssignInstanceId(sourceCard);
                 var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
@@ -4283,6 +4348,8 @@ public static class RunTracker
         {
             try
             {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+
                 _pendingCombat ??= new PendingCombat();
                 _pendingCombat.MetaStats.TotalOstyDamageAbsorbed += hpLost;
             }
@@ -5762,6 +5829,56 @@ public static class RunTracker
         }
     }
 
+    public static void RecordRegaliteCardCreatedAndArmBlockAttribution(Regalite relic, Player creator)
+    {
+        if (relic?.Owner == null || creator == null) return;
+        if (!ReferenceEquals(relic.Owner, creator)) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic)) return;
+                if (!IsTrackedPlayer(creator)) return;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordRegaliteCombatForPlayerLocked(creator);
+                RecordRegaliteTurnForPlayerLocked(creator);
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(RegaliteRelicId);
+                RecordRegaliteCardCreatedForTest(agg);
+                _pendingCombat.Windows.Arm(
+                    RegaliteRelicId,
+                    AttributionEventKind.PlayerBlockGain,
+                    CurrentHistoryCountLocked(),
+                    maxHistoryAdvance: -1);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordRegaliteCardCreatedAndArmBlockAttribution failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordRegaliteTurnStarted(Player player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                _pendingCombat ??= new PendingCombat();
+                RecordRegaliteTurnForPlayerLocked(player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordRegaliteTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
     internal static void RecordPaperPhrogVulnerableBonusForTest(
         RelicAggregate agg,
         decimal damageAdded,
@@ -5783,6 +5900,24 @@ public static class RunTracker
     {
         if (agg == null) return;
         agg.PaperPhrogTurns += Math.Max(0, count);
+    }
+
+    internal static void RecordRegaliteCardCreatedForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.RegaliteCardsCreated += Math.Max(0, count);
+    }
+
+    internal static void RecordRegaliteCombatForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.RegaliteCombats += Math.Max(0, count);
+    }
+
+    internal static void RecordRegaliteTurnForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.RegaliteTurns += Math.Max(0, count);
     }
 
     internal static void RecordBookmarkCombatForTest(RelicAggregate agg, int count = 1)
@@ -8253,6 +8388,18 @@ public static class RunTracker
         }
     }
 
+    private static bool PlayerHasRegalite(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is Regalite);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static bool PlayerHasJuzuBracelet(Player player)
     {
         try
@@ -8304,6 +8451,7 @@ public static class RunTracker
             RecordBookmarkCombatForPlayerLocked(player);
             RecordPaelsEyeCombatForPlayerLocked(player);
             RecordPaperPhrogCombatForPlayerLocked(player);
+            RecordRegaliteCombatForPlayerLocked(player);
         }
         catch (Exception e)
         {
@@ -8427,6 +8575,36 @@ public static class RunTracker
 
         var agg = GetOrCreatePendingRelicAggregateLocked(PaperPhrogRelicId);
         RecordPaperPhrogTurnForTest(agg);
+    }
+
+    private static void RecordRegaliteCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasRegalite(player)) return;
+        if (!_pendingCombat.RegaliteCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(RegaliteRelicId);
+        RecordRegaliteCombatForTest(agg);
+    }
+
+    private static void RecordRegaliteTurnForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasRegalite(player)) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.RegaliteTurnCountedTurns.TryGetValue(player, out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.RegaliteTurnCountedTurns[player] = turnNumber;
+        RecordRegaliteCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(RegaliteRelicId);
+        RecordRegaliteTurnForTest(agg);
     }
 
     private static void RecordNutritiousSoupCombatForPlayerLocked(Player player)
@@ -9155,6 +9333,8 @@ public static class RunTracker
         {
             try
             {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+
                 if (makeItSo.Owner == null || cardPlay?.Card == null) return;
                 if (!ReferenceEquals(cardPlay.Card.Owner, makeItSo.Owner)) return;
                 if (cardPlay.Card.Type != CardType.Skill) return;
@@ -9187,6 +9367,8 @@ public static class RunTracker
 
             try
             {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return false;
+
                 threshold = GetMakeItSoThreshold(card);
                 if (threshold <= 0) return false;
                 if (card.Owner == null || card.CombatState == null) return false;
@@ -9574,6 +9756,8 @@ public static class RunTracker
     {
         lock (_lock)
         {
+            if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+
             _pendingCombat ??= new PendingCombat();
             var instanceId = GetOrAssignInstanceId(entry.Card);
             var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
@@ -9606,6 +9790,8 @@ public static class RunTracker
     {
         lock (_lock)
         {
+            if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+
             _pendingCombat ??= new PendingCombat();
             var instanceId = GetOrAssignInstanceId(card);
             var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
@@ -9621,9 +9807,12 @@ public static class RunTracker
         lock (_lock)
         {
             _pendingCombat ??= new PendingCombat();
-            var instanceId = GetOrAssignInstanceId(card);
-            var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
-            agg.TimesDiscarded++;
+            if (ShouldTrackCardStatsDuringCombatLocked())
+            {
+                var instanceId = GetOrAssignInstanceId(card);
+                var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
+                agg.TimesDiscarded++;
+            }
 
             if (card.Owner is Player player
                 && IsTrackedPlayer(player)
@@ -9646,6 +9835,8 @@ public static class RunTracker
     {
         lock (_lock)
         {
+            if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+
             _pendingCombat ??= new PendingCombat();
             var exhaustedId = GetOrAssignInstanceId(exhaustedCard);
             var exhaustedAgg = GetOrCreateAggregate(_pendingCombat, exhaustedId);
@@ -9701,6 +9892,8 @@ public static class RunTracker
     {
         lock (_lock)
         {
+            if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+
             if (fromHandDraw)
             {
                 _pendingDrawSourceCard = null;
@@ -9736,6 +9929,8 @@ public static class RunTracker
     {
         lock (_lock)
         {
+            if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+
             if (source is CardModel sourceCard)
             {
                 _pendingEffectSourceCard = Canonical(sourceCard);
@@ -9750,6 +9945,8 @@ public static class RunTracker
 
         lock (_lock)
         {
+            if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+
             if (!string.Equals(Canonical(card).Id.ToString(), ShivDefinitionId, StringComparison.Ordinal))
                 return;
 
@@ -9779,6 +9976,8 @@ public static class RunTracker
         {
             try
             {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+
                 var target = TryResolvePoisonPowerTarget(poisonPower);
                 if (target == null || target.IsPlayer) return;
 
@@ -9809,6 +10008,8 @@ public static class RunTracker
         {
             try
             {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+
                 if (noxiousFumesPower is not PowerModel power) return;
 
                 var owner = GetPowerReceiverCreature(power);
@@ -9876,6 +10077,8 @@ public static class RunTracker
 
         lock (_lock)
         {
+            if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+
             var canonical = Canonical(card);
             var definitionId = canonical.Id.ToString();
 
@@ -9920,6 +10123,8 @@ public static class RunTracker
     {
         lock (_lock)
         {
+            if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+
             _sovereignBladeAvailableThisRun = true;
 
             EnsureLazyCurrentRunLocked();
@@ -9949,6 +10154,8 @@ public static class RunTracker
     {
         lock (_lock)
         {
+            if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+
             _pendingPowerChangeAttempts.Add(new PendingPowerChangeAttempt
             {
                 Power = power,
@@ -9970,6 +10177,8 @@ public static class RunTracker
     {
         lock (_lock)
         {
+            if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+
             var attempt = TakePendingPowerChangeAttemptLocked(canonicalPower, target, applier, requestedAmount);
 
             if (modifiedAmount != 0m) return;
@@ -10658,6 +10867,8 @@ public static class RunTracker
     {
         lock (_lock)
         {
+            if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+
             _pendingCombat ??= new PendingCombat();
             var instanceId = GetOrAssignInstanceId(card);
             var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
@@ -10704,6 +10915,8 @@ public static class RunTracker
     {
         lock (_lock)
         {
+            if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+
             if (fromHandDraw) return;
 
             _pendingCombat ??= new PendingCombat();
@@ -10736,6 +10949,8 @@ public static class RunTracker
         {
             try
             {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+
                 if (_pendingMakeItSoSummons.Count > 0
                     && card is MakeItSo
                     && oldPile != PileType.Hand)
@@ -10829,6 +11044,8 @@ public static class RunTracker
                 var target = TryResolvePowerReceivedTarget(entry);
                 if (target != null && entry.Amount > 0m)
                     RecordUnsettlingLampPowerReceivedLocked(entry.Power, target, entry.Applier, entry.Amount);
+
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
 
                 var causingPlay = FindCurrentlyResolvingCardPlay();
                 if (causingPlay?.Card == null)
@@ -11139,6 +11356,7 @@ public static class RunTracker
     {
         lock (_lock)
         {
+            if (!ShouldTrackCardStatsDuringCombatLocked()) return;
             if (!creature.IsPlayer) return;
             _pendingPlayerBlockClearAmount = Math.Max(0, creature.Block);
             _pendingPlayerBlockClearArmed = _pendingPlayerBlockClearAmount > 0;
@@ -11149,6 +11367,7 @@ public static class RunTracker
     {
         lock (_lock)
         {
+            if (!ShouldTrackCardStatsDuringCombatLocked()) return;
             if (!creature.IsPlayer) return;
             ClearPendingPlayerBlockClearLocked();
         }
@@ -11158,6 +11377,7 @@ public static class RunTracker
     {
         lock (_lock)
         {
+            if (!ShouldTrackCardStatsDuringCombatLocked()) return;
             if (!creature.IsPlayer) return;
 
             if (_pendingCombat == null)
@@ -11320,6 +11540,14 @@ public static class RunTracker
         lock (_lock)
         {
             _pendingCombat ??= new PendingCombat();
+            if (!entry.Receiver.IsPlayer)
+            {
+                RecordMiniatureCannonUpgradedAttackHitIfOwnedLocked(entry.CardSource!);
+                RecordVajraAttackHitIfOwnedLocked(entry.CardSource!);
+            }
+
+            if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+
             var instanceId = GetOrAssignInstanceId(entry.CardSource!);
             var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
             MarkReplayAttackDamageLocked(entry.CardSource!);
@@ -11362,8 +11590,6 @@ public static class RunTracker
                 agg.TotalOverkill += result.OverkillDamage;
                 agg.TotalEffective += damageTotals.EffectiveDamage;
                 if (result.WasTargetKilled) agg.Kills++;
-                RecordMiniatureCannonUpgradedAttackHitIfOwnedLocked(entry.CardSource!);
-                RecordVajraAttackHitIfOwnedLocked(entry.CardSource!);
 
                 _pendingCombat.CombatEvents.Add(new CardEvent
                 {
@@ -12172,6 +12398,10 @@ internal class PendingCombat
     public HashSet<Player> PaperPhrogCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> PaperPhrogTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> RegaliteCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> RegaliteTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> PaelsEyeCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

@@ -1,5 +1,6 @@
 using System;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using MegaCrit.Sts2.Core.Models.Relics;
@@ -112,7 +113,9 @@ public class MrStrugglesStatsTests
     [Fact]
     public void RelicTooltip_MrStrugglesModelRecognition_UsesGameRelicId()
     {
-        Assert.Equal(MrStrugglesRelicId, RelicHoverShowPatch.GetStatsAggregateId(new MrStruggles()));
+        var relic = (MrStruggles)RuntimeHelpers.GetUninitializedObject(typeof(MrStruggles));
+
+        Assert.Equal(MrStrugglesRelicId, RelicHoverShowPatch.GetStatsAggregateId(relic));
     }
 
     private static string BuildBody(RelicAggregate agg)

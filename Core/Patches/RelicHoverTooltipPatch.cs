@@ -388,6 +388,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is Regalite)
+            {
+                const string relicId = "RELIC.REGALITE";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildRegaliteBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Regalite", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is CloakClasp)
             {
                 const string relicId = "RELIC.CLOAK_CLASP";
@@ -849,6 +859,9 @@ public static class RelicHoverShowPatch
         if (IsMiniatureCannonStatsRelicModel(relicModel))
             return "RELIC.MINIATURE_CANNON";
 
+        if (IsMrStrugglesStatsRelicModel(relicModel))
+            return "RELIC.MR_STRUGGLES";
+
         return relicModel.Id.ToString();
     }
 
@@ -1153,6 +1166,13 @@ public static class RelicHoverShowPatch
         {
             title = "Blood-Soaked Rose";
             body = BuildBloodSoakedRoseBodyBBCode(agg, bloodSoakedRoseCurseAgg ?? new CardAggregate());
+            return true;
+        }
+
+        if (relicModel is Regalite)
+        {
+            title = "Regalite";
+            body = BuildRegaliteBodyBBCode(agg);
             return true;
         }
 
@@ -1893,6 +1913,23 @@ public static class RelicHoverShowPatch
             includeAveragePerCombat: true);
 
         AppendRelatedCurseCardStats(sb, "Enthralled", curseAgg);
+        return sb.ToString();
+    }
+
+    private static string BuildRegaliteBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var blockPerTurn = agg.RegaliteTurns <= 0
+            ? 0m
+            : (decimal)agg.AdditionalBlockGained / agg.RegaliteTurns;
+        var blockPerCombat = agg.RegaliteCombats <= 0
+            ? 0m
+            : (decimal)agg.AdditionalBlockGained / agg.RegaliteCombats;
+
+        Row3(sb, "Cards created", agg.RegaliteCardsCreated.ToString(), "");
+        Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
+        Row3(sb, BlockLabel("avg block per turn"), FormatDecimal(blockPerTurn), "");
+        Row3(sb, BlockLabel("avg block per combat"), FormatDecimal(blockPerCombat), "");
         return sb.ToString();
     }
 
@@ -2761,6 +2798,11 @@ public static class RelicHoverShowPatch
     private static bool IsMiniatureCannonStatsRelicModel(object model)
     {
         return IsRelicModel(model, "MegaCrit.Sts2.Core.Models.Relics.MiniatureCannon");
+    }
+
+    private static bool IsMrStrugglesStatsRelicModel(object model)
+    {
+        return IsRelicModel(model, "MegaCrit.Sts2.Core.Models.Relics.MrStruggles");
     }
 
     private static bool IsFakeStrikeDummyRelicModel(object model)

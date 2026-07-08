@@ -105,11 +105,14 @@ public static class DigRestSiteOptionShovelStatsPatch
 /// Counts rest sites where Shovel's Dig option was available but the local
 /// player exited after choosing something else or skipping the campfire.
 /// </summary>
-[HarmonyPatch(typeof(RestSiteSynchronizer), nameof(RestSiteSynchronizer.BeforeLocalRestSiteExited))]
+[HarmonyPatch]
 public static class RestSiteSynchronizerShovelStatsPatch
 {
     private static readonly FieldInfo? LocalPlayerIdField =
         AccessTools.Field(typeof(RestSiteSynchronizer), "_localPlayerId");
+
+    private static MethodBase? TargetMethod()
+        => AccessTools.Method(typeof(RestSiteSynchronizer), "BeforeLocalRestSiteExited");
 
     [HarmonyPrefix]
     public static void Prefix(RestSiteSynchronizer __instance)
