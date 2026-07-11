@@ -2341,6 +2341,35 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsRazorToothRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("razor-tooth-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.RAZOR_TOOTH"];
+        Assert.Equal(6, relicAgg.CardsUpgraded);
+        Assert.Equal(2, relicAgg.RazorToothCombats);
+        Assert.Equal(8, relicAgg.RazorToothTurns);
+        Assert.Equal(4, relicAgg.RazorToothUpgradedCardPlays);
+        Assert.Equal(2, relicAgg.RazorToothUpgradedCardDraws);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsRazorToothRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("razor-tooth-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.RAZOR_TOOTH"];
+        Assert.Equal(6, relicAgg.CardsUpgraded);
+        Assert.Equal(2, relicAgg.RazorToothCombats);
+        Assert.Equal(8, relicAgg.RazorToothTurns);
+        Assert.Equal(4, relicAgg.RazorToothUpgradedCardPlays);
+        Assert.Equal(2, relicAgg.RazorToothUpgradedCardDraws);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsBookmarkRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("bookmark-relic-run.json"));

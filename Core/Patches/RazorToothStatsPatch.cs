@@ -2,7 +2,9 @@ using System;
 using System.Reflection;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Entities.Cards;
+using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
+using MegaCrit.Sts2.Core.Hooks;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Relics;
 
@@ -12,7 +14,9 @@ namespace SpireLens.Core.Patches;
 /// Counts cards Razor Tooth actually upgrades. Its owner-specific callback
 /// calls CardCmd.Upgrade synchronously before returning Task.CompletedTask, so
 /// comparing the same played card before and after captures successful upgrades
-/// without inferring them from card type or eligibility.
+/// without inferring them from card type or eligibility. Successfully upgraded
+/// combat cards are then tracked by raw reference so later plays and draws can
+/// be counted without conflating generated or copied cards.
 /// </summary>
 [HarmonyPatch]
 public static class RazorToothAfterCardPlayedPatch
@@ -45,12 +49,14 @@ public static class RazorToothAfterCardPlayedPatch
     }
 
     [HarmonyPostfix]
-    public static void Postfix(UpgradeState __state)
+    public static void Postfix(RazorTooth __instance, UpgradeState __state)
     {
         try
         {
             if (__state.Card == null) return;
             RunTracker.RecordRazorToothUpgrade(
+                __instance,
+                __state.Card,
                 __state.PreviousUpgradeLevel,
                 __state.Card.CurrentUpgradeLevel);
         }
@@ -61,4 +67,21 @@ public static class RazorToothAfterCardPlayedPatch
     }
 
     public readonly record struct UpgradeState(CardModel? Card, int PreviousUpgradeLevel);
+}
+
+[HarmonyPatch(typeof(Hook), nameof(Hook.AfterPlayerTurnStart))]
+public static class HookAfterPlayerTurnStartRazorToothPatch
+{
+    [HarmonyPrefix]
+    public static void Prefix(Player player)
+    {
+        try
+        {
+            RunTracker.RecordRazorToothTurnStarted(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"HookAfterPlayerTurnStartRazorToothPatch failed: {e.Message}");
+        }
+    }
 }

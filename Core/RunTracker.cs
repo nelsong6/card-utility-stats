@@ -1520,6 +1520,7 @@ public static class RunTracker
         RecordLetterOpenerTurnForTrackedPlayerLocked();
         RecordTuningForkTurnForTrackedPlayerLocked();
         RecordPaperPhrogTurnForTrackedPlayerLocked();
+        RecordRazorToothTurnForTrackedPlayerLocked();
         RecordPaelsEyeCombatsWithoutActivationForTrackedPlayerLocked();
         RecordTurnEnergyRelicCombatsWithoutEnergyForTrackedPlayerLocked();
         RecordNunchakuCombatEndChargeForTrackedPlayerLocked();
@@ -1592,6 +1593,10 @@ public static class RunTracker
         target.PlatingAdded += source.PlatingAdded;
         target.CardsUpgraded += source.CardsUpgraded;
         MergeUpgradedCardsInto(target, source);
+        target.RazorToothCombats += source.RazorToothCombats;
+        target.RazorToothTurns += source.RazorToothTurns;
+        target.RazorToothUpgradedCardPlays += source.RazorToothUpgradedCardPlays;
+        target.RazorToothUpgradedCardDraws += source.RazorToothUpgradedCardDraws;
         target.BoneFluteTriggers += source.BoneFluteTriggers;
         target.TotalOstyHpSummoned += source.TotalOstyHpSummoned;
         target.CursesAcquired += source.CursesAcquired;
@@ -1873,6 +1878,7 @@ public static class RunTracker
             // Defensive: if CombatSetUp never fired (unusual), allocate lazily.
             _pendingCombat ??= new PendingCombat();
 
+            RecordRazorToothUpgradedCardPlayedLocked(cardPlay.Card);
             RecordStrikeDummyStrikePlayedIfOwnedLocked(cardPlay.Card);
             RecordNutritiousSoupEnchantedStrikePlayedIfOwnedLocked(cardPlay.Card);
             RecordMiniatureCannonUpgradedAttackPlayedIfOwnedLocked(cardPlay.Card);
@@ -2869,22 +2875,81 @@ public static class RunTracker
     /// level before and after that callback rather than inferring success from
     /// card type or upgrade eligibility.
     /// </summary>
-    public static void RecordRazorToothUpgrade(int previousUpgradeLevel, int currentUpgradeLevel)
+    public static void RecordRazorToothUpgrade(
+        RazorTooth relic,
+        CardModel card,
+        int previousUpgradeLevel,
+        int currentUpgradeLevel)
     {
+        if (relic?.Owner == null || card == null) return;
         if (currentUpgradeLevel <= previousUpgradeLevel) return;
 
         lock (_lock)
         {
             try
             {
+                if (!IsTrackedRelic(relic)) return;
+                if (!IsTrackedPlayer(relic.Owner)) return;
+                if (!ReferenceEquals(card.Owner, relic.Owner)) return;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordRazorToothCombatForPlayerLocked(relic.Owner);
+                RecordRazorToothTurnForPlayerLocked(relic.Owner);
+
                 var agg = GetOrCreateRelicAggregateLocked(RazorToothRelicId);
                 RecordRazorToothUpgradeForTest(agg, previousUpgradeLevel, currentUpgradeLevel);
+                _pendingCombat.RazorToothUpgradedCards.Add(card);
             }
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordRazorToothUpgrade failed: {e.Message}");
             }
         }
+    }
+
+    public static void RecordRazorToothTurnStarted(Player player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                _pendingCombat ??= new PendingCombat();
+                RecordRazorToothTurnForPlayerLocked(player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordRazorToothTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void RecordRazorToothUpgradedCardPlayedLocked(CardModel card)
+    {
+        if (_pendingCombat == null) return;
+        if (!_pendingCombat.RazorToothUpgradedCards.Contains(card)) return;
+        if (card.Owner is not Player player || !IsTrackedPlayer(player)) return;
+
+        RecordRazorToothCombatForPlayerLocked(player);
+        RecordRazorToothTurnForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(RazorToothRelicId);
+        RecordRazorToothUpgradedCardPlayForTest(agg);
+    }
+
+    private static void RecordRazorToothUpgradedCardDrawnLocked(CardModel card)
+    {
+        if (_pendingCombat == null) return;
+        if (!_pendingCombat.RazorToothUpgradedCards.Contains(card)) return;
+        if (card.Owner is not Player player || !IsTrackedPlayer(player)) return;
+
+        RecordRazorToothCombatForPlayerLocked(player);
+        RecordRazorToothTurnForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(RazorToothRelicId);
+        RecordRazorToothUpgradedCardDrawForTest(agg);
     }
 
     /// <summary>
@@ -5787,6 +5852,30 @@ public static class RunTracker
     {
         if (agg == null || currentUpgradeLevel <= previousUpgradeLevel) return;
         agg.CardsUpgraded += 1;
+    }
+
+    internal static void RecordRazorToothCombatForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.RazorToothCombats += Math.Max(0, count);
+    }
+
+    internal static void RecordRazorToothTurnForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.RazorToothTurns += Math.Max(0, count);
+    }
+
+    internal static void RecordRazorToothUpgradedCardPlayForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.RazorToothUpgradedCardPlays += Math.Max(0, count);
+    }
+
+    internal static void RecordRazorToothUpgradedCardDrawForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.RazorToothUpgradedCardDraws += Math.Max(0, count);
     }
 
     internal static void RecordWhetstoneUpgradesForTest(
@@ -8738,6 +8827,18 @@ public static class RunTracker
         }
     }
 
+    private static bool PlayerHasRazorTooth(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is RazorTooth);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static bool PlayerHasPaperPhrog(Player player)
     {
         try
@@ -8814,6 +8915,7 @@ public static class RunTracker
             RecordBookmarkCombatForPlayerLocked(player);
             RecordPaelsEyeCombatForPlayerLocked(player);
             RecordPaperPhrogCombatForPlayerLocked(player);
+            RecordRazorToothCombatForPlayerLocked(player);
             RecordRegaliteCombatForPlayerLocked(player);
         }
         catch (Exception e)
@@ -8987,6 +9089,50 @@ public static class RunTracker
 
         var agg = GetOrCreatePendingRelicAggregateLocked(PaperPhrogRelicId);
         RecordPaperPhrogTurnForTest(agg);
+    }
+
+    private static void RecordRazorToothCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasRazorTooth(player)) return;
+        if (!_pendingCombat.RazorToothCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(RazorToothRelicId);
+        RecordRazorToothCombatForTest(agg);
+    }
+
+    private static void RecordRazorToothTurnForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordRazorToothTurnForPlayerLocked(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordRazorToothTurnForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordRazorToothTurnForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasRazorTooth(player)) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.RazorToothTurnCountedTurns.TryGetValue(player, out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.RazorToothTurnCountedTurns[player] = turnNumber;
+        RecordRazorToothCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(RazorToothRelicId);
+        RecordRazorToothTurnForTest(agg);
     }
 
     private static void RecordRegaliteCombatForPlayerLocked(Player player)
@@ -11366,6 +11512,7 @@ public static class RunTracker
     {
         lock (_lock)
         {
+            RecordRazorToothUpgradedCardDrawnLocked(card);
             if (!ShouldTrackCardStatsDuringCombatLocked()) return;
 
             _pendingCombat ??= new PendingCombat();
@@ -12903,6 +13050,12 @@ internal class PendingCombat
     public HashSet<Player> PaperPhrogCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> PaperPhrogTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> RazorToothCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> RazorToothTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<CardModel> RazorToothUpgradedCards { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> RegaliteCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

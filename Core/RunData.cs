@@ -410,6 +410,14 @@ public class RelicAggregate
     public int CardsUpgraded { get; set; }
     public List<string> UpgradedCards { get; set; } = new();
 
+    // Razor Tooth tracking. Combats/turns are held denominators for averages.
+    // Plays and draws count only events after the exact combat card was
+    // successfully upgraded by Razor Tooth; the triggering play is excluded.
+    public int RazorToothCombats { get; set; }
+    public int RazorToothTurns { get; set; }
+    public int RazorToothUpgradedCardPlays { get; set; }
+    public int RazorToothUpgradedCardDraws { get; set; }
+
     // Total times Bone Flute triggered from an owned Osty attack.
     public int BoneFluteTriggers { get; set; }
 

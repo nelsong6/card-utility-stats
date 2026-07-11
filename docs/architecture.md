@@ -49,7 +49,8 @@ This combat-boundary rule is important:
 
 - [Core/RunData.cs](../Core/RunData.cs) defines the serialized run shape.
 - [Core/RunStorage.cs](../Core/RunStorage.cs) handles load/save and resumability rules.
-- Schema changes are additive when possible. The current schema fixture is `v23`.
+- Schema changes are additive when possible. The fixture catalog retains
+  historical numbered shapes and adds unversioned per-feature shapes.
 
 Historical compatibility is pinned by:
 

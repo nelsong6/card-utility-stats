@@ -410,7 +410,13 @@ effect, and `CardCmd.Upgrade` only adds the game's run-history upgrade record fo
 cards in the permanent Deck pile. Snapshot the played card's
 `CurrentUpgradeLevel` before and after Razor Tooth's callback and count only a
 positive observed delta; `CardCmd.Upgrade` can still no-op while combat is
-ending.
+ending. Keep successfully upgraded cards in a combat-local, raw-reference set:
+the same combat `CardModel` survives pile moves and later replay/draw events,
+while canonicalizing would risk giving a distinct generated or copied card the
+same credit. `CardPlayFinished` occurs before Razor Tooth's callback, so the
+triggering play is not an upgraded-card play; later finished replay iterations
+are. Count later successful draws only from `Hook.AfterCardDrawn`, and use held
+player turns/combats (including zero-result ones) as rate denominators.
 
 Brilliant Scarf increments its per-turn card counter from `AfterCardPlayed`,
 after `CardPlayFinished` has already entered combat history. Its actual cost

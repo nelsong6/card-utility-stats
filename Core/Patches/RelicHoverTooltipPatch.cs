@@ -2144,7 +2144,34 @@ public static class RelicHoverShowPatch
     private static string BuildRazorToothBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
+        var upgradedPerTurn = agg.RazorToothTurns <= 0
+            ? 0m
+            : (decimal)agg.CardsUpgraded / agg.RazorToothTurns;
+        var upgradedPerCombat = agg.RazorToothCombats <= 0
+            ? 0m
+            : (decimal)agg.CardsUpgraded / agg.RazorToothCombats;
+        var upgradedPlaysPerTurn = agg.RazorToothTurns <= 0
+            ? 0m
+            : (decimal)agg.RazorToothUpgradedCardPlays / agg.RazorToothTurns;
+        var upgradedPlaysPerCombat = agg.RazorToothCombats <= 0
+            ? 0m
+            : (decimal)agg.RazorToothUpgradedCardPlays / agg.RazorToothCombats;
+        var upgradedDrawsPerTurn = agg.RazorToothTurns <= 0
+            ? 0m
+            : (decimal)agg.RazorToothUpgradedCardDraws / agg.RazorToothTurns;
+        var upgradedDrawsPerCombat = agg.RazorToothCombats <= 0
+            ? 0m
+            : (decimal)agg.RazorToothUpgradedCardDraws / agg.RazorToothCombats;
+
         Row3(sb, "Cards upgraded", agg.CardsUpgraded.ToString(), "");
+        Row3(sb, "Avg cards upgraded/turn", FormatDecimal(upgradedPerTurn), "");
+        Row3(sb, "Avg cards upgraded/combat", FormatDecimal(upgradedPerCombat), "");
+        Row3(sb, "Upgraded-card plays", agg.RazorToothUpgradedCardPlays.ToString(), "");
+        Row3(sb, "Avg upgraded plays/turn", FormatDecimal(upgradedPlaysPerTurn), "");
+        Row3(sb, "Avg upgraded plays/combat", FormatDecimal(upgradedPlaysPerCombat), "");
+        Row3(sb, "Upgraded-card draws", agg.RazorToothUpgradedCardDraws.ToString(), "");
+        Row3(sb, "Avg upgraded draws/turn", FormatDecimal(upgradedDrawsPerTurn), "");
+        Row3(sb, "Avg upgraded draws/combat", FormatDecimal(upgradedDrawsPerCombat), "");
         return sb.ToString();
     }
 

@@ -152,6 +152,9 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds Paper Phrog tracking for bonus damage added by its Vulnerable multiplier,
   vulnerable-enhanced attack counts, and held combat/turn denominators for
   average rows.
+- `razor-tooth-relic-run.json`
+  Adds Razor Tooth held combat/turn denominators plus later finished plays and
+  successful draws of the exact combat cards it was observed upgrading.
 - `brilliant-scarf-relic-run.json`
   Adds Brilliant Scarf discount tracking: energy-discount offers, taken
   discounts, energy saved by those taken discounts, held combats, and
