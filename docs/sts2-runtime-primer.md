@@ -403,6 +403,15 @@ to confirm the eligibility rule. Base Strikes are `IsBasicStrikeOrDefend` cards
 that also carry the Strike tag, while non-base Strike cards are every other
 permanent deck card with that tag.
 
+Razor Tooth upgrades eligible Attack and Skill cards synchronously inside its
+owner-specific `AfterCardPlayed` callback, after the finished card-play history
+entry has already been emitted. Combat history has no upgrade entry for this
+effect, and `CardCmd.Upgrade` only adds the game's run-history upgrade record for
+cards in the permanent Deck pile. Snapshot the played card's
+`CurrentUpgradeLevel` before and after Razor Tooth's callback and count only a
+positive observed delta; `CardCmd.Upgrade` can still no-op while combat is
+ending.
+
 Brilliant Scarf increments its per-turn card counter from `AfterCardPlayed`,
 after `CardPlayFinished` has already entered combat history. Its actual cost
 discounts happen through `TryModifyEnergyCostInCombatLate` and `TryModifyStarCost`

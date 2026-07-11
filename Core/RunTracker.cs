@@ -2353,6 +2353,7 @@ public static class RunTracker
     private const string ReptileTrinketRelicId = "RELIC.REPTILE_TRINKET";
     private const string GorgetRelicId = "RELIC.GORGET";
     private const string StoneCrackerRelicId = "RELIC.STONE_CRACKER";
+    private const string RazorToothRelicId = "RELIC.RAZOR_TOOTH";
     private const string WhetstoneRelicId = "RELIC.WHETSTONE";
     private const string WarPaintRelicId = "RELIC.WAR_PAINT";
     private const string FragrantMushroomRelicId = "RELIC.FRAGRANT_MUSHROOM";
@@ -2857,6 +2858,31 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordStoneCrackerActivation failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record one card that Razor Tooth actually upgraded. The relic calls
+    /// <c>CardCmd.Upgrade</c> synchronously from its owner-specific
+    /// <c>AfterCardPlayed</c> callback, so callers pass the observed upgrade
+    /// level before and after that callback rather than inferring success from
+    /// card type or upgrade eligibility.
+    /// </summary>
+    public static void RecordRazorToothUpgrade(int previousUpgradeLevel, int currentUpgradeLevel)
+    {
+        if (currentUpgradeLevel <= previousUpgradeLevel) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(RazorToothRelicId);
+                RecordRazorToothUpgradeForTest(agg, previousUpgradeLevel, currentUpgradeLevel);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordRazorToothUpgrade failed: {e.Message}");
             }
         }
     }
@@ -5753,6 +5779,15 @@ public static class RunTracker
         RelicAggregate agg,
         IEnumerable<string>? upgradedCards)
         => RecordRelicUpgradedCards(agg, upgradedCards);
+
+    internal static void RecordRazorToothUpgradeForTest(
+        RelicAggregate agg,
+        int previousUpgradeLevel,
+        int currentUpgradeLevel)
+    {
+        if (agg == null || currentUpgradeLevel <= previousUpgradeLevel) return;
+        agg.CardsUpgraded += 1;
+    }
 
     internal static void RecordWhetstoneUpgradesForTest(
         RelicAggregate agg,

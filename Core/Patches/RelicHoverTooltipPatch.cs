@@ -458,6 +458,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is RazorTooth)
+            {
+                const string relicId = "RELIC.RAZOR_TOOTH";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildRazorToothBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Razor Tooth", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is Whetstone)
             {
                 const string relicId = "RELIC.WHETSTONE";
@@ -1249,6 +1259,13 @@ public static class RelicHoverShowPatch
         {
             title = "Stone Cracker";
             body = BuildStoneCrackerBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is RazorTooth)
+        {
+            title = "Razor Tooth";
+            body = BuildRazorToothBodyBBCode(agg);
             return true;
         }
 
@@ -2120,6 +2137,13 @@ public static class RelicHoverShowPatch
     {
         var sb = new StringBuilder();
         Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, "Cards upgraded", agg.CardsUpgraded.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildRazorToothBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
         Row3(sb, "Cards upgraded", agg.CardsUpgraded.ToString(), "");
         return sb.ToString();
     }
