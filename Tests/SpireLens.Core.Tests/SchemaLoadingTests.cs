@@ -2370,6 +2370,39 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsStorybookRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("storybook-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.Data.RelicAggregates.ContainsKey("RELIC.STORYBOOK"));
+        var cardAgg = loaded.Data.Aggregates["CARD.BRIGHTEST_FLAME#1"];
+        Assert.Equal(4, cardAgg.Plays);
+        Assert.Equal(6, cardAgg.TimesDrawn);
+        Assert.Equal(8, cardAgg.TotalEnergyGenerated);
+        Assert.Equal(8, cardAgg.TimesCardsDrawn);
+        Assert.Equal(4, cardAgg.TotalMaxHpLost);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsStorybookRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("storybook-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        Assert.True(resumed!.RelicAggregates.ContainsKey("RELIC.STORYBOOK"));
+        var cardAgg = resumed.Aggregates["CARD.BRIGHTEST_FLAME#1"];
+        Assert.Equal(4, cardAgg.Plays);
+        Assert.Equal(6, cardAgg.TimesDrawn);
+        Assert.Equal(8, cardAgg.TotalEnergyGenerated);
+        Assert.Equal(8, cardAgg.TimesCardsDrawn);
+        Assert.Equal(4, cardAgg.TotalMaxHpLost);
+        Assert.Equal(new[] { 1 }, resumed.InstanceNumbersByDef["CARD.BRIGHTEST_FLAME"]);
+        Assert.Equal(1, resumed.DefCounters["CARD.BRIGHTEST_FLAME"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsBookmarkRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("bookmark-relic-run.json"));

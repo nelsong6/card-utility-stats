@@ -66,6 +66,7 @@ Examples already implemented:
 - direct attack damage, blocked damage, overkill, kills
 - block gained / effective / wasted
 - actual energy generated
+- actual maximum HP lost to card costs
 - Regent stars spent / generated
 - forge granted from cards
 - observed cards drawn from draw effects

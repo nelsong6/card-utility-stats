@@ -190,6 +190,12 @@ public class CardAggregate
     // listed damage says.
     public int TotalHpLost { get; set; }
 
+    // Maximum HP actually lost from playing this card. Kept separate from
+    // TotalHpLost because reducing max HP is a permanent run cost even when
+    // the player's current HP does not move. Brightest Flame is the first
+    // card using this field.
+    public int TotalMaxHpLost { get; set; }
+
     // M3i: Draw attribution. When THIS card's play causes OTHER cards to
     // be drawn. Signal for draw-enabler cards (Prepared, Coolheaded,
     // Acrobatics etc. depending on the character). Excludes turn-start

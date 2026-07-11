@@ -20,10 +20,12 @@ public static class RelicHoverShowPatch
 {
     private const string EnthralledDefinitionId = "CARD.ENTHRALLED";
     private const string CursedPearlCurseDefinitionId = "CARD.GREED";
+    private const string BrightestFlameDefinitionId = "CARD.BRIGHTEST_FLAME";
     private const string GameOverScreenNamespace = "MegaCrit.Sts2.Core.Nodes.Screens.GameOverScreen";
     private const string VulnerableIconPath = "res://images/atlases/power_atlas.sprites/vulnerable_power.tres";
     private const string WeakIconPath = "res://images/atlases/power_atlas.sprites/weak_power.tres";
     private const string BlockIconPath = "res://images/ui/combat/block.png";
+    private const string DrawIconPath = "res://images/atlases/power_atlas.sprites/draw_cards_next_turn_power.tres";
     private const string EnergyIconPath = "res://images/atlases/potion_atlas.sprites/energy_potion.tres";
     private const string StarIconPath = "res://images/packed/sprite_fonts/star_icon.png";
     private const string VigorIconPath = "res://images/atlases/power_atlas.sprites/vigor_power.tres";
@@ -819,6 +821,7 @@ public static class RelicHoverShowPatch
         RelicAggregate? aggregate = null;
         CardAggregate? bloodSoakedRoseCurseAgg = null;
         CardAggregate? cursedPearlCurseAgg = null;
+        CardAggregate? storybookBrightestFlameAgg = null;
         IReadOnlyDictionary<string, CardAggregate>? neowsBonesCurseAggs = null;
         int? floorCount = null;
 
@@ -837,6 +840,12 @@ public static class RelicHoverShowPatch
             {
                 cursedPearlCurseAgg =
                     RunTracker.GetLastEndedPooledCardAggregateByDefinition(CursedPearlCurseDefinitionId)
+                    ?? new CardAggregate();
+            }
+            else if (relicModel is Storybook)
+            {
+                storybookBrightestFlameAgg =
+                    RunTracker.GetLastEndedPooledCardAggregateByDefinition(BrightestFlameDefinitionId)
                     ?? new CardAggregate();
             }
             else if (relicModel is NeowsBones && aggregate != null)
@@ -858,6 +867,8 @@ public static class RelicHoverShowPatch
             bloodSoakedRoseCurseAgg = RunTracker.GetEnthralledCurseAggregate();
         if (relicModel is CursedPearl && cursedPearlCurseAgg == null)
             cursedPearlCurseAgg = RunTracker.GetCursedPearlCurseAggregate();
+        if (relicModel is Storybook && storybookBrightestFlameAgg == null)
+            storybookBrightestFlameAgg = RunTracker.GetPooledCardAggregateByDefinition(BrightestFlameDefinitionId);
         if (relicModel is NeowsBones && neowsBonesCurseAggs == null)
         {
             neowsBonesCurseAggs = BuildGrantedCurseAggregates(
@@ -874,6 +885,7 @@ public static class RelicHoverShowPatch
             bloodSoakedRoseCurseAgg,
             cursedPearlCurseAgg,
             neowsBonesCurseAggs,
+            storybookBrightestFlameAgg,
             out title,
             out body);
     }
@@ -930,7 +942,7 @@ public static class RelicHoverShowPatch
         out string title,
         out string body)
     {
-        return TryBuildBodyBBCode(relicModel, agg, floorCount, null, null, null, out title, out body);
+        return TryBuildBodyBBCode(relicModel, agg, floorCount, null, null, null, null, out title, out body);
     }
 
     internal static bool TryBuildBodyBBCode(
@@ -940,6 +952,29 @@ public static class RelicHoverShowPatch
         CardAggregate? bloodSoakedRoseCurseAgg,
         CardAggregate? cursedPearlCurseAgg,
         IReadOnlyDictionary<string, CardAggregate>? neowsBonesCurseAggs,
+        out string title,
+        out string body)
+    {
+        return TryBuildBodyBBCode(
+            relicModel,
+            agg,
+            floorCount,
+            bloodSoakedRoseCurseAgg,
+            cursedPearlCurseAgg,
+            neowsBonesCurseAggs,
+            null,
+            out title,
+            out body);
+    }
+
+    internal static bool TryBuildBodyBBCode(
+        RelicModel relicModel,
+        RelicAggregate agg,
+        int? floorCount,
+        CardAggregate? bloodSoakedRoseCurseAgg,
+        CardAggregate? cursedPearlCurseAgg,
+        IReadOnlyDictionary<string, CardAggregate>? neowsBonesCurseAggs,
+        CardAggregate? storybookBrightestFlameAgg,
         out string title,
         out string body)
     {
@@ -1210,6 +1245,13 @@ public static class RelicHoverShowPatch
         {
             title = "Blood-Soaked Rose";
             body = BuildBloodSoakedRoseBodyBBCode(agg, bloodSoakedRoseCurseAgg ?? new CardAggregate());
+            return true;
+        }
+
+        if (relicModel is Storybook)
+        {
+            title = "Storybook";
+            body = BuildStorybookBodyBBCode(storybookBrightestFlameAgg ?? new CardAggregate());
             return true;
         }
 
@@ -1997,6 +2039,19 @@ public static class RelicHoverShowPatch
             includeAveragePerCombat: true);
 
         AppendRelatedCurseCardStats(sb, "Enthralled", curseAgg);
+        return sb.ToString();
+    }
+
+    private static string BuildStorybookBodyBBCode(CardAggregate brightestFlameAgg)
+    {
+        brightestFlameAgg ??= new CardAggregate();
+
+        var sb = new StringBuilder();
+        Row3(sb, "Brightest Flame played", brightestFlameAgg.Plays.ToString(), "");
+        Row3(sb, DrawLabel("Brightest Flame drawn"), brightestFlameAgg.TimesDrawn.ToString(), "");
+        Row3(sb, EnergyLabel("gained by Flame"), brightestFlameAgg.TotalEnergyGenerated.ToString(), "");
+        Row3(sb, DrawLabel("Cards drawn by Flame"), brightestFlameAgg.TimesCardsDrawn.ToString(), "");
+        Row3(sb, "Max HP lost to Flame", brightestFlameAgg.TotalMaxHpLost.ToString(), "");
         return sb.ToString();
     }
 
@@ -2828,6 +2883,12 @@ public static class RelicHoverShowPatch
     private static string EnergyLabel(string suffix)
     {
         var path = NormalizeResourcePath(EnergyIconPath);
+        return $"[img={InlineIconSize}x{InlineIconSize}]{path}[/img] {suffix}";
+    }
+
+    private static string DrawLabel(string suffix)
+    {
+        var path = NormalizeResourcePath(DrawIconPath);
         return $"[img={InlineIconSize}x{InlineIconSize}]{path}[/img] {suffix}";
     }
 

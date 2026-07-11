@@ -4506,6 +4506,47 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Record the observed maximum-HP cost of Brightest Flame after its full
+    /// async OnPlay callback resolves. The game clamps LoseMaxHp at one max HP,
+    /// so the before/after delta is the truth rather than the card's requested
+    /// amount.
+    /// </summary>
+    public static void RecordBrightestFlameMaxHpLost(
+        BrightestFlame card,
+        int previousMaxHp,
+        int currentMaxHp)
+    {
+        if (card == null || currentMaxHp >= previousMaxHp) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedCard(card)) return;
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+
+                _pendingCombat ??= new PendingCombat();
+                var instanceId = GetOrAssignInstanceId(card);
+                var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
+                RecordBrightestFlameMaxHpLostForTest(agg, previousMaxHp, currentMaxHp);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordBrightestFlameMaxHpLost failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordBrightestFlameMaxHpLostForTest(
+        CardAggregate agg,
+        int previousMaxHp,
+        int currentMaxHp)
+    {
+        if (agg == null || currentMaxHp >= previousMaxHp) return;
+        agg.TotalMaxHpLost += Math.Max(0, previousMaxHp - currentMaxHp);
+    }
+
+    /// <summary>
     /// Record Unleash's Osty-current-HP contribution to its attack payload.
     /// This is card-specific intent metadata captured at the owner callback;
     /// observed damage still flows through DamageReceivedEntry.
@@ -12568,6 +12609,7 @@ public static class RunTracker
         target.TimesExhaustedOtherCards += source.TimesExhaustedOtherCards;
         target.TimesExhausted += source.TimesExhausted;
         target.TotalHpLost += source.TotalHpLost;
+        target.TotalMaxHpLost += source.TotalMaxHpLost;
         target.TimesCardsDrawn += source.TimesCardsDrawn;
         target.TimesCardsDrawAttempted += source.TimesCardsDrawAttempted;
         target.TimesCardsDrawBlocked += source.TimesCardsDrawBlocked;

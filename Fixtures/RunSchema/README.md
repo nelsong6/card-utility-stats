@@ -155,6 +155,10 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `razor-tooth-relic-run.json`
   Adds Razor Tooth held combat/turn denominators plus later finished plays and
   successful draws of the exact combat cards it was observed upgrading.
+- `storybook-relic-run.json`
+  Adds Brightest Flame's observed max-HP-loss card aggregate, which Storybook
+  surfaces through a definition-pooled view with play, draw, energy, and
+  card-draw stats.
 - `brilliant-scarf-relic-run.json`
   Adds Brilliant Scarf discount tracking: energy-discount offers, taken
   discounts, energy saved by those taken discounts, held combats, and
