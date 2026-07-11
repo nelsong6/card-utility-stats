@@ -2,19 +2,21 @@
 
 This repo is a hot-reloadable Slay the Spire 2 mod focused on per-card attribution: not just what a card says it should do, but what it actually caused in the run.
 
-## User-Owned Validation
+## User-Owned Verification
 
-During interactive Codex development work, the user owns validation. Unless the
-user explicitly requests validation in the current task, do **not** run tests,
-build or deploy the mod, hot-reload SpireLens, inspect game logs for validation,
-manipulate live game/MCP scenarios, or capture validation screenshots. Implement
-the requested change, commit/push it when the active workflow calls for that,
-and clearly report that validation was not run.
+During interactive Codex development work, the user owns test execution and
+behavioral verification. Unless the user explicitly requests verification in
+the current task, do **not** run tests, set up or manipulate live game/MCP test
+scenarios, capture verification screenshots, or otherwise attempt to prove the
+feature's behavior. Implement the requested change and clearly report that
+tests and behavioral verification were not run.
 
-This preference overrides any repo skill or workflow default that would
-otherwise automatically validate an implementation. Explicitly assigned
-verification tasks (for example, a Glimmung verification phase) still count as
-an explicit request and should follow their own validation contract.
+Normal implementation and handoff steps are still expected: Codex may build and
+deploy the mod, hot-reload SpireLens, commit, and push. This preference overrides
+only the automatic test/live-verification parts of repo skills or workflows, not
+their build/deploy/reload flow. Explicitly assigned verification tasks (for
+example, a Glimmung verification phase) still count as an explicit request and
+should follow their own validation contract.
 
 ## Mod Policy
 
