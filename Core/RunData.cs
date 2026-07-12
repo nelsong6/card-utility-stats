@@ -190,6 +190,12 @@ public class CardAggregate
     // listed damage says.
     public int TotalHpLost { get; set; }
 
+    // Maximum HP actually lost from playing this card. Kept separate from
+    // TotalHpLost because reducing max HP is a permanent run cost even when
+    // the player's current HP does not move. Brightest Flame is the first
+    // card using this field.
+    public int TotalMaxHpLost { get; set; }
+
     // M3i: Draw attribution. When THIS card's play causes OTHER cards to
     // be drawn. Signal for draw-enabler cards (Prepared, Coolheaded,
     // Acrobatics etc. depending on the character). Excludes turn-start
@@ -405,10 +411,18 @@ public class RelicAggregate
     // Total Plating this relic added. Used by Gorget.
     public decimal PlatingAdded { get; set; }
 
-    // Total cards this relic upgraded. Used by Stone Cracker, Sand Castle,
-    // Whetstone, War Paint, and other upgrade-granting relics.
+    // Total cards this relic upgraded. Used by Stone Cracker, Razor Tooth,
+    // Sand Castle, Whetstone, War Paint, and other upgrade-granting relics.
     public int CardsUpgraded { get; set; }
     public List<string> UpgradedCards { get; set; } = new();
+
+    // Razor Tooth tracking. Combats/turns are held denominators for averages.
+    // Plays and draws count only events after the exact combat card was
+    // successfully upgraded by Razor Tooth; the triggering play is excluded.
+    public int RazorToothCombats { get; set; }
+    public int RazorToothTurns { get; set; }
+    public int RazorToothUpgradedCardPlays { get; set; }
+    public int RazorToothUpgradedCardDraws { get; set; }
 
     // Total times Bone Flute triggered from an owned Osty attack.
     public int BoneFluteTriggers { get; set; }

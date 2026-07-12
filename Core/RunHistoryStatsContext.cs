@@ -17,6 +17,7 @@ internal static class RunHistoryStatsContext
 {
     private const string EnthralledDefinitionId = "CARD.ENTHRALLED";
     private const string CursedPearlCurseDefinitionId = "CARD.GREED";
+    private const string BrightestFlameDefinitionId = "CARD.BRIGHTEST_FLAME";
 
     private static readonly FieldInfo? DeckHistoryAmountField =
         AccessTools.Field(typeof(NDeckHistoryEntry), "_amount");
@@ -130,6 +131,9 @@ internal static class RunHistoryStatsContext
         var cursedPearlCurseAgg = relicModel is CursedPearl
             ? CardAggregatePooler.PoolByDefinition(run.Aggregates, CursedPearlCurseDefinitionId) ?? new CardAggregate()
             : null;
+        var storybookBrightestFlameAgg = relicModel is Storybook
+            ? CardAggregatePooler.PoolByDefinition(run.Aggregates, BrightestFlameDefinitionId) ?? new CardAggregate()
+            : null;
         IReadOnlyDictionary<string, CardAggregate>? neowsBonesCurseAggs = null;
         if (relicModel is NeowsBones)
         {
@@ -151,6 +155,7 @@ internal static class RunHistoryStatsContext
             bloodSoakedRoseCurseAgg,
             cursedPearlCurseAgg,
             neowsBonesCurseAggs,
+            storybookBrightestFlameAgg,
             out title,
             out body);
     }

@@ -211,6 +211,24 @@ Known trap — combat-ending killing blows: `DamageReceivedEntry` is NOT complet
 
 Player self-damage is tracked as HP lost from playing a card and uses observed unblocked damage after reductions. That is the real cost, not the text value.
 
+Maximum-HP costs are a separate signal from current-HP damage. Brightest
+Flame's owner-specific `OnPlay` gains energy, draws, and then awaits
+`CreatureCmd.LoseMaxHp`. That command records the requested amount in the
+game's map history but clamps the resulting max HP to at least one; it can also
+deal current-HP damage with no card source when current HP is above the new
+maximum. Wrap Brightest Flame's returned `OnPlay` task and compare the owner's
+max HP before and after the callback so SpireLens records only the actual max
+HP removed, including a zero delta at the one-max-HP floor. Keep this in the
+card aggregate, separate from `TotalHpLost`.
+
+Storybook grants a permanent-deck Brightest Flame but does not retain a
+reference to that exact granted card. Its tooltip therefore uses the explicit
+pooled-by-definition model: combine every `CARD.BRIGHTEST_FLAME` aggregate,
+including pending combat data in live views, and show the card's play, draw,
+energy, card-draw, and max-HP-loss stats. Brightest Flame can also come from
+the event card pool, so this is deliberately a family-wide projection rather
+than exact Storybook-grant lineage.
+
 ## Osty Body Attribution
 
 Necrobinder has both investment cards that create or maintain Osty and payoff
@@ -402,6 +420,21 @@ from finished card-play events while the relic is owned; use the modifier only
 to confirm the eligibility rule. Base Strikes are `IsBasicStrikeOrDefend` cards
 that also carry the Strike tag, while non-base Strike cards are every other
 permanent deck card with that tag.
+
+Razor Tooth upgrades eligible Attack and Skill cards synchronously inside its
+owner-specific `AfterCardPlayed` callback, after the finished card-play history
+entry has already been emitted. Combat history has no upgrade entry for this
+effect, and `CardCmd.Upgrade` only adds the game's run-history upgrade record for
+cards in the permanent Deck pile. Snapshot the played card's
+`CurrentUpgradeLevel` before and after Razor Tooth's callback and count only a
+positive observed delta; `CardCmd.Upgrade` can still no-op while combat is
+ending. Keep successfully upgraded cards in a combat-local, raw-reference set:
+the same combat `CardModel` survives pile moves and later replay/draw events,
+while canonicalizing would risk giving a distinct generated or copied card the
+same credit. `CardPlayFinished` occurs before Razor Tooth's callback, so the
+triggering play is not an upgraded-card play; later finished replay iterations
+are. Count later successful draws only from `Hook.AfterCardDrawn`, and use held
+player turns/combats (including zero-result ones) as rate denominators.
 
 Brilliant Scarf increments its per-turn card counter from `AfterCardPlayed`,
 after `CardPlayFinished` has already entered combat history. Its actual cost

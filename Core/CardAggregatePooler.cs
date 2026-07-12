@@ -51,6 +51,7 @@ internal static class CardAggregatePooler
         target.TimesExhaustedOtherCards += source.TimesExhaustedOtherCards;
         target.TimesExhausted += source.TimesExhausted;
         target.TotalHpLost += source.TotalHpLost;
+        target.TotalMaxHpLost += source.TotalMaxHpLost;
         target.TimesCardsDrawn += source.TimesCardsDrawn;
         target.TimesCardsDrawAttempted += source.TimesCardsDrawAttempted;
         target.TimesCardsDrawBlocked += source.TimesCardsDrawBlocked;
