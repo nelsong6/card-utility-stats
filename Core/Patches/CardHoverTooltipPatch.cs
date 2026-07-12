@@ -492,6 +492,8 @@ public static class CardHoverShowPatch
         // show as reduced HP loss, which is the true cost signal.
         if (agg.TotalHpLost > 0)
             Row3(sb, "HP lost", agg.TotalHpLost.ToString(), "");
+        if (agg.TotalMaxHpLost > 0)
+            Row3(sb, "Max HP lost", agg.TotalMaxHpLost.ToString(), "");
     }
 
     /// <summary>
@@ -572,6 +574,8 @@ public static class CardHoverShowPatch
 
         if (agg.TotalHpLost > 0)
             Row3(sb, "HP lost", agg.TotalHpLost.ToString(), "");
+        if (agg.TotalMaxHpLost > 0)
+            Row3(sb, "Max HP lost", agg.TotalMaxHpLost.ToString(), "");
     }
 
     /// <summary>

@@ -2,7 +2,7 @@
 
 Per-card attribution stats mod for [Slay the Spire 2](https://store.steampowered.com/app/2868840/Slay_the_Spire_2/). For every card you play, it tracks what actually happened: effective damage vs. overkill, block that absorbed vs. wasted, drawn cards played vs. idle, energy generated vs. unused, and effect-oriented outcomes like poison damage.
 
-**Status:** Dev build - core per-instance card stats are live in-game, including damage/block attribution, observed draw and energy generation, Regent star-resource spend/gain tracking, forge granted from cards, blocked-draw attribution, recurring summon-to-hand tracking, applied-effect summaries, Artifact-blocked debuffs, removed-card viewing, pooled combat-generated card summaries, and dedicated poison application/damage rows. Not yet published to Nexus (M6).
+**Status:** Dev build - core per-instance card stats are live in-game, including damage/block attribution, observed draw and energy generation, card-caused current/max-HP loss, Regent star-resource spend/gain tracking, forge granted from cards, blocked-draw attribution, recurring summon-to-hand tracking, applied-effect summaries, Artifact-blocked debuffs, removed-card viewing, pooled combat-generated card summaries, and dedicated poison application/damage rows. Not yet published to Nexus (M6).
 
 For codebase orientation, start with [AGENTS.md](AGENTS.md), [docs/architecture.md](docs/architecture.md), and [docs/sts2-runtime-primer.md](docs/sts2-runtime-primer.md).
 
@@ -54,7 +54,7 @@ Available only on in-run deck-view surfaces for now (not Compendium - lifetime a
 | **M5b** | Run History integration - browse past-run stats | [#9](https://github.com/romaine-life/spirelens/issues/9) |
 | **M6** | Publish v0.1 to Nexus | - |
 
-Additional shipped: discard count, pile-top placements (from hand / from discard), exhaust-others attribution, self-exhaust count, HP-lost from self-damage cards, cards-drawn attribution, blocked-draw attempt/reason tracking, Regent star-resource tracking, forge granted tracking, recurring summon-to-hand tracking, effect application summaries, Artifact-blocked debuff tracking, and downstream poison damage attribution including stacked Noxious Fumes contributor preservation.
+Additional shipped: discard count, pile-top placements (from hand / from discard), exhaust-others attribution, self-exhaust count, current/max-HP lost from card costs, cards-drawn attribution, blocked-draw attempt/reason tracking, Regent star-resource tracking, forge granted tracking, recurring summon-to-hand tracking, effect application summaries, Artifact-blocked debuff tracking, and downstream poison damage attribution including stacked Noxious Fumes contributor preservation.
 
 Run outcome detection (win/loss/abandoned) is implemented ([#10](https://github.com/romaine-life/spirelens/issues/10), closed) via the run-history entry hook.
 

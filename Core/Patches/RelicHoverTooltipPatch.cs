@@ -20,10 +20,12 @@ public static class RelicHoverShowPatch
 {
     private const string EnthralledDefinitionId = "CARD.ENTHRALLED";
     private const string CursedPearlCurseDefinitionId = "CARD.GREED";
+    private const string BrightestFlameDefinitionId = "CARD.BRIGHTEST_FLAME";
     private const string GameOverScreenNamespace = "MegaCrit.Sts2.Core.Nodes.Screens.GameOverScreen";
     private const string VulnerableIconPath = "res://images/atlases/power_atlas.sprites/vulnerable_power.tres";
     private const string WeakIconPath = "res://images/atlases/power_atlas.sprites/weak_power.tres";
     private const string BlockIconPath = "res://images/ui/combat/block.png";
+    private const string DrawIconPath = "res://images/atlases/power_atlas.sprites/draw_cards_next_turn_power.tres";
     private const string EnergyIconPath = "res://images/atlases/potion_atlas.sprites/energy_potion.tres";
     private const string StarIconPath = "res://images/packed/sprite_fonts/star_icon.png";
     private const string VigorIconPath = "res://images/atlases/power_atlas.sprites/vigor_power.tres";
@@ -458,6 +460,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is RazorTooth)
+            {
+                const string relicId = "RELIC.RAZOR_TOOTH";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildRazorToothBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Razor Tooth", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is Whetstone)
             {
                 const string relicId = "RELIC.WHETSTONE";
@@ -809,6 +821,7 @@ public static class RelicHoverShowPatch
         RelicAggregate? aggregate = null;
         CardAggregate? bloodSoakedRoseCurseAgg = null;
         CardAggregate? cursedPearlCurseAgg = null;
+        CardAggregate? storybookBrightestFlameAgg = null;
         IReadOnlyDictionary<string, CardAggregate>? neowsBonesCurseAggs = null;
         int? floorCount = null;
 
@@ -827,6 +840,12 @@ public static class RelicHoverShowPatch
             {
                 cursedPearlCurseAgg =
                     RunTracker.GetLastEndedPooledCardAggregateByDefinition(CursedPearlCurseDefinitionId)
+                    ?? new CardAggregate();
+            }
+            else if (relicModel is Storybook)
+            {
+                storybookBrightestFlameAgg =
+                    RunTracker.GetLastEndedPooledCardAggregateByDefinition(BrightestFlameDefinitionId)
                     ?? new CardAggregate();
             }
             else if (relicModel is NeowsBones && aggregate != null)
@@ -848,6 +867,8 @@ public static class RelicHoverShowPatch
             bloodSoakedRoseCurseAgg = RunTracker.GetEnthralledCurseAggregate();
         if (relicModel is CursedPearl && cursedPearlCurseAgg == null)
             cursedPearlCurseAgg = RunTracker.GetCursedPearlCurseAggregate();
+        if (relicModel is Storybook && storybookBrightestFlameAgg == null)
+            storybookBrightestFlameAgg = RunTracker.GetPooledCardAggregateByDefinition(BrightestFlameDefinitionId);
         if (relicModel is NeowsBones && neowsBonesCurseAggs == null)
         {
             neowsBonesCurseAggs = BuildGrantedCurseAggregates(
@@ -864,6 +885,7 @@ public static class RelicHoverShowPatch
             bloodSoakedRoseCurseAgg,
             cursedPearlCurseAgg,
             neowsBonesCurseAggs,
+            storybookBrightestFlameAgg,
             out title,
             out body);
     }
@@ -920,7 +942,7 @@ public static class RelicHoverShowPatch
         out string title,
         out string body)
     {
-        return TryBuildBodyBBCode(relicModel, agg, floorCount, null, null, null, out title, out body);
+        return TryBuildBodyBBCode(relicModel, agg, floorCount, null, null, null, null, out title, out body);
     }
 
     internal static bool TryBuildBodyBBCode(
@@ -930,6 +952,29 @@ public static class RelicHoverShowPatch
         CardAggregate? bloodSoakedRoseCurseAgg,
         CardAggregate? cursedPearlCurseAgg,
         IReadOnlyDictionary<string, CardAggregate>? neowsBonesCurseAggs,
+        out string title,
+        out string body)
+    {
+        return TryBuildBodyBBCode(
+            relicModel,
+            agg,
+            floorCount,
+            bloodSoakedRoseCurseAgg,
+            cursedPearlCurseAgg,
+            neowsBonesCurseAggs,
+            null,
+            out title,
+            out body);
+    }
+
+    internal static bool TryBuildBodyBBCode(
+        RelicModel relicModel,
+        RelicAggregate agg,
+        int? floorCount,
+        CardAggregate? bloodSoakedRoseCurseAgg,
+        CardAggregate? cursedPearlCurseAgg,
+        IReadOnlyDictionary<string, CardAggregate>? neowsBonesCurseAggs,
+        CardAggregate? storybookBrightestFlameAgg,
         out string title,
         out string body)
     {
@@ -1203,6 +1248,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is Storybook)
+        {
+            title = "Storybook";
+            body = BuildStorybookBodyBBCode(storybookBrightestFlameAgg ?? new CardAggregate());
+            return true;
+        }
+
         if (relicModel is Regalite)
         {
             title = "Regalite";
@@ -1249,6 +1301,13 @@ public static class RelicHoverShowPatch
         {
             title = "Stone Cracker";
             body = BuildStoneCrackerBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is RazorTooth)
+        {
+            title = "Razor Tooth";
+            body = BuildRazorToothBodyBBCode(agg);
             return true;
         }
 
@@ -1983,6 +2042,19 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
+    private static string BuildStorybookBodyBBCode(CardAggregate brightestFlameAgg)
+    {
+        brightestFlameAgg ??= new CardAggregate();
+
+        var sb = new StringBuilder();
+        Row3(sb, "Brightest Flame played", brightestFlameAgg.Plays.ToString(), "");
+        Row3(sb, DrawLabel("Brightest Flame drawn"), brightestFlameAgg.TimesDrawn.ToString(), "");
+        Row3(sb, EnergyLabel("gained by Flame"), brightestFlameAgg.TotalEnergyGenerated.ToString(), "");
+        Row3(sb, DrawLabel("Cards drawn by Flame"), brightestFlameAgg.TimesCardsDrawn.ToString(), "");
+        Row3(sb, "Max HP lost to Flame", brightestFlameAgg.TotalMaxHpLost.ToString(), "");
+        return sb.ToString();
+    }
+
     private static string BuildRegaliteBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
@@ -2121,6 +2193,40 @@ public static class RelicHoverShowPatch
         var sb = new StringBuilder();
         Row3(sb, "Activations", agg.Activations.ToString(), "");
         Row3(sb, "Cards upgraded", agg.CardsUpgraded.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildRazorToothBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var upgradedPerTurn = agg.RazorToothTurns <= 0
+            ? 0m
+            : (decimal)agg.CardsUpgraded / agg.RazorToothTurns;
+        var upgradedPerCombat = agg.RazorToothCombats <= 0
+            ? 0m
+            : (decimal)agg.CardsUpgraded / agg.RazorToothCombats;
+        var upgradedPlaysPerTurn = agg.RazorToothTurns <= 0
+            ? 0m
+            : (decimal)agg.RazorToothUpgradedCardPlays / agg.RazorToothTurns;
+        var upgradedPlaysPerCombat = agg.RazorToothCombats <= 0
+            ? 0m
+            : (decimal)agg.RazorToothUpgradedCardPlays / agg.RazorToothCombats;
+        var upgradedDrawsPerTurn = agg.RazorToothTurns <= 0
+            ? 0m
+            : (decimal)agg.RazorToothUpgradedCardDraws / agg.RazorToothTurns;
+        var upgradedDrawsPerCombat = agg.RazorToothCombats <= 0
+            ? 0m
+            : (decimal)agg.RazorToothUpgradedCardDraws / agg.RazorToothCombats;
+
+        Row3(sb, "Cards upgraded", agg.CardsUpgraded.ToString(), "");
+        Row3(sb, "Avg cards upgraded/turn", FormatDecimal(upgradedPerTurn), "");
+        Row3(sb, "Avg cards upgraded/combat", FormatDecimal(upgradedPerCombat), "");
+        Row3(sb, "Upgraded-card plays", agg.RazorToothUpgradedCardPlays.ToString(), "");
+        Row3(sb, "Avg upgraded plays/turn", FormatDecimal(upgradedPlaysPerTurn), "");
+        Row3(sb, "Avg upgraded plays/combat", FormatDecimal(upgradedPlaysPerCombat), "");
+        Row3(sb, "Upgraded-card draws", agg.RazorToothUpgradedCardDraws.ToString(), "");
+        Row3(sb, "Avg upgraded draws/turn", FormatDecimal(upgradedDrawsPerTurn), "");
+        Row3(sb, "Avg upgraded draws/combat", FormatDecimal(upgradedDrawsPerCombat), "");
         return sb.ToString();
     }
 
@@ -2777,6 +2883,12 @@ public static class RelicHoverShowPatch
     private static string EnergyLabel(string suffix)
     {
         var path = NormalizeResourcePath(EnergyIconPath);
+        return $"[img={InlineIconSize}x{InlineIconSize}]{path}[/img] {suffix}";
+    }
+
+    private static string DrawLabel(string suffix)
+    {
+        var path = NormalizeResourcePath(DrawIconPath);
         return $"[img={InlineIconSize}x{InlineIconSize}]{path}[/img] {suffix}";
     }
 

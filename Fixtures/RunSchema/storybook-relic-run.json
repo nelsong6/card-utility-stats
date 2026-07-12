@@ -1,0 +1,36 @@
+{
+  "run_id": "storybook-relic-fixture",
+  "started_at": "2026-07-11T00:00:00Z",
+  "updated_at": "2026-07-11T00:05:00Z",
+  "character": "IRONCLAD",
+  "ascension": 10,
+  "floor_reached": 9,
+  "outcome": "in_progress",
+  "game_start_time": 1783728000,
+  "aggregates": {
+    "CARD.BRIGHTEST_FLAME#1": {
+      "combats_in_deck": 3,
+      "plays": 4,
+      "total_energy_generated": 8,
+      "times_drawn": 6,
+      "total_max_hp_lost": 4,
+      "times_cards_drawn": 8,
+      "floor_added": 5,
+      "initial_upgrade_level": 0
+    }
+  },
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.STORYBOOK": {}
+  },
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.BRIGHTEST_FLAME": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.BRIGHTEST_FLAME": 1
+  }
+}
