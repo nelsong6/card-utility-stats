@@ -85,6 +85,7 @@ internal static class CompendiumRelicStatsContext
 {
     private const string EnthralledDefinitionId = "CARD.ENTHRALLED";
     private const string CursedPearlCurseDefinitionId = "CARD.GREED";
+    private const string BrightestFlameDefinitionId = "CARD.BRIGHTEST_FLAME";
     private static readonly FieldInfo? RelicField =
         AccessTools.Field(typeof(NRelicCollectionEntry), "relic");
 
@@ -157,6 +158,9 @@ internal static class CompendiumRelicStatsContext
         var cursedPearlCurseAgg = relicModel is CursedPearl
             ? CardAggregatePooler.PoolByDefinition(run.Aggregates, CursedPearlCurseDefinitionId) ?? new CardAggregate()
             : null;
+        var storybookBrightestFlameAgg = relicModel is Storybook
+            ? CardAggregatePooler.PoolByDefinition(run.Aggregates, BrightestFlameDefinitionId) ?? new CardAggregate()
+            : null;
         IReadOnlyDictionary<string, CardAggregate>? neowsBonesCurseAggs = null;
         if (relicModel is NeowsBones)
             neowsBonesCurseAggs = BuildGrantedCurseAggregates(run, aggregate);
@@ -168,6 +172,7 @@ internal static class CompendiumRelicStatsContext
             bloodSoakedRoseCurseAgg,
             cursedPearlCurseAgg,
             neowsBonesCurseAggs,
+            storybookBrightestFlameAgg,
             out title,
             out body);
     }
