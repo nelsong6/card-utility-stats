@@ -376,7 +376,12 @@ Pael's sacrifice reward option is owned by `PaelsWing`, not `PaelsFlesh`.
 alternative and `PaelsWing.OnSacrifice` increments the saved sacrifice count.
 `PaelsFlesh` is a separate combat max-energy relic that activates after turn 3.
 Track consumed card reward rarities and skipped sacrifice opportunities from the
-card reward alternative flow, not from PaelsFlesh's energy hooks.
+card reward alternative flow, not from PaelsFlesh's energy hooks. Every second
+sacrifice pulls and obtains a normal `RelicModel`. Capture that direct artifact
+from the owner's first `RelicObtained` event during `OnSacrifice`; the event fires
+synchronously when the relic enters inventory, before its async `AfterObtained`
+callback. Store its id, display name, and count in Pael's Wing's `RelicsGranted`
+ledger.
 
 For relics that grant block after a specific owner-owned condition, arm a narrow block-gain window at the relic callback and let `Hook.AfterBlockGained` record the modified amount. Permafrost follows this pattern from `Permafrost.AfterCardPlayed`: mirror the first-owned-Power condition, count that combat trigger, then derive block per combat from observed block gained divided by triggers.
 
@@ -420,6 +425,16 @@ from finished card-play events while the relic is owned; use the modifier only
 to confirm the eligibility rule. Base Strikes are `IsBasicStrikeOrDefend` cards
 that also carry the Strike tag, while non-base Strike cards are every other
 permanent deck card with that tag.
+
+Kunai, Kusarigama, Ornamental Fan, and Shuriken share the same repeatable
+three-Attack counter shape: their owner-specific `AfterCardPlayed` callback
+increments a turn-local counter and activates at every threshold multiple.
+Count owner Attack plays at that callback, snapshot unused modulo charge from
+`Hook.BeforeSideTurnEnd` before the relic resets, and observe each payoff at its
+narrow outcome: power delta for Kunai/Shuriken, the resolved block-command
+result for Ornamental Fan, and the resolved single-target damage result for
+Kusarigama. Kusarigama only activates when its threshold play can choose a
+hittable enemy; do not infer an activation from the counter alone.
 
 Razor Tooth upgrades eligible Attack and Skill cards synchronously inside its
 owner-specific `AfterCardPlayed` callback, after the finished card-play history

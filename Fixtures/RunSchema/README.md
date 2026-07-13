@@ -130,7 +130,8 @@ New fixtures added going forward do not need a `v*-` prefix.
   combat-end charge samples for average charge.
 - `paels-wing-sacrifice-relic-run.json`
   Adds Pael's Wing sacrifice tracking: consumed card reward options split by
-  common, uncommon, and rare, plus sacrifices made and skipped.
+  common, uncommon, and rare, sacrifices made and skipped, and the total and
+  specific artifacts gained from its completed sacrifice pairs.
 - `paels-eye-relic-run.json`
   Adds Pael's Eye activation tracking plus counts of status and curse cards
   actually exhausted by its extra-turn callback, and combats where it was held
@@ -229,6 +230,10 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `kunai-relic-run.json`
   Adds Kunai attack-counter tracking: owner attack plays, activations, observed
   Dexterity gained, and 1/2 charge turn-end buckets with average charge samples.
+- `unlimited-attack-charge-relics-run.json`
+  Adds the remaining unlimited three-Attack turn counters: Kusarigama,
+  Ornamental Fan, and Shuriken, including observed damage/block/Strength
+  outcomes and 1/2 charge turn-end buckets with average charge samples.
 - `tuning-fork-relic-run.json`
   Adds Tuning Fork owner Skill-play count, trigger count, observed block
   gained, held combat/turn denominators, and turn-end charge buckets.

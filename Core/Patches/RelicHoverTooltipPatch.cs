@@ -904,6 +904,9 @@ public static class RelicHoverShowPatch
         if (IsMrStrugglesStatsRelicModel(relicModel))
             return "RELIC.MR_STRUGGLES";
 
+        if (relicModel is Storybook)
+            return "RELIC.STORYBOOK";
+
         return relicModel.Id.ToString();
     }
 
@@ -1126,6 +1129,27 @@ public static class RelicHoverShowPatch
         {
             title = "Kunai";
             body = BuildKunaiBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is Kusarigama)
+        {
+            title = "Kusarigama";
+            body = BuildKusarigamaBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is OrnamentalFan)
+        {
+            title = "Ornamental Fan";
+            body = BuildOrnamentalFanBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is Shuriken)
+        {
+            title = "Shuriken";
+            body = BuildShurikenBodyBBCode(agg);
             return true;
         }
 
@@ -2492,6 +2516,23 @@ public static class RelicHoverShowPatch
         Row3(sb, "common cards consumed", agg.CommonCardsConsumed.ToString(), "");
         Row3(sb, "uncommon cards consumed", agg.UncommonCardsConsumed.ToString(), "");
         Row3(sb, "rare cards consumed", agg.RareCardsConsumed.ToString(), "");
+        var artifacts = agg.RelicsGranted.Values
+            .Where(artifact => artifact.Count > 0)
+            .OrderByDescending(artifact => artifact.Count)
+            .ThenBy(artifact => artifact.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var artifactsGained = artifacts.Sum(artifact => Math.Max(0, artifact.Count));
+        Row3(sb, "Artifacts gained", artifactsGained.ToString(), "");
+
+        foreach (var artifact in artifacts)
+        {
+            var displayName = StatsTooltip.EscapeBbcode(string.IsNullOrWhiteSpace(artifact.DisplayName)
+                ? RunTracker.FormatRelicIdForDisplay(artifact.RelicId)
+                : artifact.DisplayName);
+            var value = artifact.Count == 1 ? displayName : $"{displayName} x{artifact.Count}";
+            Row3(sb, "Artifact gained", value, "");
+        }
+
         Row3(sb, "Sacrifices made", agg.SacrificesMade.ToString(), "");
         Row3(sb, "Sacrifices skipped", agg.SacrificesSkipped.ToString(), "");
         if (TryFloorCountSinceRelicObtained(floorReached, floorAdded, out var floorCount))
@@ -2590,6 +2631,81 @@ public static class RelicHoverShowPatch
         Row3(sb, "Turns ended at 2 charges", agg.KunaiTurnsEndedAt2Charges.ToString(), "");
         Row3(sb, "Avg charge at turn end", FormatDecimal(averageEndCharge), "");
         return sb.ToString();
+    }
+
+    private static string BuildKusarigamaBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Attacks played", agg.KusarigamaAttacksPlayed.ToString(), "");
+        AppendRelicDamageStats(
+            sb,
+            agg,
+            triggerLabel: "Activations",
+            averageLabel: "Damage per activation",
+            averageDenominator: agg.Activations);
+        AppendTurnResetChargeRows(
+            sb,
+            agg.KusarigamaTurnsEndedAt1Charge,
+            agg.KusarigamaTurnsEndedAt2Charges,
+            agg.KusarigamaTurnEndChargeTotal,
+            agg.KusarigamaTurnEndChargeCount);
+        return sb.ToString();
+    }
+
+    private static string BuildOrnamentalFanBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var blockPerActivation = agg.Activations <= 0
+            ? 0m
+            : (decimal)agg.AdditionalBlockGained / agg.Activations;
+
+        Row3(sb, "Attacks played", agg.OrnamentalFanAttacksPlayed.ToString(), "");
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
+        Row3(sb, BlockLabel("block gained per activation"), FormatDecimal(blockPerActivation), "");
+        AppendTurnResetChargeRows(
+            sb,
+            agg.OrnamentalFanTurnsEndedAt1Charge,
+            agg.OrnamentalFanTurnsEndedAt2Charges,
+            agg.OrnamentalFanTurnEndChargeTotal,
+            agg.OrnamentalFanTurnEndChargeCount);
+        return sb.ToString();
+    }
+
+    private static string BuildShurikenBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var strengthPerActivation = agg.Activations <= 0
+            ? 0m
+            : agg.StrengthAdded / agg.Activations;
+
+        Row3(sb, "Attacks played", agg.ShurikenAttacksPlayed.ToString(), "");
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, "Strength gained", FormatDecimal(agg.StrengthAdded), "");
+        Row3(sb, "Strength gained per activation", FormatDecimal(strengthPerActivation), "");
+        AppendTurnResetChargeRows(
+            sb,
+            agg.ShurikenTurnsEndedAt1Charge,
+            agg.ShurikenTurnsEndedAt2Charges,
+            agg.ShurikenTurnEndChargeTotal,
+            agg.ShurikenTurnEndChargeCount);
+        return sb.ToString();
+    }
+
+    private static void AppendTurnResetChargeRows(
+        StringBuilder sb,
+        int turnsEndedAt1Charge,
+        int turnsEndedAt2Charges,
+        int turnEndChargeTotal,
+        int turnEndChargeCount)
+    {
+        var averageEndCharge = turnEndChargeCount <= 0
+            ? 0m
+            : (decimal)turnEndChargeTotal / turnEndChargeCount;
+
+        Row3(sb, "Turns ended at 1 charge", turnsEndedAt1Charge.ToString(), "");
+        Row3(sb, "Turns ended at 2 charges", turnsEndedAt2Charges.ToString(), "");
+        Row3(sb, "Avg charge at turn end", FormatDecimal(averageEndCharge), "");
     }
 
     private static string BuildPaperPhrogBodyBBCode(RelicAggregate agg)

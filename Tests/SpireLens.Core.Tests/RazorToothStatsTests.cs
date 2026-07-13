@@ -32,6 +32,7 @@ public class RazorToothStatsTests
     };
 
     [Fact]
+    [Trait("Category", "RequiresLiveGame")]
     public void Patch_TargetsRazorToothAfterCardPlayedWithExpectedParameters()
     {
         var target = TargetMethod.Invoke(null, null) as MethodBase;

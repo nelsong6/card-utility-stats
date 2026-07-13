@@ -108,6 +108,10 @@ internal static class RelicCompendiumFilterUi
 {
     private const string PanelName = "SpireLensRelicFilterPanel";
     private const string FlatGridName = "SpireLensFlatRelicGrid";
+    private const int CategoryTreeColumn = 0;
+    private const int MaxVisibleCategoryTreeRows = 8;
+    private const float CategoryTreeRowHeight = 24f;
+    private const float CategoryTreeVerticalPadding = 8f;
     private const float DimmedAlpha = 0.5f;
     private const int FallbackFlatGridColumns = 8;
     private static readonly string[] CategoryFieldNames =
@@ -137,11 +141,15 @@ internal static class RelicCompendiumFilterUi
     private static readonly List<EntryOriginalVisual> EntryOriginals = new();
     private static readonly List<FlatCollectionLayout> FlatLayouts = new();
     private static readonly HashSet<string> SelectedCategoryIds =
-        new(RelicTaxonomy.Categories.Select(c => c.Id), StringComparer.OrdinalIgnoreCase);
+        new(RelicTaxonomy.LeafCategories.Select(c => c.Id), StringComparer.OrdinalIgnoreCase);
 
-    private static CompendiumRelicFilterMode _mode = CompendiumRelicFilterMode.Off;
-    private static bool _showUndiscoveredRelics = true;
-    private static bool _useSingleRelicGrid;
+    private const CompendiumRelicFilterMode DefaultMode = CompendiumRelicFilterMode.Filter;
+    private const bool DefaultShowUndiscoveredRelics = false;
+    private const bool DefaultUseSingleRelicGrid = true;
+
+    private static CompendiumRelicFilterMode _mode = DefaultMode;
+    private static bool _showUndiscoveredRelics = DefaultShowUndiscoveredRelics;
+    private static bool _useSingleRelicGrid = DefaultUseSingleRelicGrid;
     private static bool _syncingControls;
 
     public static void Inject(NRelicCollection? collection)
@@ -242,11 +250,11 @@ internal static class RelicCompendiumFilterUi
 
     internal static void ResetForTests()
     {
-        _mode = CompendiumRelicFilterMode.Off;
-        _showUndiscoveredRelics = true;
-        _useSingleRelicGrid = false;
+        _mode = DefaultMode;
+        _showUndiscoveredRelics = DefaultShowUndiscoveredRelics;
+        _useSingleRelicGrid = DefaultUseSingleRelicGrid;
         SelectedCategoryIds.Clear();
-        foreach (var category in RelicTaxonomy.Categories)
+        foreach (var category in RelicTaxonomy.LeafCategories)
             SelectedCategoryIds.Add(category.Id);
     }
 
@@ -336,23 +344,33 @@ internal static class RelicCompendiumFilterUi
         var categoriesLabel = NewLabel("SpireLens categories", 13, new Color(0.78f, 0.73f, 0.64f, 1f));
         vbox.AddChild(categoriesLabel);
 
-        var checkboxByCategory = new Dictionary<string, CheckBox>(StringComparer.OrdinalIgnoreCase);
-        foreach (var category in RelicTaxonomy.Categories)
+        var categoryTree = new Tree
         {
-            var checkbox = new CheckBox
-            {
-                Name = $"Category_{category.Id}",
-                Text = category.DisplayName,
-                MouseFilter = Control.MouseFilterEnum.Stop,
-                SizeFlagsHorizontal = Control.SizeFlags.Fill | Control.SizeFlags.Expand,
-            };
-            checkbox.AddThemeFontSizeOverride("font_size", 14);
-            checkbox.Connect(
-                BaseButton.SignalName.Toggled,
-                Callable.From<bool>(pressed => OnCategoryToggled(category.Id, pressed)));
-            checkboxByCategory[category.Id] = checkbox;
-            vbox.AddChild(checkbox);
-        }
+            Name = "CategoryTree",
+            Columns = 1,
+            HideRoot = true,
+            HideFolding = false,
+            ScrollHorizontalEnabled = false,
+            ScrollVerticalEnabled = true,
+            MouseFilter = Control.MouseFilterEnum.Stop,
+            SizeFlagsHorizontal = Control.SizeFlags.Fill | Control.SizeFlags.Expand,
+            CustomMinimumSize = new Vector2(
+                0f,
+                Math.Min(RelicTaxonomy.Categories.Count, MaxVisibleCategoryTreeRows)
+                * CategoryTreeRowHeight
+                + CategoryTreeVerticalPadding),
+        };
+        categoryTree.AddThemeFontSizeOverride("font_size", 14);
+
+        var categoryItems = new Dictionary<string, TreeItem>(StringComparer.OrdinalIgnoreCase);
+        var hiddenRoot = categoryTree.CreateItem();
+        foreach (var category in RelicTaxonomy.RootCategories)
+            AddCategoryTreeItem(categoryTree, hiddenRoot, category, categoryItems);
+
+        categoryTree.Connect(
+            Tree.SignalName.ItemEdited,
+            Callable.From(() => OnCategoryTreeItemEdited(categoryTree, categoryItems)));
+        vbox.AddChild(categoryTree);
 
         var buttons = new HBoxContainer
         {
@@ -377,7 +395,27 @@ internal static class RelicCompendiumFilterUi
             modeDropdown,
             showUndiscovered,
             singleRelicGrid,
-            checkboxByCategory);
+            categoryItems);
+    }
+
+    private static void AddCategoryTreeItem(
+        Tree categoryTree,
+        TreeItem parentItem,
+        RelicTaxonomyCategory category,
+        IDictionary<string, TreeItem> categoryItems)
+    {
+        var item = categoryTree.CreateItem(parentItem);
+        item.SetCellMode(CategoryTreeColumn, TreeItem.TreeCellMode.Check);
+        item.SetText(CategoryTreeColumn, category.DisplayName);
+        item.SetEditable(CategoryTreeColumn, true);
+        item.SetSelectable(CategoryTreeColumn, false);
+        categoryItems[category.Id] = item;
+
+        foreach (var child in category.Children)
+            AddCategoryTreeItem(categoryTree, item, child, categoryItems);
+
+        if (category.Children.Count > 0)
+            item.Collapsed = false;
     }
 
     private static Label NewLabel(string text, int fontSize, Color color)
@@ -419,15 +457,28 @@ internal static class RelicCompendiumFilterUi
         ApplyToActiveEntries();
     }
 
-    private static void OnCategoryToggled(string categoryId, bool selected)
+    private static void OnCategoryTreeItemEdited(
+        Tree categoryTree,
+        IReadOnlyDictionary<string, TreeItem> categoryItems)
     {
-        if (_syncingControls) return;
+        if (_syncingControls || categoryTree.GetEditedColumn() != CategoryTreeColumn) return;
 
-        if (selected)
-            SelectedCategoryIds.Add(categoryId);
-        else
-            SelectedCategoryIds.Remove(categoryId);
+        var editedItem = categoryTree.GetEdited();
+        if (editedItem == null) return;
 
+        var editedItemId = editedItem.GetInstanceId();
+        var categoryId = categoryItems
+            .FirstOrDefault(pair => pair.Value.GetInstanceId() == editedItemId)
+            .Key;
+        if (string.IsNullOrWhiteSpace(categoryId)) return;
+
+        var currentState = RelicTaxonomy.GetSelectionState(categoryId, SelectedCategoryIds);
+        RelicTaxonomy.SetCategorySelection(
+            SelectedCategoryIds,
+            categoryId,
+            selected: currentState != RelicTaxonomyCategorySelectionState.Selected);
+
+        SyncAllControls();
         ApplyToActiveEntries();
     }
 
@@ -450,7 +501,7 @@ internal static class RelicCompendiumFilterUi
 
     private static void SelectAllCategories()
     {
-        foreach (var category in RelicTaxonomy.Categories)
+        foreach (var category in RelicTaxonomy.LeafCategories)
             SelectedCategoryIds.Add(category.Id);
         SyncAllControls();
         ApplyToActiveEntries();
@@ -835,7 +886,7 @@ internal static class RelicCompendiumFilterUi
         OptionButton ModeDropdown,
         CheckBox ShowUndiscoveredCheckbox,
         CheckBox SingleRelicGridCheckbox,
-        IReadOnlyDictionary<string, CheckBox> Checkboxes)
+        IReadOnlyDictionary<string, TreeItem> CategoryItems)
     {
         public bool IsValid =>
             Root != null
@@ -869,10 +920,21 @@ internal static class RelicCompendiumFilterUi
             if (SingleRelicGridCheckbox != null && GodotObject.IsInstanceValid(SingleRelicGridCheckbox))
                 SingleRelicGridCheckbox.SetPressedNoSignal(_useSingleRelicGrid);
 
-            foreach (var (categoryId, checkbox) in Checkboxes)
+            foreach (var (categoryId, item) in CategoryItems)
             {
-                if (checkbox == null || !GodotObject.IsInstanceValid(checkbox)) continue;
-                checkbox.SetPressedNoSignal(SelectedCategoryIds.Contains(categoryId));
+                if (item == null || !GodotObject.IsInstanceValid(item)) continue;
+
+                var state = RelicTaxonomy.GetSelectionState(categoryId, SelectedCategoryIds);
+
+                // Godot can retain a stale mixed state when SetChecked(false)
+                // is a no-op, so always clear it before setting the final state.
+                item.SetIndeterminate(CategoryTreeColumn, false);
+                item.SetChecked(
+                    CategoryTreeColumn,
+                    state == RelicTaxonomyCategorySelectionState.Selected);
+                item.SetIndeterminate(
+                    CategoryTreeColumn,
+                    state == RelicTaxonomyCategorySelectionState.Partial);
             }
         }
     }

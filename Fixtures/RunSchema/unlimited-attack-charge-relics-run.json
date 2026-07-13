@@ -1,0 +1,45 @@
+{
+  "run_id": "unlimited-attack-charge-relics-fixture",
+  "started_at": "2026-07-13T17:00:00Z",
+  "updated_at": "2026-07-13T17:12:00Z",
+  "outcome": "in_progress",
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.KUSARIGAMA": {
+      "kusarigama_attacks_played": 14,
+      "activations": 4,
+      "total_damage_attempted": 24,
+      "total_damage_dealt": 17,
+      "total_damage_blocked": 3,
+      "total_damage_overkill": 4,
+      "kills": 2,
+      "total_targets": 4,
+      "kusarigama_turns_ended_at1_charge": 2,
+      "kusarigama_turns_ended_at2_charges": 3,
+      "kusarigama_turn_end_charge_total": 8,
+      "kusarigama_turn_end_charge_count": 7
+    },
+    "RELIC.ORNAMENTAL_FAN": {
+      "ornamental_fan_attacks_played": 11,
+      "activations": 3,
+      "additional_block_gained": 13,
+      "ornamental_fan_turns_ended_at1_charge": 1,
+      "ornamental_fan_turns_ended_at2_charges": 3,
+      "ornamental_fan_turn_end_charge_total": 7,
+      "ornamental_fan_turn_end_charge_count": 5
+    },
+    "RELIC.SHURIKEN": {
+      "shuriken_attacks_played": 17,
+      "activations": 5,
+      "strength_added": 5,
+      "shuriken_turns_ended_at1_charge": 2,
+      "shuriken_turns_ended_at2_charges": 2,
+      "shuriken_turn_end_charge_total": 6,
+      "shuriken_turn_end_charge_count": 6
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

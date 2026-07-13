@@ -396,8 +396,8 @@ public class RelicAggregate
 
     // Total block gained from this relic across all combats.
     // Used by Orichalcum, Permafrost, The Abacus, Bone Flute, Cloak Clasp,
-    // Anchor, Horn Cleat, Tuning Fork, Regalite, and Vambrace's extra block
-    // from its multiplier.
+    // Anchor, Horn Cleat, Tuning Fork, Ornamental Fan, Regalite, and Vambrace's
+    // extra block from its multiplier.
     public int AdditionalBlockGained { get; set; }
 
     // Total times this relic got its own trigger check but was blocked by
@@ -405,7 +405,7 @@ public class RelicAggregate
     // has block at end of turn.
     public int BlockedTriggers { get; set; }
 
-    // Total Strength this relic added. Used by Reptile Trinket.
+    // Total Strength this relic added. Used by Reptile Trinket and Shuriken.
     public decimal StrengthAdded { get; set; }
 
     // Total Plating this relic added. Used by Gorget.
@@ -558,8 +558,8 @@ public class RelicAggregate
     public int RareRelicsAcquired { get; set; }
     public int CampfiresNotDug { get; set; }
 
-    // Specific relics granted by relic-owned effects. Used by Large Capsule
-    // and Neow's Bones to show which relics were obtained.
+    // Specific relics granted by relic-owned effects. Used by Large Capsule,
+    // Neow's Bones, and Pael's Wing to show which relics/artifacts were obtained.
     public Dictionary<string, RelicGrantedAggregate> RelicsGranted { get; set; } = new();
 
     // Total offered cards by rarity for relics that generate card-choice
@@ -613,6 +613,26 @@ public class RelicAggregate
     public int KunaiTurnsEndedAt2Charges { get; set; }
     public int KunaiTurnEndChargeTotal { get; set; }
     public int KunaiTurnEndChargeCount { get; set; }
+
+    // Kusarigama, Ornamental Fan, and Shuriken share Kunai's repeatable
+    // three-Attack, turn-reset counter. Their payoff uses the shared relic
+    // damage, block, and Strength fields above; these fields preserve each
+    // relic's input count and player-turn-end unused charge.
+    public int KusarigamaAttacksPlayed { get; set; }
+    public int KusarigamaTurnsEndedAt1Charge { get; set; }
+    public int KusarigamaTurnsEndedAt2Charges { get; set; }
+    public int KusarigamaTurnEndChargeTotal { get; set; }
+    public int KusarigamaTurnEndChargeCount { get; set; }
+    public int OrnamentalFanAttacksPlayed { get; set; }
+    public int OrnamentalFanTurnsEndedAt1Charge { get; set; }
+    public int OrnamentalFanTurnsEndedAt2Charges { get; set; }
+    public int OrnamentalFanTurnEndChargeTotal { get; set; }
+    public int OrnamentalFanTurnEndChargeCount { get; set; }
+    public int ShurikenAttacksPlayed { get; set; }
+    public int ShurikenTurnsEndedAt1Charge { get; set; }
+    public int ShurikenTurnsEndedAt2Charges { get; set; }
+    public int ShurikenTurnEndChargeTotal { get; set; }
+    public int ShurikenTurnEndChargeCount { get; set; }
 
     // Paper Phrog tracking. Damage added is the actual current damage amount
     // multiplied by Paper Phrog's extra Vulnerable multiplier. Enhanced attacks

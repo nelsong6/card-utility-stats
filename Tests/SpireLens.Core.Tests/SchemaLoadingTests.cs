@@ -1388,6 +1388,8 @@ public class SchemaLoadingTests
         Assert.Equal(1, relicAgg.RareCardsConsumed);
         Assert.Equal(3, relicAgg.SacrificesMade);
         Assert.Equal(2, relicAgg.SacrificesSkipped);
+        Assert.Equal(1, relicAgg.RelicsGranted["RELIC.KUNAI"].Count);
+        Assert.Equal("Kunai", relicAgg.RelicsGranted["RELIC.KUNAI"].DisplayName);
     }
 
     [Fact]
@@ -1402,6 +1404,8 @@ public class SchemaLoadingTests
         Assert.Equal(1, relicAgg.RareCardsConsumed);
         Assert.Equal(3, relicAgg.SacrificesMade);
         Assert.Equal(2, relicAgg.SacrificesSkipped);
+        Assert.Equal(1, relicAgg.RelicsGranted["RELIC.KUNAI"].Count);
+        Assert.Equal("Kunai", relicAgg.RelicsGranted["RELIC.KUNAI"].DisplayName);
     }
 
     [Fact]
@@ -2311,6 +2315,87 @@ public class SchemaLoadingTests
         Assert.Equal(3, relicAgg.KunaiTurnsEndedAt2Charges);
         Assert.Equal(11, relicAgg.KunaiTurnEndChargeTotal);
         Assert.Equal(7, relicAgg.KunaiTurnEndChargeCount);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsUnlimitedAttackChargeRelicsFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("unlimited-attack-charge-relics-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+
+        var kusarigama = loaded.Data.RelicAggregates["RELIC.KUSARIGAMA"];
+        Assert.Equal(14, kusarigama.KusarigamaAttacksPlayed);
+        Assert.Equal(4, kusarigama.Activations);
+        Assert.Equal(24, kusarigama.TotalDamageAttempted);
+        Assert.Equal(17, kusarigama.TotalDamageDealt);
+        Assert.Equal(3, kusarigama.TotalDamageBlocked);
+        Assert.Equal(4, kusarigama.TotalDamageOverkill);
+        Assert.Equal(2, kusarigama.Kills);
+        Assert.Equal(4, kusarigama.TotalTargets);
+        Assert.Equal(2, kusarigama.KusarigamaTurnsEndedAt1Charge);
+        Assert.Equal(3, kusarigama.KusarigamaTurnsEndedAt2Charges);
+        Assert.Equal(8, kusarigama.KusarigamaTurnEndChargeTotal);
+        Assert.Equal(7, kusarigama.KusarigamaTurnEndChargeCount);
+
+        var ornamentalFan = loaded.Data.RelicAggregates["RELIC.ORNAMENTAL_FAN"];
+        Assert.Equal(11, ornamentalFan.OrnamentalFanAttacksPlayed);
+        Assert.Equal(3, ornamentalFan.Activations);
+        Assert.Equal(13, ornamentalFan.AdditionalBlockGained);
+        Assert.Equal(1, ornamentalFan.OrnamentalFanTurnsEndedAt1Charge);
+        Assert.Equal(3, ornamentalFan.OrnamentalFanTurnsEndedAt2Charges);
+        Assert.Equal(7, ornamentalFan.OrnamentalFanTurnEndChargeTotal);
+        Assert.Equal(5, ornamentalFan.OrnamentalFanTurnEndChargeCount);
+
+        var shuriken = loaded.Data.RelicAggregates["RELIC.SHURIKEN"];
+        Assert.Equal(17, shuriken.ShurikenAttacksPlayed);
+        Assert.Equal(5, shuriken.Activations);
+        Assert.Equal(5m, shuriken.StrengthAdded);
+        Assert.Equal(2, shuriken.ShurikenTurnsEndedAt1Charge);
+        Assert.Equal(2, shuriken.ShurikenTurnsEndedAt2Charges);
+        Assert.Equal(6, shuriken.ShurikenTurnEndChargeTotal);
+        Assert.Equal(6, shuriken.ShurikenTurnEndChargeCount);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsUnlimitedAttackChargeRelicsFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("unlimited-attack-charge-relics-run.json"));
+
+        Assert.NotNull(resumed);
+
+        var kusarigama = resumed!.RelicAggregates["RELIC.KUSARIGAMA"];
+        Assert.Equal(14, kusarigama.KusarigamaAttacksPlayed);
+        Assert.Equal(4, kusarigama.Activations);
+        Assert.Equal(24, kusarigama.TotalDamageAttempted);
+        Assert.Equal(17, kusarigama.TotalDamageDealt);
+        Assert.Equal(3, kusarigama.TotalDamageBlocked);
+        Assert.Equal(4, kusarigama.TotalDamageOverkill);
+        Assert.Equal(2, kusarigama.Kills);
+        Assert.Equal(4, kusarigama.TotalTargets);
+        Assert.Equal(2, kusarigama.KusarigamaTurnsEndedAt1Charge);
+        Assert.Equal(3, kusarigama.KusarigamaTurnsEndedAt2Charges);
+        Assert.Equal(8, kusarigama.KusarigamaTurnEndChargeTotal);
+        Assert.Equal(7, kusarigama.KusarigamaTurnEndChargeCount);
+
+        var ornamentalFan = resumed.RelicAggregates["RELIC.ORNAMENTAL_FAN"];
+        Assert.Equal(11, ornamentalFan.OrnamentalFanAttacksPlayed);
+        Assert.Equal(3, ornamentalFan.Activations);
+        Assert.Equal(13, ornamentalFan.AdditionalBlockGained);
+        Assert.Equal(1, ornamentalFan.OrnamentalFanTurnsEndedAt1Charge);
+        Assert.Equal(3, ornamentalFan.OrnamentalFanTurnsEndedAt2Charges);
+        Assert.Equal(7, ornamentalFan.OrnamentalFanTurnEndChargeTotal);
+        Assert.Equal(5, ornamentalFan.OrnamentalFanTurnEndChargeCount);
+
+        var shuriken = resumed.RelicAggregates["RELIC.SHURIKEN"];
+        Assert.Equal(17, shuriken.ShurikenAttacksPlayed);
+        Assert.Equal(5, shuriken.Activations);
+        Assert.Equal(5m, shuriken.StrengthAdded);
+        Assert.Equal(2, shuriken.ShurikenTurnsEndedAt1Charge);
+        Assert.Equal(2, shuriken.ShurikenTurnsEndedAt2Charges);
+        Assert.Equal(6, shuriken.ShurikenTurnEndChargeTotal);
+        Assert.Equal(6, shuriken.ShurikenTurnEndChargeCount);
     }
 
     [Fact]
