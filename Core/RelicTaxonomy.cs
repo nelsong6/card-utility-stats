@@ -20,6 +20,9 @@ internal enum RelicTaxonomyCategorySelectionState
 internal static class RelicTaxonomy
 {
     public const string ChargeCategoryId = "charge";
+    public const string ChargeAcrossCombatsCategoryId = "charge_across_combats";
+    public const string ChargeAcrossCombatsCyclingCategoryId = "charge_across_combats_cycling";
+    public const string ChargeAcrossCombatsNonCyclingCategoryId = "charge_across_combats_non_cycling";
     public const string ChargeAcrossTurnsCategoryId = "charge_across_turns";
     public const string ChargeResetsEachTurnCategoryId = "charge_resets_each_turn";
     public const string ChargeResetsEachTurnLimitedActivationsCategoryId =
@@ -32,34 +35,59 @@ internal static class RelicTaxonomy
         "Across turns",
         new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
+            "RELIC.METRONOME",
+            "RELIC.PAELS_FLESH",
+            "RELIC.PAELS_LEGION",
+            "RELIC.STONE_CALENDAR",
+        },
+        []);
+
+    private static readonly RelicTaxonomyCategory ChargeAcrossCombatsCyclingCategory = new(
+        ChargeAcrossCombatsCyclingCategoryId,
+        "Cycling",
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
             "RELIC.BOOK_OF_FIVE_RINGS",
             "RELIC.FAKE_HAPPY_FLOWER",
             "RELIC.FISHING_ROD",
             "RELIC.GALACTIC_DUST",
-            "RELIC.GIRYA",
             "RELIC.HAPPY_FLOWER",
             "RELIC.IRON_CLUB",
             "RELIC.JOSS_PAPER",
             "RELIC.LASTING_CANDY",
-            "RELIC.METRONOME",
             "RELIC.NUNCHAKU",
-            "RELIC.PAELS_FLESH",
-            "RELIC.PAELS_LEGION",
-            "RELIC.PAELS_TOOTH",
             "RELIC.PAELS_WING",
             "RELIC.PENDULUM",
             "RELIC.PEN_NIB",
             "RELIC.POLLINOUS_CORE",
-            "RELIC.PUMPKIN_CANDLE",
-            "RELIC.SILVER_CRUCIBLE",
-            "RELIC.STONE_CALENDAR",
-            "RELIC.SWORD_OF_STONE",
             "RELIC.TOY_BOX",
             "RELIC.TUNING_FORK",
+        },
+        []);
+
+    private static readonly RelicTaxonomyCategory ChargeAcrossCombatsNonCyclingCategory = new(
+        ChargeAcrossCombatsNonCyclingCategoryId,
+        "Non-cycling",
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "RELIC.GIRYA",
+            "RELIC.PAELS_TOOTH",
+            "RELIC.PUMPKIN_CANDLE",
+            "RELIC.SILVER_CRUCIBLE",
+            "RELIC.SWORD_OF_STONE",
             "RELIC.WINGED_BOOTS",
             "RELIC.WONGOS_MYSTERY_TICKET",
         },
         []);
+
+    private static readonly RelicTaxonomyCategory ChargeAcrossCombatsCategory = new(
+        ChargeAcrossCombatsCategoryId,
+        "Across combats",
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+        [
+            ChargeAcrossCombatsCyclingCategory,
+            ChargeAcrossCombatsNonCyclingCategory,
+        ]);
 
     private static readonly RelicTaxonomyCategory ChargeResetsEachTurnLimitedActivationsCategory = new(
         ChargeResetsEachTurnLimitedActivationsCategoryId,
@@ -101,6 +129,7 @@ internal static class RelicTaxonomy
         "Charge",
         new HashSet<string>(StringComparer.OrdinalIgnoreCase),
         [
+            ChargeAcrossCombatsCategory,
             ChargeAcrossTurnsCategory,
             ChargeResetsEachTurnCategory,
         ]);

@@ -109,7 +109,7 @@ internal static class RelicCompendiumFilterUi
     private const string PanelName = "SpireLensRelicFilterPanel";
     private const string FlatGridName = "SpireLensFlatRelicGrid";
     private const int CategoryTreeColumn = 0;
-    private const int MaxVisibleCategoryTreeRows = 6;
+    private const int MaxVisibleCategoryTreeRows = 8;
     private const float CategoryTreeRowHeight = 24f;
     private const float CategoryTreeVerticalPadding = 8f;
     private const float DimmedAlpha = 0.5f;

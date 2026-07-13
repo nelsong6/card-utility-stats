@@ -16,7 +16,7 @@ public class RelicCompendiumFilterTests
     }
 
     [Fact]
-    public void ChargeTaxonomy_NestsActivationLeavesUnderResetsEachTurn()
+    public void ChargeTaxonomy_NestsCombatAndTurnResetGroups()
     {
         var charge = RelicTaxonomy.RootCategories.Single();
 
@@ -26,13 +26,29 @@ public class RelicCompendiumFilterTests
         Assert.Equal(
             new[]
             {
+                RelicTaxonomy.ChargeAcrossCombatsCategoryId,
                 RelicTaxonomy.ChargeAcrossTurnsCategoryId,
                 RelicTaxonomy.ChargeResetsEachTurnCategoryId,
             },
             charge.Children.Select(category => category.Id).ToArray());
         Assert.Equal(
-            new[] { "Across turns", "Resets each turn" },
+            new[] { "Across combats", "Across turns", "Resets each turn" },
             charge.Children.Select(category => category.DisplayName).ToArray());
+
+        var acrossCombats = charge.Children.Single(
+            category => category.Id == RelicTaxonomy.ChargeAcrossCombatsCategoryId);
+
+        Assert.Empty(acrossCombats.RelicIds);
+        Assert.Equal(
+            new[]
+            {
+                RelicTaxonomy.ChargeAcrossCombatsCyclingCategoryId,
+                RelicTaxonomy.ChargeAcrossCombatsNonCyclingCategoryId,
+            },
+            acrossCombats.Children.Select(category => category.Id).ToArray());
+        Assert.Equal(
+            new[] { "Cycling", "Non-cycling" },
+            acrossCombats.Children.Select(category => category.DisplayName).ToArray());
 
         var resetsEachTurn = charge.Children.Single(
             category => category.Id == RelicTaxonomy.ChargeResetsEachTurnCategoryId);
@@ -51,6 +67,8 @@ public class RelicCompendiumFilterTests
         Assert.Equal(
             new[]
             {
+                RelicTaxonomy.ChargeAcrossCombatsCyclingCategoryId,
+                RelicTaxonomy.ChargeAcrossCombatsNonCyclingCategoryId,
                 RelicTaxonomy.ChargeAcrossTurnsCategoryId,
                 RelicTaxonomy.ChargeResetsEachTurnLimitedActivationsCategoryId,
                 RelicTaxonomy.ChargeResetsEachTurnUnlimitedActivationsCategoryId,
@@ -59,18 +77,68 @@ public class RelicCompendiumFilterTests
     }
 
     [Fact]
-    public void ChargeAcrossTurnsTaxonomy_IncludesPersistentIncrementingRelics()
+    public void ChargeAcrossTurnsTaxonomy_IncludesOnlyCombatLocalCounters()
     {
         var charge = RelicTaxonomy.LeafCategories.Single(
             c => c.Id == RelicTaxonomy.ChargeAcrossTurnsCategoryId);
 
-        Assert.Contains("RELIC.PEN_NIB", charge.RelicIds);
-        Assert.Contains("RELIC.NUNCHAKU", charge.RelicIds);
-        Assert.Contains("RELIC.IRON_CLUB", charge.RelicIds);
-        Assert.Contains("RELIC.HAPPY_FLOWER", charge.RelicIds);
-        Assert.Contains("RELIC.WINGED_BOOTS", charge.RelicIds);
-        Assert.DoesNotContain("RELIC.LETTER_OPENER", charge.RelicIds);
-        Assert.DoesNotContain("RELIC.VELVET_CHOKER", charge.RelicIds);
+        Assert.Equal(
+            new[]
+            {
+                "RELIC.METRONOME",
+                "RELIC.PAELS_FLESH",
+                "RELIC.PAELS_LEGION",
+                "RELIC.STONE_CALENDAR",
+            },
+            charge.RelicIds.OrderBy(id => id, StringComparer.Ordinal).ToArray());
+    }
+
+    [Fact]
+    public void ChargeAcrossCombatsCyclingTaxonomy_IncludesRestartingCounters()
+    {
+        var charge = RelicTaxonomy.LeafCategories.Single(
+            c => c.Id == RelicTaxonomy.ChargeAcrossCombatsCyclingCategoryId);
+
+        Assert.Equal(
+            new[]
+            {
+                "RELIC.BOOK_OF_FIVE_RINGS",
+                "RELIC.FAKE_HAPPY_FLOWER",
+                "RELIC.FISHING_ROD",
+                "RELIC.GALACTIC_DUST",
+                "RELIC.HAPPY_FLOWER",
+                "RELIC.IRON_CLUB",
+                "RELIC.JOSS_PAPER",
+                "RELIC.LASTING_CANDY",
+                "RELIC.NUNCHAKU",
+                "RELIC.PAELS_WING",
+                "RELIC.PENDULUM",
+                "RELIC.PEN_NIB",
+                "RELIC.POLLINOUS_CORE",
+                "RELIC.TOY_BOX",
+                "RELIC.TUNING_FORK",
+            },
+            charge.RelicIds.OrderBy(id => id, StringComparer.Ordinal).ToArray());
+    }
+
+    [Fact]
+    public void ChargeAcrossCombatsNonCyclingTaxonomy_IncludesNonWrappingCounters()
+    {
+        var charge = RelicTaxonomy.LeafCategories.Single(
+            c => c.Id == RelicTaxonomy.ChargeAcrossCombatsNonCyclingCategoryId);
+
+        Assert.Equal(
+            new[]
+            {
+                "RELIC.GIRYA",
+                "RELIC.PAELS_TOOTH",
+                "RELIC.PUMPKIN_CANDLE",
+                "RELIC.SILVER_CRUCIBLE",
+                "RELIC.SWORD_OF_STONE",
+                "RELIC.WINGED_BOOTS",
+                "RELIC.WONGOS_MYSTERY_TICKET",
+            },
+            charge.RelicIds.OrderBy(id => id, StringComparer.Ordinal).ToArray());
     }
 
     [Fact]
@@ -118,6 +186,14 @@ public class RelicCompendiumFilterTests
 
         Assert.True(RelicTaxonomy.IsRelicInAnySelectedCategory(
             "RELIC.PEN_NIB",
+            new[] { RelicTaxonomy.ChargeAcrossCombatsCyclingCategoryId }));
+
+        Assert.True(RelicTaxonomy.IsRelicInAnySelectedCategory(
+            "RELIC.GIRYA",
+            new[] { RelicTaxonomy.ChargeAcrossCombatsNonCyclingCategoryId }));
+
+        Assert.True(RelicTaxonomy.IsRelicInAnySelectedCategory(
+            "RELIC.METRONOME",
             new[] { RelicTaxonomy.ChargeAcrossTurnsCategoryId }));
 
         Assert.True(RelicTaxonomy.IsRelicInAnySelectedCategory(
@@ -150,6 +226,8 @@ public class RelicCompendiumFilterTests
         Assert.Equal(
             new[]
             {
+                RelicTaxonomy.ChargeAcrossCombatsCyclingCategoryId,
+                RelicTaxonomy.ChargeAcrossCombatsNonCyclingCategoryId,
                 RelicTaxonomy.ChargeAcrossTurnsCategoryId,
                 RelicTaxonomy.ChargeResetsEachTurnLimitedActivationsCategoryId,
                 RelicTaxonomy.ChargeResetsEachTurnUnlimitedActivationsCategoryId,
@@ -173,7 +251,7 @@ public class RelicCompendiumFilterTests
             RelicTaxonomy.ChargeCategoryId,
             selected: true);
 
-        Assert.Equal(3, selected.Count);
+        Assert.Equal(5, selected.Count);
         Assert.Equal(
             RelicTaxonomyCategorySelectionState.Selected,
             RelicTaxonomy.GetSelectionState(RelicTaxonomy.ChargeCategoryId, selected));
@@ -187,6 +265,33 @@ public class RelicCompendiumFilterTests
         Assert.Equal(
             RelicTaxonomyCategorySelectionState.Unselected,
             RelicTaxonomy.GetSelectionState(RelicTaxonomy.ChargeCategoryId, selected));
+    }
+
+    [Fact]
+    public void AcrossCombatsSelection_ReflectsMixedCyclingChildren()
+    {
+        var selected = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            RelicTaxonomy.ChargeAcrossCombatsCyclingCategoryId,
+        };
+
+        Assert.Equal(
+            RelicTaxonomyCategorySelectionState.Partial,
+            RelicTaxonomy.GetSelectionState(
+                RelicTaxonomy.ChargeAcrossCombatsCategoryId,
+                selected));
+
+        RelicTaxonomy.SetCategorySelection(
+            selected,
+            RelicTaxonomy.ChargeAcrossCombatsCategoryId,
+            selected: true);
+
+        Assert.Equal(2, selected.Count);
+        Assert.Equal(
+            RelicTaxonomyCategorySelectionState.Selected,
+            RelicTaxonomy.GetSelectionState(
+                RelicTaxonomy.ChargeAcrossCombatsCategoryId,
+                selected));
     }
 
     [Fact]
