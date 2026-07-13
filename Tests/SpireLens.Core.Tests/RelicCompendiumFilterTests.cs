@@ -7,15 +7,10 @@ namespace SpireLens.Core.Tests;
 public class RelicCompendiumFilterTests
 {
     [Fact]
-    public void EnergyTaxonomy_IncludesTrackedEnergyRelics()
+    public void Taxonomy_OmitsRemovedEnergyCategory()
     {
-        var energy = RelicTaxonomy.Categories.Single(c => c.Id == RelicTaxonomy.EnergyCategoryId);
-
-        Assert.Contains("RELIC.HAPPY_FLOWER", energy.RelicIds);
-        Assert.Contains("RELIC.NUNCHAKU", energy.RelicIds);
-        Assert.Contains("RELIC.BOOMING_CONCH", energy.RelicIds);
-        Assert.Contains("RELIC.PRISMATIC_GEM", energy.RelicIds);
-        Assert.Contains("RELIC.BRILLIANT_SCARF", energy.RelicIds);
+        Assert.DoesNotContain(RelicTaxonomy.Categories, category => category.Id == "energy");
+        Assert.DoesNotContain(RelicTaxonomy.Categories, category => category.DisplayName == "Energy relics");
     }
 
     [Fact]
@@ -49,16 +44,8 @@ public class RelicCompendiumFilterTests
     [Fact]
     public void IsRelicInAnySelectedCategory_UsesSelectedCategories()
     {
-        Assert.True(RelicTaxonomy.IsRelicInAnySelectedCategory(
-            "RELIC.LANTERN",
-            new[] { RelicTaxonomy.EnergyCategoryId }));
-
         Assert.False(RelicTaxonomy.IsRelicInAnySelectedCategory(
-            "RELIC.ANCHOR",
-            new[] { RelicTaxonomy.EnergyCategoryId }));
-
-        Assert.False(RelicTaxonomy.IsRelicInAnySelectedCategory(
-            "RELIC.LANTERN",
+            "RELIC.PEN_NIB",
             Enumerable.Empty<string>()));
 
         Assert.True(RelicTaxonomy.IsRelicInAnySelectedCategory(

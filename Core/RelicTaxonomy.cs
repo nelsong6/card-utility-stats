@@ -11,38 +11,8 @@ internal sealed record RelicTaxonomyCategory(
 
 internal static class RelicTaxonomy
 {
-    public const string EnergyCategoryId = "energy";
     public const string ChargeAcrossTurnsCategoryId = "charge_across_turns";
     public const string ChargeResetsEachTurnCategoryId = "charge_resets_each_turn";
-
-    private static readonly RelicTaxonomyCategory EnergyCategory = new(
-        EnergyCategoryId,
-        "Energy relics",
-        new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "RELIC.ART_OF_WAR",
-            "RELIC.BLOOD_SOAKED_ROSE",
-            "RELIC.BOOMING_CONCH",
-            "RELIC.BOOKMARK",
-            "RELIC.BRILLIANT_SCARF",
-            "RELIC.CANDELABRA",
-            "RELIC.CHANDELIER",
-            "RELIC.ECTOPLASM",
-            "RELIC.FAKE_HAPPY_FLOWER",
-            "RELIC.FAKE_VENERABLE_TEA_SET",
-            "RELIC.GREMLIN_HORN",
-            "RELIC.HAPPY_FLOWER",
-            "RELIC.ICE_CREAM",
-            "RELIC.LANTERN",
-            "RELIC.MUMMIFIED_HAND",
-            "RELIC.NUNCHAKU",
-            "RELIC.PHILOSOPHERS_STONE",
-            "RELIC.PRISMATIC_GEM",
-            "RELIC.SOZU",
-            "RELIC.VELVET_CHOKER",
-            "RELIC.VENERABLE_TEA_SET",
-            "RELIC.VERY_HOT_COCOA",
-        });
 
     private static readonly RelicTaxonomyCategory ChargeAcrossTurnsCategory = new(
         ChargeAcrossTurnsCategoryId,
@@ -96,7 +66,6 @@ internal static class RelicTaxonomy
 
     public static IReadOnlyList<RelicTaxonomyCategory> Categories { get; } =
     [
-        EnergyCategory,
         ChargeAcrossTurnsCategory,
         ChargeResetsEachTurnCategory,
     ];
