@@ -1129,6 +1129,27 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is Kusarigama)
+        {
+            title = "Kusarigama";
+            body = BuildKusarigamaBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is OrnamentalFan)
+        {
+            title = "Ornamental Fan";
+            body = BuildOrnamentalFanBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is Shuriken)
+        {
+            title = "Shuriken";
+            body = BuildShurikenBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is PaperPhrog)
         {
             title = "Paper Phrog";
@@ -2607,6 +2628,81 @@ public static class RelicHoverShowPatch
         Row3(sb, "Turns ended at 2 charges", agg.KunaiTurnsEndedAt2Charges.ToString(), "");
         Row3(sb, "Avg charge at turn end", FormatDecimal(averageEndCharge), "");
         return sb.ToString();
+    }
+
+    private static string BuildKusarigamaBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Attacks played", agg.KusarigamaAttacksPlayed.ToString(), "");
+        AppendRelicDamageStats(
+            sb,
+            agg,
+            triggerLabel: "Activations",
+            averageLabel: "Damage per activation",
+            averageDenominator: agg.Activations);
+        AppendTurnResetChargeRows(
+            sb,
+            agg.KusarigamaTurnsEndedAt1Charge,
+            agg.KusarigamaTurnsEndedAt2Charges,
+            agg.KusarigamaTurnEndChargeTotal,
+            agg.KusarigamaTurnEndChargeCount);
+        return sb.ToString();
+    }
+
+    private static string BuildOrnamentalFanBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var blockPerActivation = agg.Activations <= 0
+            ? 0m
+            : (decimal)agg.AdditionalBlockGained / agg.Activations;
+
+        Row3(sb, "Attacks played", agg.OrnamentalFanAttacksPlayed.ToString(), "");
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
+        Row3(sb, BlockLabel("block gained per activation"), FormatDecimal(blockPerActivation), "");
+        AppendTurnResetChargeRows(
+            sb,
+            agg.OrnamentalFanTurnsEndedAt1Charge,
+            agg.OrnamentalFanTurnsEndedAt2Charges,
+            agg.OrnamentalFanTurnEndChargeTotal,
+            agg.OrnamentalFanTurnEndChargeCount);
+        return sb.ToString();
+    }
+
+    private static string BuildShurikenBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var strengthPerActivation = agg.Activations <= 0
+            ? 0m
+            : agg.StrengthAdded / agg.Activations;
+
+        Row3(sb, "Attacks played", agg.ShurikenAttacksPlayed.ToString(), "");
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, "Strength gained", FormatDecimal(agg.StrengthAdded), "");
+        Row3(sb, "Strength gained per activation", FormatDecimal(strengthPerActivation), "");
+        AppendTurnResetChargeRows(
+            sb,
+            agg.ShurikenTurnsEndedAt1Charge,
+            agg.ShurikenTurnsEndedAt2Charges,
+            agg.ShurikenTurnEndChargeTotal,
+            agg.ShurikenTurnEndChargeCount);
+        return sb.ToString();
+    }
+
+    private static void AppendTurnResetChargeRows(
+        StringBuilder sb,
+        int turnsEndedAt1Charge,
+        int turnsEndedAt2Charges,
+        int turnEndChargeTotal,
+        int turnEndChargeCount)
+    {
+        var averageEndCharge = turnEndChargeCount <= 0
+            ? 0m
+            : (decimal)turnEndChargeTotal / turnEndChargeCount;
+
+        Row3(sb, "Turns ended at 1 charge", turnsEndedAt1Charge.ToString(), "");
+        Row3(sb, "Turns ended at 2 charges", turnsEndedAt2Charges.ToString(), "");
+        Row3(sb, "Avg charge at turn end", FormatDecimal(averageEndCharge), "");
     }
 
     private static string BuildPaperPhrogBodyBBCode(RelicAggregate agg)

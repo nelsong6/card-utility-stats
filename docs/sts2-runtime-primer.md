@@ -426,6 +426,16 @@ to confirm the eligibility rule. Base Strikes are `IsBasicStrikeOrDefend` cards
 that also carry the Strike tag, while non-base Strike cards are every other
 permanent deck card with that tag.
 
+Kunai, Kusarigama, Ornamental Fan, and Shuriken share the same repeatable
+three-Attack counter shape: their owner-specific `AfterCardPlayed` callback
+increments a turn-local counter and activates at every threshold multiple.
+Count owner Attack plays at that callback, snapshot unused modulo charge from
+`Hook.BeforeSideTurnEnd` before the relic resets, and observe each payoff at its
+narrow outcome: power delta for Kunai/Shuriken, the resolved block-command
+result for Ornamental Fan, and the resolved single-target damage result for
+Kusarigama. Kusarigama only activates when its threshold play can choose a
+hittable enemy; do not infer an activation from the counter alone.
+
 Razor Tooth upgrades eligible Attack and Skill cards synchronously inside its
 owner-specific `AfterCardPlayed` callback, after the finished card-play history
 entry has already been emitted. Combat history has no upgrade entry for this

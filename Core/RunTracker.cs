@@ -79,7 +79,9 @@ public static class RunTracker
     private static readonly List<PendingRelicHealing> _pendingRelicHeals = new();
     private static readonly List<Player> _pendingPendulumDrawAttributions = new();
     private static readonly List<Creature> _pendingParryingShieldDamageAttributions = new();
+    private static readonly List<Creature> _pendingKusarigamaDamageAttributions = new();
     private static readonly List<Creature> _pendingFestivePopperDamageAttributions = new();
+    private static readonly List<Creature> _pendingOrnamentalFanBlockAttributions = new();
     private static readonly List<Creature> _pendingMercuryHourglassDamageAttributions = new();
     private static readonly List<Creature> _pendingMrStrugglesDamageAttributions = new();
     private static readonly Dictionary<PowerModel, int> _bronzeScalesThornsContributions = new(ReferenceEqualityComparer.Instance);
@@ -929,7 +931,9 @@ public static class RunTracker
         _pendingAkabekoVigorAttribution = false;
         _pendingPendulumDrawAttributions.Clear();
         _pendingParryingShieldDamageAttributions.Clear();
+        _pendingKusarigamaDamageAttributions.Clear();
         _pendingFestivePopperDamageAttributions.Clear();
+        _pendingOrnamentalFanBlockAttributions.Clear();
         _pendingMercuryHourglassDamageAttributions.Clear();
         _pendingMrStrugglesDamageAttributions.Clear();
         _bronzeScalesThornsContributions.Clear();
@@ -1691,6 +1695,21 @@ public static class RunTracker
         target.KunaiTurnsEndedAt2Charges += source.KunaiTurnsEndedAt2Charges;
         target.KunaiTurnEndChargeTotal += source.KunaiTurnEndChargeTotal;
         target.KunaiTurnEndChargeCount += source.KunaiTurnEndChargeCount;
+        target.KusarigamaAttacksPlayed += source.KusarigamaAttacksPlayed;
+        target.KusarigamaTurnsEndedAt1Charge += source.KusarigamaTurnsEndedAt1Charge;
+        target.KusarigamaTurnsEndedAt2Charges += source.KusarigamaTurnsEndedAt2Charges;
+        target.KusarigamaTurnEndChargeTotal += source.KusarigamaTurnEndChargeTotal;
+        target.KusarigamaTurnEndChargeCount += source.KusarigamaTurnEndChargeCount;
+        target.OrnamentalFanAttacksPlayed += source.OrnamentalFanAttacksPlayed;
+        target.OrnamentalFanTurnsEndedAt1Charge += source.OrnamentalFanTurnsEndedAt1Charge;
+        target.OrnamentalFanTurnsEndedAt2Charges += source.OrnamentalFanTurnsEndedAt2Charges;
+        target.OrnamentalFanTurnEndChargeTotal += source.OrnamentalFanTurnEndChargeTotal;
+        target.OrnamentalFanTurnEndChargeCount += source.OrnamentalFanTurnEndChargeCount;
+        target.ShurikenAttacksPlayed += source.ShurikenAttacksPlayed;
+        target.ShurikenTurnsEndedAt1Charge += source.ShurikenTurnsEndedAt1Charge;
+        target.ShurikenTurnsEndedAt2Charges += source.ShurikenTurnsEndedAt2Charges;
+        target.ShurikenTurnEndChargeTotal += source.ShurikenTurnEndChargeTotal;
+        target.ShurikenTurnEndChargeCount += source.ShurikenTurnEndChargeCount;
         target.PaperPhrogDamageAdded += source.PaperPhrogDamageAdded;
         target.PaperPhrogEnhancedAttacks += source.PaperPhrogEnhancedAttacks;
         target.PaperPhrogCombats += source.PaperPhrogCombats;
@@ -2392,6 +2411,9 @@ public static class RunTracker
     private const string MiniatureCannonRelicId = "RELIC.MINIATURE_CANNON";
     private const string VajraRelicId = "RELIC.VAJRA";
     private const string KunaiRelicId = "RELIC.KUNAI";
+    private const string KusarigamaRelicId = "RELIC.KUSARIGAMA";
+    private const string OrnamentalFanRelicId = "RELIC.ORNAMENTAL_FAN";
+    private const string ShurikenRelicId = "RELIC.SHURIKEN";
     private const string PaperPhrogRelicId = "RELIC.PAPER_PHROG";
     private const string RegaliteRelicId = "RELIC.REGALITE";
     private const string BookmarkRelicId = "RELIC.BOOKMARK";
@@ -6276,6 +6298,417 @@ public static class RunTracker
             agg.KunaiTurnsEndedAt2Charges += 1;
     }
 
+    /// <summary>
+    /// Record a Kusarigama-owned Attack and arm the exact damage command when
+    /// this play reaches the repeatable three-Attack threshold.
+    /// </summary>
+    public static bool RecordKusarigamaAttackPlayedAndShouldArmDamageAttribution(
+        Kusarigama relic,
+        CardPlay cardPlay,
+        out Creature? dealer)
+    {
+        dealer = null;
+        if (relic?.Owner == null || cardPlay?.Card == null) return false;
+        if (cardPlay.Card.Type != CardType.Attack) return false;
+        if (cardPlay.Card.Owner != null && !ReferenceEquals(cardPlay.Card.Owner, relic.Owner)) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(relic.Owner)) return false;
+                if (CombatManager.Instance?.IsInProgress != true) return false;
+
+                _pendingCombat ??= new PendingCombat();
+                var agg = GetOrCreatePendingRelicAggregateLocked(KusarigamaRelicId);
+                RecordKusarigamaAttackPlayedForTest(agg);
+
+                var threshold = KusarigamaCardsPerActivation(relic);
+                if (threshold <= 0 || KusarigamaCharge(relic) + 1 < threshold) return false;
+
+                dealer = relic.Owner.Creature;
+                if (dealer?.CombatState?.HittableEnemies?.Any() != true)
+                {
+                    dealer = null;
+                    return false;
+                }
+
+                RecordKusarigamaActivationForTest(agg);
+                _pendingKusarigamaDamageAttributions.Add(dealer);
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordKusarigamaAttackPlayedAndShouldArmDamageAttribution failed: {e.Message}");
+                dealer = null;
+                return false;
+            }
+        }
+    }
+
+    public static bool TryConsumeKusarigamaDamageAttribution(Creature dealer)
+    {
+        if (dealer == null) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                return ConsumePendingCreatureAttribution(_pendingKusarigamaDamageAttributions, dealer);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"TryConsumeKusarigamaDamageAttribution failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    public static void DisarmKusarigamaDamageAttribution(Creature? dealer)
+    {
+        if (dealer == null) return;
+        lock (_lock)
+            ConsumePendingCreatureAttribution(_pendingKusarigamaDamageAttributions, dealer);
+    }
+
+    public static void RecordKusarigamaDamage(IEnumerable<DamageResult>? results)
+    {
+        if (results == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateForCurrentContextLocked(KusarigamaRelicId);
+                AddRelicDamageResultsLocked(agg, results);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordKusarigamaDamage failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordKusarigamaAttackPlayedForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.KusarigamaAttacksPlayed += Math.Max(0, count);
+    }
+
+    internal static void RecordKusarigamaActivationForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.Activations += Math.Max(0, count);
+    }
+
+    internal static void RecordKusarigamaDamageForTest(
+        RelicAggregate agg,
+        IEnumerable<(int BlockedDamage, int UnblockedDamage, int OverkillDamage, bool WasTargetKilled)> results)
+    {
+        if (agg == null || results == null) return;
+        foreach (var result in results)
+        {
+            AddRelicDamageResultPartsLocked(
+                agg,
+                result.BlockedDamage,
+                result.UnblockedDamage,
+                result.OverkillDamage,
+                result.WasTargetKilled);
+        }
+    }
+
+    internal static void RecordKusarigamaTurnEndChargeForTest(RelicAggregate agg, int charge)
+    {
+        if (agg == null || charge < 0) return;
+
+        charge %= 3;
+        agg.KusarigamaTurnEndChargeTotal += charge;
+        agg.KusarigamaTurnEndChargeCount += 1;
+        if (charge == 1)
+            agg.KusarigamaTurnsEndedAt1Charge += 1;
+        else if (charge == 2)
+            agg.KusarigamaTurnsEndedAt2Charges += 1;
+    }
+
+    /// <summary>
+    /// Record an Ornamental Fan-owned Attack and arm its exact block command
+    /// when this play reaches the repeatable three-Attack threshold.
+    /// </summary>
+    public static bool RecordOrnamentalFanAttackPlayedAndShouldArmBlockAttribution(
+        OrnamentalFan relic,
+        CardPlay cardPlay,
+        out Creature? ownerCreature)
+    {
+        ownerCreature = null;
+        if (relic?.Owner == null || cardPlay?.Card == null) return false;
+        if (cardPlay.Card.Type != CardType.Attack) return false;
+        if (cardPlay.Card.Owner != null && !ReferenceEquals(cardPlay.Card.Owner, relic.Owner)) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(relic.Owner)) return false;
+                if (CombatManager.Instance?.IsInProgress != true) return false;
+
+                _pendingCombat ??= new PendingCombat();
+                var agg = GetOrCreatePendingRelicAggregateLocked(OrnamentalFanRelicId);
+                RecordOrnamentalFanAttackPlayedForTest(agg);
+
+                var threshold = OrnamentalFanCardsPerActivation(relic);
+                if (threshold <= 0 || OrnamentalFanCharge(relic) + 1 < threshold) return false;
+
+                ownerCreature = relic.Owner.Creature;
+                if (ownerCreature == null) return false;
+
+                RecordOrnamentalFanActivationForTest(agg);
+                _pendingOrnamentalFanBlockAttributions.Add(ownerCreature);
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordOrnamentalFanAttackPlayedAndShouldArmBlockAttribution failed: {e.Message}");
+                ownerCreature = null;
+                return false;
+            }
+        }
+    }
+
+    public static bool TryConsumeOrnamentalFanBlockAttribution(Creature creature)
+    {
+        if (creature == null) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                return ConsumePendingCreatureAttribution(_pendingOrnamentalFanBlockAttributions, creature);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"TryConsumeOrnamentalFanBlockAttribution failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    public static void DisarmOrnamentalFanBlockAttribution(Creature? creature)
+    {
+        if (creature == null) return;
+        lock (_lock)
+            ConsumePendingCreatureAttribution(_pendingOrnamentalFanBlockAttributions, creature);
+    }
+
+    public static void RecordOrnamentalFanBlockGained(decimal amount)
+    {
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateForCurrentContextLocked(OrnamentalFanRelicId);
+                RecordOrnamentalFanBlockGainedForTest(agg, amount);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordOrnamentalFanBlockGained failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordOrnamentalFanAttackPlayedForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.OrnamentalFanAttacksPlayed += Math.Max(0, count);
+    }
+
+    internal static void RecordOrnamentalFanActivationForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.Activations += Math.Max(0, count);
+    }
+
+    internal static void RecordOrnamentalFanBlockGainedForTest(RelicAggregate agg, decimal amount)
+    {
+        if (agg == null || amount <= 0m) return;
+        agg.AdditionalBlockGained += (int)amount;
+    }
+
+    internal static void RecordOrnamentalFanTurnEndChargeForTest(RelicAggregate agg, int charge)
+    {
+        if (agg == null || charge < 0) return;
+
+        charge %= 3;
+        agg.OrnamentalFanTurnEndChargeTotal += charge;
+        agg.OrnamentalFanTurnEndChargeCount += 1;
+        if (charge == 1)
+            agg.OrnamentalFanTurnsEndedAt1Charge += 1;
+        else if (charge == 2)
+            agg.OrnamentalFanTurnsEndedAt2Charges += 1;
+    }
+
+    /// <summary>
+    /// Record a Shuriken-owned Attack and snapshot Strength when this play
+    /// reaches the repeatable three-Attack threshold.
+    /// </summary>
+    public static bool RecordShurikenAttackPlayedAndShouldObserveActivation(
+        Shuriken relic,
+        CardPlay cardPlay,
+        out Creature? ownerCreature,
+        out decimal strengthBefore)
+    {
+        ownerCreature = null;
+        strengthBefore = 0m;
+        if (relic?.Owner == null || cardPlay?.Card == null) return false;
+        if (cardPlay.Card.Type != CardType.Attack) return false;
+        if (cardPlay.Card.Owner != null && !ReferenceEquals(cardPlay.Card.Owner, relic.Owner)) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(relic.Owner)) return false;
+                if (CombatManager.Instance?.IsInProgress != true) return false;
+
+                _pendingCombat ??= new PendingCombat();
+                var agg = GetOrCreatePendingRelicAggregateLocked(ShurikenRelicId);
+                RecordShurikenAttackPlayedForTest(agg);
+
+                var threshold = ShurikenCardsPerActivation(relic);
+                if (threshold <= 0 || ShurikenCharge(relic) + 1 < threshold) return false;
+
+                ownerCreature = relic.Owner.Creature;
+                if (ownerCreature == null) return false;
+                strengthBefore = CurrentStrength(ownerCreature);
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordShurikenAttackPlayedAndShouldObserveActivation failed: {e.Message}");
+                ownerCreature = null;
+                strengthBefore = 0m;
+                return false;
+            }
+        }
+    }
+
+    public static void RecordShurikenActivation(decimal strengthGained)
+    {
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateForCurrentContextLocked(ShurikenRelicId);
+                RecordShurikenActivationForTest(agg, strengthGained);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordShurikenActivation failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordShurikenAttackPlayedForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.ShurikenAttacksPlayed += Math.Max(0, count);
+    }
+
+    internal static void RecordShurikenActivationForTest(RelicAggregate agg, decimal strengthGained)
+    {
+        if (agg == null) return;
+        agg.Activations += 1;
+        agg.StrengthAdded += Math.Max(0m, strengthGained);
+    }
+
+    internal static void RecordShurikenTurnEndChargeForTest(RelicAggregate agg, int charge)
+    {
+        if (agg == null || charge < 0) return;
+
+        charge %= 3;
+        agg.ShurikenTurnEndChargeTotal += charge;
+        agg.ShurikenTurnEndChargeCount += 1;
+        if (charge == 1)
+            agg.ShurikenTurnsEndedAt1Charge += 1;
+        else if (charge == 2)
+            agg.ShurikenTurnsEndedAt2Charges += 1;
+    }
+
+    /// <summary>
+    /// Snapshot the three missing Kunai-style Attack counters at player turn
+    /// end before their game models reset them.
+    /// </summary>
+    public static void RecordUnlimitedAttackChargeRelicsTurnEnded(IEnumerable<Creature>? participants)
+    {
+        if (participants == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                _pendingCombat ??= new PendingCombat();
+
+                foreach (var creature in participants)
+                {
+                    var player = creature?.Player;
+                    if (player == null || !IsTrackedPlayer(player)) continue;
+
+                    var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+                    if (turnNumber <= 0) continue;
+
+                    RecordKusarigamaTurnEndChargeForPlayerLocked(player, turnNumber);
+                    RecordOrnamentalFanTurnEndChargeForPlayerLocked(player, turnNumber);
+                    RecordShurikenTurnEndChargeForPlayerLocked(player, turnNumber);
+                }
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordUnlimitedAttackChargeRelicsTurnEnded failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void RecordKusarigamaTurnEndChargeForPlayerLocked(Player player, int turnNumber)
+    {
+        if (_pendingCombat == null || !TryGetKusarigama(player, out var relic) || relic == null) return;
+        if (_pendingCombat.KusarigamaTurnEndChargeRecordedTurns.TryGetValue(player, out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.KusarigamaTurnEndChargeRecordedTurns[player] = turnNumber;
+        var agg = GetOrCreatePendingRelicAggregateLocked(KusarigamaRelicId);
+        RecordKusarigamaTurnEndChargeForTest(agg, KusarigamaCharge(relic));
+    }
+
+    private static void RecordOrnamentalFanTurnEndChargeForPlayerLocked(Player player, int turnNumber)
+    {
+        if (_pendingCombat == null || !TryGetOrnamentalFan(player, out var relic) || relic == null) return;
+        if (_pendingCombat.OrnamentalFanTurnEndChargeRecordedTurns.TryGetValue(player, out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.OrnamentalFanTurnEndChargeRecordedTurns[player] = turnNumber;
+        var agg = GetOrCreatePendingRelicAggregateLocked(OrnamentalFanRelicId);
+        RecordOrnamentalFanTurnEndChargeForTest(agg, OrnamentalFanCharge(relic));
+    }
+
+    private static void RecordShurikenTurnEndChargeForPlayerLocked(Player player, int turnNumber)
+    {
+        if (_pendingCombat == null || !TryGetShuriken(player, out var relic) || relic == null) return;
+        if (_pendingCombat.ShurikenTurnEndChargeRecordedTurns.TryGetValue(player, out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.ShurikenTurnEndChargeRecordedTurns[player] = turnNumber;
+        var agg = GetOrCreatePendingRelicAggregateLocked(ShurikenRelicId);
+        RecordShurikenTurnEndChargeForTest(agg, ShurikenCharge(relic));
+    }
+
     public static void RecordPaperPhrogVulnerableBonus(
         PaperPhrog relic,
         decimal damageAdded,
@@ -9599,6 +10032,123 @@ public static class RunTracker
         catch
         {
             return 0;
+        }
+    }
+
+    private static bool TryGetKusarigama(Player player, out Kusarigama? kusarigama)
+    {
+        kusarigama = null;
+
+        try
+        {
+            kusarigama = player?.Relics?.OfType<Kusarigama>().FirstOrDefault();
+            return kusarigama != null;
+        }
+        catch
+        {
+            kusarigama = null;
+            return false;
+        }
+    }
+
+    private static int KusarigamaCharge(Kusarigama relic)
+    {
+        var threshold = KusarigamaCardsPerActivation(relic);
+        if (threshold <= 0) return 0;
+        return Math.Max(0, relic.AttacksPlayedThisTurn) % threshold;
+    }
+
+    private static int KusarigamaCardsPerActivation(Kusarigama relic)
+    {
+        try
+        {
+            return Math.Max(1, relic.DynamicVars.Cards.IntValue);
+        }
+        catch
+        {
+            return 3;
+        }
+    }
+
+    private static bool TryGetOrnamentalFan(Player player, out OrnamentalFan? ornamentalFan)
+    {
+        ornamentalFan = null;
+
+        try
+        {
+            ornamentalFan = player?.Relics?.OfType<OrnamentalFan>().FirstOrDefault();
+            return ornamentalFan != null;
+        }
+        catch
+        {
+            ornamentalFan = null;
+            return false;
+        }
+    }
+
+    private static int OrnamentalFanCharge(OrnamentalFan relic)
+    {
+        var threshold = OrnamentalFanCardsPerActivation(relic);
+        if (threshold <= 0) return 0;
+        return Math.Max(0, relic.AttacksPlayedThisTurn) % threshold;
+    }
+
+    private static int OrnamentalFanCardsPerActivation(OrnamentalFan relic)
+    {
+        try
+        {
+            return Math.Max(1, relic.DynamicVars.Cards.IntValue);
+        }
+        catch
+        {
+            return 3;
+        }
+    }
+
+    private static bool TryGetShuriken(Player player, out Shuriken? shuriken)
+    {
+        shuriken = null;
+
+        try
+        {
+            shuriken = player?.Relics?.OfType<Shuriken>().FirstOrDefault();
+            return shuriken != null;
+        }
+        catch
+        {
+            shuriken = null;
+            return false;
+        }
+    }
+
+    private static int ShurikenCharge(Shuriken relic)
+    {
+        var threshold = ShurikenCardsPerActivation(relic);
+        if (threshold <= 0) return 0;
+        return Math.Max(0, relic.AttacksPlayedThisTurn) % threshold;
+    }
+
+    private static int ShurikenCardsPerActivation(Shuriken relic)
+    {
+        try
+        {
+            return Math.Max(1, relic.DynamicVars.Cards.IntValue);
+        }
+        catch
+        {
+            return 3;
+        }
+    }
+
+    private static decimal CurrentStrength(Creature creature)
+    {
+        try
+        {
+            return creature.GetPower<StrengthPower>()?.Amount ?? 0m;
+        }
+        catch
+        {
+            return 0m;
         }
     }
 
@@ -13156,6 +13706,12 @@ internal class PendingCombat
     public Dictionary<Player, int> PenNibTurnEndChargeRecordedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> KunaiTurnEndChargeRecordedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> KusarigamaTurnEndChargeRecordedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> OrnamentalFanTurnEndChargeRecordedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> ShurikenTurnEndChargeRecordedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> GamblingChipDiscardAttributionPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

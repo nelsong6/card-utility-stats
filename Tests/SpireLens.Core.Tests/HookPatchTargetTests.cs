@@ -131,6 +131,28 @@ public class HookPatchTargetTests
 
     [Fact]
     [Trait("Category", "RequiresLiveGame")]
+    public void UnlimitedAttackChargeRelicsTurnEndPatch_ResolvesBeforeSideTurnEnd()
+    {
+        var target = InvokeTargetMethod(typeof(HookBeforeSideTurnEndUnlimitedAttackChargeRelicsPatch));
+
+        Assert.NotNull(target);
+        Assert.Equal("MegaCrit.Sts2.Core.Hooks.Hook", target!.DeclaringType?.FullName);
+        Assert.Contains(target.Name, new[] { "BeforeSideTurnEnd", "BeforeTurnEnd" });
+        Assert.Equal(
+            new[]
+            {
+                "side",
+                "participants",
+            },
+            target.GetParameters().Select(parameter => parameter.Name).ToArray());
+
+        var sideParameter = target.GetParameters().SingleOrDefault(parameter => parameter.Name == "side");
+        Assert.NotNull(sideParameter);
+        Assert.Equal("MegaCrit.Sts2.Core.Combat.CombatSide", sideParameter!.ParameterType.FullName);
+    }
+
+    [Fact]
+    [Trait("Category", "RequiresLiveGame")]
     public void TuningForkTurnEndPatch_ResolvesBeforeSideTurnEnd()
     {
         var target = InvokeTargetMethod(typeof(HookBeforeSideTurnEndTuningForkPatch));

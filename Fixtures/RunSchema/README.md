@@ -230,6 +230,10 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `kunai-relic-run.json`
   Adds Kunai attack-counter tracking: owner attack plays, activations, observed
   Dexterity gained, and 1/2 charge turn-end buckets with average charge samples.
+- `unlimited-attack-charge-relics-run.json`
+  Adds the remaining unlimited three-Attack turn counters: Kusarigama,
+  Ornamental Fan, and Shuriken, including observed damage/block/Strength
+  outcomes and 1/2 charge turn-end buckets with average charge samples.
 - `tuning-fork-relic-run.json`
   Adds Tuning Fork owner Skill-play count, trigger count, observed block
   gained, held combat/turn denominators, and turn-end charge buckets.
