@@ -143,9 +143,13 @@ internal static class RelicCompendiumFilterUi
     private static readonly HashSet<string> SelectedCategoryIds =
         new(RelicTaxonomy.LeafCategories.Select(c => c.Id), StringComparer.OrdinalIgnoreCase);
 
-    private static CompendiumRelicFilterMode _mode = CompendiumRelicFilterMode.Off;
-    private static bool _showUndiscoveredRelics = true;
-    private static bool _useSingleRelicGrid;
+    private const CompendiumRelicFilterMode DefaultMode = CompendiumRelicFilterMode.Filter;
+    private const bool DefaultShowUndiscoveredRelics = false;
+    private const bool DefaultUseSingleRelicGrid = true;
+
+    private static CompendiumRelicFilterMode _mode = DefaultMode;
+    private static bool _showUndiscoveredRelics = DefaultShowUndiscoveredRelics;
+    private static bool _useSingleRelicGrid = DefaultUseSingleRelicGrid;
     private static bool _syncingControls;
 
     public static void Inject(NRelicCollection? collection)
@@ -246,9 +250,9 @@ internal static class RelicCompendiumFilterUi
 
     internal static void ResetForTests()
     {
-        _mode = CompendiumRelicFilterMode.Off;
-        _showUndiscoveredRelics = true;
-        _useSingleRelicGrid = false;
+        _mode = DefaultMode;
+        _showUndiscoveredRelics = DefaultShowUndiscoveredRelics;
+        _useSingleRelicGrid = DefaultUseSingleRelicGrid;
         SelectedCategoryIds.Clear();
         foreach (var category in RelicTaxonomy.LeafCategories)
             SelectedCategoryIds.Add(category.Id);
