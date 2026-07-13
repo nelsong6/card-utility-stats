@@ -904,6 +904,9 @@ public static class RelicHoverShowPatch
         if (IsMrStrugglesStatsRelicModel(relicModel))
             return "RELIC.MR_STRUGGLES";
 
+        if (relicModel is Storybook)
+            return "RELIC.STORYBOOK";
+
         return relicModel.Id.ToString();
     }
 

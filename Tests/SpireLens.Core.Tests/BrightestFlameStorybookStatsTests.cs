@@ -28,6 +28,7 @@ public class BrightestFlameStorybookStatsTests
     };
 
     [Fact]
+    [Trait("Category", "RequiresLiveGame")]
     public void Patch_TargetsBrightestFlameOnPlayWithExpectedParameters()
     {
         var target = TargetMethod.Invoke(null, null) as MethodBase;
@@ -96,7 +97,7 @@ public class BrightestFlameStorybookStatsTests
     [Fact]
     public void CardTooltip_BrightestFlame_ShowsMaxHpLostInFullAndCompactViews()
     {
-        var card = new BrightestFlame();
+        var card = (BrightestFlame)RuntimeHelpers.GetUninitializedObject(typeof(BrightestFlame));
         var agg = new CardAggregate { TotalMaxHpLost = 4 };
 
         var full = CardHoverShowPatch.BuildHistoricalBodyBBCode(card, agg, new RunMetaStats());
