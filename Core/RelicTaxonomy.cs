@@ -22,6 +22,10 @@ internal static class RelicTaxonomy
     public const string ChargeCategoryId = "charge";
     public const string ChargeAcrossTurnsCategoryId = "charge_across_turns";
     public const string ChargeResetsEachTurnCategoryId = "charge_resets_each_turn";
+    public const string ChargeResetsEachTurnLimitedActivationsCategoryId =
+        "charge_resets_each_turn_limited_activations";
+    public const string ChargeResetsEachTurnUnlimitedActivationsCategoryId =
+        "charge_resets_each_turn_unlimited_activations";
 
     private static readonly RelicTaxonomyCategory ChargeAcrossTurnsCategory = new(
         ChargeAcrossTurnsCategoryId,
@@ -57,23 +61,40 @@ internal static class RelicTaxonomy
         },
         []);
 
-    private static readonly RelicTaxonomyCategory ChargeResetsEachTurnCategory = new(
-        ChargeResetsEachTurnCategoryId,
-        "Resets each turn",
+    private static readonly RelicTaxonomyCategory ChargeResetsEachTurnLimitedActivationsCategory = new(
+        ChargeResetsEachTurnLimitedActivationsCategoryId,
+        "Limited activations",
         new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "RELIC.BRILLIANT_SCARF",
             "RELIC.DIAMOND_DIADEM",
+            "RELIC.POCKETWATCH",
+            "RELIC.RAINBOW_RING",
+            "RELIC.VELVET_CHOKER",
+        },
+        []);
+
+    private static readonly RelicTaxonomyCategory ChargeResetsEachTurnUnlimitedActivationsCategory = new(
+        ChargeResetsEachTurnUnlimitedActivationsCategoryId,
+        "Unlimited activations",
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
             "RELIC.KUNAI",
             "RELIC.KUSARIGAMA",
             "RELIC.LETTER_OPENER",
             "RELIC.ORNAMENTAL_FAN",
-            "RELIC.POCKETWATCH",
-            "RELIC.RAINBOW_RING",
             "RELIC.SHURIKEN",
-            "RELIC.VELVET_CHOKER",
         },
         []);
+
+    private static readonly RelicTaxonomyCategory ChargeResetsEachTurnCategory = new(
+        ChargeResetsEachTurnCategoryId,
+        "Resets each turn",
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+        [
+            ChargeResetsEachTurnLimitedActivationsCategory,
+            ChargeResetsEachTurnUnlimitedActivationsCategory,
+        ]);
 
     private static readonly RelicTaxonomyCategory ChargeCategory = new(
         ChargeCategoryId,

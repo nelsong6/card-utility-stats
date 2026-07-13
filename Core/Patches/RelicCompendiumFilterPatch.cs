@@ -109,6 +109,9 @@ internal static class RelicCompendiumFilterUi
     private const string PanelName = "SpireLensRelicFilterPanel";
     private const string FlatGridName = "SpireLensFlatRelicGrid";
     private const int CategoryTreeColumn = 0;
+    private const int MaxVisibleCategoryTreeRows = 6;
+    private const float CategoryTreeRowHeight = 24f;
+    private const float CategoryTreeVerticalPadding = 8f;
     private const float DimmedAlpha = 0.5f;
     private const int FallbackFlatGridColumns = 8;
     private static readonly string[] CategoryFieldNames =
@@ -347,7 +350,11 @@ internal static class RelicCompendiumFilterUi
             ScrollVerticalEnabled = true,
             MouseFilter = Control.MouseFilterEnum.Stop,
             SizeFlagsHorizontal = Control.SizeFlags.Fill | Control.SizeFlags.Expand,
-            CustomMinimumSize = new Vector2(0f, 92f),
+            CustomMinimumSize = new Vector2(
+                0f,
+                Math.Min(RelicTaxonomy.Categories.Count, MaxVisibleCategoryTreeRows)
+                * CategoryTreeRowHeight
+                + CategoryTreeVerticalPadding),
         };
         categoryTree.AddThemeFontSizeOverride("font_size", 14);
 
