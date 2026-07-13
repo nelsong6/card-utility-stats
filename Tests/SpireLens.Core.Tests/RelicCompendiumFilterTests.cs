@@ -79,13 +79,16 @@ public class RelicCompendiumFilterTests
         var charge = RelicTaxonomy.LeafCategories.Single(
             c => c.Id == RelicTaxonomy.ChargeResetsEachTurnLimitedActivationsCategoryId);
 
-        Assert.Contains("RELIC.BRILLIANT_SCARF", charge.RelicIds);
-        Assert.Contains("RELIC.DIAMOND_DIADEM", charge.RelicIds);
-        Assert.Contains("RELIC.POCKETWATCH", charge.RelicIds);
-        Assert.Contains("RELIC.RAINBOW_RING", charge.RelicIds);
-        Assert.Contains("RELIC.VELVET_CHOKER", charge.RelicIds);
-        Assert.DoesNotContain("RELIC.KUNAI", charge.RelicIds);
-        Assert.DoesNotContain("RELIC.SHURIKEN", charge.RelicIds);
+        Assert.Equal(
+            new[]
+            {
+                "RELIC.BRILLIANT_SCARF",
+                "RELIC.DIAMOND_DIADEM",
+                "RELIC.POCKETWATCH",
+                "RELIC.RAINBOW_RING",
+                "RELIC.VELVET_CHOKER",
+            },
+            charge.RelicIds.OrderBy(id => id, StringComparer.Ordinal).ToArray());
     }
 
     [Fact]
@@ -94,13 +97,16 @@ public class RelicCompendiumFilterTests
         var charge = RelicTaxonomy.LeafCategories.Single(
             c => c.Id == RelicTaxonomy.ChargeResetsEachTurnUnlimitedActivationsCategoryId);
 
-        Assert.Contains("RELIC.KUNAI", charge.RelicIds);
-        Assert.Contains("RELIC.KUSARIGAMA", charge.RelicIds);
-        Assert.Contains("RELIC.LETTER_OPENER", charge.RelicIds);
-        Assert.Contains("RELIC.ORNAMENTAL_FAN", charge.RelicIds);
-        Assert.Contains("RELIC.SHURIKEN", charge.RelicIds);
-        Assert.DoesNotContain("RELIC.BRILLIANT_SCARF", charge.RelicIds);
-        Assert.DoesNotContain("RELIC.VELVET_CHOKER", charge.RelicIds);
+        Assert.Equal(
+            new[]
+            {
+                "RELIC.KUNAI",
+                "RELIC.KUSARIGAMA",
+                "RELIC.LETTER_OPENER",
+                "RELIC.ORNAMENTAL_FAN",
+                "RELIC.SHURIKEN",
+            },
+            charge.RelicIds.OrderBy(id => id, StringComparer.Ordinal).ToArray());
     }
 
     [Fact]
