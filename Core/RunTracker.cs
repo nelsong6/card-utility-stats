@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using MegaCrit.Sts2.Core.Combat;
@@ -830,6 +831,7 @@ public static class RunTracker
     /// this record instead of stranding it — the previous inline mints omitted
     /// it, re-seeding the stranding bug. Single home for the lazy mint.
     /// </summary>
+    [MemberNotNull(nameof(_currentRun))]
     private static void EnsureLazyCurrentRunLocked()
     {
         if (_currentRun != null) return;
