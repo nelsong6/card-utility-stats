@@ -95,6 +95,7 @@ public class BrightestFlameStorybookStatsTests
     }
 
     [Fact]
+    [Trait("Category", "RequiresLiveGame")]
     public void CardTooltip_BrightestFlame_ShowsMaxHpLostInFullAndCompactViews()
     {
         var card = (BrightestFlame)RuntimeHelpers.GetUninitializedObject(typeof(BrightestFlame));
