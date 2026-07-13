@@ -36,6 +36,7 @@ public class PaelsWingStatsTests
         Assert.Equal(0, agg.RareCardsConsumed);
         Assert.Equal(0, agg.SacrificesMade);
         Assert.Equal(0, agg.SacrificesSkipped);
+        Assert.Empty(agg.RelicsGranted);
     }
 
     [Fact]
@@ -48,6 +49,15 @@ public class PaelsWingStatsTests
             RareCardsConsumed = 1,
             SacrificesMade = 3,
             SacrificesSkipped = 2,
+            RelicsGranted =
+            {
+                ["RELIC.KUNAI"] = new RelicGrantedAggregate
+                {
+                    RelicId = "RELIC.KUNAI",
+                    DisplayName = "Kunai",
+                    Count = 1,
+                },
+            },
         };
         var run = new RunData();
         run.RelicAggregates[PaelsWingRelicId] = agg;
@@ -59,6 +69,7 @@ public class PaelsWingStatsTests
         Assert.Contains("rare_cards_consumed", json);
         Assert.Contains("sacrifices_made", json);
         Assert.Contains("sacrifices_skipped", json);
+        Assert.Contains("relics_granted", json);
 
         var restored = JsonSerializer.Deserialize<RunData>(json, SerializerOptions);
 
@@ -70,6 +81,8 @@ public class PaelsWingStatsTests
         Assert.Equal(1, restoredAgg.RareCardsConsumed);
         Assert.Equal(3, restoredAgg.SacrificesMade);
         Assert.Equal(2, restoredAgg.SacrificesSkipped);
+        Assert.Equal(1, restoredAgg.RelicsGranted["RELIC.KUNAI"].Count);
+        Assert.Equal("Kunai", restoredAgg.RelicsGranted["RELIC.KUNAI"].DisplayName);
     }
 
     [Fact]
@@ -82,6 +95,21 @@ public class PaelsWingStatsTests
             RareCardsConsumed = 1,
             SacrificesMade = 3,
             SacrificesSkipped = 2,
+            RelicsGranted =
+            {
+                ["RELIC.KUNAI"] = new RelicGrantedAggregate
+                {
+                    RelicId = "RELIC.KUNAI",
+                    DisplayName = "Kunai",
+                    Count = 2,
+                },
+                ["RELIC.BAG_OF_PREPARATION"] = new RelicGrantedAggregate
+                {
+                    RelicId = "RELIC.BAG_OF_PREPARATION",
+                    DisplayName = "Bag of Preparation",
+                    Count = 1,
+                },
+            },
         };
 
         var body = (string)(BuildPaelsWingBodyMethod.Invoke(null, new object?[] { agg })
@@ -92,12 +120,36 @@ public class PaelsWingStatsTests
         Assert.Contains("rare cards consumed", body);
         Assert.Contains("Sacrifices made", body);
         Assert.Contains("Sacrifices skipped", body);
+        Assert.Contains("Artifacts gained", body);
+        Assert.Contains("Artifact gained", body);
+        Assert.Contains("Kunai x2", body);
+        Assert.Contains("Bag of Preparation", body);
         Assert.DoesNotContain("Sacrifice rate", body);
         Assert.DoesNotContain("/floor", body);
         Assert.Contains("[b]5[/b]", body);
         Assert.Contains("[b]3[/b]", body);
         Assert.Contains("[b]2[/b]", body);
         Assert.Contains("[b]1[/b]", body);
+    }
+
+    [Fact]
+    public void RunTracker_PaelsWingHelper_RecordsEachArtifactGained()
+    {
+        var agg = new RelicAggregate();
+
+        RunTracker.RecordPaelsWingArtifactGainedForTest(agg, "RELIC.KUNAI", "Kunai");
+        RunTracker.RecordPaelsWingArtifactGainedForTest(agg, "RELIC.KUNAI", "Kunai");
+        RunTracker.RecordPaelsWingArtifactGainedForTest(
+            agg,
+            "RELIC.BAG_OF_PREPARATION",
+            "Bag of Preparation");
+        RunTracker.RecordPaelsWingArtifactGainedForTest(agg, null, null);
+
+        Assert.Equal(2, agg.RelicsGranted.Count);
+        Assert.Equal(2, agg.RelicsGranted["RELIC.KUNAI"].Count);
+        Assert.Equal("Kunai", agg.RelicsGranted["RELIC.KUNAI"].DisplayName);
+        Assert.Equal(1, agg.RelicsGranted["RELIC.BAG_OF_PREPARATION"].Count);
+        Assert.Equal("Bag of Preparation", agg.RelicsGranted["RELIC.BAG_OF_PREPARATION"].DisplayName);
     }
 
     [Fact]
@@ -164,5 +216,6 @@ public class PaelsWingStatsTests
         Assert.Equal(0, agg.RareCardsConsumed);
         Assert.Equal(0, agg.SacrificesMade);
         Assert.Equal(0, agg.SacrificesSkipped);
+        Assert.Empty(agg.RelicsGranted);
     }
 }

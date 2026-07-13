@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Entities.CardRewardAlternatives;
 using MegaCrit.Sts2.Core.Entities.Players;
+using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Relics;
 using MegaCrit.Sts2.Core.Rewards;
 
@@ -45,8 +46,24 @@ public static class PaelsWingTryModifyCardRewardAlternativesPatch
 
             async Task WrappedOnSelect()
             {
+                var owner = __instance.Owner;
+
+                void OnRelicObtained(RelicModel relic)
+                {
+                    owner.RelicObtained -= OnRelicObtained;
+                    RunTracker.RecordPaelsWingArtifactGained(relic);
+                }
+
                 RunTracker.RecordPaelSacrificeMade(cardReward);
-                await original();
+                owner.RelicObtained += OnRelicObtained;
+                try
+                {
+                    await original();
+                }
+                finally
+                {
+                    owner.RelicObtained -= OnRelicObtained;
+                }
             }
 
             OnSelectBackingField.SetValue(sacrifice, (Func<Task>)WrappedOnSelect);

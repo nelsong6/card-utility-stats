@@ -18,7 +18,14 @@
       "uncommon_cards_consumed": 3,
       "rare_cards_consumed": 1,
       "sacrifices_made": 3,
-      "sacrifices_skipped": 2
+      "sacrifices_skipped": 2,
+      "relics_granted": {
+        "RELIC.KUNAI": {
+          "relic_id": "RELIC.KUNAI",
+          "display_name": "Kunai",
+          "count": 1
+        }
+      }
     }
   },
   "meta_stats": {},

@@ -2492,6 +2492,23 @@ public static class RelicHoverShowPatch
         Row3(sb, "common cards consumed", agg.CommonCardsConsumed.ToString(), "");
         Row3(sb, "uncommon cards consumed", agg.UncommonCardsConsumed.ToString(), "");
         Row3(sb, "rare cards consumed", agg.RareCardsConsumed.ToString(), "");
+        var artifacts = agg.RelicsGranted.Values
+            .Where(artifact => artifact.Count > 0)
+            .OrderByDescending(artifact => artifact.Count)
+            .ThenBy(artifact => artifact.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var artifactsGained = artifacts.Sum(artifact => Math.Max(0, artifact.Count));
+        Row3(sb, "Artifacts gained", artifactsGained.ToString(), "");
+
+        foreach (var artifact in artifacts)
+        {
+            var displayName = StatsTooltip.EscapeBbcode(string.IsNullOrWhiteSpace(artifact.DisplayName)
+                ? RunTracker.FormatRelicIdForDisplay(artifact.RelicId)
+                : artifact.DisplayName);
+            var value = artifact.Count == 1 ? displayName : $"{displayName} x{artifact.Count}";
+            Row3(sb, "Artifact gained", value, "");
+        }
+
         Row3(sb, "Sacrifices made", agg.SacrificesMade.ToString(), "");
         Row3(sb, "Sacrifices skipped", agg.SacrificesSkipped.ToString(), "");
         if (TryFloorCountSinceRelicObtained(floorReached, floorAdded, out var floorCount))

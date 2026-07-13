@@ -130,7 +130,8 @@ New fixtures added going forward do not need a `v*-` prefix.
   combat-end charge samples for average charge.
 - `paels-wing-sacrifice-relic-run.json`
   Adds Pael's Wing sacrifice tracking: consumed card reward options split by
-  common, uncommon, and rare, plus sacrifices made and skipped.
+  common, uncommon, and rare, sacrifices made and skipped, and the total and
+  specific artifacts gained from its completed sacrifice pairs.
 - `paels-eye-relic-run.json`
   Adds Pael's Eye activation tracking plus counts of status and curse cards
   actually exhausted by its extra-turn callback, and combats where it was held

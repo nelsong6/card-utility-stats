@@ -4481,6 +4481,33 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Record the direct artifact Pael's Wing adds to its owner's inventory
+    /// after a completed pair of sacrifices.
+    /// </summary>
+    public static void RecordPaelsWingArtifactGained(RelicModel artifactGained)
+    {
+        if (artifactGained == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(PaelsWingRelicId);
+                RecordPaelsWingArtifactGainedForTest(
+                    agg,
+                    artifactGained.Id.ToString(),
+                    GetRelicDisplayName(artifactGained));
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPaelsWingArtifactGained failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Record a Pael's Wing sacrifice opportunity that resolved without
     /// selecting Sacrifice, either by taking a card or by using another
     /// alternative such as Skip.
@@ -6421,6 +6448,15 @@ public static class RunTracker
     }
 
     internal static void RecordLargeCapsuleRelicObtainedForTest(
+        RelicAggregate agg,
+        string? relicId,
+        string? displayName)
+    {
+        if (agg == null || string.IsNullOrWhiteSpace(relicId)) return;
+        AddRelicGranted(agg.RelicsGranted, relicId, displayName ?? "", 1);
+    }
+
+    internal static void RecordPaelsWingArtifactGainedForTest(
         RelicAggregate agg,
         string? relicId,
         string? displayName)

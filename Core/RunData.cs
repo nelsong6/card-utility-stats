@@ -558,8 +558,8 @@ public class RelicAggregate
     public int RareRelicsAcquired { get; set; }
     public int CampfiresNotDug { get; set; }
 
-    // Specific relics granted by relic-owned effects. Used by Large Capsule
-    // and Neow's Bones to show which relics were obtained.
+    // Specific relics granted by relic-owned effects. Used by Large Capsule,
+    // Neow's Bones, and Pael's Wing to show which relics/artifacts were obtained.
     public Dictionary<string, RelicGrantedAggregate> RelicsGranted { get; set; } = new();
 
     // Total offered cards by rarity for relics that generate card-choice

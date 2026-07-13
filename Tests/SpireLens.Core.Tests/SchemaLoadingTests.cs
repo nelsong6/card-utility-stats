@@ -1388,6 +1388,8 @@ public class SchemaLoadingTests
         Assert.Equal(1, relicAgg.RareCardsConsumed);
         Assert.Equal(3, relicAgg.SacrificesMade);
         Assert.Equal(2, relicAgg.SacrificesSkipped);
+        Assert.Equal(1, relicAgg.RelicsGranted["RELIC.KUNAI"].Count);
+        Assert.Equal("Kunai", relicAgg.RelicsGranted["RELIC.KUNAI"].DisplayName);
     }
 
     [Fact]
@@ -1402,6 +1404,8 @@ public class SchemaLoadingTests
         Assert.Equal(1, relicAgg.RareCardsConsumed);
         Assert.Equal(3, relicAgg.SacrificesMade);
         Assert.Equal(2, relicAgg.SacrificesSkipped);
+        Assert.Equal(1, relicAgg.RelicsGranted["RELIC.KUNAI"].Count);
+        Assert.Equal("Kunai", relicAgg.RelicsGranted["RELIC.KUNAI"].DisplayName);
     }
 
     [Fact]
