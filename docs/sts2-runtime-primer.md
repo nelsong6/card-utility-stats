@@ -183,6 +183,16 @@ For source context, `RunTracker` keeps notions like current player card play, re
 
 Do not casually widen temporal attribution windows. A wide window can make unrelated follow-up effects look card-caused.
 
+Alchemize creates one random in-combat potion and awaits the exact
+`PotionCmd.TryToProcure(PotionModel, Player, int)` overload, but discards its
+`PotionProcureResult`. Capture the currently resolving physical Alchemize card
+when that command begins, then wrap the returned task and record its observed
+result before returning it to Alchemize. A successful result supplies the
+actual gained potion and rarity; a failed result means no potion entered the
+belt (currently a full belt or a `ShouldProcurePotion` blocker such as Sozu).
+Do not resolve the source after awaiting: `CardPlayFinished` can clear the
+current-card context as soon as Alchemize resumes.
+
 ## Damage Attribution
 
 For direct card damage, `DamageReceivedEntry` is the important observed outcome.

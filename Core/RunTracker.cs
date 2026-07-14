@@ -2348,6 +2348,102 @@ public static class RunTracker
         }
     }
 
+    /// <summary>
+    /// Capture Alchemize's physical source card while its owner-specific play
+    /// is still resolving. The potion command finishes asynchronously, so the
+    /// source must be captured before awaiting its result.
+    /// </summary>
+    internal static CardModel? CaptureAlchemizePotionSource(Player? player)
+    {
+        if (player == null) return null;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return null;
+                if (!IsTrackedPlayer(player)) return null;
+
+                var causingPlay = FindCurrentlyResolvingCardPlay();
+                var sourceCard = causingPlay?.Card;
+                if (sourceCard is not Alchemize) return null;
+                if (sourceCard.Owner != null && !ReferenceEquals(sourceCard.Owner, player)) return null;
+
+                return Canonical(sourceCard);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"CaptureAlchemizePotionSource failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record the observed result returned by Alchemize's potion procurement.
+    /// A failed result is the card-side equivalent of White Beast Statue's
+    /// skipped reward: the potion was generated but did not enter the belt.
+    /// </summary>
+    internal static void RecordAlchemizePotionResult(
+        CardModel sourceCard,
+        Player? player,
+        PotionProcureResult? result)
+    {
+        if (player == null || result == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+                if (!IsTrackedPlayer(player)) return;
+                if (sourceCard is not Alchemize) return;
+                if (sourceCard.Owner != null && !ReferenceEquals(sourceCard.Owner, player)) return;
+
+                _pendingCombat ??= new PendingCombat();
+                var instanceId = GetOrAssignInstanceId(sourceCard);
+                var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
+                AccumulateAlchemizePotionResult(agg, result.success, result.potion?.Rarity);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordAlchemizePotionResult failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void AccumulateAlchemizePotionResult(
+        CardAggregate agg,
+        bool success,
+        PotionRarity? rarity)
+    {
+        if (!success)
+        {
+            agg.PotionsSkipped++;
+            return;
+        }
+
+        agg.PotionsGained++;
+        switch (rarity)
+        {
+            case PotionRarity.Common:
+                agg.CommonPotionsGained++;
+                break;
+            case PotionRarity.Uncommon:
+                agg.UncommonPotionsGained++;
+                break;
+            case PotionRarity.Rare:
+                agg.RarePotionsGained++;
+                break;
+        }
+    }
+
+    internal static void RecordAlchemizePotionResultForTest(
+        CardAggregate agg,
+        bool success,
+        PotionRarity? rarity)
+        => AccumulateAlchemizePotionResult(agg, success, rarity);
+
     // -------- Relic stat recording --------
 
     private const string BagOfMarblesRelicId = "RELIC.BAG_OF_MARBLES";
@@ -13547,6 +13643,11 @@ public static class RunTracker
         target.TotalStarsSpent += source.TotalStarsSpent;
         target.TotalStarsGenerated += source.TotalStarsGenerated;
         target.TotalForgeGenerated += source.TotalForgeGenerated;
+        target.PotionsGained += source.PotionsGained;
+        target.CommonPotionsGained += source.CommonPotionsGained;
+        target.UncommonPotionsGained += source.UncommonPotionsGained;
+        target.RarePotionsGained += source.RarePotionsGained;
+        target.PotionsSkipped += source.PotionsSkipped;
         target.TotalBlockGained += source.TotalBlockGained;
         target.TotalBlockEffective += source.TotalBlockEffective;
         target.TotalBlockWasted += source.TotalBlockWasted;

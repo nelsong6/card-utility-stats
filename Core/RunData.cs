@@ -139,6 +139,16 @@ public class CardAggregate
     // current cards use whole numbers.
     public decimal TotalForgeGenerated { get; set; }
 
+    // Potion procurement outcomes caused by this card. Alchemize is the
+    // first card using these fields: gained counts only successful observed
+    // procure results, rarity buckets use the potion actually returned by
+    // the command, and skipped counts failed procure results.
+    public int PotionsGained { get; set; }
+    public int CommonPotionsGained { get; set; }
+    public int UncommonPotionsGained { get; set; }
+    public int RarePotionsGained { get; set; }
+    public int PotionsSkipped { get; set; }
+
     // M2a: Block gained (how much block this card contributed over the run,
     // summed across plays). M2b extends this with absorbed/wasted splits
     // using an ordered provenance ledger for the player's block pool.

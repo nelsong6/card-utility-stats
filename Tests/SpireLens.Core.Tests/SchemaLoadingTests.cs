@@ -467,6 +467,23 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsAlchemizeCardFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("alchemize-card-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        var cardAgg = loaded.Data.Aggregates["CARD.ALCHEMIZE#1"];
+        Assert.Equal(5, cardAgg.PotionsGained);
+        Assert.Equal(2, cardAgg.CommonPotionsGained);
+        Assert.Equal(2, cardAgg.UncommonPotionsGained);
+        Assert.Equal(1, cardAgg.RarePotionsGained);
+        Assert.Equal(3, cardAgg.PotionsSkipped);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsPhylacteryRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("phylactery-relic-run.json"));
@@ -1034,6 +1051,20 @@ public class SchemaLoadingTests
         Assert.Equal(2, relicAgg.UncommonPotionsGained);
         Assert.Equal(1, relicAgg.RarePotionsGained);
         Assert.Equal(3, relicAgg.PotionsSkipped);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsAlchemizeCardFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("alchemize-card-run.json"));
+
+        Assert.NotNull(resumed);
+        var cardAgg = resumed!.Aggregates["CARD.ALCHEMIZE#1"];
+        Assert.Equal(5, cardAgg.PotionsGained);
+        Assert.Equal(2, cardAgg.CommonPotionsGained);
+        Assert.Equal(2, cardAgg.UncommonPotionsGained);
+        Assert.Equal(1, cardAgg.RarePotionsGained);
+        Assert.Equal(3, cardAgg.PotionsSkipped);
     }
 
     [Fact]

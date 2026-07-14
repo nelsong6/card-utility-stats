@@ -41,6 +41,11 @@ internal static class CardAggregatePooler
         target.TotalStarsSpent += source.TotalStarsSpent;
         target.TotalStarsGenerated += source.TotalStarsGenerated;
         target.TotalForgeGenerated += source.TotalForgeGenerated;
+        target.PotionsGained += source.PotionsGained;
+        target.CommonPotionsGained += source.CommonPotionsGained;
+        target.UncommonPotionsGained += source.UncommonPotionsGained;
+        target.RarePotionsGained += source.RarePotionsGained;
+        target.PotionsSkipped += source.PotionsSkipped;
         target.TotalBlockGained += source.TotalBlockGained;
         target.TotalBlockEffective += source.TotalBlockEffective;
         target.TotalBlockWasted += source.TotalBlockWasted;

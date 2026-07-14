@@ -69,6 +69,7 @@ Examples already implemented:
 - actual maximum HP lost to card costs
 - Regent stars spent / generated
 - forge granted from cards
+- Alchemize potions actually procured, failed procurements, and gained rarity splits
 - observed cards drawn from draw effects
 - blocked draw attempts, categorized blocked reasons, and effect-side downstream blocked counts
 - successful self-summons to hand for recurring cards like Make It So
