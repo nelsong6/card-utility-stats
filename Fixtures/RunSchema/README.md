@@ -201,6 +201,10 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `leafy-poultice-relic-run.json`
   Adds Leafy Poultice pickup tracking: original/new max HP after the relic's
   max-HP loss resolves, plus the two source/result card transform pairs.
+- `fresnel-lens-relic-run.json`
+  Adds Fresnel Lens's Drowning Beacon max-HP loss snapshots, successful Nimble
+  card picks, any-Nimble / exact-two / three-or-more reward-screen counts, the
+  no-Nimble count, and rewards where Nimble was offered but none was taken.
 - `strawberry-relic-run.json`
   Adds Strawberry pickup tracking: activations, observed max HP gained, and
   original/new max-HP snapshots.

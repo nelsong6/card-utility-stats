@@ -468,6 +468,21 @@ inspect `RestSiteSynchronizer.BeforeLocalRestSiteExited`: at that point the
 local option list and chosen-option index still reveal whether a Dig option was
 available and whether the selected option was anything other than Dig.
 
+Fresnel Lens applies Nimble from its owner-specific
+`TryModifyCardRewardOptionsLate` callback. Count the final option only when its
+`CardCreationResult` is still Nimble and names Fresnel Lens in
+`ModifyingRelics`; this distinguishes relic-caused Nimble from an option that
+was already enchanted. `CardReward.OnSelect` opens the actual selection and
+removes a card from its option list only after `CardPileCmd.Add(..., Deck)`
+succeeds, so an initial-versus-remaining option snapshot measures cards taken.
+The card-screen Skip returns to the outer rewards page without consuming the
+reward, so keep the same reference-keyed pending snapshot across reopenings and
+finalize it only on a completed selection or `CardReward.OnSkipped`. A reroll
+reuses that same reward/screen and must refresh, not increment, its snapshot.
+Drowning Beacon applies its max-HP loss before obtaining Fresnel Lens; wrap the
+full async `DrowningBeacon.ClimbOption` to preserve the observed before/after
+max HP because a relic pickup hook begins too late to recover the baseline.
+
 ## Generated And Supplemental Cards
 
 Not every visible card should become a permanent per-instance deck card.

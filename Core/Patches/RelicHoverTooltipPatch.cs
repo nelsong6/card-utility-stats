@@ -399,6 +399,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is FresnelLens)
+            {
+                const string relicId = "RELIC.FRESNEL_LENS";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildFresnelLensBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Fresnel Lens", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is BloodSoakedRose)
             {
                 var relicId = relicNode.Model.Id.ToString();
@@ -1265,6 +1275,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is FresnelLens)
+        {
+            title = "Fresnel Lens";
+            body = BuildFresnelLensBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is BloodSoakedRose)
         {
             title = "Blood-Soaked Rose";
@@ -2050,6 +2067,19 @@ public static class RelicHoverShowPatch
         {
             Row3(sb, $"{StatsTooltip.EscapeBbcode(category.Value.DisplayName)} rewards", category.Value.Count.ToString(), "");
         }
+        return sb.ToString();
+    }
+
+    private static string BuildFresnelLensBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        AppendMaxHpChangeRows(sb, agg, "Max HP lost", MaxHpLost(agg));
+        Row3(sb, "Nimble cards taken", agg.NimbleCardsTaken.ToString(), "");
+        Row3(sb, "Reward screens with Nimble cards", agg.RewardScreensWithNimbleCards.ToString(), "");
+        Row3(sb, "Reward screens with 2 Nimble cards", agg.RewardScreensWithTwoNimbleCards.ToString(), "");
+        Row3(sb, "Reward screens with 3+ Nimble cards", agg.RewardScreensWithThreeOrMoreNimbleCards.ToString(), "");
+        Row3(sb, "Reward screens with no Nimble cards", agg.RewardScreensWithoutNimbleCards.ToString(), "");
+        Row3(sb, "Nimble offered, none taken", agg.RewardScreensWithNimbleCardsButNoneTaken.ToString(), "");
         return sb.ToString();
     }
 

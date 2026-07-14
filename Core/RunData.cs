@@ -704,6 +704,16 @@ public class RelicAggregate
     // Used by Prismatic Gem.
     public int CardRewardsAffected { get; set; }
 
+    // Fresnel Lens card-reward tracking. The any-Nimble counter overlaps the
+    // exact-two and three-or-more breakdowns. Taken counts only successful
+    // picks from those rewards.
+    public int NimbleCardsTaken { get; set; }
+    public int RewardScreensWithNimbleCards { get; set; }
+    public int RewardScreensWithTwoNimbleCards { get; set; }
+    public int RewardScreensWithThreeOrMoreNimbleCards { get; set; }
+    public int RewardScreensWithoutNimbleCards { get; set; }
+    public int RewardScreensWithNimbleCardsButNoneTaken { get; set; }
+
     // Observed card reward options by card pool while Prismatic Gem is owned.
     // This is intentionally meta: other reward modifiers may also affect the
     // final options. Used by Prismatic Gem.

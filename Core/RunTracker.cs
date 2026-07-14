@@ -93,6 +93,7 @@ public static class RunTracker
     private static readonly List<Player> _pendingHeftyTabletChoicePlayers = new();
     private static readonly HashSet<PotionReward> _whiteBeastPotionRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, PendingPaelSacrificeReward> _paelSacrificeRewards = new(ReferenceEqualityComparer.Instance);
+    private static readonly Dictionary<CardReward, PendingFresnelLensReward> _fresnelLensRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<Player, PendingRegalPillowRestHeal> _pendingRegalPillowRestHeals = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<Player, PendingPrecariousShearsPickup> _pendingPrecariousShearsPickups = new(ReferenceEqualityComparer.Instance);
     private static readonly HashSet<Player> _pendingLeafyPoulticePickups = new(ReferenceEqualityComparer.Instance);
@@ -961,6 +962,7 @@ public static class RunTracker
     {
         _pendingHeftyTabletChoicePlayers.Clear();
         _paelSacrificeRewards.Clear();
+        _fresnelLensRewards.Clear();
         _pendingRegalPillowRestHeals.Clear();
         _pendingPrecariousShearsPickups.Clear();
         _pendingLeafyPoulticePickups.Clear();
@@ -1748,6 +1750,12 @@ public static class RunTracker
         if (source.StartingMaxHp.HasValue) target.StartingMaxHp = source.StartingMaxHp;
         if (source.ResultingMaxHp.HasValue) target.ResultingMaxHp = source.ResultingMaxHp;
         target.CardRewardsAffected += source.CardRewardsAffected;
+        target.NimbleCardsTaken += source.NimbleCardsTaken;
+        target.RewardScreensWithNimbleCards += source.RewardScreensWithNimbleCards;
+        target.RewardScreensWithTwoNimbleCards += source.RewardScreensWithTwoNimbleCards;
+        target.RewardScreensWithThreeOrMoreNimbleCards += source.RewardScreensWithThreeOrMoreNimbleCards;
+        target.RewardScreensWithoutNimbleCards += source.RewardScreensWithoutNimbleCards;
+        target.RewardScreensWithNimbleCardsButNoneTaken += source.RewardScreensWithNimbleCardsButNoneTaken;
         MergeCardRewardCategories(target.CardRewardCategories, source.CardRewardCategories);
         MergeRelicCardsGranted(target.CardsGranted, source.CardsGranted);
         target.CardChoicesSkipped += source.CardChoicesSkipped;
@@ -2374,6 +2382,7 @@ public static class RunTracker
     private const string BronzeScalesRelicId = "RELIC.BRONZE_SCALES";
     private const string HornCleatRelicId = "RELIC.HORN_CLEAT";
     private const string PrismaticGemRelicId = "RELIC.PRISMATIC_GEM";
+    private const string FresnelLensRelicId = "RELIC.FRESNEL_LENS";
     private const string BloodSoakedRoseRelicId = "RELIC.BLOOD_SOAKED_ROSE";
     private const string CursedPearlRelicId = "RELIC.CURSED_PEARL";
     private const string CloakClaspRelicId = "RELIC.CLOAK_CLASP";
@@ -8630,6 +8639,170 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Snapshot the final options when a Fresnel Lens owner's card-reward
+    /// selection opens. The same reward can be rerolled, so the snapshot is
+    /// refreshable and is counted only when the selection resolves.
+    /// </summary>
+    public static void NoteFresnelLensRewardOpened(CardReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(reward.Player)) return;
+                if (!PlayerHasFresnelLens(reward.Player)) return;
+
+                if (!_fresnelLensRewards.ContainsKey(reward))
+                    _fresnelLensRewards[reward] = PendingFresnelLensReward.FromReward(reward);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"NoteFresnelLensRewardOpened failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// A Driftwood reroll reuses the same CardReward and screen. Replace the
+    /// option snapshot so the eventual taken/skipped result describes the
+    /// cards the player could actually choose after rerolling.
+    /// </summary>
+    public static void RefreshFresnelLensRewardAfterReroll(CardReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_fresnelLensRewards.ContainsKey(reward)) return;
+                _fresnelLensRewards[reward] = PendingFresnelLensReward.FromReward(reward);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RefreshFresnelLensRewardAfterReroll failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Resolve one opened Fresnel Lens card reward. CardReward removes each
+    /// successfully obtained card from its option list, so the observed drop
+    /// in Nimble options is the number actually taken rather than merely
+    /// clicked. Reward stats happen outside combat and persist immediately.
+    /// </summary>
+    public static void RecordFresnelLensRewardResolved(CardReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_fresnelLensRewards.Remove(reward, out var pending)) return;
+                if (!IsTrackedPlayer(reward.Player)) return;
+
+                var remaining = PendingFresnelLensReward.FromReward(reward).NimbleCards;
+                var taken = Math.Max(0, pending.NimbleCards - remaining);
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(FresnelLensRelicId);
+                RecordFresnelLensRewardForTest(agg, pending.NimbleCards, taken);
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordFresnelLensRewardResolved failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void CancelFresnelLensReward(CardReward reward)
+    {
+        if (reward == null) return;
+        lock (_lock)
+            _fresnelLensRewards.Remove(reward);
+    }
+
+    /// <summary>
+    /// Record Drowning Beacon's observed max-HP cost across the full climb
+    /// option. The event loses max HP before obtaining Fresnel Lens, so the
+    /// relic's own pickup callbacks cannot recover the original value.
+    /// </summary>
+    public static void RecordFresnelLensEventMaxHpChanged(
+        Player player,
+        decimal originalMaxHp,
+        decimal newMaxHp)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                if (!PlayerHasFresnelLens(player)) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(FresnelLensRelicId);
+                RecordFresnelLensMaxHpChangedForTest(agg, originalMaxHp, newMaxHp);
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordFresnelLensEventMaxHpChanged failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordFresnelLensRewardForTest(
+        RelicAggregate agg,
+        int nimbleCardsOffered,
+        int nimbleCardsTaken)
+    {
+        if (agg == null) return;
+
+        var offered = Math.Max(0, nimbleCardsOffered);
+        var taken = Math.Clamp(nimbleCardsTaken, 0, offered);
+        agg.NimbleCardsTaken += taken;
+
+        if (offered == 0)
+        {
+            agg.RewardScreensWithoutNimbleCards += 1;
+            return;
+        }
+
+        agg.RewardScreensWithNimbleCards += 1;
+
+        if (offered == 2)
+            agg.RewardScreensWithTwoNimbleCards += 1;
+        else if (offered >= 3)
+            agg.RewardScreensWithThreeOrMoreNimbleCards += 1;
+
+        if (taken == 0)
+            agg.RewardScreensWithNimbleCardsButNoneTaken += 1;
+    }
+
+    internal static void RecordFresnelLensMaxHpChangedForTest(
+        RelicAggregate agg,
+        decimal originalMaxHp,
+        decimal newMaxHp)
+        => RecordRelicMaxHpChangeForTest(agg, originalMaxHp, newMaxHp);
+
+    private static bool PlayerHasFresnelLens(Player? player)
+    {
+        try
+        {
+            return player?.Relics?.Any(relic => relic is FresnelLens) == true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Record that Prismatic Gem modified one card reward's creation options.
     /// Card rewards are created outside combat, so persist directly to the
     /// committed run instead of waiting for a combat boundary.
@@ -13614,6 +13787,32 @@ internal sealed class PendingPaelSacrificeReward
                 case CardRarity.Rare:
                     result.RareCards += 1;
                     break;
+            }
+        }
+
+        return result;
+    }
+}
+
+internal sealed class PendingFresnelLensReward
+{
+    public int NimbleCards { get; private set; }
+
+    public static PendingFresnelLensReward FromReward(CardReward? reward)
+    {
+        var result = new PendingFresnelLensReward();
+        if (reward == null) return result;
+
+        foreach (var option in reward._cards)
+        {
+            try
+            {
+                if (option?.Card?.Enchantment is Nimble
+                    && option.ModifyingRelics.Any(relic => relic is FresnelLens))
+                    result.NimbleCards += 1;
+            }
+            catch
+            {
             }
         }
 

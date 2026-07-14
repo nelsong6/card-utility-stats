@@ -2517,6 +2517,25 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsFresnelLensRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("fresnel-lens-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertFresnelLensFixture(loaded.Data.RelicAggregates["RELIC.FRESNEL_LENS"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsFresnelLensRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("fresnel-lens-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertFresnelLensFixture(resumed!.RelicAggregates["RELIC.FRESNEL_LENS"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsUnmovablePowerMetaFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("unmovable-power-meta-run.json"));
@@ -2548,5 +2567,17 @@ public class SchemaLoadingTests
         Assert.Equal("Defend", relicAgg.CardTransformations[1].SourceDisplayName);
         Assert.Equal("CARD.SHRUG_IT_OFF", relicAgg.CardTransformations[1].ResultCardId);
         Assert.Equal("Shrug It Off", relicAgg.CardTransformations[1].ResultDisplayName);
+    }
+
+    private static void AssertFresnelLensFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(70m, relicAgg.OriginalMaxHp);
+        Assert.Equal(57m, relicAgg.NewMaxHp);
+        Assert.Equal(9, relicAgg.NimbleCardsTaken);
+        Assert.Equal(8, relicAgg.RewardScreensWithNimbleCards);
+        Assert.Equal(3, relicAgg.RewardScreensWithTwoNimbleCards);
+        Assert.Equal(2, relicAgg.RewardScreensWithThreeOrMoreNimbleCards);
+        Assert.Equal(5, relicAgg.RewardScreensWithoutNimbleCards);
+        Assert.Equal(4, relicAgg.RewardScreensWithNimbleCardsButNoneTaken);
     }
 }
