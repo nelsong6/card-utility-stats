@@ -395,6 +395,15 @@ and record its returned post-modifier amount. Use all distinct combats and
 player turns while the relic is held, including zero-trigger ones, as the
 per-combat and per-turn block denominators.
 
+`JugglingPower` already owns the exact turn-local progress needed for its live
+counter. `AfterApplied` seeds `attacksPlayedThisTurn` from owner Attack plays in
+combat history, `AfterCardPlayed` increments it for subsequent owner Attacks,
+and `AfterSideTurnEnd` resets it. Surface that field through `DisplayAmount` and
+raise `DisplayAmountChanged` after each mutation; do not repurpose `Amount`,
+which remains Juggling's stack count and controls how many Attack copies it
+creates. The progress counter continues above the third-Attack trigger and does
+not belong in persisted run data.
+
 For relics that emit damage commands, prefer the relic-owned callback plus the resolved `CreatureCmd.Damage` result. Mercury Hourglass arms from `MercuryHourglass.AfterPlayerTurnStart`, records the actual multi-target damage split from the command result on each turn, and counts the combat once so damage per combat is not confused with damage per turn-start trigger.
 
 Mr. Struggles follows the same owner-specific turn-start pattern, but its
