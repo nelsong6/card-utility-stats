@@ -10,6 +10,7 @@ public sealed class RuntimeOptions
     public bool ViewStatsToggleEnabled { get; set; }
     public bool ShowRemovedCardsInDeckView { get; set; } = true;
     public bool ShowEnemyStatsOnHover { get; set; }
+    public bool ShowCardStatsDuringCombat { get; set; }
     public bool ShowHandTooltips { get; set; } = true;
     public bool UseVerboseHandStats { get; set; }
     public bool DisableCardStatsDuringCombat { get; set; }
@@ -24,6 +25,7 @@ public static class RuntimeOptionsProvider
     private const string SetViewStatsToggleEnabledMethodName = "SetViewStatsToggleEnabled";
     private const string SetShowRemovedCardsInDeckViewMethodName = "SetShowRemovedCardsInDeckView";
     private const string SetShowEnemyStatsOnHoverMethodName = "SetShowEnemyStatsOnHover";
+    private const string SetShowCardStatsDuringCombatMethodName = "SetShowCardStatsDuringCombat";
     private const string SetVerboseHandStatsEnabledMethodName = "SetVerboseHandStatsEnabled";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -36,12 +38,14 @@ public static class RuntimeOptionsProvider
     private static MethodInfo? _setViewStatsToggleEnabledMethod;
     private static MethodInfo? _setShowRemovedCardsInDeckViewMethod;
     private static MethodInfo? _setShowEnemyStatsOnHoverMethod;
+    private static MethodInfo? _setShowCardStatsDuringCombatMethod;
     private static MethodInfo? _setVerboseHandStatsEnabledMethod;
     private static bool _loggedMissingBridge;
     private static bool _loggedRefreshFailure;
     private static bool _loggedToggleFailure;
     private static bool _loggedShowRemovedCardsFailure;
     private static bool _loggedShowEnemyStatsFailure;
+    private static bool _loggedShowCardStatsDuringCombatFailure;
     private static bool _loggedVerboseHandStatsFailure;
 
     public static RuntimeOptions Current { get; private set; } = new();
@@ -131,6 +135,26 @@ public static class RuntimeOptionsProvider
         Refresh();
     }
 
+    public static void SetShowCardStatsDuringCombat(bool isEnabled)
+    {
+        try
+        {
+            var setShowCardStatsDuringCombatMethod = ResolveSetShowCardStatsDuringCombatMethod();
+            setShowCardStatsDuringCombatMethod?.Invoke(null, new object?[] { isEnabled });
+            _loggedShowCardStatsDuringCombatFailure = false;
+        }
+        catch (Exception e)
+        {
+            if (!_loggedShowCardStatsDuringCombatFailure)
+            {
+                CoreMain.Logger.Warn($"RuntimeOptionsProvider.SetShowCardStatsDuringCombat failed: {e.Message}");
+                _loggedShowCardStatsDuringCombatFailure = true;
+            }
+        }
+
+        Refresh();
+    }
+
     public static void SetVerboseHandStatsEnabled(bool isEnabled)
     {
         try
@@ -181,6 +205,14 @@ public static class RuntimeOptionsProvider
             SetShowEnemyStatsOnHoverMethodName,
             BindingFlags.Public | BindingFlags.Static);
         return _setShowEnemyStatsOnHoverMethod;
+    }
+
+    private static MethodInfo? ResolveSetShowCardStatsDuringCombatMethod()
+    {
+        _setShowCardStatsDuringCombatMethod ??= ResolveBridgeType()?.GetMethod(
+            SetShowCardStatsDuringCombatMethodName,
+            BindingFlags.Public | BindingFlags.Static);
+        return _setShowCardStatsDuringCombatMethod;
     }
 
     private static MethodInfo? ResolveSetVerboseHandStatsEnabledMethod()

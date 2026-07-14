@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using Godot;
 using HarmonyLib;
+using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Models.Cards;
 using MegaCrit.Sts2.Core.Nodes.Cards.Holders;
@@ -38,19 +39,20 @@ public static class CardHoverShowPatch
     [HarmonyPostfix]
     public static void Postfix(NCardHolder __instance)
     {
-        // We DO want to fire on hand cards (combat) per Nelson's call:
-        // "which version of a card I'm using" is useful info mid-combat
-        // when the same card has multiple instances with different stats.
-        // The placement is handled in StatsTooltip: if stacking below the
-        // game's hover tips would overflow the viewport (common for hand
-        // hovers on cards with multiple keyword tooltips like Coolheaded),
-        // we stack above instead.
+        // Combat card tooltips are an explicit display-only opt-in. Keep this
+        // gate ahead of tracker locks, aggregate merging, and tooltip markup;
+        // attribution continues normally while the UI is disabled.
+        var showCardStatsDuringCombat = ViewStatsInjectorPatch.ShowCardStatsDuringCombatEnabled;
+        var tickbox = ViewStatsInjectorPatch.LastInjectedTickbox;
+        var viewStatsEnabled = tickbox?.IsTicked
+            ?? RuntimeOptionsProvider.Current.ViewStatsToggleEnabled;
+        var combatActive = CombatManager.Instance?.IsInProgress == true;
+        if (!ResolveCardStatsEnabled(
+                viewStatsEnabled,
+                combatActive,
+                showCardStatsDuringCombat)) return;
 
-        RuntimeOptionsProvider.Refresh();
         if (RunTracker.AreCardStatsDisabledForActiveCombat())
-            return;
-
-        if (__instance is NHandCardHolder && !RuntimeOptionsProvider.Current.ShowHandTooltips)
             return;
 
         if (IsCardRewardSelectionSurface(__instance))
@@ -58,12 +60,6 @@ public static class CardHoverShowPatch
             StatsTooltip.Hide();
             return;
         }
-
-        // Gate on our checkbox state. If it's not even injected yet (no deck
-        // view opened this session) or unchecked, do nothing.
-        var tickbox = ViewStatsInjectorPatch.LastInjectedTickbox;
-        var viewStatsEnabled = tickbox?.IsTicked ?? RuntimeOptionsProvider.Current.ViewStatsToggleEnabled;
-        if (!viewStatsEnabled) return;
 
         try
         {
@@ -122,6 +118,12 @@ public static class CardHoverShowPatch
             CoreMain.Logger.Error($"CardHoverShow failed: {e.Message}");
         }
     }
+
+    internal static bool ResolveCardStatsEnabled(
+        bool viewStatsEnabled,
+        bool combatActive,
+        bool showCardStatsDuringCombat)
+        => viewStatsEnabled && (!combatActive || showCardStatsDuringCombat);
 
     private static bool IsCardRewardSelectionSurface(Node? node)
     {

@@ -39,6 +39,8 @@ public static class ViewStatsInjectorPatch
 
     public static NTickbox? LastInjectedEnemyStatsTickbox { get; private set; }
 
+    public static NTickbox? LastInjectedCombatCardStatsTickbox { get; private set; }
+
     // Track the active deck-view screen so the toggle handler can trigger
     // a live re-render (via DisplayCards) when the user flips the checkbox.
     // Without this, toggling the checkbox wouldn't show/hide removed cards
@@ -54,18 +56,28 @@ public static class ViewStatsInjectorPatch
         "ViewStats",
         "ViewRemovedCards",
         "ViewEnemyStats",
+        "ViewCombatCardStats",
         "ViewRelicStatsBeforeCollected",
     ];
 
-    // Persist the user's checkbox choice across deck-view open/close cycles
-    // AND across Core hot reloads. Each time the deck view re-opens or Core
-    // reloads, we reset this from the on-disk prefs file. Each toggle writes
-    // the new state back. Cheap disk I/O (single-bool JSON file), worth it
-    // so F5 doesn't keep flipping the checkbox off.
+    // Persist the user's checkbox choices across deck-view open/close cycles
+    // AND across Core hot reloads. Each Core load refreshes them from the
+    // loader-backed mod config, and each toggle writes the complete set back
+    // so changing one control never resets another.
     private static bool _persistedTicked;
     private static bool _persistedShowRemovedCardsTicked = true;
     private static bool _persistedEnemyStatsTicked;
+    private static bool _persistedCombatCardStatsTicked;
     private static bool _prefsLoaded;
+
+    public static bool ShowCardStatsDuringCombatEnabled
+    {
+        get
+        {
+            EnsurePrefsLoaded();
+            return _persistedCombatCardStatsTicked;
+        }
+    }
 
     /// <summary>
     /// Load the checkbox state from disk on first use. Called lazily from
@@ -82,6 +94,7 @@ public static class ViewStatsInjectorPatch
             _persistedTicked = prefs.ViewStatsTicked;
             _persistedShowRemovedCardsTicked = prefs.ShowRemovedCardsTicked;
             _persistedEnemyStatsTicked = prefs.ShowEnemyStatsTicked;
+            _persistedCombatCardStatsTicked = prefs.ShowCombatCardStatsTicked;
         }
         catch (Exception e)
         {
@@ -149,6 +162,7 @@ public static class ViewStatsInjectorPatch
         LastInjectedTickbox = null;
         LastInjectedShowRemovedCardsTickbox = null;
         LastInjectedEnemyStatsTickbox = null;
+        LastInjectedCombatCardStatsTickbox = null;
     }
 
     [HarmonyPostfix]
@@ -187,10 +201,21 @@ public static class ViewStatsInjectorPatch
             "Stats",
             "ViewStatsLabel",
             "spirelens: show stats",
-            new Vector2(0, -180),
+            new Vector2(0, -240),
             _persistedTicked,
             OnStatsToggled,
             tickbox => LastInjectedTickbox = tickbox);
+
+        InjectTickbox(
+            viewUpgradesContainer,
+            "ViewCombatCardStats",
+            "CombatCardStats",
+            "ViewCombatCardStatsLabel",
+            "spirelens: show combat card stats",
+            new Vector2(0, -180),
+            _persistedCombatCardStatsTicked,
+            OnCombatCardStatsToggled,
+            tickbox => LastInjectedCombatCardStatsTickbox = tickbox);
 
         InjectTickbox(
             viewUpgradesContainer,
@@ -377,7 +402,20 @@ public static class ViewStatsInjectorPatch
         CoreMain.Logger.Info($"ViewStats toggled: IsTicked={tickbox.IsTicked}");
 
         if (!tickbox.IsTicked)
+        {
             StatsTooltip.HideIfAnchoredToCreature();
+            StatsTooltip.HideIfAnchoredToCard();
+        }
+    }
+
+    private static void OnCombatCardStatsToggled(NTickbox tickbox)
+    {
+        _persistedCombatCardStatsTicked = tickbox.IsTicked;
+        SavePreferences();
+        CoreMain.Logger.Info($"CombatCardStats toggled: IsTicked={tickbox.IsTicked}");
+
+        if (!tickbox.IsTicked)
+            StatsTooltip.HideIfAnchoredToCard();
     }
 
     private static void OnEnemyStatsToggled(NTickbox tickbox)
@@ -417,6 +455,7 @@ public static class ViewStatsInjectorPatch
             ViewStatsTicked = _persistedTicked,
             ShowRemovedCardsTicked = _persistedShowRemovedCardsTicked,
             ShowEnemyStatsTicked = _persistedEnemyStatsTicked,
+            ShowCombatCardStatsTicked = _persistedCombatCardStatsTicked,
         });
     }
 

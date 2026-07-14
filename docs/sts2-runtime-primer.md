@@ -544,7 +544,7 @@ Card stats are exposed through Godot UI patches, not through game combat state a
 
 Important surfaces:
 
-- `ViewStatsInjectorPatch` hooks `NCardsViewScreen.ConnectSignals`, gates to `NDeckViewScreen`, clones the existing View Upgrades tickbox, rewires duplicated node internals, persists preferences, and reinjects on hot reload if the deck view is already open. Monster hover stats use their own default-off toggle; gate `NCreature.OnFocus` on it before aggregate lookup or tooltip construction so ordinary combat focus stays cheap.
+- `ViewStatsInjectorPatch` hooks `NCardsViewScreen.ConnectSignals`, gates to `NDeckViewScreen`, clones the existing View Upgrades tickbox, rewires duplicated node internals, persists preferences, and reinjects on hot reload if the deck view is already open. Monster hover stats and combat card stats use separate default-off toggles. Gate `NCreature.OnFocus` and combat-time `NCardHolder.CreateHoverTips` before aggregate lookup or tooltip construction; the combat-card control is presentation-only and must not be wired to `DisableCardStatsDuringCombat`, which suppresses attribution itself.
 - `CardHoverTooltipPatch` hooks `NCardHolder.CreateHoverTips` and `ClearHoverTips` to show/hide the SpireLens tooltip.
 - Hand hovers are compact unless verbose hand stats are enabled.
 - Deck view and other card-view hovers can show full lineage and stat breakdown.

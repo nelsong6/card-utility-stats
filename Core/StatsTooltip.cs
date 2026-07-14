@@ -1,6 +1,7 @@
 using System;
 using Godot;
 using MegaCrit.Sts2.Core.Nodes;
+using MegaCrit.Sts2.Core.Nodes.Cards.Holders;
 using MegaCrit.Sts2.Core.Nodes.Combat;
 using MegaCrit.Sts2.Core.Nodes.HoverTips;
 
@@ -323,6 +324,11 @@ public static class StatsTooltip
     public static void HideIfAnchoredToCreature()
     {
         if (_anchor is NCreature) Hide();
+    }
+
+    public static void HideIfAnchoredToCard()
+    {
+        if (_anchor is NCardHolder) Hide();
     }
 
     public static void Destroy()

@@ -88,7 +88,7 @@ When attribution is not naturally one-card-to-one-outcome, the code prefers:
 
 ## UI Surface
 
-- [Core/Patches/ViewStatsInjectorPatch.cs](../Core/Patches/ViewStatsInjectorPatch.cs) injects the deck-view stats, removed-card, and opt-in monster-hover toggles.
+- [Core/Patches/ViewStatsInjectorPatch.cs](../Core/Patches/ViewStatsInjectorPatch.cs) injects the deck-view stats, removed-card, opt-in combat-card, and opt-in monster-hover toggles.
 - [Core/Patches/CardHoverTooltipPatch.cs](../Core/Patches/CardHoverTooltipPatch.cs) builds compact and full tooltip bodies.
 - [Core/StatsTooltip.cs](../Core/StatsTooltip.cs) renders the side tooltip panel.
 - [Config/SpireLensConfig.cs](../Config/SpireLensConfig.cs) provides the persistent mod-settings UI for runtime display options.
@@ -96,6 +96,7 @@ When attribution is not naturally one-card-to-one-outcome, the code prefers:
 Current UI conventions:
 
 - hand tooltips stay compact
+- combat card tooltips are display-only opt-in; disabling them does not disable attribution
 - deck-view tooltips can be fuller and include lineage/context
 - rows should be self-describing
 - loud section headers are discouraged unless they add real clarity

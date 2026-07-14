@@ -12,9 +12,12 @@ public sealed class SpireLensConfig : SimpleModConfig
 
     public static bool ShowEnemyStatsOnHover { get; set; }
 
-    [ConfigSection("Tooltips")]
+    public static bool ShowCardStatsDuringCombat { get; set; }
+
+    [ConfigHideInUI]
     public static bool ShowHandTooltips { get; set; } = true;
 
+    [ConfigSection("Tooltips")]
     public static bool UseVerboseHandStats { get; set; }
 
     [ConfigSection("Performance")]

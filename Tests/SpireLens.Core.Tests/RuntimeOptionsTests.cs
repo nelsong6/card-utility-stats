@@ -55,6 +55,53 @@ public class RuntimeOptionsTests
     }
 
     [Fact]
+    public void CombatCardStats_DefaultOff()
+    {
+        Assert.False(new RuntimeOptions().ShowCardStatsDuringCombat);
+        Assert.False(new Prefs().ShowCombatCardStatsTicked);
+    }
+
+    [Fact]
+    public void CombatCardStats_OlderRuntimeSnapshotDefaultsOff()
+    {
+        var options = JsonSerializer.Deserialize<RuntimeOptions>("{}");
+
+        Assert.NotNull(options);
+        Assert.False(options!.ShowCardStatsDuringCombat);
+    }
+
+    [Fact]
+    public void CombatCardStats_ExplicitRuntimeSnapshotCanEnableIt()
+    {
+        var options = JsonSerializer.Deserialize<RuntimeOptions>(
+            """{"ShowCardStatsDuringCombat":true}""");
+
+        Assert.NotNull(options);
+        Assert.True(options!.ShowCardStatsDuringCombat);
+    }
+
+    [Theory]
+    [InlineData(false, false, false, false)]
+    [InlineData(false, true, true, false)]
+    [InlineData(true, false, false, true)]
+    [InlineData(true, false, true, true)]
+    [InlineData(true, true, false, false)]
+    [InlineData(true, true, true, true)]
+    public void CombatCardStats_RequiresOptInOnlyDuringCombat(
+        bool viewStatsEnabled,
+        bool combatActive,
+        bool showCardStatsDuringCombat,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            CardHoverShowPatch.ResolveCardStatsEnabled(
+                viewStatsEnabled,
+                combatActive,
+                showCardStatsDuringCombat));
+    }
+
+    [Fact]
     public void DisableCardStatsDuringCombat_OnlyPausesActiveCombatCardTracking()
     {
         Assert.True(RunTracker.ShouldTrackCardStatsDuringCombatForTest(
