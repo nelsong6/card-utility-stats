@@ -2125,6 +2125,33 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsIntimidatingHelmetRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("intimidating-helmet-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.INTIMIDATING_HELMET"];
+        Assert.Equal(6, relicAgg.Activations);
+        Assert.Equal(30, relicAgg.AdditionalBlockGained);
+        Assert.Equal(8, relicAgg.IntimidatingHelmetTurns);
+        Assert.Equal(3, relicAgg.IntimidatingHelmetCombats);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsIntimidatingHelmetRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("intimidating-helmet-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.INTIMIDATING_HELMET"];
+        Assert.Equal(6, relicAgg.Activations);
+        Assert.Equal(30, relicAgg.AdditionalBlockGained);
+        Assert.Equal(8, relicAgg.IntimidatingHelmetTurns);
+        Assert.Equal(3, relicAgg.IntimidatingHelmetCombats);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsTuningForkRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("tuning-fork-relic-run.json"));

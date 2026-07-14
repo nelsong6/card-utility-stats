@@ -231,6 +231,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `regalite-relic-run.json`
   Adds Regalite tracking for owner-created combat cards, observed block gained,
   and held turn/combat denominators for average block rows.
+- `intimidating-helmet-relic-run.json`
+  Adds Intimidating Helmet qualifying 2+-Energy card plays, observed block
+  gained, and held turn/combat denominators for average block rows.
 - `kunai-relic-run.json`
   Adds Kunai attack-counter tracking: owner attack plays, activations, observed
   Dexterity gained, and 1/2 charge turn-end buckets with average charge samples.

@@ -385,6 +385,16 @@ ledger.
 
 For relics that grant block after a specific owner-owned condition, arm a narrow block-gain window at the relic callback and let `Hook.AfterBlockGained` record the modified amount. Permafrost follows this pattern from `Permafrost.AfterCardPlayed`: mirror the first-owned-Power condition, count that combat trigger, then derive block per combat from observed block gained divided by triggers.
 
+Intimidating Helmet's `BeforeCardPlayed` condition uses the frozen play-time
+`cardPlay.Resources.EnergyValue`, not printed cost or `EnergySpent`. Normal
+plays therefore use the energy actually paid, resolved X-cost plays use their
+captured X value, and autoplay can qualify at its resolved cost despite spending
+zero energy. The callback immediately awaits the `BlockVar` overload of
+`CreatureCmd.GainBlock`; consume an owner-creature marker at that exact command
+and record its returned post-modifier amount. Use all distinct combats and
+player turns while the relic is held, including zero-trigger ones, as the
+per-combat and per-turn block denominators.
+
 For relics that emit damage commands, prefer the relic-owned callback plus the resolved `CreatureCmd.Damage` result. Mercury Hourglass arms from `MercuryHourglass.AfterPlayerTurnStart`, records the actual multi-target damage split from the command result on each turn, and counts the combat once so damage per combat is not confused with damage per turn-start trigger.
 
 Mr. Struggles follows the same owner-specific turn-start pattern, but its

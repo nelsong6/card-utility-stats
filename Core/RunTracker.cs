@@ -82,6 +82,7 @@ public static class RunTracker
     private static readonly List<Creature> _pendingKusarigamaDamageAttributions = new();
     private static readonly List<Creature> _pendingFestivePopperDamageAttributions = new();
     private static readonly List<Creature> _pendingOrnamentalFanBlockAttributions = new();
+    private static readonly List<Creature> _pendingIntimidatingHelmetBlockAttributions = new();
     private static readonly List<Creature> _pendingMercuryHourglassDamageAttributions = new();
     private static readonly List<Creature> _pendingMrStrugglesDamageAttributions = new();
     private static readonly Dictionary<PowerModel, int> _bronzeScalesThornsContributions = new(ReferenceEqualityComparer.Instance);
@@ -935,6 +936,7 @@ public static class RunTracker
         _pendingKusarigamaDamageAttributions.Clear();
         _pendingFestivePopperDamageAttributions.Clear();
         _pendingOrnamentalFanBlockAttributions.Clear();
+        _pendingIntimidatingHelmetBlockAttributions.Clear();
         _pendingMercuryHourglassDamageAttributions.Clear();
         _pendingMrStrugglesDamageAttributions.Clear();
         _bronzeScalesThornsContributions.Clear();
@@ -1719,6 +1721,8 @@ public static class RunTracker
         target.RegaliteCardsCreated += source.RegaliteCardsCreated;
         target.RegaliteCombats += source.RegaliteCombats;
         target.RegaliteTurns += source.RegaliteTurns;
+        target.IntimidatingHelmetCombats += source.IntimidatingHelmetCombats;
+        target.IntimidatingHelmetTurns += source.IntimidatingHelmetTurns;
 
         target.BookmarkCombats += source.BookmarkCombats;
         target.BookmarkCommonActivations += source.BookmarkCommonActivations;
@@ -2425,6 +2429,7 @@ public static class RunTracker
     private const string ShurikenRelicId = "RELIC.SHURIKEN";
     private const string PaperPhrogRelicId = "RELIC.PAPER_PHROG";
     private const string RegaliteRelicId = "RELIC.REGALITE";
+    private const string IntimidatingHelmetRelicId = "RELIC.INTIMIDATING_HELMET";
     private const string BookmarkRelicId = "RELIC.BOOKMARK";
     private const string BrilliantScarfRelicId = "RELIC.BRILLIANT_SCARF";
     private const string JuzuBraceletRelicId = "RELIC.JUZU_BRACELET";
@@ -6815,6 +6820,118 @@ public static class RunTracker
         }
     }
 
+    /// <summary>
+    /// Count one owner card play that meets Intimidating Helmet's exact
+    /// play-time EnergyValue threshold, then arm the relic's immediately
+    /// following BlockVar gain-block command for observed-result attribution.
+    /// </summary>
+    public static bool RecordIntimidatingHelmetCardPlayedAndArmBlockAttribution(
+        IntimidatingHelmet relic,
+        CardPlay cardPlay,
+        out Creature? ownerCreature)
+    {
+        ownerCreature = null;
+        if (relic?.Owner == null || cardPlay?.Card == null) return false;
+        if (!ReferenceEquals(cardPlay.Card.Owner, relic.Owner)) return false;
+        if (!IntimidatingHelmetEnergyValueQualifiesForTest(
+                cardPlay.Resources.EnergyValue,
+                relic.DynamicVars.Energy.IntValue))
+        {
+            return false;
+        }
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(relic.Owner)) return false;
+                if (CombatManager.Instance?.IsInProgress != true) return false;
+
+                ownerCreature = relic.Owner.Creature;
+                if (ownerCreature == null) return false;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordIntimidatingHelmetCombatForPlayerLocked(relic.Owner);
+                RecordIntimidatingHelmetTurnForPlayerLocked(relic.Owner);
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(IntimidatingHelmetRelicId);
+                RecordIntimidatingHelmetActivationForTest(agg);
+                _pendingIntimidatingHelmetBlockAttributions.Add(ownerCreature);
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordIntimidatingHelmetCardPlayedAndArmBlockAttribution failed: {e.Message}");
+                ownerCreature = null;
+                return false;
+            }
+        }
+    }
+
+    public static bool TryConsumeIntimidatingHelmetBlockAttribution(Creature creature)
+    {
+        if (creature == null) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                return ConsumePendingCreatureAttribution(
+                    _pendingIntimidatingHelmetBlockAttributions,
+                    creature);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"TryConsumeIntimidatingHelmetBlockAttribution failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    public static void DisarmIntimidatingHelmetBlockAttribution(Creature? creature)
+    {
+        if (creature == null) return;
+        lock (_lock)
+            ConsumePendingCreatureAttribution(_pendingIntimidatingHelmetBlockAttributions, creature);
+    }
+
+    public static void RecordIntimidatingHelmetBlockGained(decimal amount)
+    {
+        if (amount <= 0m) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateForCurrentContextLocked(IntimidatingHelmetRelicId);
+                RecordIntimidatingHelmetBlockGainedForTest(agg, amount);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordIntimidatingHelmetBlockGained failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordIntimidatingHelmetTurnStarted(Player player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                _pendingCombat ??= new PendingCombat();
+                RecordIntimidatingHelmetTurnForPlayerLocked(player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordIntimidatingHelmetTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
     internal static void RecordPaperPhrogVulnerableBonusForTest(
         RelicAggregate agg,
         decimal damageAdded,
@@ -6854,6 +6971,33 @@ public static class RunTracker
     {
         if (agg == null) return;
         agg.RegaliteTurns += Math.Max(0, count);
+    }
+
+    internal static bool IntimidatingHelmetEnergyValueQualifiesForTest(int energyValue, int threshold = 2)
+        => energyValue >= threshold;
+
+    internal static void RecordIntimidatingHelmetActivationForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.Activations += Math.Max(0, count);
+    }
+
+    internal static void RecordIntimidatingHelmetBlockGainedForTest(RelicAggregate agg, decimal amount)
+    {
+        if (agg == null || amount <= 0m) return;
+        agg.AdditionalBlockGained += (int)amount;
+    }
+
+    internal static void RecordIntimidatingHelmetCombatForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.IntimidatingHelmetCombats += Math.Max(0, count);
+    }
+
+    internal static void RecordIntimidatingHelmetTurnForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.IntimidatingHelmetTurns += Math.Max(0, count);
     }
 
     internal static void RecordBookmarkCombatForTest(RelicAggregate agg, int count = 1)
@@ -9548,6 +9692,18 @@ public static class RunTracker
         }
     }
 
+    private static bool PlayerHasIntimidatingHelmet(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is IntimidatingHelmet);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static bool PlayerHasJuzuBracelet(Player player)
     {
         try
@@ -9602,6 +9758,7 @@ public static class RunTracker
             RecordPaperPhrogCombatForPlayerLocked(player);
             RecordRazorToothCombatForPlayerLocked(player);
             RecordRegaliteCombatForPlayerLocked(player);
+            RecordIntimidatingHelmetCombatForPlayerLocked(player);
         }
         catch (Exception e)
         {
@@ -9848,6 +10005,36 @@ public static class RunTracker
 
         var agg = GetOrCreatePendingRelicAggregateLocked(RegaliteRelicId);
         RecordRegaliteTurnForTest(agg);
+    }
+
+    private static void RecordIntimidatingHelmetCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasIntimidatingHelmet(player)) return;
+        if (!_pendingCombat.IntimidatingHelmetCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(IntimidatingHelmetRelicId);
+        RecordIntimidatingHelmetCombatForTest(agg);
+    }
+
+    private static void RecordIntimidatingHelmetTurnForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasIntimidatingHelmet(player)) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.IntimidatingHelmetTurnCountedTurns.TryGetValue(player, out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.IntimidatingHelmetTurnCountedTurns[player] = turnNumber;
+        RecordIntimidatingHelmetCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(IntimidatingHelmetRelicId);
+        RecordIntimidatingHelmetTurnForTest(agg);
     }
 
     private static void RecordNutritiousSoupCombatForPlayerLocked(Player player)
@@ -13889,6 +14076,10 @@ internal class PendingCombat
     public HashSet<Player> RegaliteCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> RegaliteTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> IntimidatingHelmetCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> IntimidatingHelmetTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> PaelsEyeCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

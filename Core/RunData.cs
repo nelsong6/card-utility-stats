@@ -649,6 +649,13 @@ public class RelicAggregate
     public int RegaliteCombats { get; set; }
     public int RegaliteTurns { get; set; }
 
+    // Intimidating Helmet tracking. Activations is the number of owner card
+    // plays whose play-time EnergyValue met the relic's 2+ threshold;
+    // AdditionalBlockGained is the observed block. These are held combat/turn
+    // denominators for the requested averages, including zero-trigger periods.
+    public int IntimidatingHelmetCombats { get; set; }
+    public int IntimidatingHelmetTurns { get; set; }
+
     // Bookmark tracking. Activations is total cost-reduction activations;
     // BookmarkCombats is the denominator for average activations per combat.
     public int BookmarkCombats { get; set; }

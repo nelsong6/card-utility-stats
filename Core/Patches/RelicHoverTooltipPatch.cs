@@ -430,6 +430,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is IntimidatingHelmet)
+            {
+                const string relicId = "RELIC.INTIMIDATING_HELMET";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildIntimidatingHelmetBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Intimidating Helmet", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is CloakClasp)
             {
                 const string relicId = "RELIC.CLOAK_CLASP";
@@ -1303,6 +1313,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is IntimidatingHelmet)
+        {
+            title = "Intimidating Helmet";
+            body = BuildIntimidatingHelmetBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is CursedPearl)
         {
             title = "Cursed Pearl";
@@ -2120,6 +2137,23 @@ public static class RelicHoverShowPatch
             : (decimal)agg.AdditionalBlockGained / agg.RegaliteCombats;
 
         Row3(sb, "Cards created", agg.RegaliteCardsCreated.ToString(), "");
+        Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
+        Row3(sb, BlockLabel("avg block per turn"), FormatDecimal(blockPerTurn), "");
+        Row3(sb, BlockLabel("avg block per combat"), FormatDecimal(blockPerCombat), "");
+        return sb.ToString();
+    }
+
+    private static string BuildIntimidatingHelmetBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var blockPerTurn = agg.IntimidatingHelmetTurns <= 0
+            ? 0m
+            : (decimal)agg.AdditionalBlockGained / agg.IntimidatingHelmetTurns;
+        var blockPerCombat = agg.IntimidatingHelmetCombats <= 0
+            ? 0m
+            : (decimal)agg.AdditionalBlockGained / agg.IntimidatingHelmetCombats;
+
+        Row3(sb, "Cards played costing 2+", agg.Activations.ToString(), "");
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
         Row3(sb, BlockLabel("avg block per turn"), FormatDecimal(blockPerTurn), "");
         Row3(sb, BlockLabel("avg block per combat"), FormatDecimal(blockPerCombat), "");
