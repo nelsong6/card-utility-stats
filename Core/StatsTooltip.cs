@@ -320,6 +320,11 @@ public static class StatsTooltip
         Hide();
     }
 
+    public static void HideIfAnchoredToCreature()
+    {
+        if (_anchor is NCreature) Hide();
+    }
+
     public static void Destroy()
     {
         if (_tree != null && _frameHandler != null)

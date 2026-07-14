@@ -37,6 +37,8 @@ public static class ViewStatsInjectorPatch
 
     public static NTickbox? LastInjectedShowRemovedCardsTickbox { get; private set; }
 
+    public static NTickbox? LastInjectedEnemyStatsTickbox { get; private set; }
+
     // Track the active deck-view screen so the toggle handler can trigger
     // a live re-render (via DisplayCards) when the user flips the checkbox.
     // Without this, toggling the checkbox wouldn't show/hide removed cards
@@ -51,6 +53,7 @@ public static class ViewStatsInjectorPatch
     [
         "ViewStats",
         "ViewRemovedCards",
+        "ViewEnemyStats",
         "ViewRelicStatsBeforeCollected",
     ];
 
@@ -61,6 +64,7 @@ public static class ViewStatsInjectorPatch
     // so F5 doesn't keep flipping the checkbox off.
     private static bool _persistedTicked;
     private static bool _persistedShowRemovedCardsTicked = true;
+    private static bool _persistedEnemyStatsTicked;
     private static bool _prefsLoaded;
 
     /// <summary>
@@ -77,6 +81,7 @@ public static class ViewStatsInjectorPatch
             var prefs = PrefsStorage.Load();
             _persistedTicked = prefs.ViewStatsTicked;
             _persistedShowRemovedCardsTicked = prefs.ShowRemovedCardsTicked;
+            _persistedEnemyStatsTicked = prefs.ShowEnemyStatsTicked;
         }
         catch (Exception e)
         {
@@ -143,6 +148,7 @@ public static class ViewStatsInjectorPatch
         _injectedClones.Clear();
         LastInjectedTickbox = null;
         LastInjectedShowRemovedCardsTickbox = null;
+        LastInjectedEnemyStatsTickbox = null;
     }
 
     [HarmonyPostfix]
@@ -181,10 +187,21 @@ public static class ViewStatsInjectorPatch
             "Stats",
             "ViewStatsLabel",
             "spirelens: show stats",
-            new Vector2(0, -120),
+            new Vector2(0, -180),
             _persistedTicked,
             OnStatsToggled,
             tickbox => LastInjectedTickbox = tickbox);
+
+        InjectTickbox(
+            viewUpgradesContainer,
+            "ViewEnemyStats",
+            "EnemyStats",
+            "ViewEnemyStatsLabel",
+            "spirelens: show monster stats",
+            new Vector2(0, -120),
+            _persistedEnemyStatsTicked,
+            OnEnemyStatsToggled,
+            tickbox => LastInjectedEnemyStatsTickbox = tickbox);
 
         InjectTickbox(
             viewUpgradesContainer,
@@ -356,22 +373,27 @@ public static class ViewStatsInjectorPatch
         // every time they close and reopen the deck view.
         _persistedTicked = tickbox.IsTicked;
         // Persist to disk so F5 / game restart reloads with the same state.
-        PrefsStorage.Save(new Prefs
-        {
-            ViewStatsTicked = _persistedTicked,
-            ShowRemovedCardsTicked = _persistedShowRemovedCardsTicked,
-        });
+        SavePreferences();
         CoreMain.Logger.Info($"ViewStats toggled: IsTicked={tickbox.IsTicked}");
+
+        if (!tickbox.IsTicked)
+            StatsTooltip.HideIfAnchoredToCreature();
+    }
+
+    private static void OnEnemyStatsToggled(NTickbox tickbox)
+    {
+        _persistedEnemyStatsTicked = tickbox.IsTicked;
+        SavePreferences();
+        CoreMain.Logger.Info($"EnemyStats toggled: IsTicked={tickbox.IsTicked}");
+
+        if (!tickbox.IsTicked)
+            StatsTooltip.HideIfAnchoredToCreature();
     }
 
     private static void OnShowRemovedCardsToggled(NTickbox tickbox)
     {
         _persistedShowRemovedCardsTicked = tickbox.IsTicked;
-        PrefsStorage.Save(new Prefs
-        {
-            ViewStatsTicked = _persistedTicked,
-            ShowRemovedCardsTicked = _persistedShowRemovedCardsTicked,
-        });
+        SavePreferences();
         CoreMain.Logger.Info($"ShowRemovedCards toggled: IsTicked={tickbox.IsTicked}");
 
         // Live re-render so removed cards appear/disappear the moment the
@@ -386,6 +408,16 @@ public static class ViewStatsInjectorPatch
         {
             CoreMain.Logger.Error($"DisplayCards re-render failed: {e.Message}");
         }
+    }
+
+    private static void SavePreferences()
+    {
+        PrefsStorage.Save(new Prefs
+        {
+            ViewStatsTicked = _persistedTicked,
+            ShowRemovedCardsTicked = _persistedShowRemovedCardsTicked,
+            ShowEnemyStatsTicked = _persistedEnemyStatsTicked,
+        });
     }
 
     private static void SetOwnerRecursive(Node node, Node owner)

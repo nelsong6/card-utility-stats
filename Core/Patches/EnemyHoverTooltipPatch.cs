@@ -16,8 +16,13 @@ public static class EnemyHoverShowPatch
         try
         {
             var tickbox = ViewStatsInjectorPatch.LastInjectedTickbox;
-            var viewStatsEnabled = tickbox?.IsTicked ?? RuntimeOptionsProvider.Current.ViewStatsToggleEnabled;
-            if (!viewStatsEnabled) return;
+            var viewStatsEnabled = tickbox?.IsTicked
+                ?? RuntimeOptionsProvider.Current.ViewStatsToggleEnabled;
+            var enemyStatsTickbox = ViewStatsInjectorPatch.LastInjectedEnemyStatsTickbox;
+            if (!ResolveEnemyStatsEnabled(
+                    viewStatsEnabled,
+                    enemyStatsTickbox?.IsTicked,
+                    RuntimeOptionsProvider.Current.ShowEnemyStatsOnHover)) return;
 
             var creature = __instance.Entity;
             var monster = creature?.Monster;
@@ -44,6 +49,12 @@ public static class EnemyHoverShowPatch
             CoreMain.Logger.Error($"EnemyHoverShowPatch failed: {e.Message}");
         }
     }
+
+    internal static bool ResolveEnemyStatsEnabled(
+        bool viewStatsEnabled,
+        bool? injectedEnemyToggleState,
+        bool persistedEnemyPreference)
+        => viewStatsEnabled && (injectedEnemyToggleState ?? persistedEnemyPreference);
 
     internal static string BuildEnemyBodyBBCode(EnemyAggregate agg)
     {

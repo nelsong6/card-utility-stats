@@ -15,6 +15,9 @@ public class Prefs
 
     [JsonPropertyName("show_removed_cards_ticked")]
     public bool ShowRemovedCardsTicked { get; set; } = true;
+
+    [JsonPropertyName("show_enemy_stats_ticked")]
+    public bool ShowEnemyStatsTicked { get; set; }
 }
 
 public static class PrefsStorage
@@ -28,6 +31,7 @@ public static class PrefsStorage
             {
                 ViewStatsTicked = options.ViewStatsToggleEnabled,
                 ShowRemovedCardsTicked = options.ShowRemovedCardsInDeckView,
+                ShowEnemyStatsTicked = options.ShowEnemyStatsOnHover,
             };
         }
         catch (Exception e)
@@ -43,6 +47,7 @@ public static class PrefsStorage
         {
             RuntimeOptionsProvider.SetViewStatsToggleEnabled(prefs.ViewStatsTicked);
             RuntimeOptionsProvider.SetShowRemovedCardsInDeckView(prefs.ShowRemovedCardsTicked);
+            RuntimeOptionsProvider.SetShowEnemyStatsOnHover(prefs.ShowEnemyStatsTicked);
         }
         catch (Exception e)
         {

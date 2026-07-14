@@ -88,7 +88,7 @@ When attribution is not naturally one-card-to-one-outcome, the code prefers:
 
 ## UI Surface
 
-- [Core/Patches/ViewStatsInjectorPatch.cs](../Core/Patches/ViewStatsInjectorPatch.cs) injects the `View Stats` toggle into the deck view.
+- [Core/Patches/ViewStatsInjectorPatch.cs](../Core/Patches/ViewStatsInjectorPatch.cs) injects the deck-view stats, removed-card, and opt-in monster-hover toggles.
 - [Core/Patches/CardHoverTooltipPatch.cs](../Core/Patches/CardHoverTooltipPatch.cs) builds compact and full tooltip bodies.
 - [Core/StatsTooltip.cs](../Core/StatsTooltip.cs) renders the side tooltip panel.
 - [Config/SpireLensConfig.cs](../Config/SpireLensConfig.cs) provides the persistent mod-settings UI for runtime display options.

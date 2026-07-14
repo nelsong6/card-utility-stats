@@ -10,6 +10,8 @@ public sealed class SpireLensConfig : SimpleModConfig
 
     public static bool ShowRemovedCardsInDeckView { get; set; } = true;
 
+    public static bool ShowEnemyStatsOnHover { get; set; }
+
     [ConfigSection("Tooltips")]
     public static bool ShowHandTooltips { get; set; } = true;
 
