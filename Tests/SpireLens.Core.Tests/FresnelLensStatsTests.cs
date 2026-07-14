@@ -130,7 +130,7 @@ public class FresnelLensStatsTests
 
         Assert.Contains("Original max HP", body);
         Assert.Contains("New max HP", body);
-        Assert.Contains("Max HP lost", body);
+        Assert.Contains("Max HP lost to Drowning Beacon", body);
         Assert.Contains("Nimble cards taken", body);
         Assert.Contains("Reward screens with Nimble cards", body);
         Assert.Contains("Reward screens with 2 Nimble cards", body);

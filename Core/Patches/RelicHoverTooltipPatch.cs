@@ -2073,7 +2073,7 @@ public static class RelicHoverShowPatch
     private static string BuildFresnelLensBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        AppendMaxHpChangeRows(sb, agg, "Max HP lost", MaxHpLost(agg));
+        AppendMaxHpChangeRows(sb, agg, "Max HP lost to Drowning Beacon", MaxHpLost(agg));
         Row3(sb, "Nimble cards taken", agg.NimbleCardsTaken.ToString(), "");
         Row3(sb, "Reward screens with Nimble cards", agg.RewardScreensWithNimbleCards.ToString(), "");
         Row3(sb, "Reward screens with 2 Nimble cards", agg.RewardScreensWithTwoNimbleCards.ToString(), "");
