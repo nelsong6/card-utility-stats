@@ -12,9 +12,10 @@ using MegaCrit.Sts2.Core.Platform;
 namespace SpireLens.Core.Patches;
 
 /// <summary>
-/// Toggles the persisted global stats visibility setting with Left Shift.
-/// The game does not bind Shift in its default or current gameplay map, while
-/// Left Trigger is intentionally left alone because it opens the draw pile.
+/// Toggles the persisted global stats visibility setting with Left Shift or
+/// Right Stick press (R3). The game does not bind either input in its default
+/// or current gameplay map, while Left Trigger is intentionally left alone
+/// because it opens the draw pile and Left Stick press is Peek.
 /// </summary>
 [HarmonyPatch]
 public static class StatsVisibilityHotkeyPatch
@@ -34,18 +35,40 @@ public static class StatsVisibilityHotkeyPatch
     {
         try
         {
-            if (evt is not InputEventKey keyEvent) return;
-            if (!TapTracker.Process(
-                    keyEvent.Keycode,
-                    keyEvent.PhysicalKeycode,
-                    keyEvent.Location,
-                    keyEvent.Pressed,
-                    keyEvent.Echo)) return;
+            string toggleSource;
+            if (evt is InputEventKey keyEvent)
+            {
+                if (!TapTracker.Process(
+                        keyEvent.Keycode,
+                        keyEvent.PhysicalKeycode,
+                        keyEvent.Location,
+                        keyEvent.Pressed,
+                        keyEvent.Echo)) return;
+
+                toggleSource = "Left Shift hotkey";
+            }
+            else if (evt is InputEventJoypadButton joypadEvent
+                     && IsRightStickPress(joypadEvent.ButtonIndex, joypadEvent.Pressed))
+            {
+                toggleSource = "R3 hotkey";
+            }
+            else
+            {
+                return;
+            }
 
             var inputManager = NInputManager.Instance;
             if (inputManager == null || !CanToggle(inputManager)) return;
 
-            ViewStatsInjectorPatch.ToggleStatsVisibility("Left Shift hotkey");
+            // Shift is free in the shipped and current mappings. If the player
+            // later assigns it to a game action, the game binding wins and the
+            // keyboard shortcut quietly disables itself. R3 is not exposed as
+            // a remappable game action, so it cannot collide through this map.
+            if (evt is InputEventKey
+                && NInputManager.remappableKeyboardInputs.Any(
+                    action => inputManager.GetShortcutKey(action) == Key.Shift)) return;
+
+            ViewStatsInjectorPatch.ToggleStatsVisibility(toggleSource);
         }
         catch (Exception e)
         {
@@ -67,12 +90,11 @@ public static class StatsVisibilityHotkeyPatch
         var tree = viewport?.GetTree();
         if (tree != null && HasActiveInputRebind(tree.Root)) return false;
 
-        // Shift is free in the shipped and current mappings. If the player
-        // later assigns it to a game action, the game binding wins and this
-        // shortcut quietly disables itself.
-        return !NInputManager.remappableKeyboardInputs.Any(
-            action => inputManager.GetShortcutKey(action) == Key.Shift);
+        return true;
     }
+
+    internal static bool IsRightStickPress(JoyButton buttonIndex, bool pressed)
+        => pressed && buttonIndex == JoyButton.RightStick;
 
     private static bool HasActiveInputRebind(Node? node)
     {

@@ -90,7 +90,7 @@ When attribution is not naturally one-card-to-one-outcome, the code prefers:
 ## UI Surface
 
 - [Core/Patches/ViewStatsInjectorPatch.cs](../Core/Patches/ViewStatsInjectorPatch.cs) injects the deck-view master, card-stats, removed-card, and opt-in monster-hover toggles.
-- [Core/Patches/StatsVisibilityHotkeyPatch.cs](../Core/Patches/StatsVisibilityHotkeyPatch.cs) maps a standalone Left Shift tap to the same persisted global visibility state while preserving Shift-based chords; Left Trigger remains reserved for the game's Draw Pile action.
+- [Core/Patches/StatsVisibilityHotkeyPatch.cs](../Core/Patches/StatsVisibilityHotkeyPatch.cs) maps a standalone Left Shift tap and Right Stick (R3) press to the same persisted global visibility state while preserving Shift-based chords; Left Trigger remains Draw Pile and Left Stick press remains Peek.
 - [Core/Patches/CardHoverTooltipPatch.cs](../Core/Patches/CardHoverTooltipPatch.cs) builds compact and full tooltip bodies.
 - [Core/StatsTooltip.cs](../Core/StatsTooltip.cs) renders the side tooltip panel.
 - [Config/SpireLensConfig.cs](../Config/SpireLensConfig.cs) provides the persistent mod-settings UI for runtime display options.

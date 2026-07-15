@@ -68,6 +68,21 @@ public class StatsVisibilityHotkeyTests
         Assert.False(Process(tracker, Key.Shift, pressed: false));
     }
 
+    [Theory]
+    [InlineData(JoyButton.RightStick, true, true)]
+    [InlineData(JoyButton.RightStick, false, false)]
+    [InlineData(JoyButton.LeftStick, true, false)]
+    [InlineData(JoyButton.A, true, false)]
+    public void IsRightStickPress_RequiresPressedR3(
+        JoyButton buttonIndex,
+        bool pressed,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            StatsVisibilityHotkeyPatch.IsRightStickPress(buttonIndex, pressed));
+    }
+
     private static bool Process(
         LeftShiftTapTracker tracker,
         Key key,

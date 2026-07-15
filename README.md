@@ -37,12 +37,13 @@ Existing stats mods answer "how often did I *pick* this card" ([SlayTheStats](ht
 
 A **"SpireLens: on/off"** checkbox sits next to the game's existing "View Upgrades" toggle on the in-run deck view. It is the master switch for SpireLens tooltip stats and coexists with the game's built-in hover tips rather than replacing them.
 
-Tap **Left Shift** to toggle the same global stats-visibility setting during
-normal play. Shift-based chords such as Steam's Shift+Tab are left alone.
+Tap **Left Shift** on keyboard or press **Right Stick (R3)** on controller to
+toggle the same global stats-visibility setting during normal play. Shift-based
+chords such as Steam's Shift+Tab are left alone.
 Turning stats off hides any open SpireLens panel and skips aggregate
 lookup and tooltip construction while stats are hidden; attribution continues
 in the background. Controller Left Trigger remains the game's Draw Pile input,
-so it is intentionally not claimed by SpireLens.
+and Left Stick press remains Peek, so neither is claimed by SpireLens.
 
 A separate, default-off **"SpireLens: card stats"** checkbox controls per-card panels on every supported card surface, including the deck, hand, combat piles, and run history. It changes presentation only: card attribution continues to be recorded while the checkbox is off. Hand hovers stay compact unless verbose hand stats are enabled.
 
