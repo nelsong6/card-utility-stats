@@ -95,6 +95,9 @@ public static class RunTracker
     private static readonly HashSet<PotionReward> _whiteBeastPotionRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, PendingPaelSacrificeReward> _paelSacrificeRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, PendingFresnelLensReward> _fresnelLensRewards = new(ReferenceEqualityComparer.Instance);
+    private static readonly Dictionary<CardReward, PendingSilverCrucibleReward> _silverCrucibleRewards = new(ReferenceEqualityComparer.Instance);
+    private static readonly List<int> _silverCrucibleRestoreBatchScreenNumbers = new();
+    private static int _silverCrucibleRestoreBatchDepth;
     private static readonly Dictionary<Player, PendingRegalPillowRestHeal> _pendingRegalPillowRestHeals = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<Player, PendingPrecariousShearsPickup> _pendingPrecariousShearsPickups = new(ReferenceEqualityComparer.Instance);
     private static readonly HashSet<Player> _pendingLeafyPoulticePickups = new(ReferenceEqualityComparer.Instance);
@@ -965,6 +968,9 @@ public static class RunTracker
         _pendingHeftyTabletChoicePlayers.Clear();
         _paelSacrificeRewards.Clear();
         _fresnelLensRewards.Clear();
+        _silverCrucibleRewards.Clear();
+        _silverCrucibleRestoreBatchScreenNumbers.Clear();
+        _silverCrucibleRestoreBatchDepth = 0;
         _pendingRegalPillowRestHeals.Clear();
         _pendingPrecariousShearsPickups.Clear();
         _pendingLeafyPoulticePickups.Clear();
@@ -1760,6 +1766,7 @@ public static class RunTracker
         target.RewardScreensWithThreeOrMoreNimbleCards += source.RewardScreensWithThreeOrMoreNimbleCards;
         target.RewardScreensWithoutNimbleCards += source.RewardScreensWithoutNimbleCards;
         target.RewardScreensWithNimbleCardsButNoneTaken += source.RewardScreensWithNimbleCardsButNoneTaken;
+        MergeCardRewardScreens(target, source);
         MergeCardRewardCategories(target.CardRewardCategories, source.CardRewardCategories);
         MergeRelicCardsGranted(target.CardsGranted, source.CardsGranted);
         target.CardChoicesSkipped += source.CardChoicesSkipped;
@@ -2483,6 +2490,7 @@ public static class RunTracker
     private const string HornCleatRelicId = "RELIC.HORN_CLEAT";
     private const string PrismaticGemRelicId = "RELIC.PRISMATIC_GEM";
     private const string FresnelLensRelicId = "RELIC.FRESNEL_LENS";
+    private const string SilverCrucibleRelicId = "RELIC.SILVER_CRUCIBLE";
     private const string BloodSoakedRoseRelicId = "RELIC.BLOOD_SOAKED_ROSE";
     private const string CursedPearlRelicId = "RELIC.CURSED_PEARL";
     private const string CloakClaspRelicId = "RELIC.CLOAK_CLASP";
@@ -9085,6 +9093,389 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Arm one of Silver Crucible's three charge-consuming card rewards after
+    /// Populate has finished. The screen number comes from the relic's saved
+    /// TimesUsed value, while the option snapshot preserves the final visible
+    /// order and CardCreationResult identity for observed taken attribution.
+    /// </summary>
+    public static void NoteSilverCrucibleRewardGenerated(CardReward reward, int screenNumber)
+    {
+        if (reward == null || screenNumber is < 1 or > 3) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(reward.Player)) return;
+
+                var pending = new PendingSilverCrucibleReward(screenNumber, CurrentRunFloorLocked());
+                CaptureSilverCrucibleRewardOptionsLocked(pending, reward);
+                _silverCrucibleRewards[reward] = pending;
+                _silverCrucibleRestoreBatchScreenNumbers.Remove(screenNumber);
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(SilverCrucibleRelicId);
+                RecordSilverCrucibleRewardForTest(
+                    agg,
+                    BuildSilverCrucibleRewardScreenLocked(pending, remaining: null, resolved: false));
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"NoteSilverCrucibleRewardGenerated failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Refresh the display snapshot immediately before the card selection is
+    /// shown. Relics obtained from another reward on the same page can modify
+    /// CardCreationResult.Card after Populate while preserving the result
+    /// object's identity. Reopenings refresh only while every original result
+    /// is still present, so a multi-pick hook can never erase an earlier take.
+    /// </summary>
+    public static void NoteSilverCrucibleRewardOpened(CardReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_silverCrucibleRewards.TryGetValue(reward, out var pending)
+                    && !TryRestoreSilverCrucibleRewardLocked(reward, allowBatchFallback: false, out pending))
+                    return;
+
+                var currentResults = new HashSet<CardCreationResult>(
+                    reward._cards,
+                    ReferenceEqualityComparer.Instance);
+                var canRefresh = !pending.SelectionOpened
+                    || (pending.Cards.Count == currentResults.Count
+                        && pending.Cards.All(card => currentResults.Contains(card.Result)));
+                if (!canRefresh) return;
+
+                CaptureSilverCrucibleRewardOptionsLocked(pending, reward);
+                pending.SelectionOpened = true;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(SilverCrucibleRelicId);
+                RecordSilverCrucibleRewardForTest(
+                    agg,
+                    BuildSilverCrucibleRewardScreenLocked(pending, remaining: null, resolved: false));
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"NoteSilverCrucibleRewardOpened failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Finalize a Silver Crucible reward at an observed terminal boundary:
+    /// successful CardReward completion, outer rewards-page skip, or the
+    /// pre-clear side of a Driftwood reroll. CardReward removes a
+    /// CardCreationResult only after that card successfully enters the deck,
+    /// so missing result references are the cards actually taken.
+    /// </summary>
+    public static void RecordSilverCrucibleRewardResolved(CardReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_silverCrucibleRewards.TryGetValue(reward, out var pending)
+                    && !TryRestoreSilverCrucibleRewardLocked(reward, allowBatchFallback: false, out pending))
+                    return;
+
+                _silverCrucibleRewards.Remove(reward);
+                if (!IsTrackedPlayer(reward.Player)) return;
+
+                var remaining = new HashSet<CardCreationResult>(reward._cards, ReferenceEqualityComparer.Instance);
+                var screen = BuildSilverCrucibleRewardScreenLocked(pending, remaining, resolved: true);
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(SilverCrucibleRelicId);
+                RecordSilverCrucibleRewardForTest(agg, screen);
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordSilverCrucibleRewardResolved failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void PreserveSilverCrucibleRewardAfterFault(CardReward reward)
+    {
+        // Keep both the live binding and the persisted unresolved screen. A
+        // fault is not an observed skip/take boundary, and unbinding it would
+        // make the same screen eligible for an unrelated reward restore.
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_silverCrucibleRewards.ContainsKey(reward)) return;
+                TryRestoreSilverCrucibleRewardLocked(reward, allowBatchFallback: false, out _);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"PreserveSilverCrucibleRewardAfterFault failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Open a tightly bounded ordered-restore window around one
+    /// RewardsSet.GenerateWithoutOffering call. Continued combat rooms rebuild
+    /// CardReward options rather than serializing them, so signatures may
+    /// differ; within this one generation batch, sequential Populate calls are
+    /// the stable fallback for the saved Silver use order.
+    /// </summary>
+    public static bool BeginSilverCrucibleRewardRestoreBatch(Player player)
+    {
+        if (player == null) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return false;
+                if (player.Relics?.Any(relic => relic is SilverCrucible) != true) return false;
+
+                if (_silverCrucibleRestoreBatchDepth > 0)
+                {
+                    _silverCrucibleRestoreBatchDepth += 1;
+                    return true;
+                }
+
+                EnsureLazyCurrentRunLocked();
+                if (!_currentRun.RelicAggregates.TryGetValue(SilverCrucibleRelicId, out var agg))
+                    return false;
+
+                var candidates = GetUnboundUnresolvedSilverCrucibleScreensLocked(agg);
+                if (candidates.Count == 0) return false;
+
+                _silverCrucibleRestoreBatchScreenNumbers.Clear();
+                _silverCrucibleRestoreBatchScreenNumbers.AddRange(
+                    candidates.Select(screen => screen.ScreenNumber));
+                _silverCrucibleRestoreBatchDepth = 1;
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"BeginSilverCrucibleRewardRestoreBatch failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    public static void EndSilverCrucibleRewardRestoreBatch()
+    {
+        lock (_lock)
+        {
+            if (_silverCrucibleRestoreBatchDepth <= 0) return;
+
+            _silverCrucibleRestoreBatchDepth -= 1;
+            if (_silverCrucibleRestoreBatchDepth == 0)
+                _silverCrucibleRestoreBatchScreenNumbers.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Rebind a generated-but-unresolved screen after a Core hot reload or a
+    /// continued rewards page. Exact ordered card signatures are preferred;
+    /// when Continue regenerates different cards, ordered fallback is allowed
+    /// only inside that reward set's bounded generation batch.
+    /// </summary>
+    public static void RestoreSilverCrucibleRewardAfterPopulate(CardReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_silverCrucibleRewards.ContainsKey(reward)) return;
+                if (!TryRestoreSilverCrucibleRewardLocked(
+                        reward,
+                        allowBatchFallback: _silverCrucibleRestoreBatchDepth > 0,
+                        out var pending))
+                    return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(SilverCrucibleRelicId);
+                RecordSilverCrucibleRewardForTest(
+                    agg,
+                    BuildSilverCrucibleRewardScreenLocked(pending, remaining: null, resolved: false));
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RestoreSilverCrucibleRewardAfterPopulate failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordSilverCrucibleRewardForTest(
+        RelicAggregate agg,
+        RelicCardRewardScreenAggregate screen)
+    {
+        if (agg == null || screen == null || screen.ScreenNumber is < 1 or > 3) return;
+
+        var copy = new RelicCardRewardScreenAggregate
+        {
+            ScreenNumber = screen.ScreenNumber,
+            Floor = screen.Floor,
+            Resolved = screen.Resolved,
+            Cards = (screen.Cards ?? new List<RelicCardRewardOptionAggregate>())
+                .Where(card => card != null)
+                .Select(card => new RelicCardRewardOptionAggregate
+                {
+                    CardId = card.CardId ?? "",
+                    DisplayName = card.DisplayName ?? "",
+                    UpgradeLevel = Math.Max(0, card.UpgradeLevel),
+                    Taken = card.Taken,
+                })
+                .ToList(),
+        };
+
+        agg.CardRewardScreens ??= new List<RelicCardRewardScreenAggregate>();
+        var existingIndex = agg.CardRewardScreens.FindIndex(candidate =>
+            candidate != null && candidate.ScreenNumber == copy.ScreenNumber);
+        if (existingIndex >= 0)
+            agg.CardRewardScreens[existingIndex] = copy;
+        else
+            agg.CardRewardScreens.Add(copy);
+
+        agg.CardRewardScreens.Sort((left, right) =>
+            (left?.ScreenNumber ?? int.MaxValue).CompareTo(right?.ScreenNumber ?? int.MaxValue));
+    }
+
+    private static void CaptureSilverCrucibleRewardOptionsLocked(
+        PendingSilverCrucibleReward pending,
+        CardReward reward)
+    {
+        pending.Cards.Clear();
+        foreach (var option in reward._cards)
+        {
+            var card = option?.Card;
+            if (option == null || card == null) continue;
+
+            pending.Cards.Add(new PendingSilverCrucibleCard
+            {
+                Result = option,
+                CardId = GetRewardCardIdForStats(card),
+                DisplayName = GetRewardCardDisplayNameForStats(card),
+                UpgradeLevel = GetRewardCardUpgradeLevelForStats(card),
+            });
+        }
+    }
+
+    private static RelicCardRewardScreenAggregate BuildSilverCrucibleRewardScreenLocked(
+        PendingSilverCrucibleReward pending,
+        HashSet<CardCreationResult>? remaining,
+        bool resolved)
+    {
+        return new RelicCardRewardScreenAggregate
+        {
+            ScreenNumber = pending.ScreenNumber,
+            Floor = pending.Floor,
+            Resolved = resolved,
+            Cards = pending.Cards.Select(card => new RelicCardRewardOptionAggregate
+            {
+                CardId = card.CardId,
+                DisplayName = card.DisplayName,
+                UpgradeLevel = card.UpgradeLevel,
+                Taken = resolved && remaining != null && !remaining.Contains(card.Result),
+            }).ToList(),
+        };
+    }
+
+    private static bool TryRestoreSilverCrucibleRewardLocked(
+        CardReward reward,
+        bool allowBatchFallback,
+        [NotNullWhen(true)] out PendingSilverCrucibleReward? pending)
+    {
+        pending = null;
+        if (!IsTrackedPlayer(reward.Player)) return false;
+
+        EnsureLazyCurrentRunLocked();
+        if (!_currentRun.RelicAggregates.TryGetValue(SilverCrucibleRelicId, out var agg))
+            return false;
+
+        var candidates = GetUnboundUnresolvedSilverCrucibleScreensLocked(agg);
+        if (candidates.Count == 0) return false;
+
+        var matching = candidates
+            .Where(screen => SilverCrucibleScreenMatchesReward(screen, reward))
+            .ToList();
+        var selected = matching.FirstOrDefault();
+        if (selected == null
+            && allowBatchFallback
+            && _silverCrucibleRestoreBatchDepth > 0)
+        {
+            selected = _silverCrucibleRestoreBatchScreenNumbers
+                .Select(screenNumber => candidates.FirstOrDefault(screen => screen.ScreenNumber == screenNumber))
+                .FirstOrDefault(screen => screen != null);
+        }
+        if (selected == null) return false;
+
+        _silverCrucibleRestoreBatchScreenNumbers.Remove(selected.ScreenNumber);
+        pending = new PendingSilverCrucibleReward(selected.ScreenNumber, selected.Floor);
+        CaptureSilverCrucibleRewardOptionsLocked(pending, reward);
+        _silverCrucibleRewards[reward] = pending;
+        return true;
+    }
+
+    private static List<RelicCardRewardScreenAggregate> GetUnboundUnresolvedSilverCrucibleScreensLocked(
+        RelicAggregate agg)
+    {
+        var boundScreenNumbers = _silverCrucibleRewards.Values
+            .Select(candidate => candidate.ScreenNumber)
+            .ToHashSet();
+        var currentFloor = CurrentRunFloorLocked();
+
+        return (agg.CardRewardScreens ?? new List<RelicCardRewardScreenAggregate>())
+            .Where(screen => screen != null
+                && !screen.Resolved
+                && screen.ScreenNumber is >= 1 and <= 3
+                && !boundScreenNumbers.Contains(screen.ScreenNumber)
+                && (!screen.Floor.HasValue
+                    || !currentFloor.HasValue
+                    || screen.Floor.Value == currentFloor.Value))
+            .OrderBy(screen => screen.ScreenNumber)
+            .ToList();
+    }
+
+    private static bool SilverCrucibleScreenMatchesReward(
+        RelicCardRewardScreenAggregate screen,
+        CardReward reward)
+    {
+        var savedCards = screen.Cards ?? new List<RelicCardRewardOptionAggregate>();
+        var currentCards = reward._cards
+            .Where(option => option?.Card != null)
+            .Select(option => option.Card)
+            .ToList();
+        if (savedCards.Count != currentCards.Count) return false;
+
+        for (var index = 0; index < savedCards.Count; index++)
+        {
+            var saved = savedCards[index];
+            var current = currentCards[index];
+            if (saved == null || current == null) return false;
+            if (!string.Equals(saved.CardId, GetRewardCardIdForStats(current), StringComparison.Ordinal))
+                return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
     /// Record that Prismatic Gem modified one card reward's creation options.
     /// Card rewards are created outside combat, so persist directly to the
     /// committed run instead of waiting for a combat boundary.
@@ -10898,6 +11289,14 @@ public static class RunTracker
         target.UpgradedCards.AddRange(source.UpgradedCards.Where(card => !string.IsNullOrWhiteSpace(card)));
     }
 
+    private static void MergeCardRewardScreens(RelicAggregate target, RelicAggregate source)
+    {
+        if (source.CardRewardScreens == null || source.CardRewardScreens.Count == 0) return;
+
+        foreach (var screen in source.CardRewardScreens)
+            RecordSilverCrucibleRewardForTest(target, screen);
+    }
+
     private static void MergeCardRewardCategories(
         Dictionary<string, CardRewardCategoryAggregate> target,
         Dictionary<string, CardRewardCategoryAggregate>? source)
@@ -11269,6 +11668,34 @@ public static class RunTracker
             try { return card.Id.ToString(); }
             catch { return ""; }
         }
+    }
+
+    private static string GetRewardCardIdForStats(CardModel card)
+    {
+        try { return card.Id.ToString(); }
+        catch { return ""; }
+    }
+
+    private static string GetRewardCardDisplayNameForStats(CardModel card)
+    {
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(card.Title))
+                return card.Title;
+
+            return FormatCardIdForDisplay(card.Id.ToString());
+        }
+        catch
+        {
+            try { return FormatCardIdForDisplay(card.Id.ToString()); }
+            catch { return "Unknown card"; }
+        }
+    }
+
+    private static int GetRewardCardUpgradeLevelForStats(CardModel card)
+    {
+        try { return Math.Max(0, card.CurrentUpgradeLevel); }
+        catch { return 0; }
     }
 
     private static int TryGetPileTypeSortValue(CardModel card)
@@ -14148,6 +14575,28 @@ internal sealed class PendingFresnelLensReward
 
         return result;
     }
+}
+
+internal sealed class PendingSilverCrucibleReward
+{
+    public PendingSilverCrucibleReward(int screenNumber, int? floor)
+    {
+        ScreenNumber = screenNumber;
+        Floor = floor;
+    }
+
+    public int ScreenNumber { get; }
+    public int? Floor { get; }
+    public bool SelectionOpened { get; set; }
+    public List<PendingSilverCrucibleCard> Cards { get; } = new();
+}
+
+internal sealed class PendingSilverCrucibleCard
+{
+    public required CardCreationResult Result { get; init; }
+    public string CardId { get; init; } = "";
+    public string DisplayName { get; init; } = "";
+    public int UpgradeLevel { get; init; }
 }
 
 /// <summary>

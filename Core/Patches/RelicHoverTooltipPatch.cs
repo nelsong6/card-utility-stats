@@ -407,6 +407,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is SilverCrucible)
+            {
+                const string relicId = "RELIC.SILVER_CRUCIBLE";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildSilverCrucibleBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Silver Crucible", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is BloodSoakedRose)
             {
                 var relicId = relicNode.Model.Id.ToString();
@@ -1300,6 +1310,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is SilverCrucible)
+        {
+            title = "Silver Crucible";
+            body = BuildSilverCrucibleBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is BloodSoakedRose)
         {
             title = "Blood-Soaked Rose";
@@ -2112,6 +2129,48 @@ public static class RelicHoverShowPatch
         Row3(sb, "Reward screens with 3+ Nimble cards", agg.RewardScreensWithThreeOrMoreNimbleCards.ToString(), "");
         Row3(sb, "Reward screens with no Nimble cards", agg.RewardScreensWithoutNimbleCards.ToString(), "");
         Row3(sb, "Nimble offered, none taken", agg.RewardScreensWithNimbleCardsButNoneTaken.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildSilverCrucibleBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var screens = agg.CardRewardScreens ?? new List<RelicCardRewardScreenAggregate>();
+
+        for (var screenNumber = 1; screenNumber <= 3; screenNumber++)
+        {
+            var screen = screens.LastOrDefault(candidate =>
+                candidate != null && candidate.ScreenNumber == screenNumber);
+            if (screen == null)
+            {
+                Row3(sb, $"Card reward {screenNumber}", "not seen yet", "");
+                continue;
+            }
+
+            var cards = screen.Cards ?? new List<RelicCardRewardOptionAggregate>();
+            if (cards.Count == 0)
+            {
+                Row3(sb, $"Card reward {screenNumber}", "no cards offered", "");
+                continue;
+            }
+
+            foreach (var card in cards)
+            {
+                if (card == null) continue;
+
+                var displayName = !string.IsNullOrWhiteSpace(card.DisplayName)
+                    ? card.DisplayName
+                    : !string.IsNullOrWhiteSpace(card.CardId)
+                        ? RunTracker.FormatCardIdForDisplay(card.CardId)
+                        : "Unknown card";
+                Row3(
+                    sb,
+                    $"Card reward {screenNumber}",
+                    StatsTooltip.EscapeBbcode(displayName),
+                    !screen.Resolved ? "pending" : card.Taken ? "taken" : "not taken");
+            }
+        }
+
         return sb.ToString();
     }
 

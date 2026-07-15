@@ -731,6 +731,13 @@ public class RelicAggregate
     public int RewardScreensWithoutNimbleCards { get; set; }
     public int RewardScreensWithNimbleCardsButNoneTaken { get; set; }
 
+    // Ordered card-reward offers modified by Silver Crucible. Each screen is
+    // keyed by the relic's own one-based use number (1-3), while Cards keeps
+    // the visible left-to-right option order and, once resolved, explicit
+    // taken/not-taken outcomes. A list is required because duplicate card
+    // definitions can be offered and must remain distinct observations.
+    public List<RelicCardRewardScreenAggregate> CardRewardScreens { get; set; } = new();
+
     // Observed card reward options by card pool while Prismatic Gem is owned.
     // This is intentionally meta: other reward modifiers may also affect the
     // final options. Used by Prismatic Gem.
@@ -760,6 +767,28 @@ public class RelicCardAggregate
     public string CardId { get; set; } = "";
     public string DisplayName { get; set; } = "";
     public int Count { get; set; }
+}
+
+public class RelicCardRewardScreenAggregate
+{
+    public int ScreenNumber { get; set; }
+    // Floor where this Silver use generated its options. This bounds hot-
+    // reload/Continue re-association so an abandoned unresolved screen cannot
+    // attach itself to an unrelated reward on a later floor.
+    public int? Floor { get; set; }
+    // False while the reward is generated but no terminal selection/skip/
+    // reroll outcome has been observed yet. Persisting this state keeps the
+    // screen recoverable across a Core hot reload between floors.
+    public bool Resolved { get; set; }
+    public List<RelicCardRewardOptionAggregate> Cards { get; set; } = new();
+}
+
+public class RelicCardRewardOptionAggregate
+{
+    public string CardId { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public int UpgradeLevel { get; set; }
+    public bool Taken { get; set; }
 }
 
 public class RelicGrantedAggregate

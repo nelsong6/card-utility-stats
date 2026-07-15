@@ -524,6 +524,35 @@ Drowning Beacon applies its max-HP loss before obtaining Fresnel Lens; wrap the
 full async `DrowningBeacon.ClimbOption` to preserve the observed before/after
 max HP because a relic pickup hook begins too late to recover the baseline.
 
+Silver Crucible's first, second, and third reward numbers are generation order,
+not click order. `CardReward.Populate` runs before the outer rewards page is
+shown, and `SilverCrucible.AfterModifyingCardRewardOptions` synchronously
+increments its saved `TimesUsed`; snapshot that before/after transition to bind
+the final ordered `_cards` options to the exact one-based use. Multiple rewards
+such as Prayer Wheel can consume consecutive uses before either is opened. An
+ordinary Driftwood reroll clears the old `CardCreationResult` objects and calls
+`Populate` again with `IsCardReward`, so finalize the old set as all not taken
+and register the rerolled set as the next Silver use. Compare result-object
+references, not card ids or `CardModel` references: `ModifyCard` can replace the
+displayed card while preserving its result object, and a successful deck add
+removes that result object from `_cards`. Inner card-screen Skip remains
+non-terminal; completed selection, outer `OnSkipped`, and pre-clear reroll are
+the terminal outcome boundaries.
+Persist the generated offer immediately as unresolved, then upsert its final
+taken flags at a terminal boundary. On Core reload or Continue, rebind current
+`CardReward` objects to same-floor unresolved screens by ordered card
+id signature. Continued reward sets may regenerate different cards
+because they serialize creation options rather than `_cards`; allow generation-
+order fallback only inside that one `RewardsSet.GenerateWithoutOffering` batch,
+never on an arbitrary later reward. Otherwise the already-advanced `TimesUsed`
+counter makes those ordinals impossible to recover after the in-memory
+reference map is cleared.
+`CardReward.OnRelicObtained` can apply a newly obtained Silver Crucible to an
+already-populated reward, but the game then calls `AfterModifyingRewards`
+rather than `AfterModifyingCardRewardOptions`, so that free modification does
+not consume `TimesUsed`. Keep it outside the numbered three-use ledger unless
+the game changes its own counter behavior.
+
 ## Generated And Supplemental Cards
 
 Not every visible card should become a permanent per-instance deck card.

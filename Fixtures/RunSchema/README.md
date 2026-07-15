@@ -208,6 +208,10 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds Fresnel Lens's Drowning Beacon max-HP loss snapshots, successful Nimble
   card picks, any-Nimble / exact-two / three-or-more reward-screen counts, the
   no-Nimble count, and rewards where Nimble was offered but none was taken.
+- `silver-crucible-relic-run.json`
+  Adds Silver Crucible's ordered first, second, and third card-reward screens,
+  including every offered card's displayed upgrade state and explicit
+  taken/not-taken outcome.
 - `strawberry-relic-run.json`
   Adds Strawberry pickup tracking: activations, observed max HP gained, and
   original/new max-HP snapshots.

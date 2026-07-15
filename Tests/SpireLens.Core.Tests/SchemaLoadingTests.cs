@@ -2621,6 +2621,25 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsSilverCrucibleRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("silver-crucible-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertSilverCrucibleFixture(loaded.Data.RelicAggregates["RELIC.SILVER_CRUCIBLE"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsSilverCrucibleRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("silver-crucible-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertSilverCrucibleFixture(resumed!.RelicAggregates["RELIC.SILVER_CRUCIBLE"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsUnmovablePowerMetaFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("unmovable-power-meta-run.json"));
@@ -2664,5 +2683,56 @@ public class SchemaLoadingTests
         Assert.Equal(2, relicAgg.RewardScreensWithThreeOrMoreNimbleCards);
         Assert.Equal(5, relicAgg.RewardScreensWithoutNimbleCards);
         Assert.Equal(4, relicAgg.RewardScreensWithNimbleCardsButNoneTaken);
+    }
+
+    private static void AssertSilverCrucibleFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(3, relicAgg.CardRewardScreens.Count);
+
+        var first = relicAgg.CardRewardScreens[0];
+        Assert.Equal(1, first.ScreenNumber);
+        Assert.Equal(12, first.Floor);
+        Assert.True(first.Resolved);
+        Assert.Collection(
+            first.Cards,
+            card => AssertSilverCrucibleCard(card, "CARD.BASH", "Bash+", 1, taken: true),
+            card => AssertSilverCrucibleCard(card, "CARD.SHRUG_IT_OFF", "Shrug It Off+", 1, taken: false),
+            card => AssertSilverCrucibleCard(card, "CARD.INFLAME", "Inflame+", 1, taken: false));
+
+        var second = relicAgg.CardRewardScreens[1];
+        Assert.Equal(2, second.ScreenNumber);
+        Assert.Equal(12, second.Floor);
+        Assert.True(second.Resolved);
+        Assert.Collection(
+            second.Cards,
+            card => AssertSilverCrucibleCard(card, "CARD.POMMEL_STRIKE", "Pommel Strike+", 1, taken: false),
+            card => AssertSilverCrucibleCard(card, "CARD.TRUE_GRIT", "True Grit+", 1, taken: true),
+            card => AssertSilverCrucibleCard(card, "CARD.SPOT_WEAKNESS", "Spot Weakness+", 1, taken: false));
+
+        var third = relicAgg.CardRewardScreens[2];
+        Assert.Equal(3, third.ScreenNumber);
+        Assert.Equal(14, third.Floor);
+        Assert.True(third.Resolved);
+        Assert.Equal(
+            new[] { "CARD.HEADBUTT", "CARD.IRON_WAVE", "CARD.BATTLE_TRANCE" },
+            third.Cards.Select(card => card.CardId));
+        Assert.All(third.Cards, card =>
+        {
+            Assert.Equal(1, card.UpgradeLevel);
+            Assert.False(card.Taken);
+        });
+    }
+
+    private static void AssertSilverCrucibleCard(
+        RelicCardRewardOptionAggregate card,
+        string cardId,
+        string displayName,
+        int upgradeLevel,
+        bool taken)
+    {
+        Assert.Equal(cardId, card.CardId);
+        Assert.Equal(displayName, card.DisplayName);
+        Assert.Equal(upgradeLevel, card.UpgradeLevel);
+        Assert.Equal(taken, card.Taken);
     }
 }
