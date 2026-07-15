@@ -2502,6 +2502,7 @@ public static class RunTracker
     private const string LeesWaffleRelicId = "RELIC.LEES_WAFFLE";
     private const string StrawberryRelicId = "RELIC.STRAWBERRY";
     private const string PearRelicId = "RELIC.PEAR";
+    private const string NutritiousOysterRelicId = "RELIC.NUTRITIOUS_OYSTER";
     private const string ChosenCheeseRelicId = "RELIC.CHOSEN_CHEESE";
     private const string DarkstonePeriaptRelicId = "RELIC.DARKSTONE_PERIAPT";
     private const string LeafyPoulticeRelicId = "RELIC.LEAFY_POULTICE";
@@ -5431,6 +5432,34 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Record Nutritious Oyster's observed pickup max-HP gain after its async
+    /// pickup effect resolves.
+    /// </summary>
+    public static void RecordNutritiousOysterMaxHpGained(
+        Creature creature,
+        decimal maxHpGained,
+        decimal? originalMaxHp = null,
+        decimal? newMaxHp = null)
+    {
+        if (creature?.Player == null || maxHpGained < 0m) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(creature.Player)) return;
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(NutritiousOysterRelicId);
+                RecordNutritiousOysterMaxHpGainedForTest(agg, maxHpGained, originalMaxHp, newMaxHp);
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordNutritiousOysterMaxHpGained failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Record Chosen Cheese's max HP at the pickup boundary. This value is
     /// displayed as the relic's starting max HP and is kept separate from later
     /// combat-end gains because unrelated max-HP changes can happen in between.
@@ -5955,6 +5984,19 @@ public static class RunTracker
     }
 
     internal static void RecordPearMaxHpGainedForTest(
+        RelicAggregate agg,
+        decimal maxHpGained,
+        decimal? originalMaxHp = null,
+        decimal? newMaxHp = null)
+    {
+        if (agg == null || maxHpGained < 0m) return;
+
+        agg.Activations++;
+        agg.MaxHpGained += maxHpGained;
+        RecordRelicMaxHpChangeForTest(agg, originalMaxHp, newMaxHp);
+    }
+
+    internal static void RecordNutritiousOysterMaxHpGainedForTest(
         RelicAggregate agg,
         decimal maxHpGained,
         decimal? originalMaxHp = null,

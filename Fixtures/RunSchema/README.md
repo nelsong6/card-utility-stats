@@ -214,6 +214,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `pear-relic-run.json`
   Adds Pear pickup tracking: activations, observed max HP gained, and
   original/new max-HP snapshots.
+- `nutritious-oyster-relic-run.json`
+  Adds Nutritious Oyster pickup tracking: activations, observed max HP gained,
+  and original/new max-HP snapshots.
 - `sand-castle-relic-run.json`
   Adds Sand Castle pickup tracking: the actual cards upgraded by the relic.
 - `fragrant-mushroom-relic-run.json`

@@ -1,0 +1,19 @@
+{
+  "run_id": "nutritious-oyster-relic-fixture",
+  "started_at": "2026-07-14T20:00:00Z",
+  "updated_at": "2026-07-14T20:05:00Z",
+  "outcome": "in_progress",
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.NUTRITIOUS_OYSTER": {
+      "activations": 1,
+      "max_hp_gained": 11,
+      "original_max_hp": 70,
+      "new_max_hp": 81
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

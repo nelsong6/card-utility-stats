@@ -439,6 +439,11 @@ across the full pickup callback when that is what the player experiences. Lee's
 Waffle records current-HP gained across `AfterObtained`, covering both its
 max-HP grant and the follow-up heal-to-full.
 
+For simple max-HP pickup relics such as Strawberry, Pear, and Nutritious Oyster,
+snapshot the owner's max HP in an `AfterObtained` prefix and observe it only
+after the returned task completes successfully. This captures the actual gain,
+including caps or other runtime changes, without counting relic restoration.
+
 Darkstone Periapt is owned by `DarkstonePeriapt.AfterCardChangedPiles`. Mirror
 the relic's own final-pile condition (`card.Pile.Type == Deck`, same owner,
 `CardType.Curse`), then record the actual max-HP delta after the async

@@ -461,7 +461,7 @@ public class RelicAggregate
     public int? FloorAcquired { get; set; }
     public int? FloorActivated { get; set; }
 
-    // Total maximum HP gained from this relic. Used by Chosen Cheese.
+    // Total observed maximum HP gained by pickup max-HP relics and Chosen Cheese.
     public decimal MaxHpGained { get; set; }
 
     // Shared max-HP before/after snapshot for relics that add or remove max HP.
