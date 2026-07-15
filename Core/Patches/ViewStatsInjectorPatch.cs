@@ -79,6 +79,40 @@ public static class ViewStatsInjectorPatch
         }
     }
 
+    public static bool StatsVisibilityEnabled
+    {
+        get
+        {
+            EnsurePrefsLoaded();
+            return _persistedTicked;
+        }
+    }
+
+    /// <summary>
+    /// Toggle the same persisted global visibility state as the deck-view
+    /// checkbox. Input shortcuts and UI controls share this path so the live
+    /// checkbox, tooltip state, and loader-backed config cannot drift apart.
+    /// </summary>
+    public static bool ToggleStatsVisibility(string source)
+    {
+        EnsurePrefsLoaded();
+        SetStatsVisibilityEnabled(!_persistedTicked, source);
+        return _persistedTicked;
+    }
+
+    public static void SetStatsVisibilityEnabled(bool isEnabled, string source)
+    {
+        EnsurePrefsLoaded();
+        _persistedTicked = isEnabled;
+        SetTickboxVisualState(LastInjectedTickbox, isEnabled);
+        SavePreferences();
+
+        if (!isEnabled)
+            StatsTooltip.Hide();
+
+        CoreMain.Logger.Info($"Stats visibility set to {isEnabled} ({source})");
+    }
+
     /// <summary>
     /// Load the checkbox state from disk on first use. Called lazily from
     /// Inject so it happens before the first deck view opens and also
@@ -369,9 +403,7 @@ public static class ViewStatsInjectorPatch
                 // clone always constructs unticked, but the player expects
                 // their "I want stats on" preference to survive closing and
                 // re-opening the deck view within the same session.
-                if (innerTickbox._tickedImage != null) innerTickbox._tickedImage.Visible = isTicked;
-                if (innerTickbox._notTickedImage != null) innerTickbox._notTickedImage.Visible = !isTicked;
-                innerTickbox.IsTicked = isTicked;
+                SetTickboxVisualState(innerTickbox, isTicked);
             }
             else
             {
@@ -392,20 +424,7 @@ public static class ViewStatsInjectorPatch
 
     private static void OnStatsToggled(NTickbox tickbox)
     {
-        // Capture user intent so the next deck-view open reflects this state
-        // rather than reverting to unticked. The Postfix re-injects on each
-        // ConnectSignals, and without this the user would have to re-tick
-        // every time they close and reopen the deck view.
-        _persistedTicked = tickbox.IsTicked;
-        // Persist to disk so F5 / game restart reloads with the same state.
-        SavePreferences();
-        CoreMain.Logger.Info($"ViewStats toggled: IsTicked={tickbox.IsTicked}");
-
-        if (!tickbox.IsTicked)
-        {
-            StatsTooltip.HideIfAnchoredToCreature();
-            StatsTooltip.HideIfAnchoredToCard();
-        }
+        SetStatsVisibilityEnabled(tickbox.IsTicked, "deck-view checkbox");
     }
 
     private static void OnCombatCardStatsToggled(NTickbox tickbox)
@@ -457,6 +476,17 @@ public static class ViewStatsInjectorPatch
             ShowEnemyStatsTicked = _persistedEnemyStatsTicked,
             ShowCombatCardStatsTicked = _persistedCombatCardStatsTicked,
         });
+    }
+
+    private static void SetTickboxVisualState(NTickbox? tickbox, bool isTicked)
+    {
+        if (tickbox == null || !GodotObject.IsInstanceValid(tickbox)) return;
+
+        if (tickbox._tickedImage != null)
+            tickbox._tickedImage.Visible = isTicked;
+        if (tickbox._notTickedImage != null)
+            tickbox._notTickedImage.Visible = !isTicked;
+        tickbox.IsTicked = isTicked;
     }
 
     private static void SetOwnerRecursive(Node node, Node owner)

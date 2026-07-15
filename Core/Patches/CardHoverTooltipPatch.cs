@@ -43,9 +43,7 @@ public static class CardHoverShowPatch
         // gate ahead of tracker locks, aggregate merging, and tooltip markup;
         // attribution continues normally while the UI is disabled.
         var showCardStatsDuringCombat = ViewStatsInjectorPatch.ShowCardStatsDuringCombatEnabled;
-        var tickbox = ViewStatsInjectorPatch.LastInjectedTickbox;
-        var viewStatsEnabled = tickbox?.IsTicked
-            ?? RuntimeOptionsProvider.Current.ViewStatsToggleEnabled;
+        var viewStatsEnabled = ViewStatsInjectorPatch.StatsVisibilityEnabled;
         var combatActive = CombatManager.Instance?.IsInProgress == true;
         if (!ResolveCardStatsEnabled(
                 viewStatsEnabled,

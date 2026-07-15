@@ -15,9 +15,7 @@ public static class EnemyHoverShowPatch
     {
         try
         {
-            var tickbox = ViewStatsInjectorPatch.LastInjectedTickbox;
-            var viewStatsEnabled = tickbox?.IsTicked
-                ?? RuntimeOptionsProvider.Current.ViewStatsToggleEnabled;
+            var viewStatsEnabled = ViewStatsInjectorPatch.StatsVisibilityEnabled;
             var enemyStatsTickbox = ViewStatsInjectorPatch.LastInjectedEnemyStatsTickbox;
             if (!ResolveEnemyStatsEnabled(
                     viewStatsEnabled,

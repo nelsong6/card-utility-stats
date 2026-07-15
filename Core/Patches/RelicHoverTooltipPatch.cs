@@ -39,9 +39,7 @@ public static class RelicHoverShowPatch
     {
         try
         {
-            var tickbox = ViewStatsInjectorPatch.LastInjectedTickbox;
-            var viewStatsEnabled = tickbox?.IsTicked ?? RuntimeOptionsProvider.Current.ViewStatsToggleEnabled;
-            if (!viewStatsEnabled) return;
+            if (!ViewStatsInjectorPatch.StatsVisibilityEnabled) return;
 
             var relicNode = __instance.Relic;
             if (relicNode?.Model == null) return;

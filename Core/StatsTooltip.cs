@@ -277,6 +277,11 @@ public static class StatsTooltip
         string bodyBBCode,
         bool showHeader = true)
     {
+        // Every producer also gates before aggregate lookup/markup work. Keep
+        // this final guard so a future stats surface cannot bypass the global
+        // visibility toggle accidentally.
+        if (!Patches.ViewStatsInjectorPatch.StatsVisibilityEnabled) return;
+
         EnsureBuilt(tree);
         if (_panel == null || _headerRow == null || _statsLabel == null || _titleLabel == null || _brandLabel == null) return;
 

@@ -24,8 +24,9 @@ internal static class RunHistoryStatsContext
 
     private static LoadedRunFile? _loaded;
     private static long? _gameStartTime;
+    private static bool _loadAttempted;
 
-    public static bool HasCurrent => _loaded?.Data != null;
+    public static bool HasCurrent => EnsureLoaded()?.Data != null;
 
     public static void SetRun(RunHistory? history)
     {
@@ -39,23 +40,36 @@ internal static class RunHistoryStatsContext
             return;
 
         _gameStartTime = history.StartTime;
-        _loaded = RunStorage.FindHistoricalByGameStartTime(history.StartTime);
+        _loaded = null;
+        _loadAttempted = false;
+    }
+
+    private static LoadedRunFile? EnsureLoaded()
+    {
+        if (_loadAttempted || !_gameStartTime.HasValue)
+            return _loaded;
+
+        _loadAttempted = true;
+        _loaded = RunStorage.FindHistoricalByGameStartTime(_gameStartTime.Value);
         if (_loaded?.Data != null)
         {
             CoreMain.LogDebug(
-                $"RunHistoryStatsContext: loaded SpireLens run '{_loaded.Data.RunId}' for history start_time={history.StartTime}");
+                $"RunHistoryStatsContext: loaded SpireLens run '{_loaded.Data.RunId}' for history start_time={_gameStartTime.Value}");
         }
         else
         {
             CoreMain.LogDebug(
-                $"RunHistoryStatsContext: no SpireLens run found for history start_time={history.StartTime}");
+                $"RunHistoryStatsContext: no SpireLens run found for history start_time={_gameStartTime.Value}");
         }
+
+        return _loaded;
     }
 
     public static void Clear()
     {
         _loaded = null;
         _gameStartTime = null;
+        _loadAttempted = false;
     }
 
     public static bool TryBuildCardTooltip(
@@ -66,7 +80,7 @@ internal static class RunHistoryStatsContext
         title = "";
         body = "";
 
-        var run = _loaded?.Data;
+        var run = EnsureLoaded()?.Data;
         if (entry == null) return false;
 
         var card = entry.Card;
@@ -117,7 +131,7 @@ internal static class RunHistoryStatsContext
         title = "";
         body = "";
 
-        var run = _loaded?.Data;
+        var run = EnsureLoaded()?.Data;
         var relicModel = holder?.Relic?.Model;
         if (run == null || relicModel == null) return false;
 
@@ -381,6 +395,7 @@ public static class RunHistoryDeckEntryStatsTooltipShowPatch
     {
         PatchGuard.Run(nameof(RunHistoryDeckEntryStatsTooltipShowPatch), () =>
         {
+            if (!ViewStatsInjectorPatch.StatsVisibilityEnabled) return;
             if (!RunHistoryStatsContext.HasCurrent) return;
 
             var tree = Engine.GetMainLoop() as SceneTree;
@@ -415,6 +430,7 @@ public static class RunHistoryRelicStatsTooltipShowPatch
     {
         PatchGuard.Run(nameof(RunHistoryRelicStatsTooltipShowPatch), () =>
         {
+            if (!ViewStatsInjectorPatch.StatsVisibilityEnabled) return;
             if (!RunHistoryStatsContext.HasCurrent) return;
             if (!RunHistoryStatsContext.HasAncestor<NRelicHistory>(__instance)) return;
 

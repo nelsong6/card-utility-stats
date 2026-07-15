@@ -17,6 +17,22 @@ public class CompendiumRelicStatsContextTests
         Assert.False(CompendiumRelicStatsContext.ShouldShowStatsForVisibility(ModelVisibility.Locked));
     }
 
+    [Theory]
+    [InlineData(false, ModelVisibility.Visible, false)]
+    [InlineData(true, ModelVisibility.Visible, true)]
+    [InlineData(true, ModelVisibility.None, false)]
+    [InlineData(true, ModelVisibility.NotSeen, false)]
+    [InlineData(true, ModelVisibility.Locked, false)]
+    public void ShouldShowStats_RequiresGlobalVisibilityAndVisibleRelic(
+        bool statsVisibilityEnabled,
+        ModelVisibility visibility,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            CompendiumRelicStatsContext.ShouldShowStats(statsVisibilityEnabled, visibility));
+    }
+
     [Fact]
     public void TryBuildRelicTooltipForRun_UsesSavedRunAggregate()
     {

@@ -37,6 +37,13 @@ Existing stats mods answer "how often did I *pick* this card" ([SlayTheStats](ht
 
 A **"View Stats"** checkbox sits next to the game's existing "View Upgrades" toggle on the in-run deck view. When ticked, hovering a card outside combat shows a side-panel tooltip with per-instance stats (plays, damage, block gained, energy spent, etc.) - it coexists with the game's built-in hover tips rather than replacing them. Deck-view hovers get the full elaborate view.
 
+Tap **Left Shift** to toggle the same global stats-visibility setting during
+normal play. Shift-based chords such as Steam's Shift+Tab are left alone.
+Turning stats off hides any open SpireLens panel and skips aggregate
+lookup and tooltip construction while stats are hidden; attribution continues
+in the background. Controller Left Trigger remains the game's Draw Pile input,
+so it is intentionally not claimed by SpireLens.
+
 A separate, default-off **"show combat card stats"** checkbox enables card hover panels while combat is active. It changes presentation only: combat attribution continues to be recorded while the checkbox is off. Hand hovers stay compact unless verbose hand stats are enabled.
 
 A separate **"show removed cards"** checkbox controls the removed-card overlay: cards you've removed this run (Smith, events, curse dispose) appear inline in the deck grid, marked with a red "Card Removed" banner in their tooltip so you can review their stats post-removal. Generated combat-only cards that do not live in the deck permanently can also render as pooled summaries when that is a better representation than pretending each temporary copy is a normal deck instance. Checkbox state persists across hot reloads through the mod configuration.

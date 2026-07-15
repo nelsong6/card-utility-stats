@@ -92,10 +92,15 @@ internal static class CompendiumRelicStatsContext
     public static bool ShouldShowStatsForVisibility(ModelVisibility visibility)
         => visibility == ModelVisibility.Visible;
 
+    public static bool ShouldShowStats(bool statsVisibilityEnabled, ModelVisibility visibility)
+        => statsVisibilityEnabled && ShouldShowStatsForVisibility(visibility);
+
     public static void ShowForEntry(NRelicCollectionEntry? entry)
     {
         if (entry == null || !GodotObject.IsInstanceValid(entry)) return;
-        if (!ShouldShowStatsForVisibility(entry.ModelVisibility)) return;
+        if (!ShouldShowStats(
+                ViewStatsInjectorPatch.StatsVisibilityEnabled,
+                entry.ModelVisibility)) return;
         if (!TryGetRelicModel(entry, out var relicModel)) return;
 
         var tree = Engine.GetMainLoop() as SceneTree;
