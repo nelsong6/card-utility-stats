@@ -1467,6 +1467,25 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsPaelsToothRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("paels-tooth-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertPaelsToothFixture(loaded.Data.RelicAggregates["RELIC.PAELS_TOOTH"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsPaelsToothRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("paels-tooth-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertPaelsToothFixture(resumed!.RelicAggregates["RELIC.PAELS_TOOTH"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsStrikeDummyRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("strike-dummy-relic-run.json"));
@@ -2683,6 +2702,26 @@ public class SchemaLoadingTests
         Assert.Equal(2, relicAgg.RewardScreensWithThreeOrMoreNimbleCards);
         Assert.Equal(5, relicAgg.RewardScreensWithoutNimbleCards);
         Assert.Equal(4, relicAgg.RewardScreensWithNimbleCardsButNoneTaken);
+    }
+
+    private static void AssertPaelsToothFixture(RelicAggregate relicAgg)
+    {
+        Assert.Collection(
+            relicAgg.CardsReturned,
+            card => AssertPaelsToothCard(card, "CARD.STRIKE_KIN", "Strike+", 1),
+            card => AssertPaelsToothCard(card, "CARD.POMMEL_STRIKE", "Pommel Strike++", 2),
+            card => AssertPaelsToothCard(card, "CARD.STRIKE_KIN", "Strike++", 2));
+    }
+
+    private static void AssertPaelsToothCard(
+        RelicCardReturnAggregate card,
+        string cardId,
+        string displayName,
+        int upgradeLevel)
+    {
+        Assert.Equal(cardId, card.CardId);
+        Assert.Equal(displayName, card.DisplayName);
+        Assert.Equal(upgradeLevel, card.UpgradeLevel);
     }
 
     private static void AssertSilverCrucibleFixture(RelicAggregate relicAgg)

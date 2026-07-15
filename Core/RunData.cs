@@ -748,6 +748,11 @@ public class RelicAggregate
     // show the rare card it added, and Neow's Bones to show the curse it added.
     public Dictionary<string, RelicCardAggregate> CardsGranted { get; set; } = new();
 
+    // Physical cards Pael's Tooth has actually returned to the deck. The list
+    // preserves observed return order, duplicate definitions, the final title,
+    // and the post-return upgrade level of each new deck instance.
+    public List<RelicCardReturnAggregate> CardsReturned { get; set; } = new();
+
     // Times a relic-owned card choice was skipped. Used by Hefty Tablet.
     public int CardChoicesSkipped { get; set; }
 
@@ -767,6 +772,13 @@ public class RelicCardAggregate
     public string CardId { get; set; } = "";
     public string DisplayName { get; set; } = "";
     public int Count { get; set; }
+}
+
+public class RelicCardReturnAggregate
+{
+    public string CardId { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public int UpgradeLevel { get; set; }
 }
 
 public class RelicCardRewardScreenAggregate

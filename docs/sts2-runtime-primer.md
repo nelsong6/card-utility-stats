@@ -400,6 +400,18 @@ synchronously when the relic enters inventory, before its async `AfterObtained`
 callback. Store its id, display name, and count in Pael's Wing's `RelicsGranted`
 ledger.
 
+Pael's Tooth is a separate pickup-and-return mechanic. Its native `CardTitles`
+text is rebuilt from only the `SerializableCards` still held by the relic, so a
+card intentionally disappears from that text when it is returned. At combat
+end, `Hook.AfterCombatEnd` awaits relic listeners sequentially before the
+game's `CombatEnded` event: Tooth reconstructs one stored card, upgrades it,
+awaits its deck insertion, then removes the stored entry. Wrap Tooth's returned
+task so attribution completes before combat promotion, and compare raw deck
+references before and after to capture the final physical card after upgrade
+and deck-add replacement modifiers. Do not infer a successful return merely
+from the stored entry disappearing; Tooth removes it even when the deck-add
+result reports failure.
+
 For relics that grant block after a specific owner-owned condition, arm a narrow block-gain window at the relic callback and let `Hook.AfterBlockGained` record the modified amount. Permafrost follows this pattern from `Permafrost.AfterCardPlayed`: mirror the first-owned-Power condition, count that combat trigger, then derive block per combat from observed block gained divided by triggers.
 
 Intimidating Helmet's `BeforeCardPlayed` condition uses the frozen play-time

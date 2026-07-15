@@ -1769,6 +1769,7 @@ public static class RunTracker
         MergeCardRewardScreens(target, source);
         MergeCardRewardCategories(target.CardRewardCategories, source.CardRewardCategories);
         MergeRelicCardsGranted(target.CardsGranted, source.CardsGranted);
+        MergeRelicCardsReturned(target, source);
         target.CardChoicesSkipped += source.CardChoicesSkipped;
         MergeRelicCardTransformations(target, source);
     }
@@ -2523,6 +2524,7 @@ public static class RunTracker
     private const string PhylacteryUnboundRelicId = "RELIC.PHYLACTERY_UNBOUND";
     private const string ToolboxRelicId = "RELIC.TOOLBOX";
     private const string PaelsWingRelicId = "RELIC.PAELS_WING";
+    private const string PaelsToothRelicId = "RELIC.PAELS_TOOTH";
     private const string PaelsEyeRelicId = "RELIC.PAELS_EYE";
     private const string StrikeDummyRelicId = "RELIC.STRIKE_DUMMY";
     private const string NutritiousSoupRelicId = "RELIC.NUTRITIOUS_SOUP";
@@ -4644,6 +4646,43 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordPaelsWingArtifactGained failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record the final physical deck card returned by Pael's Tooth after its
+    /// combat-end callback succeeds. The caller observes the new raw deck
+    /// instance after upgrade and deck-add modifiers have finished. Route it
+    /// through pending combat until the normal CombatEnded promotion.
+    /// </summary>
+    public static void RecordPaelsToothCardReturned(CardModel cardReturned)
+    {
+        if (cardReturned == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(cardReturned.Owner)) return;
+                if (_currentRun == null && _pendingCombat == null) return;
+
+                var persistDirectlyToRun = _pendingCombat == null;
+                var agg = GetOrCreateRelicAggregateForCurrentContextLocked(PaelsToothRelicId);
+                RecordPaelsToothCardReturnedForTest(
+                    agg,
+                    GetCardIdForStats(cardReturned),
+                    GetCardDisplayNameForStats(cardReturned),
+                    cardReturned.CurrentUpgradeLevel);
+                if (persistDirectlyToRun)
+                {
+                    RefreshCurrentRunMetadataLocked();
+                    SaveCurrentRun();
+                }
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPaelsToothCardReturned failed: {e.Message}");
             }
         }
     }
@@ -7195,6 +7234,32 @@ public static class RunTracker
     {
         if (agg == null || string.IsNullOrWhiteSpace(relicId)) return;
         AddRelicGranted(agg.RelicsGranted, relicId, displayName ?? "", 1);
+    }
+
+    internal static void RecordPaelsToothCardReturnedForTest(
+        RelicAggregate agg,
+        string? cardId,
+        string? displayName,
+        int upgradeLevel)
+    {
+        if (agg == null || string.IsNullOrWhiteSpace(cardId)) return;
+
+        agg.CardsReturned ??= new List<RelicCardReturnAggregate>();
+        var normalizedUpgradeLevel = Math.Max(0, upgradeLevel);
+        var normalizedDisplayName = displayName ?? "";
+        if (string.IsNullOrWhiteSpace(normalizedDisplayName))
+        {
+            normalizedDisplayName = FormatCardIdForDisplay(cardId);
+            if (normalizedUpgradeLevel > 0)
+                normalizedDisplayName += new string('+', normalizedUpgradeLevel);
+        }
+
+        agg.CardsReturned.Add(new RelicCardReturnAggregate
+        {
+            CardId = cardId,
+            DisplayName = normalizedDisplayName,
+            UpgradeLevel = normalizedUpgradeLevel,
+        });
     }
 
     internal static void RecordNeowsBonesRelicObtainedForTest(
@@ -11347,6 +11412,24 @@ public static class RunTracker
             if (card.Count <= 0) continue;
             var cardId = string.IsNullOrWhiteSpace(card.CardId) ? kvp.Key : card.CardId;
             AddRelicCardGranted(target, cardId, card.DisplayName, card.Count);
+        }
+    }
+
+    private static void MergeRelicCardsReturned(RelicAggregate target, RelicAggregate source)
+    {
+        if (source.CardsReturned == null || source.CardsReturned.Count == 0) return;
+
+        target.CardsReturned ??= new List<RelicCardReturnAggregate>();
+        foreach (var card in source.CardsReturned)
+        {
+            if (card == null || string.IsNullOrWhiteSpace(card.CardId)) continue;
+
+            target.CardsReturned.Add(new RelicCardReturnAggregate
+            {
+                CardId = card.CardId,
+                DisplayName = card.DisplayName ?? "",
+                UpgradeLevel = Math.Max(0, card.UpgradeLevel),
+            });
         }
     }
 

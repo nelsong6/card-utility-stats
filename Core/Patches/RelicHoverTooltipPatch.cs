@@ -1555,6 +1555,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is PaelsTooth)
+        {
+            title = "Pael's Tooth";
+            body = BuildPaelsToothBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is PaelsWing)
         {
             title = "Pael's Wing";
@@ -2651,6 +2658,32 @@ public static class RelicHoverShowPatch
     private static string BuildPaelsWingBodyBBCode(RelicAggregate agg)
     {
         return BuildPaelsWingBodyBBCodeForFloor(agg, RunTracker.GetCurrentFloorForRateStats(), floorAdded: null);
+    }
+
+    private static string BuildPaelsToothBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var cards = (agg.CardsReturned ?? new List<RelicCardReturnAggregate>())
+            .Where(card => card != null)
+            .ToList();
+        Row3(sb, "Cards returned", cards.Count.ToString(), "");
+
+        foreach (var card in cards)
+        {
+            var displayName = card.DisplayName;
+            if (string.IsNullOrWhiteSpace(displayName))
+            {
+                displayName = string.IsNullOrWhiteSpace(card.CardId)
+                    ? "Unknown card"
+                    : RunTracker.FormatCardIdForDisplay(card.CardId);
+                if (card.UpgradeLevel > 0)
+                    displayName += new string('+', card.UpgradeLevel);
+            }
+
+            Row3(sb, "Returned card", StatsTooltip.EscapeBbcode(displayName), "");
+        }
+
+        return sb.ToString();
     }
 
     private static string BuildPaelsWingBodyBBCodeForFloor(
