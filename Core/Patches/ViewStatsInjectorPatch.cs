@@ -24,7 +24,8 @@ namespace SpireLens.Core.Patches;
 /// _Ready throws on derived types), gate on NDeckViewScreen specifically
 /// so we don't inject on unrelated card-view surfaces, duplicate the
 /// entire ViewUpgrades subtree, rename the clone's inner nodes, change the
-/// label text, offset the position, and connect our own toggle handler.
+/// label text, force the clone visible even when controller mode hid the
+/// source tickbox, offset the position, and connect our own toggle handler.
 ///
 /// Phase-1 scope: checkbox renders and logs when toggled. Tooltip/description
 /// override is phase 2.
@@ -322,6 +323,13 @@ public static class ViewStatsInjectorPatch
         if (innerTickbox != null)
         {
             innerTickbox.Name = tickboxName;
+            // NCardsViewScreen.ConnectSignals calls OnControllerStateUpdated
+            // before this postfix runs. When the deck was opened with a
+            // controller (for example, Left Bumper), that hides the source
+            // %Upgrades tickbox, so Duplicate() otherwise gives every
+            // SpireLens clone Visible=false. Our controls remain useful in
+            // controller mode and must not inherit that presentation choice.
+            innerTickbox.Visible = true;
             // Connect our toggle handler. Use the Toggled signal defined on NTickbox.
             innerTickbox.Connect(NTickbox.SignalName.Toggled, Callable.From<NTickbox>(onToggled));
             rememberTickbox(innerTickbox);

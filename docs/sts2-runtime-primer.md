@@ -567,6 +567,7 @@ Card stats are exposed through Godot UI patches, not through game combat state a
 Important surfaces:
 
 - `ViewStatsInjectorPatch` hooks `NCardsViewScreen.ConnectSignals`, gates to `NDeckViewScreen`, clones the existing View Upgrades tickbox, rewires duplicated node internals, persists preferences, and reinjects on hot reload if the deck view is already open. Monster hover stats and combat card stats use separate default-off toggles. Gate `NCreature.OnFocus` and combat-time `NCardHolder.CreateHoverTips` before aggregate lookup or tooltip construction; the combat-card control is presentation-only and must not be wired to `DisableCardStatsDuringCombat`, which suppresses attribution itself.
+- `NCardsViewScreen.ConnectSignals` calls its controller-state update before the SpireLens postfix. Controller mode hides the built-in `%Upgrades` tickbox, so clones of that subtree inherit `Visible=false` unless SpireLens explicitly restores visibility. Any injected deck controls cloned from View Upgrades must set their own visibility rather than inherit the source's controller-specific state.
 - `CardHoverTooltipPatch` hooks `NCardHolder.CreateHoverTips` and `ClearHoverTips` to show/hide the SpireLens tooltip.
 - Hand hovers are compact unless verbose hand stats are enabled.
 - Deck view and other card-view hovers can show full lineage and stat breakdown.
