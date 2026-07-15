@@ -375,6 +375,13 @@ This is intentionally outcome-shaped but still simple. It assumes the relic appl
 
 Relic aggregates live in `RunData.RelicAggregates`, keyed by relic id. Fields are shared across relics; each relic uses only relevant fields.
 
+Centennial Puzzle already exposes the exact combat-local state needed for a
+live tooltip through `UsedThisCombat`. The relic sets it before drawing from
+its first qualifying unblocked HP-loss callback and resets it in
+`AfterCombatEnd`. Read that property directly for `Triggered this combat`;
+do not infer the boolean from cumulative activations or persist it in the run
+aggregate.
+
 Juzu Bracelet is map-point based, not resolved-room based. Count
 `RunManager.EnterMapPointInternal` when the original `MapPointType` is
 `Unknown` and the player currently holds the relic. Do not infer this stat from

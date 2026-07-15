@@ -770,12 +770,12 @@ public static class RelicHoverShowPatch
                 return;
             }
 
-            if (relicNode.Model is CentennialPuzzle)
+            if (relicNode.Model is CentennialPuzzle centennialPuzzle)
             {
                 const string relicId = "RELIC.CENTENNIAL_PUZZLE";
                 var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
 
-                var body = BuildCentennialPuzzleBodyBBCode(agg);
+                var body = BuildCentennialPuzzleBodyBBCode(agg, centennialPuzzle.UsedThisCombat);
                 StatsTooltip.Show(tree, __instance, "Centennial Puzzle", "SpireLens", body);
                 return;
             }
@@ -1589,10 +1589,10 @@ public static class RelicHoverShowPatch
             return true;
         }
 
-        if (relicModel is CentennialPuzzle)
+        if (relicModel is CentennialPuzzle centennialPuzzle)
         {
             title = "Centennial Puzzle";
-            body = BuildCentennialPuzzleBodyBBCode(agg);
+            body = BuildCentennialPuzzleBodyBBCode(agg, centennialPuzzle.UsedThisCombat);
             return true;
         }
 
@@ -2869,13 +2869,16 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
-    private static string BuildCentennialPuzzleBodyBBCode(RelicAggregate agg)
+    private static string BuildCentennialPuzzleBodyBBCode(
+        RelicAggregate agg,
+        bool triggeredThisCombat = false)
     {
         var sb = new StringBuilder();
         var averageDrawn = agg.Activations <= 0
             ? 0m
             : (decimal)agg.AdditionalCardsDrawn / agg.Activations;
         Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, "Triggered this combat", triggeredThisCombat ? "true" : "false", "");
         Row3(sb, "Cards drawn total", agg.AdditionalCardsDrawn.ToString(), "");
         Row3(sb, "Avg cards drawn per combat", FormatDecimal(averageDrawn), "");
         return sb.ToString();
