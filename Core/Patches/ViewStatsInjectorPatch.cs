@@ -40,7 +40,7 @@ public static class ViewStatsInjectorPatch
 
     public static NTickbox? LastInjectedEnemyStatsTickbox { get; private set; }
 
-    public static NTickbox? LastInjectedCombatCardStatsTickbox { get; private set; }
+    public static NTickbox? LastInjectedCardStatsTickbox { get; private set; }
 
     // Track the active deck-view screen so the toggle handler can trigger
     // a live re-render (via DisplayCards) when the user flips the checkbox.
@@ -68,15 +68,15 @@ public static class ViewStatsInjectorPatch
     private static bool _persistedTicked;
     private static bool _persistedShowRemovedCardsTicked = true;
     private static bool _persistedEnemyStatsTicked;
-    private static bool _persistedCombatCardStatsTicked;
+    private static bool _persistedCardStatsTicked;
     private static bool _prefsLoaded;
 
-    public static bool ShowCardStatsDuringCombatEnabled
+    public static bool CardStatsEnabled
     {
         get
         {
             EnsurePrefsLoaded();
-            return _persistedCombatCardStatsTicked;
+            return _persistedCardStatsTicked;
         }
     }
 
@@ -129,7 +129,9 @@ public static class ViewStatsInjectorPatch
             _persistedTicked = prefs.ViewStatsTicked;
             _persistedShowRemovedCardsTicked = prefs.ShowRemovedCardsTicked;
             _persistedEnemyStatsTicked = prefs.ShowEnemyStatsTicked;
-            _persistedCombatCardStatsTicked = prefs.ShowCombatCardStatsTicked;
+            // Keep the legacy preference field as the on-disk compatibility
+            // key even though the setting now applies to every card surface.
+            _persistedCardStatsTicked = prefs.ShowCombatCardStatsTicked;
         }
         catch (Exception e)
         {
@@ -197,7 +199,7 @@ public static class ViewStatsInjectorPatch
         LastInjectedTickbox = null;
         LastInjectedShowRemovedCardsTickbox = null;
         LastInjectedEnemyStatsTickbox = null;
-        LastInjectedCombatCardStatsTickbox = null;
+        LastInjectedCardStatsTickbox = null;
     }
 
     [HarmonyPostfix]
@@ -235,7 +237,7 @@ public static class ViewStatsInjectorPatch
             "ViewStats",
             "Stats",
             "ViewStatsLabel",
-            "spirelens: show stats",
+            "SpireLens: on/off",
             new Vector2(0, -240),
             _persistedTicked,
             OnStatsToggled,
@@ -246,11 +248,11 @@ public static class ViewStatsInjectorPatch
             "ViewCombatCardStats",
             "CombatCardStats",
             "ViewCombatCardStatsLabel",
-            "spirelens: show combat card stats",
+            "SpireLens: card stats",
             new Vector2(0, -180),
-            _persistedCombatCardStatsTicked,
-            OnCombatCardStatsToggled,
-            tickbox => LastInjectedCombatCardStatsTickbox = tickbox);
+            _persistedCardStatsTicked,
+            OnCardStatsToggled,
+            tickbox => LastInjectedCardStatsTickbox = tickbox);
 
         InjectTickbox(
             viewUpgradesContainer,
@@ -435,11 +437,11 @@ public static class ViewStatsInjectorPatch
         SetStatsVisibilityEnabled(tickbox.IsTicked, "deck-view checkbox");
     }
 
-    private static void OnCombatCardStatsToggled(NTickbox tickbox)
+    private static void OnCardStatsToggled(NTickbox tickbox)
     {
-        _persistedCombatCardStatsTicked = tickbox.IsTicked;
+        _persistedCardStatsTicked = tickbox.IsTicked;
         SavePreferences();
-        CoreMain.Logger.Info($"CombatCardStats toggled: IsTicked={tickbox.IsTicked}");
+        CoreMain.Logger.Info($"CardStats toggled: IsTicked={tickbox.IsTicked}");
 
         if (!tickbox.IsTicked)
             StatsTooltip.HideIfAnchoredToCard();
@@ -482,7 +484,9 @@ public static class ViewStatsInjectorPatch
             ViewStatsTicked = _persistedTicked,
             ShowRemovedCardsTicked = _persistedShowRemovedCardsTicked,
             ShowEnemyStatsTicked = _persistedEnemyStatsTicked,
-            ShowCombatCardStatsTicked = _persistedCombatCardStatsTicked,
+            // Preserve the legacy wire/storage name for existing installs and
+            // for compatibility with the stable Loader across Core reloads.
+            ShowCombatCardStatsTicked = _persistedCardStatsTicked,
         });
     }
 

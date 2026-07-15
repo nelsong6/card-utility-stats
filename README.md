@@ -35,7 +35,7 @@ Existing stats mods answer "how often did I *pick* this card" ([SlayTheStats](ht
 
 ## How you'd use it
 
-A **"View Stats"** checkbox sits next to the game's existing "View Upgrades" toggle on the in-run deck view. When ticked, hovering a card outside combat shows a side-panel tooltip with per-instance stats (plays, damage, block gained, energy spent, etc.) - it coexists with the game's built-in hover tips rather than replacing them. Deck-view hovers get the full elaborate view.
+A **"SpireLens: on/off"** checkbox sits next to the game's existing "View Upgrades" toggle on the in-run deck view. It is the master switch for SpireLens tooltip stats and coexists with the game's built-in hover tips rather than replacing them.
 
 Tap **Left Shift** to toggle the same global stats-visibility setting during
 normal play. Shift-based chords such as Steam's Shift+Tab are left alone.
@@ -44,13 +44,13 @@ lookup and tooltip construction while stats are hidden; attribution continues
 in the background. Controller Left Trigger remains the game's Draw Pile input,
 so it is intentionally not claimed by SpireLens.
 
-A separate, default-off **"show combat card stats"** checkbox enables card hover panels while combat is active. It changes presentation only: combat attribution continues to be recorded while the checkbox is off. Hand hovers stay compact unless verbose hand stats are enabled.
+A separate, default-off **"SpireLens: card stats"** checkbox controls per-card panels on every supported card surface, including the deck, hand, combat piles, and run history. It changes presentation only: card attribution continues to be recorded while the checkbox is off. Hand hovers stay compact unless verbose hand stats are enabled.
 
 A separate **"show removed cards"** checkbox controls the removed-card overlay: cards you've removed this run (Smith, events, curse dispose) appear inline in the deck grid, marked with a red "Card Removed" banner in their tooltip so you can review their stats post-removal. Generated combat-only cards that do not live in the deck permanently can also render as pooled summaries when that is a better representation than pretending each temporary copy is a normal deck instance. Checkbox state persists across hot reloads through the mod configuration.
 
 A separate, default-off **"show monster stats"** checkbox in the deck viewer controls combat monster hover popups when general stats are enabled. Keeping it off bypasses enemy aggregate lookup and tooltip construction on creature focus while leaving card and relic stats enabled.
 
-Available only on in-run deck-view surfaces for now (not Compendium - lifetime aggregation is deferred, see [issue #2](https://github.com/romaine-life/spirelens/issues/2)).
+The controls themselves are injected only into the in-run deck viewer for now (not Compendium - lifetime aggregation is deferred, see [issue #2](https://github.com/romaine-life/spirelens/issues/2)).
 
 ## Roadmap
 
@@ -60,7 +60,7 @@ Available only on in-run deck-view surfaces for now (not Compendium - lifetime a
 | **M2a** | Intended block (how much this card contributed) | OK |
 | **M2b** | Block absorption (effective vs wasted) - needs heuristic | [#14](https://github.com/romaine-life/spirelens/issues/14) |
 | **M3** | Utility card closure (energy spent, draw count) | OK [#7](https://github.com/romaine-life/spirelens/issues/7) |
-| **M4** | In-game UI: "View Stats" checkbox on deck view | OK [#8](https://github.com/romaine-life/spirelens/issues/8) |
+| **M4** | In-game UI: SpireLens stats controls on deck view | OK [#8](https://github.com/romaine-life/spirelens/issues/8) |
 | **M5a** | Removed-card viewing in deck view | OK |
 | **M5b** | Run History integration - browse past-run stats | [#9](https://github.com/romaine-life/spirelens/issues/9) |
 | **M6** | Publish v0.1 to Nexus | - |

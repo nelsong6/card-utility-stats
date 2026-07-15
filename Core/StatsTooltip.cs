@@ -4,6 +4,7 @@ using MegaCrit.Sts2.Core.Nodes;
 using MegaCrit.Sts2.Core.Nodes.Cards.Holders;
 using MegaCrit.Sts2.Core.Nodes.Combat;
 using MegaCrit.Sts2.Core.Nodes.HoverTips;
+using MegaCrit.Sts2.Core.Nodes.Screens.RunHistoryScreen;
 
 namespace SpireLens.Core;
 
@@ -333,7 +334,7 @@ public static class StatsTooltip
 
     public static void HideIfAnchoredToCard()
     {
-        if (_anchor is NCardHolder) Hide();
+        if (_anchor is NCardHolder or NDeckHistoryEntry) Hide();
     }
 
     public static void Destroy()

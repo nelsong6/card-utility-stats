@@ -395,7 +395,9 @@ public static class RunHistoryDeckEntryStatsTooltipShowPatch
     {
         PatchGuard.Run(nameof(RunHistoryDeckEntryStatsTooltipShowPatch), () =>
         {
-            if (!ViewStatsInjectorPatch.StatsVisibilityEnabled) return;
+            if (!CardHoverShowPatch.ResolveCardStatsEnabled(
+                    ViewStatsInjectorPatch.StatsVisibilityEnabled,
+                    ViewStatsInjectorPatch.CardStatsEnabled)) return;
             if (!RunHistoryStatsContext.HasCurrent) return;
 
             var tree = Engine.GetMainLoop() as SceneTree;

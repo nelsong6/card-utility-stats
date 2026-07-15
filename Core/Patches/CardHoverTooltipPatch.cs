@@ -4,7 +4,6 @@ using System.Linq;
 using System.Text;
 using Godot;
 using HarmonyLib;
-using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Models.Cards;
 using MegaCrit.Sts2.Core.Nodes.Cards.Holders;
@@ -39,19 +38,12 @@ public static class CardHoverShowPatch
     [HarmonyPostfix]
     public static void Postfix(NCardHolder __instance)
     {
-        // Combat card tooltips are an explicit display-only opt-in. Keep this
-        // gate ahead of tracker locks, aggregate merging, and tooltip markup;
-        // attribution continues normally while the UI is disabled.
-        var showCardStatsDuringCombat = ViewStatsInjectorPatch.ShowCardStatsDuringCombatEnabled;
+        // Card tooltips are an explicit display-only opt-in on every surface.
+        // Keep this gate ahead of tracker locks, aggregate merging, and tooltip
+        // markup; attribution continues normally while the UI is disabled.
+        var cardStatsEnabled = ViewStatsInjectorPatch.CardStatsEnabled;
         var viewStatsEnabled = ViewStatsInjectorPatch.StatsVisibilityEnabled;
-        var combatActive = CombatManager.Instance?.IsInProgress == true;
-        if (!ResolveCardStatsEnabled(
-                viewStatsEnabled,
-                combatActive,
-                showCardStatsDuringCombat)) return;
-
-        if (RunTracker.AreCardStatsDisabledForActiveCombat())
-            return;
+        if (!ResolveCardStatsEnabled(viewStatsEnabled, cardStatsEnabled)) return;
 
         if (IsCardRewardSelectionSurface(__instance))
         {
@@ -119,9 +111,8 @@ public static class CardHoverShowPatch
 
     internal static bool ResolveCardStatsEnabled(
         bool viewStatsEnabled,
-        bool combatActive,
-        bool showCardStatsDuringCombat)
-        => viewStatsEnabled && (!combatActive || showCardStatsDuringCombat);
+        bool cardStatsEnabled)
+        => viewStatsEnabled && cardStatsEnabled;
 
     private static bool IsCardRewardSelectionSurface(Node? node)
     {

@@ -55,14 +55,14 @@ public class RuntimeOptionsTests
     }
 
     [Fact]
-    public void CombatCardStats_DefaultOff()
+    public void CardStats_LegacyPersistedSettingDefaultsOff()
     {
         Assert.False(new RuntimeOptions().ShowCardStatsDuringCombat);
         Assert.False(new Prefs().ShowCombatCardStatsTicked);
     }
 
     [Fact]
-    public void CombatCardStats_OlderRuntimeSnapshotDefaultsOff()
+    public void CardStats_OlderRuntimeSnapshotDefaultsOff()
     {
         var options = JsonSerializer.Deserialize<RuntimeOptions>("{}");
 
@@ -71,7 +71,7 @@ public class RuntimeOptionsTests
     }
 
     [Fact]
-    public void CombatCardStats_ExplicitRuntimeSnapshotCanEnableIt()
+    public void CardStats_LegacyRuntimeSnapshotCanEnableIt()
     {
         var options = JsonSerializer.Deserialize<RuntimeOptions>(
             """{"ShowCardStatsDuringCombat":true}""");
@@ -81,24 +81,20 @@ public class RuntimeOptionsTests
     }
 
     [Theory]
-    [InlineData(false, false, false, false)]
-    [InlineData(false, true, true, false)]
-    [InlineData(true, false, false, true)]
-    [InlineData(true, false, true, true)]
-    [InlineData(true, true, false, false)]
-    [InlineData(true, true, true, true)]
-    public void CombatCardStats_RequiresOptInOnlyDuringCombat(
+    [InlineData(false, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(true, false, false)]
+    [InlineData(true, true, true)]
+    public void CardStats_RequiresGlobalAndCardToggles(
         bool viewStatsEnabled,
-        bool combatActive,
-        bool showCardStatsDuringCombat,
+        bool cardStatsEnabled,
         bool expected)
     {
         Assert.Equal(
             expected,
             CardHoverShowPatch.ResolveCardStatsEnabled(
                 viewStatsEnabled,
-                combatActive,
-                showCardStatsDuringCombat));
+                cardStatsEnabled));
     }
 
     [Fact]
