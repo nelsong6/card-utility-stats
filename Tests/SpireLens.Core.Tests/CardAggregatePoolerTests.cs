@@ -10,6 +10,7 @@ public class CardAggregatePoolerTests
     {
         var first = new CardAggregate
         {
+            CombatsInDeck = 2,
             Plays = 1,
             TotalEffective = 4,
             TotalBlocked = 1,
@@ -59,6 +60,7 @@ public class CardAggregatePoolerTests
 
         var second = new CardAggregate
         {
+            CombatsInDeck = 3,
             Plays = 2,
             TotalEffective = 11,
             TotalBlocked = 2,
@@ -107,6 +109,7 @@ public class CardAggregatePoolerTests
 
         var otherDefinition = new CardAggregate
         {
+            CombatsInDeck = 99,
             Plays = 99,
             TotalEffective = 999,
             TimesExhausted = 99,
@@ -122,7 +125,8 @@ public class CardAggregatePoolerTests
             "CARD.SHIV");
 
         Assert.NotNull(pooled);
-        Assert.Equal(3, pooled!.Plays);
+        Assert.Equal(5, pooled!.CombatsInDeck);
+        Assert.Equal(3, pooled.Plays);
         Assert.Equal(15, pooled.TotalEffective);
         Assert.Equal(3, pooled.TotalBlocked);
         Assert.Equal(3, pooled.TimesExhausted);

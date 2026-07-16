@@ -118,6 +118,19 @@ public class AggregateDriftTests
     }
 
     [Fact]
+    public void CardAggregatePoolerMergeInto_Empty_ReproducesEveryAccumulatingCardField()
+    {
+        _seed = 0;
+        var src = new CardAggregate();
+        Populate(src, CardLineage);
+
+        var target = new CardAggregate();
+        CardAggregatePooler.MergeInto(target, src);
+
+        Assert.Equal(ScalarJson(src), ScalarJson(target));
+    }
+
+    [Fact]
     public void MergeRelicAggregateInto_Empty_ReproducesEveryRelicField()
     {
         _seed = 0;
