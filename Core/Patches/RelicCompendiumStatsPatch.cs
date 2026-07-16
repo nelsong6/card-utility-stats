@@ -16,7 +16,8 @@ namespace SpireLens.Core.Patches;
 /// <summary>
 /// Adds SpireLens relic stat hovers to the relic compendium. In-run hovers use
 /// the live tracker, including pending combat data; main-menu hovers use the
-/// saved continue-run start time to load the matching in-progress run file.
+/// saved continue-run start time to load the matching in-progress run file,
+/// or render the tracked relic's empty stat layout when no run is available.
 /// </summary>
 [HarmonyPatch(typeof(NRelicCollectionEntry), "OnFocus")]
 public static class RelicCompendiumStatsShowPatch
@@ -86,6 +87,7 @@ internal static class CompendiumRelicStatsContext
     private const string EnthralledDefinitionId = "CARD.ENTHRALLED";
     private const string CursedPearlCurseDefinitionId = "CARD.GREED";
     private const string BrightestFlameDefinitionId = "CARD.BRIGHTEST_FLAME";
+    private static readonly RelicAggregate EmptyRelicAggregate = new();
     private static readonly FieldInfo? RelicField =
         AccessTools.Field(typeof(NRelicCollectionEntry), "relic");
 
@@ -136,11 +138,22 @@ internal static class CompendiumRelicStatsContext
         if (RunTracker.Current != null)
             return RelicHoverShowPatch.TryBuildInventoryBodyBBCode(null, relicModel, out title, out body);
 
-        if (!MainMenuContinueRunStatsContext.TryGetCurrentRun(out var run))
-            return false;
+        if (MainMenuContinueRunStatsContext.TryGetCurrentRun(out var run))
+            return TryBuildRelicTooltipForRun(relicModel, run, out title, out body);
 
-        return TryBuildRelicTooltipForRun(relicModel, run, out title, out body);
+        return TryBuildEmptyRelicTooltip(relicModel, out title, out body);
     }
+
+    internal static bool TryBuildEmptyRelicTooltip(
+        RelicModel relicModel,
+        out string title,
+        out string body)
+        => RelicHoverShowPatch.TryBuildBodyBBCode(
+            relicModel,
+            EmptyRelicAggregate,
+            floorCount: null,
+            out title,
+            out body);
 
     internal static bool TryBuildRelicTooltipForRun(
         RelicModel relicModel,
@@ -366,8 +379,6 @@ internal static class MainMenuContinueRunStatsContext
             return;
         }
 
-        if (_gameStartTime == startTime) return;
-
         _gameStartTime = startTime;
         _cachedRun = null;
         _cachedGameStartTime = null;
@@ -386,8 +397,10 @@ internal static class MainMenuContinueRunStatsContext
         var gameStartTime = _gameStartTime ?? TryGetLiveGameStartTime();
         if (!gameStartTime.HasValue) return false;
 
-        if (_cachedRun != null && _cachedGameStartTime == gameStartTime)
+        if (_cachedGameStartTime == gameStartTime)
         {
+            if (_cachedRun == null) return false;
+
             run = _cachedRun;
             return true;
         }
@@ -396,10 +409,13 @@ internal static class MainMenuContinueRunStatsContext
             gameStartTime.Value,
             out _,
             requireInProgress: true);
-        if (loaded == null) return false;
 
+        // Cache misses as well as hits so each hover after an ended run does
+        // not repeat the bounded on-disk run search for the same start time.
         _cachedRun = loaded;
         _cachedGameStartTime = gameStartTime;
+        if (loaded == null) return false;
+
         run = loaded;
         return true;
     }

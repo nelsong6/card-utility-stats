@@ -58,6 +58,50 @@ public class CompendiumRelicStatsContextTests
     }
 
     [Fact]
+    public void TryBuildEmptyRelicTooltip_UsesZeroAggregateForSupportedRelic()
+    {
+        var ok = CompendiumRelicStatsContext.TryBuildEmptyRelicTooltip(
+            Uninitialized<FakeAnchor>(),
+            out var title,
+            out var body);
+
+        Assert.True(ok);
+        Assert.Equal("???", title);
+        Assert.Contains("Activations", body);
+        Assert.Contains("block gained", body);
+        Assert.Equal(2, body.Split("[b]0[/b]").Length - 1);
+    }
+
+    [Fact]
+    public void TryBuildEmptyRelicTooltip_CursedPearlIncludesZeroGreedStats()
+    {
+        var ok = CompendiumRelicStatsContext.TryBuildEmptyRelicTooltip(
+            Uninitialized<CursedPearl>(),
+            out var title,
+            out var body);
+
+        Assert.True(ok);
+        Assert.Equal("Cursed Pearl", title);
+        Assert.Contains("Floors ascended before first shop", body);
+        Assert.Contains("Greed combats", body);
+        Assert.Contains("Greed drawn", body);
+        Assert.Equal(5, body.Split("[b]0[/b]").Length - 1);
+    }
+
+    [Fact]
+    public void TryBuildEmptyRelicTooltip_DoesNotCreatePanelForUnsupportedRelic()
+    {
+        var ok = CompendiumRelicStatsContext.TryBuildEmptyRelicTooltip(
+            Uninitialized<Mango>(),
+            out var title,
+            out var body);
+
+        Assert.False(ok);
+        Assert.Empty(title);
+        Assert.Empty(body);
+    }
+
+    [Fact]
     public void TryBuildRelicTooltipForRun_StorybookUsesSavedBrightestFlameAggregate()
     {
         var run = new RunData { FloorReached = 9 };
