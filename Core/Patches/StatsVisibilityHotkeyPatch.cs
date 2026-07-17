@@ -67,7 +67,7 @@ public static class StatsVisibilityHotkeyPatch
             }
             else
             {
-                if (SpireLensOptionsMenu.IsOpen && evt is InputEventJoypadButton)
+                if (SpireLensOptionsMenu.IsOpen && evt is InputEventJoypadButton or InputEventJoypadMotion)
                     inputManager.GetViewport()?.SetInputAsHandled();
                 return;
             }

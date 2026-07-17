@@ -44,6 +44,8 @@ Shift+Tab are left alone.
 The modal blocks normal game input while open and contains the master stats
 visibility, card stats, monster stats, and removed-card checkboxes. Keyboard
 shortcuts `1`–`4` and controller face buttons toggle the corresponding rows.
+The D-pad and left stick move focus between rows; left/right toggles the focused
+checkbox. Mouse selection remains fully supported.
 Left Shift, R3, or the window's Close button closes it.
 
 Turning stats off hides any open SpireLens panel and skips aggregate

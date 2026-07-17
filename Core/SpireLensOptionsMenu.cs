@@ -15,6 +15,9 @@ public static class SpireLensOptionsMenu
     private const int Layer = 1000;
     private static CanvasLayer? _layer;
     private static readonly List<CheckBox> Checkboxes = new();
+    private static int _selectedIndex;
+    private static int _leftStickVerticalDirection;
+    private static int _leftStickHorizontalDirection;
 
     public static bool IsOpen =>
         _layer != null && GodotObject.IsInstanceValid(_layer) && _layer.Visible;
@@ -37,7 +40,10 @@ public static class SpireLensOptionsMenu
 
         RefreshCheckboxes();
         _layer!.Visible = true;
-        Checkboxes[0].GrabFocus();
+        _selectedIndex = 0;
+        _leftStickVerticalDirection = 0;
+        _leftStickHorizontalDirection = 0;
+        Checkboxes[_selectedIndex].GrabFocus();
         StatsTooltip.Hide();
         CoreMain.Logger.Info($"SpireLens options menu opened ({source})");
     }
@@ -52,6 +58,26 @@ public static class SpireLensOptionsMenu
     public static bool HandleShortcut(InputEvent evt)
     {
         if (!IsOpen) return false;
+
+        if (evt is InputEventJoypadMotion motion)
+            return HandleLeftStick(motion);
+
+        if (evt is InputEventJoypadButton { Pressed: true } direction)
+        {
+            switch (direction.ButtonIndex)
+            {
+                case JoyButton.DpadUp:
+                    MoveFocus(-1);
+                    return true;
+                case JoyButton.DpadDown:
+                    MoveFocus(1);
+                    return true;
+                case JoyButton.DpadLeft:
+                case JoyButton.DpadRight:
+                    ToggleOption(_selectedIndex, "menu directional");
+                    return true;
+            }
+        }
 
         int optionIndex = evt switch
         {
@@ -77,6 +103,9 @@ public static class SpireLensOptionsMenu
             _layer.QueueFree();
         _layer = null;
         Checkboxes.Clear();
+        _selectedIndex = 0;
+        _leftStickVerticalDirection = 0;
+        _leftStickHorizontalDirection = 0;
     }
 
     private static void Build(SceneTree tree)
@@ -123,7 +152,7 @@ public static class SpireLensOptionsMenu
         title.HorizontalAlignment = HorizontalAlignment.Center;
         rows.AddChild(title);
 
-        var help = NewLabel("Choose what SpireLens shows. Press RS or Left Shift to close.", 18);
+        var help = NewLabel("Mouse, D-pad, or Left Stick • Left/Right toggles • RS or Left Shift closes", 18);
         help.HorizontalAlignment = HorizontalAlignment.Center;
         help.Modulate = new Color(0.82f, 0.82f, 0.82f);
         rows.AddChild(help);
@@ -171,6 +200,7 @@ public static class SpireLensOptionsMenu
         };
         checkbox.AddThemeFontSizeOverride("font_size", 23);
         checkbox.Toggled += enabled => SetOption(index, enabled, "menu checkbox");
+        checkbox.FocusEntered += () => _selectedIndex = index;
         Checkboxes.Add(checkbox);
         row.AddChild(checkbox);
 
@@ -186,6 +216,50 @@ public static class SpireLensOptionsMenu
         RefreshCheckboxes();
         SetOption(index, !Checkboxes[index].ButtonPressed, source);
         RefreshCheckboxes();
+    }
+
+    private static void MoveFocus(int delta)
+    {
+        if (Checkboxes.Count == 0) return;
+        _selectedIndex = (_selectedIndex + delta + Checkboxes.Count) % Checkboxes.Count;
+        Checkboxes[_selectedIndex].GrabFocus();
+    }
+
+    private static bool HandleLeftStick(InputEventJoypadMotion motion)
+    {
+        const float deadZone = 0.55f;
+
+        if (motion.Axis == JoyAxis.LeftY)
+        {
+            var direction = motion.AxisValue > deadZone ? 1 : motion.AxisValue < -deadZone ? -1 : 0;
+            if (direction == 0)
+            {
+                _leftStickVerticalDirection = 0;
+            }
+            else if (direction != _leftStickVerticalDirection)
+            {
+                _leftStickVerticalDirection = direction;
+                MoveFocus(direction);
+            }
+            return true;
+        }
+
+        if (motion.Axis == JoyAxis.LeftX)
+        {
+            var direction = motion.AxisValue > deadZone ? 1 : motion.AxisValue < -deadZone ? -1 : 0;
+            if (direction == 0)
+            {
+                _leftStickHorizontalDirection = 0;
+            }
+            else if (direction != _leftStickHorizontalDirection)
+            {
+                _leftStickHorizontalDirection = direction;
+                ToggleOption(_selectedIndex, "menu left stick");
+            }
+            return true;
+        }
+
+        return false;
     }
 
     private static void SetOption(int index, bool enabled, string source)
