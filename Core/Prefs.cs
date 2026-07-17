@@ -24,6 +24,9 @@ public class Prefs
 
     [JsonPropertyName("hide_non_combat_relic_stats")]
     public bool HideNonCombatRelicStats { get; set; }
+
+    [JsonPropertyName("show_combat_only_relics_at_combat_screen")]
+    public bool ShowCombatOnlyRelicsAtCombatScreen { get; set; }
 }
 
 public static class PrefsStorage
@@ -40,6 +43,7 @@ public static class PrefsStorage
                 ShowEnemyStatsTicked = options.ShowEnemyStatsOnHover,
                 ShowCombatCardStatsTicked = options.ShowCardStatsDuringCombat,
                 HideNonCombatRelicStats = options.HideNonCombatRelicStats,
+                ShowCombatOnlyRelicsAtCombatScreen = options.ShowCombatOnlyRelicsAtCombatScreen,
             };
         }
         catch (Exception e)
@@ -58,6 +62,7 @@ public static class PrefsStorage
             RuntimeOptionsProvider.SetShowEnemyStatsOnHover(prefs.ShowEnemyStatsTicked);
             RuntimeOptionsProvider.SetShowCardStatsDuringCombat(prefs.ShowCombatCardStatsTicked);
             RuntimeOptionsProvider.SetHideNonCombatRelicStats(prefs.HideNonCombatRelicStats);
+            RuntimeOptionsProvider.SetShowCombatOnlyRelicsAtCombatScreen(prefs.ShowCombatOnlyRelicsAtCombatScreen);
         }
         catch (Exception e)
         {

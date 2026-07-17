@@ -71,6 +71,7 @@ public static class ViewStatsInjectorPatch
     private static bool _persistedEnemyStatsTicked;
     private static bool _persistedCardStatsTicked;
     private static bool _persistedHideNonCombatRelicStats;
+    private static bool _persistedShowCombatOnlyRelicsAtCombatScreen;
     private static bool _prefsLoaded;
 
     public static bool CardStatsEnabled
@@ -115,6 +116,15 @@ public static class ViewStatsInjectorPatch
         {
             EnsurePrefsLoaded();
             return _persistedHideNonCombatRelicStats;
+        }
+    }
+
+    public static bool ShowCombatOnlyRelicsAtCombatScreen
+    {
+        get
+        {
+            EnsurePrefsLoaded();
+            return _persistedShowCombatOnlyRelicsAtCombatScreen;
         }
     }
 
@@ -179,11 +189,24 @@ public static class ViewStatsInjectorPatch
     {
         EnsurePrefsLoaded();
         _persistedHideNonCombatRelicStats = isEnabled;
+        if (isEnabled)
+            _persistedShowCombatOnlyRelicsAtCombatScreen = false;
         SavePreferences();
         if (isEnabled)
             StatsTooltip.Hide();
         RelicBarFilterPatch.RefreshAll();
-        CoreMain.Logger.Info($"Hide non-combat relic stats set to {isEnabled} ({source})");
+        CoreMain.Logger.Info($"Force combat-only relic bar set to {isEnabled} ({source})");
+    }
+
+    public static void SetShowCombatOnlyRelicsAtCombatScreen(bool isEnabled, string source)
+    {
+        EnsurePrefsLoaded();
+        _persistedShowCombatOnlyRelicsAtCombatScreen = isEnabled;
+        if (isEnabled)
+            _persistedHideNonCombatRelicStats = false;
+        SavePreferences();
+        RelicBarFilterPatch.RefreshAll();
+        CoreMain.Logger.Info($"Combat-screen-only relic filter set to {isEnabled} ({source})");
     }
 
     /// <summary>
@@ -205,6 +228,7 @@ public static class ViewStatsInjectorPatch
             // key even though the setting now applies to every card surface.
             _persistedCardStatsTicked = prefs.ShowCombatCardStatsTicked;
             _persistedHideNonCombatRelicStats = prefs.HideNonCombatRelicStats;
+            _persistedShowCombatOnlyRelicsAtCombatScreen = prefs.ShowCombatOnlyRelicsAtCombatScreen;
         }
         catch (Exception e)
         {
@@ -521,6 +545,7 @@ public static class ViewStatsInjectorPatch
             // for compatibility with the stable Loader across Core reloads.
             ShowCombatCardStatsTicked = _persistedCardStatsTicked,
             HideNonCombatRelicStats = _persistedHideNonCombatRelicStats,
+            ShowCombatOnlyRelicsAtCombatScreen = _persistedShowCombatOnlyRelicsAtCombatScreen,
         });
     }
 

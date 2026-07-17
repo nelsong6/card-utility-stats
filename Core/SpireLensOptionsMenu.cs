@@ -132,7 +132,7 @@ public static class SpireLensOptionsMenu
 
         var panel = new PanelContainer
         {
-            CustomMinimumSize = new Vector2(720, 590),
+            CustomMinimumSize = new Vector2(780, 710),
             MouseFilter = Control.MouseFilterEnum.Stop,
         };
         center.AddChild(panel);
@@ -161,7 +161,12 @@ public static class SpireLensOptionsMenu
         AddOption(rows, "SpireLens: card stats", 1);
         AddOption(rows, "Show monster stats", 2);
         AddOption(rows, "Show removed cards", 3);
-        AddOption(rows, "Hide non-combat relics from relic bar", 4);
+
+        var relicFilterHeader = NewLabel("Relic bar filter — choose one", 20);
+        relicFilterHeader.Modulate = new Color(0.72f, 0.8f, 0.92f);
+        rows.AddChild(relicFilterHeader);
+        AddOption(rows, "Show combat-only relics at the combat screen", 4);
+        AddOption(rows, "Force show only combat relics on all screens", 5);
 
         var close = new Button
         {
@@ -332,6 +337,9 @@ public static class SpireLensOptionsMenu
                 ViewStatsInjectorPatch.SetShowRemovedCardsEnabled(enabled, source);
                 break;
             case 4:
+                ViewStatsInjectorPatch.SetShowCombatOnlyRelicsAtCombatScreen(enabled, source);
+                break;
+            case 5:
                 ViewStatsInjectorPatch.SetHideNonCombatRelicStats(enabled, source);
                 break;
         }
@@ -339,12 +347,13 @@ public static class SpireLensOptionsMenu
 
     private static void RefreshCheckboxes()
     {
-        if (Checkboxes.Count != 5) return;
+        if (Checkboxes.Count != 6) return;
         SetCheckboxState(0, ViewStatsInjectorPatch.StatsVisibilityEnabled);
         SetCheckboxState(1, ViewStatsInjectorPatch.CardStatsEnabled);
         SetCheckboxState(2, ViewStatsInjectorPatch.EnemyStatsEnabled);
         SetCheckboxState(3, ViewStatsInjectorPatch.ShowRemovedCardsEnabled);
-        SetCheckboxState(4, ViewStatsInjectorPatch.HideNonCombatRelicStats);
+        SetCheckboxState(4, ViewStatsInjectorPatch.ShowCombatOnlyRelicsAtCombatScreen);
+        SetCheckboxState(5, ViewStatsInjectorPatch.HideNonCombatRelicStats);
     }
 
     private static void SetCheckboxState(int index, bool enabled)

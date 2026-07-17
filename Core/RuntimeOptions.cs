@@ -12,6 +12,7 @@ public sealed class RuntimeOptions
     public bool ShowEnemyStatsOnHover { get; set; }
     public bool ShowCardStatsDuringCombat { get; set; }
     public bool HideNonCombatRelicStats { get; set; }
+    public bool ShowCombatOnlyRelicsAtCombatScreen { get; set; }
     public bool ShowHandTooltips { get; set; } = true;
     public bool UseVerboseHandStats { get; set; }
     public bool DisableCardStatsDuringCombat { get; set; }
@@ -28,6 +29,7 @@ public static class RuntimeOptionsProvider
     private const string SetShowEnemyStatsOnHoverMethodName = "SetShowEnemyStatsOnHover";
     private const string SetShowCardStatsDuringCombatMethodName = "SetShowCardStatsDuringCombat";
     private const string SetHideNonCombatRelicStatsMethodName = "SetHideNonCombatRelicStats";
+    private const string SetShowCombatOnlyRelicsAtCombatScreenMethodName = "SetShowCombatOnlyRelicsAtCombatScreen";
     private const string SetVerboseHandStatsEnabledMethodName = "SetVerboseHandStatsEnabled";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -42,6 +44,7 @@ public static class RuntimeOptionsProvider
     private static MethodInfo? _setShowEnemyStatsOnHoverMethod;
     private static MethodInfo? _setShowCardStatsDuringCombatMethod;
     private static MethodInfo? _setHideNonCombatRelicStatsMethod;
+    private static MethodInfo? _setShowCombatOnlyRelicsAtCombatScreenMethod;
     private static MethodInfo? _setVerboseHandStatsEnabledMethod;
     private static bool _loggedMissingBridge;
     private static bool _loggedRefreshFailure;
@@ -50,6 +53,7 @@ public static class RuntimeOptionsProvider
     private static bool _loggedShowEnemyStatsFailure;
     private static bool _loggedShowCardStatsDuringCombatFailure;
     private static bool _loggedHideNonCombatRelicStatsFailure;
+    private static bool _loggedShowCombatOnlyRelicsAtCombatScreenFailure;
     private static bool _loggedVerboseHandStatsFailure;
 
     public static RuntimeOptions Current { get; private set; } = new();
@@ -179,6 +183,26 @@ public static class RuntimeOptionsProvider
         Refresh();
     }
 
+    public static void SetShowCombatOnlyRelicsAtCombatScreen(bool isEnabled)
+    {
+        try
+        {
+            var method = ResolveSetShowCombatOnlyRelicsAtCombatScreenMethod();
+            method?.Invoke(null, new object?[] { isEnabled });
+            _loggedShowCombatOnlyRelicsAtCombatScreenFailure = false;
+        }
+        catch (Exception e)
+        {
+            if (!_loggedShowCombatOnlyRelicsAtCombatScreenFailure)
+            {
+                CoreMain.Logger.Warn($"RuntimeOptionsProvider.SetShowCombatOnlyRelicsAtCombatScreen failed: {e.Message}");
+                _loggedShowCombatOnlyRelicsAtCombatScreenFailure = true;
+            }
+        }
+
+        Refresh();
+    }
+
     public static void SetVerboseHandStatsEnabled(bool isEnabled)
     {
         try
@@ -253,6 +277,14 @@ public static class RuntimeOptionsProvider
             SetHideNonCombatRelicStatsMethodName,
             BindingFlags.Public | BindingFlags.Static);
         return _setHideNonCombatRelicStatsMethod;
+    }
+
+    private static MethodInfo? ResolveSetShowCombatOnlyRelicsAtCombatScreenMethod()
+    {
+        _setShowCombatOnlyRelicsAtCombatScreenMethod ??= ResolveBridgeType()?.GetMethod(
+            SetShowCombatOnlyRelicsAtCombatScreenMethodName,
+            BindingFlags.Public | BindingFlags.Static);
+        return _setShowCombatOnlyRelicsAtCombatScreenMethod;
     }
 
     private static Type? ResolveBridgeType()
