@@ -49,7 +49,7 @@ public static class RelicBarFilterPatch
         if (_monitor != null && GodotObject.IsInstanceValid(_monitor)) return;
 
         _monitor = new RelicBarFilterMonitor { Name = "SpireLensRelicBarFilterMonitor" };
-        tree.Root.AddChild(_monitor);
+        tree.Root.CallDeferred(Node.MethodName.AddChild, _monitor);
     }
 
     public static void DestroyMonitor()
