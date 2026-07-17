@@ -172,6 +172,9 @@ public static class CoreMain
         try { ViewStatsInjectorPatch.TeardownInjectedUI(); }
         catch (Exception e) { Logger.Error($"Shutdown: UI teardown failed: {e}"); }
 
+        try { SpireLensOptionsMenu.Destroy(); }
+        catch (Exception e) { Logger.Error($"Shutdown: options menu teardown failed: {e}"); }
+
         try { RelicCompendiumStatsSignals.TeardownAttachedSignals(); }
         catch (Exception e) { Logger.Error($"Shutdown: relic compendium signal teardown failed: {e}"); }
 

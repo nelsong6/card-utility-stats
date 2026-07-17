@@ -54,6 +54,7 @@ public static class ViewStatsInjectorPatch
     private static readonly List<Node> _injectedClones = new();
     private static readonly string[] InjectedCloneNames =
     [
+        "ViewStatsShortcut",
         "ViewStats",
         "ViewRemovedCards",
         "ViewEnemyStats",
@@ -89,6 +90,24 @@ public static class ViewStatsInjectorPatch
         }
     }
 
+    public static bool ShowRemovedCardsEnabled
+    {
+        get
+        {
+            EnsurePrefsLoaded();
+            return _persistedShowRemovedCardsTicked;
+        }
+    }
+
+    public static bool EnemyStatsEnabled
+    {
+        get
+        {
+            EnsurePrefsLoaded();
+            return _persistedEnemyStatsTicked;
+        }
+    }
+
     /// <summary>
     /// Toggle the same persisted global visibility state as the deck-view
     /// checkbox. Input shortcuts and UI controls share this path so the live
@@ -112,6 +131,38 @@ public static class ViewStatsInjectorPatch
             StatsTooltip.Hide();
 
         CoreMain.Logger.Info($"Stats visibility set to {isEnabled} ({source})");
+    }
+
+    public static void SetCardStatsEnabled(bool isEnabled, string source)
+    {
+        EnsurePrefsLoaded();
+        _persistedCardStatsTicked = isEnabled;
+        SetTickboxVisualState(LastInjectedCardStatsTickbox, isEnabled);
+        SavePreferences();
+        if (!isEnabled)
+            StatsTooltip.HideIfAnchoredToCard();
+        CoreMain.Logger.Info($"Card stats set to {isEnabled} ({source})");
+    }
+
+    public static void SetEnemyStatsEnabled(bool isEnabled, string source)
+    {
+        EnsurePrefsLoaded();
+        _persistedEnemyStatsTicked = isEnabled;
+        SetTickboxVisualState(LastInjectedEnemyStatsTickbox, isEnabled);
+        SavePreferences();
+        if (!isEnabled)
+            StatsTooltip.HideIfAnchoredToCreature();
+        CoreMain.Logger.Info($"Monster stats set to {isEnabled} ({source})");
+    }
+
+    public static void SetShowRemovedCardsEnabled(bool isEnabled, string source)
+    {
+        EnsurePrefsLoaded();
+        _persistedShowRemovedCardsTicked = isEnabled;
+        SetTickboxVisualState(LastInjectedShowRemovedCardsTickbox, isEnabled);
+        SavePreferences();
+        CoreMain.Logger.Info($"Show removed cards set to {isEnabled} ({source})");
+        RefreshDeckView();
     }
 
     /// <summary>
@@ -232,51 +283,23 @@ public static class ViewStatsInjectorPatch
 
         RemoveExistingInjectedControls(viewUpgradesContainer.GetParent());
 
-        InjectTickbox(
-            viewUpgradesContainer,
-            "ViewStats",
-            "Stats",
-            "ViewStatsLabel",
-            "SpireLens: on/off",
-            new Vector2(0, -240),
-            _persistedTicked,
-            OnStatsToggled,
-            tickbox => LastInjectedTickbox = tickbox);
+        var shortcut = new Button
+        {
+            Name = "ViewStatsShortcut",
+            Text = "Open SpireLens menu\nRS / Left Shift",
+            CustomMinimumSize = new Vector2(300, 72),
+            MouseDefaultCursorShape = Control.CursorShape.PointingHand,
+        };
+        shortcut.AddThemeFontSizeOverride("font_size", 20);
+        shortcut.Pressed += () => SpireLensOptionsMenu.Toggle("deck-view button");
 
-        InjectTickbox(
-            viewUpgradesContainer,
-            "ViewCombatCardStats",
-            "CombatCardStats",
-            "ViewCombatCardStatsLabel",
-            "SpireLens: card stats",
-            new Vector2(0, -180),
-            _persistedCardStatsTicked,
-            OnCardStatsToggled,
-            tickbox => LastInjectedCardStatsTickbox = tickbox);
+        var parent = viewUpgradesContainer.GetParent();
+        parent.AddChild(shortcut);
+        if (viewUpgradesContainer is Control original)
+            shortcut.Position = original.Position + new Vector2(0, -80);
+        _injectedClones.Add(shortcut);
 
-        InjectTickbox(
-            viewUpgradesContainer,
-            "ViewEnemyStats",
-            "EnemyStats",
-            "ViewEnemyStatsLabel",
-            "spirelens: show monster stats",
-            new Vector2(0, -120),
-            _persistedEnemyStatsTicked,
-            OnEnemyStatsToggled,
-            tickbox => LastInjectedEnemyStatsTickbox = tickbox);
-
-        InjectTickbox(
-            viewUpgradesContainer,
-            "ViewRemovedCards",
-            "RemovedCards",
-            "ViewRemovedCardsLabel",
-            "spirelens: show removed cards",
-            new Vector2(0, -60),
-            _persistedShowRemovedCardsTicked,
-            OnShowRemovedCardsToggled,
-            tickbox => LastInjectedShowRemovedCardsTickbox = tickbox);
-
-        CoreMain.Logger.Info("ViewStatsInjector: injected deck-view SpireLens checkboxes");
+        CoreMain.Logger.Info("ViewStatsInjector: injected deck-view menu shortcut");
     }
 
     private static void RemoveExistingInjectedControls(Node? parent)
@@ -439,33 +462,21 @@ public static class ViewStatsInjectorPatch
 
     private static void OnCardStatsToggled(NTickbox tickbox)
     {
-        _persistedCardStatsTicked = tickbox.IsTicked;
-        SavePreferences();
-        CoreMain.Logger.Info($"CardStats toggled: IsTicked={tickbox.IsTicked}");
-
-        if (!tickbox.IsTicked)
-            StatsTooltip.HideIfAnchoredToCard();
+        SetCardStatsEnabled(tickbox.IsTicked, "deck-view checkbox");
     }
 
     private static void OnEnemyStatsToggled(NTickbox tickbox)
     {
-        _persistedEnemyStatsTicked = tickbox.IsTicked;
-        SavePreferences();
-        CoreMain.Logger.Info($"EnemyStats toggled: IsTicked={tickbox.IsTicked}");
-
-        if (!tickbox.IsTicked)
-            StatsTooltip.HideIfAnchoredToCreature();
+        SetEnemyStatsEnabled(tickbox.IsTicked, "deck-view checkbox");
     }
 
     private static void OnShowRemovedCardsToggled(NTickbox tickbox)
     {
-        _persistedShowRemovedCardsTicked = tickbox.IsTicked;
-        SavePreferences();
-        CoreMain.Logger.Info($"ShowRemovedCards toggled: IsTicked={tickbox.IsTicked}");
+        SetShowRemovedCardsEnabled(tickbox.IsTicked, "deck-view checkbox");
+    }
 
-        // Live re-render so removed cards appear/disappear the moment the
-        // user flips the checkbox. DisplayCards reads our prefix-appended
-        // _cards list, so it automatically picks up the current tick state.
+    private static void RefreshDeckView()
+    {
         try
         {
             if (LastInjectedDeckView != null && Godot.GodotObject.IsInstanceValid(LastInjectedDeckView))

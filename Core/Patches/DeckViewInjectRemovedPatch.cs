@@ -48,11 +48,7 @@ public static class DeckViewInjectRemovedPatch
             // (a separate field on the screen), not the order of _cards.
             __instance._cards = __instance._pile.Cards.ToList();
 
-            RuntimeOptionsProvider.Refresh();
-
-            var tickbox = ViewStatsInjectorPatch.LastInjectedShowRemovedCardsTickbox;
-            var showRemovedCards = tickbox?.IsTicked ?? RuntimeOptionsProvider.Current.ShowRemovedCardsInDeckView;
-            if (!showRemovedCards) return;
+            if (!ViewStatsInjectorPatch.ShowRemovedCardsEnabled) return;
 
             var supplemental = RunTracker.GetSupplementalDeckViewCards();
             if (supplemental.Count == 0) return;

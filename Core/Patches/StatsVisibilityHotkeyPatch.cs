@@ -12,10 +12,9 @@ using MegaCrit.Sts2.Core.Platform;
 namespace SpireLens.Core.Patches;
 
 /// <summary>
-/// Toggles the persisted global stats visibility setting with Left Shift or
-/// Right Stick press (R3). The game does not bind either input in its default
-/// or current gameplay map, while Left Trigger is intentionally left alone
-/// because it opens the draw pile and Left Stick press is Peek.
+/// Opens and closes the global SpireLens options menu with Left Shift or
+/// Right Stick press (R3), and dispatches the menu's keyboard/controller
+/// option shortcuts while that modal is open.
 /// </summary>
 [HarmonyPatch]
 public static class StatsVisibilityHotkeyPatch
@@ -35,6 +34,15 @@ public static class StatsVisibilityHotkeyPatch
     {
         try
         {
+            var inputManager = NInputManager.Instance;
+            if (inputManager == null || !CanToggle(inputManager)) return;
+
+            if (SpireLensOptionsMenu.HandleShortcut(evt))
+            {
+                inputManager.GetViewport()?.SetInputAsHandled();
+                return;
+            }
+
             string toggleSource;
             if (evt is InputEventKey keyEvent)
             {
@@ -43,7 +51,12 @@ public static class StatsVisibilityHotkeyPatch
                         keyEvent.PhysicalKeycode,
                         keyEvent.Location,
                         keyEvent.Pressed,
-                        keyEvent.Echo)) return;
+                        keyEvent.Echo))
+                {
+                    if (SpireLensOptionsMenu.IsOpen)
+                        inputManager.GetViewport()?.SetInputAsHandled();
+                    return;
+                }
 
                 toggleSource = "Left Shift hotkey";
             }
@@ -54,11 +67,10 @@ public static class StatsVisibilityHotkeyPatch
             }
             else
             {
+                if (SpireLensOptionsMenu.IsOpen && evt is InputEventJoypadButton)
+                    inputManager.GetViewport()?.SetInputAsHandled();
                 return;
             }
-
-            var inputManager = NInputManager.Instance;
-            if (inputManager == null || !CanToggle(inputManager)) return;
 
             // Shift is free in the shipped and current mappings. If the player
             // later assigns it to a game action, the game binding wins and the
@@ -68,7 +80,8 @@ public static class StatsVisibilityHotkeyPatch
                 && NInputManager.remappableKeyboardInputs.Any(
                     action => inputManager.GetShortcutKey(action) == Key.Shift)) return;
 
-            ViewStatsInjectorPatch.ToggleStatsVisibility(toggleSource);
+            SpireLensOptionsMenu.Toggle(toggleSource);
+            inputManager.GetViewport()?.SetInputAsHandled();
         }
         catch (Exception e)
         {

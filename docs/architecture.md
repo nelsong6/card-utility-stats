@@ -89,8 +89,9 @@ When attribution is not naturally one-card-to-one-outcome, the code prefers:
 
 ## UI Surface
 
-- [Core/Patches/ViewStatsInjectorPatch.cs](../Core/Patches/ViewStatsInjectorPatch.cs) injects the deck-view master, card-stats, removed-card, and opt-in monster-hover toggles.
-- [Core/Patches/StatsVisibilityHotkeyPatch.cs](../Core/Patches/StatsVisibilityHotkeyPatch.cs) maps a standalone Left Shift tap and Right Stick (R3) press to the same persisted global visibility state while preserving Shift-based chords; Left Trigger remains Draw Pile and Left Stick press remains Peek.
+- [Core/Patches/ViewStatsInjectorPatch.cs](../Core/Patches/ViewStatsInjectorPatch.cs) injects the deck-view shortcut for the global SpireLens options menu.
+- [Core/SpireLensOptionsMenu.cs](../Core/SpireLensOptionsMenu.cs) owns the modal, screen-independent checkbox window and its keyboard/gamepad shortcuts.
+- [Core/Patches/StatsVisibilityHotkeyPatch.cs](../Core/Patches/StatsVisibilityHotkeyPatch.cs) maps a standalone Left Shift tap and Right Stick (R3) press to opening/closing that menu while preserving Shift-based chords; Left Trigger remains Draw Pile and Left Stick press remains Peek.
 - [Core/Patches/CardHoverTooltipPatch.cs](../Core/Patches/CardHoverTooltipPatch.cs) builds compact and full tooltip bodies.
 - [Core/StatsTooltip.cs](../Core/StatsTooltip.cs) renders the side tooltip panel.
 - [Config/SpireLensConfig.cs](../Config/SpireLensConfig.cs) provides the persistent mod-settings UI for runtime display options.

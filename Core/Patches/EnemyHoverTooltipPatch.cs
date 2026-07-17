@@ -16,10 +16,9 @@ public static class EnemyHoverShowPatch
         try
         {
             var viewStatsEnabled = ViewStatsInjectorPatch.StatsVisibilityEnabled;
-            var enemyStatsTickbox = ViewStatsInjectorPatch.LastInjectedEnemyStatsTickbox;
             if (!ResolveEnemyStatsEnabled(
                     viewStatsEnabled,
-                    enemyStatsTickbox?.IsTicked,
+                    ViewStatsInjectorPatch.EnemyStatsEnabled,
                     RuntimeOptionsProvider.Current.ShowEnemyStatsOnHover)) return;
 
             var creature = __instance.Entity;
