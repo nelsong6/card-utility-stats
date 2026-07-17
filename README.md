@@ -42,11 +42,10 @@ can be opened from any screen by tapping **Left Shift** on keyboard or pressing
 Shift+Tab are left alone.
 
 The modal blocks normal game input while open and contains the master stats
-visibility, card stats, monster stats, and removed-card checkboxes. Keyboard
-shortcuts `1`–`4` and controller face buttons toggle the corresponding rows.
-The D-pad and left stick move focus between rows; left/right toggles the focused
-checkbox. Mouse selection remains fully supported.
-Left Shift, R3, or the window's Close button closes it.
+visibility, card stats, monster stats, and removed-card checkboxes. The D-pad
+and left stick move focus between rows, and `A` toggles the highlighted option.
+Any other non-direction controller button closes the menu. Mouse selection
+remains fully supported; Left Shift or the window's Close button also closes it.
 
 Turning stats off hides any open SpireLens panel and skips aggregate
 lookup and tooltip construction while stats are hidden; attribution continues

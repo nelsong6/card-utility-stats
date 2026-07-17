@@ -18,7 +18,6 @@ public static class SpireLensOptionsMenu
     private static readonly List<Button> CheckboxIndicators = new();
     private static int _selectedIndex;
     private static int _leftStickVerticalDirection;
-    private static int _leftStickHorizontalDirection;
 
     public static bool IsOpen =>
         _layer != null && GodotObject.IsInstanceValid(_layer) && _layer.Visible;
@@ -43,7 +42,6 @@ public static class SpireLensOptionsMenu
         _layer!.Visible = true;
         _selectedIndex = 0;
         _leftStickVerticalDirection = 0;
-        _leftStickHorizontalDirection = 0;
         Checkboxes[_selectedIndex].GrabFocus();
         StatsTooltip.Hide();
         CoreMain.Logger.Info($"SpireLens options menu opened ({source})");
@@ -63,9 +61,9 @@ public static class SpireLensOptionsMenu
         if (evt is InputEventJoypadMotion motion)
             return HandleLeftStick(motion);
 
-        if (evt is InputEventJoypadButton { Pressed: true } direction)
+        if (evt is InputEventJoypadButton { Pressed: true } button)
         {
-            switch (direction.ButtonIndex)
+            switch (button.ButtonIndex)
             {
                 case JoyButton.DpadUp:
                     MoveFocus(-1);
@@ -75,27 +73,16 @@ public static class SpireLensOptionsMenu
                     return true;
                 case JoyButton.DpadLeft:
                 case JoyButton.DpadRight:
-                    ToggleOption(_selectedIndex, "menu directional");
+                    return true;
+                case JoyButton.A:
+                    ToggleOption(_selectedIndex, "menu confirm");
+                    return true;
+                default:
+                    Close("menu controller button");
                     return true;
             }
         }
-
-        int optionIndex = evt switch
-        {
-            InputEventKey { Pressed: true, Echo: false, Keycode: Key.Key1 } => 0,
-            InputEventKey { Pressed: true, Echo: false, Keycode: Key.Key2 } => 1,
-            InputEventKey { Pressed: true, Echo: false, Keycode: Key.Key3 } => 2,
-            InputEventKey { Pressed: true, Echo: false, Keycode: Key.Key4 } => 3,
-            InputEventJoypadButton { Pressed: true, ButtonIndex: JoyButton.A } => 0,
-            InputEventJoypadButton { Pressed: true, ButtonIndex: JoyButton.X } => 1,
-            InputEventJoypadButton { Pressed: true, ButtonIndex: JoyButton.Y } => 2,
-            InputEventJoypadButton { Pressed: true, ButtonIndex: JoyButton.B } => 3,
-            _ => -1,
-        };
-
-        if (optionIndex < 0) return false;
-        ToggleOption(optionIndex, "menu shortcut");
-        return true;
+        return false;
     }
 
     public static void Destroy()
@@ -107,7 +94,6 @@ public static class SpireLensOptionsMenu
         CheckboxIndicators.Clear();
         _selectedIndex = 0;
         _leftStickVerticalDirection = 0;
-        _leftStickHorizontalDirection = 0;
     }
 
     private static void Build(SceneTree tree)
@@ -154,15 +140,15 @@ public static class SpireLensOptionsMenu
         title.HorizontalAlignment = HorizontalAlignment.Center;
         rows.AddChild(title);
 
-        var help = NewLabel("Mouse, D-pad, or Left Stick • Left/Right toggles • RS or Left Shift closes", 18);
+        var help = NewLabel("Mouse or Up/Down to select • A toggles • Any other button closes", 18);
         help.HorizontalAlignment = HorizontalAlignment.Center;
         help.Modulate = new Color(0.82f, 0.82f, 0.82f);
         rows.AddChild(help);
 
-        AddOption(rows, "SpireLens: on/off", "1", "A", 0);
-        AddOption(rows, "SpireLens: card stats", "2", "X", 1);
-        AddOption(rows, "Show monster stats", "3", "Y", 2);
-        AddOption(rows, "Show removed cards", "4", "B", 3);
+        AddOption(rows, "SpireLens: on/off", 0);
+        AddOption(rows, "SpireLens: card stats", 1);
+        AddOption(rows, "Show monster stats", 2);
+        AddOption(rows, "Show removed cards", 3);
 
         var close = new Button
         {
@@ -185,8 +171,6 @@ public static class SpireLensOptionsMenu
     private static void AddOption(
         VBoxContainer parent,
         string text,
-        string keyboardShortcut,
-        string gamepadShortcut,
         int index)
     {
         var row = new HBoxContainer();
@@ -218,11 +202,6 @@ public static class SpireLensOptionsMenu
         Checkboxes.Add(checkbox);
         row.AddChild(checkbox);
 
-        var shortcut = NewLabel($"[{keyboardShortcut}]   [{gamepadShortcut}]", 21);
-        shortcut.VerticalAlignment = VerticalAlignment.Center;
-        shortcut.CustomMinimumSize = new Vector2(120, 0);
-        shortcut.HorizontalAlignment = HorizontalAlignment.Right;
-        row.AddChild(shortcut);
     }
 
     private static Button CreateCheckboxIndicator()
@@ -291,16 +270,8 @@ public static class SpireLensOptionsMenu
 
         if (motion.Axis == JoyAxis.LeftX)
         {
-            var direction = motion.AxisValue > deadZone ? 1 : motion.AxisValue < -deadZone ? -1 : 0;
-            if (direction == 0)
-            {
-                _leftStickHorizontalDirection = 0;
-            }
-            else if (direction != _leftStickHorizontalDirection)
-            {
-                _leftStickHorizontalDirection = direction;
-                ToggleOption(_selectedIndex, "menu left stick");
-            }
+            // Horizontal directions are intentionally inert in this vertical
+            // list, but remain modal input rather than closing the menu.
             return true;
         }
 
