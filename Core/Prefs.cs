@@ -21,6 +21,9 @@ public class Prefs
 
     [JsonPropertyName("show_combat_card_stats_ticked")]
     public bool ShowCombatCardStatsTicked { get; set; }
+
+    [JsonPropertyName("hide_non_combat_relic_stats")]
+    public bool HideNonCombatRelicStats { get; set; }
 }
 
 public static class PrefsStorage
@@ -36,6 +39,7 @@ public static class PrefsStorage
                 ShowRemovedCardsTicked = options.ShowRemovedCardsInDeckView,
                 ShowEnemyStatsTicked = options.ShowEnemyStatsOnHover,
                 ShowCombatCardStatsTicked = options.ShowCardStatsDuringCombat,
+                HideNonCombatRelicStats = options.HideNonCombatRelicStats,
             };
         }
         catch (Exception e)
@@ -53,6 +57,7 @@ public static class PrefsStorage
             RuntimeOptionsProvider.SetShowRemovedCardsInDeckView(prefs.ShowRemovedCardsTicked);
             RuntimeOptionsProvider.SetShowEnemyStatsOnHover(prefs.ShowEnemyStatsTicked);
             RuntimeOptionsProvider.SetShowCardStatsDuringCombat(prefs.ShowCombatCardStatsTicked);
+            RuntimeOptionsProvider.SetHideNonCombatRelicStats(prefs.HideNonCombatRelicStats);
         }
         catch (Exception e)
         {

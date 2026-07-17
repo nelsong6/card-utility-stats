@@ -47,6 +47,11 @@ and left stick move focus between rows, and `A` toggles the highlighted option.
 Any other non-direction controller button closes the menu. Mouse selection
 remains fully supported; Left Shift or the window's Close button also closes it.
 
+The optional non-combat relic filter hides already-resolved relics from the
+standard relic bar throughout an active run while leaving them owned,
+functional, and visible on every other relic surface. The initial category is
+limited to max-HP-granting relics.
+
 Turning stats off hides any open SpireLens panel and skips aggregate
 lookup and tooltip construction while stats are hidden; attribution continues
 in the background. Controller Left Trigger remains the game's Draw Pile input,

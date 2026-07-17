@@ -18,6 +18,8 @@ public static class SpireLensOptionsMenu
     private static readonly List<Button> CheckboxIndicators = new();
     private static int _selectedIndex;
     private static int _leftStickVerticalDirection;
+    private static int _leftStickHorizontalDirection;
+    private static bool _leftTriggerPressed;
 
     public static bool IsOpen =>
         _layer != null && GodotObject.IsInstanceValid(_layer) && _layer.Visible;
@@ -40,8 +42,10 @@ public static class SpireLensOptionsMenu
 
         RefreshCheckboxes();
         _layer!.Visible = true;
-        _selectedIndex = 0;
+        _selectedIndex = Math.Clamp(_selectedIndex, 0, Checkboxes.Count - 1);
         _leftStickVerticalDirection = 0;
+        _leftStickHorizontalDirection = 0;
+        _leftTriggerPressed = false;
         Checkboxes[_selectedIndex].GrabFocus();
         StatsTooltip.Hide();
         CoreMain.Logger.Info($"SpireLens options menu opened ({source})");
@@ -72,7 +76,13 @@ public static class SpireLensOptionsMenu
                     MoveFocus(1);
                     return true;
                 case JoyButton.DpadLeft:
+                    JumpToEdge(first: true);
+                    return true;
                 case JoyButton.DpadRight:
+                    JumpToEdge(first: false);
+                    return true;
+                case JoyButton.LeftShoulder:
+                    JumpToEdge(first: true);
                     return true;
                 case JoyButton.A:
                     ToggleOption(_selectedIndex, "menu confirm");
@@ -94,6 +104,8 @@ public static class SpireLensOptionsMenu
         CheckboxIndicators.Clear();
         _selectedIndex = 0;
         _leftStickVerticalDirection = 0;
+        _leftStickHorizontalDirection = 0;
+        _leftTriggerPressed = false;
     }
 
     private static void Build(SceneTree tree)
@@ -120,7 +132,7 @@ public static class SpireLensOptionsMenu
 
         var panel = new PanelContainer
         {
-            CustomMinimumSize = new Vector2(720, 520),
+            CustomMinimumSize = new Vector2(720, 590),
             MouseFilter = Control.MouseFilterEnum.Stop,
         };
         center.AddChild(panel);
@@ -140,7 +152,7 @@ public static class SpireLensOptionsMenu
         title.HorizontalAlignment = HorizontalAlignment.Center;
         rows.AddChild(title);
 
-        var help = NewLabel("Mouse or Up/Down to select • A toggles • Any other button closes", 18);
+        var help = NewLabel("Up/Down selects • A toggles • Left/Right or LB/LT jumps to an edge", 18);
         help.HorizontalAlignment = HorizontalAlignment.Center;
         help.Modulate = new Color(0.82f, 0.82f, 0.82f);
         rows.AddChild(help);
@@ -149,6 +161,7 @@ public static class SpireLensOptionsMenu
         AddOption(rows, "SpireLens: card stats", 1);
         AddOption(rows, "Show monster stats", 2);
         AddOption(rows, "Show removed cards", 3);
+        AddOption(rows, "Hide non-combat relics from relic bar", 4);
 
         var close = new Button
         {
@@ -249,6 +262,13 @@ public static class SpireLensOptionsMenu
         Checkboxes[_selectedIndex].GrabFocus();
     }
 
+    private static void JumpToEdge(bool first)
+    {
+        if (Checkboxes.Count == 0) return;
+        _selectedIndex = first ? 0 : Checkboxes.Count - 1;
+        Checkboxes[_selectedIndex].GrabFocus();
+    }
+
     private static bool HandleLeftStick(InputEventJoypadMotion motion)
     {
         const float deadZone = 0.55f;
@@ -270,8 +290,25 @@ public static class SpireLensOptionsMenu
 
         if (motion.Axis == JoyAxis.LeftX)
         {
-            // Horizontal directions are intentionally inert in this vertical
-            // list, but remain modal input rather than closing the menu.
+            var direction = motion.AxisValue > deadZone ? 1 : motion.AxisValue < -deadZone ? -1 : 0;
+            if (direction == 0)
+            {
+                _leftStickHorizontalDirection = 0;
+            }
+            else if (direction != _leftStickHorizontalDirection)
+            {
+                _leftStickHorizontalDirection = direction;
+                JumpToEdge(first: direction < 0);
+            }
+            return true;
+        }
+
+        if (motion.Axis == JoyAxis.TriggerLeft)
+        {
+            var pressed = motion.AxisValue > deadZone;
+            if (pressed && !_leftTriggerPressed)
+                JumpToEdge(first: false);
+            _leftTriggerPressed = pressed;
             return true;
         }
 
@@ -294,16 +331,20 @@ public static class SpireLensOptionsMenu
             case 3:
                 ViewStatsInjectorPatch.SetShowRemovedCardsEnabled(enabled, source);
                 break;
+            case 4:
+                ViewStatsInjectorPatch.SetHideNonCombatRelicStats(enabled, source);
+                break;
         }
     }
 
     private static void RefreshCheckboxes()
     {
-        if (Checkboxes.Count != 4) return;
+        if (Checkboxes.Count != 5) return;
         SetCheckboxState(0, ViewStatsInjectorPatch.StatsVisibilityEnabled);
         SetCheckboxState(1, ViewStatsInjectorPatch.CardStatsEnabled);
         SetCheckboxState(2, ViewStatsInjectorPatch.EnemyStatsEnabled);
         SetCheckboxState(3, ViewStatsInjectorPatch.ShowRemovedCardsEnabled);
+        SetCheckboxState(4, ViewStatsInjectorPatch.HideNonCombatRelicStats);
     }
 
     private static void SetCheckboxState(int index, bool enabled)

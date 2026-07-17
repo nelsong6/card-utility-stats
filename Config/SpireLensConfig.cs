@@ -14,6 +14,8 @@ public sealed class SpireLensConfig : SimpleModConfig
 
     public static bool ShowCardStatsDuringCombat { get; set; }
 
+    public static bool HideNonCombatRelicStats { get; set; }
+
     [ConfigHideInUI]
     public static bool ShowHandTooltips { get; set; } = true;
 
@@ -57,6 +59,7 @@ public sealed class SpireLensConfig : SimpleModConfig
         // on disk, but use the current names anywhere the player sees them.
         RelabelGeneratedOption(root, nameof(ViewStatsToggleEnabled), "SpireLens: on/off");
         RelabelGeneratedOption(root, nameof(ShowCardStatsDuringCombat), "SpireLens: card stats");
+        RelabelGeneratedOption(root, nameof(HideNonCombatRelicStats), "Hide non-combat relics from relic bar");
 
         root.AddChild(CreateSectionHeader("Build Info", false));
         root.AddChild(CreateRawLabelControl($"Build version: {BuildVersion}", 18));

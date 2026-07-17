@@ -70,6 +70,7 @@ public static class ViewStatsInjectorPatch
     private static bool _persistedShowRemovedCardsTicked = true;
     private static bool _persistedEnemyStatsTicked;
     private static bool _persistedCardStatsTicked;
+    private static bool _persistedHideNonCombatRelicStats;
     private static bool _prefsLoaded;
 
     public static bool CardStatsEnabled
@@ -105,6 +106,15 @@ public static class ViewStatsInjectorPatch
         {
             EnsurePrefsLoaded();
             return _persistedEnemyStatsTicked;
+        }
+    }
+
+    public static bool HideNonCombatRelicStats
+    {
+        get
+        {
+            EnsurePrefsLoaded();
+            return _persistedHideNonCombatRelicStats;
         }
     }
 
@@ -165,6 +175,17 @@ public static class ViewStatsInjectorPatch
         RefreshDeckView();
     }
 
+    public static void SetHideNonCombatRelicStats(bool isEnabled, string source)
+    {
+        EnsurePrefsLoaded();
+        _persistedHideNonCombatRelicStats = isEnabled;
+        SavePreferences();
+        if (isEnabled)
+            StatsTooltip.Hide();
+        RelicBarFilterPatch.RefreshAll();
+        CoreMain.Logger.Info($"Hide non-combat relic stats set to {isEnabled} ({source})");
+    }
+
     /// <summary>
     /// Load the checkbox state from disk on first use. Called lazily from
     /// Inject so it happens before the first deck view opens and also
@@ -183,6 +204,7 @@ public static class ViewStatsInjectorPatch
             // Keep the legacy preference field as the on-disk compatibility
             // key even though the setting now applies to every card surface.
             _persistedCardStatsTicked = prefs.ShowCombatCardStatsTicked;
+            _persistedHideNonCombatRelicStats = prefs.HideNonCombatRelicStats;
         }
         catch (Exception e)
         {
@@ -498,6 +520,7 @@ public static class ViewStatsInjectorPatch
             // Preserve the legacy wire/storage name for existing installs and
             // for compatibility with the stable Loader across Core reloads.
             ShowCombatCardStatsTicked = _persistedCardStatsTicked,
+            HideNonCombatRelicStats = _persistedHideNonCombatRelicStats,
         });
     }
 

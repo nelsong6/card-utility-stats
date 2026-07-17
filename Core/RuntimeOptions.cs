@@ -11,6 +11,7 @@ public sealed class RuntimeOptions
     public bool ShowRemovedCardsInDeckView { get; set; } = true;
     public bool ShowEnemyStatsOnHover { get; set; }
     public bool ShowCardStatsDuringCombat { get; set; }
+    public bool HideNonCombatRelicStats { get; set; }
     public bool ShowHandTooltips { get; set; } = true;
     public bool UseVerboseHandStats { get; set; }
     public bool DisableCardStatsDuringCombat { get; set; }
@@ -26,6 +27,7 @@ public static class RuntimeOptionsProvider
     private const string SetShowRemovedCardsInDeckViewMethodName = "SetShowRemovedCardsInDeckView";
     private const string SetShowEnemyStatsOnHoverMethodName = "SetShowEnemyStatsOnHover";
     private const string SetShowCardStatsDuringCombatMethodName = "SetShowCardStatsDuringCombat";
+    private const string SetHideNonCombatRelicStatsMethodName = "SetHideNonCombatRelicStats";
     private const string SetVerboseHandStatsEnabledMethodName = "SetVerboseHandStatsEnabled";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -39,6 +41,7 @@ public static class RuntimeOptionsProvider
     private static MethodInfo? _setShowRemovedCardsInDeckViewMethod;
     private static MethodInfo? _setShowEnemyStatsOnHoverMethod;
     private static MethodInfo? _setShowCardStatsDuringCombatMethod;
+    private static MethodInfo? _setHideNonCombatRelicStatsMethod;
     private static MethodInfo? _setVerboseHandStatsEnabledMethod;
     private static bool _loggedMissingBridge;
     private static bool _loggedRefreshFailure;
@@ -46,6 +49,7 @@ public static class RuntimeOptionsProvider
     private static bool _loggedShowRemovedCardsFailure;
     private static bool _loggedShowEnemyStatsFailure;
     private static bool _loggedShowCardStatsDuringCombatFailure;
+    private static bool _loggedHideNonCombatRelicStatsFailure;
     private static bool _loggedVerboseHandStatsFailure;
 
     public static RuntimeOptions Current { get; private set; } = new();
@@ -155,6 +159,26 @@ public static class RuntimeOptionsProvider
         Refresh();
     }
 
+    public static void SetHideNonCombatRelicStats(bool isEnabled)
+    {
+        try
+        {
+            var method = ResolveSetHideNonCombatRelicStatsMethod();
+            method?.Invoke(null, new object?[] { isEnabled });
+            _loggedHideNonCombatRelicStatsFailure = false;
+        }
+        catch (Exception e)
+        {
+            if (!_loggedHideNonCombatRelicStatsFailure)
+            {
+                CoreMain.Logger.Warn($"RuntimeOptionsProvider.SetHideNonCombatRelicStats failed: {e.Message}");
+                _loggedHideNonCombatRelicStatsFailure = true;
+            }
+        }
+
+        Refresh();
+    }
+
     public static void SetVerboseHandStatsEnabled(bool isEnabled)
     {
         try
@@ -221,6 +245,14 @@ public static class RuntimeOptionsProvider
             SetVerboseHandStatsEnabledMethodName,
             BindingFlags.Public | BindingFlags.Static);
         return _setVerboseHandStatsEnabledMethod;
+    }
+
+    private static MethodInfo? ResolveSetHideNonCombatRelicStatsMethod()
+    {
+        _setHideNonCombatRelicStatsMethod ??= ResolveBridgeType()?.GetMethod(
+            SetHideNonCombatRelicStatsMethodName,
+            BindingFlags.Public | BindingFlags.Static);
+        return _setHideNonCombatRelicStatsMethod;
     }
 
     private static Type? ResolveBridgeType()

@@ -137,6 +137,7 @@ public static class CoreMain
         // the user would see the checkbox disappear until they close and
         // reopen the deck view.
         Patches.ViewStatsInjectorPatch.ReinjectIntoActiveDeckView();
+        Patches.RelicBarFilterPatch.RefreshAll();
         Patches.RelicCompendiumFilterUi.ReinjectIntoActiveCollections();
         Patches.RelicCompendiumStatsSignals.ReattachToActiveEntries();
 
