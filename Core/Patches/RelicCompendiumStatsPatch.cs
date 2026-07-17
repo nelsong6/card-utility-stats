@@ -88,8 +88,8 @@ internal static class CompendiumRelicStatsContext
     private const string CursedPearlCurseDefinitionId = "CARD.GREED";
     private const string BrightestFlameDefinitionId = "CARD.BRIGHTEST_FLAME";
     private static readonly RelicAggregate EmptyRelicAggregate = new();
-    private static readonly FieldInfo? RelicField =
-        AccessTools.Field(typeof(NRelicCollectionEntry), "relic");
+    private static readonly Lazy<FieldInfo?> RelicField = new(
+        () => AccessTools.Field(typeof(NRelicCollectionEntry), "relic"));
 
     public static bool ShouldShowStatsForVisibility(ModelVisibility visibility)
         => visibility == ModelVisibility.Visible;
@@ -120,7 +120,7 @@ internal static class CompendiumRelicStatsContext
     {
         relicModel = null!;
         if (entry == null || !GodotObject.IsInstanceValid(entry)) return false;
-        if (RelicField?.GetValue(entry) is not RelicModel found) return false;
+        if (RelicField.Value?.GetValue(entry) is not RelicModel found) return false;
 
         relicModel = found;
         return true;
