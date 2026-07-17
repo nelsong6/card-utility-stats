@@ -39,9 +39,7 @@ public static class RelicHoverShowPatch
     {
         try
         {
-            var tickbox = ViewStatsInjectorPatch.LastInjectedTickbox;
-            var viewStatsEnabled = tickbox?.IsTicked ?? RuntimeOptionsProvider.Current.ViewStatsToggleEnabled;
-            if (!viewStatsEnabled) return;
+            if (!ViewStatsInjectorPatch.StatsVisibilityEnabled) return;
 
             var relicNode = __instance.Relic;
             if (relicNode?.Model == null) return;
@@ -399,6 +397,26 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is FresnelLens)
+            {
+                const string relicId = "RELIC.FRESNEL_LENS";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildFresnelLensBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Fresnel Lens", "SpireLens", body);
+                return;
+            }
+
+            if (relicNode.Model is SilverCrucible)
+            {
+                const string relicId = "RELIC.SILVER_CRUCIBLE";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildSilverCrucibleBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Silver Crucible", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is BloodSoakedRose)
             {
                 var relicId = relicNode.Model.Id.ToString();
@@ -417,6 +435,16 @@ public static class RelicHoverShowPatch
 
                 var body = BuildRegaliteBodyBBCode(agg);
                 StatsTooltip.Show(tree, __instance, "Regalite", "SpireLens", body);
+                return;
+            }
+
+            if (relicNode.Model is IntimidatingHelmet)
+            {
+                const string relicId = "RELIC.INTIMIDATING_HELMET";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildIntimidatingHelmetBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Intimidating Helmet", "SpireLens", body);
                 return;
             }
 
@@ -590,6 +618,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is NutritiousOyster)
+            {
+                const string relicId = "RELIC.NUTRITIOUS_OYSTER";
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+
+                var body = BuildNutritiousOysterBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Nutritious Oyster", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is ChosenCheese)
             {
                 const string relicId = "RELIC.CHOSEN_CHEESE";
@@ -750,12 +788,12 @@ public static class RelicHoverShowPatch
                 return;
             }
 
-            if (relicNode.Model is CentennialPuzzle)
+            if (relicNode.Model is CentennialPuzzle centennialPuzzle)
             {
                 const string relicId = "RELIC.CENTENNIAL_PUZZLE";
                 var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
 
-                var body = BuildCentennialPuzzleBodyBBCode(agg);
+                var body = BuildCentennialPuzzleBodyBBCode(agg, centennialPuzzle.UsedThisCombat);
                 StatsTooltip.Show(tree, __instance, "Centennial Puzzle", "SpireLens", body);
                 return;
             }
@@ -1265,6 +1303,20 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is FresnelLens)
+        {
+            title = "Fresnel Lens";
+            body = BuildFresnelLensBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is SilverCrucible)
+        {
+            title = "Silver Crucible";
+            body = BuildSilverCrucibleBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is BloodSoakedRose)
         {
             title = "Blood-Soaked Rose";
@@ -1283,6 +1335,13 @@ public static class RelicHoverShowPatch
         {
             title = "Regalite";
             body = BuildRegaliteBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is IntimidatingHelmet)
+        {
+            title = "Intimidating Helmet";
+            body = BuildIntimidatingHelmetBodyBBCode(agg);
             return true;
         }
 
@@ -1419,6 +1478,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is NutritiousOyster)
+        {
+            title = "Nutritious Oyster";
+            body = BuildNutritiousOysterBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is ChosenCheese)
         {
             title = "Chosen Cheese";
@@ -1489,6 +1555,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is PaelsTooth)
+        {
+            title = "Pael's Tooth";
+            body = BuildPaelsToothBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is PaelsWing)
         {
             title = "Pael's Wing";
@@ -1555,10 +1628,10 @@ public static class RelicHoverShowPatch
             return true;
         }
 
-        if (relicModel is CentennialPuzzle)
+        if (relicModel is CentennialPuzzle centennialPuzzle)
         {
             title = "Centennial Puzzle";
-            body = BuildCentennialPuzzleBodyBBCode(agg);
+            body = BuildCentennialPuzzleBodyBBCode(agg, centennialPuzzle.UsedThisCombat);
             return true;
         }
 
@@ -2053,6 +2126,61 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
+    private static string BuildFresnelLensBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        AppendMaxHpChangeRows(sb, agg, "Max HP lost to Drowning Beacon", MaxHpLost(agg));
+        Row3(sb, "Nimble cards taken", agg.NimbleCardsTaken.ToString(), "");
+        Row3(sb, "Reward screens with Nimble cards", agg.RewardScreensWithNimbleCards.ToString(), "");
+        Row3(sb, "Reward screens with 2 Nimble cards", agg.RewardScreensWithTwoNimbleCards.ToString(), "");
+        Row3(sb, "Reward screens with 3+ Nimble cards", agg.RewardScreensWithThreeOrMoreNimbleCards.ToString(), "");
+        Row3(sb, "Reward screens with no Nimble cards", agg.RewardScreensWithoutNimbleCards.ToString(), "");
+        Row3(sb, "Nimble offered, none taken", agg.RewardScreensWithNimbleCardsButNoneTaken.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildSilverCrucibleBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var screens = agg.CardRewardScreens ?? new List<RelicCardRewardScreenAggregate>();
+
+        for (var screenNumber = 1; screenNumber <= 3; screenNumber++)
+        {
+            var screen = screens.LastOrDefault(candidate =>
+                candidate != null && candidate.ScreenNumber == screenNumber);
+            if (screen == null)
+            {
+                Row3(sb, $"Card reward {screenNumber}", "not seen yet", "");
+                continue;
+            }
+
+            var cards = screen.Cards ?? new List<RelicCardRewardOptionAggregate>();
+            if (cards.Count == 0)
+            {
+                Row3(sb, $"Card reward {screenNumber}", "no cards offered", "");
+                continue;
+            }
+
+            foreach (var card in cards)
+            {
+                if (card == null) continue;
+
+                var displayName = !string.IsNullOrWhiteSpace(card.DisplayName)
+                    ? card.DisplayName
+                    : !string.IsNullOrWhiteSpace(card.CardId)
+                        ? RunTracker.FormatCardIdForDisplay(card.CardId)
+                        : "Unknown card";
+                Row3(
+                    sb,
+                    $"Card reward {screenNumber}",
+                    StatsTooltip.EscapeBbcode(displayName),
+                    !screen.Resolved ? "pending" : card.Taken ? "taken" : "not taken");
+            }
+        }
+
+        return sb.ToString();
+    }
+
     private static string BuildBloodSoakedRoseBodyBBCode(RelicAggregate agg, CardAggregate curseAgg)
     {
         var sb = new StringBuilder();
@@ -2090,6 +2218,23 @@ public static class RelicHoverShowPatch
             : (decimal)agg.AdditionalBlockGained / agg.RegaliteCombats;
 
         Row3(sb, "Cards created", agg.RegaliteCardsCreated.ToString(), "");
+        Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
+        Row3(sb, BlockLabel("avg block per turn"), FormatDecimal(blockPerTurn), "");
+        Row3(sb, BlockLabel("avg block per combat"), FormatDecimal(blockPerCombat), "");
+        return sb.ToString();
+    }
+
+    private static string BuildIntimidatingHelmetBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var blockPerTurn = agg.IntimidatingHelmetTurns <= 0
+            ? 0m
+            : (decimal)agg.AdditionalBlockGained / agg.IntimidatingHelmetTurns;
+        var blockPerCombat = agg.IntimidatingHelmetCombats <= 0
+            ? 0m
+            : (decimal)agg.AdditionalBlockGained / agg.IntimidatingHelmetCombats;
+
+        Row3(sb, "Cards played costing 2+", agg.Activations.ToString(), "");
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
         Row3(sb, BlockLabel("avg block per turn"), FormatDecimal(blockPerTurn), "");
         Row3(sb, BlockLabel("avg block per combat"), FormatDecimal(blockPerCombat), "");
@@ -2362,6 +2507,14 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
+    private static string BuildNutritiousOysterBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        AppendMaxHpChangeRows(sb, agg, "Max HP gained", agg.MaxHpGained);
+        return sb.ToString();
+    }
+
     private static string BuildChosenCheeseBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
@@ -2505,6 +2658,32 @@ public static class RelicHoverShowPatch
     private static string BuildPaelsWingBodyBBCode(RelicAggregate agg)
     {
         return BuildPaelsWingBodyBBCodeForFloor(agg, RunTracker.GetCurrentFloorForRateStats(), floorAdded: null);
+    }
+
+    private static string BuildPaelsToothBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var cards = (agg.CardsReturned ?? new List<RelicCardReturnAggregate>())
+            .Where(card => card != null)
+            .ToList();
+        Row3(sb, "Cards returned", cards.Count.ToString(), "");
+
+        foreach (var card in cards)
+        {
+            var displayName = card.DisplayName;
+            if (string.IsNullOrWhiteSpace(displayName))
+            {
+                displayName = string.IsNullOrWhiteSpace(card.CardId)
+                    ? "Unknown card"
+                    : RunTracker.FormatCardIdForDisplay(card.CardId);
+                if (card.UpgradeLevel > 0)
+                    displayName += new string('+', card.UpgradeLevel);
+            }
+
+            Row3(sb, "Returned card", StatsTooltip.EscapeBbcode(displayName), "");
+        }
+
+        return sb.ToString();
     }
 
     private static string BuildPaelsWingBodyBBCodeForFloor(
@@ -2805,13 +2984,16 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
-    private static string BuildCentennialPuzzleBodyBBCode(RelicAggregate agg)
+    private static string BuildCentennialPuzzleBodyBBCode(
+        RelicAggregate agg,
+        bool triggeredThisCombat = false)
     {
         var sb = new StringBuilder();
         var averageDrawn = agg.Activations <= 0
             ? 0m
             : (decimal)agg.AdditionalCardsDrawn / agg.Activations;
         Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, "Triggered this combat", triggeredThisCombat ? "true" : "false", "");
         Row3(sb, "Cards drawn total", agg.AdditionalCardsDrawn.ToString(), "");
         Row3(sb, "Avg cards drawn per combat", FormatDecimal(averageDrawn), "");
         return sb.ToString();

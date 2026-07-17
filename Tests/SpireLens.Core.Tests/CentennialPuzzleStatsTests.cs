@@ -76,6 +76,8 @@ public class CentennialPuzzleStatsTests
         });
 
         Assert.Contains("Activations", body);
+        Assert.Contains("Triggered this combat", body);
+        Assert.Contains("[b]false[/b]", body);
         Assert.Contains("Cards drawn total", body);
         Assert.Contains("Avg cards drawn per combat", body);
         Assert.Contains("[b]4[/b]", body);
@@ -90,10 +92,23 @@ public class CentennialPuzzleStatsTests
 
         Assert.Contains("Cards drawn total", body);
         Assert.Contains("Avg cards drawn per combat", body);
+        Assert.Contains("Triggered this combat", body);
+        Assert.Contains("[b]false[/b]", body);
         Assert.Contains("[b]0[/b]", body);
     }
 
-    private static string BuildBody(RelicAggregate agg)
-        => (string)(BuildCentennialPuzzleBodyMethod.Invoke(null, new object?[] { agg })
+    [Fact]
+    public void RelicTooltip_CentennialPuzzle_CanShowTriggeredThisCombatTrue()
+    {
+        var body = BuildBody(new RelicAggregate(), triggeredThisCombat: true);
+
+        Assert.Contains("Triggered this combat", body);
+        Assert.Contains("[b]true[/b]", body);
+    }
+
+    private static string BuildBody(RelicAggregate agg, bool triggeredThisCombat = false)
+        => (string)(BuildCentennialPuzzleBodyMethod.Invoke(
+            null,
+            new object?[] { agg, triggeredThisCombat })
             ?? throw new InvalidOperationException("BuildCentennialPuzzleBodyBBCode returned null."));
 }

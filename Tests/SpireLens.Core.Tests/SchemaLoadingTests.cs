@@ -450,6 +450,20 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsNutritiousOysterRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("nutritious-oyster-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.NUTRITIOUS_OYSTER"];
+        Assert.Equal(1, relicAgg.Activations);
+        Assert.Equal(11m, relicAgg.MaxHpGained);
+        Assert.Equal(70m, relicAgg.OriginalMaxHp);
+        Assert.Equal(81m, relicAgg.NewMaxHp);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsWhiteBeastStatueRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("white-beast-statue-relic-run.json"));
@@ -464,6 +478,23 @@ public class SchemaLoadingTests
         Assert.Equal(2, relicAgg.UncommonPotionsGained);
         Assert.Equal(1, relicAgg.RarePotionsGained);
         Assert.Equal(3, relicAgg.PotionsSkipped);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsAlchemizeCardFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("alchemize-card-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        var cardAgg = loaded.Data.Aggregates["CARD.ALCHEMIZE#1"];
+        Assert.Equal(5, cardAgg.PotionsGained);
+        Assert.Equal(2, cardAgg.CommonPotionsGained);
+        Assert.Equal(2, cardAgg.UncommonPotionsGained);
+        Assert.Equal(1, cardAgg.RarePotionsGained);
+        Assert.Equal(3, cardAgg.PotionsSkipped);
     }
 
     [Fact]
@@ -1023,6 +1054,19 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void ResumableLoad_AcceptsNutritiousOysterRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("nutritious-oyster-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.NUTRITIOUS_OYSTER"];
+        Assert.Equal(1, relicAgg.Activations);
+        Assert.Equal(11m, relicAgg.MaxHpGained);
+        Assert.Equal(70m, relicAgg.OriginalMaxHp);
+        Assert.Equal(81m, relicAgg.NewMaxHp);
+    }
+
+    [Fact]
     public void ResumableLoad_AcceptsWhiteBeastStatueRelicFixture()
     {
         var resumed = RunStorage.LoadResumable(FixturePath("white-beast-statue-relic-run.json"));
@@ -1034,6 +1078,20 @@ public class SchemaLoadingTests
         Assert.Equal(2, relicAgg.UncommonPotionsGained);
         Assert.Equal(1, relicAgg.RarePotionsGained);
         Assert.Equal(3, relicAgg.PotionsSkipped);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsAlchemizeCardFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("alchemize-card-run.json"));
+
+        Assert.NotNull(resumed);
+        var cardAgg = resumed!.Aggregates["CARD.ALCHEMIZE#1"];
+        Assert.Equal(5, cardAgg.PotionsGained);
+        Assert.Equal(2, cardAgg.CommonPotionsGained);
+        Assert.Equal(2, cardAgg.UncommonPotionsGained);
+        Assert.Equal(1, cardAgg.RarePotionsGained);
+        Assert.Equal(3, cardAgg.PotionsSkipped);
     }
 
     [Fact]
@@ -1406,6 +1464,25 @@ public class SchemaLoadingTests
         Assert.Equal(2, relicAgg.SacrificesSkipped);
         Assert.Equal(1, relicAgg.RelicsGranted["RELIC.KUNAI"].Count);
         Assert.Equal("Kunai", relicAgg.RelicsGranted["RELIC.KUNAI"].DisplayName);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsPaelsToothRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("paels-tooth-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertPaelsToothFixture(loaded.Data.RelicAggregates["RELIC.PAELS_TOOTH"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsPaelsToothRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("paels-tooth-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertPaelsToothFixture(resumed!.RelicAggregates["RELIC.PAELS_TOOTH"]);
     }
 
     [Fact]
@@ -2125,6 +2202,33 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsIntimidatingHelmetRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("intimidating-helmet-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.INTIMIDATING_HELMET"];
+        Assert.Equal(6, relicAgg.Activations);
+        Assert.Equal(30, relicAgg.AdditionalBlockGained);
+        Assert.Equal(8, relicAgg.IntimidatingHelmetTurns);
+        Assert.Equal(3, relicAgg.IntimidatingHelmetCombats);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsIntimidatingHelmetRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("intimidating-helmet-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.INTIMIDATING_HELMET"];
+        Assert.Equal(6, relicAgg.Activations);
+        Assert.Equal(30, relicAgg.AdditionalBlockGained);
+        Assert.Equal(8, relicAgg.IntimidatingHelmetTurns);
+        Assert.Equal(3, relicAgg.IntimidatingHelmetCombats);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsTuningForkRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("tuning-fork-relic-run.json"));
@@ -2517,6 +2621,44 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsFresnelLensRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("fresnel-lens-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertFresnelLensFixture(loaded.Data.RelicAggregates["RELIC.FRESNEL_LENS"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsFresnelLensRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("fresnel-lens-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertFresnelLensFixture(resumed!.RelicAggregates["RELIC.FRESNEL_LENS"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsSilverCrucibleRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("silver-crucible-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertSilverCrucibleFixture(loaded.Data.RelicAggregates["RELIC.SILVER_CRUCIBLE"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsSilverCrucibleRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("silver-crucible-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertSilverCrucibleFixture(resumed!.RelicAggregates["RELIC.SILVER_CRUCIBLE"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsUnmovablePowerMetaFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("unmovable-power-meta-run.json"));
@@ -2548,5 +2690,88 @@ public class SchemaLoadingTests
         Assert.Equal("Defend", relicAgg.CardTransformations[1].SourceDisplayName);
         Assert.Equal("CARD.SHRUG_IT_OFF", relicAgg.CardTransformations[1].ResultCardId);
         Assert.Equal("Shrug It Off", relicAgg.CardTransformations[1].ResultDisplayName);
+    }
+
+    private static void AssertFresnelLensFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(70m, relicAgg.OriginalMaxHp);
+        Assert.Equal(57m, relicAgg.NewMaxHp);
+        Assert.Equal(9, relicAgg.NimbleCardsTaken);
+        Assert.Equal(8, relicAgg.RewardScreensWithNimbleCards);
+        Assert.Equal(3, relicAgg.RewardScreensWithTwoNimbleCards);
+        Assert.Equal(2, relicAgg.RewardScreensWithThreeOrMoreNimbleCards);
+        Assert.Equal(5, relicAgg.RewardScreensWithoutNimbleCards);
+        Assert.Equal(4, relicAgg.RewardScreensWithNimbleCardsButNoneTaken);
+    }
+
+    private static void AssertPaelsToothFixture(RelicAggregate relicAgg)
+    {
+        Assert.Collection(
+            relicAgg.CardsReturned,
+            card => AssertPaelsToothCard(card, "CARD.STRIKE_KIN", "Strike+", 1),
+            card => AssertPaelsToothCard(card, "CARD.POMMEL_STRIKE", "Pommel Strike++", 2),
+            card => AssertPaelsToothCard(card, "CARD.STRIKE_KIN", "Strike++", 2));
+    }
+
+    private static void AssertPaelsToothCard(
+        RelicCardReturnAggregate card,
+        string cardId,
+        string displayName,
+        int upgradeLevel)
+    {
+        Assert.Equal(cardId, card.CardId);
+        Assert.Equal(displayName, card.DisplayName);
+        Assert.Equal(upgradeLevel, card.UpgradeLevel);
+    }
+
+    private static void AssertSilverCrucibleFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(3, relicAgg.CardRewardScreens.Count);
+
+        var first = relicAgg.CardRewardScreens[0];
+        Assert.Equal(1, first.ScreenNumber);
+        Assert.Equal(12, first.Floor);
+        Assert.True(first.Resolved);
+        Assert.Collection(
+            first.Cards,
+            card => AssertSilverCrucibleCard(card, "CARD.BASH", "Bash+", 1, taken: true),
+            card => AssertSilverCrucibleCard(card, "CARD.SHRUG_IT_OFF", "Shrug It Off+", 1, taken: false),
+            card => AssertSilverCrucibleCard(card, "CARD.INFLAME", "Inflame+", 1, taken: false));
+
+        var second = relicAgg.CardRewardScreens[1];
+        Assert.Equal(2, second.ScreenNumber);
+        Assert.Equal(12, second.Floor);
+        Assert.True(second.Resolved);
+        Assert.Collection(
+            second.Cards,
+            card => AssertSilverCrucibleCard(card, "CARD.POMMEL_STRIKE", "Pommel Strike+", 1, taken: false),
+            card => AssertSilverCrucibleCard(card, "CARD.TRUE_GRIT", "True Grit+", 1, taken: true),
+            card => AssertSilverCrucibleCard(card, "CARD.SPOT_WEAKNESS", "Spot Weakness+", 1, taken: false));
+
+        var third = relicAgg.CardRewardScreens[2];
+        Assert.Equal(3, third.ScreenNumber);
+        Assert.Equal(14, third.Floor);
+        Assert.True(third.Resolved);
+        Assert.Equal(
+            new[] { "CARD.HEADBUTT", "CARD.IRON_WAVE", "CARD.BATTLE_TRANCE" },
+            third.Cards.Select(card => card.CardId));
+        Assert.All(third.Cards, card =>
+        {
+            Assert.Equal(1, card.UpgradeLevel);
+            Assert.False(card.Taken);
+        });
+    }
+
+    private static void AssertSilverCrucibleCard(
+        RelicCardRewardOptionAggregate card,
+        string cardId,
+        string displayName,
+        int upgradeLevel,
+        bool taken)
+    {
+        Assert.Equal(cardId, card.CardId);
+        Assert.Equal(displayName, card.DisplayName);
+        Assert.Equal(upgradeLevel, card.UpgradeLevel);
+        Assert.Equal(taken, card.Taken);
     }
 }

@@ -88,6 +88,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `white-beast-statue-relic-run.json`
   Adds White Beast Statue potion-gained tracking with common, uncommon, and
   rare potion rarity splits, plus skipped White Beast potion reward tracking.
+- `alchemize-card-run.json`
+  Adds Alchemize potion procurement tracking with successful common, uncommon,
+  and rare potion splits plus failed procure results.
 - `phylactery-relic-run.json`
   Adds Bound Phylactery and Phylactery Unbound activation tracking plus actual
   Osty summon HP gained from the shared summon command result.
@@ -132,6 +135,9 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds Pael's Wing sacrifice tracking: consumed card reward options split by
   common, uncommon, and rare, sacrifices made and skipped, and the total and
   specific artifacts gained from its completed sacrifice pairs.
+- `paels-tooth-relic-run.json`
+  Adds Pael's Tooth returned-card history in observed return order, preserving
+  duplicate definitions, final display names, and post-return upgrade levels.
 - `paels-eye-relic-run.json`
   Adds Pael's Eye activation tracking plus counts of status and curse cards
   actually exhausted by its extra-turn callback, and combats where it was held
@@ -201,12 +207,23 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `leafy-poultice-relic-run.json`
   Adds Leafy Poultice pickup tracking: original/new max HP after the relic's
   max-HP loss resolves, plus the two source/result card transform pairs.
+- `fresnel-lens-relic-run.json`
+  Adds Fresnel Lens's Drowning Beacon max-HP loss snapshots, successful Nimble
+  card picks, any-Nimble / exact-two / three-or-more reward-screen counts, the
+  no-Nimble count, and rewards where Nimble was offered but none was taken.
+- `silver-crucible-relic-run.json`
+  Adds Silver Crucible's ordered first, second, and third card-reward screens,
+  including every offered card's displayed upgrade state and explicit
+  taken/not-taken outcome.
 - `strawberry-relic-run.json`
   Adds Strawberry pickup tracking: activations, observed max HP gained, and
   original/new max-HP snapshots.
 - `pear-relic-run.json`
   Adds Pear pickup tracking: activations, observed max HP gained, and
   original/new max-HP snapshots.
+- `nutritious-oyster-relic-run.json`
+  Adds Nutritious Oyster pickup tracking: activations, observed max HP gained,
+  and original/new max-HP snapshots.
 - `sand-castle-relic-run.json`
   Adds Sand Castle pickup tracking: the actual cards upgraded by the relic.
 - `fragrant-mushroom-relic-run.json`
@@ -227,6 +244,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `regalite-relic-run.json`
   Adds Regalite tracking for owner-created combat cards, observed block gained,
   and held turn/combat denominators for average block rows.
+- `intimidating-helmet-relic-run.json`
+  Adds Intimidating Helmet qualifying 2+-Energy card plays, observed block
+  gained, and held turn/combat denominators for average block rows.
 - `kunai-relic-run.json`
   Adds Kunai attack-counter tracking: owner attack plays, activations, observed
   Dexterity gained, and 1/2 charge turn-end buckets with average charge samples.

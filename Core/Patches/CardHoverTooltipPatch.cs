@@ -38,32 +38,18 @@ public static class CardHoverShowPatch
     [HarmonyPostfix]
     public static void Postfix(NCardHolder __instance)
     {
-        // We DO want to fire on hand cards (combat) per Nelson's call:
-        // "which version of a card I'm using" is useful info mid-combat
-        // when the same card has multiple instances with different stats.
-        // The placement is handled in StatsTooltip: if stacking below the
-        // game's hover tips would overflow the viewport (common for hand
-        // hovers on cards with multiple keyword tooltips like Coolheaded),
-        // we stack above instead.
-
-        RuntimeOptionsProvider.Refresh();
-        if (RunTracker.AreCardStatsDisabledForActiveCombat())
-            return;
-
-        if (__instance is NHandCardHolder && !RuntimeOptionsProvider.Current.ShowHandTooltips)
-            return;
+        // Card tooltips are an explicit display-only opt-in on every surface.
+        // Keep this gate ahead of tracker locks, aggregate merging, and tooltip
+        // markup; attribution continues normally while the UI is disabled.
+        var cardStatsEnabled = ViewStatsInjectorPatch.CardStatsEnabled;
+        var viewStatsEnabled = ViewStatsInjectorPatch.StatsVisibilityEnabled;
+        if (!ResolveCardStatsEnabled(viewStatsEnabled, cardStatsEnabled)) return;
 
         if (IsCardRewardSelectionSurface(__instance))
         {
             StatsTooltip.Hide();
             return;
         }
-
-        // Gate on our checkbox state. If it's not even injected yet (no deck
-        // view opened this session) or unchecked, do nothing.
-        var tickbox = ViewStatsInjectorPatch.LastInjectedTickbox;
-        var viewStatsEnabled = tickbox?.IsTicked ?? RuntimeOptionsProvider.Current.ViewStatsToggleEnabled;
-        if (!viewStatsEnabled) return;
 
         try
         {
@@ -122,6 +108,11 @@ public static class CardHoverShowPatch
             CoreMain.Logger.Error($"CardHoverShow failed: {e.Message}");
         }
     }
+
+    internal static bool ResolveCardStatsEnabled(
+        bool viewStatsEnabled,
+        bool cardStatsEnabled)
+        => viewStatsEnabled && cardStatsEnabled;
 
     private static bool IsCardRewardSelectionSurface(Node? node)
     {
@@ -359,6 +350,7 @@ public static class CardHoverShowPatch
         AppendUnleashStats(sb, cardModel, agg, compact: false);
         AppendOstySummonStats(sb, cardModel, agg, metaStats, compact: false);
         AppendUnmovablePowerStats(sb, cardModel, metaStats);
+        AppendAlchemizePotionStats(sb, cardModel, agg, compact: false);
         AppendReplayStats(sb, agg);
 
         bool hasDedicatedPoison = AppendDedicatedPoisonStats(sb, agg, compact: false);
@@ -560,6 +552,7 @@ public static class CardHoverShowPatch
         AppendUnleashStats(sb, cardModel, agg, compact: true);
         AppendOstySummonStats(sb, cardModel, agg, metaStats, compact: true);
         AppendUnmovablePowerStats(sb, cardModel, metaStats);
+        AppendAlchemizePotionStats(sb, cardModel, agg, compact: true);
         AppendReplayStats(sb, agg);
 
         bool showDamage = isAttack || agg.TotalIntended > 0;
@@ -682,6 +675,26 @@ public static class CardHoverShowPatch
             "Extra block gained from unmovable's power",
             FormatDecimal(metaStats.ExtraBlockGainedFromUnmovablePower),
             "");
+    }
+
+    private static void AppendAlchemizePotionStats(
+        StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel card,
+        CardAggregate agg,
+        bool compact)
+    {
+        if (card is not Alchemize && !IsCardId(card, "CARD.ALCHEMIZE")) return;
+
+        // Match White Beast Statue's potion outcome rows. Alchemize has no
+        // reward screen, so its skipped count means the observed procure
+        // result failed (for example, a full potion belt or Sozu).
+        Row3(sb, "Potions gained", agg.PotionsGained.ToString(), "");
+        Row3(sb, "Potions skipped", agg.PotionsSkipped.ToString(), "");
+        if (compact) return;
+
+        Row3(sb, "common potions", agg.CommonPotionsGained.ToString(), "");
+        Row3(sb, "uncommon potions", agg.UncommonPotionsGained.ToString(), "");
+        Row3(sb, "rare potions", agg.RarePotionsGained.ToString(), "");
     }
 
     private static bool IsCardId(MegaCrit.Sts2.Core.Models.CardModel? card, string id)

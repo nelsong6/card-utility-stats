@@ -1,0 +1,45 @@
+{
+  "run_id": "fixture-paels-tooth-relic",
+  "started_at": "2026-07-15T07:00:00Z",
+  "updated_at": "2026-07-15T07:20:00Z",
+  "character": "IRONCLAD",
+  "ascension": 5,
+  "floor_reached": 11,
+  "outcome": "in_progress",
+  "aggregates": {
+    "CARD.STRIKE_KIN#1": {
+      "plays": 1
+    }
+  },
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.PAELS_TOOTH": {
+      "cards_returned": [
+        {
+          "card_id": "CARD.STRIKE_KIN",
+          "display_name": "Strike+",
+          "upgrade_level": 1
+        },
+        {
+          "card_id": "CARD.POMMEL_STRIKE",
+          "display_name": "Pommel Strike++",
+          "upgrade_level": 2
+        },
+        {
+          "card_id": "CARD.STRIKE_KIN",
+          "display_name": "Strike++",
+          "upgrade_level": 2
+        }
+      ]
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.STRIKE_KIN": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.STRIKE_KIN": 1
+  }
+}

@@ -24,7 +24,8 @@ namespace SpireLens.Core.Patches;
 /// _Ready throws on derived types), gate on NDeckViewScreen specifically
 /// so we don't inject on unrelated card-view surfaces, duplicate the
 /// entire ViewUpgrades subtree, rename the clone's inner nodes, change the
-/// label text, offset the position, and connect our own toggle handler.
+/// label text, force the clone visible even when controller mode hid the
+/// source tickbox, offset the position, and connect our own toggle handler.
 ///
 /// Phase-1 scope: checkbox renders and logs when toggled. Tooltip/description
 /// override is phase 2.
@@ -36,6 +37,10 @@ public static class ViewStatsInjectorPatch
     public static NTickbox? LastInjectedTickbox { get; private set; }
 
     public static NTickbox? LastInjectedShowRemovedCardsTickbox { get; private set; }
+
+    public static NTickbox? LastInjectedEnemyStatsTickbox { get; private set; }
+
+    public static NTickbox? LastInjectedCardStatsTickbox { get; private set; }
 
     // Track the active deck-view screen so the toggle handler can trigger
     // a live re-render (via DisplayCards) when the user flips the checkbox.
@@ -51,17 +56,63 @@ public static class ViewStatsInjectorPatch
     [
         "ViewStats",
         "ViewRemovedCards",
+        "ViewEnemyStats",
+        "ViewCombatCardStats",
         "ViewRelicStatsBeforeCollected",
     ];
 
-    // Persist the user's checkbox choice across deck-view open/close cycles
-    // AND across Core hot reloads. Each time the deck view re-opens or Core
-    // reloads, we reset this from the on-disk prefs file. Each toggle writes
-    // the new state back. Cheap disk I/O (single-bool JSON file), worth it
-    // so F5 doesn't keep flipping the checkbox off.
+    // Persist the user's checkbox choices across deck-view open/close cycles
+    // AND across Core hot reloads. Each Core load refreshes them from the
+    // loader-backed mod config, and each toggle writes the complete set back
+    // so changing one control never resets another.
     private static bool _persistedTicked;
     private static bool _persistedShowRemovedCardsTicked = true;
+    private static bool _persistedEnemyStatsTicked;
+    private static bool _persistedCardStatsTicked;
     private static bool _prefsLoaded;
+
+    public static bool CardStatsEnabled
+    {
+        get
+        {
+            EnsurePrefsLoaded();
+            return _persistedCardStatsTicked;
+        }
+    }
+
+    public static bool StatsVisibilityEnabled
+    {
+        get
+        {
+            EnsurePrefsLoaded();
+            return _persistedTicked;
+        }
+    }
+
+    /// <summary>
+    /// Toggle the same persisted global visibility state as the deck-view
+    /// checkbox. Input shortcuts and UI controls share this path so the live
+    /// checkbox, tooltip state, and loader-backed config cannot drift apart.
+    /// </summary>
+    public static bool ToggleStatsVisibility(string source)
+    {
+        EnsurePrefsLoaded();
+        SetStatsVisibilityEnabled(!_persistedTicked, source);
+        return _persistedTicked;
+    }
+
+    public static void SetStatsVisibilityEnabled(bool isEnabled, string source)
+    {
+        EnsurePrefsLoaded();
+        _persistedTicked = isEnabled;
+        SetTickboxVisualState(LastInjectedTickbox, isEnabled);
+        SavePreferences();
+
+        if (!isEnabled)
+            StatsTooltip.Hide();
+
+        CoreMain.Logger.Info($"Stats visibility set to {isEnabled} ({source})");
+    }
 
     /// <summary>
     /// Load the checkbox state from disk on first use. Called lazily from
@@ -77,6 +128,10 @@ public static class ViewStatsInjectorPatch
             var prefs = PrefsStorage.Load();
             _persistedTicked = prefs.ViewStatsTicked;
             _persistedShowRemovedCardsTicked = prefs.ShowRemovedCardsTicked;
+            _persistedEnemyStatsTicked = prefs.ShowEnemyStatsTicked;
+            // Keep the legacy preference field as the on-disk compatibility
+            // key even though the setting now applies to every card surface.
+            _persistedCardStatsTicked = prefs.ShowCombatCardStatsTicked;
         }
         catch (Exception e)
         {
@@ -143,6 +198,8 @@ public static class ViewStatsInjectorPatch
         _injectedClones.Clear();
         LastInjectedTickbox = null;
         LastInjectedShowRemovedCardsTickbox = null;
+        LastInjectedEnemyStatsTickbox = null;
+        LastInjectedCardStatsTickbox = null;
     }
 
     [HarmonyPostfix]
@@ -180,11 +237,33 @@ public static class ViewStatsInjectorPatch
             "ViewStats",
             "Stats",
             "ViewStatsLabel",
-            "spirelens: show stats",
-            new Vector2(0, -120),
+            "SpireLens: on/off",
+            new Vector2(0, -240),
             _persistedTicked,
             OnStatsToggled,
             tickbox => LastInjectedTickbox = tickbox);
+
+        InjectTickbox(
+            viewUpgradesContainer,
+            "ViewCombatCardStats",
+            "CombatCardStats",
+            "ViewCombatCardStatsLabel",
+            "SpireLens: card stats",
+            new Vector2(0, -180),
+            _persistedCardStatsTicked,
+            OnCardStatsToggled,
+            tickbox => LastInjectedCardStatsTickbox = tickbox);
+
+        InjectTickbox(
+            viewUpgradesContainer,
+            "ViewEnemyStats",
+            "EnemyStats",
+            "ViewEnemyStatsLabel",
+            "spirelens: show monster stats",
+            new Vector2(0, -120),
+            _persistedEnemyStatsTicked,
+            OnEnemyStatsToggled,
+            tickbox => LastInjectedEnemyStatsTickbox = tickbox);
 
         InjectTickbox(
             viewUpgradesContainer,
@@ -246,6 +325,13 @@ public static class ViewStatsInjectorPatch
         if (innerTickbox != null)
         {
             innerTickbox.Name = tickboxName;
+            // NCardsViewScreen.ConnectSignals calls OnControllerStateUpdated
+            // before this postfix runs. When the deck was opened with a
+            // controller (for example, Left Bumper), that hides the source
+            // %Upgrades tickbox, so Duplicate() otherwise gives every
+            // SpireLens clone Visible=false. Our controls remain useful in
+            // controller mode and must not inherit that presentation choice.
+            innerTickbox.Visible = true;
             // Connect our toggle handler. Use the Toggled signal defined on NTickbox.
             innerTickbox.Connect(NTickbox.SignalName.Toggled, Callable.From<NTickbox>(onToggled));
             rememberTickbox(innerTickbox);
@@ -327,9 +413,7 @@ public static class ViewStatsInjectorPatch
                 // clone always constructs unticked, but the player expects
                 // their "I want stats on" preference to survive closing and
                 // re-opening the deck view within the same session.
-                if (innerTickbox._tickedImage != null) innerTickbox._tickedImage.Visible = isTicked;
-                if (innerTickbox._notTickedImage != null) innerTickbox._notTickedImage.Visible = !isTicked;
-                innerTickbox.IsTicked = isTicked;
+                SetTickboxVisualState(innerTickbox, isTicked);
             }
             else
             {
@@ -350,28 +434,33 @@ public static class ViewStatsInjectorPatch
 
     private static void OnStatsToggled(NTickbox tickbox)
     {
-        // Capture user intent so the next deck-view open reflects this state
-        // rather than reverting to unticked. The Postfix re-injects on each
-        // ConnectSignals, and without this the user would have to re-tick
-        // every time they close and reopen the deck view.
-        _persistedTicked = tickbox.IsTicked;
-        // Persist to disk so F5 / game restart reloads with the same state.
-        PrefsStorage.Save(new Prefs
-        {
-            ViewStatsTicked = _persistedTicked,
-            ShowRemovedCardsTicked = _persistedShowRemovedCardsTicked,
-        });
-        CoreMain.Logger.Info($"ViewStats toggled: IsTicked={tickbox.IsTicked}");
+        SetStatsVisibilityEnabled(tickbox.IsTicked, "deck-view checkbox");
+    }
+
+    private static void OnCardStatsToggled(NTickbox tickbox)
+    {
+        _persistedCardStatsTicked = tickbox.IsTicked;
+        SavePreferences();
+        CoreMain.Logger.Info($"CardStats toggled: IsTicked={tickbox.IsTicked}");
+
+        if (!tickbox.IsTicked)
+            StatsTooltip.HideIfAnchoredToCard();
+    }
+
+    private static void OnEnemyStatsToggled(NTickbox tickbox)
+    {
+        _persistedEnemyStatsTicked = tickbox.IsTicked;
+        SavePreferences();
+        CoreMain.Logger.Info($"EnemyStats toggled: IsTicked={tickbox.IsTicked}");
+
+        if (!tickbox.IsTicked)
+            StatsTooltip.HideIfAnchoredToCreature();
     }
 
     private static void OnShowRemovedCardsToggled(NTickbox tickbox)
     {
         _persistedShowRemovedCardsTicked = tickbox.IsTicked;
-        PrefsStorage.Save(new Prefs
-        {
-            ViewStatsTicked = _persistedTicked,
-            ShowRemovedCardsTicked = _persistedShowRemovedCardsTicked,
-        });
+        SavePreferences();
         CoreMain.Logger.Info($"ShowRemovedCards toggled: IsTicked={tickbox.IsTicked}");
 
         // Live re-render so removed cards appear/disappear the moment the
@@ -386,6 +475,30 @@ public static class ViewStatsInjectorPatch
         {
             CoreMain.Logger.Error($"DisplayCards re-render failed: {e.Message}");
         }
+    }
+
+    private static void SavePreferences()
+    {
+        PrefsStorage.Save(new Prefs
+        {
+            ViewStatsTicked = _persistedTicked,
+            ShowRemovedCardsTicked = _persistedShowRemovedCardsTicked,
+            ShowEnemyStatsTicked = _persistedEnemyStatsTicked,
+            // Preserve the legacy wire/storage name for existing installs and
+            // for compatibility with the stable Loader across Core reloads.
+            ShowCombatCardStatsTicked = _persistedCardStatsTicked,
+        });
+    }
+
+    private static void SetTickboxVisualState(NTickbox? tickbox, bool isTicked)
+    {
+        if (tickbox == null || !GodotObject.IsInstanceValid(tickbox)) return;
+
+        if (tickbox._tickedImage != null)
+            tickbox._tickedImage.Visible = isTicked;
+        if (tickbox._notTickedImage != null)
+            tickbox._notTickedImage.Visible = !isTicked;
+        tickbox.IsTicked = isTicked;
     }
 
     private static void SetOwnerRecursive(Node node, Node owner)

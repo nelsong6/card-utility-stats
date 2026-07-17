@@ -82,6 +82,7 @@ public static class RunTracker
     private static readonly List<Creature> _pendingKusarigamaDamageAttributions = new();
     private static readonly List<Creature> _pendingFestivePopperDamageAttributions = new();
     private static readonly List<Creature> _pendingOrnamentalFanBlockAttributions = new();
+    private static readonly List<Creature> _pendingIntimidatingHelmetBlockAttributions = new();
     private static readonly List<Creature> _pendingMercuryHourglassDamageAttributions = new();
     private static readonly List<Creature> _pendingMrStrugglesDamageAttributions = new();
     private static readonly Dictionary<PowerModel, int> _bronzeScalesThornsContributions = new(ReferenceEqualityComparer.Instance);
@@ -93,6 +94,10 @@ public static class RunTracker
     private static readonly List<Player> _pendingHeftyTabletChoicePlayers = new();
     private static readonly HashSet<PotionReward> _whiteBeastPotionRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, PendingPaelSacrificeReward> _paelSacrificeRewards = new(ReferenceEqualityComparer.Instance);
+    private static readonly Dictionary<CardReward, PendingFresnelLensReward> _fresnelLensRewards = new(ReferenceEqualityComparer.Instance);
+    private static readonly Dictionary<CardReward, PendingSilverCrucibleReward> _silverCrucibleRewards = new(ReferenceEqualityComparer.Instance);
+    private static readonly List<int> _silverCrucibleRestoreBatchScreenNumbers = new();
+    private static int _silverCrucibleRestoreBatchDepth;
     private static readonly Dictionary<Player, PendingRegalPillowRestHeal> _pendingRegalPillowRestHeals = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<Player, PendingPrecariousShearsPickup> _pendingPrecariousShearsPickups = new(ReferenceEqualityComparer.Instance);
     private static readonly HashSet<Player> _pendingLeafyPoulticePickups = new(ReferenceEqualityComparer.Instance);
@@ -934,6 +939,7 @@ public static class RunTracker
         _pendingKusarigamaDamageAttributions.Clear();
         _pendingFestivePopperDamageAttributions.Clear();
         _pendingOrnamentalFanBlockAttributions.Clear();
+        _pendingIntimidatingHelmetBlockAttributions.Clear();
         _pendingMercuryHourglassDamageAttributions.Clear();
         _pendingMrStrugglesDamageAttributions.Clear();
         _bronzeScalesThornsContributions.Clear();
@@ -961,6 +967,10 @@ public static class RunTracker
     {
         _pendingHeftyTabletChoicePlayers.Clear();
         _paelSacrificeRewards.Clear();
+        _fresnelLensRewards.Clear();
+        _silverCrucibleRewards.Clear();
+        _silverCrucibleRestoreBatchScreenNumbers.Clear();
+        _silverCrucibleRestoreBatchDepth = 0;
         _pendingRegalPillowRestHeals.Clear();
         _pendingPrecariousShearsPickups.Clear();
         _pendingLeafyPoulticePickups.Clear();
@@ -1717,6 +1727,8 @@ public static class RunTracker
         target.RegaliteCardsCreated += source.RegaliteCardsCreated;
         target.RegaliteCombats += source.RegaliteCombats;
         target.RegaliteTurns += source.RegaliteTurns;
+        target.IntimidatingHelmetCombats += source.IntimidatingHelmetCombats;
+        target.IntimidatingHelmetTurns += source.IntimidatingHelmetTurns;
 
         target.BookmarkCombats += source.BookmarkCombats;
         target.BookmarkCommonActivations += source.BookmarkCommonActivations;
@@ -1748,8 +1760,16 @@ public static class RunTracker
         if (source.StartingMaxHp.HasValue) target.StartingMaxHp = source.StartingMaxHp;
         if (source.ResultingMaxHp.HasValue) target.ResultingMaxHp = source.ResultingMaxHp;
         target.CardRewardsAffected += source.CardRewardsAffected;
+        target.NimbleCardsTaken += source.NimbleCardsTaken;
+        target.RewardScreensWithNimbleCards += source.RewardScreensWithNimbleCards;
+        target.RewardScreensWithTwoNimbleCards += source.RewardScreensWithTwoNimbleCards;
+        target.RewardScreensWithThreeOrMoreNimbleCards += source.RewardScreensWithThreeOrMoreNimbleCards;
+        target.RewardScreensWithoutNimbleCards += source.RewardScreensWithoutNimbleCards;
+        target.RewardScreensWithNimbleCardsButNoneTaken += source.RewardScreensWithNimbleCardsButNoneTaken;
+        MergeCardRewardScreens(target, source);
         MergeCardRewardCategories(target.CardRewardCategories, source.CardRewardCategories);
         MergeRelicCardsGranted(target.CardsGranted, source.CardsGranted);
+        MergeRelicCardsReturned(target, source);
         target.CardChoicesSkipped += source.CardChoicesSkipped;
         MergeRelicCardTransformations(target, source);
     }
@@ -2336,6 +2356,102 @@ public static class RunTracker
         }
     }
 
+    /// <summary>
+    /// Capture Alchemize's physical source card while its owner-specific play
+    /// is still resolving. The potion command finishes asynchronously, so the
+    /// source must be captured before awaiting its result.
+    /// </summary>
+    internal static CardModel? CaptureAlchemizePotionSource(Player? player)
+    {
+        if (player == null) return null;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return null;
+                if (!IsTrackedPlayer(player)) return null;
+
+                var causingPlay = FindCurrentlyResolvingCardPlay();
+                var sourceCard = causingPlay?.Card;
+                if (sourceCard is not Alchemize) return null;
+                if (sourceCard.Owner != null && !ReferenceEquals(sourceCard.Owner, player)) return null;
+
+                return Canonical(sourceCard);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"CaptureAlchemizePotionSource failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record the observed result returned by Alchemize's potion procurement.
+    /// A failed result is the card-side equivalent of White Beast Statue's
+    /// skipped reward: the potion was generated but did not enter the belt.
+    /// </summary>
+    internal static void RecordAlchemizePotionResult(
+        CardModel sourceCard,
+        Player? player,
+        PotionProcureResult? result)
+    {
+        if (player == null || result == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+                if (!IsTrackedPlayer(player)) return;
+                if (sourceCard is not Alchemize) return;
+                if (sourceCard.Owner != null && !ReferenceEquals(sourceCard.Owner, player)) return;
+
+                _pendingCombat ??= new PendingCombat();
+                var instanceId = GetOrAssignInstanceId(sourceCard);
+                var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
+                AccumulateAlchemizePotionResult(agg, result.success, result.potion?.Rarity);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordAlchemizePotionResult failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void AccumulateAlchemizePotionResult(
+        CardAggregate agg,
+        bool success,
+        PotionRarity? rarity)
+    {
+        if (!success)
+        {
+            agg.PotionsSkipped++;
+            return;
+        }
+
+        agg.PotionsGained++;
+        switch (rarity)
+        {
+            case PotionRarity.Common:
+                agg.CommonPotionsGained++;
+                break;
+            case PotionRarity.Uncommon:
+                agg.UncommonPotionsGained++;
+                break;
+            case PotionRarity.Rare:
+                agg.RarePotionsGained++;
+                break;
+        }
+    }
+
+    internal static void RecordAlchemizePotionResultForTest(
+        CardAggregate agg,
+        bool success,
+        PotionRarity? rarity)
+        => AccumulateAlchemizePotionResult(agg, success, rarity);
+
     // -------- Relic stat recording --------
 
     private const string BagOfMarblesRelicId = "RELIC.BAG_OF_MARBLES";
@@ -2374,6 +2490,8 @@ public static class RunTracker
     private const string BronzeScalesRelicId = "RELIC.BRONZE_SCALES";
     private const string HornCleatRelicId = "RELIC.HORN_CLEAT";
     private const string PrismaticGemRelicId = "RELIC.PRISMATIC_GEM";
+    private const string FresnelLensRelicId = "RELIC.FRESNEL_LENS";
+    private const string SilverCrucibleRelicId = "RELIC.SILVER_CRUCIBLE";
     private const string BloodSoakedRoseRelicId = "RELIC.BLOOD_SOAKED_ROSE";
     private const string CursedPearlRelicId = "RELIC.CURSED_PEARL";
     private const string CloakClaspRelicId = "RELIC.CLOAK_CLASP";
@@ -2393,6 +2511,7 @@ public static class RunTracker
     private const string LeesWaffleRelicId = "RELIC.LEES_WAFFLE";
     private const string StrawberryRelicId = "RELIC.STRAWBERRY";
     private const string PearRelicId = "RELIC.PEAR";
+    private const string NutritiousOysterRelicId = "RELIC.NUTRITIOUS_OYSTER";
     private const string ChosenCheeseRelicId = "RELIC.CHOSEN_CHEESE";
     private const string DarkstonePeriaptRelicId = "RELIC.DARKSTONE_PERIAPT";
     private const string LeafyPoulticeRelicId = "RELIC.LEAFY_POULTICE";
@@ -2405,6 +2524,7 @@ public static class RunTracker
     private const string PhylacteryUnboundRelicId = "RELIC.PHYLACTERY_UNBOUND";
     private const string ToolboxRelicId = "RELIC.TOOLBOX";
     private const string PaelsWingRelicId = "RELIC.PAELS_WING";
+    private const string PaelsToothRelicId = "RELIC.PAELS_TOOTH";
     private const string PaelsEyeRelicId = "RELIC.PAELS_EYE";
     private const string StrikeDummyRelicId = "RELIC.STRIKE_DUMMY";
     private const string NutritiousSoupRelicId = "RELIC.NUTRITIOUS_SOUP";
@@ -2416,6 +2536,7 @@ public static class RunTracker
     private const string ShurikenRelicId = "RELIC.SHURIKEN";
     private const string PaperPhrogRelicId = "RELIC.PAPER_PHROG";
     private const string RegaliteRelicId = "RELIC.REGALITE";
+    private const string IntimidatingHelmetRelicId = "RELIC.INTIMIDATING_HELMET";
     private const string BookmarkRelicId = "RELIC.BOOKMARK";
     private const string BrilliantScarfRelicId = "RELIC.BRILLIANT_SCARF";
     private const string JuzuBraceletRelicId = "RELIC.JUZU_BRACELET";
@@ -4530,6 +4651,43 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Record the final physical deck card returned by Pael's Tooth after its
+    /// combat-end callback succeeds. The caller observes the new raw deck
+    /// instance after upgrade and deck-add modifiers have finished. Route it
+    /// through pending combat until the normal CombatEnded promotion.
+    /// </summary>
+    public static void RecordPaelsToothCardReturned(CardModel cardReturned)
+    {
+        if (cardReturned == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(cardReturned.Owner)) return;
+                if (_currentRun == null && _pendingCombat == null) return;
+
+                var persistDirectlyToRun = _pendingCombat == null;
+                var agg = GetOrCreateRelicAggregateForCurrentContextLocked(PaelsToothRelicId);
+                RecordPaelsToothCardReturnedForTest(
+                    agg,
+                    GetCardIdForStats(cardReturned),
+                    GetCardDisplayNameForStats(cardReturned),
+                    cardReturned.CurrentUpgradeLevel);
+                if (persistDirectlyToRun)
+                {
+                    RefreshCurrentRunMetadataLocked();
+                    SaveCurrentRun();
+                }
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPaelsToothCardReturned failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Record a Pael's Wing sacrifice opportunity that resolved without
     /// selecting Sacrifice, either by taking a card or by using another
     /// alternative such as Skip.
@@ -5321,6 +5479,34 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Record Nutritious Oyster's observed pickup max-HP gain after its async
+    /// pickup effect resolves.
+    /// </summary>
+    public static void RecordNutritiousOysterMaxHpGained(
+        Creature creature,
+        decimal maxHpGained,
+        decimal? originalMaxHp = null,
+        decimal? newMaxHp = null)
+    {
+        if (creature?.Player == null || maxHpGained < 0m) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(creature.Player)) return;
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(NutritiousOysterRelicId);
+                RecordNutritiousOysterMaxHpGainedForTest(agg, maxHpGained, originalMaxHp, newMaxHp);
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordNutritiousOysterMaxHpGained failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Record Chosen Cheese's max HP at the pickup boundary. This value is
     /// displayed as the relic's starting max HP and is kept separate from later
     /// combat-end gains because unrelated max-HP changes can happen in between.
@@ -5845,6 +6031,19 @@ public static class RunTracker
     }
 
     internal static void RecordPearMaxHpGainedForTest(
+        RelicAggregate agg,
+        decimal maxHpGained,
+        decimal? originalMaxHp = null,
+        decimal? newMaxHp = null)
+    {
+        if (agg == null || maxHpGained < 0m) return;
+
+        agg.Activations++;
+        agg.MaxHpGained += maxHpGained;
+        RecordRelicMaxHpChangeForTest(agg, originalMaxHp, newMaxHp);
+    }
+
+    internal static void RecordNutritiousOysterMaxHpGainedForTest(
         RelicAggregate agg,
         decimal maxHpGained,
         decimal? originalMaxHp = null,
@@ -6806,6 +7005,118 @@ public static class RunTracker
         }
     }
 
+    /// <summary>
+    /// Count one owner card play that meets Intimidating Helmet's exact
+    /// play-time EnergyValue threshold, then arm the relic's immediately
+    /// following BlockVar gain-block command for observed-result attribution.
+    /// </summary>
+    public static bool RecordIntimidatingHelmetCardPlayedAndArmBlockAttribution(
+        IntimidatingHelmet relic,
+        CardPlay cardPlay,
+        out Creature? ownerCreature)
+    {
+        ownerCreature = null;
+        if (relic?.Owner == null || cardPlay?.Card == null) return false;
+        if (!ReferenceEquals(cardPlay.Card.Owner, relic.Owner)) return false;
+        if (!IntimidatingHelmetEnergyValueQualifiesForTest(
+                cardPlay.Resources.EnergyValue,
+                relic.DynamicVars.Energy.IntValue))
+        {
+            return false;
+        }
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(relic.Owner)) return false;
+                if (CombatManager.Instance?.IsInProgress != true) return false;
+
+                ownerCreature = relic.Owner.Creature;
+                if (ownerCreature == null) return false;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordIntimidatingHelmetCombatForPlayerLocked(relic.Owner);
+                RecordIntimidatingHelmetTurnForPlayerLocked(relic.Owner);
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(IntimidatingHelmetRelicId);
+                RecordIntimidatingHelmetActivationForTest(agg);
+                _pendingIntimidatingHelmetBlockAttributions.Add(ownerCreature);
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordIntimidatingHelmetCardPlayedAndArmBlockAttribution failed: {e.Message}");
+                ownerCreature = null;
+                return false;
+            }
+        }
+    }
+
+    public static bool TryConsumeIntimidatingHelmetBlockAttribution(Creature creature)
+    {
+        if (creature == null) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                return ConsumePendingCreatureAttribution(
+                    _pendingIntimidatingHelmetBlockAttributions,
+                    creature);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"TryConsumeIntimidatingHelmetBlockAttribution failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    public static void DisarmIntimidatingHelmetBlockAttribution(Creature? creature)
+    {
+        if (creature == null) return;
+        lock (_lock)
+            ConsumePendingCreatureAttribution(_pendingIntimidatingHelmetBlockAttributions, creature);
+    }
+
+    public static void RecordIntimidatingHelmetBlockGained(decimal amount)
+    {
+        if (amount <= 0m) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateForCurrentContextLocked(IntimidatingHelmetRelicId);
+                RecordIntimidatingHelmetBlockGainedForTest(agg, amount);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordIntimidatingHelmetBlockGained failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordIntimidatingHelmetTurnStarted(Player player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                _pendingCombat ??= new PendingCombat();
+                RecordIntimidatingHelmetTurnForPlayerLocked(player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordIntimidatingHelmetTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
     internal static void RecordPaperPhrogVulnerableBonusForTest(
         RelicAggregate agg,
         decimal damageAdded,
@@ -6845,6 +7156,33 @@ public static class RunTracker
     {
         if (agg == null) return;
         agg.RegaliteTurns += Math.Max(0, count);
+    }
+
+    internal static bool IntimidatingHelmetEnergyValueQualifiesForTest(int energyValue, int threshold = 2)
+        => energyValue >= threshold;
+
+    internal static void RecordIntimidatingHelmetActivationForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.Activations += Math.Max(0, count);
+    }
+
+    internal static void RecordIntimidatingHelmetBlockGainedForTest(RelicAggregate agg, decimal amount)
+    {
+        if (agg == null || amount <= 0m) return;
+        agg.AdditionalBlockGained += (int)amount;
+    }
+
+    internal static void RecordIntimidatingHelmetCombatForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.IntimidatingHelmetCombats += Math.Max(0, count);
+    }
+
+    internal static void RecordIntimidatingHelmetTurnForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.IntimidatingHelmetTurns += Math.Max(0, count);
     }
 
     internal static void RecordBookmarkCombatForTest(RelicAggregate agg, int count = 1)
@@ -6896,6 +7234,32 @@ public static class RunTracker
     {
         if (agg == null || string.IsNullOrWhiteSpace(relicId)) return;
         AddRelicGranted(agg.RelicsGranted, relicId, displayName ?? "", 1);
+    }
+
+    internal static void RecordPaelsToothCardReturnedForTest(
+        RelicAggregate agg,
+        string? cardId,
+        string? displayName,
+        int upgradeLevel)
+    {
+        if (agg == null || string.IsNullOrWhiteSpace(cardId)) return;
+
+        agg.CardsReturned ??= new List<RelicCardReturnAggregate>();
+        var normalizedUpgradeLevel = Math.Max(0, upgradeLevel);
+        var normalizedDisplayName = displayName ?? "";
+        if (string.IsNullOrWhiteSpace(normalizedDisplayName))
+        {
+            normalizedDisplayName = FormatCardIdForDisplay(cardId);
+            if (normalizedUpgradeLevel > 0)
+                normalizedDisplayName += new string('+', normalizedUpgradeLevel);
+        }
+
+        agg.CardsReturned.Add(new RelicCardReturnAggregate
+        {
+            CardId = cardId,
+            DisplayName = normalizedDisplayName,
+            UpgradeLevel = normalizedUpgradeLevel,
+        });
     }
 
     internal static void RecordNeowsBonesRelicObtainedForTest(
@@ -8630,6 +8994,553 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Snapshot the final options when a Fresnel Lens owner's card-reward
+    /// selection opens. The same reward can be rerolled, so the snapshot is
+    /// refreshable and is counted only when the selection resolves.
+    /// </summary>
+    public static void NoteFresnelLensRewardOpened(CardReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(reward.Player)) return;
+                if (!PlayerHasFresnelLens(reward.Player)) return;
+
+                if (!_fresnelLensRewards.ContainsKey(reward))
+                    _fresnelLensRewards[reward] = PendingFresnelLensReward.FromReward(reward);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"NoteFresnelLensRewardOpened failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// A Driftwood reroll reuses the same CardReward and screen. Replace the
+    /// option snapshot so the eventual taken/skipped result describes the
+    /// cards the player could actually choose after rerolling.
+    /// </summary>
+    public static void RefreshFresnelLensRewardAfterReroll(CardReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_fresnelLensRewards.ContainsKey(reward)) return;
+                _fresnelLensRewards[reward] = PendingFresnelLensReward.FromReward(reward);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RefreshFresnelLensRewardAfterReroll failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Resolve one opened Fresnel Lens card reward. CardReward removes each
+    /// successfully obtained card from its option list, so the observed drop
+    /// in Nimble options is the number actually taken rather than merely
+    /// clicked. Reward stats happen outside combat and persist immediately.
+    /// </summary>
+    public static void RecordFresnelLensRewardResolved(CardReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_fresnelLensRewards.Remove(reward, out var pending)) return;
+                if (!IsTrackedPlayer(reward.Player)) return;
+
+                var remaining = PendingFresnelLensReward.FromReward(reward).NimbleCards;
+                var taken = Math.Max(0, pending.NimbleCards - remaining);
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(FresnelLensRelicId);
+                RecordFresnelLensRewardForTest(agg, pending.NimbleCards, taken);
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordFresnelLensRewardResolved failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void CancelFresnelLensReward(CardReward reward)
+    {
+        if (reward == null) return;
+        lock (_lock)
+            _fresnelLensRewards.Remove(reward);
+    }
+
+    /// <summary>
+    /// Record Drowning Beacon's observed max-HP cost across the full climb
+    /// option. The event loses max HP before obtaining Fresnel Lens, so the
+    /// relic's own pickup callbacks cannot recover the original value.
+    /// </summary>
+    public static void RecordFresnelLensEventMaxHpChanged(
+        Player player,
+        decimal originalMaxHp,
+        decimal newMaxHp)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                if (!PlayerHasFresnelLens(player)) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(FresnelLensRelicId);
+                RecordFresnelLensMaxHpChangedForTest(agg, originalMaxHp, newMaxHp);
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordFresnelLensEventMaxHpChanged failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordFresnelLensRewardForTest(
+        RelicAggregate agg,
+        int nimbleCardsOffered,
+        int nimbleCardsTaken)
+    {
+        if (agg == null) return;
+
+        var offered = Math.Max(0, nimbleCardsOffered);
+        var taken = Math.Clamp(nimbleCardsTaken, 0, offered);
+        agg.NimbleCardsTaken += taken;
+
+        if (offered == 0)
+        {
+            agg.RewardScreensWithoutNimbleCards += 1;
+            return;
+        }
+
+        agg.RewardScreensWithNimbleCards += 1;
+
+        if (offered == 2)
+            agg.RewardScreensWithTwoNimbleCards += 1;
+        else if (offered >= 3)
+            agg.RewardScreensWithThreeOrMoreNimbleCards += 1;
+
+        if (taken == 0)
+            agg.RewardScreensWithNimbleCardsButNoneTaken += 1;
+    }
+
+    internal static void RecordFresnelLensMaxHpChangedForTest(
+        RelicAggregate agg,
+        decimal originalMaxHp,
+        decimal newMaxHp)
+        => RecordRelicMaxHpChangeForTest(agg, originalMaxHp, newMaxHp);
+
+    private static bool PlayerHasFresnelLens(Player? player)
+    {
+        try
+        {
+            return player?.Relics?.Any(relic => relic is FresnelLens) == true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Arm one of Silver Crucible's three charge-consuming card rewards after
+    /// Populate has finished. The screen number comes from the relic's saved
+    /// TimesUsed value, while the option snapshot preserves the final visible
+    /// order and CardCreationResult identity for observed taken attribution.
+    /// </summary>
+    public static void NoteSilverCrucibleRewardGenerated(CardReward reward, int screenNumber)
+    {
+        if (reward == null || screenNumber is < 1 or > 3) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(reward.Player)) return;
+
+                var pending = new PendingSilverCrucibleReward(screenNumber, CurrentRunFloorLocked());
+                CaptureSilverCrucibleRewardOptionsLocked(pending, reward);
+                _silverCrucibleRewards[reward] = pending;
+                _silverCrucibleRestoreBatchScreenNumbers.Remove(screenNumber);
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(SilverCrucibleRelicId);
+                RecordSilverCrucibleRewardForTest(
+                    agg,
+                    BuildSilverCrucibleRewardScreenLocked(pending, remaining: null, resolved: false));
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"NoteSilverCrucibleRewardGenerated failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Refresh the display snapshot immediately before the card selection is
+    /// shown. Relics obtained from another reward on the same page can modify
+    /// CardCreationResult.Card after Populate while preserving the result
+    /// object's identity. Reopenings refresh only while every original result
+    /// is still present, so a multi-pick hook can never erase an earlier take.
+    /// </summary>
+    public static void NoteSilverCrucibleRewardOpened(CardReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_silverCrucibleRewards.TryGetValue(reward, out var pending)
+                    && !TryRestoreSilverCrucibleRewardLocked(reward, allowBatchFallback: false, out pending))
+                    return;
+
+                var currentResults = new HashSet<CardCreationResult>(
+                    reward._cards,
+                    ReferenceEqualityComparer.Instance);
+                var canRefresh = !pending.SelectionOpened
+                    || (pending.Cards.Count == currentResults.Count
+                        && pending.Cards.All(card => currentResults.Contains(card.Result)));
+                if (!canRefresh) return;
+
+                CaptureSilverCrucibleRewardOptionsLocked(pending, reward);
+                pending.SelectionOpened = true;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(SilverCrucibleRelicId);
+                RecordSilverCrucibleRewardForTest(
+                    agg,
+                    BuildSilverCrucibleRewardScreenLocked(pending, remaining: null, resolved: false));
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"NoteSilverCrucibleRewardOpened failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Finalize a Silver Crucible reward at an observed terminal boundary:
+    /// successful CardReward completion, outer rewards-page skip, or the
+    /// pre-clear side of a Driftwood reroll. CardReward removes a
+    /// CardCreationResult only after that card successfully enters the deck,
+    /// so missing result references are the cards actually taken.
+    /// </summary>
+    public static void RecordSilverCrucibleRewardResolved(CardReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_silverCrucibleRewards.TryGetValue(reward, out var pending)
+                    && !TryRestoreSilverCrucibleRewardLocked(reward, allowBatchFallback: false, out pending))
+                    return;
+
+                _silverCrucibleRewards.Remove(reward);
+                if (!IsTrackedPlayer(reward.Player)) return;
+
+                var remaining = new HashSet<CardCreationResult>(reward._cards, ReferenceEqualityComparer.Instance);
+                var screen = BuildSilverCrucibleRewardScreenLocked(pending, remaining, resolved: true);
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(SilverCrucibleRelicId);
+                RecordSilverCrucibleRewardForTest(agg, screen);
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordSilverCrucibleRewardResolved failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void PreserveSilverCrucibleRewardAfterFault(CardReward reward)
+    {
+        // Keep both the live binding and the persisted unresolved screen. A
+        // fault is not an observed skip/take boundary, and unbinding it would
+        // make the same screen eligible for an unrelated reward restore.
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_silverCrucibleRewards.ContainsKey(reward)) return;
+                TryRestoreSilverCrucibleRewardLocked(reward, allowBatchFallback: false, out _);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"PreserveSilverCrucibleRewardAfterFault failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Open a tightly bounded ordered-restore window around one
+    /// RewardsSet.GenerateWithoutOffering call. Continued combat rooms rebuild
+    /// CardReward options rather than serializing them, so signatures may
+    /// differ; within this one generation batch, sequential Populate calls are
+    /// the stable fallback for the saved Silver use order.
+    /// </summary>
+    public static bool BeginSilverCrucibleRewardRestoreBatch(Player player)
+    {
+        if (player == null) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return false;
+                if (player.Relics?.Any(relic => relic is SilverCrucible) != true) return false;
+
+                if (_silverCrucibleRestoreBatchDepth > 0)
+                {
+                    _silverCrucibleRestoreBatchDepth += 1;
+                    return true;
+                }
+
+                EnsureLazyCurrentRunLocked();
+                if (!_currentRun.RelicAggregates.TryGetValue(SilverCrucibleRelicId, out var agg))
+                    return false;
+
+                var candidates = GetUnboundUnresolvedSilverCrucibleScreensLocked(agg);
+                if (candidates.Count == 0) return false;
+
+                _silverCrucibleRestoreBatchScreenNumbers.Clear();
+                _silverCrucibleRestoreBatchScreenNumbers.AddRange(
+                    candidates.Select(screen => screen.ScreenNumber));
+                _silverCrucibleRestoreBatchDepth = 1;
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"BeginSilverCrucibleRewardRestoreBatch failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    public static void EndSilverCrucibleRewardRestoreBatch()
+    {
+        lock (_lock)
+        {
+            if (_silverCrucibleRestoreBatchDepth <= 0) return;
+
+            _silverCrucibleRestoreBatchDepth -= 1;
+            if (_silverCrucibleRestoreBatchDepth == 0)
+                _silverCrucibleRestoreBatchScreenNumbers.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Rebind a generated-but-unresolved screen after a Core hot reload or a
+    /// continued rewards page. Exact ordered card signatures are preferred;
+    /// when Continue regenerates different cards, ordered fallback is allowed
+    /// only inside that reward set's bounded generation batch.
+    /// </summary>
+    public static void RestoreSilverCrucibleRewardAfterPopulate(CardReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_silverCrucibleRewards.ContainsKey(reward)) return;
+                if (!TryRestoreSilverCrucibleRewardLocked(
+                        reward,
+                        allowBatchFallback: _silverCrucibleRestoreBatchDepth > 0,
+                        out var pending))
+                    return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(SilverCrucibleRelicId);
+                RecordSilverCrucibleRewardForTest(
+                    agg,
+                    BuildSilverCrucibleRewardScreenLocked(pending, remaining: null, resolved: false));
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RestoreSilverCrucibleRewardAfterPopulate failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordSilverCrucibleRewardForTest(
+        RelicAggregate agg,
+        RelicCardRewardScreenAggregate screen)
+    {
+        if (agg == null || screen == null || screen.ScreenNumber is < 1 or > 3) return;
+
+        var copy = new RelicCardRewardScreenAggregate
+        {
+            ScreenNumber = screen.ScreenNumber,
+            Floor = screen.Floor,
+            Resolved = screen.Resolved,
+            Cards = (screen.Cards ?? new List<RelicCardRewardOptionAggregate>())
+                .Where(card => card != null)
+                .Select(card => new RelicCardRewardOptionAggregate
+                {
+                    CardId = card.CardId ?? "",
+                    DisplayName = card.DisplayName ?? "",
+                    UpgradeLevel = Math.Max(0, card.UpgradeLevel),
+                    Taken = card.Taken,
+                })
+                .ToList(),
+        };
+
+        agg.CardRewardScreens ??= new List<RelicCardRewardScreenAggregate>();
+        var existingIndex = agg.CardRewardScreens.FindIndex(candidate =>
+            candidate != null && candidate.ScreenNumber == copy.ScreenNumber);
+        if (existingIndex >= 0)
+            agg.CardRewardScreens[existingIndex] = copy;
+        else
+            agg.CardRewardScreens.Add(copy);
+
+        agg.CardRewardScreens.Sort((left, right) =>
+            (left?.ScreenNumber ?? int.MaxValue).CompareTo(right?.ScreenNumber ?? int.MaxValue));
+    }
+
+    private static void CaptureSilverCrucibleRewardOptionsLocked(
+        PendingSilverCrucibleReward pending,
+        CardReward reward)
+    {
+        pending.Cards.Clear();
+        foreach (var option in reward._cards)
+        {
+            var card = option?.Card;
+            if (option == null || card == null) continue;
+
+            pending.Cards.Add(new PendingSilverCrucibleCard
+            {
+                Result = option,
+                CardId = GetRewardCardIdForStats(card),
+                DisplayName = GetRewardCardDisplayNameForStats(card),
+                UpgradeLevel = GetRewardCardUpgradeLevelForStats(card),
+            });
+        }
+    }
+
+    private static RelicCardRewardScreenAggregate BuildSilverCrucibleRewardScreenLocked(
+        PendingSilverCrucibleReward pending,
+        HashSet<CardCreationResult>? remaining,
+        bool resolved)
+    {
+        return new RelicCardRewardScreenAggregate
+        {
+            ScreenNumber = pending.ScreenNumber,
+            Floor = pending.Floor,
+            Resolved = resolved,
+            Cards = pending.Cards.Select(card => new RelicCardRewardOptionAggregate
+            {
+                CardId = card.CardId,
+                DisplayName = card.DisplayName,
+                UpgradeLevel = card.UpgradeLevel,
+                Taken = resolved && remaining != null && !remaining.Contains(card.Result),
+            }).ToList(),
+        };
+    }
+
+    private static bool TryRestoreSilverCrucibleRewardLocked(
+        CardReward reward,
+        bool allowBatchFallback,
+        [NotNullWhen(true)] out PendingSilverCrucibleReward? pending)
+    {
+        pending = null;
+        if (!IsTrackedPlayer(reward.Player)) return false;
+
+        EnsureLazyCurrentRunLocked();
+        if (!_currentRun.RelicAggregates.TryGetValue(SilverCrucibleRelicId, out var agg))
+            return false;
+
+        var candidates = GetUnboundUnresolvedSilverCrucibleScreensLocked(agg);
+        if (candidates.Count == 0) return false;
+
+        var matching = candidates
+            .Where(screen => SilverCrucibleScreenMatchesReward(screen, reward))
+            .ToList();
+        var selected = matching.FirstOrDefault();
+        if (selected == null
+            && allowBatchFallback
+            && _silverCrucibleRestoreBatchDepth > 0)
+        {
+            selected = _silverCrucibleRestoreBatchScreenNumbers
+                .Select(screenNumber => candidates.FirstOrDefault(screen => screen.ScreenNumber == screenNumber))
+                .FirstOrDefault(screen => screen != null);
+        }
+        if (selected == null) return false;
+
+        _silverCrucibleRestoreBatchScreenNumbers.Remove(selected.ScreenNumber);
+        pending = new PendingSilverCrucibleReward(selected.ScreenNumber, selected.Floor);
+        CaptureSilverCrucibleRewardOptionsLocked(pending, reward);
+        _silverCrucibleRewards[reward] = pending;
+        return true;
+    }
+
+    private static List<RelicCardRewardScreenAggregate> GetUnboundUnresolvedSilverCrucibleScreensLocked(
+        RelicAggregate agg)
+    {
+        var boundScreenNumbers = _silverCrucibleRewards.Values
+            .Select(candidate => candidate.ScreenNumber)
+            .ToHashSet();
+        var currentFloor = CurrentRunFloorLocked();
+
+        return (agg.CardRewardScreens ?? new List<RelicCardRewardScreenAggregate>())
+            .Where(screen => screen != null
+                && !screen.Resolved
+                && screen.ScreenNumber is >= 1 and <= 3
+                && !boundScreenNumbers.Contains(screen.ScreenNumber)
+                && (!screen.Floor.HasValue
+                    || !currentFloor.HasValue
+                    || screen.Floor.Value == currentFloor.Value))
+            .OrderBy(screen => screen.ScreenNumber)
+            .ToList();
+    }
+
+    private static bool SilverCrucibleScreenMatchesReward(
+        RelicCardRewardScreenAggregate screen,
+        CardReward reward)
+    {
+        var savedCards = screen.Cards ?? new List<RelicCardRewardOptionAggregate>();
+        var currentCards = reward._cards
+            .Where(option => option?.Card != null)
+            .Select(option => option.Card)
+            .ToList();
+        if (savedCards.Count != currentCards.Count) return false;
+
+        for (var index = 0; index < savedCards.Count; index++)
+        {
+            var saved = savedCards[index];
+            var current = currentCards[index];
+            if (saved == null || current == null) return false;
+            if (!string.Equals(saved.CardId, GetRewardCardIdForStats(current), StringComparison.Ordinal))
+                return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
     /// Record that Prismatic Gem modified one card reward's creation options.
     /// Card rewards are created outside combat, so persist directly to the
     /// committed run instead of waiting for a combat boundary.
@@ -9375,6 +10286,18 @@ public static class RunTracker
         }
     }
 
+    private static bool PlayerHasIntimidatingHelmet(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is IntimidatingHelmet);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static bool PlayerHasJuzuBracelet(Player player)
     {
         try
@@ -9429,6 +10352,7 @@ public static class RunTracker
             RecordPaperPhrogCombatForPlayerLocked(player);
             RecordRazorToothCombatForPlayerLocked(player);
             RecordRegaliteCombatForPlayerLocked(player);
+            RecordIntimidatingHelmetCombatForPlayerLocked(player);
         }
         catch (Exception e)
         {
@@ -9675,6 +10599,36 @@ public static class RunTracker
 
         var agg = GetOrCreatePendingRelicAggregateLocked(RegaliteRelicId);
         RecordRegaliteTurnForTest(agg);
+    }
+
+    private static void RecordIntimidatingHelmetCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasIntimidatingHelmet(player)) return;
+        if (!_pendingCombat.IntimidatingHelmetCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(IntimidatingHelmetRelicId);
+        RecordIntimidatingHelmetCombatForTest(agg);
+    }
+
+    private static void RecordIntimidatingHelmetTurnForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasIntimidatingHelmet(player)) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.IntimidatingHelmetTurnCountedTurns.TryGetValue(player, out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.IntimidatingHelmetTurnCountedTurns[player] = turnNumber;
+        RecordIntimidatingHelmetCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(IntimidatingHelmetRelicId);
+        RecordIntimidatingHelmetTurnForTest(agg);
     }
 
     private static void RecordNutritiousSoupCombatForPlayerLocked(Player player)
@@ -10400,6 +11354,14 @@ public static class RunTracker
         target.UpgradedCards.AddRange(source.UpgradedCards.Where(card => !string.IsNullOrWhiteSpace(card)));
     }
 
+    private static void MergeCardRewardScreens(RelicAggregate target, RelicAggregate source)
+    {
+        if (source.CardRewardScreens == null || source.CardRewardScreens.Count == 0) return;
+
+        foreach (var screen in source.CardRewardScreens)
+            RecordSilverCrucibleRewardForTest(target, screen);
+    }
+
     private static void MergeCardRewardCategories(
         Dictionary<string, CardRewardCategoryAggregate> target,
         Dictionary<string, CardRewardCategoryAggregate>? source)
@@ -10450,6 +11412,24 @@ public static class RunTracker
             if (card.Count <= 0) continue;
             var cardId = string.IsNullOrWhiteSpace(card.CardId) ? kvp.Key : card.CardId;
             AddRelicCardGranted(target, cardId, card.DisplayName, card.Count);
+        }
+    }
+
+    private static void MergeRelicCardsReturned(RelicAggregate target, RelicAggregate source)
+    {
+        if (source.CardsReturned == null || source.CardsReturned.Count == 0) return;
+
+        target.CardsReturned ??= new List<RelicCardReturnAggregate>();
+        foreach (var card in source.CardsReturned)
+        {
+            if (card == null || string.IsNullOrWhiteSpace(card.CardId)) continue;
+
+            target.CardsReturned.Add(new RelicCardReturnAggregate
+            {
+                CardId = card.CardId,
+                DisplayName = card.DisplayName ?? "",
+                UpgradeLevel = Math.Max(0, card.UpgradeLevel),
+            });
         }
     }
 
@@ -10771,6 +11751,34 @@ public static class RunTracker
             try { return card.Id.ToString(); }
             catch { return ""; }
         }
+    }
+
+    private static string GetRewardCardIdForStats(CardModel card)
+    {
+        try { return card.Id.ToString(); }
+        catch { return ""; }
+    }
+
+    private static string GetRewardCardDisplayNameForStats(CardModel card)
+    {
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(card.Title))
+                return card.Title;
+
+            return FormatCardIdForDisplay(card.Id.ToString());
+        }
+        catch
+        {
+            try { return FormatCardIdForDisplay(card.Id.ToString()); }
+            catch { return "Unknown card"; }
+        }
+    }
+
+    private static int GetRewardCardUpgradeLevelForStats(CardModel card)
+    {
+        try { return Math.Max(0, card.CurrentUpgradeLevel); }
+        catch { return 0; }
     }
 
     private static int TryGetPileTypeSortValue(CardModel card)
@@ -13187,6 +14195,11 @@ public static class RunTracker
         target.TotalStarsSpent += source.TotalStarsSpent;
         target.TotalStarsGenerated += source.TotalStarsGenerated;
         target.TotalForgeGenerated += source.TotalForgeGenerated;
+        target.PotionsGained += source.PotionsGained;
+        target.CommonPotionsGained += source.CommonPotionsGained;
+        target.UncommonPotionsGained += source.UncommonPotionsGained;
+        target.RarePotionsGained += source.RarePotionsGained;
+        target.PotionsSkipped += source.PotionsSkipped;
         target.TotalBlockGained += source.TotalBlockGained;
         target.TotalBlockEffective += source.TotalBlockEffective;
         target.TotalBlockWasted += source.TotalBlockWasted;
@@ -13621,6 +14634,54 @@ internal sealed class PendingPaelSacrificeReward
     }
 }
 
+internal sealed class PendingFresnelLensReward
+{
+    public int NimbleCards { get; private set; }
+
+    public static PendingFresnelLensReward FromReward(CardReward? reward)
+    {
+        var result = new PendingFresnelLensReward();
+        if (reward == null) return result;
+
+        foreach (var option in reward._cards)
+        {
+            try
+            {
+                if (option?.Card?.Enchantment is Nimble
+                    && option.ModifyingRelics.Any(relic => relic is FresnelLens))
+                    result.NimbleCards += 1;
+            }
+            catch
+            {
+            }
+        }
+
+        return result;
+    }
+}
+
+internal sealed class PendingSilverCrucibleReward
+{
+    public PendingSilverCrucibleReward(int screenNumber, int? floor)
+    {
+        ScreenNumber = screenNumber;
+        Floor = floor;
+    }
+
+    public int ScreenNumber { get; }
+    public int? Floor { get; }
+    public bool SelectionOpened { get; set; }
+    public List<PendingSilverCrucibleCard> Cards { get; } = new();
+}
+
+internal sealed class PendingSilverCrucibleCard
+{
+    public required CardCreationResult Result { get; init; }
+    public string CardId { get; init; } = "";
+    public string DisplayName { get; init; } = "";
+    public int UpgradeLevel { get; init; }
+}
+
 /// <summary>
 /// Holds per-combat stats and events while a combat is in progress.
 /// Discarded if the combat doesn't finish cleanly; promoted into the run on CombatEnded.
@@ -13690,6 +14751,10 @@ internal class PendingCombat
     public HashSet<Player> RegaliteCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> RegaliteTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> IntimidatingHelmetCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> IntimidatingHelmetTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> PaelsEyeCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

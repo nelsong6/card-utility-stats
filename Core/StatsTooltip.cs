@@ -1,8 +1,10 @@
 using System;
 using Godot;
 using MegaCrit.Sts2.Core.Nodes;
+using MegaCrit.Sts2.Core.Nodes.Cards.Holders;
 using MegaCrit.Sts2.Core.Nodes.Combat;
 using MegaCrit.Sts2.Core.Nodes.HoverTips;
+using MegaCrit.Sts2.Core.Nodes.Screens.RunHistoryScreen;
 
 namespace SpireLens.Core;
 
@@ -276,6 +278,11 @@ public static class StatsTooltip
         string bodyBBCode,
         bool showHeader = true)
     {
+        // Every producer also gates before aggregate lookup/markup work. Keep
+        // this final guard so a future stats surface cannot bypass the global
+        // visibility toggle accidentally.
+        if (!Patches.ViewStatsInjectorPatch.StatsVisibilityEnabled) return;
+
         EnsureBuilt(tree);
         if (_panel == null || _headerRow == null || _statsLabel == null || _titleLabel == null || _brandLabel == null) return;
 
@@ -318,6 +325,16 @@ public static class StatsTooltip
     {
         if (anchor == null || !ReferenceEquals(_anchor, anchor)) return;
         Hide();
+    }
+
+    public static void HideIfAnchoredToCreature()
+    {
+        if (_anchor is NCreature) Hide();
+    }
+
+    public static void HideIfAnchoredToCard()
+    {
+        if (_anchor is NCardHolder or NDeckHistoryEntry) Hide();
     }
 
     public static void Destroy()

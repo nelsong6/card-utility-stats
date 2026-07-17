@@ -139,6 +139,16 @@ public class CardAggregate
     // current cards use whole numbers.
     public decimal TotalForgeGenerated { get; set; }
 
+    // Potion procurement outcomes caused by this card. Alchemize is the
+    // first card using these fields: gained counts only successful observed
+    // procure results, rarity buckets use the potion actually returned by
+    // the command, and skipped counts failed procure results.
+    public int PotionsGained { get; set; }
+    public int CommonPotionsGained { get; set; }
+    public int UncommonPotionsGained { get; set; }
+    public int RarePotionsGained { get; set; }
+    public int PotionsSkipped { get; set; }
+
     // M2a: Block gained (how much block this card contributed over the run,
     // summed across plays). M2b extends this with absorbed/wasted splits
     // using an ordered provenance ledger for the player's block pool.
@@ -451,7 +461,7 @@ public class RelicAggregate
     public int? FloorAcquired { get; set; }
     public int? FloorActivated { get; set; }
 
-    // Total maximum HP gained from this relic. Used by Chosen Cheese.
+    // Total observed maximum HP gained by pickup max-HP relics and Chosen Cheese.
     public decimal MaxHpGained { get; set; }
 
     // Shared max-HP before/after snapshot for relics that add or remove max HP.
@@ -649,6 +659,13 @@ public class RelicAggregate
     public int RegaliteCombats { get; set; }
     public int RegaliteTurns { get; set; }
 
+    // Intimidating Helmet tracking. Activations is the number of owner card
+    // plays whose play-time EnergyValue met the relic's 2+ threshold;
+    // AdditionalBlockGained is the observed block. These are held combat/turn
+    // denominators for the requested averages, including zero-trigger periods.
+    public int IntimidatingHelmetCombats { get; set; }
+    public int IntimidatingHelmetTurns { get; set; }
+
     // Bookmark tracking. Activations is total cost-reduction activations;
     // BookmarkCombats is the denominator for average activations per combat.
     public int BookmarkCombats { get; set; }
@@ -704,6 +721,23 @@ public class RelicAggregate
     // Used by Prismatic Gem.
     public int CardRewardsAffected { get; set; }
 
+    // Fresnel Lens card-reward tracking. The any-Nimble counter overlaps the
+    // exact-two and three-or-more breakdowns. Taken counts only successful
+    // picks from those rewards.
+    public int NimbleCardsTaken { get; set; }
+    public int RewardScreensWithNimbleCards { get; set; }
+    public int RewardScreensWithTwoNimbleCards { get; set; }
+    public int RewardScreensWithThreeOrMoreNimbleCards { get; set; }
+    public int RewardScreensWithoutNimbleCards { get; set; }
+    public int RewardScreensWithNimbleCardsButNoneTaken { get; set; }
+
+    // Ordered card-reward offers modified by Silver Crucible. Each screen is
+    // keyed by the relic's own one-based use number (1-3), while Cards keeps
+    // the visible left-to-right option order and, once resolved, explicit
+    // taken/not-taken outcomes. A list is required because duplicate card
+    // definitions can be offered and must remain distinct observations.
+    public List<RelicCardRewardScreenAggregate> CardRewardScreens { get; set; } = new();
+
     // Observed card reward options by card pool while Prismatic Gem is owned.
     // This is intentionally meta: other reward modifiers may also affect the
     // final options. Used by Prismatic Gem.
@@ -713,6 +747,11 @@ public class RelicAggregate
     // show which rare card was picked from its pickup screen, Arcane Scroll to
     // show the rare card it added, and Neow's Bones to show the curse it added.
     public Dictionary<string, RelicCardAggregate> CardsGranted { get; set; } = new();
+
+    // Physical cards Pael's Tooth has actually returned to the deck. The list
+    // preserves observed return order, duplicate definitions, the final title,
+    // and the post-return upgrade level of each new deck instance.
+    public List<RelicCardReturnAggregate> CardsReturned { get; set; } = new();
 
     // Times a relic-owned card choice was skipped. Used by Hefty Tablet.
     public int CardChoicesSkipped { get; set; }
@@ -733,6 +772,35 @@ public class RelicCardAggregate
     public string CardId { get; set; } = "";
     public string DisplayName { get; set; } = "";
     public int Count { get; set; }
+}
+
+public class RelicCardReturnAggregate
+{
+    public string CardId { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public int UpgradeLevel { get; set; }
+}
+
+public class RelicCardRewardScreenAggregate
+{
+    public int ScreenNumber { get; set; }
+    // Floor where this Silver use generated its options. This bounds hot-
+    // reload/Continue re-association so an abandoned unresolved screen cannot
+    // attach itself to an unrelated reward on a later floor.
+    public int? Floor { get; set; }
+    // False while the reward is generated but no terminal selection/skip/
+    // reroll outcome has been observed yet. Persisting this state keeps the
+    // screen recoverable across a Core hot reload between floors.
+    public bool Resolved { get; set; }
+    public List<RelicCardRewardOptionAggregate> Cards { get; set; } = new();
+}
+
+public class RelicCardRewardOptionAggregate
+{
+    public string CardId { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public int UpgradeLevel { get; set; }
+    public bool Taken { get; set; }
 }
 
 public class RelicGrantedAggregate

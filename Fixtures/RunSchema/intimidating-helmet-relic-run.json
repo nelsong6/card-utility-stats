@@ -1,0 +1,19 @@
+{
+  "run_id": "intimidating-helmet-relic-fixture",
+  "started_at": "2026-07-13T21:00:00Z",
+  "updated_at": "2026-07-13T21:12:00Z",
+  "outcome": "in_progress",
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.INTIMIDATING_HELMET": {
+      "activations": 6,
+      "additional_block_gained": 30,
+      "intimidating_helmet_turns": 8,
+      "intimidating_helmet_combats": 3
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

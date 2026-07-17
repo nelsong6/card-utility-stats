@@ -1,10 +1,102 @@
+using System.Text.Json;
 using SpireLens.Core;
+using SpireLens.Core.Patches;
 using Xunit;
 
 namespace SpireLens.Core.Tests;
 
 public class RuntimeOptionsTests
 {
+    [Fact]
+    public void EnemyHoverStats_DefaultOff()
+    {
+        Assert.False(new RuntimeOptions().ShowEnemyStatsOnHover);
+        Assert.False(new Prefs().ShowEnemyStatsTicked);
+    }
+
+    [Fact]
+    public void EnemyHoverStats_OlderRuntimeSnapshotDefaultsOff()
+    {
+        var options = JsonSerializer.Deserialize<RuntimeOptions>("{}");
+
+        Assert.NotNull(options);
+        Assert.False(options!.ShowEnemyStatsOnHover);
+    }
+
+    [Fact]
+    public void EnemyHoverStats_ExplicitRuntimeSnapshotCanEnableIt()
+    {
+        var options = JsonSerializer.Deserialize<RuntimeOptions>(
+            """{"ShowEnemyStatsOnHover":true}""");
+
+        Assert.NotNull(options);
+        Assert.True(options!.ShowEnemyStatsOnHover);
+    }
+
+    [Theory]
+    [InlineData(false, null, true, false)]
+    [InlineData(false, true, true, false)]
+    [InlineData(true, null, false, false)]
+    [InlineData(true, null, true, true)]
+    [InlineData(true, false, true, false)]
+    [InlineData(true, true, false, true)]
+    public void EnemyHoverStats_RequiresGeneralStatsAndEnemyOptIn(
+        bool viewStatsEnabled,
+        bool? injectedEnemyToggleState,
+        bool persistedEnemyPreference,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            EnemyHoverShowPatch.ResolveEnemyStatsEnabled(
+                viewStatsEnabled,
+                injectedEnemyToggleState,
+                persistedEnemyPreference));
+    }
+
+    [Fact]
+    public void CardStats_LegacyPersistedSettingDefaultsOff()
+    {
+        Assert.False(new RuntimeOptions().ShowCardStatsDuringCombat);
+        Assert.False(new Prefs().ShowCombatCardStatsTicked);
+    }
+
+    [Fact]
+    public void CardStats_OlderRuntimeSnapshotDefaultsOff()
+    {
+        var options = JsonSerializer.Deserialize<RuntimeOptions>("{}");
+
+        Assert.NotNull(options);
+        Assert.False(options!.ShowCardStatsDuringCombat);
+    }
+
+    [Fact]
+    public void CardStats_LegacyRuntimeSnapshotCanEnableIt()
+    {
+        var options = JsonSerializer.Deserialize<RuntimeOptions>(
+            """{"ShowCardStatsDuringCombat":true}""");
+
+        Assert.NotNull(options);
+        Assert.True(options!.ShowCardStatsDuringCombat);
+    }
+
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(true, false, false)]
+    [InlineData(true, true, true)]
+    public void CardStats_RequiresGlobalAndCardToggles(
+        bool viewStatsEnabled,
+        bool cardStatsEnabled,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            CardHoverShowPatch.ResolveCardStatsEnabled(
+                viewStatsEnabled,
+                cardStatsEnabled));
+    }
+
     [Fact]
     public void DisableCardStatsDuringCombat_OnlyPausesActiveCombatCardTracking()
     {

@@ -183,6 +183,16 @@ For source context, `RunTracker` keeps notions like current player card play, re
 
 Do not casually widen temporal attribution windows. A wide window can make unrelated follow-up effects look card-caused.
 
+Alchemize creates one random in-combat potion and awaits the exact
+`PotionCmd.TryToProcure(PotionModel, Player, int)` overload, but discards its
+`PotionProcureResult`. Capture the currently resolving physical Alchemize card
+when that command begins, then wrap the returned task and record its observed
+result before returning it to Alchemize. A successful result supplies the
+actual gained potion and rarity; a failed result means no potion entered the
+belt (currently a full belt or a `ShouldProcurePotion` blocker such as Sozu).
+Do not resolve the source after awaiting: `CardPlayFinished` can clear the
+current-card context as soon as Alchemize resumes.
+
 ## Damage Attribution
 
 For direct card damage, `DamageReceivedEntry` is the important observed outcome.
@@ -365,6 +375,13 @@ This is intentionally outcome-shaped but still simple. It assumes the relic appl
 
 Relic aggregates live in `RunData.RelicAggregates`, keyed by relic id. Fields are shared across relics; each relic uses only relevant fields.
 
+Centennial Puzzle already exposes the exact combat-local state needed for a
+live tooltip through `UsedThisCombat`. The relic sets it before drawing from
+its first qualifying unblocked HP-loss callback and resets it in
+`AfterCombatEnd`. Read that property directly for `Triggered this combat`;
+do not infer the boolean from cumulative activations or persist it in the run
+aggregate.
+
 Juzu Bracelet is map-point based, not resolved-room based. Count
 `RunManager.EnterMapPointInternal` when the original `MapPointType` is
 `Unknown` and the player currently holds the relic. Do not infer this stat from
@@ -383,7 +400,38 @@ synchronously when the relic enters inventory, before its async `AfterObtained`
 callback. Store its id, display name, and count in Pael's Wing's `RelicsGranted`
 ledger.
 
+Pael's Tooth is a separate pickup-and-return mechanic. Its native `CardTitles`
+text is rebuilt from only the `SerializableCards` still held by the relic, so a
+card intentionally disappears from that text when it is returned. At combat
+end, `Hook.AfterCombatEnd` awaits relic listeners sequentially before the
+game's `CombatEnded` event: Tooth reconstructs one stored card, upgrades it,
+awaits its deck insertion, then removes the stored entry. Wrap Tooth's returned
+task so attribution completes before combat promotion, and compare raw deck
+references before and after to capture the final physical card after upgrade
+and deck-add replacement modifiers. Do not infer a successful return merely
+from the stored entry disappearing; Tooth removes it even when the deck-add
+result reports failure.
+
 For relics that grant block after a specific owner-owned condition, arm a narrow block-gain window at the relic callback and let `Hook.AfterBlockGained` record the modified amount. Permafrost follows this pattern from `Permafrost.AfterCardPlayed`: mirror the first-owned-Power condition, count that combat trigger, then derive block per combat from observed block gained divided by triggers.
+
+Intimidating Helmet's `BeforeCardPlayed` condition uses the frozen play-time
+`cardPlay.Resources.EnergyValue`, not printed cost or `EnergySpent`. Normal
+plays therefore use the energy actually paid, resolved X-cost plays use their
+captured X value, and autoplay can qualify at its resolved cost despite spending
+zero energy. The callback immediately awaits the `BlockVar` overload of
+`CreatureCmd.GainBlock`; consume an owner-creature marker at that exact command
+and record its returned post-modifier amount. Use all distinct combats and
+player turns while the relic is held, including zero-trigger ones, as the
+per-combat and per-turn block denominators.
+
+`JugglingPower` already owns the exact turn-local progress needed for its live
+counter. `AfterApplied` seeds `attacksPlayedThisTurn` from owner Attack plays in
+combat history, `AfterCardPlayed` increments it for subsequent owner Attacks,
+and `AfterSideTurnEnd` resets it. Surface that field through `DisplayAmount` and
+raise `DisplayAmountChanged` after each mutation; do not repurpose `Amount`,
+which remains Juggling's stack count and controls how many Attack copies it
+creates. The progress counter continues above the third-Attack trigger and does
+not belong in persisted run data.
 
 For relics that emit damage commands, prefer the relic-owned callback plus the resolved `CreatureCmd.Damage` result. Mercury Hourglass arms from `MercuryHourglass.AfterPlayerTurnStart`, records the actual multi-target damage split from the command result on each turn, and counts the combat once so damage per combat is not confused with damage per turn-start trigger.
 
@@ -402,6 +450,11 @@ Pickup relics with multi-step health effects should record the observed result
 across the full pickup callback when that is what the player experiences. Lee's
 Waffle records current-HP gained across `AfterObtained`, covering both its
 max-HP grant and the follow-up heal-to-full.
+
+For simple max-HP pickup relics such as Strawberry, Pear, and Nutritious Oyster,
+snapshot the owner's max HP in an `AfterObtained` prefix and observe it only
+after the returned task completes successfully. This captures the actual gain,
+including caps or other runtime changes, without counting relic restoration.
 
 Darkstone Periapt is owned by `DarkstonePeriapt.AfterCardChangedPiles`. Mirror
 the relic's own final-pile condition (`card.Pile.Type == Deck`, same owner,
@@ -468,6 +521,50 @@ inspect `RestSiteSynchronizer.BeforeLocalRestSiteExited`: at that point the
 local option list and chosen-option index still reveal whether a Dig option was
 available and whether the selected option was anything other than Dig.
 
+Fresnel Lens applies Nimble from its owner-specific
+`TryModifyCardRewardOptionsLate` callback. Count the final option only when its
+`CardCreationResult` is still Nimble and names Fresnel Lens in
+`ModifyingRelics`; this distinguishes relic-caused Nimble from an option that
+was already enchanted. `CardReward.OnSelect` opens the actual selection and
+removes a card from its option list only after `CardPileCmd.Add(..., Deck)`
+succeeds, so an initial-versus-remaining option snapshot measures cards taken.
+The card-screen Skip returns to the outer rewards page without consuming the
+reward, so keep the same reference-keyed pending snapshot across reopenings and
+finalize it only on a completed selection or `CardReward.OnSkipped`. A reroll
+reuses that same reward/screen and must refresh, not increment, its snapshot.
+Drowning Beacon applies its max-HP loss before obtaining Fresnel Lens; wrap the
+full async `DrowningBeacon.ClimbOption` to preserve the observed before/after
+max HP because a relic pickup hook begins too late to recover the baseline.
+
+Silver Crucible's first, second, and third reward numbers are generation order,
+not click order. `CardReward.Populate` runs before the outer rewards page is
+shown, and `SilverCrucible.AfterModifyingCardRewardOptions` synchronously
+increments its saved `TimesUsed`; snapshot that before/after transition to bind
+the final ordered `_cards` options to the exact one-based use. Multiple rewards
+such as Prayer Wheel can consume consecutive uses before either is opened. An
+ordinary Driftwood reroll clears the old `CardCreationResult` objects and calls
+`Populate` again with `IsCardReward`, so finalize the old set as all not taken
+and register the rerolled set as the next Silver use. Compare result-object
+references, not card ids or `CardModel` references: `ModifyCard` can replace the
+displayed card while preserving its result object, and a successful deck add
+removes that result object from `_cards`. Inner card-screen Skip remains
+non-terminal; completed selection, outer `OnSkipped`, and pre-clear reroll are
+the terminal outcome boundaries.
+Persist the generated offer immediately as unresolved, then upsert its final
+taken flags at a terminal boundary. On Core reload or Continue, rebind current
+`CardReward` objects to same-floor unresolved screens by ordered card
+id signature. Continued reward sets may regenerate different cards
+because they serialize creation options rather than `_cards`; allow generation-
+order fallback only inside that one `RewardsSet.GenerateWithoutOffering` batch,
+never on an arbitrary later reward. Otherwise the already-advanced `TimesUsed`
+counter makes those ordinals impossible to recover after the in-memory
+reference map is cleared.
+`CardReward.OnRelicObtained` can apply a newly obtained Silver Crucible to an
+already-populated reward, but the game then calls `AfterModifyingRewards`
+rather than `AfterModifyingCardRewardOptions`, so that free modification does
+not consume `TimesUsed`. Keep it outside the numbered three-use ledger unless
+the game changes its own counter behavior.
+
 ## Generated And Supplemental Cards
 
 Not every visible card should become a permanent per-instance deck card.
@@ -510,7 +607,9 @@ Card stats are exposed through Godot UI patches, not through game combat state a
 
 Important surfaces:
 
-- `ViewStatsInjectorPatch` hooks `NCardsViewScreen.ConnectSignals`, gates to `NDeckViewScreen`, clones the existing View Upgrades tickbox, rewires duplicated node internals, persists preference, and reinjects on hot reload if the deck view is already open.
+- `ViewStatsInjectorPatch` hooks `NCardsViewScreen.ConnectSignals`, gates to `NDeckViewScreen`, clones the existing View Upgrades tickbox, rewires duplicated node internals, persists preferences, and reinjects on hot reload if the deck view is already open. The master on/off control gates every SpireLens stats surface, while separate default-off controls gate card stats and monster hover stats. Gate both `NCardHolder.CreateHoverTips` and run-history deck-entry focus before aggregate lookup or tooltip construction when Card Stats is off. The Card Stats control is presentation-only and must not be wired to `DisableCardStatsDuringCombat`, which suppresses attribution itself.
+- `StatsVisibilityHotkeyPatch` postfixes the stable Loader input node so hot-reloaded Core code can handle both keyboard and controller events. A standalone Left Shift tap and raw Right Stick (R3) press share the persisted master toggle and the same focus/overlay/transition/rebind guards. Left Stick press is the game's Peek action; R3 is absent from the shipped and saved controller action maps. Native Steam Input layouts must expose R3 as a virtual joypad button for the raw event to reach the mod.
+- `NCardsViewScreen.ConnectSignals` calls its controller-state update before the SpireLens postfix. Controller mode hides the built-in `%Upgrades` tickbox, so clones of that subtree inherit `Visible=false` unless SpireLens explicitly restores visibility. Any injected deck controls cloned from View Upgrades must set their own visibility rather than inherit the source's controller-specific state.
 - `CardHoverTooltipPatch` hooks `NCardHolder.CreateHoverTips` and `ClearHoverTips` to show/hide the SpireLens tooltip.
 - Hand hovers are compact unless verbose hand stats are enabled.
 - Deck view and other card-view hovers can show full lineage and stat breakdown.

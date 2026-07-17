@@ -1,0 +1,92 @@
+{
+  "run_id": "silver-crucible-relic-fixture",
+  "started_at": "2026-07-14T20:00:00Z",
+  "updated_at": "2026-07-14T20:15:00Z",
+  "outcome": "in_progress",
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.SILVER_CRUCIBLE": {
+      "card_reward_screens": [
+        {
+          "screen_number": 1,
+          "floor": 12,
+          "resolved": true,
+          "cards": [
+            {
+              "card_id": "CARD.BASH",
+              "display_name": "Bash+",
+              "upgrade_level": 1,
+              "taken": true
+            },
+            {
+              "card_id": "CARD.SHRUG_IT_OFF",
+              "display_name": "Shrug It Off+",
+              "upgrade_level": 1,
+              "taken": false
+            },
+            {
+              "card_id": "CARD.INFLAME",
+              "display_name": "Inflame+",
+              "upgrade_level": 1,
+              "taken": false
+            }
+          ]
+        },
+        {
+          "screen_number": 2,
+          "floor": 12,
+          "resolved": true,
+          "cards": [
+            {
+              "card_id": "CARD.POMMEL_STRIKE",
+              "display_name": "Pommel Strike+",
+              "upgrade_level": 1,
+              "taken": false
+            },
+            {
+              "card_id": "CARD.TRUE_GRIT",
+              "display_name": "True Grit+",
+              "upgrade_level": 1,
+              "taken": true
+            },
+            {
+              "card_id": "CARD.SPOT_WEAKNESS",
+              "display_name": "Spot Weakness+",
+              "upgrade_level": 1,
+              "taken": false
+            }
+          ]
+        },
+        {
+          "screen_number": 3,
+          "floor": 14,
+          "resolved": true,
+          "cards": [
+            {
+              "card_id": "CARD.HEADBUTT",
+              "display_name": "Headbutt+",
+              "upgrade_level": 1,
+              "taken": false
+            },
+            {
+              "card_id": "CARD.IRON_WAVE",
+              "display_name": "Iron Wave+",
+              "upgrade_level": 1,
+              "taken": false
+            },
+            {
+              "card_id": "CARD.BATTLE_TRANCE",
+              "display_name": "Battle Trance+",
+              "upgrade_level": 1,
+              "taken": false
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

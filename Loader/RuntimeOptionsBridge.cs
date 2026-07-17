@@ -12,6 +12,8 @@ public sealed class RuntimeOptionsSnapshot
 {
     public bool ViewStatsToggleEnabled { get; set; }
     public bool ShowRemovedCardsInDeckView { get; set; } = true;
+    public bool ShowEnemyStatsOnHover { get; set; }
+    public bool ShowCardStatsDuringCombat { get; set; }
     public bool ShowHandTooltips { get; set; } = true;
     public bool UseVerboseHandStats { get; set; }
     public bool DisableCardStatsDuringCombat { get; set; }
@@ -53,6 +55,22 @@ public static class RuntimeOptionsBridge
         ModConfig.SaveDebounced<SpireLensConfig>();
     }
 
+    public static void SetShowEnemyStatsOnHover(bool isEnabled)
+    {
+        if (SpireLensConfig.ShowEnemyStatsOnHover == isEnabled) return;
+
+        SpireLensConfig.ShowEnemyStatsOnHover = isEnabled;
+        ModConfig.SaveDebounced<SpireLensConfig>();
+    }
+
+    public static void SetShowCardStatsDuringCombat(bool isEnabled)
+    {
+        if (SpireLensConfig.ShowCardStatsDuringCombat == isEnabled) return;
+
+        SpireLensConfig.ShowCardStatsDuringCombat = isEnabled;
+        ModConfig.SaveDebounced<SpireLensConfig>();
+    }
+
     public static void SetVerboseHandStatsEnabled(bool isEnabled)
     {
         if (SpireLensConfig.UseVerboseHandStats == isEnabled) return;
@@ -67,6 +85,8 @@ public static class RuntimeOptionsBridge
         {
             ViewStatsToggleEnabled = SpireLensConfig.ViewStatsToggleEnabled,
             ShowRemovedCardsInDeckView = SpireLensConfig.ShowRemovedCardsInDeckView,
+            ShowEnemyStatsOnHover = SpireLensConfig.ShowEnemyStatsOnHover,
+            ShowCardStatsDuringCombat = SpireLensConfig.ShowCardStatsDuringCombat,
             ShowHandTooltips = SpireLensConfig.ShowHandTooltips,
             UseVerboseHandStats = SpireLensConfig.UseVerboseHandStats,
             DisableCardStatsDuringCombat = SpireLensConfig.DisableCardStatsDuringCombat,

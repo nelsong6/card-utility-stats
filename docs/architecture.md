@@ -69,6 +69,7 @@ Examples already implemented:
 - actual maximum HP lost to card costs
 - Regent stars spent / generated
 - forge granted from cards
+- Alchemize potions actually procured, failed procurements, and gained rarity splits
 - observed cards drawn from draw effects
 - blocked draw attempts, categorized blocked reasons, and effect-side downstream blocked counts
 - successful self-summons to hand for recurring cards like Make It So
@@ -88,7 +89,8 @@ When attribution is not naturally one-card-to-one-outcome, the code prefers:
 
 ## UI Surface
 
-- [Core/Patches/ViewStatsInjectorPatch.cs](../Core/Patches/ViewStatsInjectorPatch.cs) injects the `View Stats` toggle into the deck view.
+- [Core/Patches/ViewStatsInjectorPatch.cs](../Core/Patches/ViewStatsInjectorPatch.cs) injects the deck-view master, card-stats, removed-card, and opt-in monster-hover toggles.
+- [Core/Patches/StatsVisibilityHotkeyPatch.cs](../Core/Patches/StatsVisibilityHotkeyPatch.cs) maps a standalone Left Shift tap and Right Stick (R3) press to the same persisted global visibility state while preserving Shift-based chords; Left Trigger remains Draw Pile and Left Stick press remains Peek.
 - [Core/Patches/CardHoverTooltipPatch.cs](../Core/Patches/CardHoverTooltipPatch.cs) builds compact and full tooltip bodies.
 - [Core/StatsTooltip.cs](../Core/StatsTooltip.cs) renders the side tooltip panel.
 - [Config/SpireLensConfig.cs](../Config/SpireLensConfig.cs) provides the persistent mod-settings UI for runtime display options.
@@ -96,6 +98,8 @@ When attribution is not naturally one-card-to-one-outcome, the code prefers:
 Current UI conventions:
 
 - hand tooltips stay compact
+- global visibility gates card, relic, enemy, compendium, and run-history stats before aggregate/markup work
+- card tooltips on every surface are display-only opt-in; disabling them does not disable attribution
 - deck-view tooltips can be fuller and include lineage/context
 - rows should be self-describing
 - loud section headers are discouraged unless they add real clarity

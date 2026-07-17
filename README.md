@@ -2,7 +2,7 @@
 
 Per-card attribution stats mod for [Slay the Spire 2](https://store.steampowered.com/app/2868840/Slay_the_Spire_2/). For every card you play, it tracks what actually happened: effective damage vs. overkill, block that absorbed vs. wasted, drawn cards played vs. idle, energy generated vs. unused, and effect-oriented outcomes like poison damage.
 
-**Status:** Dev build - core per-instance card stats are live in-game, including damage/block attribution, observed draw and energy generation, card-caused current/max-HP loss, Regent star-resource spend/gain tracking, forge granted from cards, blocked-draw attribution, recurring summon-to-hand tracking, applied-effect summaries, Artifact-blocked debuffs, removed-card viewing, pooled combat-generated card summaries, and dedicated poison application/damage rows. Not yet published to Nexus (M6).
+**Status:** Dev build - core per-instance card stats are live in-game, including damage/block attribution, observed draw and energy generation, card-caused current/max-HP loss, Regent star-resource spend/gain tracking, forge granted from cards, Alchemize potion outcomes by rarity, blocked-draw attribution, recurring summon-to-hand tracking, applied-effect summaries, Artifact-blocked debuffs, removed-card viewing, pooled combat-generated card summaries, and dedicated poison application/damage rows. Not yet published to Nexus (M6).
 
 For codebase orientation, start with [AGENTS.md](AGENTS.md), [docs/architecture.md](docs/architecture.md), and [docs/sts2-runtime-primer.md](docs/sts2-runtime-primer.md).
 
@@ -35,11 +35,23 @@ Existing stats mods answer "how often did I *pick* this card" ([SlayTheStats](ht
 
 ## How you'd use it
 
-A **"View Stats"** checkbox sits next to the game's existing "View Upgrades" toggle on the in-run deck view. When ticked, hovering a card shows a side-panel tooltip with per-instance stats (plays, damage, block gained, energy spent, etc.) - it coexists with the game's built-in hover tips rather than replacing them. Hand hovers get a compact version; deck-view hovers get the full elaborate view.
+A **"SpireLens: on/off"** checkbox sits next to the game's existing "View Upgrades" toggle on the in-run deck view. It is the master switch for SpireLens tooltip stats and coexists with the game's built-in hover tips rather than replacing them.
 
-The checkbox also toggles a **removed-card overlay**: cards you've removed this run (Smith, events, curse dispose) appear inline in the deck grid, marked with a red "Card Removed" banner in their tooltip so you can review their stats post-removal. Generated combat-only cards that do not live in the deck permanently can also render as pooled summaries when that is a better representation than pretending each temporary copy is a normal deck instance. Checkbox state persists across hot reloads via a small `prefs.json`.
+Tap **Left Shift** on keyboard or press **Right Stick (R3)** on controller to
+toggle the same global stats-visibility setting during normal play. Shift-based
+chords such as Steam's Shift+Tab are left alone.
+Turning stats off hides any open SpireLens panel and skips aggregate
+lookup and tooltip construction while stats are hidden; attribution continues
+in the background. Controller Left Trigger remains the game's Draw Pile input,
+and Left Stick press remains Peek, so neither is claimed by SpireLens.
 
-Available only on in-run deck-view surfaces for now (not Compendium - lifetime aggregation is deferred, see [issue #2](https://github.com/romaine-life/spirelens/issues/2)).
+A separate, default-off **"SpireLens: card stats"** checkbox controls per-card panels on every supported card surface, including the deck, hand, combat piles, and run history. It changes presentation only: card attribution continues to be recorded while the checkbox is off. Hand hovers stay compact unless verbose hand stats are enabled.
+
+A separate **"show removed cards"** checkbox controls the removed-card overlay: cards you've removed this run (Smith, events, curse dispose) appear inline in the deck grid, marked with a red "Card Removed" banner in their tooltip so you can review their stats post-removal. Generated combat-only cards that do not live in the deck permanently can also render as pooled summaries when that is a better representation than pretending each temporary copy is a normal deck instance. Checkbox state persists across hot reloads through the mod configuration.
+
+A separate, default-off **"show monster stats"** checkbox in the deck viewer controls combat monster hover popups when general stats are enabled. Keeping it off bypasses enemy aggregate lookup and tooltip construction on creature focus while leaving card and relic stats enabled.
+
+The controls themselves are injected only into the in-run deck viewer for now (not Compendium - lifetime aggregation is deferred, see [issue #2](https://github.com/romaine-life/spirelens/issues/2)).
 
 ## Roadmap
 
@@ -49,18 +61,18 @@ Available only on in-run deck-view surfaces for now (not Compendium - lifetime a
 | **M2a** | Intended block (how much this card contributed) | OK |
 | **M2b** | Block absorption (effective vs wasted) - needs heuristic | [#14](https://github.com/romaine-life/spirelens/issues/14) |
 | **M3** | Utility card closure (energy spent, draw count) | OK [#7](https://github.com/romaine-life/spirelens/issues/7) |
-| **M4** | In-game UI: "View Stats" checkbox on deck view | OK [#8](https://github.com/romaine-life/spirelens/issues/8) |
+| **M4** | In-game UI: SpireLens stats controls on deck view | OK [#8](https://github.com/romaine-life/spirelens/issues/8) |
 | **M5a** | Removed-card viewing in deck view | OK |
 | **M5b** | Run History integration - browse past-run stats | [#9](https://github.com/romaine-life/spirelens/issues/9) |
 | **M6** | Publish v0.1 to Nexus | - |
 
-Additional shipped: discard count, pile-top placements (from hand / from discard), exhaust-others attribution, self-exhaust count, current/max-HP lost from card costs, cards-drawn attribution, blocked-draw attempt/reason tracking, Regent star-resource tracking, forge granted tracking, recurring summon-to-hand tracking, effect application summaries, Artifact-blocked debuff tracking, and downstream poison damage attribution including stacked Noxious Fumes contributor preservation.
+Additional shipped: discard count, pile-top placements (from hand / from discard), exhaust-others attribution, self-exhaust count, current/max-HP lost from card costs, cards-drawn attribution, blocked-draw attempt/reason tracking, Regent star-resource tracking, forge granted tracking, observed Alchemize potion gains/failures with rarity splits, recurring summon-to-hand tracking, effect application summaries, Artifact-blocked debuff tracking, and downstream poison damage attribution including stacked Noxious Fumes contributor preservation.
 
 Run outcome detection (win/loss/abandoned) is implemented ([#10](https://github.com/romaine-life/spirelens/issues/10), closed) via the run-history entry hook.
 
 ## Storage
 
-Per-run JSON files at `%APPDATA%/SlayTheSpire2/SpireLens/runs/<run-id>.json` (Godot's `user://` path). Contains both aggregated stats (fast for UI) and a full event log (one entry per card-played / damage-received / card-upgraded / block-gained / card-removed event, for future analysis). The on-disk shape evolves additively and is detected structurally on load: files containing `instance_numbers_by_def` or `def_counters` use the per-instance shape, while older pooled-shape files lack both fields. Pooled-shape files are history-only; per-instance files remain resumable under the current loader. Session preferences (checkbox state) at `prefs.json` in the same dir.
+Per-run JSON files at `%APPDATA%/SlayTheSpire2/SpireLens/runs/<run-id>.json` (Godot's `user://` path). Contains both aggregated stats (fast for UI) and a full event log (one entry per card-played / damage-received / card-upgraded / block-gained / card-removed event, for future analysis). The on-disk shape evolves additively and is detected structurally on load: files containing `instance_numbers_by_def` or `def_counters` use the per-instance shape, while older pooled-shape files lack both fields. Pooled-shape files are history-only; per-instance files remain resumable under the current loader. Session preferences are stored in the BaseLib-backed mod configuration.
 
 ## Requirements
 

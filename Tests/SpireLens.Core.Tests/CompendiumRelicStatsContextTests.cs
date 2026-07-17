@@ -17,6 +17,22 @@ public class CompendiumRelicStatsContextTests
         Assert.False(CompendiumRelicStatsContext.ShouldShowStatsForVisibility(ModelVisibility.Locked));
     }
 
+    [Theory]
+    [InlineData(false, ModelVisibility.Visible, false)]
+    [InlineData(true, ModelVisibility.Visible, true)]
+    [InlineData(true, ModelVisibility.None, false)]
+    [InlineData(true, ModelVisibility.NotSeen, false)]
+    [InlineData(true, ModelVisibility.Locked, false)]
+    public void ShouldShowStats_RequiresGlobalVisibilityAndVisibleRelic(
+        bool statsVisibilityEnabled,
+        ModelVisibility visibility,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            CompendiumRelicStatsContext.ShouldShowStats(statsVisibilityEnabled, visibility));
+    }
+
     [Fact]
     public void TryBuildRelicTooltipForRun_UsesSavedRunAggregate()
     {
@@ -39,6 +55,50 @@ public class CompendiumRelicStatsContextTests
         Assert.Contains("[b]1[/b]", body);
         Assert.Contains("block gained", body);
         Assert.Contains("[b]10[/b]", body);
+    }
+
+    [Fact]
+    public void TryBuildEmptyRelicTooltip_UsesZeroAggregateForSupportedRelic()
+    {
+        var ok = CompendiumRelicStatsContext.TryBuildEmptyRelicTooltip(
+            Uninitialized<FakeAnchor>(),
+            out var title,
+            out var body);
+
+        Assert.True(ok);
+        Assert.Equal("???", title);
+        Assert.Contains("Activations", body);
+        Assert.Contains("block gained", body);
+        Assert.Equal(2, body.Split("[b]0[/b]").Length - 1);
+    }
+
+    [Fact]
+    public void TryBuildEmptyRelicTooltip_CursedPearlIncludesZeroGreedStats()
+    {
+        var ok = CompendiumRelicStatsContext.TryBuildEmptyRelicTooltip(
+            Uninitialized<CursedPearl>(),
+            out var title,
+            out var body);
+
+        Assert.True(ok);
+        Assert.Equal("Cursed Pearl", title);
+        Assert.Contains("Floors ascended before first shop", body);
+        Assert.Contains("Greed combats", body);
+        Assert.Contains("Greed drawn", body);
+        Assert.Equal(5, body.Split("[b]0[/b]").Length - 1);
+    }
+
+    [Fact]
+    public void TryBuildEmptyRelicTooltip_DoesNotCreatePanelForUnsupportedRelic()
+    {
+        var ok = CompendiumRelicStatsContext.TryBuildEmptyRelicTooltip(
+            Uninitialized<Mango>(),
+            out var title,
+            out var body);
+
+        Assert.False(ok);
+        Assert.Empty(title);
+        Assert.Empty(body);
     }
 
     [Fact]

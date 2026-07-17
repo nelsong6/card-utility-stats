@@ -1,0 +1,23 @@
+{
+  "run_id": "fresnel-lens-relic-fixture",
+  "started_at": "2026-07-13T20:00:00Z",
+  "updated_at": "2026-07-13T20:15:00Z",
+  "outcome": "in_progress",
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.FRESNEL_LENS": {
+      "original_max_hp": 70,
+      "new_max_hp": 57,
+      "nimble_cards_taken": 9,
+      "reward_screens_with_nimble_cards": 8,
+      "reward_screens_with_two_nimble_cards": 3,
+      "reward_screens_with_three_or_more_nimble_cards": 2,
+      "reward_screens_without_nimble_cards": 5,
+      "reward_screens_with_nimble_cards_but_none_taken": 4
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

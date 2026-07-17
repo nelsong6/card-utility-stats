@@ -10,9 +10,14 @@ public sealed class SpireLensConfig : SimpleModConfig
 
     public static bool ShowRemovedCardsInDeckView { get; set; } = true;
 
-    [ConfigSection("Tooltips")]
+    public static bool ShowEnemyStatsOnHover { get; set; }
+
+    public static bool ShowCardStatsDuringCombat { get; set; }
+
+    [ConfigHideInUI]
     public static bool ShowHandTooltips { get; set; } = true;
 
+    [ConfigSection("Tooltips")]
     public static bool UseVerboseHandStats { get; set; }
 
     [ConfigSection("Performance")]
@@ -48,11 +53,23 @@ public sealed class SpireLensConfig : SimpleModConfig
     {
         base.SetupConfigUI(root);
 
+        // These property names are legacy persistence keys. Keep them stable
+        // on disk, but use the current names anywhere the player sees them.
+        RelabelGeneratedOption(root, nameof(ViewStatsToggleEnabled), "SpireLens: on/off");
+        RelabelGeneratedOption(root, nameof(ShowCardStatsDuringCombat), "SpireLens: card stats");
+
         root.AddChild(CreateSectionHeader("Build Info", false));
         root.AddChild(CreateRawLabelControl($"Build version: {BuildVersion}", 18));
         root.AddChild(CreateRawLabelControl($"Build source: {BuildSource}", 18));
         root.AddChild(CreateRawLabelControl($"Commit: {BuildCommit}", 18));
         root.AddChild(CreateRawLabelControl($"Build date: {BuildDate}", 18));
         root.AddChild(CreateRawLabelControl($"Build timestamp UTC: {BuildTimestampUtc}", 18));
+    }
+
+    private static void RelabelGeneratedOption(Node root, string optionName, string labelText)
+    {
+        var row = root.FindChild(optionName, recursive: true, owned: false);
+        if (row?.GetChildCount() > 0 && row.GetChild(0) is RichTextLabel label)
+            label.Text = labelText;
     }
 }
