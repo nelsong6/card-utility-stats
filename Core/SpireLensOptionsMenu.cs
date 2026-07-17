@@ -14,7 +14,8 @@ public static class SpireLensOptionsMenu
 {
     private const int Layer = 1000;
     private static CanvasLayer? _layer;
-    private static readonly List<CheckBox> Checkboxes = new();
+    private static readonly List<Button> Checkboxes = new();
+    private static readonly List<Button> CheckboxIndicators = new();
     private static int _selectedIndex;
     private static int _leftStickVerticalDirection;
     private static int _leftStickHorizontalDirection;
@@ -103,6 +104,7 @@ public static class SpireLensOptionsMenu
             _layer.QueueFree();
         _layer = null;
         Checkboxes.Clear();
+        CheckboxIndicators.Clear();
         _selectedIndex = 0;
         _leftStickVerticalDirection = 0;
         _leftStickHorizontalDirection = 0;
@@ -191,15 +193,27 @@ public static class SpireLensOptionsMenu
         row.AddThemeConstantOverride("separation", 20);
         parent.AddChild(row);
 
-        var checkbox = new CheckBox
+        var indicator = CreateCheckboxIndicator();
+        indicator.Pressed += () => ToggleOption(index, "menu checkbox icon");
+        CheckboxIndicators.Add(indicator);
+        row.AddChild(indicator);
+
+        var checkbox = new Button
         {
             Text = text,
+            ToggleMode = true,
+            Flat = true,
+            Alignment = HorizontalAlignment.Left,
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
             CustomMinimumSize = new Vector2(0, 54),
             MouseDefaultCursorShape = Control.CursorShape.PointingHand,
         };
         checkbox.AddThemeFontSizeOverride("font_size", 23);
-        checkbox.Toggled += enabled => SetOption(index, enabled, "menu checkbox");
+        checkbox.Toggled += enabled =>
+        {
+            UpdateIndicator(index, enabled);
+            SetOption(index, enabled, "menu checkbox");
+        };
         checkbox.FocusEntered += () => _selectedIndex = index;
         Checkboxes.Add(checkbox);
         row.AddChild(checkbox);
@@ -209,6 +223,37 @@ public static class SpireLensOptionsMenu
         shortcut.CustomMinimumSize = new Vector2(120, 0);
         shortcut.HorizontalAlignment = HorizontalAlignment.Right;
         row.AddChild(shortcut);
+    }
+
+    private static Button CreateCheckboxIndicator()
+    {
+        var border = new StyleBoxFlat
+        {
+            BgColor = new Color(0.06f, 0.06f, 0.08f, 0.9f),
+            BorderColor = new Color(0.9f, 0.9f, 0.9f),
+            BorderWidthLeft = 2,
+            BorderWidthTop = 2,
+            BorderWidthRight = 2,
+            BorderWidthBottom = 2,
+            CornerRadiusTopLeft = 3,
+            CornerRadiusTopRight = 3,
+            CornerRadiusBottomLeft = 3,
+            CornerRadiusBottomRight = 3,
+        };
+
+        var indicator = new Button
+        {
+            Text = "",
+            CustomMinimumSize = new Vector2(34, 34),
+            FocusMode = Control.FocusModeEnum.None,
+            MouseDefaultCursorShape = Control.CursorShape.PointingHand,
+        };
+        indicator.AddThemeFontSizeOverride("font_size", 24);
+        indicator.AddThemeStyleboxOverride("normal", border);
+        indicator.AddThemeStyleboxOverride("hover", (StyleBoxFlat)border.Duplicate());
+        indicator.AddThemeStyleboxOverride("pressed", (StyleBoxFlat)border.Duplicate());
+        indicator.AddThemeStyleboxOverride("focus", (StyleBoxFlat)border.Duplicate());
+        return indicator;
     }
 
     private static void ToggleOption(int index, string source)
@@ -284,9 +329,21 @@ public static class SpireLensOptionsMenu
     private static void RefreshCheckboxes()
     {
         if (Checkboxes.Count != 4) return;
-        Checkboxes[0].SetPressedNoSignal(ViewStatsInjectorPatch.StatsVisibilityEnabled);
-        Checkboxes[1].SetPressedNoSignal(ViewStatsInjectorPatch.CardStatsEnabled);
-        Checkboxes[2].SetPressedNoSignal(ViewStatsInjectorPatch.EnemyStatsEnabled);
-        Checkboxes[3].SetPressedNoSignal(ViewStatsInjectorPatch.ShowRemovedCardsEnabled);
+        SetCheckboxState(0, ViewStatsInjectorPatch.StatsVisibilityEnabled);
+        SetCheckboxState(1, ViewStatsInjectorPatch.CardStatsEnabled);
+        SetCheckboxState(2, ViewStatsInjectorPatch.EnemyStatsEnabled);
+        SetCheckboxState(3, ViewStatsInjectorPatch.ShowRemovedCardsEnabled);
+    }
+
+    private static void SetCheckboxState(int index, bool enabled)
+    {
+        Checkboxes[index].SetPressedNoSignal(enabled);
+        UpdateIndicator(index, enabled);
+    }
+
+    private static void UpdateIndicator(int index, bool enabled)
+    {
+        if (index < 0 || index >= CheckboxIndicators.Count) return;
+        CheckboxIndicators[index].Text = enabled ? "✓" : "";
     }
 }
