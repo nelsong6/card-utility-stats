@@ -49,8 +49,9 @@ remains fully supported; Left Shift or the window's Close button also closes it.
 
 The optional non-combat relic filter hides already-resolved relics from the
 standard relic bar throughout an active run while leaving them owned,
-functional, and visible on every other relic surface. The initial category is
-limited to max-HP-granting relics.
+functional, and visible on every other relic surface. The category includes
+already-resolved max-HP relics, permanent inventory upgrades, card-reward
+upgrades, and other relics whose effects do not need combat-bar attention.
 
 Turning stats off hides any open SpireLens panel and skips aggregate
 lookup and tooltip construction while stats are hidden; attribution continues

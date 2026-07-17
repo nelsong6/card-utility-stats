@@ -41,7 +41,16 @@ public static class RelicBarFilterPatch
             or Pear
             or NutritiousOyster
             or ChosenCheese
-            or DarkstonePeriapt;
+            or DarkstonePeriapt
+            or LeadPaperweight
+            or LargeCapsule
+            or NeowsBones
+            or RegalPillow
+            or PotionBelt
+            or MoltenEgg
+            or ToxicEgg
+            or FrozenEgg
+            or GlassEye;
 
     private static void ApplyToHolder(NRelicInventoryHolder holder)
     {
