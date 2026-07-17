@@ -50,7 +50,8 @@ public static class RelicBarFilterPatch
             or MoltenEgg
             or ToxicEgg
             or FrozenEgg
-            or GlassEye;
+            or GlassEye
+            or PetrifiedToad;
 
     private static void ApplyToHolder(NRelicInventoryHolder holder)
     {
