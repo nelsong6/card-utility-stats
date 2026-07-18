@@ -95,9 +95,9 @@ internal static class RelicCompendiumClassificationUi
         {
             Name = BadgeName,
             MouseFilter = Control.MouseFilterEnum.Ignore,
-            // Stay above the relic art inside this entry, but below the game's
-            // hover-tip layer and SpireLens' tooltip panel (z=100).
-            ZIndex = 1,
+            // Keep the game's default z=0. Since this is appended after the
+            // entry's RelicHolder it still draws over the relic art, while the
+            // game's later hover-tip draw order remains above the badge.
             ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
             AnchorLeft = 1f,
