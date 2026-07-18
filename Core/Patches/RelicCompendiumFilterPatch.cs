@@ -16,6 +16,7 @@ internal enum CompendiumRelicFilterMode
     Off = 0,
     Compare = 1,
     Filter = 2,
+    EditCombatRelevance = 3,
 }
 
 internal enum CompendiumRelicEntryVisualAction
@@ -87,7 +88,8 @@ internal static class RelicCompendiumFilterContext
         bool showUndiscoveredRelics,
         bool matchesSelectedCategories)
     {
-        if (mode == CompendiumRelicFilterMode.Off)
+        if (mode is CompendiumRelicFilterMode.Off
+            or CompendiumRelicFilterMode.EditCombatRelevance)
             return CompendiumRelicEntryVisualAction.Normal;
 
         if (!isVisibleRelic)
@@ -146,15 +148,14 @@ internal static class RelicCompendiumFilterUi
     private const CompendiumRelicFilterMode DefaultMode = CompendiumRelicFilterMode.Filter;
     private const bool DefaultShowUndiscoveredRelics = false;
     private const bool DefaultUseSingleRelicGrid = true;
-    private const bool DefaultEditCombatRelevance = false;
 
     private static CompendiumRelicFilterMode _mode = DefaultMode;
     private static bool _showUndiscoveredRelics = DefaultShowUndiscoveredRelics;
     private static bool _useSingleRelicGrid = DefaultUseSingleRelicGrid;
-    private static bool _editCombatRelevance = DefaultEditCombatRelevance;
     private static bool _syncingControls;
 
-    internal static bool IsEditingCombatRelevance => _editCombatRelevance;
+    internal static bool IsEditingCombatRelevance =>
+        _mode == CompendiumRelicFilterMode.EditCombatRelevance;
 
     public static void Inject(NRelicCollection? collection)
     {
@@ -227,7 +228,7 @@ internal static class RelicCompendiumFilterUi
             matches = RelicTaxonomy.IsRelicInAnySelectedCategory(relicId, SelectedCategoryIds);
         }
 
-        var action = _editCombatRelevance
+        var action = IsEditingCombatRelevance
             ? !isVisibleRelic && !_showUndiscoveredRelics
                 ? CompendiumRelicEntryVisualAction.Hidden
                 : CompendiumRelicEntryVisualAction.Normal
@@ -238,7 +239,7 @@ internal static class RelicCompendiumFilterUi
                 matches);
 
         ApplyVisualAction(entry, action);
-        RelicCompendiumClassificationUi.ApplyToEntry(entry, _editCombatRelevance);
+        RelicCompendiumClassificationUi.ApplyToEntry(entry, IsEditingCombatRelevance);
     }
 
     public static void ApplyToActiveEntries()
@@ -263,7 +264,6 @@ internal static class RelicCompendiumFilterUi
         _mode = DefaultMode;
         _showUndiscoveredRelics = DefaultShowUndiscoveredRelics;
         _useSingleRelicGrid = DefaultUseSingleRelicGrid;
-        _editCombatRelevance = DefaultEditCombatRelevance;
         SelectedCategoryIds.Clear();
         foreach (var category in RelicTaxonomy.LeafCategories)
             SelectedCategoryIds.Add(category.Id);
@@ -309,27 +309,6 @@ internal static class RelicCompendiumFilterUi
         var title = NewLabel("SpireLens relic view", 16, new Color(0.918f, 0.745f, 0.318f, 1f));
         vbox.AddChild(title);
 
-        var editCombatRelevance = new CheckBox
-        {
-            Name = "EditCombatRelevance",
-            Text = "Edit combat relevance",
-            MouseFilter = Control.MouseFilterEnum.Stop,
-            SizeFlagsHorizontal = Control.SizeFlags.Fill | Control.SizeFlags.Expand,
-        };
-        editCombatRelevance.AddThemeFontSizeOverride("font_size", 14);
-        editCombatRelevance.Connect(
-            BaseButton.SignalName.Toggled,
-            Callable.From<bool>(OnEditCombatRelevanceToggled));
-        vbox.AddChild(editCombatRelevance);
-
-        var editHint = NewLabel(
-            "Click a relic or press A to switch Combat / Non-combat.",
-            12,
-            new Color(0.82f, 0.78f, 0.68f, 1f));
-        editHint.Name = "EditCombatRelevanceHint";
-        editHint.Visible = false;
-        vbox.AddChild(editHint);
-
         var modeLabel = NewLabel("Mode", 13, new Color(0.78f, 0.73f, 0.64f, 1f));
         vbox.AddChild(modeLabel);
 
@@ -342,10 +321,21 @@ internal static class RelicCompendiumFilterUi
         modeDropdown.AddItem("Off", (int)CompendiumRelicFilterMode.Off);
         modeDropdown.AddItem("Compare", (int)CompendiumRelicFilterMode.Compare);
         modeDropdown.AddItem("Filter", (int)CompendiumRelicFilterMode.Filter);
+        modeDropdown.AddItem(
+            "Edit combat relevance",
+            (int)CompendiumRelicFilterMode.EditCombatRelevance);
         modeDropdown.Connect(
             OptionButton.SignalName.ItemSelected,
             Callable.From<long>(index => OnModeSelected(modeDropdown, index)));
         vbox.AddChild(modeDropdown);
+
+        var editHint = NewLabel(
+            "Click a relic or press A to switch Combat / Non-combat.",
+            12,
+            new Color(0.82f, 0.78f, 0.68f, 1f));
+        editHint.Name = "EditCombatRelevanceHint";
+        editHint.Visible = false;
+        vbox.AddChild(editHint);
 
         var showUndiscovered = new CheckBox
         {
@@ -424,7 +414,6 @@ internal static class RelicCompendiumFilterUi
         return new InjectedPanel(
             null,
             root,
-            editCombatRelevance,
             editHint,
             modeDropdown,
             showUndiscovered,
@@ -488,14 +477,6 @@ internal static class RelicCompendiumFilterUi
             ? (CompendiumRelicFilterMode)selectedId
             : CompendiumRelicFilterMode.Off;
 
-        ApplyToActiveEntries();
-    }
-
-    private static void OnEditCombatRelevanceToggled(bool selected)
-    {
-        if (_syncingControls) return;
-
-        _editCombatRelevance = selected;
         SyncAllControls();
         ApplyToActiveEntries();
     }
@@ -926,7 +907,6 @@ internal static class RelicCompendiumFilterUi
     private sealed record InjectedPanel(
         NRelicCollection? Collection,
         PanelContainer Root,
-        CheckBox EditCombatRelevanceCheckbox,
         Label EditCombatRelevanceHint,
         OptionButton ModeDropdown,
         CheckBox ShowUndiscoveredCheckbox,
@@ -950,16 +930,10 @@ internal static class RelicCompendiumFilterUi
 
         public void SyncFromState()
         {
-            if (EditCombatRelevanceCheckbox != null
-                && GodotObject.IsInstanceValid(EditCombatRelevanceCheckbox))
-            {
-                EditCombatRelevanceCheckbox.SetPressedNoSignal(_editCombatRelevance);
-            }
-
             if (EditCombatRelevanceHint != null
                 && GodotObject.IsInstanceValid(EditCombatRelevanceHint))
             {
-                EditCombatRelevanceHint.Visible = _editCombatRelevance;
+                EditCombatRelevanceHint.Visible = IsEditingCombatRelevance;
             }
 
             var selectedIndex = 0;
