@@ -103,19 +103,17 @@ public static class RelicBarFilterPatch
         if (ViewStatsInjectorPatch.HideNonCombatRelicStats) return true;
         if (!ViewStatsInjectorPatch.ShowCombatOnlyRelicsAtCombatScreen) return false;
         if (CombatManager.Instance?.IsInProgress != true) return false;
-        return !HasDeckView(root);
+        return !HasVisibleDeckView(root);
     }
 
-    private static bool HasDeckView(Node node)
+    private static bool HasVisibleDeckView(Node node)
     {
-        // Capstone screens can be presented while their own Visible flag is
-        // still managed by the container. Presence in the live tree is the
-        // reliable discriminator: combat piles use NCardPileScreen instead.
-        if (node is NDeckViewScreen) return true;
+        if (node is NDeckViewScreen deckView && deckView.IsVisibleInTree())
+            return true;
 
         for (var i = 0; i < node.GetChildCount(); i++)
         {
-            if (HasDeckView(node.GetChild(i))) return true;
+            if (HasVisibleDeckView(node.GetChild(i))) return true;
         }
         return false;
     }
