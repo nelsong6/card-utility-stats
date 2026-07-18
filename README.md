@@ -65,7 +65,8 @@ and **Non-combat** radio buttons on the full relic inspection screen. Combat
 relics also have an **Always / Until turn 1 / Until turn 2 / Until turn 3**
 dropdown; a finite assignment stays visible through that turn, then leaves the
 filtered relic bar on the following turn. The same assignment controls appear
-when inspecting an owned relic from the in-run relic bar.
+when inspecting an owned relic from the in-run relic bar. The duration dropdown
+stays available for both categories; choosing a duration also selects Combat.
 Changes apply immediately and are saved under
 `user://SpireLens/relic-classifications.json`. Run
 `scripts/sync-relic-classifications.ps1` to promote the working file into the

@@ -323,6 +323,7 @@ internal static class RelicInspectionClassificationUi
             Name = "CombatRelevanceDuration",
             MouseFilter = Control.MouseFilterEnum.Stop,
             FocusMode = Control.FocusModeEnum.All,
+            AllowReselect = true,
             CustomMinimumSize = new Vector2(185f, 32f),
             TooltipText = "How long this relic should remain visible in a filtered combat relic bar.",
         };
@@ -346,7 +347,7 @@ internal static class RelicInspectionClassificationUi
 
         var controls = new InspectorControls(screen, root, combat, duration, nonCombat);
         Controls.Add(controls);
-        UpdateFocusNeighbors(controls, isNonCombat: false);
+        UpdateFocusNeighbors(controls);
     }
 
     public static void RefreshActiveScreen()
@@ -383,11 +384,10 @@ internal static class RelicInspectionClassificationUi
         {
             controls.Combat.SetPressedNoSignal(!isNonCombat);
             controls.NonCombat.SetPressedNoSignal(isNonCombat);
-            controls.Duration.Visible = !isNonCombat;
             SelectItemById(
                 controls.Duration,
                 relevantUntilTurn ?? AlwaysRelevantItemId);
-            UpdateFocusNeighbors(controls, isNonCombat);
+            UpdateFocusNeighbors(controls);
         }
         finally
         {
@@ -497,6 +497,7 @@ internal static class RelicInspectionClassificationUi
 
         var itemId = duration.GetItemId((int)selectedIndex);
         int? relevantUntilTurn = itemId is >= 1 and <= 3 ? itemId : null;
+        RelicClassificationStore.SetNonCombat(relicModel, isNonCombat: false);
         RelicClassificationStore.SetCombatRelevantUntilTurn(relicModel, relevantUntilTurn);
         RelicCompendiumFilterUi.ApplyToActiveEntries();
         Refresh(screen);
@@ -508,16 +509,13 @@ internal static class RelicInspectionClassificationUi
         control.FocusNeighborRight = control.GetPath();
     }
 
-    private static void UpdateFocusNeighbors(InspectorControls controls, bool isNonCombat)
+    private static void UpdateFocusNeighbors(InspectorControls controls)
     {
-        var middle = isNonCombat ? (Control)controls.NonCombat : controls.Duration;
         controls.Combat.FocusNeighborTop = controls.NonCombat.GetPath();
-        controls.Combat.FocusNeighborBottom = middle.GetPath();
+        controls.Combat.FocusNeighborBottom = controls.Duration.GetPath();
         controls.Duration.FocusNeighborTop = controls.Combat.GetPath();
         controls.Duration.FocusNeighborBottom = controls.NonCombat.GetPath();
-        controls.NonCombat.FocusNeighborTop = middle == controls.NonCombat
-            ? controls.Combat.GetPath()
-            : controls.Duration.GetPath();
+        controls.NonCombat.FocusNeighborTop = controls.Duration.GetPath();
         controls.NonCombat.FocusNeighborBottom = controls.Combat.GetPath();
     }
 
