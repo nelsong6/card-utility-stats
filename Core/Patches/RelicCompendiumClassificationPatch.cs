@@ -200,6 +200,7 @@ internal static class RelicCompendiumClassificationUi
 internal static class RelicInspectionClassificationUi
 {
     private const string RootName = "SpireLensRelicClassificationChoices";
+    private const int AlwaysRelevantItemId = 0;
     private static readonly FieldInfo? RelicsField =
         AccessTools.Field(typeof(NInspectRelicScreen), "_relics");
     private static readonly FieldInfo? IndexField =
@@ -242,8 +243,8 @@ internal static class RelicInspectionClassificationUi
             AnchorRight = 0.5f,
             AnchorTop = 0.5f,
             AnchorBottom = 0.5f,
-            OffsetLeft = -300f,
-            OffsetRight = 300f,
+            OffsetLeft = -360f,
+            OffsetRight = 360f,
             OffsetTop = 42f,
             OffsetBottom = 82f,
             Visible = false,
@@ -280,7 +281,7 @@ internal static class RelicInspectionClassificationUi
             Text = "Combat relevance",
             MouseFilter = Control.MouseFilterEnum.Ignore,
             VerticalAlignment = VerticalAlignment.Center,
-            CustomMinimumSize = new Vector2(170f, 0f),
+            CustomMinimumSize = new Vector2(145f, 0f),
         };
         label.AddThemeFontSizeOverride("font_size", 17);
         label.AddThemeColorOverride("font_color", new Color(0.918f, 0.745f, 0.318f, 1f));
@@ -289,22 +290,39 @@ internal static class RelicInspectionClassificationUi
         var group = new ButtonGroup { AllowUnpress = false };
         var combat = CreateRadioButton("Combat", group);
         var nonCombat = CreateRadioButton("Non-combat", group);
+        combat.CustomMinimumSize = new Vector2(105f, 32f);
+        nonCombat.CustomMinimumSize = new Vector2(135f, 32f);
         row.AddChild(combat);
+
+        var duration = new OptionButton
+        {
+            Name = "CombatRelevanceDuration",
+            MouseFilter = Control.MouseFilterEnum.Stop,
+            FocusMode = Control.FocusModeEnum.All,
+            CustomMinimumSize = new Vector2(185f, 32f),
+            TooltipText = "How long this relic should remain visible in a filtered combat relic bar.",
+        };
+        duration.AddItem("Always", AlwaysRelevantItemId);
+        duration.AddItem("Until turn 1", 1);
+        duration.AddItem("Until turn 2", 2);
+        duration.AddItem("Until turn 3", 3);
+        duration.AddThemeFontSizeOverride("font_size", 17);
+        row.AddChild(duration);
         row.AddChild(nonCombat);
 
-        combat.FocusNeighborLeft = combat.GetPath();
-        combat.FocusNeighborRight = combat.GetPath();
-        combat.FocusNeighborTop = nonCombat.GetPath();
-        combat.FocusNeighborBottom = nonCombat.GetPath();
-        nonCombat.FocusNeighborLeft = nonCombat.GetPath();
-        nonCombat.FocusNeighborRight = nonCombat.GetPath();
-        nonCombat.FocusNeighborTop = combat.GetPath();
-        nonCombat.FocusNeighborBottom = combat.GetPath();
+        KeepHorizontalNavigationOnControl(combat);
+        KeepHorizontalNavigationOnControl(duration);
+        KeepHorizontalNavigationOnControl(nonCombat);
 
         combat.Toggled += selected => Assign(screen, isNonCombat: false, selected);
         nonCombat.Toggled += selected => Assign(screen, isNonCombat: true, selected);
+        duration.Connect(
+            OptionButton.SignalName.ItemSelected,
+            Callable.From<long>(index => AssignDuration(screen, duration, index)));
 
-        Controls.Add(new InspectorControls(screen, root, combat, nonCombat));
+        var controls = new InspectorControls(screen, root, combat, duration, nonCombat);
+        Controls.Add(controls);
+        UpdateFocusNeighbors(controls, isNonCombat: false);
     }
 
     public static void RefreshActiveScreen()
@@ -329,18 +347,25 @@ internal static class RelicInspectionClassificationUi
         if (!shouldShow) return;
 
         var isNonCombat = RelicClassificationStore.IsNonCombat(relicModel);
+        var relevantUntilTurn = RelicClassificationStore.GetCombatRelevantUntilTurn(relicModel);
+        var hadFocusWithinControls = HasFocusWithinControls(controls);
         _syncingControls = true;
         try
         {
             controls.Combat.SetPressedNoSignal(!isNonCombat);
             controls.NonCombat.SetPressedNoSignal(isNonCombat);
+            controls.Duration.Visible = !isNonCombat;
+            SelectItemById(
+                controls.Duration,
+                relevantUntilTurn ?? AlwaysRelevantItemId);
+            UpdateFocusNeighbors(controls, isNonCombat);
         }
         finally
         {
             _syncingControls = false;
         }
 
-        if (screen.Visible)
+        if (screen.Visible && !hadFocusWithinControls)
             (isNonCombat ? controls.NonCombat : controls.Combat).GrabFocus();
     }
 
@@ -407,6 +432,59 @@ internal static class RelicInspectionClassificationUi
         Refresh(screen);
     }
 
+    private static void AssignDuration(
+        NInspectRelicScreen screen,
+        OptionButton duration,
+        long selectedIndex)
+    {
+        if (_syncingControls) return;
+        if (!TryGetCurrentSeenRelic(screen, out var relicModel)) return;
+
+        var itemId = duration.GetItemId((int)selectedIndex);
+        int? relevantUntilTurn = itemId is >= 1 and <= 3 ? itemId : null;
+        RelicClassificationStore.SetCombatRelevantUntilTurn(relicModel, relevantUntilTurn);
+        RelicCompendiumFilterUi.ApplyToActiveEntries();
+        Refresh(screen);
+    }
+
+    private static void KeepHorizontalNavigationOnControl(Control control)
+    {
+        control.FocusNeighborLeft = control.GetPath();
+        control.FocusNeighborRight = control.GetPath();
+    }
+
+    private static void UpdateFocusNeighbors(InspectorControls controls, bool isNonCombat)
+    {
+        var middle = isNonCombat ? (Control)controls.NonCombat : controls.Duration;
+        controls.Combat.FocusNeighborTop = controls.NonCombat.GetPath();
+        controls.Combat.FocusNeighborBottom = middle.GetPath();
+        controls.Duration.FocusNeighborTop = controls.Combat.GetPath();
+        controls.Duration.FocusNeighborBottom = controls.NonCombat.GetPath();
+        controls.NonCombat.FocusNeighborTop = middle == controls.NonCombat
+            ? controls.Combat.GetPath()
+            : controls.Duration.GetPath();
+        controls.NonCombat.FocusNeighborBottom = controls.Combat.GetPath();
+    }
+
+    private static void SelectItemById(OptionButton dropdown, int itemId)
+    {
+        for (var index = 0; index < dropdown.ItemCount; index++)
+        {
+            if (dropdown.GetItemId(index) != itemId) continue;
+            dropdown.Select(index);
+            return;
+        }
+        dropdown.Select(0);
+    }
+
+    private static bool HasFocusWithinControls(InspectorControls controls)
+    {
+        var focusOwner = controls.Root.GetViewport()?.GuiGetFocusOwner();
+        return focusOwner != null
+               && (ReferenceEquals(focusOwner, controls.Root)
+                   || controls.Root.IsAncestorOf(focusOwner));
+    }
+
     private static bool TryGetCurrentSeenRelic(
         NInspectRelicScreen screen,
         out RelicModel relicModel)
@@ -444,6 +522,7 @@ internal static class RelicInspectionClassificationUi
         NInspectRelicScreen Screen,
         PanelContainer Root,
         CheckBox Combat,
+        OptionButton Duration,
         CheckBox NonCombat)
     {
         public bool IsValid =>

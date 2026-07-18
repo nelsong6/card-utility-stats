@@ -339,7 +339,7 @@ internal static class RelicCompendiumFilterUi
         vbox.AddChild(modeDropdown);
 
         var editHint = NewLabel(
-            "Enemy icon = Combat • Map icon = Non-combat\nInspect a relic to change its assignment.",
+            "Enemy icon = Combat • Map icon = Non-combat\nInspect a relic to assign its category and combat duration.",
             12,
             new Color(0.82f, 0.78f, 0.68f, 1f));
         editHint.Name = "EditCombatRelevanceHint";

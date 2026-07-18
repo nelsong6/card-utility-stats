@@ -2,11 +2,13 @@ using System;
 using Godot;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Combat;
+using MegaCrit.Sts2.Core.Hooks;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Nodes.Relics;
 using MegaCrit.Sts2.Core.Nodes.Screens;
 using MegaCrit.Sts2.Core.Nodes.Screens.Capstones;
 using MegaCrit.Sts2.Core.Rooms;
+using MegaCrit.Sts2.Core.Runs;
 
 namespace SpireLens.Core.Patches;
 
@@ -53,16 +55,23 @@ public static class RelicBarFilterPatch
             var tree = Engine.GetMainLoop() as SceneTree;
             if (tree == null) return;
             var shouldFilter = ShouldFilterNow();
+            var currentTurn = GetCurrentPlayerTurnNumber();
             var holders = 0;
             var classified = 0;
             var hidden = 0;
-            RefreshRecursive(tree.Root, shouldFilter, ref holders, ref classified, ref hidden);
+            RefreshRecursive(
+                tree.Root,
+                shouldFilter,
+                currentTurn,
+                ref holders,
+                ref classified,
+                ref hidden);
 
             var capstone = NCapstoneContainer.Instance?.CurrentCapstoneScreen?.GetType().Name ?? "none";
             CoreMain.Logger.Info(
                 $"Relic bar filter refresh ({reason}): combat={CombatManager.Instance?.IsInProgress == true}, " +
-                $"capstone={capstone}, filter={shouldFilter}, holders={holders}, " +
-                $"non_combat={classified}, hidden={hidden}.");
+                $"turn={currentTurn}, capstone={capstone}, filter={shouldFilter}, holders={holders}, " +
+                $"not_relevant={classified}, hidden={hidden}.");
         }
         catch (Exception e)
         {
@@ -73,6 +82,16 @@ public static class RelicBarFilterPatch
     internal static bool IsNonCombatRelic(RelicModel relicModel)
         => RelicClassificationStore.IsNonCombat(relicModel);
 
+    internal static bool IsCombatRelevantNow(RelicModel relicModel, int currentTurn)
+    {
+        if (IsNonCombatRelic(relicModel)) return false;
+
+        var relevantUntilTurn = RelicClassificationStore.GetCombatRelevantUntilTurn(relicModel);
+        return !relevantUntilTurn.HasValue
+               || currentTurn <= 0
+               || currentTurn <= relevantUntilTurn.Value;
+    }
+
     private static void ApplyToHolder(NRelicInventoryHolder holder)
     {
         if (holder == null || !GodotObject.IsInstanceValid(holder)) return;
@@ -80,7 +99,8 @@ public static class RelicBarFilterPatch
         if (relicModel == null) return;
 
         var shouldFilter = holder.GetTree() != null && ShouldFilterNow();
-        holder.Visible = !shouldFilter || !IsNonCombatRelic(relicModel);
+        holder.Visible = !shouldFilter
+                         || IsCombatRelevantNow(relicModel, GetCurrentPlayerTurnNumber());
     }
 
     private static bool ShouldFilterNow()
@@ -94,6 +114,7 @@ public static class RelicBarFilterPatch
     private static void RefreshRecursive(
         Node node,
         bool shouldFilter,
+        int currentTurn,
         ref int holders,
         ref int classified,
         ref int hidden)
@@ -104,21 +125,45 @@ public static class RelicBarFilterPatch
             var relicModel = holder.Relic?.Model;
             if (relicModel != null)
             {
-                var isNonCombat = IsNonCombatRelic(relicModel);
-                if (isNonCombat) classified++;
-                var shouldHide = shouldFilter && isNonCombat;
+                var isRelevant = IsCombatRelevantNow(relicModel, currentTurn);
+                if (!isRelevant) classified++;
+                var shouldHide = shouldFilter && !isRelevant;
                 holder.Visible = !shouldHide;
                 if (shouldHide) hidden++;
             }
         }
 
         for (var i = 0; i < node.GetChildCount(); i++)
-            RefreshRecursive(node.GetChild(i), shouldFilter, ref holders, ref classified, ref hidden);
+        {
+            RefreshRecursive(
+                node.GetChild(i),
+                shouldFilter,
+                currentTurn,
+                ref holders,
+                ref classified,
+                ref hidden);
+        }
+    }
+
+    private static int GetCurrentPlayerTurnNumber()
+    {
+        if (CombatManager.Instance?.IsInProgress != true) return 0;
+
+        var players = RunManager.Instance?.State?.Players;
+        if (players == null || players.Count == 0) return 0;
+        return players.Max(player => player.PlayerCombatState?.TurnNumber ?? 0);
     }
 
     private static void OnCombatBegan(CombatState _) => RefreshAll("combat began");
 
     private static void OnCombatEnded(CombatRoom _) => RefreshAll("combat ended");
+}
+
+[HarmonyPatch(typeof(Hook), nameof(Hook.AfterPlayerTurnStart))]
+public static class RelicBarFilterAfterPlayerTurnStartPatch
+{
+    [HarmonyPostfix]
+    public static void Postfix() => RelicBarFilterPatch.RefreshAll("player turn started");
 }
 
 [HarmonyPatch(typeof(NCapstoneContainer), nameof(NCapstoneContainer.Open))]

@@ -301,6 +301,6 @@
     "RELIC.REGAL_PILLOW",
     "RELIC.STRAWBERRY",
     "RELIC.TOXIC_EGG"
-  ]
+  ],
+  "combat_relevant_until_turn": {}
 }
-

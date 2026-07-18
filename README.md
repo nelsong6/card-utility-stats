@@ -61,8 +61,10 @@ whose effects do not need combat-bar attention.
 The relic compendium's **Edit combat relevance** mode shows each discovered
 relic's classification with the game's enemy-map icon for combat or top-bar
 map icon for non-combat. Inspecting a discovered relic opens explicit **Combat**
-and **Non-combat** radio buttons on the full relic inspection screen; choosing
-one assigns the relic to that mutually exclusive list.
+and **Non-combat** radio buttons on the full relic inspection screen. Combat
+relics also have an **Always / Until turn 1 / Until turn 2 / Until turn 3**
+dropdown; a finite assignment stays visible through that turn, then leaves the
+filtered relic bar on the following turn.
 Changes apply immediately and are saved under
 `user://SpireLens/relic-classifications.json`. Run
 `scripts/sync-relic-classifications.ps1` to promote the working file into the

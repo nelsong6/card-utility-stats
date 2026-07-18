@@ -13,6 +13,10 @@ internal sealed class RelicClassificationDocument
 
     [JsonPropertyName("non_combat")]
     public List<string> NonCombat { get; set; } = [];
+
+    [JsonPropertyName("combat_relevant_until_turn")]
+    public Dictionary<string, int> CombatRelevantUntilTurn { get; set; } =
+        new(StringComparer.OrdinalIgnoreCase);
 }
 
 internal static class RelicClassificationStore
@@ -28,6 +32,8 @@ internal static class RelicClassificationStore
 
     private static readonly HashSet<string> CombatIds = new(StringComparer.OrdinalIgnoreCase);
     private static readonly HashSet<string> NonCombatIds = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly Dictionary<string, int> CombatRelevantUntilTurns =
+        new(StringComparer.OrdinalIgnoreCase);
     private static bool _initialized;
 
     public static string UserFilePath => ProjectSettings.GlobalizePath(UserFileUri);
@@ -47,7 +53,8 @@ internal static class RelicClassificationStore
         {
             CoreMain.Logger.Info(
                 $"Relic classifications loaded: combat={CombatIds.Count}, " +
-                $"non_combat={NonCombatIds.Count}, file={UserFilePath}");
+                $"non_combat={NonCombatIds.Count}, finite_combat={CombatRelevantUntilTurns.Count}, " +
+                $"file={UserFilePath}");
         }
     }
 
@@ -55,6 +62,7 @@ internal static class RelicClassificationStore
     {
         CombatIds.Clear();
         NonCombatIds.Clear();
+        CombatRelevantUntilTurns.Clear();
         _initialized = false;
     }
 
@@ -69,19 +77,18 @@ internal static class RelicClassificationStore
         if (!_initialized) Initialize();
 
         var relicId = GetRelicId(relicModel);
-        var changed = isNonCombat
-            ? !NonCombatIds.Contains(relicId)
-            : NonCombatIds.Contains(relicId);
+        var changed = false;
 
         if (isNonCombat)
         {
-            CombatIds.Remove(relicId);
-            NonCombatIds.Add(relicId);
+            changed |= CombatIds.Remove(relicId);
+            changed |= NonCombatIds.Add(relicId);
+            changed |= CombatRelevantUntilTurns.Remove(relicId);
         }
         else
         {
-            NonCombatIds.Remove(relicId);
-            CombatIds.Add(relicId);
+            changed |= NonCombatIds.Remove(relicId);
+            changed |= CombatIds.Add(relicId);
         }
 
         if (!changed) return false;
@@ -91,6 +98,41 @@ internal static class RelicClassificationStore
             $"Relic classification changed: {relicId} => " +
             (isNonCombat ? "non-combat" : "combat"));
         Patches.RelicBarFilterPatch.RefreshAll("classification changed");
+        return true;
+    }
+
+    public static int? GetCombatRelevantUntilTurn(RelicModel relicModel)
+    {
+        if (!_initialized) Initialize();
+        return CombatRelevantUntilTurns.TryGetValue(GetRelicId(relicModel), out var turn)
+            ? turn
+            : null;
+    }
+
+    public static bool SetCombatRelevantUntilTurn(RelicModel relicModel, int? turn)
+    {
+        if (!_initialized) Initialize();
+
+        var relicId = GetRelicId(relicModel);
+        if (!CombatIds.Contains(relicId) || NonCombatIds.Contains(relicId)) return false;
+
+        var normalizedTurn = turn is >= 1 and <= 3 ? turn : null;
+        var changed = normalizedTurn.HasValue
+            ? !CombatRelevantUntilTurns.TryGetValue(relicId, out var currentTurn)
+              || currentTurn != normalizedTurn.Value
+            : CombatRelevantUntilTurns.ContainsKey(relicId);
+        if (!changed) return false;
+
+        if (normalizedTurn.HasValue)
+            CombatRelevantUntilTurns[relicId] = normalizedTurn.Value;
+        else
+            CombatRelevantUntilTurns.Remove(relicId);
+
+        Save();
+        CoreMain.Logger.Info(
+            $"Relic combat relevance changed: {relicId} => " +
+            (normalizedTurn.HasValue ? $"through turn {normalizedTurn.Value}" : "always"));
+        Patches.RelicBarFilterPatch.RefreshAll("combat relevance duration changed");
         return true;
     }
 
@@ -145,9 +187,18 @@ internal static class RelicClassificationStore
     {
         CombatIds.Clear();
         NonCombatIds.Clear();
+        CombatRelevantUntilTurns.Clear();
 
         AddIds(CombatIds, document.Combat);
         AddIds(NonCombatIds, document.NonCombat);
+        if (document.CombatRelevantUntilTurn != null)
+        {
+            foreach (var pair in document.CombatRelevantUntilTurn)
+            {
+                if (!string.IsNullOrWhiteSpace(pair.Key))
+                    CombatRelevantUntilTurns[pair.Key.Trim()] = pair.Value;
+            }
+        }
 
         var duplicates = CombatIds.Where(NonCombatIds.Contains).ToArray();
         if (duplicates.Length == 0) return;
@@ -176,6 +227,13 @@ internal static class RelicClassificationStore
                 if (!NonCombatIds.Contains(relicId))
                     CombatIds.Add(relicId);
             }
+
+            var invalidCutoffs = CombatRelevantUntilTurns
+                .Where(pair => !CombatIds.Contains(pair.Key) || pair.Value is < 1 or > 3)
+                .Select(pair => pair.Key)
+                .ToArray();
+            foreach (var relicId in invalidCutoffs)
+                CombatRelevantUntilTurns.Remove(relicId);
         }
         catch (Exception e)
         {
@@ -206,6 +264,12 @@ internal static class RelicClassificationStore
             {
                 Combat = CombatIds.OrderBy(id => id, StringComparer.Ordinal).ToList(),
                 NonCombat = NonCombatIds.OrderBy(id => id, StringComparer.Ordinal).ToList(),
+                CombatRelevantUntilTurn = CombatRelevantUntilTurns
+                    .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                    .ToDictionary(
+                        pair => pair.Key,
+                        pair => pair.Value,
+                        StringComparer.OrdinalIgnoreCase),
             };
             var temporaryPath = path + ".tmp";
             File.WriteAllText(temporaryPath, JsonSerializer.Serialize(document, JsonOptions) + System.Environment.NewLine);

@@ -27,6 +27,18 @@ if ($duplicates.Count -gt 0) {
     throw "Relics cannot appear in both lists: $($duplicates -join ', ')"
 }
 
+if ($null -ne $document.combat_relevant_until_turn) {
+    foreach ($property in $document.combat_relevant_until_turn.PSObject.Properties) {
+        if (-not $combat.Contains($property.Name)) {
+            throw "Combat relevance duration is assigned to a non-combat relic: $($property.Name)"
+        }
+        $turn = [int]$property.Value
+        if ($turn -lt 1 -or $turn -gt 3) {
+            throw "Combat relevance duration must be between turns 1 and 3: $($property.Name)=$turn"
+        }
+    }
+}
+
 Copy-Item -LiteralPath $sourcePath -Destination $destinationPath -Force
 Write-Host "Copied classifications to $destinationPath"
 
