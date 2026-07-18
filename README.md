@@ -36,10 +36,11 @@ Existing stats mods answer "how often did I *pick* this card" ([SlayTheStats](ht
 ## How you'd use it
 
 A compact **Open SpireLens menu** shortcut sits beside the game's existing
-"View Upgrades" toggle on the in-run deck view. The same modal options window
-can be opened from any screen by tapping **Left Shift** on keyboard or pressing
-**Right Stick (R3)** on controller. Shift-based chords such as Steam's
-Shift+Tab are left alone.
+"View Upgrades" toggle on the in-run deck view. During an active run, the same
+modal options window can be opened from any screen by tapping **Left Shift** on
+keyboard or pressing **Right Stick (R3)** on controller. The shortcuts do
+nothing on main-menu surfaces such as the compendium or run history.
+Shift-based chords such as Steam's Shift+Tab are left alone.
 
 The modal blocks normal game input while open and contains the master stats
 visibility, card stats, monster stats, and removed-card checkboxes. The D-pad

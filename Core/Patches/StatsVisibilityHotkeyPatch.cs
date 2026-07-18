@@ -8,6 +8,7 @@ using MegaCrit.Sts2.Core.Nodes.CommonUi;
 using MegaCrit.Sts2.Core.Nodes.Debug;
 using MegaCrit.Sts2.Core.Nodes.Screens.Settings;
 using MegaCrit.Sts2.Core.Platform;
+using MegaCrit.Sts2.Core.Runs;
 
 namespace SpireLens.Core.Patches;
 
@@ -93,6 +94,7 @@ public static class StatsVisibilityHotkeyPatch
 
     private static bool CanToggle(NInputManager inputManager)
     {
+        if (!RunManager.Instance.IsInProgress) return false;
         if (!NGame.IsGameFocusedWindow()) return false;
         if (PlatformUtil.IsPlatformOverlayOpen()) return false;
         if (NGame.Instance?.Transition?.InTransition == true) return false;
