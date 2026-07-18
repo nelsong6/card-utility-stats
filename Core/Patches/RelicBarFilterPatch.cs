@@ -3,7 +3,6 @@ using Godot;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Models;
-using MegaCrit.Sts2.Core.Models.Relics;
 using MegaCrit.Sts2.Core.Nodes.Relics;
 using MegaCrit.Sts2.Core.Nodes.Screens;
 using MegaCrit.Sts2.Core.Nodes.Screens.Capstones;
@@ -72,22 +71,7 @@ public static class RelicBarFilterPatch
     }
 
     internal static bool IsNonCombatRelic(RelicModel relicModel)
-        => relicModel is LeesWaffle
-            or Strawberry
-            or Pear
-            or NutritiousOyster
-            or ChosenCheese
-            or DarkstonePeriapt
-            or LeadPaperweight
-            or LargeCapsule
-            or NeowsBones
-            or RegalPillow
-            or PotionBelt
-            or MoltenEgg
-            or ToxicEgg
-            or FrozenEgg
-            or GlassEye
-            or PetrifiedToad;
+        => RelicClassificationStore.IsNonCombat(relicModel);
 
     private static void ApplyToHolder(NRelicInventoryHolder holder)
     {

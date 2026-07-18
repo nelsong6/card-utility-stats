@@ -55,6 +55,14 @@ throughout the active run. The category includes already-resolved max-HP
 relics, permanent inventory upgrades, card-reward upgrades, and other relics
 whose effects do not need combat-bar attention.
 
+The relic compendium's **Edit combat relevance** mode shows each discovered
+relic's `COMBAT` or `NON-COMBAT` classification. Clicking a relic, or focusing
+it and pressing `A`, switches it between those two mutually exclusive lists.
+Changes apply immediately and are saved under
+`user://SpireLens/relic-classifications.json`. Run
+`scripts/sync-relic-classifications.ps1` to promote the working file into the
+repository's shipped default.
+
 Turning stats off hides any open SpireLens panel and skips aggregate
 lookup and tooltip construction while stats are hidden; attribution continues
 in the background. Controller Left Trigger remains the game's Draw Pile input,

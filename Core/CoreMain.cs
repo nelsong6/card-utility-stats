@@ -118,6 +118,7 @@ public static class CoreMain
         foreach (var m in patched)
             Logger.Info($"[CUS-diag]   {m.DeclaringType?.FullName}.{m.Name}");
 
+        RelicClassificationStore.Initialize();
         RunTracker.InitializeHooks();
 
         // Resume an active run across hot reload. Our static state (current
@@ -179,6 +180,9 @@ public static class CoreMain
 
         try { RelicBarFilterPatch.TeardownHooks(); }
         catch (Exception e) { Logger.Error($"Shutdown: relic bar filter hook teardown failed: {e}"); }
+
+        try { RelicClassificationStore.Shutdown(); }
+        catch (Exception e) { Logger.Error($"Shutdown: relic classification teardown failed: {e}"); }
 
         try { RelicCompendiumStatsSignals.TeardownAttachedSignals(); }
         catch (Exception e) { Logger.Error($"Shutdown: relic compendium signal teardown failed: {e}"); }
