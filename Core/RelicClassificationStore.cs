@@ -64,30 +64,34 @@ internal static class RelicClassificationStore
         return NonCombatIds.Contains(GetRelicId(relicModel));
     }
 
-    public static bool Toggle(RelicModel relicModel)
+    public static bool SetNonCombat(RelicModel relicModel, bool isNonCombat)
     {
         if (!_initialized) Initialize();
 
         var relicId = GetRelicId(relicModel);
-        bool isNowNonCombat;
-        if (NonCombatIds.Remove(relicId))
-        {
-            CombatIds.Add(relicId);
-            isNowNonCombat = false;
-        }
-        else
+        var changed = isNonCombat
+            ? !NonCombatIds.Contains(relicId)
+            : NonCombatIds.Contains(relicId);
+
+        if (isNonCombat)
         {
             CombatIds.Remove(relicId);
             NonCombatIds.Add(relicId);
-            isNowNonCombat = true;
         }
+        else
+        {
+            NonCombatIds.Remove(relicId);
+            CombatIds.Add(relicId);
+        }
+
+        if (!changed) return false;
 
         Save();
         CoreMain.Logger.Info(
             $"Relic classification changed: {relicId} => " +
-            (isNowNonCombat ? "non-combat" : "combat"));
+            (isNonCombat ? "non-combat" : "combat"));
         Patches.RelicBarFilterPatch.RefreshAll("classification changed");
-        return isNowNonCombat;
+        return true;
     }
 
     internal static string GetRelicId(RelicModel relicModel)

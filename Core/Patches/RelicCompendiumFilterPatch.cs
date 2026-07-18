@@ -196,6 +196,7 @@ internal static class RelicCompendiumFilterUi
                 ApplyLayoutToCollection(collection);
             }
             ApplyToActiveEntries();
+            RelicInspectionClassificationUi.ReinjectIntoActiveScreen();
         }
         catch (Exception e)
         {
@@ -208,6 +209,7 @@ internal static class RelicCompendiumFilterUi
         RestoreAllCollectionLayouts();
         RestoreAllEntries();
         RelicCompendiumClassificationUi.TeardownBadges();
+        RelicInspectionClassificationUi.Teardown();
 
         foreach (var panel in InjectedPanels.ToArray())
             panel.QueueFree();
@@ -257,6 +259,13 @@ internal static class RelicCompendiumFilterUi
         {
             CoreMain.Logger.Error($"RelicCompendiumFilter.ApplyToActiveEntries failed: {e}");
         }
+    }
+
+    internal static bool HasVisibleRelicCollection()
+    {
+        var tree = Engine.GetMainLoop() as SceneTree;
+        return tree != null
+               && FindRelicCollections(tree.Root).Any(collection => collection.IsVisibleInTree());
     }
 
     internal static void ResetForTests()
@@ -330,7 +339,7 @@ internal static class RelicCompendiumFilterUi
         vbox.AddChild(modeDropdown);
 
         var editHint = NewLabel(
-            "Enemy icon = Combat • Map icon = Non-combat\nClick a relic or press A to switch.",
+            "Enemy icon = Combat • Map icon = Non-combat\nInspect a relic to change its assignment.",
             12,
             new Color(0.82f, 0.78f, 0.68f, 1f));
         editHint.Name = "EditCombatRelevanceHint";
@@ -479,6 +488,7 @@ internal static class RelicCompendiumFilterUi
 
         SyncAllControls();
         ApplyToActiveEntries();
+        RelicInspectionClassificationUi.RefreshActiveScreen();
     }
 
     private static void OnCategoryTreeItemEdited(

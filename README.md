@@ -60,8 +60,9 @@ whose effects do not need combat-bar attention.
 
 The relic compendium's **Edit combat relevance** mode shows each discovered
 relic's classification with the game's enemy-map icon for combat or top-bar
-map icon for non-combat. Clicking a relic, or focusing it and pressing `A`,
-switches it between those two mutually exclusive lists.
+map icon for non-combat. Inspecting a discovered relic opens explicit **Combat**
+and **Non-combat** radio buttons on the full relic inspection screen; choosing
+one assigns the relic to that mutually exclusive list.
 Changes apply immediately and are saved under
 `user://SpireLens/relic-classifications.json`. Run
 `scripts/sync-relic-classifications.ps1` to promote the working file into the

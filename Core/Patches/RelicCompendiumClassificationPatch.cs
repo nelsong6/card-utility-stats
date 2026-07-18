@@ -1,19 +1,76 @@
+using System.Reflection;
 using Godot;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Entities.UI;
+using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Nodes;
+using MegaCrit.Sts2.Core.Nodes.Screens.InspectScreens;
 using MegaCrit.Sts2.Core.Nodes.Screens.RelicCollection;
+using MegaCrit.Sts2.Core.Saves;
 
 namespace SpireLens.Core.Patches;
 
-[HarmonyPatch(typeof(NRelicCollectionEntry), "OnPress")]
-public static class RelicCompendiumClassificationPressPatch
+[HarmonyPatch(typeof(NRelicCollectionCategory), "OnRelicEntryPressed")]
+public static class RelicCompendiumClassificationInspectPatch
+{
+    [HarmonyPrefix]
+    public static void Prefix(NRelicCollectionEntry entry)
+    {
+        PatchGuard.Run(nameof(RelicCompendiumClassificationInspectPatch), () =>
+        {
+            RelicInspectionClassificationUi.BeginInspection(entry);
+        });
+    }
+}
+
+[HarmonyPatch(typeof(NInspectRelicScreen), "_Ready")]
+public static class RelicInspectionClassificationReadyPatch
 {
     [HarmonyPostfix]
-    public static void Postfix(NRelicCollectionEntry __instance)
+    public static void Postfix(NInspectRelicScreen __instance)
     {
-        PatchGuard.Run(nameof(RelicCompendiumClassificationPressPatch), () =>
+        PatchGuard.Run(nameof(RelicInspectionClassificationReadyPatch), () =>
         {
-            RelicCompendiumClassificationUi.ToggleEntry(__instance);
+            RelicInspectionClassificationUi.Attach(__instance);
+        });
+    }
+}
+
+[HarmonyPatch(typeof(NInspectRelicScreen), "UpdateRelicDisplay")]
+public static class RelicInspectionClassificationRefreshPatch
+{
+    [HarmonyPostfix]
+    public static void Postfix(NInspectRelicScreen __instance)
+    {
+        PatchGuard.Run(nameof(RelicInspectionClassificationRefreshPatch), () =>
+        {
+            RelicInspectionClassificationUi.Refresh(__instance);
+        });
+    }
+}
+
+[HarmonyPatch(typeof(NInspectRelicScreen), nameof(NInspectRelicScreen.Open))]
+public static class RelicInspectionClassificationOpenPatch
+{
+    [HarmonyPostfix]
+    public static void Postfix(NInspectRelicScreen __instance)
+    {
+        PatchGuard.Run(nameof(RelicInspectionClassificationOpenPatch), () =>
+        {
+            RelicInspectionClassificationUi.Refresh(__instance);
+        });
+    }
+}
+
+[HarmonyPatch(typeof(NInspectRelicScreen), nameof(NInspectRelicScreen.Close))]
+public static class RelicInspectionClassificationClosePatch
+{
+    [HarmonyPostfix]
+    public static void Postfix(NInspectRelicScreen __instance)
+    {
+        PatchGuard.Run(nameof(RelicInspectionClassificationClosePatch), () =>
+        {
+            RelicInspectionClassificationUi.EndInspection(__instance);
         });
     }
 }
@@ -28,17 +85,6 @@ internal static class RelicCompendiumClassificationUi
     private static readonly List<TextureRect> Badges = new();
     private static Texture2D? _combatIcon;
     private static Texture2D? _nonCombatIcon;
-
-    public static void ToggleEntry(NRelicCollectionEntry? entry)
-    {
-        if (!RelicCompendiumFilterUi.IsEditingCombatRelevance) return;
-        if (entry == null || !GodotObject.IsInstanceValid(entry)) return;
-        if (entry.ModelVisibility != ModelVisibility.Visible) return;
-        if (!CompendiumRelicStatsContext.TryGetRelicModel(entry, out var relicModel)) return;
-
-        RelicClassificationStore.Toggle(relicModel);
-        RelicCompendiumFilterUi.ApplyToActiveEntries();
-    }
 
     public static void ApplyToEntry(NRelicCollectionEntry? entry, bool editing)
     {
@@ -148,5 +194,264 @@ internal static class RelicCompendiumClassificationUi
             if (Badges[i] != null && GodotObject.IsInstanceValid(Badges[i])) continue;
             Badges.RemoveAt(i);
         }
+    }
+}
+
+internal static class RelicInspectionClassificationUi
+{
+    private const string RootName = "SpireLensRelicClassificationChoices";
+    private static readonly FieldInfo? RelicsField =
+        AccessTools.Field(typeof(NInspectRelicScreen), "_relics");
+    private static readonly FieldInfo? IndexField =
+        AccessTools.Field(typeof(NInspectRelicScreen), "_index");
+    private static readonly List<InspectorControls> Controls = new();
+    private static bool _inspectionFromEditor;
+    private static bool _syncingControls;
+
+    public static void BeginInspection(NRelicCollectionEntry? entry)
+    {
+        _inspectionFromEditor = RelicCompendiumFilterUi.IsEditingCombatRelevance
+                                && entry != null
+                                && GodotObject.IsInstanceValid(entry)
+                                && entry.ModelVisibility == ModelVisibility.Visible;
+    }
+
+    public static void Attach(NInspectRelicScreen? screen)
+    {
+        if (screen == null || !GodotObject.IsInstanceValid(screen)) return;
+        CleanupInvalidControls();
+
+        var tracked = Controls.FirstOrDefault(controls => controls.IsFor(screen));
+        if (tracked != null) return;
+
+        var popup = screen.GetNodeOrNull<Control>("%Popup");
+        if (popup == null) return;
+
+        var staleRoot = popup.GetNodeOrNull<Control>(RootName);
+        if (staleRoot != null)
+        {
+            popup.RemoveChild(staleRoot);
+            staleRoot.QueueFree();
+        }
+
+        var root = new PanelContainer
+        {
+            Name = RootName,
+            MouseFilter = Control.MouseFilterEnum.Stop,
+            AnchorLeft = 0.5f,
+            AnchorRight = 0.5f,
+            AnchorTop = 0.5f,
+            AnchorBottom = 0.5f,
+            OffsetLeft = -300f,
+            OffsetRight = 300f,
+            OffsetTop = 42f,
+            OffsetBottom = 82f,
+            Visible = false,
+        };
+        root.AddThemeStyleboxOverride("panel", new StyleBoxFlat
+        {
+            BgColor = new Color(0.055f, 0.049f, 0.043f, 0.92f),
+            BorderColor = new Color(0.56f, 0.46f, 0.25f, 0.78f),
+            BorderWidthLeft = 1,
+            BorderWidthRight = 1,
+            BorderWidthTop = 1,
+            BorderWidthBottom = 1,
+            ContentMarginLeft = 12f,
+            ContentMarginRight = 12f,
+            ContentMarginTop = 3f,
+            ContentMarginBottom = 3f,
+            CornerRadiusTopLeft = 4,
+            CornerRadiusTopRight = 4,
+            CornerRadiusBottomLeft = 4,
+            CornerRadiusBottomRight = 4,
+        });
+        popup.AddChild(root);
+
+        var row = new HBoxContainer
+        {
+            Alignment = BoxContainer.AlignmentMode.Center,
+            MouseFilter = Control.MouseFilterEnum.Pass,
+        };
+        row.AddThemeConstantOverride("separation", 14);
+        root.AddChild(row);
+
+        var label = new Label
+        {
+            Text = "Combat relevance",
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            VerticalAlignment = VerticalAlignment.Center,
+            CustomMinimumSize = new Vector2(170f, 0f),
+        };
+        label.AddThemeFontSizeOverride("font_size", 17);
+        label.AddThemeColorOverride("font_color", new Color(0.918f, 0.745f, 0.318f, 1f));
+        row.AddChild(label);
+
+        var group = new ButtonGroup { AllowUnpress = false };
+        var combat = CreateRadioButton("Combat", group);
+        var nonCombat = CreateRadioButton("Non-combat", group);
+        row.AddChild(combat);
+        row.AddChild(nonCombat);
+
+        combat.FocusNeighborLeft = combat.GetPath();
+        combat.FocusNeighborRight = combat.GetPath();
+        combat.FocusNeighborTop = nonCombat.GetPath();
+        combat.FocusNeighborBottom = nonCombat.GetPath();
+        nonCombat.FocusNeighborLeft = nonCombat.GetPath();
+        nonCombat.FocusNeighborRight = nonCombat.GetPath();
+        nonCombat.FocusNeighborTop = combat.GetPath();
+        nonCombat.FocusNeighborBottom = combat.GetPath();
+
+        combat.Toggled += selected => Assign(screen, isNonCombat: false, selected);
+        nonCombat.Toggled += selected => Assign(screen, isNonCombat: true, selected);
+
+        Controls.Add(new InspectorControls(screen, root, combat, nonCombat));
+    }
+
+    public static void RefreshActiveScreen()
+    {
+        var screen = NGame.Instance?.InspectRelicScreen;
+        if (screen != null) Refresh(screen);
+    }
+
+    public static void Refresh(NInspectRelicScreen? screen)
+    {
+        if (screen == null || !GodotObject.IsInstanceValid(screen)) return;
+        AttachIfMissing(screen);
+
+        var controls = Controls.FirstOrDefault(candidate => candidate.IsFor(screen));
+        if (controls == null) return;
+
+        var hasCurrentRelic = TryGetCurrentSeenRelic(screen, out var relicModel);
+        var shouldShow = _inspectionFromEditor
+                         && RelicCompendiumFilterUi.IsEditingCombatRelevance
+                         && hasCurrentRelic;
+        controls.Root.Visible = shouldShow;
+        if (!shouldShow) return;
+
+        var isNonCombat = RelicClassificationStore.IsNonCombat(relicModel);
+        _syncingControls = true;
+        try
+        {
+            controls.Combat.SetPressedNoSignal(!isNonCombat);
+            controls.NonCombat.SetPressedNoSignal(isNonCombat);
+        }
+        finally
+        {
+            _syncingControls = false;
+        }
+
+        if (screen.Visible)
+            (isNonCombat ? controls.NonCombat : controls.Combat).GrabFocus();
+    }
+
+    public static void EndInspection(NInspectRelicScreen? screen)
+    {
+        _inspectionFromEditor = false;
+        if (screen == null || !GodotObject.IsInstanceValid(screen)) return;
+        var controls = Controls.FirstOrDefault(candidate => candidate.IsFor(screen));
+        if (controls != null) controls.Root.Visible = false;
+    }
+
+    public static void ReinjectIntoActiveScreen()
+    {
+        var screen = NGame.Instance?.InspectRelicScreen;
+        if (screen == null || !GodotObject.IsInstanceValid(screen)) return;
+
+        _inspectionFromEditor = screen.Visible
+                                && RelicCompendiumFilterUi.IsEditingCombatRelevance
+                                && RelicCompendiumFilterUi.HasVisibleRelicCollection();
+        Attach(screen);
+        Refresh(screen);
+    }
+
+    public static void Teardown()
+    {
+        foreach (var controls in Controls.ToArray())
+        {
+            if (controls.Root != null && GodotObject.IsInstanceValid(controls.Root))
+            {
+                controls.Root.GetParent()?.RemoveChild(controls.Root);
+                controls.Root.QueueFree();
+            }
+        }
+        Controls.Clear();
+        _inspectionFromEditor = false;
+        _syncingControls = false;
+    }
+
+    private static CheckBox CreateRadioButton(string text, ButtonGroup group)
+    {
+        var button = new CheckBox
+        {
+            Text = text,
+            ButtonGroup = group,
+            MouseFilter = Control.MouseFilterEnum.Stop,
+            FocusMode = Control.FocusModeEnum.All,
+            MouseDefaultCursorShape = Control.CursorShape.PointingHand,
+            CustomMinimumSize = new Vector2(145f, 32f),
+        };
+        button.AddThemeFontSizeOverride("font_size", 18);
+        return button;
+    }
+
+    private static void Assign(
+        NInspectRelicScreen screen,
+        bool isNonCombat,
+        bool selected)
+    {
+        if (_syncingControls || !selected) return;
+        if (!TryGetCurrentSeenRelic(screen, out var relicModel)) return;
+
+        RelicClassificationStore.SetNonCombat(relicModel, isNonCombat);
+        RelicCompendiumFilterUi.ApplyToActiveEntries();
+        Refresh(screen);
+    }
+
+    private static bool TryGetCurrentSeenRelic(
+        NInspectRelicScreen screen,
+        out RelicModel relicModel)
+    {
+        relicModel = null!;
+        if (RelicsField?.GetValue(screen) is not IReadOnlyList<RelicModel> relics
+            || IndexField?.GetValue(screen) is not int index
+            || index < 0
+            || index >= relics.Count)
+            return false;
+
+        var current = relics[index];
+        if (!SaveManager.Instance.IsRelicSeen(current)) return false;
+        relicModel = current;
+        return true;
+    }
+
+    private static void AttachIfMissing(NInspectRelicScreen screen)
+    {
+        CleanupInvalidControls();
+        if (Controls.Any(controls => controls.IsFor(screen))) return;
+        Attach(screen);
+    }
+
+    private static void CleanupInvalidControls()
+    {
+        for (var index = Controls.Count - 1; index >= 0; index--)
+        {
+            if (Controls[index].IsValid) continue;
+            Controls.RemoveAt(index);
+        }
+    }
+
+    private sealed record InspectorControls(
+        NInspectRelicScreen Screen,
+        PanelContainer Root,
+        CheckBox Combat,
+        CheckBox NonCombat)
+    {
+        public bool IsValid =>
+            Screen != null
+            && GodotObject.IsInstanceValid(Screen)
+            && Root != null
+            && GodotObject.IsInstanceValid(Root);
+
+        public bool IsFor(NInspectRelicScreen screen) => ReferenceEquals(Screen, screen);
     }
 }
