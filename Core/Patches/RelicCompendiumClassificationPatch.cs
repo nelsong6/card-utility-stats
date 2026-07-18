@@ -58,6 +58,7 @@ internal static class RelicCompendiumClassificationUi
         var isNonCombat = RelicClassificationStore.IsNonCombat(relicModel);
         badge.Texture = isNonCombat ? GetNonCombatIcon() : GetCombatIcon();
         badge.TooltipText = isNonCombat ? "Non-combat" : "Combat";
+        ApplyBadgeSize(badge, isNonCombat);
         badge.Visible = true;
     }
 
@@ -116,6 +117,14 @@ internal static class RelicCompendiumClassificationUi
 
     private static Texture2D? GetNonCombatIcon()
         => _nonCombatIcon ??= LoadIcon(NonCombatIconPath, "non-combat");
+
+    private static void ApplyBadgeSize(TextureRect badge, bool isNonCombat)
+    {
+        badge.OffsetLeft = isNonCombat ? -40f : -78f;
+        badge.OffsetRight = -2f;
+        badge.OffsetTop = isNonCombat ? -34f : -66f;
+        badge.OffsetBottom = -2f;
+    }
 
     private static Texture2D? LoadIcon(string path, string classification)
     {
