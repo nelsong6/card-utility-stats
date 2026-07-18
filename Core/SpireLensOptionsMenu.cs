@@ -62,6 +62,13 @@ public static class SpireLensOptionsMenu
     {
         if (!IsOpen) return false;
 
+        if (evt is InputEventKey { Pressed: true, Echo: false } key
+            && (key.Keycode == Key.Escape || key.PhysicalKeycode == Key.Escape))
+        {
+            Close("Escape key");
+            return true;
+        }
+
         if (evt is InputEventJoypadMotion motion)
             return HandleLeftStick(motion);
 
@@ -152,7 +159,7 @@ public static class SpireLensOptionsMenu
         title.HorizontalAlignment = HorizontalAlignment.Center;
         rows.AddChild(title);
 
-        var help = NewLabel("Up/Down selects • A toggles • Left/Right or LB/LT jumps to an edge", 18);
+        var help = NewLabel("Up/Down selects • A toggles • Left/Right or LB/LT jumps • Esc closes", 18);
         help.HorizontalAlignment = HorizontalAlignment.Center;
         help.Modulate = new Color(0.82f, 0.82f, 0.82f);
         rows.AddChild(help);
@@ -170,7 +177,7 @@ public static class SpireLensOptionsMenu
 
         var close = new Button
         {
-            Text = "Close  —  RS / Left Shift",
+            Text = "Close  —  RS / Left Shift / Esc",
             CustomMinimumSize = new Vector2(0, 56),
             MouseDefaultCursorShape = Control.CursorShape.PointingHand,
         };

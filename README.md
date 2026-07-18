@@ -45,7 +45,8 @@ The modal blocks normal game input while open and contains the master stats
 visibility, card stats, monster stats, and removed-card checkboxes. The D-pad
 and left stick move focus between rows, and `A` toggles the highlighted option.
 Any other non-direction controller button closes the menu. Mouse selection
-remains fully supported; Left Shift or the window's Close button also closes it.
+remains fully supported; Escape, Left Shift, or the window's Close button also
+closes it.
 
 The optional, mutually exclusive relic-bar filters hide already-resolved relics
 while leaving them owned, functional, and visible on every other relic surface.
@@ -56,8 +57,9 @@ relics, permanent inventory upgrades, card-reward upgrades, and other relics
 whose effects do not need combat-bar attention.
 
 The relic compendium's **Edit combat relevance** mode shows each discovered
-relic's `COMBAT` or `NON-COMBAT` classification. Clicking a relic, or focusing
-it and pressing `A`, switches it between those two mutually exclusive lists.
+relic's classification with the game's enemy-map icon for combat or top-bar
+map icon for non-combat. Clicking a relic, or focusing it and pressing `A`,
+switches it between those two mutually exclusive lists.
 Changes apply immediately and are saved under
 `user://SpireLens/relic-classifications.json`. Run
 `scripts/sync-relic-classifications.ps1` to promote the working file into the

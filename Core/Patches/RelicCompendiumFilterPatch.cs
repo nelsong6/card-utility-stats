@@ -330,7 +330,7 @@ internal static class RelicCompendiumFilterUi
         vbox.AddChild(modeDropdown);
 
         var editHint = NewLabel(
-            "Click a relic or press A to switch Combat / Non-combat.",
+            "Enemy icon = Combat • Map icon = Non-combat\nClick a relic or press A to switch.",
             12,
             new Color(0.82f, 0.78f, 0.68f, 1f));
         editHint.Name = "EditCombatRelevanceHint";

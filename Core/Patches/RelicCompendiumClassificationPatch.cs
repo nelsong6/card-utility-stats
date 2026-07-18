@@ -21,7 +21,13 @@ public static class RelicCompendiumClassificationPressPatch
 internal static class RelicCompendiumClassificationUi
 {
     private const string BadgeName = "SpireLensCombatRelevanceBadge";
-    private static readonly List<Label> Badges = new();
+    private const string CombatIconPath =
+        "res://images/atlases/ui_atlas.sprites/map/icons/map_monster.tres";
+    private const string NonCombatIconPath =
+        "res://images/atlases/ui_atlas.sprites/top_bar/top_bar_map.tres";
+    private static readonly List<TextureRect> Badges = new();
+    private static Texture2D? _combatIcon;
+    private static Texture2D? _nonCombatIcon;
 
     public static void ToggleEntry(NRelicCollectionEntry? entry)
     {
@@ -50,13 +56,8 @@ internal static class RelicCompendiumClassificationUi
 
         badge ??= CreateBadge(entry);
         var isNonCombat = RelicClassificationStore.IsNonCombat(relicModel);
-        badge.Text = isNonCombat ? "NON-COMBAT" : "COMBAT";
-        badge.AddThemeColorOverride(
-            "font_color",
-            isNonCombat
-                ? new Color(0.84f, 0.9f, 1f, 1f)
-                : new Color(1f, 0.88f, 0.52f, 1f));
-        badge.AddThemeStyleboxOverride("normal", CreateBadgeStyle(isNonCombat));
+        badge.Texture = isNonCombat ? GetNonCombatIcon() : GetCombatIcon();
+        badge.TooltipText = isNonCombat ? "Non-combat" : "Combat";
         badge.Visible = true;
     }
 
@@ -71,56 +72,61 @@ internal static class RelicCompendiumClassificationUi
             }
         }
         Badges.Clear();
+        _combatIcon = null;
+        _nonCombatIcon = null;
     }
 
-    private static Label? FindBadge(NRelicCollectionEntry entry)
+    private static TextureRect? FindBadge(NRelicCollectionEntry entry)
     {
         var node = entry.GetNodeOrNull(BadgeName);
-        return node as Label;
+        if (node is TextureRect badge) return badge;
+        if (node != null)
+        {
+            entry.RemoveChild(node);
+            node.QueueFree();
+        }
+        return null;
     }
 
-    private static Label CreateBadge(NRelicCollectionEntry entry)
+    private static TextureRect CreateBadge(NRelicCollectionEntry entry)
     {
-        var badge = new Label
+        var badge = new TextureRect
         {
             Name = BadgeName,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center,
             MouseFilter = Control.MouseFilterEnum.Ignore,
             ZIndex = 500,
-            AnchorLeft = 0f,
+            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+            AnchorLeft = 1f,
             AnchorRight = 1f,
             AnchorTop = 1f,
             AnchorBottom = 1f,
-            OffsetLeft = 2f,
+            OffsetLeft = -40f,
             OffsetRight = -2f,
-            OffsetTop = -22f,
+            OffsetTop = -34f,
             OffsetBottom = -2f,
         };
-        badge.AddThemeFontSizeOverride("font_size", 10);
         entry.AddChild(badge);
         Badges.Add(badge);
         return badge;
     }
 
-    private static StyleBoxFlat CreateBadgeStyle(bool isNonCombat)
-        => new()
+    private static Texture2D? GetCombatIcon()
+        => _combatIcon ??= LoadIcon(CombatIconPath, "combat");
+
+    private static Texture2D? GetNonCombatIcon()
+        => _nonCombatIcon ??= LoadIcon(NonCombatIconPath, "non-combat");
+
+    private static Texture2D? LoadIcon(string path, string classification)
+    {
+        var texture = ResourceLoader.Load<Texture2D>(path, null, ResourceLoader.CacheMode.Reuse);
+        if (texture == null)
         {
-            BgColor = isNonCombat
-                ? new Color(0.08f, 0.14f, 0.22f, 0.92f)
-                : new Color(0.22f, 0.15f, 0.04f, 0.92f),
-            BorderColor = isNonCombat
-                ? new Color(0.48f, 0.67f, 0.9f, 0.95f)
-                : new Color(0.86f, 0.64f, 0.2f, 0.95f),
-            BorderWidthLeft = 1,
-            BorderWidthRight = 1,
-            BorderWidthTop = 1,
-            BorderWidthBottom = 1,
-            CornerRadiusTopLeft = 3,
-            CornerRadiusTopRight = 3,
-            CornerRadiusBottomLeft = 3,
-            CornerRadiusBottomRight = 3,
-        };
+            CoreMain.Logger.Error(
+                $"Could not load {classification} relic classification icon: {path}");
+        }
+        return texture;
+    }
 
     private static void CleanupInvalidBadges()
     {

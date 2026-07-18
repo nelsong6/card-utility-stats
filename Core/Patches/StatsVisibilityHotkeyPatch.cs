@@ -13,8 +13,8 @@ namespace SpireLens.Core.Patches;
 
 /// <summary>
 /// Opens and closes the global SpireLens options menu with Left Shift or
-/// Right Stick press (R3), and dispatches the menu's keyboard/controller
-/// option shortcuts while that modal is open.
+/// Right Stick press (R3), closes it with Escape, and dispatches the menu's
+/// keyboard/controller option shortcuts while that modal is open.
 /// </summary>
 [HarmonyPatch]
 public static class StatsVisibilityHotkeyPatch
@@ -35,13 +35,15 @@ public static class StatsVisibilityHotkeyPatch
         try
         {
             var inputManager = NInputManager.Instance;
-            if (inputManager == null || !CanToggle(inputManager)) return;
+            if (inputManager == null) return;
 
             if (SpireLensOptionsMenu.HandleShortcut(evt))
             {
                 inputManager.GetViewport()?.SetInputAsHandled();
                 return;
             }
+
+            if (!CanToggle(inputManager)) return;
 
             string toggleSource;
             if (evt is InputEventKey keyEvent)
