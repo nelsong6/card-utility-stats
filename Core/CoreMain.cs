@@ -137,8 +137,8 @@ public static class CoreMain
         // the user would see the checkbox disappear until they close and
         // reopen the deck view.
         Patches.ViewStatsInjectorPatch.ReinjectIntoActiveDeckView();
-        Patches.RelicBarFilterPatch.EnsureMonitor();
-        Patches.RelicBarFilterPatch.RefreshAll();
+        Patches.RelicBarFilterPatch.InitializeHooks();
+        Patches.RelicBarFilterPatch.RefreshAll("core initialized");
         Patches.RelicCompendiumFilterUi.ReinjectIntoActiveCollections();
         Patches.RelicCompendiumStatsSignals.ReattachToActiveEntries();
 
@@ -177,8 +177,8 @@ public static class CoreMain
         try { SpireLensOptionsMenu.Destroy(); }
         catch (Exception e) { Logger.Error($"Shutdown: options menu teardown failed: {e}"); }
 
-        try { RelicBarFilterPatch.DestroyMonitor(); }
-        catch (Exception e) { Logger.Error($"Shutdown: relic bar filter monitor teardown failed: {e}"); }
+        try { RelicBarFilterPatch.TeardownHooks(); }
+        catch (Exception e) { Logger.Error($"Shutdown: relic bar filter hook teardown failed: {e}"); }
 
         try { RelicCompendiumStatsSignals.TeardownAttachedSignals(); }
         catch (Exception e) { Logger.Error($"Shutdown: relic compendium signal teardown failed: {e}"); }

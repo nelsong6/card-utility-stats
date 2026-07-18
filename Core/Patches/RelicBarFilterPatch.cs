@@ -6,6 +6,8 @@ using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Relics;
 using MegaCrit.Sts2.Core.Nodes.Relics;
 using MegaCrit.Sts2.Core.Nodes.Screens;
+using MegaCrit.Sts2.Core.Nodes.Screens.Capstones;
+using MegaCrit.Sts2.Core.Rooms;
 
 namespace SpireLens.Core.Patches;
 
@@ -16,8 +18,7 @@ namespace SpireLens.Core.Patches;
 [HarmonyPatch(typeof(NRelicInventoryHolder), nameof(NRelicInventoryHolder._Ready))]
 public static class RelicBarFilterPatch
 {
-    private static RelicBarFilterMonitor? _monitor;
-    private static bool? _lastShouldFilter;
+    private static bool _hooksInitialized;
 
     [HarmonyPostfix]
     public static void Postfix(NRelicInventoryHolder __instance)
@@ -26,47 +27,48 @@ public static class RelicBarFilterPatch
         catch (Exception e) { CoreMain.Logger.Error($"RelicBarFilterPatch failed: {e.Message}"); }
     }
 
-    public static void RefreshAll()
+    public static void InitializeHooks()
+    {
+        if (_hooksInitialized) return;
+
+        CombatManager.Instance.CombatBegan += OnCombatBegan;
+        CombatManager.Instance.CombatEnded += OnCombatEnded;
+        _hooksInitialized = true;
+        CoreMain.Logger.Info("Relic bar filter hooks wired (CombatBegan, CombatEnded).");
+    }
+
+    public static void TeardownHooks()
+    {
+        if (!_hooksInitialized) return;
+
+        CombatManager.Instance.CombatBegan -= OnCombatBegan;
+        CombatManager.Instance.CombatEnded -= OnCombatEnded;
+        _hooksInitialized = false;
+        CoreMain.Logger.Info("Relic bar filter hooks unwired.");
+    }
+
+    public static void RefreshAll(string reason = "requested")
     {
         try
         {
             var tree = Engine.GetMainLoop() as SceneTree;
             if (tree == null) return;
-            var shouldFilter = ShouldFilterNow(tree.Root);
-            _lastShouldFilter = shouldFilter;
-            RefreshRecursive(tree.Root, shouldFilter);
+            var shouldFilter = ShouldFilterNow();
+            var holders = 0;
+            var classified = 0;
+            var hidden = 0;
+            RefreshRecursive(tree.Root, shouldFilter, ref holders, ref classified, ref hidden);
+
+            var capstone = NCapstoneContainer.Instance?.CurrentCapstoneScreen?.GetType().Name ?? "none";
+            CoreMain.Logger.Info(
+                $"Relic bar filter refresh ({reason}): combat={CombatManager.Instance?.IsInProgress == true}, " +
+                $"capstone={capstone}, filter={shouldFilter}, holders={holders}, " +
+                $"non_combat={classified}, hidden={hidden}.");
         }
         catch (Exception e)
         {
             CoreMain.Logger.Error($"RelicBarFilter refresh failed: {e.Message}");
         }
-    }
-
-    public static void EnsureMonitor()
-    {
-        var tree = Engine.GetMainLoop() as SceneTree;
-        if (tree == null) return;
-        if (_monitor != null && GodotObject.IsInstanceValid(_monitor)) return;
-
-        _monitor = new RelicBarFilterMonitor { Name = "SpireLensRelicBarFilterMonitor" };
-        tree.Root.CallDeferred(Node.MethodName.AddChild, _monitor);
-    }
-
-    public static void DestroyMonitor()
-    {
-        if (_monitor != null && GodotObject.IsInstanceValid(_monitor))
-            _monitor.QueueFree();
-        _monitor = null;
-        _lastShouldFilter = null;
-    }
-
-    internal static void RefreshIfContextChanged()
-    {
-        var tree = Engine.GetMainLoop() as SceneTree;
-        if (tree == null) return;
-        var shouldFilter = ShouldFilterNow(tree.Root);
-        if (_lastShouldFilter == shouldFilter) return;
-        RefreshAll();
     }
 
     internal static bool IsNonCombatRelic(RelicModel relicModel)
@@ -93,49 +95,58 @@ public static class RelicBarFilterPatch
         var relicModel = holder.Relic?.Model;
         if (relicModel == null) return;
 
-        var tree = holder.GetTree();
-        var shouldFilter = tree != null && ShouldFilterNow(tree.Root);
+        var shouldFilter = holder.GetTree() != null && ShouldFilterNow();
         holder.Visible = !shouldFilter || !IsNonCombatRelic(relicModel);
     }
 
-    private static bool ShouldFilterNow(Node root)
+    private static bool ShouldFilterNow()
     {
         if (ViewStatsInjectorPatch.HideNonCombatRelicStats) return true;
         if (!ViewStatsInjectorPatch.ShowCombatOnlyRelicsAtCombatScreen) return false;
         if (CombatManager.Instance?.IsInProgress != true) return false;
-        return !HasVisibleDeckView(root);
+        return NCapstoneContainer.Instance?.CurrentCapstoneScreen is not NDeckViewScreen;
     }
 
-    private static bool HasVisibleDeckView(Node node)
-    {
-        if (node is NDeckViewScreen deckView && deckView.IsVisibleInTree())
-            return true;
-
-        for (var i = 0; i < node.GetChildCount(); i++)
-        {
-            if (HasVisibleDeckView(node.GetChild(i))) return true;
-        }
-        return false;
-    }
-
-    private static void RefreshRecursive(Node node, bool shouldFilter)
+    private static void RefreshRecursive(
+        Node node,
+        bool shouldFilter,
+        ref int holders,
+        ref int classified,
+        ref int hidden)
     {
         if (node is NRelicInventoryHolder holder)
         {
+            holders++;
             var relicModel = holder.Relic?.Model;
             if (relicModel != null)
-                holder.Visible = !shouldFilter || !IsNonCombatRelic(relicModel);
+            {
+                var isNonCombat = IsNonCombatRelic(relicModel);
+                if (isNonCombat) classified++;
+                var shouldHide = shouldFilter && isNonCombat;
+                holder.Visible = !shouldHide;
+                if (shouldHide) hidden++;
+            }
         }
 
         for (var i = 0; i < node.GetChildCount(); i++)
-            RefreshRecursive(node.GetChild(i), shouldFilter);
+            RefreshRecursive(node.GetChild(i), shouldFilter, ref holders, ref classified, ref hidden);
     }
+
+    private static void OnCombatBegan(CombatState _) => RefreshAll("combat began");
+
+    private static void OnCombatEnded(CombatRoom _) => RefreshAll("combat ended");
 }
 
-public partial class RelicBarFilterMonitor : Node
+[HarmonyPatch(typeof(NCapstoneContainer), nameof(NCapstoneContainer.Open))]
+public static class RelicBarFilterCapstoneOpenPatch
 {
-    public override void _Process(double delta)
-    {
-        RelicBarFilterPatch.RefreshIfContextChanged();
-    }
+    [HarmonyPostfix]
+    public static void Postfix() => RelicBarFilterPatch.RefreshAll("capstone opened");
+}
+
+[HarmonyPatch(typeof(NCapstoneContainer), nameof(NCapstoneContainer.Close))]
+public static class RelicBarFilterCapstoneClosePatch
+{
+    [HarmonyPostfix]
+    public static void Postfix() => RelicBarFilterPatch.RefreshAll("capstone closed");
 }
