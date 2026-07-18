@@ -120,10 +120,12 @@ internal static class RelicCompendiumClassificationUi
 
     private static void ApplyBadgeSize(TextureRect badge, bool isNonCombat)
     {
-        badge.OffsetLeft = isNonCombat ? -40f : -78f;
+        badge.OffsetLeft = -40f;
         badge.OffsetRight = -2f;
-        badge.OffsetTop = isNonCombat ? -34f : -66f;
+        badge.OffsetTop = -34f;
         badge.OffsetBottom = -2f;
+        badge.PivotOffset = new Vector2(19f, 16f);
+        badge.Scale = isNonCombat ? Vector2.One : Vector2.One * 2f;
     }
 
     private static Texture2D? LoadIcon(string path, string classification)
