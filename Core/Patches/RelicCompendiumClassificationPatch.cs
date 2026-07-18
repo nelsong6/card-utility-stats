@@ -4,8 +4,10 @@ using HarmonyLib;
 using MegaCrit.Sts2.Core.Entities.UI;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Nodes;
+using MegaCrit.Sts2.Core.Nodes.Relics;
 using MegaCrit.Sts2.Core.Nodes.Screens.InspectScreens;
 using MegaCrit.Sts2.Core.Nodes.Screens.RelicCollection;
+using MegaCrit.Sts2.Core.Runs;
 using MegaCrit.Sts2.Core.Saves;
 
 namespace SpireLens.Core.Patches;
@@ -19,6 +21,19 @@ public static class RelicCompendiumClassificationInspectPatch
         PatchGuard.Run(nameof(RelicCompendiumClassificationInspectPatch), () =>
         {
             RelicInspectionClassificationUi.BeginInspection(entry);
+        });
+    }
+}
+
+[HarmonyPatch(typeof(NRelicInventory), "OnRelicClicked")]
+public static class RelicInventoryClassificationInspectPatch
+{
+    [HarmonyPrefix]
+    public static void Prefix(RelicModel model)
+    {
+        PatchGuard.Run(nameof(RelicInventoryClassificationInspectPatch), () =>
+        {
+            RelicInspectionClassificationUi.BeginRunInspection(model);
         });
     }
 }
@@ -206,15 +221,24 @@ internal static class RelicInspectionClassificationUi
     private static readonly FieldInfo? IndexField =
         AccessTools.Field(typeof(NInspectRelicScreen), "_index");
     private static readonly List<InspectorControls> Controls = new();
-    private static bool _inspectionFromEditor;
+    private static InspectionContext _inspectionContext;
     private static bool _syncingControls;
 
     public static void BeginInspection(NRelicCollectionEntry? entry)
     {
-        _inspectionFromEditor = RelicCompendiumFilterUi.IsEditingCombatRelevance
-                                && entry != null
-                                && GodotObject.IsInstanceValid(entry)
-                                && entry.ModelVisibility == ModelVisibility.Visible;
+        _inspectionContext = RelicCompendiumFilterUi.IsEditingCombatRelevance
+                             && entry != null
+                             && GodotObject.IsInstanceValid(entry)
+                             && entry.ModelVisibility == ModelVisibility.Visible
+            ? InspectionContext.CompendiumEditor
+            : InspectionContext.None;
+    }
+
+    public static void BeginRunInspection(RelicModel? relicModel)
+    {
+        _inspectionContext = relicModel != null && RunManager.Instance.IsInProgress
+            ? InspectionContext.RunRelicBar
+            : InspectionContext.None;
     }
 
     public static void Attach(NInspectRelicScreen? screen)
@@ -340,9 +364,14 @@ internal static class RelicInspectionClassificationUi
         if (controls == null) return;
 
         var hasCurrentRelic = TryGetCurrentSeenRelic(screen, out var relicModel);
-        var shouldShow = _inspectionFromEditor
-                         && RelicCompendiumFilterUi.IsEditingCombatRelevance
-                         && hasCurrentRelic;
+        var contextAllowsEditing = _inspectionContext switch
+        {
+            InspectionContext.CompendiumEditor =>
+                RelicCompendiumFilterUi.IsEditingCombatRelevance,
+            InspectionContext.RunRelicBar => RunManager.Instance.IsInProgress,
+            _ => false,
+        };
+        var shouldShow = contextAllowsEditing && hasCurrentRelic;
         controls.Root.Visible = shouldShow;
         if (!shouldShow) return;
 
@@ -371,7 +400,7 @@ internal static class RelicInspectionClassificationUi
 
     public static void EndInspection(NInspectRelicScreen? screen)
     {
-        _inspectionFromEditor = false;
+        _inspectionContext = InspectionContext.None;
         if (screen == null || !GodotObject.IsInstanceValid(screen)) return;
         var controls = Controls.FirstOrDefault(candidate => candidate.IsFor(screen));
         if (controls != null) controls.Root.Visible = false;
@@ -382,9 +411,7 @@ internal static class RelicInspectionClassificationUi
         var screen = NGame.Instance?.InspectRelicScreen;
         if (screen == null || !GodotObject.IsInstanceValid(screen)) return;
 
-        _inspectionFromEditor = screen.Visible
-                                && RelicCompendiumFilterUi.IsEditingCombatRelevance
-                                && RelicCompendiumFilterUi.HasVisibleRelicCollection();
+        _inspectionContext = GetActiveInspectionContext(screen);
         Attach(screen);
         Refresh(screen);
     }
@@ -400,8 +427,36 @@ internal static class RelicInspectionClassificationUi
             }
         }
         Controls.Clear();
-        _inspectionFromEditor = false;
+        _inspectionContext = InspectionContext.None;
         _syncingControls = false;
+    }
+
+    private static InspectionContext GetActiveInspectionContext(NInspectRelicScreen screen)
+    {
+        if (!screen.Visible) return InspectionContext.None;
+
+        var hasVisibleCompendium = RelicCompendiumFilterUi.HasVisibleRelicCollection();
+        if (hasVisibleCompendium)
+        {
+            return RelicCompendiumFilterUi.IsEditingCombatRelevance
+                ? InspectionContext.CompendiumEditor
+                : InspectionContext.None;
+        }
+
+        return RunManager.Instance.IsInProgress && IsOwnedRunRelicInspection(screen)
+            ? InspectionContext.RunRelicBar
+            : InspectionContext.None;
+    }
+
+    private static bool IsOwnedRunRelicInspection(NInspectRelicScreen screen)
+    {
+        if (RelicsField?.GetValue(screen) is not IReadOnlyList<RelicModel> inspectedRelics)
+            return false;
+
+        var players = RunManager.Instance.State?.Players;
+        return players != null && players.Any(player =>
+            inspectedRelics.Count == player.Relics.Count
+            && inspectedRelics.SequenceEqual(player.Relics));
     }
 
     private static CheckBox CreateRadioButton(string text, ButtonGroup group)
@@ -532,5 +587,12 @@ internal static class RelicInspectionClassificationUi
             && GodotObject.IsInstanceValid(Root);
 
         public bool IsFor(NInspectRelicScreen screen) => ReferenceEquals(Screen, screen);
+    }
+
+    private enum InspectionContext
+    {
+        None,
+        CompendiumEditor,
+        RunRelicBar,
     }
 }

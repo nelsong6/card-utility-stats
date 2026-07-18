@@ -64,7 +64,8 @@ map icon for non-combat. Inspecting a discovered relic opens explicit **Combat**
 and **Non-combat** radio buttons on the full relic inspection screen. Combat
 relics also have an **Always / Until turn 1 / Until turn 2 / Until turn 3**
 dropdown; a finite assignment stays visible through that turn, then leaves the
-filtered relic bar on the following turn.
+filtered relic bar on the following turn. The same assignment controls appear
+when inspecting an owned relic from the in-run relic bar.
 Changes apply immediately and are saved under
 `user://SpireLens/relic-classifications.json`. Run
 `scripts/sync-relic-classifications.ps1` to promote the working file into the
