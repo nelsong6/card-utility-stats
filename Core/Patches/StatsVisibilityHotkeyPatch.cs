@@ -6,6 +6,7 @@ using HarmonyLib;
 using MegaCrit.Sts2.Core.Nodes;
 using MegaCrit.Sts2.Core.Nodes.CommonUi;
 using MegaCrit.Sts2.Core.Nodes.Debug;
+using MegaCrit.Sts2.Core.Nodes.Screens.Capstones;
 using MegaCrit.Sts2.Core.Nodes.Screens.Settings;
 using MegaCrit.Sts2.Core.Platform;
 using MegaCrit.Sts2.Core.Runs;
@@ -94,7 +95,7 @@ public static class StatsVisibilityHotkeyPatch
 
     private static bool CanToggle(NInputManager inputManager)
     {
-        if (!RunManager.Instance.IsInProgress) return false;
+        if (!IsRunGameplaySurface()) return false;
         if (!NGame.IsGameFocusedWindow()) return false;
         if (PlatformUtil.IsPlatformOverlayOpen()) return false;
         if (NGame.Instance?.Transition?.InTransition == true) return false;
@@ -108,6 +109,22 @@ public static class StatsVisibilityHotkeyPatch
         if (tree != null && HasActiveInputRebind(tree.Root)) return false;
 
         return true;
+    }
+
+    private static bool IsRunGameplaySurface()
+    {
+        var run = NRun.Instance;
+        if (run == null || !RunManager.Instance.IsInProgress) return false;
+
+        // The run keeps existing behind Pause, Settings, Compendium, and
+        // Feedback. Those screens all share this dedicated capstone submenu
+        // stack, so run state alone cannot tell them from gameplay surfaces.
+        // Other capstones (rewards, etc.) are part of the run and remain valid.
+        var submenuStack = run.GlobalUi?.SubmenuStack;
+        return submenuStack == null
+               || !ReferenceEquals(
+                   NCapstoneContainer.Instance?.CurrentCapstoneScreen,
+                   submenuStack);
     }
 
     internal static bool IsRightStickPress(JoyButton buttonIndex, bool pressed)
