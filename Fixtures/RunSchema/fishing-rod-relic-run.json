@@ -1,0 +1,52 @@
+{
+  "run_id": "fishing-rod-relic-fixture",
+  "started_at": "2026-07-19T00:00:00Z",
+  "updated_at": "2026-07-19T00:10:00Z",
+  "outcome": "in_progress",
+  "aggregates": {
+    "CARD.GRAVE_WARDEN#1": {
+      "initial_upgrade_level": 0
+    },
+    "CARD.REAP#1": {
+      "initial_upgrade_level": 0
+    }
+  },
+  "events": [
+    {
+      "t": "2026-07-19T00:05:00Z",
+      "type": "card_upgraded",
+      "card_id": "CARD.GRAVE_WARDEN#1",
+      "floor": 8,
+      "upgrade_level": 1
+    },
+    {
+      "t": "2026-07-19T00:09:00Z",
+      "type": "card_upgraded",
+      "card_id": "CARD.REAP#1",
+      "floor": 12,
+      "upgrade_level": 1
+    }
+  ],
+  "relic_aggregates": {
+    "RELIC.FISHING_ROD": {
+      "cards_upgraded": 2,
+      "upgraded_cards": [
+        "Grave Warden+",
+        "Reap+"
+      ]
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.GRAVE_WARDEN": [
+      1
+    ],
+    "CARD.REAP": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.GRAVE_WARDEN": 1,
+    "CARD.REAP": 1
+  }
+}

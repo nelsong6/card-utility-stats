@@ -396,6 +396,14 @@ the broader map-point hook. Reconcile from the live Dowsing/Abundance deck card
 after Continue or hot reload so the relic tooltip inherits the game's persisted
 quest state.
 
+Fishing Rod owns a saved `CombatsSeen` counter and increments it only after
+normal monster combats. Every third increment, `FishingRod.AfterCombatEnd`
+chooses one random upgradable permanent-deck card and calls `CardCmd.Upgrade`
+synchronously before returning its completed task. Attribute the result by
+arming a window around that exact callback and consuming the existing
+`CardModel.UpgradeInternal` observation; do not infer the chosen card from deck
+state or independently reproduce the relic's RNG selection.
+
 Pael's sacrifice reward option is owned by `PaelsWing`, not `PaelsFlesh`.
 `PaelsWing.TryModifyCardRewardAlternatives` adds the `SACRIFICE` card reward
 alternative and `PaelsWing.OnSacrifice` increments the saved sacrifice count.

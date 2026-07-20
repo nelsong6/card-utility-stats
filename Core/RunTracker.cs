@@ -105,6 +105,7 @@ public static class RunTracker
     private static readonly Dictionary<Player, PendingWhetstonePickup> _pendingWhetstonePickups = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<Player, PendingWarPaintPickup> _pendingWarPaintPickups = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<Player, PendingFragrantMushroomPickup> _pendingFragrantMushroomPickups = new(ReferenceEqualityComparer.Instance);
+    private static readonly Dictionary<Player, PendingFishingRodUpgrade> _pendingFishingRodUpgrades = new(ReferenceEqualityComparer.Instance);
     private static bool _shivAvailableThisRun;
     private static CardModel? _shivDeckViewCard;
     private const decimal PoisonOwnershipEpsilon = 0.0001m;
@@ -978,6 +979,7 @@ public static class RunTracker
         _pendingWhetstonePickups.Clear();
         _pendingWarPaintPickups.Clear();
         _pendingFragrantMushroomPickups.Clear();
+        _pendingFishingRodUpgrades.Clear();
     }
 
     /// <summary>
@@ -2506,6 +2508,7 @@ public static class RunTracker
     private const string WhetstoneRelicId = "RELIC.WHETSTONE";
     private const string WarPaintRelicId = "RELIC.WAR_PAINT";
     private const string FragrantMushroomRelicId = "RELIC.FRAGRANT_MUSHROOM";
+    private const string FishingRodRelicId = "RELIC.FISHING_ROD";
     private const string MealTicketRelicId = "RELIC.MEAL_TICKET";
     private const string BurningBloodRelicId = "RELIC.BURNING_BLOOD";
     private const string BloodVialRelicId = "RELIC.BLOOD_VIAL";
@@ -5460,6 +5463,62 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Arm a narrowly scoped Fishing Rod attribution window around its native
+    /// end-of-combat callback. The actual upgraded card is observed by
+    /// <see cref="RecordUpgrade"/> when Fishing Rod calls CardCmd.Upgrade.
+    /// </summary>
+    public static bool BeginFishingRodUpgrade(
+        FishingRod relic,
+        CombatRoom room,
+        out Player? player)
+    {
+        player = null;
+        if (relic?.Owner == null || room?.Encounter?.RoomType != RoomType.Monster)
+            return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic)) return false;
+                if (!IsTrackedPlayer(relic.Owner)) return false;
+
+                player = relic.Owner;
+                _pendingFishingRodUpgrades[player] = new PendingFishingRodUpgrade();
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"BeginFishingRodUpgrade failed: {e.Message}");
+                player = null;
+                return false;
+            }
+        }
+    }
+
+    public static void CompleteFishingRodUpgrade(Player? player, bool succeeded)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_pendingFishingRodUpgrades.Remove(player, out var pending)) return;
+                if (!succeeded || pending.UpgradedCards.Count == 0) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(FishingRodRelicId);
+                RecordFishingRodUpgradesForTest(agg, pending.UpgradedCards);
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"CompleteFishingRodUpgrade failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Record Lee's Waffle's observed pickup HP gain. The relic first grants
     /// max HP, which itself heals, then heals to full; the full pickup delta is
     /// clearer than splitting those two game commands into separate attempts.
@@ -6242,6 +6301,11 @@ public static class RunTracker
         => RecordRelicUpgradedCards(agg, upgradedCards);
 
     internal static void RecordFragrantMushroomUpgradesForTest(
+        RelicAggregate agg,
+        IEnumerable<string>? upgradedCards)
+        => RecordRelicUpgradedCards(agg, upgradedCards);
+
+    internal static void RecordFishingRodUpgradesForTest(
         RelicAggregate agg,
         IEnumerable<string>? upgradedCards)
         => RecordRelicUpgradedCards(agg, upgradedCards);
@@ -11948,6 +12012,7 @@ public static class RunTracker
             RecordWhetstoneCardUpgradedLocked(card);
             RecordWarPaintCardUpgradedLocked(card);
             RecordFragrantMushroomCardUpgradedLocked(card);
+            RecordFishingRodCardUpgradedLocked(card);
 
             // Non-assigning: skip upgrades on cards we haven't seen enter
             // the deck. This is what fixes the "starters begin at #5" bug
@@ -12084,6 +12149,23 @@ public static class RunTracker
         catch (Exception e)
         {
             CoreMain.LogDebug($"RecordFragrantMushroomCardUpgradedLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordFishingRodCardUpgradedLocked(CardModel card)
+    {
+        try
+        {
+            if (card == null) return;
+            var owner = card.Owner;
+            if (owner == null) return;
+            if (!_pendingFishingRodUpgrades.TryGetValue(owner, out var pending)) return;
+
+            pending.UpgradedCards.Add(GetCardDisplayNameForStats(card));
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordFishingRodCardUpgradedLocked failed: {e.Message}");
         }
     }
 
@@ -15029,6 +15111,11 @@ internal sealed class PendingWarPaintPickup
 }
 
 internal sealed class PendingFragrantMushroomPickup
+{
+    public List<string> UpgradedCards { get; } = new();
+}
+
+internal sealed class PendingFishingRodUpgrade
 {
     public List<string> UpgradedCards { get; } = new();
 }

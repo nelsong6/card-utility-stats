@@ -1321,6 +1321,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is FishingRod)
+        {
+            title = "Fishing Rod";
+            body = BuildFishingRodBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is SilverCrucible)
         {
             title = "Silver Crucible";
@@ -2157,6 +2164,13 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
+    private static string BuildFishingRodBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        AppendUpgradedCardStats(sb, agg);
+        return sb.ToString();
+    }
+
     private static string BuildSilverCrucibleBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
@@ -2467,7 +2481,7 @@ public static class RelicHoverShowPatch
 
         Row3(sb, "Cards upgraded", agg.CardsUpgraded.ToString(), "");
         foreach (var card in upgradedCards)
-            Row3(sb, "Upgraded card", StatsTooltip.EscapeBbcode(card), "");
+            RowFlow(sb, "Upgraded card", StatsTooltip.EscapeBbcode(card), "");
     }
 
     private static string BuildMealTicketBodyBBCode(RelicAggregate agg)

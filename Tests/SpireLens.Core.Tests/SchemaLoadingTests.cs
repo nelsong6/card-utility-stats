@@ -1906,6 +1906,29 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsFishingRodRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("fishing-rod-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.FISHING_ROD"];
+        Assert.Equal(2, relicAgg.CardsUpgraded);
+        Assert.Equal(new[] { "Grave Warden+", "Reap+" }, relicAgg.UpgradedCards);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsFishingRodRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("fishing-rod-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.FISHING_ROD"];
+        Assert.Equal(2, relicAgg.CardsUpgraded);
+        Assert.Equal(new[] { "Grave Warden+", "Reap+" }, relicAgg.UpgradedCards);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsBloodSoakedRoseRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("blood-soaked-rose-relic-run.json"));
