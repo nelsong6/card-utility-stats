@@ -1929,6 +1929,29 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsEggRelicOffersFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("egg-relic-offers-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.Equal(7, loaded.Data.RelicAggregates["RELIC.MOLTEN_EGG"].UpgradedCardsOffered);
+        Assert.Equal(5, loaded.Data.RelicAggregates["RELIC.TOXIC_EGG"].UpgradedCardsOffered);
+        Assert.Equal(3, loaded.Data.RelicAggregates["RELIC.FROZEN_EGG"].UpgradedCardsOffered);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsEggRelicOffersFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("egg-relic-offers-run.json"));
+
+        Assert.NotNull(resumed);
+        Assert.Equal(7, resumed!.RelicAggregates["RELIC.MOLTEN_EGG"].UpgradedCardsOffered);
+        Assert.Equal(5, resumed.RelicAggregates["RELIC.TOXIC_EGG"].UpgradedCardsOffered);
+        Assert.Equal(3, resumed.RelicAggregates["RELIC.FROZEN_EGG"].UpgradedCardsOffered);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsBloodSoakedRoseRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("blood-soaked-rose-relic-run.json"));

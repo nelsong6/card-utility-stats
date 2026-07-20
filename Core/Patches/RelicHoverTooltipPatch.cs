@@ -1328,6 +1328,27 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is MoltenEgg)
+        {
+            title = "Molten Egg";
+            body = BuildEggBodyBBCode(agg, "attacks");
+            return true;
+        }
+
+        if (relicModel is ToxicEgg)
+        {
+            title = "Toxic Egg";
+            body = BuildEggBodyBBCode(agg, "skills");
+            return true;
+        }
+
+        if (relicModel is FrozenEgg)
+        {
+            title = "Frozen Egg";
+            body = BuildEggBodyBBCode(agg, "powers");
+            return true;
+        }
+
         if (relicModel is SilverCrucible)
         {
             title = "Silver Crucible";
@@ -2168,6 +2189,13 @@ public static class RelicHoverShowPatch
     {
         var sb = new StringBuilder();
         AppendUpgradedCardStats(sb, agg);
+        return sb.ToString();
+    }
+
+    private static string BuildEggBodyBBCode(RelicAggregate agg, string cardType)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, $"Upgraded {cardType} offered", agg.UpgradedCardsOffered.ToString(), "");
         return sb.ToString();
     }
 

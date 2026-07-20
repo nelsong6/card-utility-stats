@@ -404,6 +404,15 @@ arming a window around that exact callback and consuming the existing
 `CardModel.UpgradeInternal` observation; do not infer the chosen card from deck
 state or independently reproduce the relic's RNG selection.
 
+Molten Egg, Toxic Egg, and Frozen Egg share `EggRelicHelper.UpgradeValidCards`
+for both late card-reward modification and merchant inventory modification.
+For each matching upgradable option, that helper calls the two-argument
+`CardCreationResult.ModifyCard(CardModel, RelicModel)` overload with the egg as
+the modifying relic. Observe that exact call to count upgraded cards offered:
+it covers rewards, shops, and other choosable-card surfaces that use the shared
+helper, while excluding the eggs' separate `TryModifyCardBeingAddedToDeck`
+path for direct non-choosable deck additions.
+
 Pael's sacrifice reward option is owned by `PaelsWing`, not `PaelsFlesh`.
 `PaelsWing.TryModifyCardRewardAlternatives` adds the `SACRIFICE` card reward
 alternative and `PaelsWing.OnSacrifice` increments the saved sacrifice count.

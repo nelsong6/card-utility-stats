@@ -580,6 +580,10 @@ public class RelicAggregate
     public int UncommonCardsTaken { get; set; }
     public int RareCardsTaken { get; set; }
 
+    // Total choosable card options actually upgraded by Molten Egg, Toxic Egg,
+    // or Frozen Egg. Direct card grants are intentionally excluded.
+    public int UpgradedCardsOffered { get; set; }
+
     // Total card reward options consumed when Pael's Wing's Sacrifice option
     // is selected. The game model that owns the sacrifice option is
     // PaelsWing; PaelsFlesh is the separate max-energy-after-turn-3 relic.

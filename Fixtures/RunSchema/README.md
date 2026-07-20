@@ -234,6 +234,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `fishing-rod-relic-run.json`
   Adds Fishing Rod tracking: every card actually upgraded at its three-combat
   interval, retained in upgrade order.
+- `egg-relic-offers-run.json`
+  Adds Molten, Toxic, and Frozen Egg tracking: every matching choosable card
+  option the egg actually upgraded across rewards, shops, and other offers.
 - `hefty-tablet-relic-run.json`
   Adds Hefty Tablet rare-card choice tracking: cards granted by id/name and
   skipped pickup choices.

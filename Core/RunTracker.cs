@@ -1680,6 +1680,7 @@ public static class RunTracker
         target.RareCardsOffered += source.RareCardsOffered;
         target.UncommonCardsTaken += source.UncommonCardsTaken;
         target.RareCardsTaken += source.RareCardsTaken;
+        target.UpgradedCardsOffered += source.UpgradedCardsOffered;
         target.CommonCardsConsumed += source.CommonCardsConsumed;
         target.UncommonCardsConsumed += source.UncommonCardsConsumed;
         target.RareCardsConsumed += source.RareCardsConsumed;
@@ -2509,6 +2510,9 @@ public static class RunTracker
     private const string WarPaintRelicId = "RELIC.WAR_PAINT";
     private const string FragrantMushroomRelicId = "RELIC.FRAGRANT_MUSHROOM";
     private const string FishingRodRelicId = "RELIC.FISHING_ROD";
+    private const string MoltenEggRelicId = "RELIC.MOLTEN_EGG";
+    private const string ToxicEggRelicId = "RELIC.TOXIC_EGG";
+    private const string FrozenEggRelicId = "RELIC.FROZEN_EGG";
     private const string MealTicketRelicId = "RELIC.MEAL_TICKET";
     private const string BurningBloodRelicId = "RELIC.BURNING_BLOOD";
     private const string BloodVialRelicId = "RELIC.BLOOD_VIAL";
@@ -2555,6 +2559,42 @@ public static class RunTracker
     private const string CentennialPuzzleRelicId = "RELIC.CENTENNIAL_PUZZLE";
     private const string PrecariousShearsRelicId = "RELIC.PRECARIOUS_SHEARS";
     private const string SandCastleRelicId = "RELIC.SAND_CASTLE";
+
+    /// <summary>
+    /// Record one choosable card option that an egg relic actually upgraded.
+    /// Card rewards, merchant cards, and any future offer surface using the
+    /// game's shared egg helper all pass through this observation point.
+    /// </summary>
+    public static void RecordEggUpgradedCardOffered(RelicModel eggRelic)
+    {
+        if (eggRelic == null) return;
+
+        var relicId = eggRelic switch
+        {
+            MoltenEgg => MoltenEggRelicId,
+            ToxicEgg => ToxicEggRelicId,
+            FrozenEgg => FrozenEggRelicId,
+            _ => null,
+        };
+        if (relicId == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(eggRelic) || !IsTrackedPlayer(eggRelic.Owner)) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(relicId);
+                RecordEggUpgradedCardOfferedForTest(agg);
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordEggUpgradedCardOffered failed: {e.Message}");
+            }
+        }
+    }
 
     /// <summary>
     /// Record a Bag of Marbles combat-start Vulnerable application.
@@ -6309,6 +6349,12 @@ public static class RunTracker
         RelicAggregate agg,
         IEnumerable<string>? upgradedCards)
         => RecordRelicUpgradedCards(agg, upgradedCards);
+
+    internal static void RecordEggUpgradedCardOfferedForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.UpgradedCardsOffered += Math.Max(0, count);
+    }
 
     private static void RecordRelicUpgradedCards(
         RelicAggregate agg,
