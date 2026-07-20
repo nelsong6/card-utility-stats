@@ -98,7 +98,7 @@ The controls themselves are injected only into the in-run deck viewer for now (n
 | **M5b** | Run History integration - browse past-run stats | [#9](https://github.com/romaine-life/spirelens/issues/9) |
 | **M6** | Publish v0.1 to Nexus | - |
 
-Additional shipped: discard count, pile-top placements (from hand / from discard), exhaust-others attribution, self-exhaust count, current/max-HP lost from card costs, cards-drawn attribution, blocked-draw attempt/reason tracking, Regent star-resource tracking, forge granted tracking, observed Alchemize potion gains/failures with rarity splits, recurring summon-to-hand tracking, effect application summaries, Artifact-blocked debuff tracking, and downstream poison damage attribution including stacked Noxious Fumes contributor preservation.
+Additional shipped: discard count, pile-top placements (from hand / from discard), exhaust-others attribution, self-exhaust count, current/max-HP lost from card costs, cards-drawn attribution, blocked-draw attempt/reason tracking, Regent star-resource tracking, forge granted tracking, observed Alchemize potion gains/failures with rarity splits, recurring summon-to-hand tracking, effect application summaries, Artifact-blocked debuff tracking, downstream poison damage attribution including stacked Noxious Fumes contributor preservation, and Dowsing Rod's live `?`-room countdown.
 
 Run outcome detection (win/loss/abandoned) is implemented ([#10](https://github.com/romaine-life/spirelens/issues/10), closed) via the run-history entry hook.
 

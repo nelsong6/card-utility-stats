@@ -181,6 +181,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `juzu-bracelet-relic-run.json`
   Adds Juzu Bracelet tracking for map `?` sites entered while the relic was
   held.
+- `dowsing-rod-relic-run.json`
+  Adds Dowsing Rod's current `?`-room countdown, derived from the saved Dowsing
+  quest card state.
 - `cursed-pearl-relic-run.json`
   Adds Cursed Pearl tracking for floors ascended before the first shop while
   held, plus the stats for the Greed curse granted by the relic.

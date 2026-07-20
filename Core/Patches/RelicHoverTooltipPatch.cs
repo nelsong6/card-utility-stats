@@ -5,6 +5,7 @@ using System.Text;
 using Godot;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Models.Cards;
 using MegaCrit.Sts2.Core.Models.Relics;
 using MegaCrit.Sts2.Core.Nodes.Relics;
 
@@ -901,6 +902,16 @@ public static class RelicHoverShowPatch
                 ? RunTracker.GetMiniatureCannonAggregate()
             : RunTracker.GetRelicAggregate(relicId);
 
+        if (!useEndedRun && relicModel is DowsingRod)
+        {
+            var liveRoomsRemaining = RunTracker.GetLiveDowsingRoomsRemaining();
+            if (liveRoomsRemaining.HasValue)
+            {
+                aggregate ??= new RelicAggregate();
+                aggregate.DowsingQuestionRoomsRemaining = liveRoomsRemaining.Value;
+            }
+        }
+
         if (relicModel is BloodSoakedRose && bloodSoakedRoseCurseAgg == null)
             bloodSoakedRoseCurseAgg = RunTracker.GetEnthralledCurseAggregate();
         if (relicModel is CursedPearl && cursedPearlCurseAgg == null)
@@ -1618,6 +1629,13 @@ public static class RelicHoverShowPatch
         {
             title = "Juzu Bracelet";
             body = BuildJuzuBraceletBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is DowsingRod)
+        {
+            title = "Dowsing Rod";
+            body = BuildDowsingRodBodyBBCode(agg);
             return true;
         }
 
@@ -2969,6 +2987,17 @@ public static class RelicHoverShowPatch
     {
         var sb = new StringBuilder();
         Row3(sb, "? sites entered", agg.QuestionMarkSitesEntered.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildDowsingRodBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var roomsRemaining = Math.Clamp(
+            agg.DowsingQuestionRoomsRemaining ?? Dowsing.maxRooms,
+            0,
+            Dowsing.maxRooms);
+        Row3(sb, "? rooms remaining", roomsRemaining.ToString(), "");
         return sb.ToString();
     }
 

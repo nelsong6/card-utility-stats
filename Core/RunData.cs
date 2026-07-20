@@ -705,6 +705,10 @@ public class RelicAggregate
     // Total ? map points entered while the relic was held. Used by Juzu Bracelet.
     public int QuestionMarkSitesEntered { get; set; }
 
+    // Current Dowsing quest progress granted by Dowsing Rod. Nullable keeps
+    // historic run files distinguishable from an observed zero remaining.
+    public int? DowsingQuestionRoomsRemaining { get; set; }
+
     // Floors already ascended when the first shop map point is entered while
     // the relic is held. Used by Cursed Pearl.
     public int? FloorsAscendedBeforeFirstShop { get; set; }

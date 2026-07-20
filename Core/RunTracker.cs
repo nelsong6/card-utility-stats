@@ -1126,6 +1126,7 @@ public static class RunTracker
         }
         bool strikeDummyDeckCountsChanged = RefreshStrikeDummyDeckCountsIfOwnedLocked();
         bool miniatureCannonDeckCountsChanged = RefreshMiniatureCannonDeckCountsIfOwnedLocked();
+        bool dowsingRoomsChanged = RefreshDowsingRoomsRemainingIfOwnedLocked(player);
         int stillWaiting = _pendingRankRestores.Values.Sum(q => q.Count);
         int restored = seeded - stillWaiting;
         int unmatched = deckCards - restored;
@@ -1206,7 +1207,8 @@ public static class RunTracker
         if (repairedDamageAggregates
             || prunedGhosts > 0
             || strikeDummyDeckCountsChanged
-            || miniatureCannonDeckCountsChanged)
+            || miniatureCannonDeckCountsChanged
+            || dowsingRoomsChanged)
         {
             SaveCurrentRun();
         }
@@ -1754,6 +1756,8 @@ public static class RunTracker
         MergeDiscountedCardCosts(target, source);
         target.CardsDiscarded += source.CardsDiscarded;
         target.QuestionMarkSitesEntered += source.QuestionMarkSitesEntered;
+        if (source.DowsingQuestionRoomsRemaining.HasValue)
+            target.DowsingQuestionRoomsRemaining = source.DowsingQuestionRoomsRemaining;
         if (source.FloorsAscendedBeforeFirstShop.HasValue && !target.FloorsAscendedBeforeFirstShop.HasValue)
             target.FloorsAscendedBeforeFirstShop = source.FloorsAscendedBeforeFirstShop;
         MergeCardsRemovedInto(target, source);
@@ -2540,6 +2544,7 @@ public static class RunTracker
     private const string BookmarkRelicId = "RELIC.BOOKMARK";
     private const string BrilliantScarfRelicId = "RELIC.BRILLIANT_SCARF";
     private const string JuzuBraceletRelicId = "RELIC.JUZU_BRACELET";
+    private const string DowsingRodRelicId = "RELIC.DOWSING_ROD";
     private const string HeftyTabletRelicId = "RELIC.HEFTY_TABLET";
     private const string ArcaneScrollRelicId = "RELIC.ARCANE_SCROLL";
     private const string VambraceRelicId = "RELIC.VAMBRACE";
@@ -4249,6 +4254,63 @@ public static class RunTracker
     {
         if (agg == null || count <= 0) return;
         agg.QuestionMarkSitesEntered += count;
+    }
+
+    /// <summary>
+    /// Snapshot Dowsing's own saved room counter after it changes. The quest
+    /// card, not Dowsing Rod, owns the authoritative five-room countdown.
+    /// </summary>
+    public static void RecordDowsingRoomsEntered(Dowsing? dowsing)
+    {
+        if (dowsing == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedCard(dowsing)) return;
+                if (!RefreshDowsingRoomsRemainingIfOwnedLocked(dowsing.Owner, dowsing)) return;
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordDowsingRoomsEntered failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static bool RecordDowsingRoomsEnteredForTest(
+        RelicAggregate agg,
+        int roomsEntered)
+    {
+        if (agg == null) return false;
+
+        var roomsRemaining = Math.Clamp(Dowsing.maxRooms - roomsEntered, 0, Dowsing.maxRooms);
+        if (agg.DowsingQuestionRoomsRemaining == roomsRemaining) return false;
+        agg.DowsingQuestionRoomsRemaining = roomsRemaining;
+        return true;
+    }
+
+    internal static int? GetLiveDowsingRoomsRemaining()
+    {
+        lock (_lock)
+        {
+            try
+            {
+                var player = GetTrackedRunPlayerLocked();
+                if (player == null || !PlayerHasDowsingRod(player)) return null;
+
+                var roomsEntered = GetLiveDowsingRoomsEnteredLocked(player);
+                return roomsEntered.HasValue
+                    ? Math.Clamp(Dowsing.maxRooms - roomsEntered.Value, 0, Dowsing.maxRooms)
+                    : null;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"GetLiveDowsingRoomsRemaining failed: {e.Message}");
+                return null;
+            }
+        }
     }
 
     internal static bool RecordCursedPearlFloorsBeforeFirstShopForTest(RelicAggregate agg, int floorsAscended)
@@ -9674,6 +9736,11 @@ public static class RunTracker
         lock (_lock)
         {
             RecordHeldCombatRelicBaselinesForTrackedPlayerLocked();
+            if (string.Equals(relicId, DowsingRodRelicId, StringComparison.Ordinal)
+                && RefreshDowsingRoomsRemainingIfOwnedLocked())
+            {
+                SaveCurrentRun();
+            }
 
             RelicAggregate? result = null;
 
@@ -10307,6 +10374,74 @@ public static class RunTracker
         catch
         {
             return false;
+        }
+    }
+
+    private static bool PlayerHasDowsingRod(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is DowsingRod);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool RefreshDowsingRoomsRemainingIfOwnedLocked(
+        Player? player = null,
+        Dowsing? dowsing = null)
+    {
+        if (_currentRun == null || !CurrentRunMatchesLiveGameLocked()) return false;
+
+        player ??= GetTrackedRunPlayerLocked();
+        if (player == null || !IsTrackedPlayer(player) || !PlayerHasDowsingRod(player))
+            return false;
+
+        var roomsEntered = GetLiveDowsingRoomsEnteredLocked(player, dowsing);
+        if (!roomsEntered.HasValue) return false;
+
+        var roomsRemaining = Math.Clamp(
+            Dowsing.maxRooms - roomsEntered.Value,
+            0,
+            Dowsing.maxRooms);
+        if (_currentRun.RelicAggregates.TryGetValue(DowsingRodRelicId, out var existing)
+            && existing.DowsingQuestionRoomsRemaining == roomsRemaining)
+            return false;
+
+        var agg = GetOrCreateCurrentRunRelicAggregateLocked(DowsingRodRelicId);
+        return RecordDowsingRoomsEnteredForTest(agg, roomsEntered.Value);
+    }
+
+    private static int? GetLiveDowsingRoomsEnteredLocked(
+        Player player,
+        Dowsing? dowsing = null)
+    {
+        dowsing ??= player.Deck?.Cards?.OfType<Dowsing>().FirstOrDefault();
+        if (dowsing != null) return dowsing.RoomsEntered;
+
+        // Dowsing transforms into Abundance when its fifth ? room resolves.
+        // This reconstructs completion for runs first observed afterward.
+        return player.Deck?.Cards?.Any(card => card is Abundance) == true
+            ? Dowsing.maxRooms
+            : null;
+    }
+
+    private static bool CurrentRunMatchesLiveGameLocked()
+    {
+        if (_currentRun == null) return false;
+
+        try
+        {
+            var liveGameStartTime = RunManager.Instance._startTime;
+            return liveGameStartTime == 0
+                   || !_currentRun.GameStartTime.HasValue
+                   || _currentRun.GameStartTime.Value == liveGameStartTime;
+        }
+        catch
+        {
+            return true;
         }
     }
 

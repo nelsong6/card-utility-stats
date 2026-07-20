@@ -388,6 +388,14 @@ Juzu Bracelet is map-point based, not resolved-room based. Count
 `RoomType.Event` or `EventRoom`: a `?` can resolve into multiple room types, and
 later room transitions can happen after the map site was already entered.
 
+Dowsing Rod itself only grants the Dowsing quest card. The card owns the saved
+`RoomsEntered` counter, updates it only for qualifying `?` room entries, and
+transforms into Abundance at five. Observe the `Dowsing.RoomsEntered` setter and
+derive remaining rooms as `5 - RoomsEntered`; do not independently decrement at
+the broader map-point hook. Reconcile from the live Dowsing/Abundance deck card
+after Continue or hot reload so the relic tooltip inherits the game's persisted
+quest state.
+
 Pael's sacrifice reward option is owned by `PaelsWing`, not `PaelsFlesh`.
 `PaelsWing.TryModifyCardRewardAlternatives` adds the `SACRIFICE` card reward
 alternative and `PaelsWing.OnSacrifice` increments the saved sacrifice count.

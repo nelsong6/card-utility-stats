@@ -2679,6 +2679,29 @@ public class SchemaLoadingTests
         Assert.Equal(24m, resumed!.MetaStats.ExtraBlockGainedFromUnmovablePower);
     }
 
+    [Fact]
+    public void HistoricalLoad_AcceptsDowsingRodRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("dowsing-rod-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.Equal(
+            2,
+            loaded.Data.RelicAggregates["RELIC.DOWSING_ROD"].DowsingQuestionRoomsRemaining);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsDowsingRodRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("dowsing-rod-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        Assert.Equal(
+            2,
+            resumed!.RelicAggregates["RELIC.DOWSING_ROD"].DowsingQuestionRoomsRemaining);
+    }
+
     private static void AssertLeafyPoulticeTransformations(RelicAggregate relicAgg)
     {
         Assert.Equal(2, relicAgg.CardTransformations.Count);
