@@ -63,8 +63,9 @@ relic's classification with the game's enemy-map icon for combat or top-bar
 map icon for non-combat. Inspecting a discovered relic opens explicit **Combat**
 and **Non-combat** radio buttons on the full relic inspection screen. Combat
 relics also have an **Always / Until turn 1 / Until turn 2 / Until turn 3**
-dropdown; a finite assignment stays visible through that turn, then leaves the
-filtered relic bar on the following turn. The same assignment controls appear
+dropdown; a finite assignment leaves the filtered relic bar when that turn
+begins. For example, **Until turn 2** shows the relic on turn 1 and hides it
+starting on turn 2. The same assignment controls appear
 when inspecting an owned relic from the in-run relic bar. The duration dropdown
 stays available for both categories; choosing a duration also selects Combat.
 Changes apply immediately and are saved under

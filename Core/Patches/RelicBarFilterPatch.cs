@@ -87,10 +87,13 @@ public static class RelicBarFilterPatch
         if (IsNonCombatRelic(relicModel)) return false;
 
         var relevantUntilTurn = RelicClassificationStore.GetCombatRelevantUntilTurn(relicModel);
-        return !relevantUntilTurn.HasValue
-               || currentTurn <= 0
-               || currentTurn <= relevantUntilTurn.Value;
+        return IsBeforeCombatRelevanceCutoff(currentTurn, relevantUntilTurn);
     }
+
+    internal static bool IsBeforeCombatRelevanceCutoff(int currentTurn, int? hiddenStartingTurn)
+        => !hiddenStartingTurn.HasValue
+           || currentTurn <= 0
+           || currentTurn < hiddenStartingTurn.Value;
 
     private static void ApplyToHolder(NRelicInventoryHolder holder)
     {

@@ -131,7 +131,7 @@ internal static class RelicClassificationStore
         Save();
         CoreMain.Logger.Info(
             $"Relic combat relevance changed: {relicId} => " +
-            (normalizedTurn.HasValue ? $"through turn {normalizedTurn.Value}" : "always"));
+            (normalizedTurn.HasValue ? $"until turn {normalizedTurn.Value}" : "always"));
         Patches.RelicBarFilterPatch.RefreshAll("combat relevance duration changed");
         return true;
     }

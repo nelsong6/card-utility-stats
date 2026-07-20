@@ -9,6 +9,16 @@ namespace SpireLens.Core.Tests;
 public class RelicCompendiumFilterTests
 {
     [Fact]
+    public void CombatRelevanceTurn_IsAnExclusiveCutoff()
+    {
+        Assert.True(RelicBarFilterPatch.IsBeforeCombatRelevanceCutoff(0, 2));
+        Assert.True(RelicBarFilterPatch.IsBeforeCombatRelevanceCutoff(1, 2));
+        Assert.False(RelicBarFilterPatch.IsBeforeCombatRelevanceCutoff(2, 2));
+        Assert.False(RelicBarFilterPatch.IsBeforeCombatRelevanceCutoff(3, 2));
+        Assert.True(RelicBarFilterPatch.IsBeforeCombatRelevanceCutoff(3, null));
+    }
+
+    [Fact]
     public void Taxonomy_OmitsRemovedEnergyCategory()
     {
         Assert.DoesNotContain(RelicTaxonomy.Categories, category => category.Id == "energy");
