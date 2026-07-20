@@ -2179,6 +2179,7 @@ public static class RelicHoverShowPatch
                 continue;
             }
 
+            sb.Append($"[color=#e0e0e0]Card reward {screenNumber}[/color]\n");
             foreach (var card in cards)
             {
                 if (card == null) continue;
@@ -2188,15 +2189,28 @@ public static class RelicHoverShowPatch
                     : !string.IsNullOrWhiteSpace(card.CardId)
                         ? RunTracker.FormatCardIdForDisplay(card.CardId)
                         : "Unknown card";
-                Row3(
+                AppendSilverCrucibleCardRow(
                     sb,
-                    $"Card reward {screenNumber}",
                     StatsTooltip.EscapeBbcode(displayName),
                     !screen.Resolved ? "pending" : card.Taken ? "taken" : "not taken");
             }
         }
 
         return sb.ToString();
+    }
+
+    private static void AppendSilverCrucibleCardRow(
+        StringBuilder sb,
+        string displayName,
+        string outcome)
+    {
+        // Card names need substantially more room than ordinary numeric stat
+        // values. Keeping them out of Row3's narrow middle column prevents
+        // multi-word names such as Grave Warden from wrapping and staggering.
+        sb.Append("[table=2]");
+        sb.Append($"[cell expand=4 padding=12,0,12,0][b]{displayName}[/b][/cell]");
+        sb.Append($"[cell expand=2 padding=0,0,4,0][right][color=#b5b5b5]{outcome}[/color][/right][/cell]");
+        sb.Append("[/table]\n");
     }
 
     private static string BuildBloodSoakedRoseBodyBBCode(RelicAggregate agg, CardAggregate curseAgg)
