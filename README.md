@@ -73,10 +73,12 @@ Changes apply immediately and are saved under
 `scripts/sync-relic-classifications.ps1` to promote the working file into the
 repository's shipped default.
 
-The relic compendium's charge-category memberships are maintained in
-`Core/Config/relic-taxonomy.json`. Edit the relic IDs there, then rebuild and
-hot-reload the Core to apply the changes. Category hierarchy and display names
-remain defined in `Core/RelicTaxonomy.cs`.
+The relic compendium's charge taxonomy is maintained in
+`Core/Config/relic-taxonomy.json`. Its nested objects mirror the category tree,
+and its top-level `uncategorized` list contains every relic not assigned to a
+leaf category. Every relic ID appears exactly once and each list is alphabetical.
+Move IDs between lists, then rebuild and hot-reload the Core to apply changes;
+display names remain defined in `Core/RelicTaxonomy.cs`.
 
 Turning stats off hides any open SpireLens panel and skips aggregate
 lookup and tooltip construction while stats are hidden; attribution continues
