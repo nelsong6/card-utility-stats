@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 
 namespace SpireLens.Core;
 
@@ -19,6 +20,8 @@ internal enum RelicTaxonomyCategorySelectionState
 
 internal static class RelicTaxonomy
 {
+    private const string EmbeddedFileSuffix = "Config.relic-taxonomy.json";
+
     public const string ChargeCategoryId = "charge";
     public const string ChargeAcrossCombatsCategoryId = "charge_across_combats";
     public const string ChargeAcrossCombatsCyclingCategoryId = "charge_across_combats_cycling";
@@ -30,54 +33,28 @@ internal static class RelicTaxonomy
     public const string ChargeResetsEachTurnUnlimitedActivationsCategoryId =
         "charge_resets_each_turn_unlimited_activations";
 
+    private static readonly IReadOnlySet<string> EmptyRelicIds =
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+    private static readonly IReadOnlyDictionary<string, IReadOnlySet<string>> RelicIdsByCategory =
+        LoadRelicIdsByCategory();
+
     private static readonly RelicTaxonomyCategory ChargeAcrossTurnsCategory = new(
         ChargeAcrossTurnsCategoryId,
         "Across turns",
-        new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "RELIC.METRONOME",
-            "RELIC.PAELS_FLESH",
-            "RELIC.PAELS_LEGION",
-            "RELIC.STONE_CALENDAR",
-        },
+        RelicIdsFor(ChargeAcrossTurnsCategoryId),
         []);
 
     private static readonly RelicTaxonomyCategory ChargeAcrossCombatsCyclingCategory = new(
         ChargeAcrossCombatsCyclingCategoryId,
         "Cycling",
-        new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "RELIC.BOOK_OF_FIVE_RINGS",
-            "RELIC.FAKE_HAPPY_FLOWER",
-            "RELIC.FISHING_ROD",
-            "RELIC.GALACTIC_DUST",
-            "RELIC.HAPPY_FLOWER",
-            "RELIC.IRON_CLUB",
-            "RELIC.JOSS_PAPER",
-            "RELIC.LASTING_CANDY",
-            "RELIC.NUNCHAKU",
-            "RELIC.PAELS_WING",
-            "RELIC.PENDULUM",
-            "RELIC.PEN_NIB",
-            "RELIC.POLLINOUS_CORE",
-            "RELIC.TOY_BOX",
-            "RELIC.TUNING_FORK",
-        },
+        RelicIdsFor(ChargeAcrossCombatsCyclingCategoryId),
         []);
 
     private static readonly RelicTaxonomyCategory ChargeAcrossCombatsNonCyclingCategory = new(
         ChargeAcrossCombatsNonCyclingCategoryId,
         "Non-cycling",
-        new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "RELIC.GIRYA",
-            "RELIC.PAELS_TOOTH",
-            "RELIC.PUMPKIN_CANDLE",
-            "RELIC.SILVER_CRUCIBLE",
-            "RELIC.SWORD_OF_STONE",
-            "RELIC.WINGED_BOOTS",
-            "RELIC.WONGOS_MYSTERY_TICKET",
-        },
+        RelicIdsFor(ChargeAcrossCombatsNonCyclingCategoryId),
         []);
 
     private static readonly RelicTaxonomyCategory ChargeAcrossCombatsCategory = new(
@@ -92,27 +69,13 @@ internal static class RelicTaxonomy
     private static readonly RelicTaxonomyCategory ChargeResetsEachTurnLimitedActivationsCategory = new(
         ChargeResetsEachTurnLimitedActivationsCategoryId,
         "Limited activations",
-        new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "RELIC.BRILLIANT_SCARF",
-            "RELIC.DIAMOND_DIADEM",
-            "RELIC.POCKETWATCH",
-            "RELIC.RAINBOW_RING",
-            "RELIC.VELVET_CHOKER",
-        },
+        RelicIdsFor(ChargeResetsEachTurnLimitedActivationsCategoryId),
         []);
 
     private static readonly RelicTaxonomyCategory ChargeResetsEachTurnUnlimitedActivationsCategory = new(
         ChargeResetsEachTurnUnlimitedActivationsCategoryId,
         "Unlimited activations",
-        new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "RELIC.KUNAI",
-            "RELIC.KUSARIGAMA",
-            "RELIC.LETTER_OPENER",
-            "RELIC.ORNAMENTAL_FAN",
-            "RELIC.SHURIKEN",
-        },
+        RelicIdsFor(ChargeResetsEachTurnUnlimitedActivationsCategoryId),
         []);
 
     private static readonly RelicTaxonomyCategory ChargeResetsEachTurnCategory = new(
@@ -223,6 +186,44 @@ internal static class RelicTaxonomy
         return LeafCategories.Any(category =>
             selected.Contains(category.Id)
             && category.RelicIds.Contains(relicId));
+    }
+
+    private static IReadOnlySet<string> RelicIdsFor(string categoryId)
+    {
+        return RelicIdsByCategory.TryGetValue(categoryId, out var relicIds)
+            ? relicIds
+            : EmptyRelicIds;
+    }
+
+    private static IReadOnlyDictionary<string, IReadOnlySet<string>> LoadRelicIdsByCategory()
+    {
+        try
+        {
+            var assembly = typeof(RelicTaxonomy).Assembly;
+            var resourceName = assembly.GetManifestResourceNames().FirstOrDefault(name =>
+                name.EndsWith(EmbeddedFileSuffix, StringComparison.Ordinal));
+            if (resourceName == null)
+                throw new InvalidOperationException("Embedded relic taxonomy was not found.");
+
+            using var stream = assembly.GetManifestResourceStream(resourceName)
+                ?? throw new InvalidOperationException("Embedded relic taxonomy could not be opened.");
+            var document = JsonSerializer.Deserialize<Dictionary<string, List<string>>>(stream)
+                ?? new Dictionary<string, List<string>>();
+
+            return document.ToDictionary(
+                pair => pair.Key,
+                pair => (IReadOnlySet<string>)new HashSet<string>(
+                    pair.Value
+                        .Where(id => !string.IsNullOrWhiteSpace(id))
+                        .Select(id => id.Trim()),
+                    StringComparer.OrdinalIgnoreCase),
+                StringComparer.OrdinalIgnoreCase);
+        }
+        catch (Exception e)
+        {
+            CoreMain.Logger.Error($"Could not read embedded relic taxonomy: {e.Message}");
+            return new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase);
+        }
     }
 
     private static IReadOnlyList<RelicTaxonomyCategory> Flatten(

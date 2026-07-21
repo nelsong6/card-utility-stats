@@ -62,6 +62,7 @@
 
     <ItemGroup>
         <EmbeddedResource Include="Config\relic-classifications.json" />
+        <EmbeddedResource Include="Config\relic-taxonomy.json" />
     </ItemGroup>
 
     <!-- Only compile files in this directory and subdirectories; ignore the rest of the repo. -->

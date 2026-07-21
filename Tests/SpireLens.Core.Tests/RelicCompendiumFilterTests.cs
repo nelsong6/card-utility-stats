@@ -160,6 +160,7 @@ public class RelicCompendiumFilterTests
         Assert.Equal(
             new[]
             {
+                "RELIC.ART_OF_WAR",
                 "RELIC.BRILLIANT_SCARF",
                 "RELIC.DIAMOND_DIADEM",
                 "RELIC.POCKETWATCH",

@@ -73,6 +73,11 @@ Changes apply immediately and are saved under
 `scripts/sync-relic-classifications.ps1` to promote the working file into the
 repository's shipped default.
 
+The relic compendium's charge-category memberships are maintained in
+`Core/Config/relic-taxonomy.json`. Edit the relic IDs there, then rebuild and
+hot-reload the Core to apply the changes. Category hierarchy and display names
+remain defined in `Core/RelicTaxonomy.cs`.
+
 Turning stats off hides any open SpireLens panel and skips aggregate
 lookup and tooltip construction while stats are hidden; attribution continues
 in the background. Controller Left Trigger remains the game's Draw Pile input,

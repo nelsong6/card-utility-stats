@@ -1,0 +1,49 @@
+{
+  "charge_across_combats_cycling": [
+    "RELIC.BOOK_OF_FIVE_RINGS",
+    "RELIC.FAKE_HAPPY_FLOWER",
+    "RELIC.FISHING_ROD",
+    "RELIC.GALACTIC_DUST",
+    "RELIC.HAPPY_FLOWER",
+    "RELIC.IRON_CLUB",
+    "RELIC.JOSS_PAPER",
+    "RELIC.LASTING_CANDY",
+    "RELIC.NUNCHAKU",
+    "RELIC.PAELS_WING",
+    "RELIC.PENDULUM",
+    "RELIC.PEN_NIB",
+    "RELIC.POLLINOUS_CORE",
+    "RELIC.TOY_BOX",
+    "RELIC.TUNING_FORK"
+  ],
+  "charge_across_combats_non_cycling": [
+    "RELIC.GIRYA",
+    "RELIC.PAELS_TOOTH",
+    "RELIC.PUMPKIN_CANDLE",
+    "RELIC.SILVER_CRUCIBLE",
+    "RELIC.SWORD_OF_STONE",
+    "RELIC.WINGED_BOOTS",
+    "RELIC.WONGOS_MYSTERY_TICKET"
+  ],
+  "charge_across_turns": [
+    "RELIC.METRONOME",
+    "RELIC.PAELS_FLESH",
+    "RELIC.PAELS_LEGION",
+    "RELIC.STONE_CALENDAR"
+  ],
+  "charge_resets_each_turn_limited_activations": [
+    "RELIC.ART_OF_WAR",
+    "RELIC.BRILLIANT_SCARF",
+    "RELIC.DIAMOND_DIADEM",
+    "RELIC.POCKETWATCH",
+    "RELIC.RAINBOW_RING",
+    "RELIC.VELVET_CHOKER"
+  ],
+  "charge_resets_each_turn_unlimited_activations": [
+    "RELIC.KUNAI",
+    "RELIC.KUSARIGAMA",
+    "RELIC.LETTER_OPENER",
+    "RELIC.ORNAMENTAL_FAN",
+    "RELIC.SHURIKEN"
+  ]
+}
