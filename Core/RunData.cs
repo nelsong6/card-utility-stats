@@ -687,6 +687,21 @@ public class RelicAggregate
     public int IntimidatingHelmetCombats { get; set; }
     public int IntimidatingHelmetTurns { get; set; }
 
+    // Mummified Hand tracking. Activations is every qualifying owner Power
+    // play, including triggers with no card left to discount. Power cost uses
+    // the play-time EnergyValue; the ratio uses actual EnergySpent divided by
+    // the selected card's pre-discount energy cost. Combats and turns are held
+    // denominators, including zero-trigger periods.
+    public decimal MummifiedHandTriggeringPowerCostTotal { get; set; }
+    public decimal MummifiedHandDiscountGivenTotal { get; set; }
+    public decimal MummifiedHandEnergySpentToDiscountedCostRatioTotal { get; set; }
+    public int MummifiedHandEnergySpentToDiscountedCostRatioCount { get; set; }
+    public int MummifiedHandCombats { get; set; }
+    public int MummifiedHandTurns { get; set; }
+    public int MummifiedHandDiscountedPowers { get; set; }
+    public int MummifiedHandDiscountedAttacks { get; set; }
+    public int MummifiedHandDiscountedSkills { get; set; }
+
     // Bookmark tracking. Activations is total cost-reduction activations;
     // BookmarkCombats is the denominator for average activations per combat.
     public int BookmarkCombats { get; set; }

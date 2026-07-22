@@ -1541,6 +1541,7 @@ public static class RunTracker
         RecordTuningForkTurnForTrackedPlayerLocked();
         RecordPaperPhrogTurnForTrackedPlayerLocked();
         RecordRazorToothTurnForTrackedPlayerLocked();
+        RecordMummifiedHandTurnForTrackedPlayerLocked();
         RecordPaelsEyeCombatsWithoutActivationForTrackedPlayerLocked();
         RecordTurnEnergyRelicCombatsWithoutEnergyForTrackedPlayerLocked();
         RecordNunchakuCombatEndChargeForTrackedPlayerLocked();
@@ -1736,6 +1737,15 @@ public static class RunTracker
         target.RegaliteTurns += source.RegaliteTurns;
         target.IntimidatingHelmetCombats += source.IntimidatingHelmetCombats;
         target.IntimidatingHelmetTurns += source.IntimidatingHelmetTurns;
+        target.MummifiedHandTriggeringPowerCostTotal += source.MummifiedHandTriggeringPowerCostTotal;
+        target.MummifiedHandDiscountGivenTotal += source.MummifiedHandDiscountGivenTotal;
+        target.MummifiedHandEnergySpentToDiscountedCostRatioTotal += source.MummifiedHandEnergySpentToDiscountedCostRatioTotal;
+        target.MummifiedHandEnergySpentToDiscountedCostRatioCount += source.MummifiedHandEnergySpentToDiscountedCostRatioCount;
+        target.MummifiedHandCombats += source.MummifiedHandCombats;
+        target.MummifiedHandTurns += source.MummifiedHandTurns;
+        target.MummifiedHandDiscountedPowers += source.MummifiedHandDiscountedPowers;
+        target.MummifiedHandDiscountedAttacks += source.MummifiedHandDiscountedAttacks;
+        target.MummifiedHandDiscountedSkills += source.MummifiedHandDiscountedSkills;
 
         target.BookmarkCombats += source.BookmarkCombats;
         target.BookmarkCommonActivations += source.BookmarkCommonActivations;
@@ -2611,6 +2621,7 @@ public static class RunTracker
     private const string PaperPhrogRelicId = "RELIC.PAPER_PHROG";
     private const string RegaliteRelicId = "RELIC.REGALITE";
     private const string IntimidatingHelmetRelicId = "RELIC.INTIMIDATING_HELMET";
+    private const string MummifiedHandRelicId = "RELIC.MUMMIFIED_HAND";
     private const string BookmarkRelicId = "RELIC.BOOKMARK";
     private const string BrilliantScarfRelicId = "RELIC.BRILLIANT_SCARF";
     private const string JuzuBraceletRelicId = "RELIC.JUZU_BRACELET";
@@ -7352,6 +7363,69 @@ public static class RunTracker
         }
     }
 
+    /// <summary>
+    /// Record Mummified Hand from the relic's completed AfterCardPlayed call.
+    /// The selected card and its before/after effective energy costs are
+    /// captured around the exact SetToFreeThisTurn invocation made by the
+    /// relic, rather than inferred from later cost queries.
+    /// </summary>
+    public static void RecordMummifiedHandTrigger(
+        MummifiedHand relic,
+        CardPlay cardPlay,
+        CardModel? discountedCard,
+        decimal discountedCardCostBefore,
+        decimal discountedCardCostAfter)
+    {
+        if (relic?.Owner == null || cardPlay?.Card == null) return;
+        if (!ReferenceEquals(cardPlay.Card.Owner, relic.Owner)) return;
+        if (cardPlay.Card.Type != CardType.Power) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(relic.Owner)) return;
+                if (CombatManager.Instance?.IsInProgress != true) return;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordMummifiedHandCombatForPlayerLocked(relic.Owner);
+                RecordMummifiedHandTurnForPlayerLocked(relic.Owner);
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(MummifiedHandRelicId);
+                RecordMummifiedHandTriggerForTest(
+                    agg,
+                    triggeringPowerCost: cardPlay.Resources.EnergyValue,
+                    triggeringPowerEnergySpent: cardPlay.Resources.EnergySpent,
+                    discountedCardCostBefore,
+                    discountedCardCostAfter,
+                    discountedCard?.Type);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordMummifiedHandTrigger failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordMummifiedHandTurnStarted(Player player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                _pendingCombat ??= new PendingCombat();
+                RecordMummifiedHandTurnForPlayerLocked(player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordMummifiedHandTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
     internal static void RecordPaperPhrogVulnerableBonusForTest(
         RelicAggregate agg,
         decimal damageAdded,
@@ -7418,6 +7492,57 @@ public static class RunTracker
     {
         if (agg == null) return;
         agg.IntimidatingHelmetTurns += Math.Max(0, count);
+    }
+
+    internal static void RecordMummifiedHandTriggerForTest(
+        RelicAggregate agg,
+        int triggeringPowerCost,
+        int triggeringPowerEnergySpent,
+        decimal discountedCardCostBefore,
+        decimal discountedCardCostAfter,
+        CardType? discountedCardType)
+    {
+        if (agg == null) return;
+
+        var powerCost = Math.Max(0, triggeringPowerCost);
+        var energySpent = Math.Max(0, triggeringPowerEnergySpent);
+        var costBefore = Math.Max(0m, discountedCardCostBefore);
+        var costAfter = Math.Max(0m, discountedCardCostAfter);
+
+        agg.Activations += 1;
+        agg.MummifiedHandTriggeringPowerCostTotal += powerCost;
+        agg.MummifiedHandDiscountGivenTotal += Math.Max(0m, costBefore - costAfter);
+
+        if (costBefore > 0m)
+        {
+            agg.MummifiedHandEnergySpentToDiscountedCostRatioTotal += energySpent / costBefore;
+            agg.MummifiedHandEnergySpentToDiscountedCostRatioCount += 1;
+        }
+
+        switch (discountedCardType)
+        {
+            case CardType.Power:
+                agg.MummifiedHandDiscountedPowers += 1;
+                break;
+            case CardType.Attack:
+                agg.MummifiedHandDiscountedAttacks += 1;
+                break;
+            case CardType.Skill:
+                agg.MummifiedHandDiscountedSkills += 1;
+                break;
+        }
+    }
+
+    internal static void RecordMummifiedHandCombatForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.MummifiedHandCombats += Math.Max(0, count);
+    }
+
+    internal static void RecordMummifiedHandTurnForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.MummifiedHandTurns += Math.Max(0, count);
     }
 
     internal static void RecordBookmarkCombatForTest(RelicAggregate agg, int count = 1)
@@ -10737,6 +10862,7 @@ public static class RunTracker
             RecordRazorToothCombatForPlayerLocked(player);
             RecordRegaliteCombatForPlayerLocked(player);
             RecordIntimidatingHelmetCombatForPlayerLocked(player);
+            RecordMummifiedHandCombatForPlayerLocked(player);
         }
         catch (Exception e)
         {
@@ -11015,6 +11141,50 @@ public static class RunTracker
         RecordIntimidatingHelmetTurnForTest(agg);
     }
 
+    private static void RecordMummifiedHandCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasMummifiedHand(player)) return;
+        if (!_pendingCombat.MummifiedHandCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(MummifiedHandRelicId);
+        RecordMummifiedHandCombatForTest(agg);
+    }
+
+    private static void RecordMummifiedHandTurnForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordMummifiedHandTurnForPlayerLocked(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordMummifiedHandTurnForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordMummifiedHandTurnForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasMummifiedHand(player)) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.MummifiedHandTurnCountedTurns.TryGetValue(player, out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.MummifiedHandTurnCountedTurns[player] = turnNumber;
+        RecordMummifiedHandCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(MummifiedHandRelicId);
+        RecordMummifiedHandTurnForTest(agg);
+    }
+
     private static void RecordNutritiousSoupCombatForPlayerLocked(Player player)
     {
         if (_pendingCombat == null) return;
@@ -11253,6 +11423,18 @@ public static class RunTracker
         try
         {
             return player.Relics.Any(r => r is BrilliantScarf);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool PlayerHasMummifiedHand(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is MummifiedHand);
         }
         catch
         {
@@ -15158,6 +15340,10 @@ internal class PendingCombat
     public HashSet<Player> IronClubCombatEndChargeRecordedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> BrilliantScarfCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> MummifiedHandCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> MummifiedHandTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> NutritiousSoupCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

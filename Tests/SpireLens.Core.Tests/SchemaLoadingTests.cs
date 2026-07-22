@@ -2819,6 +2819,39 @@ public class SchemaLoadingTests
         Assert.Equal("Shrug It Off", relicAgg.CardTransformations[1].ResultDisplayName);
     }
 
+    [Fact]
+    public void HistoricalLoad_AcceptsMummifiedHandRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("mummified-hand-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertMummifiedHandFixture(loaded.Data.RelicAggregates["RELIC.MUMMIFIED_HAND"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsMummifiedHandRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("mummified-hand-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertMummifiedHandFixture(resumed!.RelicAggregates["RELIC.MUMMIFIED_HAND"]);
+    }
+
+    private static void AssertMummifiedHandFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(4, relicAgg.Activations);
+        Assert.Equal(6m, relicAgg.MummifiedHandTriggeringPowerCostTotal);
+        Assert.Equal(6m, relicAgg.MummifiedHandDiscountGivenTotal);
+        Assert.Equal(1.25m, relicAgg.MummifiedHandEnergySpentToDiscountedCostRatioTotal);
+        Assert.Equal(2, relicAgg.MummifiedHandEnergySpentToDiscountedCostRatioCount);
+        Assert.Equal(2, relicAgg.MummifiedHandCombats);
+        Assert.Equal(5, relicAgg.MummifiedHandTurns);
+        Assert.Equal(1, relicAgg.MummifiedHandDiscountedPowers);
+        Assert.Equal(1, relicAgg.MummifiedHandDiscountedAttacks);
+        Assert.Equal(1, relicAgg.MummifiedHandDiscountedSkills);
+    }
+
     private static void AssertFresnelLensFixture(RelicAggregate relicAgg)
     {
         Assert.Equal(70m, relicAgg.OriginalMaxHp);

@@ -272,6 +272,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `tuning-fork-relic-run.json`
   Adds Tuning Fork owner Skill-play count, trigger count, observed block
   gained, held combat/turn denominators, and turn-end charge buckets.
+- `mummified-hand-relic-run.json`
+  Adds Mummified Hand trigger costs, observed card discounts, energy-spend to
+  discounted-cost ratios, held combat/turn denominators, and recipient types.
 - `ripple-basin-relic-run.json`
   Adds Ripple Basin no-attack turn-end activation tracking plus observed block
   gained.

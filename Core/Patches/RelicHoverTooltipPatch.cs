@@ -1671,6 +1671,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is MummifiedHand)
+        {
+            title = "Mummified Hand";
+            body = BuildMummifiedHandBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is JuzuBracelet)
         {
             title = "Juzu Bracelet";
@@ -3070,6 +3077,43 @@ public static class RelicHoverShowPatch
                 "");
         }
 
+        return sb.ToString();
+    }
+
+    private static string BuildMummifiedHandBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var averageTriggeringPowerCost = agg.Activations <= 0
+            ? 0m
+            : agg.MummifiedHandTriggeringPowerCostTotal / agg.Activations;
+        var averageDiscountGiven = agg.Activations <= 0
+            ? 0m
+            : agg.MummifiedHandDiscountGivenTotal / agg.Activations;
+        var averageEnergySpentToDiscountedCostRatio =
+            agg.MummifiedHandEnergySpentToDiscountedCostRatioCount <= 0
+                ? 0m
+                : agg.MummifiedHandEnergySpentToDiscountedCostRatioTotal
+                  / agg.MummifiedHandEnergySpentToDiscountedCostRatioCount;
+        var averageActivationsPerCombat = agg.MummifiedHandCombats <= 0
+            ? 0m
+            : (decimal)agg.Activations / agg.MummifiedHandCombats;
+        var averageActivationsPerTurn = agg.MummifiedHandTurns <= 0
+            ? 0m
+            : (decimal)agg.Activations / agg.MummifiedHandTurns;
+
+        Row3(sb, "Times triggered", agg.Activations.ToString(), "");
+        Row3(sb, EnergyLabel("Avg cost of triggering Power"), FormatDecimal(averageTriggeringPowerCost), "");
+        Row3(sb, EnergyLabel("Avg discount given"), FormatDecimal(averageDiscountGiven), "");
+        Row3(
+            sb,
+            "Avg ratio: Power energy spent / discounted card cost",
+            FormatDecimal(averageEnergySpentToDiscountedCostRatio),
+            "");
+        Row3(sb, "Avg activations per combat", FormatDecimal(averageActivationsPerCombat), "");
+        Row3(sb, "Avg activations per turn", FormatDecimal(averageActivationsPerTurn), "");
+        Row3(sb, "Discounted Powers", agg.MummifiedHandDiscountedPowers.ToString(), "");
+        Row3(sb, "Discounted Attacks", agg.MummifiedHandDiscountedAttacks.ToString(), "");
+        Row3(sb, "Discounted Skills", agg.MummifiedHandDiscountedSkills.ToString(), "");
         return sb.ToString();
     }
 

@@ -555,6 +555,13 @@ queried repeatedly for UI/playability, so count the offer from the counter
 transition and use the modifier only to measure energy saved by the card that
 later consumes the offer.
 
+Mummified Hand resolves entirely inside its `AfterCardPlayed` callback despite
+returning `Task.CompletedTask`: after an owner Power play, it selects one card
+already in hand and calls that card's `SetToFreeThisTurn`. Observe the selected
+card and its effective energy cost immediately around that exact call. The
+triggering `CardPlay.Resources.EnergyValue` is the Power's play-time cost, while
+`EnergySpent` is the distinct numerator for spend-to-discounted-cost ratios.
+
 Shovel adds `DigRestSiteOption` from `TryModifyRestSiteOptions`; the relic
 itself does not receive the obtained relic payload. Patch
 `DigRestSiteOption.OnSelect`, snapshot the owner's relic inventory before the
