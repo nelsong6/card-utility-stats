@@ -91,6 +91,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `alchemize-card-run.json`
   Adds Alchemize potion procurement tracking with successful common, uncommon,
   and rare potion splits plus failed procure results.
+- `debt-card-run.json`
+  Adds Debt end-of-turn trigger tracking with observed gold lost and the
+  unaffordable portion blocked by the player being out of gold.
 - `phylactery-relic-run.json`
   Adds Bound Phylactery and Phylactery Unbound activation tracking plus actual
   Osty summon HP gained from the shared summon command result.

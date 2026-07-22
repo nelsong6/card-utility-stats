@@ -193,6 +193,15 @@ belt (currently a full belt or a `ShouldProcurePotion` blocker such as Sozu).
 Do not resolve the source after awaiting: `CardPlayFinished` can clear the
 current-card context as soon as Alchemize resumes.
 
+Debt applies its curse effect from the owner-specific
+`Debt.OnTurnEndInHand(PlayerChoiceContext)` callback. Its intended loss is the
+card's `Gold` dynamic var, but Debt clamps the amount passed to
+`PlayerCmd.LoseGold` to the owner's current balance. Observe the owner's gold
+before and after the completed callback: that delta is actual gold lost, and
+`intended - actual` is the amount blocked by insufficient gold. Patching the
+generic gold-loss command would lose Debt's unclamped intent and risk
+attributing unrelated gold changes.
+
 ## Damage Attribution
 
 For direct card damage, `DamageReceivedEntry` is the important observed outcome.

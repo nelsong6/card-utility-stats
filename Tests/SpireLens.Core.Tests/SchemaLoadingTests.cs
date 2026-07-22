@@ -498,6 +498,21 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsDebtCardFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("debt-card-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        var cardAgg = loaded.Data.Aggregates["CARD.DEBT#1"];
+        Assert.Equal(4, cardAgg.DebtTriggers);
+        Assert.Equal(23, cardAgg.DebtGoldLost);
+        Assert.Equal(17, cardAgg.DebtGoldLossBlocked);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsPhylacteryRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("phylactery-relic-run.json"));
@@ -1092,6 +1107,18 @@ public class SchemaLoadingTests
         Assert.Equal(2, cardAgg.UncommonPotionsGained);
         Assert.Equal(1, cardAgg.RarePotionsGained);
         Assert.Equal(3, cardAgg.PotionsSkipped);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsDebtCardFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("debt-card-run.json"));
+
+        Assert.NotNull(resumed);
+        var cardAgg = resumed!.Aggregates["CARD.DEBT#1"];
+        Assert.Equal(4, cardAgg.DebtTriggers);
+        Assert.Equal(23, cardAgg.DebtGoldLost);
+        Assert.Equal(17, cardAgg.DebtGoldLossBlocked);
     }
 
     [Fact]

@@ -351,6 +351,7 @@ public static class CardHoverShowPatch
         AppendOstySummonStats(sb, cardModel, agg, metaStats, compact: false);
         AppendUnmovablePowerStats(sb, cardModel, metaStats);
         AppendAlchemizePotionStats(sb, cardModel, agg, compact: false);
+        AppendDebtStats(sb, cardModel, agg);
         AppendReplayStats(sb, agg);
 
         bool hasDedicatedPoison = AppendDedicatedPoisonStats(sb, agg, compact: false);
@@ -553,6 +554,7 @@ public static class CardHoverShowPatch
         AppendOstySummonStats(sb, cardModel, agg, metaStats, compact: true);
         AppendUnmovablePowerStats(sb, cardModel, metaStats);
         AppendAlchemizePotionStats(sb, cardModel, agg, compact: true);
+        AppendDebtStats(sb, cardModel, agg);
         AppendReplayStats(sb, agg);
 
         bool showDamage = isAttack || agg.TotalIntended > 0;
@@ -695,6 +697,18 @@ public static class CardHoverShowPatch
         Row3(sb, "common potions", agg.CommonPotionsGained.ToString(), "");
         Row3(sb, "uncommon potions", agg.UncommonPotionsGained.ToString(), "");
         Row3(sb, "rare potions", agg.RarePotionsGained.ToString(), "");
+    }
+
+    private static void AppendDebtStats(
+        StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel card,
+        CardAggregate agg)
+    {
+        if (card is not Debt && !IsCardId(card, "CARD.DEBT")) return;
+
+        Row3(sb, "Times triggered", agg.DebtTriggers.ToString(), "");
+        Row3(sb, "Gold lost", agg.DebtGoldLost.ToString(), "");
+        Row3(sb, "Gold loss blocked", agg.DebtGoldLossBlocked.ToString(), "");
     }
 
     private static bool IsCardId(MegaCrit.Sts2.Core.Models.CardModel? card, string id)

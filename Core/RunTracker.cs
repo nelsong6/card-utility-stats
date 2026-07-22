@@ -2459,6 +2459,66 @@ public static class RunTracker
         PotionRarity? rarity)
         => AccumulateAlchemizePotionResult(agg, success, rarity);
 
+    /// <summary>
+    /// Record one completed Debt end-of-turn effect. Debt clamps the amount
+    /// passed to LoseGold to the owner's current balance, so the card's Gold
+    /// dynamic var is the intended loss while the before/after balance delta
+    /// is the observed loss. Their difference is the amount blocked by being
+    /// out of gold.
+    /// </summary>
+    internal static void RecordDebtTrigger(
+        Debt card,
+        Player? player,
+        int intendedGoldLoss,
+        int initialGold,
+        int finalGold)
+    {
+        if (card == null || player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+                if (!IsTrackedCard(card) || !IsTrackedPlayer(player)) return;
+                if (card.Owner != null && !ReferenceEquals(card.Owner, player)) return;
+
+                _pendingCombat ??= new PendingCombat();
+                var instanceId = GetOrAssignInstanceId(card);
+                var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
+                AccumulateDebtTrigger(agg, intendedGoldLoss, initialGold, finalGold);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordDebtTrigger failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void AccumulateDebtTrigger(
+        CardAggregate agg,
+        int intendedGoldLoss,
+        int initialGold,
+        int finalGold)
+    {
+        if (agg == null) return;
+
+        int intended = Math.Max(0, intendedGoldLoss);
+        int observed = Math.Max(0, initialGold - finalGold);
+        int actual = Math.Min(intended, observed);
+
+        agg.DebtTriggers++;
+        agg.DebtGoldLost += actual;
+        agg.DebtGoldLossBlocked += Math.Max(0, intended - actual);
+    }
+
+    internal static void RecordDebtTriggerForTest(
+        CardAggregate agg,
+        int intendedGoldLoss,
+        int initialGold,
+        int finalGold)
+        => AccumulateDebtTrigger(agg, intendedGoldLoss, initialGold, finalGold);
+
     // -------- Relic stat recording --------
 
     private const string BagOfMarblesRelicId = "RELIC.BAG_OF_MARBLES";
@@ -14463,6 +14523,9 @@ public static class RunTracker
         target.UncommonPotionsGained += source.UncommonPotionsGained;
         target.RarePotionsGained += source.RarePotionsGained;
         target.PotionsSkipped += source.PotionsSkipped;
+        target.DebtTriggers += source.DebtTriggers;
+        target.DebtGoldLost += source.DebtGoldLost;
+        target.DebtGoldLossBlocked += source.DebtGoldLossBlocked;
         target.TotalBlockGained += source.TotalBlockGained;
         target.TotalBlockEffective += source.TotalBlockEffective;
         target.TotalBlockWasted += source.TotalBlockWasted;

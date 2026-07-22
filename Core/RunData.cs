@@ -149,6 +149,14 @@ public class CardAggregate
     public int RarePotionsGained { get; set; }
     public int PotionsSkipped { get; set; }
 
+    // Debt's end-of-turn curse effect. The intended amount comes from the
+    // card's Gold dynamic var; actual loss is observed from the owner's gold
+    // balance before/after the callback. Any unaffordable remainder is kept
+    // separately so a trigger at zero gold is still visible and explainable.
+    public int DebtTriggers { get; set; }
+    public int DebtGoldLost { get; set; }
+    public int DebtGoldLossBlocked { get; set; }
+
     // M2a: Block gained (how much block this card contributed over the run,
     // summed across plays). M2b extends this with absorbed/wasted splits
     // using an ordered provenance ledger for the player's block pool.
