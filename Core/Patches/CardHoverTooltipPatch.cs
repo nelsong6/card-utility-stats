@@ -31,6 +31,7 @@ public static class CardHoverShowPatch
     private const string BlockIconPath = "res://images/ui/combat/block.png";
     private const string DrawCardsNextTurnPowerIconPath = "res://images/atlases/power_atlas.sprites/draw_cards_next_turn_power.tres";
     private const string BlockedDrawIconPath = DrawCardsNextTurnPowerIconPath;
+    private const int DebtGoldLossPerTrigger = 5;
     private const string EnergyPotionIconPath = "res://images/atlases/potion_atlas.sprites/energy_potion.tres";
     private const string StarIconPath = "res://images/packed/sprite_fonts/star_icon.png";
     private const string SovereignBladeMetaNote = "Reflects All Sovereign Blade Usage";
@@ -707,6 +708,7 @@ public static class CardHoverShowPatch
         if (card is not Debt && !IsCardId(card, "CARD.DEBT")) return;
 
         Row3(sb, "Times triggered", agg.DebtTriggers.ToString(), "");
+        Row3(sb, "Gold loss attempted", (agg.DebtTriggers * DebtGoldLossPerTrigger).ToString(), "");
         Row3(sb, "Gold lost", agg.DebtGoldLost.ToString(), "");
         Row3(sb, "Gold loss blocked", agg.DebtGoldLossBlocked.ToString(), "");
     }

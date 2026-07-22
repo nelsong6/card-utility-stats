@@ -12,8 +12,8 @@
       "combats_in_deck": 5,
       "times_drawn": 7,
       "debt_triggers": 4,
-      "debt_gold_lost": 23,
-      "debt_gold_loss_blocked": 17,
+      "debt_gold_lost": 13,
+      "debt_gold_loss_blocked": 7,
       "floor_added": 7,
       "initial_upgrade_level": 0
     }

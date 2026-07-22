@@ -58,8 +58,8 @@ public class DebtStatsTests
         run.Aggregates[$"{DebtCardId}#1"] = new CardAggregate
         {
             DebtTriggers = 4,
-            DebtGoldLost = 23,
-            DebtGoldLossBlocked = 17,
+            DebtGoldLost = 13,
+            DebtGoldLossBlocked = 7,
         };
 
         var json = JsonSerializer.Serialize(run, RunStorage.Options);
@@ -72,8 +72,8 @@ public class DebtStatsTests
 
         var agg = restored!.Aggregates[$"{DebtCardId}#1"];
         Assert.Equal(4, agg.DebtTriggers);
-        Assert.Equal(23, agg.DebtGoldLost);
-        Assert.Equal(17, agg.DebtGoldLossBlocked);
+        Assert.Equal(13, agg.DebtGoldLost);
+        Assert.Equal(7, agg.DebtGoldLossBlocked);
     }
 
     [Fact]
@@ -81,13 +81,13 @@ public class DebtStatsTests
     {
         var agg = new CardAggregate();
 
-        RunTracker.RecordDebtTriggerForTest(agg, intendedGoldLoss: 10, initialGold: 50, finalGold: 40);
-        RunTracker.RecordDebtTriggerForTest(agg, intendedGoldLoss: 10, initialGold: 6, finalGold: 0);
-        RunTracker.RecordDebtTriggerForTest(agg, intendedGoldLoss: 10, initialGold: 0, finalGold: 0);
+        RunTracker.RecordDebtTriggerForTest(agg, intendedGoldLoss: 5, initialGold: 50, finalGold: 45);
+        RunTracker.RecordDebtTriggerForTest(agg, intendedGoldLoss: 5, initialGold: 3, finalGold: 0);
+        RunTracker.RecordDebtTriggerForTest(agg, intendedGoldLoss: 5, initialGold: 0, finalGold: 0);
 
         Assert.Equal(3, agg.DebtTriggers);
-        Assert.Equal(16, agg.DebtGoldLost);
-        Assert.Equal(14, agg.DebtGoldLossBlocked);
+        Assert.Equal(8, agg.DebtGoldLost);
+        Assert.Equal(7, agg.DebtGoldLossBlocked);
     }
 
     [Fact]
@@ -99,14 +99,14 @@ public class DebtStatsTests
                 [$"{DebtCardId}#1"] = new()
                 {
                     DebtTriggers = 2,
-                    DebtGoldLost = 13,
-                    DebtGoldLossBlocked = 7,
+                    DebtGoldLost = 7,
+                    DebtGoldLossBlocked = 3,
                 },
                 [$"{DebtCardId}#2"] = new()
                 {
                     DebtTriggers = 3,
-                    DebtGoldLost = 10,
-                    DebtGoldLossBlocked = 20,
+                    DebtGoldLost = 6,
+                    DebtGoldLossBlocked = 9,
                 },
                 ["CARD.PAIN#1"] = new()
                 {
@@ -119,28 +119,30 @@ public class DebtStatsTests
 
         Assert.NotNull(pooled);
         Assert.Equal(5, pooled!.DebtTriggers);
-        Assert.Equal(23, pooled.DebtGoldLost);
-        Assert.Equal(27, pooled.DebtGoldLossBlocked);
+        Assert.Equal(13, pooled.DebtGoldLost);
+        Assert.Equal(12, pooled.DebtGoldLossBlocked);
     }
 
     [Fact]
-    public void DebtTooltip_ShowsAllThreeRows()
+    public void DebtTooltip_ShowsAttemptedLossAsFivePerTriggerAndOutcomeRows()
     {
         var agg = new CardAggregate
         {
             DebtTriggers = 4,
-            DebtGoldLost = 23,
-            DebtGoldLossBlocked = 17,
+            DebtGoldLost = 13,
+            DebtGoldLossBlocked = 7,
         };
 
         var body = AppendDebtStats(agg);
 
         Assert.Contains("Times triggered", body);
+        Assert.Contains("Gold loss attempted", body);
         Assert.Contains("Gold lost", body);
         Assert.Contains("Gold loss blocked", body);
         Assert.Contains("[b]4[/b]", body);
-        Assert.Contains("[b]23[/b]", body);
-        Assert.Contains("[b]17[/b]", body);
+        Assert.Contains("[b]20[/b]", body);
+        Assert.Contains("[b]13[/b]", body);
+        Assert.Contains("[b]7[/b]", body);
     }
 
     [Fact]

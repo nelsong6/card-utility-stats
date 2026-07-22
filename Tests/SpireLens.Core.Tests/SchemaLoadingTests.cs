@@ -508,8 +508,8 @@ public class SchemaLoadingTests
         Assert.Null(loaded.CompatibilityNote);
         var cardAgg = loaded.Data.Aggregates["CARD.DEBT#1"];
         Assert.Equal(4, cardAgg.DebtTriggers);
-        Assert.Equal(23, cardAgg.DebtGoldLost);
-        Assert.Equal(17, cardAgg.DebtGoldLossBlocked);
+        Assert.Equal(13, cardAgg.DebtGoldLost);
+        Assert.Equal(7, cardAgg.DebtGoldLossBlocked);
     }
 
     [Fact]
@@ -1117,8 +1117,8 @@ public class SchemaLoadingTests
         Assert.NotNull(resumed);
         var cardAgg = resumed!.Aggregates["CARD.DEBT#1"];
         Assert.Equal(4, cardAgg.DebtTriggers);
-        Assert.Equal(23, cardAgg.DebtGoldLost);
-        Assert.Equal(17, cardAgg.DebtGoldLossBlocked);
+        Assert.Equal(13, cardAgg.DebtGoldLost);
+        Assert.Equal(7, cardAgg.DebtGoldLossBlocked);
     }
 
     [Fact]
