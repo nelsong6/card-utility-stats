@@ -496,12 +496,20 @@ public class RelicAggregate
     // Lantern/Very Hot Cocoa/Candelabra/Chandelier (gain energy at the start
     // of turns 1/1/2/3),
     // Prismatic Gem, and Blood-Soaked Rose (max-energy relics counted once per
-    // player energy reset). Also used by Nunchaku, whose gained energy is
-    // attributed from the observed PlayerCombatState.GainEnergy delta.
+    // player energy reset), and Seal of Gold (turn-start energy purchased with
+    // gold). Also used by Nunchaku, whose gained energy is attributed from the
+    // observed PlayerCombatState.GainEnergy delta.
     public int EnergyGenerated { get; set; }
 
+    // Gold actually lost to a relic effect and the portion of its attempted
+    // loss that did not leave the player's balance. Seal of Gold is the first
+    // relic using these observed outcome fields; attempted loss is derived
+    // from its activation count and fixed five-gold cost in the tooltip.
+    public int GoldLost { get; set; }
+    public int GoldLossBlocked { get; set; }
+
     // Combats held for relics whose energy-generation tooltip reports a
-    // per-combat average. Used by Happy Flower and Nunchaku.
+    // per-combat average. Used by Happy Flower, Nunchaku, and Seal of Gold.
     public int EnergyGeneratedCombats { get; set; }
 
     // Total relevant player turns that ended with unspent energy while the

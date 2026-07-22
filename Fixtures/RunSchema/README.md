@@ -94,6 +94,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `debt-card-run.json`
   Adds Debt end-of-turn trigger tracking with observed gold lost and the
   unaffordable portion blocked by the player being out of gold.
+- `seal-of-gold-relic-run.json`
+  Adds Seal of Gold activation, observed gold-loss outcome, energy generated,
+  and held-combat denominator tracking for its energy-per-combat average.
 - `phylactery-relic-run.json`
   Adds Bound Phylactery and Phylactery Unbound activation tracking plus actual
   Osty summon HP gained from the shared summon command result.

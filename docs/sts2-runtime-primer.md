@@ -202,6 +202,15 @@ before and after the completed callback: that delta is actual gold lost, and
 generic gold-loss command would lose Debt's unclamped intent and risk
 attributing unrelated gold changes.
 
+Seal of Gold uses its owner-specific
+`AfterSideTurnStart(CombatSide, IReadOnlyList<Creature>, ICombatState)`
+callback. It activates only when the owner is in the callback's participant
+list and has at least its five-gold cost, then awaits energy gain followed by
+gold loss. Apply the same affordability gate in the prefix, wrap the returned
+task, and observe both resource deltas on completion. Count held combats
+separately from activations so its boss-relic energy-per-combat average includes
+combats where the owner ran out of gold and the relic produced no energy.
+
 ## Damage Attribution
 
 For direct card damage, `DamageReceivedEntry` is the important observed outcome.

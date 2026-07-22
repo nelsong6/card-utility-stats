@@ -30,6 +30,7 @@ public static class RelicHoverShowPatch
     private const string EnergyIconPath = "res://images/atlases/potion_atlas.sprites/energy_potion.tres";
     private const string StarIconPath = "res://images/packed/sprite_fonts/star_icon.png";
     private const string VigorIconPath = "res://images/atlases/power_atlas.sprites/vigor_power.tres";
+    private const int SealOfGoldLossPerTrigger = 5;
     private const int InlineIconSize = 16;
     private const int MaxTableLabelVisibleChars = 28;
     private static readonly System.Reflection.FieldInfo? VambraceBlockGainedThisCombatField =
@@ -395,6 +396,16 @@ public static class RelicHoverShowPatch
 
                 var body = BuildPrismaticGemBodyBBCode(agg);
                 StatsTooltip.Show(tree, __instance, "Prismatic Gem", "SpireLens", body);
+                return;
+            }
+
+            if (relicNode.Model is SealOfGold)
+            {
+                const string relicId = "RELIC.SEAL_OF_GOLD";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildSealOfGoldBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Seal of Gold", "SpireLens", body);
                 return;
             }
 
@@ -1314,6 +1325,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is SealOfGold)
+        {
+            title = "Seal of Gold";
+            body = BuildSealOfGoldBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is FresnelLens)
         {
             title = "Fresnel Lens";
@@ -2169,6 +2187,22 @@ public static class RelicHoverShowPatch
         {
             Row3(sb, $"{StatsTooltip.EscapeBbcode(category.Value.DisplayName)} rewards", category.Value.Count.ToString(), "");
         }
+        return sb.ToString();
+    }
+
+    private static string BuildSealOfGoldBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Times triggered", agg.Activations.ToString(), "");
+        Row3(sb, "Gold loss attempted", (agg.Activations * SealOfGoldLossPerTrigger).ToString(), "");
+        Row3(sb, "Gold lost", agg.GoldLost.ToString(), "");
+        Row3(sb, "Gold loss blocked", agg.GoldLossBlocked.ToString(), "");
+        AppendEnergyGeneratedStats(
+            sb,
+            agg,
+            totalLabel: "Energy gained total",
+            includeAveragePerCombat: true,
+            combatCount: agg.EnergyGeneratedCombats);
         return sb.ToString();
     }
 

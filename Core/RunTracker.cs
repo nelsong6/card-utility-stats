@@ -1637,6 +1637,8 @@ public static class RunTracker
         target.DoomDeathTriggers += source.DoomDeathTriggers;
         target.DoomKills += source.DoomKills;
         target.EnergyGenerated += source.EnergyGenerated;
+        target.GoldLost += source.GoldLost;
+        target.GoldLossBlocked += source.GoldLossBlocked;
         target.EnergyGeneratedCombats += source.EnergyGeneratedCombats;
         target.FirstTurnsEndedWithExcessEnergy += source.FirstTurnsEndedWithExcessEnergy;
         target.SecondTurnsEndedWithExcessEnergy += source.SecondTurnsEndedWithExcessEnergy;
@@ -2557,6 +2559,7 @@ public static class RunTracker
     private const string BronzeScalesRelicId = "RELIC.BRONZE_SCALES";
     private const string HornCleatRelicId = "RELIC.HORN_CLEAT";
     private const string PrismaticGemRelicId = "RELIC.PRISMATIC_GEM";
+    private const string SealOfGoldRelicId = "RELIC.SEAL_OF_GOLD";
     private const string FresnelLensRelicId = "RELIC.FRESNEL_LENS";
     private const string SilverCrucibleRelicId = "RELIC.SILVER_CRUCIBLE";
     private const string BloodSoakedRoseRelicId = "RELIC.BLOOD_SOAKED_ROSE";
@@ -9144,6 +9147,81 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Record one completed Seal of Gold activation from its owner-specific
+    /// turn-start callback. The callback's own affordability gate establishes
+    /// that the relic triggered; before/after snapshots preserve the actual
+    /// energy gained and gold lost.
+    /// </summary>
+    public static void RecordSealOfGoldActivation(
+        SealOfGold relic,
+        Player? owner,
+        int intendedGoldLoss,
+        int initialGold,
+        int finalGold,
+        int initialEnergy,
+        int finalEnergy)
+    {
+        if (relic == null || owner == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(owner)) return;
+                if (relic.Owner != null && !ReferenceEquals(relic.Owner, owner)) return;
+
+                var agg = GetOrCreateRelicAggregateLocked(SealOfGoldRelicId);
+                AccumulateSealOfGoldActivation(
+                    agg,
+                    intendedGoldLoss,
+                    initialGold,
+                    finalGold,
+                    initialEnergy,
+                    finalEnergy);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordSealOfGoldActivation failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void AccumulateSealOfGoldActivation(
+        RelicAggregate agg,
+        int intendedGoldLoss,
+        int initialGold,
+        int finalGold,
+        int initialEnergy,
+        int finalEnergy)
+    {
+        if (agg == null) return;
+
+        int intended = Math.Max(0, intendedGoldLoss);
+        int observedGoldLost = Math.Max(0, initialGold - finalGold);
+        int actualGoldLost = Math.Min(intended, observedGoldLost);
+
+        agg.Activations++;
+        agg.GoldLost += actualGoldLost;
+        agg.GoldLossBlocked += Math.Max(0, intended - actualGoldLost);
+        agg.EnergyGenerated += Math.Max(0, finalEnergy - initialEnergy);
+    }
+
+    internal static void RecordSealOfGoldActivationForTest(
+        RelicAggregate agg,
+        int intendedGoldLoss,
+        int initialGold,
+        int finalGold,
+        int initialEnergy,
+        int finalEnergy)
+        => AccumulateSealOfGoldActivation(
+            agg,
+            intendedGoldLoss,
+            initialGold,
+            finalGold,
+            initialEnergy,
+            finalEnergy);
+
+    /// <summary>
     /// Record Prismatic Gem's +1 max-energy contribution once per player
     /// energy reset. The relic modifies max energy whenever the game queries
     /// it, so this is tied to the actual reset hook instead of the modifier
@@ -10646,6 +10724,7 @@ public static class RunTracker
             RecordLetterOpenerCombatForPlayerLocked(player);
             RecordTuningForkCombatForPlayerLocked(player);
             RecordHappyFlowerCombatForPlayerLocked(player);
+            RecordSealOfGoldCombatForPlayerLocked(player);
             RecordNunchakuCombatForPlayerLocked(player);
             RecordIronClubCombatForPlayerLocked(player);
             RecordBrilliantScarfCombatForPlayerLocked(player);
@@ -10980,6 +11059,16 @@ public static class RunTracker
         agg.EnergyGeneratedCombats += 1;
     }
 
+    private static void RecordSealOfGoldCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasSealOfGold(player)) return;
+        if (!_pendingCombat.SealOfGoldCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(SealOfGoldRelicId);
+        agg.EnergyGeneratedCombats += 1;
+    }
+
     private static void RecordNunchakuCombatForTrackedPlayerLocked()
     {
         try
@@ -11200,6 +11289,18 @@ public static class RunTracker
         try
         {
             return player.Relics.Any(r => r is HappyFlower);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool PlayerHasSealOfGold(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is SealOfGold);
         }
         catch
         {
@@ -15045,6 +15146,8 @@ internal class PendingCombat
     public Dictionary<Player, int> TuningForkTurnEndChargeRecordedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> HappyFlowerCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> SealOfGoldCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> NunchakuCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

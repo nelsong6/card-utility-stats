@@ -513,6 +513,23 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsSealOfGoldRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("seal-of-gold-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.SEAL_OF_GOLD"];
+        Assert.Equal(4, relicAgg.Activations);
+        Assert.Equal(17, relicAgg.GoldLost);
+        Assert.Equal(3, relicAgg.GoldLossBlocked);
+        Assert.Equal(3, relicAgg.EnergyGenerated);
+        Assert.Equal(2, relicAgg.EnergyGeneratedCombats);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsPhylacteryRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("phylactery-relic-run.json"));
@@ -1119,6 +1136,20 @@ public class SchemaLoadingTests
         Assert.Equal(4, cardAgg.DebtTriggers);
         Assert.Equal(13, cardAgg.DebtGoldLost);
         Assert.Equal(7, cardAgg.DebtGoldLossBlocked);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsSealOfGoldRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("seal-of-gold-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.SEAL_OF_GOLD"];
+        Assert.Equal(4, relicAgg.Activations);
+        Assert.Equal(17, relicAgg.GoldLost);
+        Assert.Equal(3, relicAgg.GoldLossBlocked);
+        Assert.Equal(3, relicAgg.EnergyGenerated);
+        Assert.Equal(2, relicAgg.EnergyGeneratedCombats);
     }
 
     [Fact]
