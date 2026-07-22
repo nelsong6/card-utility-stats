@@ -562,6 +562,12 @@ card and its effective energy cost immediately around that exact call. The
 triggering `CardPlay.Resources.EnergyValue` is the Power's play-time cost, while
 `EnergySpent` is the distinct numerator for spend-to-discounted-cost ratios.
 
+Stone Humidifier applies its repeatable max-HP gain from the owner-specific
+async `AfterRestSiteHeal(Player, bool)` callback. Snapshot the owner's max HP
+before the callback and only record the resulting max HP after its returned
+task completes successfully; the callback awaits `CreatureCmd.GainMaxHp`, so
+the post-task value is the observed result after game modifiers or prevention.
+
 Shovel adds `DigRestSiteOption` from `TryModifyRestSiteOptions`; the relic
 itself does not receive the obtained relic payload. Patch
 `DigRestSiteOption.OnSelect`, snapshot the owner's relic inventory before the

@@ -1542,6 +1542,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is StoneHumidifier)
+        {
+            title = "Stone Humidifier";
+            body = BuildStoneHumidifierBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is ChosenCheese)
         {
             title = "Chosen Cheese";
@@ -2627,6 +2634,36 @@ public static class RelicHoverShowPatch
         var sb = new StringBuilder();
         Row3(sb, "Activations", agg.Activations.ToString(), "");
         AppendMaxHpChangeRows(sb, agg, "Max HP gained", agg.MaxHpGained);
+        return sb.ToString();
+    }
+
+    private static string BuildStoneHumidifierBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var activations = agg.MaxHpActivations
+            ?? new List<RelicMaxHpActivationAggregate>();
+
+        Row3(sb, "Times triggered", agg.Activations.ToString(), "");
+        Row3(sb, "Max HP gained", FormatDecimal(Math.Max(0m, agg.MaxHpGained)), "");
+
+        for (var index = 0; index < activations.Count; index++)
+        {
+            var activation = activations[index];
+            if (activation == null) continue;
+
+            var activationNumber = index + 1;
+            Row3(
+                sb,
+                $"Activation {activationNumber} starting HP",
+                FormatDecimal(Math.Max(0m, activation.StartingHp)),
+                "");
+            Row3(
+                sb,
+                $"Activation {activationNumber} resulting HP",
+                FormatDecimal(Math.Max(0m, activation.ResultingHp)),
+                "");
+        }
+
         return sb.ToString();
     }
 

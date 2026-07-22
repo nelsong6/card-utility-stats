@@ -473,6 +473,11 @@ public class RelicAggregate
     // Total observed maximum HP gained by pickup max-HP relics and Chosen Cheese.
     public decimal MaxHpGained { get; set; }
 
+    // Ordered observed before/after max-HP snapshots for repeatable relic
+    // effects. Used by Stone Humidifier so each rest-site activation remains
+    // inspectable even when unrelated max-HP changes happen between rests.
+    public List<RelicMaxHpActivationAggregate> MaxHpActivations { get; set; } = new();
+
     // Shared max-HP before/after snapshot for relics that add or remove max HP.
     // Original is the first observed value before the relic changed max HP; New
     // is the latest observed value after its max-HP change resolved.
@@ -856,6 +861,12 @@ public class RelicCardTransformationAggregate
     public string SourceDisplayName { get; set; } = "";
     public string ResultCardId { get; set; } = "";
     public string ResultDisplayName { get; set; } = "";
+}
+
+public class RelicMaxHpActivationAggregate
+{
+    public decimal StartingHp { get; set; }
+    public decimal ResultingHp { get; set; }
 }
 
 public class DiscountedCardCostAggregate

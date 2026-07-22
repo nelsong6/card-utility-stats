@@ -233,6 +233,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `nutritious-oyster-relic-run.json`
   Adds Nutritious Oyster pickup tracking: activations, observed max HP gained,
   and original/new max-HP snapshots.
+- `stone-humidifier-relic-run.json`
+  Adds Stone Humidifier rest-site trigger tracking: observed max HP gained and
+  an ordered starting/resulting max-HP snapshot for every activation.
 - `sand-castle-relic-run.json`
   Adds Sand Castle pickup tracking: the actual cards upgraded by the relic.
 - `fragrant-mushroom-relic-run.json`

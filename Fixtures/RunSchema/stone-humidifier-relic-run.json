@@ -1,0 +1,32 @@
+{
+  "run_id": "stone-humidifier-relic-fixture",
+  "started_at": "2026-07-22T20:00:00Z",
+  "updated_at": "2026-07-22T20:30:00Z",
+  "character": "CHAR.NECROBINDER",
+  "ascension": 6,
+  "floor_reached": 28,
+  "outcome": "in_progress",
+  "game_start_time": 1784750400,
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.STONE_HUMIDIFIER": {
+      "activations": 2,
+      "max_hp_gained": 9,
+      "max_hp_activations": [
+        {
+          "starting_hp": 70,
+          "resulting_hp": 75
+        },
+        {
+          "starting_hp": 80,
+          "resulting_hp": 84
+        }
+      ]
+    }
+  },
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

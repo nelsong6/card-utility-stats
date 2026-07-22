@@ -1631,6 +1631,7 @@ public static class RunTracker
         if (source.FloorActivated.HasValue)
             target.FloorActivated = source.FloorActivated;
         target.MaxHpGained += source.MaxHpGained;
+        MergeRelicMaxHpActivations(target, source);
         if (source.OriginalMaxHp.HasValue && !target.OriginalMaxHp.HasValue)
             target.OriginalMaxHp = source.OriginalMaxHp;
         if (source.NewMaxHp.HasValue)
@@ -2596,6 +2597,7 @@ public static class RunTracker
     private const string StrawberryRelicId = "RELIC.STRAWBERRY";
     private const string PearRelicId = "RELIC.PEAR";
     private const string NutritiousOysterRelicId = "RELIC.NUTRITIOUS_OYSTER";
+    private const string StoneHumidifierRelicId = "RELIC.STONE_HUMIDIFIER";
     private const string ChosenCheeseRelicId = "RELIC.CHOSEN_CHEESE";
     private const string DarkstonePeriaptRelicId = "RELIC.DARKSTONE_PERIAPT";
     private const string LeafyPoulticeRelicId = "RELIC.LEAFY_POULTICE";
@@ -5742,6 +5744,36 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Record one completed Stone Humidifier rest-site trigger using the
+    /// owner's observed max HP immediately before and after the async game
+    /// command. This is saved outside the combat buffer because rest sites are
+    /// run-map events.
+    /// </summary>
+    public static void RecordStoneHumidifierMaxHpGain(
+        Creature creature,
+        decimal startingMaxHp,
+        decimal resultingMaxHp)
+    {
+        if (creature?.Player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(creature.Player)) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(StoneHumidifierRelicId);
+                RecordStoneHumidifierMaxHpGainForTest(agg, startingMaxHp, resultingMaxHp);
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordStoneHumidifierMaxHpGain failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Record Chosen Cheese's max HP at the pickup boundary. This value is
     /// displayed as the relic's starting max HP and is kept separate from later
     /// combat-end gains because unrelated max-HP changes can happen in between.
@@ -6289,6 +6321,26 @@ public static class RunTracker
         agg.Activations++;
         agg.MaxHpGained += maxHpGained;
         RecordRelicMaxHpChangeForTest(agg, originalMaxHp, newMaxHp);
+    }
+
+    internal static void RecordStoneHumidifierMaxHpGainForTest(
+        RelicAggregate agg,
+        decimal startingMaxHp,
+        decimal resultingMaxHp)
+    {
+        if (agg == null) return;
+
+        var starting = Math.Max(0m, startingMaxHp);
+        var resulting = Math.Max(0m, resultingMaxHp);
+
+        agg.Activations += 1;
+        agg.MaxHpGained += Math.Max(0m, resulting - starting);
+        agg.MaxHpActivations ??= new List<RelicMaxHpActivationAggregate>();
+        agg.MaxHpActivations.Add(new RelicMaxHpActivationAggregate
+        {
+            StartingHp = starting,
+            ResultingHp = resulting,
+        });
     }
 
     internal static void RecordRegalPillowRestHealForTest(
@@ -12056,6 +12108,22 @@ public static class RunTracker
                 SourceDisplayName = transformation.SourceDisplayName,
                 ResultCardId = transformation.ResultCardId,
                 ResultDisplayName = transformation.ResultDisplayName,
+            });
+        }
+    }
+
+    private static void MergeRelicMaxHpActivations(RelicAggregate target, RelicAggregate source)
+    {
+        if (source.MaxHpActivations == null || source.MaxHpActivations.Count == 0) return;
+
+        target.MaxHpActivations ??= new List<RelicMaxHpActivationAggregate>();
+        foreach (var activation in source.MaxHpActivations)
+        {
+            if (activation == null) continue;
+            target.MaxHpActivations.Add(new RelicMaxHpActivationAggregate
+            {
+                StartingHp = Math.Max(0m, activation.StartingHp),
+                ResultingHp = Math.Max(0m, activation.ResultingHp),
             });
         }
     }

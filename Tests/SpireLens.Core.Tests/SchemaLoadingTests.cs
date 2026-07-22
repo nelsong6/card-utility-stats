@@ -2838,6 +2838,43 @@ public class SchemaLoadingTests
         AssertMummifiedHandFixture(resumed!.RelicAggregates["RELIC.MUMMIFIED_HAND"]);
     }
 
+    [Fact]
+    public void HistoricalLoad_AcceptsStoneHumidifierRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("stone-humidifier-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertStoneHumidifierFixture(loaded.Data.RelicAggregates["RELIC.STONE_HUMIDIFIER"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsStoneHumidifierRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("stone-humidifier-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertStoneHumidifierFixture(resumed!.RelicAggregates["RELIC.STONE_HUMIDIFIER"]);
+    }
+
+    private static void AssertStoneHumidifierFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(2, relicAgg.Activations);
+        Assert.Equal(9m, relicAgg.MaxHpGained);
+        Assert.Collection(
+            relicAgg.MaxHpActivations,
+            activation =>
+            {
+                Assert.Equal(70m, activation.StartingHp);
+                Assert.Equal(75m, activation.ResultingHp);
+            },
+            activation =>
+            {
+                Assert.Equal(80m, activation.StartingHp);
+                Assert.Equal(84m, activation.ResultingHp);
+            });
+    }
+
     private static void AssertMummifiedHandFixture(RelicAggregate relicAgg)
     {
         Assert.Equal(4, relicAgg.Activations);
