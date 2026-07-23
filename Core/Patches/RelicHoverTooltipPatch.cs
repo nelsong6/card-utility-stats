@@ -1686,10 +1686,7 @@ public static class RelicHoverShowPatch
         if (relicModel is PaelsWing)
         {
             title = "Pael's Wing";
-            body = BuildPaelsWingBodyBBCodeForFloor(
-                agg,
-                floorCount,
-                RelicFloorAddedToDeck(relicModel));
+            body = BuildPaelsWingBodyBBCode(agg);
             return true;
         }
 
@@ -2897,7 +2894,42 @@ public static class RelicHoverShowPatch
 
     private static string BuildPaelsWingBodyBBCode(RelicAggregate agg)
     {
-        return BuildPaelsWingBodyBBCodeForFloor(agg, RunTracker.GetCurrentFloorForRateStats(), floorAdded: null);
+        var sb = new StringBuilder();
+        Row3(sb, "common cards consumed", agg.CommonCardsConsumed.ToString(), "");
+        Row3(sb, "uncommon cards consumed", agg.UncommonCardsConsumed.ToString(), "");
+        Row3(sb, "rare cards consumed", agg.RareCardsConsumed.ToString(), "");
+        var artifacts = agg.RelicsGranted.Values
+            .Where(artifact => artifact.Count > 0)
+            .OrderByDescending(artifact => artifact.Count)
+            .ThenBy(artifact => artifact.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var artifactsGained = artifacts.Sum(artifact => Math.Max(0, artifact.Count));
+        Row3(sb, "Artifacts gained", artifactsGained.ToString(), "");
+
+        foreach (var artifact in artifacts)
+        {
+            var displayName = StatsTooltip.EscapeBbcode(string.IsNullOrWhiteSpace(artifact.DisplayName)
+                ? RunTracker.FormatRelicIdForDisplay(artifact.RelicId)
+                : artifact.DisplayName);
+            var value = artifact.Count == 1 ? displayName : $"{displayName} x{artifact.Count}";
+            Row3(sb, "Artifact gained", value, "");
+        }
+
+        Row3(sb, "Sacrifices made", agg.SacrificesMade.ToString(), "");
+        Row3(sb, "Sacrifices skipped", agg.SacrificesSkipped.ToString(), "");
+        var sacrificesMade = Math.Max(0, agg.SacrificesMade);
+        var sacrificeOpportunities = sacrificesMade + Math.Max(0, agg.SacrificesSkipped);
+        if (sacrificeOpportunities > 0)
+        {
+            var ratePercent = 100m * sacrificesMade / sacrificeOpportunities;
+            Row3(
+                sb,
+                "Sacrifice rate",
+                $"{sacrificesMade}/{sacrificeOpportunities}",
+                $"{FormatDecimal(ratePercent)}%");
+        }
+
+        return sb.ToString();
     }
 
     private static string BuildPaelsToothBodyBBCode(RelicAggregate agg)
@@ -2948,56 +2980,6 @@ public static class RelicHoverShowPatch
             FormatDecimal(enhancementsPerGoopyCard),
             "");
         return sb.ToString();
-    }
-
-    private static string BuildPaelsWingBodyBBCodeForFloor(
-        RelicAggregate agg,
-        int? floorReached,
-        int? floorAdded)
-    {
-        var sb = new StringBuilder();
-        Row3(sb, "common cards consumed", agg.CommonCardsConsumed.ToString(), "");
-        Row3(sb, "uncommon cards consumed", agg.UncommonCardsConsumed.ToString(), "");
-        Row3(sb, "rare cards consumed", agg.RareCardsConsumed.ToString(), "");
-        var artifacts = agg.RelicsGranted.Values
-            .Where(artifact => artifact.Count > 0)
-            .OrderByDescending(artifact => artifact.Count)
-            .ThenBy(artifact => artifact.DisplayName, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-        var artifactsGained = artifacts.Sum(artifact => Math.Max(0, artifact.Count));
-        Row3(sb, "Artifacts gained", artifactsGained.ToString(), "");
-
-        foreach (var artifact in artifacts)
-        {
-            var displayName = StatsTooltip.EscapeBbcode(string.IsNullOrWhiteSpace(artifact.DisplayName)
-                ? RunTracker.FormatRelicIdForDisplay(artifact.RelicId)
-                : artifact.DisplayName);
-            var value = artifact.Count == 1 ? displayName : $"{displayName} x{artifact.Count}";
-            Row3(sb, "Artifact gained", value, "");
-        }
-
-        Row3(sb, "Sacrifices made", agg.SacrificesMade.ToString(), "");
-        Row3(sb, "Sacrifices skipped", agg.SacrificesSkipped.ToString(), "");
-        if (TryFloorCountSinceRelicObtained(floorReached, floorAdded, out var floorCount))
-        {
-            var rate = (decimal)agg.SacrificesMade / floorCount;
-            Row3(sb, "Sacrifice rate", FormatDecimal(rate), "/floor");
-        }
-
-        return sb.ToString();
-    }
-
-    private static bool TryFloorCountSinceRelicObtained(int? floorReached, int? floorAdded, out int floorCount)
-    {
-        floorCount = 0;
-        var reached = floorReached.GetValueOrDefault();
-        if (reached <= 0) return false;
-
-        var added = floorAdded.GetValueOrDefault();
-        if (added <= 0 || reached < added) return false;
-
-        floorCount = reached - added + 1;
-        return true;
     }
 
     private static string BuildPaelsEyeBodyBBCode(RelicAggregate agg, bool activatedThisCombat = false)

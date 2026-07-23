@@ -441,7 +441,10 @@ sacrifice pulls and obtains a normal `RelicModel`. Capture that direct artifact
 from the owner's first `RelicObtained` event during `OnSacrifice`; the event fires
 synchronously when the relic enters inventory, before its async `AfterObtained`
 callback. Store its id, display name, and count in Pael's Wing's `RelicsGranted`
-ledger.
+ledger. Derive the displayed sacrifice rate from exact recorded opportunities:
+`SacrificesMade / (SacrificesMade + SacrificesSkipped)`. Do not use floors since
+pickup; that incorrectly counts acquisition or non-reward floors where Sacrifice
+was never offered.
 
 Pael's Tooth is a separate pickup-and-return mechanic. Its native `CardTitles`
 text is rebuilt from only the `SerializableCards` still held by the relic, so a
