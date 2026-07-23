@@ -111,7 +111,13 @@ internal static class CompendiumRelicStatsContext
         if (!TryBuildRelicTooltip(relicModel, out var title, out var body))
             return;
 
-        StatsTooltip.Show(tree, entry, title, "SpireLens", body);
+        StatsTooltip.Show(
+            tree,
+            entry,
+            title,
+            "SpireLens",
+            body,
+            panelWidth: RelicHoverShowPatch.GetPreferredStatsTooltipWidth(relicModel));
     }
 
     internal static bool TryGetRelicModel(

@@ -128,6 +128,15 @@ public class SturdyClampStatsTests
     }
 
     [Fact]
+    public void RelicTooltip_SturdyClamp_UsesWidePanelWithoutChangingDefaultPolicy()
+    {
+        var relic = (SturdyClamp)RuntimeHelpers.GetUninitializedObject(typeof(SturdyClamp));
+
+        Assert.Equal(420f, RelicHoverShowPatch.GetPreferredStatsTooltipWidth(relic));
+        Assert.Null(RelicHoverShowPatch.GetPreferredStatsTooltipWidth(null));
+    }
+
+    [Fact]
     [Trait("Category", "RequiresLiveGame")]
     public void RelicTooltip_SturdyClamp_DispatchesForModel()
     {

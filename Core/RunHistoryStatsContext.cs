@@ -442,7 +442,13 @@ public static class RunHistoryRelicStatsTooltipShowPatch
             if (!RunHistoryStatsContext.TryBuildRelicTooltip(__instance, out var title, out var body))
                 return;
 
-            StatsTooltip.Show(tree, __instance, title, "SpireLens", body);
+            StatsTooltip.Show(
+                tree,
+                __instance,
+                title,
+                "SpireLens",
+                body,
+                panelWidth: RelicHoverShowPatch.GetPreferredStatsTooltipWidth(__instance.Relic?.Model));
         });
     }
 }

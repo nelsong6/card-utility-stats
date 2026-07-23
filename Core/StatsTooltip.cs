@@ -42,8 +42,11 @@ namespace SpireLens.Core;
 /// </summary>
 public static class StatsTooltip
 {
-    private const float PanelWidth = 348f;
-    private const float InnerWidth = 326f;
+    private const float DefaultPanelWidth = 348f;
+    private const float PanelToInnerWidth = 22f;
+    private const float InnerToBodyWidth = 22f;
+    private const float DefaultInnerWidth = DefaultPanelWidth - PanelToInnerWidth;
+    private const float DefaultBodyWidth = DefaultInnerWidth - InnerToBodyWidth;
     private const float HeaderHeight = 28f;
     private const float StackGap = 8f;
     private const float ViewportPad = 8f;
@@ -58,6 +61,7 @@ public static class StatsTooltip
 
     private static PanelContainer? _panel;
     private static NinePatchRect? _shadow;
+    private static VBoxContainer? _contentContainer;
     private static Control? _headerRow;
     private static Label? _titleLabel;
     private static Label? _brandLabel;
@@ -151,7 +155,7 @@ public static class StatsTooltip
         _panel = new PanelContainer
         {
             Name = "SpireLensTooltip",
-            CustomMinimumSize = new Vector2(PanelWidth, 0),
+            CustomMinimumSize = new Vector2(DefaultPanelWidth, 0),
             ZIndex = 100,
             SelfModulate = PanelTint,
             MouseFilter = Control.MouseFilterEnum.Ignore,
@@ -164,8 +168,9 @@ public static class StatsTooltip
         {
             Name = "VBoxContainer",
             MouseFilter = Control.MouseFilterEnum.Ignore,
-            CustomMinimumSize = new Vector2(InnerWidth, 0),
+            CustomMinimumSize = new Vector2(DefaultInnerWidth, 0),
         };
+        _contentContainer = vbox;
         vbox.AddThemeConstantOverride("separation", 2);
         _panel.AddChild(vbox);
 
@@ -217,7 +222,7 @@ public static class StatsTooltip
             SelectionEnabled = false,
             ShortcutKeysEnabled = false,
             MouseFilter = Control.MouseFilterEnum.Ignore,
-            CustomMinimumSize = new Vector2(InnerWidth - 22f, 0),
+            CustomMinimumSize = new Vector2(DefaultBodyWidth, 0),
         };
         ApplyStatsStyle(_statsLabel);
         vbox.AddChild(_statsLabel);
@@ -276,7 +281,8 @@ public static class StatsTooltip
         string titleText,
         string brandText,
         string bodyBBCode,
-        bool showHeader = true)
+        bool showHeader = true,
+        float? panelWidth = null)
     {
         // Every producer also gates before aggregate lookup/markup work. Keep
         // this final guard so a future stats surface cannot bypass the global
@@ -284,9 +290,18 @@ public static class StatsTooltip
         if (!Patches.ViewStatsInjectorPatch.StatsVisibilityEnabled) return;
 
         EnsureBuilt(tree);
-        if (_panel == null || _headerRow == null || _statsLabel == null || _titleLabel == null || _brandLabel == null) return;
+        if (_panel == null
+            || _contentContainer == null
+            || _headerRow == null
+            || _statsLabel == null
+            || _titleLabel == null
+            || _brandLabel == null)
+        {
+            return;
+        }
 
         _anchor = anchor;
+        ApplyPanelWidth(panelWidth);
         _headerRow.Visible = showHeader;
         _headerRow.CustomMinimumSize = new Vector2(0, showHeader ? HeaderHeight : 0f);
         _titleLabel.Text = titleText;
@@ -298,6 +313,21 @@ public static class StatsTooltip
         if (_shadow != null && GodotObject.IsInstanceValid(_shadow)) _shadow.Visible = true;
 
         _panel.CallDeferred(Control.MethodName.ResetSize);
+    }
+
+    private static void ApplyPanelWidth(float? requestedWidth)
+    {
+        if (_panel == null || _contentContainer == null || _statsLabel == null) return;
+
+        var panelWidth = requestedWidth.GetValueOrDefault(DefaultPanelWidth);
+        if (!float.IsFinite(panelWidth) || panelWidth <= PanelToInnerWidth + InnerToBodyWidth)
+            panelWidth = DefaultPanelWidth;
+
+        var innerWidth = panelWidth - PanelToInnerWidth;
+        var bodyWidth = innerWidth - InnerToBodyWidth;
+        _panel.CustomMinimumSize = new Vector2(panelWidth, 0);
+        _contentContainer.CustomMinimumSize = new Vector2(innerWidth, 0);
+        _statsLabel.CustomMinimumSize = new Vector2(bodyWidth, 0);
     }
 
     /// <summary>
@@ -352,6 +382,7 @@ public static class StatsTooltip
         _shadow = null;
         _panel = null;
         _anchor = null;
+        _contentContainer = null;
         _headerRow = null;
         _titleLabel = null;
         _brandLabel = null;

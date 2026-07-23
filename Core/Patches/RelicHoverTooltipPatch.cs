@@ -33,6 +33,7 @@ public static class RelicHoverShowPatch
     private const int SealOfGoldLossPerTrigger = 5;
     private const int InlineIconSize = 16;
     private const int MaxTableLabelVisibleChars = 28;
+    private const float SturdyClampTooltipWidth = 420f;
     private static readonly System.Reflection.FieldInfo? VambraceBlockGainedThisCombatField =
         AccessTools.Field(typeof(Vambrace), "_blockGainedThisCombat");
 
@@ -51,7 +52,13 @@ public static class RelicHoverShowPatch
 
             if (TryBuildInventoryBodyBBCode(__instance, relicNode.Model, out var statsTitle, out var statsBody))
             {
-                StatsTooltip.Show(tree, __instance, statsTitle, "SpireLens", statsBody);
+                StatsTooltip.Show(
+                    tree,
+                    __instance,
+                    statsTitle,
+                    "SpireLens",
+                    statsBody,
+                    panelWidth: GetPreferredStatsTooltipWidth(relicNode.Model));
                 return;
             }
 
@@ -466,7 +473,13 @@ public static class RelicHoverShowPatch
                 var agg = RelicAgg(relicId);
 
                 var body = BuildSturdyClampBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Sturdy Clamp", "SpireLens", body);
+                StatsTooltip.Show(
+                    tree,
+                    __instance,
+                    "Sturdy Clamp",
+                    "SpireLens",
+                    body,
+                    panelWidth: GetPreferredStatsTooltipWidth(relicNode.Model));
                 return;
             }
 
@@ -1017,6 +1030,9 @@ public static class RelicHoverShowPatch
     {
         return TryBuildBodyBBCode(relicModel, agg, floorCount, null, null, null, null, out title, out body);
     }
+
+    internal static float? GetPreferredStatsTooltipWidth(RelicModel? relicModel)
+        => relicModel is SturdyClamp ? SturdyClampTooltipWidth : null;
 
     internal static bool TryBuildBodyBBCode(
         RelicModel relicModel,
