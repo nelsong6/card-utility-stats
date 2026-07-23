@@ -15,13 +15,9 @@ namespace SpireLens.Core.Patches;
 /// Shows our per-card stats tooltip when the user hovers a card in the deck
 /// view (or other card-holder surfaces) AND the ViewStats checkbox is on.
 ///
-/// Hook surface matches what SlayTheStats uses:
+/// Hook surfaces:
 ///   NCardHolder.CreateHoverTips  (postfix) — show on hover
 ///   NCardHolder.ClearHoverTips   (postfix) — hide on unhover
-///
-/// Our panel is independent of theirs. If both mods are active, both
-/// tooltips appear — side-by-side on screen (or one on each side of the
-/// card). No collision because we don't touch their TooltipHelper.
 /// </summary>
 [HarmonyPatch(typeof(NCardHolder), "CreateHoverTips")]
 public static class CardHoverShowPatch

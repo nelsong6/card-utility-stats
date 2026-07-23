@@ -10,10 +10,8 @@ namespace SpireLens.Core;
 
 /// <summary>
 /// Our hover tooltip panel, positioned below the game's built-in card-text
-/// tooltip AND styled to match it (same hover_tip.png StyleBoxTexture, same
-/// Kreon fonts, same color palette). Closely mirrors SlayTheStats'
-/// TooltipHelper so the two panels look like siblings instead of alien
-/// elements crashing the party.
+/// tooltip and styled to match it (same hover_tip.png StyleBoxTexture, same
+/// Kreon fonts, and same color palette).
 ///
 /// Visual recipe — all taken directly from SlayTheStats' TooltipHelper.cs:
 ///   - Background: StyleBoxTexture with res://images/ui/hover_tip.png
@@ -36,9 +34,10 @@ namespace SpireLens.Core;
 ///         BrandLabel (top-right)      — e.g. "SpireLens"
 ///       StatsLabel (RichTextLabel, BBCode) — the data block
 ///
-/// Positioning: per-frame via SceneTree.ProcessFrame, stacking below
-/// either SlayTheStats' panel (if loaded) or the game's NHoverTipSet
-/// textHoverTipContainer (the HUD slot where "Deal 6 damage" appears).
+/// Positioning: per-frame via SceneTree.ProcessFrame, stacking below the
+/// game's NHoverTipSet textHoverTipContainer (the HUD slot where "Deal 6
+/// damage" appears). Third-party tooltip integration is intentionally
+/// unsupported.
 /// </summary>
 public static class StatsTooltip
 {
@@ -409,36 +408,25 @@ public static class StatsTooltip
         {
             var viewport = _tree.Root.GetViewport().GetVisibleRect();
 
-            // Anchor choice: stack below SlayTheStats' panel if visible, else
-            // below the game's textHoverTipContainer. We capture both the
-            // TOP and BOTTOM Y of the anchor so we can flip to above-anchor
-            // placement if below would overflow the viewport (common in
-            // hand hovers on cards with many keyword tooltips — Coolheaded
-            // shows Channel + Frost which fills most of the vertical space).
+            // Anchor below the game's textHoverTipContainer. We capture both
+            // the TOP and BOTTOM Y of the anchor so we can flip to
+            // above-anchor placement if below would overflow the viewport
+            // (common in hand hovers on cards with many keyword tooltips —
+            // Coolheaded shows Channel + Frost, which fills most of the
+            // vertical space).
             float anchorX = 0f, anchorTopY = 0f, anchorBottomY = 0f;
             bool anchorFound = false;
 
-            var sts = FindNodeByName(_tree.Root, "SlayTheStatsTooltip") as Control;
-            if (sts != null && GodotObject.IsInstanceValid(sts) && sts.Visible && sts.Size.Y > 0)
+            var tipSet = FindHoverTipSet();
+            if (tipSet != null && GodotObject.IsInstanceValid(tipSet))
             {
-                anchorX = sts.GlobalPosition.X;
-                anchorTopY = sts.GlobalPosition.Y;
-                anchorBottomY = anchorTopY + sts.Size.Y;
-                anchorFound = true;
-            }
-            else
-            {
-                var tipSet = FindHoverTipSet();
-                if (tipSet != null && GodotObject.IsInstanceValid(tipSet))
+                var textContainer = tipSet._textHoverTipContainer;
+                if (textContainer != null && GodotObject.IsInstanceValid(textContainer))
                 {
-                    var textContainer = tipSet._textHoverTipContainer;
-                    if (textContainer != null && GodotObject.IsInstanceValid(textContainer))
-                    {
-                        anchorX = textContainer.GlobalPosition.X;
-                        anchorTopY = textContainer.GlobalPosition.Y;
-                        anchorBottomY = anchorTopY + textContainer.Size.Y;
-                        anchorFound = true;
-                    }
+                    anchorX = textContainer.GlobalPosition.X;
+                    anchorTopY = textContainer.GlobalPosition.Y;
+                    anchorBottomY = anchorTopY + textContainer.Size.Y;
+                    anchorFound = true;
                 }
             }
 
@@ -501,16 +489,4 @@ public static class StatsTooltip
         return null;
     }
 
-    private static Node? FindNodeByName(Node root, string name)
-    {
-        if (root == null) return null;
-        if (root.Name == name) return root;
-        int count = root.GetChildCount();
-        for (int i = 0; i < count; i++)
-        {
-            var found = FindNodeByName(root.GetChild(i), name);
-            if (found != null) return found;
-        }
-        return null;
-    }
 }
