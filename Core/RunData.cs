@@ -436,6 +436,10 @@ public class RelicAggregate
     public int CardsUpgraded { get; set; }
     public List<string> UpgradedCards { get; set; } = new();
 
+    // Permanent deck cards whose Sharp enchantment was applied or increased
+    // by Gnarled Hammer's pickup effect.
+    public List<string> SharpEnchantedCards { get; set; } = new();
+
     // Razor Tooth tracking. Combats/turns are held denominators for averages.
     // Plays and draws count only events after the exact combat card was
     // successfully upgraded by Razor Tooth; the triggering play is excluded.

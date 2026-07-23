@@ -1552,6 +1552,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is GnarledHammer)
+        {
+            title = "Gnarled Hammer";
+            body = BuildGnarledHammerBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is Whetstone)
         {
             title = "Whetstone";
@@ -2782,6 +2789,19 @@ public static class RelicHoverShowPatch
     {
         var sb = new StringBuilder();
         AppendUpgradedCardStats(sb, agg);
+        return sb.ToString();
+    }
+
+    private static string BuildGnarledHammerBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var cards = (agg.SharpEnchantedCards ?? new List<string>())
+            .Where(card => !string.IsNullOrWhiteSpace(card))
+            .ToList();
+
+        Row3(sb, "Cards enchanted with Sharp", cards.Count.ToString(), "");
+        foreach (var card in cards)
+            RowFlow(sb, "Sharp-enchanted card", StatsTooltip.EscapeBbcode(card), "");
         return sb.ToString();
     }
 

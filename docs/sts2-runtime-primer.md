@@ -510,6 +510,13 @@ only after the returned task completes successfully. This captures the actual
 gain, including caps or other runtime changes, without counting relic
 restoration.
 
+Gnarled Hammer's `AfterObtained` awaits a deck selection, then synchronously
+calls `CardCmd.Enchant` with Sharp on each returned physical deck card. Snapshot
+the deck card references and their optional Sharp amounts before the callback,
+then compare them after its task completes successfully. A transition to Sharp
+or an increased Sharp amount is an observed enchantment; the selector's
+three-card maximum is not itself evidence that three cards changed.
+
 Darkstone Periapt is owned by `DarkstonePeriapt.AfterCardChangedPiles`. Mirror
 the relic's own final-pile condition (`card.Pile.Type == Deck`, same owner,
 `CardType.Curse`), then record the actual max-HP delta after the async

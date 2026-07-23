@@ -1625,6 +1625,7 @@ public static class RunTracker
         target.PlatingAdded += source.PlatingAdded;
         target.CardsUpgraded += source.CardsUpgraded;
         MergeUpgradedCardsInto(target, source);
+        MergeSharpEnchantedCardsInto(target, source);
         target.RazorToothCombats += source.RazorToothCombats;
         target.RazorToothTurns += source.RazorToothTurns;
         target.RazorToothUpgradedCardPlays += source.RazorToothUpgradedCardPlays;
@@ -2666,6 +2667,7 @@ public static class RunTracker
     private const string SturdyClampRelicId = "RELIC.STURDY_CLAMP";
     private const string RuinedHelmetRelicId = "RELIC.RUINED_HELMET";
     private const string MummifiedHandRelicId = "RELIC.MUMMIFIED_HAND";
+    private const string GnarledHammerRelicId = "RELIC.GNARLED_HAMMER";
     private const string BookmarkRelicId = "RELIC.BOOKMARK";
     private const string BrilliantScarfRelicId = "RELIC.BRILLIANT_SCARF";
     private const string JuzuBraceletRelicId = "RELIC.JUZU_BRACELET";
@@ -8189,6 +8191,56 @@ public static class RunTracker
         agg.MummifiedHandTurns += Math.Max(0, count);
     }
 
+    /// <summary>
+    /// Persist the permanent-deck cards whose Sharp amount changed across
+    /// Gnarled Hammer's completed pickup callback.
+    /// </summary>
+    public static void RecordGnarledHammerSharpCards(
+        GnarledHammer relic,
+        IEnumerable<CardModel> cards)
+    {
+        if (relic?.Owner == null || cards == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(relic.Owner)) return;
+
+                var cardNames = cards
+                    .Where(card =>
+                        card != null
+                        && ReferenceEquals(card.Owner, relic.Owner)
+                        && card.Pile?.Type == PileType.Deck
+                        && card.Enchantment is Sharp)
+                    .Select(GetCardDisplayNameForStats)
+                    .Where(cardName => !string.IsNullOrWhiteSpace(cardName))
+                    .ToList();
+                if (cardNames.Count == 0) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(GnarledHammerRelicId);
+                RecordGnarledHammerSharpCardsForTest(agg, cardNames);
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordGnarledHammerSharpCards failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordGnarledHammerSharpCardsForTest(
+        RelicAggregate agg,
+        IEnumerable<string>? cards)
+    {
+        if (agg == null || cards == null) return;
+
+        agg.SharpEnchantedCards ??= new List<string>();
+        agg.SharpEnchantedCards.AddRange(
+            cards.Where(card => !string.IsNullOrWhiteSpace(card)));
+    }
+
     internal static void RecordBookmarkCombatForTest(RelicAggregate agg, int count = 1)
     {
         if (agg == null) return;
@@ -13316,6 +13368,16 @@ public static class RunTracker
 
         target.UpgradedCards ??= new List<string>();
         target.UpgradedCards.AddRange(source.UpgradedCards.Where(card => !string.IsNullOrWhiteSpace(card)));
+    }
+
+    private static void MergeSharpEnchantedCardsInto(RelicAggregate target, RelicAggregate source)
+    {
+        if (source.SharpEnchantedCards == null || source.SharpEnchantedCards.Count == 0)
+            return;
+
+        target.SharpEnchantedCards ??= new List<string>();
+        target.SharpEnchantedCards.AddRange(
+            source.SharpEnchantedCards.Where(card => !string.IsNullOrWhiteSpace(card)));
     }
 
     private static void MergeCardRewardScreens(RelicAggregate target, RelicAggregate source)

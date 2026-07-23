@@ -1,0 +1,25 @@
+{
+  "run_id": "gnarled-hammer-relic-fixture",
+  "started_at": "2026-07-23T22:00:00Z",
+  "updated_at": "2026-07-23T22:05:00Z",
+  "character": "CHAR.IRONCLAD",
+  "ascension": 6,
+  "floor_reached": 18,
+  "outcome": "in_progress",
+  "game_start_time": 1784768400,
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.GNARLED_HAMMER": {
+      "sharp_enchanted_cards": [
+        "Pommel Strike",
+        "Uppercut+",
+        "Pommel Strike"
+      ]
+    }
+  },
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

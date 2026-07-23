@@ -2929,6 +2929,25 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsGnarledHammerRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("gnarled-hammer-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertGnarledHammerFixture(loaded.Data.RelicAggregates["RELIC.GNARLED_HAMMER"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsGnarledHammerRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("gnarled-hammer-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertGnarledHammerFixture(resumed!.RelicAggregates["RELIC.GNARLED_HAMMER"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsStoneHumidifierRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("stone-humidifier-relic-run.json"));
@@ -3115,6 +3134,13 @@ public class SchemaLoadingTests
         Assert.Equal(1, relicAgg.MummifiedHandDiscountedCommons);
         Assert.Equal(1, relicAgg.MummifiedHandDiscountedUncommons);
         Assert.Equal(1, relicAgg.MummifiedHandDiscountedRares);
+    }
+
+    private static void AssertGnarledHammerFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(
+            new[] { "Pommel Strike", "Uppercut+", "Pommel Strike" },
+            relicAgg.SharpEnchantedCards);
     }
 
     private static void AssertFresnelLensFixture(RelicAggregate relicAgg)
