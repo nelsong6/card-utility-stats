@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Commands;
+using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
@@ -26,6 +27,10 @@ public static class GremlinHornAfterDeathPatch
         {
             if (__instance?.Owner?.Creature == null || target == null) return;
             if (target.Side == __instance.Owner.Creature.Side) return;
+            // AfterDeath still reaches Gremlin Horn for the combat-ending kill,
+            // but its native energy and draw commands both no-op once combat is
+            // over or ending. Do not count that callback as an activation.
+            if (CombatManager.Instance.IsOverOrEnding) return;
 
             RunTracker.ArmGremlinHornAttribution(__instance.Owner);
         }

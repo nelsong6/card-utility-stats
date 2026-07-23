@@ -481,6 +481,13 @@ not belong in persisted run data.
 
 For relics that emit damage commands, prefer the relic-owned callback plus the resolved `CreatureCmd.Damage` result. Mercury Hourglass arms from `MercuryHourglass.AfterPlayerTurnStart`, records the actual multi-target damage split from the command result on each turn, and counts the combat once so damage per combat is not confused with damage per turn-start trigger.
 
+Gremlin Horn's `AfterDeath` callback still runs for the combat-ending enemy and
+flashes the relic, but `PlayerCmd.GainEnergy` and `CardPileCmd.Draw` suppress
+their outcomes once combat is over or ending. Exclude that callback before
+incrementing activations or arming resource-attribution windows; otherwise
+activation count measures attempted callbacks while the other rows measure
+observed outcomes.
+
 Mr. Struggles follows the same owner-specific turn-start pattern, but its
 damage amount is the current turn number, so it uses the multi-target
 `CreatureCmd.Damage` overload with a decimal amount plus `ValueProp` rather
