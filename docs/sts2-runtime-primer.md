@@ -516,6 +516,12 @@ the relic's own final-pile condition (`card.Pile.Type == Deck`, same owner,
 `GainMaxHp` command resolves. Count the curse acquisition from that same
 owner-specific match rather than from every generic curse card entry.
 
+Lucky Fysh uses the same owner-specific `AfterCardChangedPiles` surface for
+every same-owner card whose final pile is the permanent Deck. Wrap its returned
+task, count the confirmed deck addition only after successful completion, and
+measure the owner's completed gold-balance delta so gold modifiers or
+prevention are reflected instead of assuming its base 15 gold.
+
 Chosen Cheese gains max HP from `AfterCombatEnd`, then the game heals the same
 amount as part of `CreatureCmd.GainMaxHp`. Snapshot the owner's max HP before
 the async relic callback and record only the actual max-HP delta after

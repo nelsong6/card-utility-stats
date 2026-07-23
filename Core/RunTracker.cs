@@ -1646,6 +1646,8 @@ public static class RunTracker
         target.DoomDeathTriggers += source.DoomDeathTriggers;
         target.DoomKills += source.DoomKills;
         target.EnergyGenerated += source.EnergyGenerated;
+        target.GoldGained += source.GoldGained;
+        target.CardsAddedToDeck += source.CardsAddedToDeck;
         target.GoldLost += source.GoldLost;
         target.GoldLossBlocked += source.GoldLossBlocked;
         target.EnergyGeneratedCombats += source.EnergyGeneratedCombats;
@@ -2623,6 +2625,7 @@ public static class RunTracker
     private const string StoneHumidifierRelicId = "RELIC.STONE_HUMIDIFIER";
     private const string ChosenCheeseRelicId = "RELIC.CHOSEN_CHEESE";
     private const string DarkstonePeriaptRelicId = "RELIC.DARKSTONE_PERIAPT";
+    private const string LuckyFyshRelicId = "RELIC.LUCKY_FYSH";
     private const string LeafyPoulticeRelicId = "RELIC.LEAFY_POULTICE";
     private const string RegalPillowRelicId = "RELIC.REGAL_PILLOW";
     private const string WhiteBeastStatueRelicId = "RELIC.WHITE_BEAST_STATUE";
@@ -6014,6 +6017,38 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Record one completed Lucky Fysh permanent-deck callback and the actual
+    /// gold added to its tracked owner's balance.
+    /// </summary>
+    public static void RecordLuckyFyshCardAdded(
+        LuckyFysh relic,
+        Player owner,
+        int initialGold,
+        int currentGold)
+    {
+        if (relic == null || owner == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ReferenceEquals(relic.Owner, owner)
+                    || !IsTrackedRelic(relic)
+                    || !IsTrackedPlayer(owner))
+                    return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(LuckyFyshRelicId);
+                RecordLuckyFyshCardAddedForTest(agg, initialGold, currentGold);
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordLuckyFyshCardAdded failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Arm Leafy Poultice pickup attribution. The pickup loses max HP and then
     /// transforms up to two basic cards through <c>CardCmd.Transform</c>.
     /// </summary>
@@ -6711,6 +6746,17 @@ public static class RunTracker
         agg.CursesAcquired++;
         agg.TotalMaxHpGained += Math.Max(0, maxHpGained);
         RecordRelicMaxHpChangeForTest(agg, originalMaxHp, newMaxHp);
+    }
+
+    internal static void RecordLuckyFyshCardAddedForTest(
+        RelicAggregate agg,
+        int initialGold,
+        int currentGold)
+    {
+        if (agg == null) return;
+
+        agg.CardsAddedToDeck++;
+        agg.GoldGained += Math.Max(0, currentGold - initialGold);
     }
 
     internal static void RecordChosenCheeseMaxHpGainedForTest(

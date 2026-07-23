@@ -180,6 +180,9 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds Darkstone Periapt curse acquisition tracking plus observed max HP
   gained from the relic's owner-specific curse-to-deck callback, and
   original/new max-HP snapshots.
+- `lucky-fysh-relic-run.json`
+  Adds Lucky Fysh permanent-deck additions and the actual gold gained from
+  those owner-specific callbacks.
 - `shovel-relic-run.json`
   Adds Shovel Dig tracking: total relics acquired plus common, uncommon, and
   rare rarity splits from the actual obtained relic instances, plus campfires

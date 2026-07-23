@@ -1678,6 +1678,18 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsLuckyFyshRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("lucky-fysh-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.LUCKY_FYSH"];
+        Assert.Equal(45, relicAgg.GoldGained);
+        Assert.Equal(3, relicAgg.CardsAddedToDeck);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsShovelRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("shovel-relic-run.json"));
@@ -1731,6 +1743,17 @@ public class SchemaLoadingTests
         Assert.Equal(18, relicAgg.TotalMaxHpGained);
         Assert.Equal(70m, relicAgg.OriginalMaxHp);
         Assert.Equal(88m, relicAgg.NewMaxHp);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsLuckyFyshRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("lucky-fysh-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.LUCKY_FYSH"];
+        Assert.Equal(45, relicAgg.GoldGained);
+        Assert.Equal(3, relicAgg.CardsAddedToDeck);
     }
 
     [Fact]

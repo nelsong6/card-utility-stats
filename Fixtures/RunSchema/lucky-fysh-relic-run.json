@@ -1,0 +1,17 @@
+{
+  "run_id": "lucky-fysh-relic-fixture",
+  "started_at": "2026-07-23T08:00:00Z",
+  "updated_at": "2026-07-23T08:10:00Z",
+  "outcome": "in_progress",
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.LUCKY_FYSH": {
+      "gold_gained": 45,
+      "cards_added_to_deck": 3
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

@@ -507,6 +507,14 @@ public class RelicAggregate
     // observed PlayerCombatState.GainEnergy delta.
     public int EnergyGenerated { get; set; }
 
+    // Gold actually gained by a relic effect. Lucky Fysh measures the owner's
+    // completed balance delta after its gold command resolves.
+    public int GoldGained { get; set; }
+
+    // Permanent deck additions confirmed by a relic-owned pile-change
+    // callback. Lucky Fysh is the first relic using this field.
+    public int CardsAddedToDeck { get; set; }
+
     // Gold actually lost to a relic effect and the portion of its attempted
     // loss that did not leave the player's balance. Seal of Gold is the first
     // relic using these observed outcome fields; attempted loss is derived
