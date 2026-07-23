@@ -91,6 +91,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `alchemize-card-run.json`
   Adds Alchemize potion procurement tracking with successful common, uncommon,
   and rare potion splits plus failed procure results.
+- `jack-of-all-trades-card-run.json`
+  Adds Jack of All Trades generated colorless-card totals, uncommon/rare and
+  attack/skill/power splits, plus the numerator for average added-card cost.
 - `debt-card-run.json`
   Adds Debt end-of-turn trigger tracking with observed gold lost and the
   unaffordable portion blocked by the player being out of gold.

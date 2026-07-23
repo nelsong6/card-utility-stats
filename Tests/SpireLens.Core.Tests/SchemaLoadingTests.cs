@@ -512,6 +512,25 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsJackOfAllTradesCardFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("jack-of-all-trades-card-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        var cardAgg = loaded.Data.Aggregates["CARD.JACK_OF_ALL_TRADES#1"];
+        Assert.Equal(5, cardAgg.JackColorlessCardsAdded);
+        Assert.Equal(3, cardAgg.JackUncommonCardsAdded);
+        Assert.Equal(2, cardAgg.JackRareCardsAdded);
+        Assert.Equal(2, cardAgg.JackAttacksAdded);
+        Assert.Equal(2, cardAgg.JackSkillsAdded);
+        Assert.Equal(1, cardAgg.JackPowersAdded);
+        Assert.Equal(7, cardAgg.JackAddedCardCostTotal);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsDebtCardFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("debt-card-run.json"));
@@ -1151,6 +1170,22 @@ public class SchemaLoadingTests
         Assert.Equal(2, cardAgg.UncommonPotionsGained);
         Assert.Equal(1, cardAgg.RarePotionsGained);
         Assert.Equal(3, cardAgg.PotionsSkipped);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsJackOfAllTradesCardFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("jack-of-all-trades-card-run.json"));
+
+        Assert.NotNull(resumed);
+        var cardAgg = resumed!.Aggregates["CARD.JACK_OF_ALL_TRADES#1"];
+        Assert.Equal(5, cardAgg.JackColorlessCardsAdded);
+        Assert.Equal(3, cardAgg.JackUncommonCardsAdded);
+        Assert.Equal(2, cardAgg.JackRareCardsAdded);
+        Assert.Equal(2, cardAgg.JackAttacksAdded);
+        Assert.Equal(2, cardAgg.JackSkillsAdded);
+        Assert.Equal(1, cardAgg.JackPowersAdded);
+        Assert.Equal(7, cardAgg.JackAddedCardCostTotal);
     }
 
     [Fact]

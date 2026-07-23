@@ -2512,6 +2512,127 @@ public static class RunTracker
         => AccumulateAlchemizePotionResult(agg, success, rarity);
 
     /// <summary>
+    /// Capture Jack of All Trades while its generated-card add command is
+    /// still resolving. The command completes asynchronously, so the physical
+    /// source must be retained before awaiting the observed add result.
+    /// </summary>
+    internal static CardModel? CaptureJackOfAllTradesSource(Player? player)
+    {
+        if (player == null) return null;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return null;
+                if (!IsTrackedPlayer(player)) return null;
+
+                var causingPlay = FindCurrentlyResolvingCardPlay();
+                var sourceCard = causingPlay?.Card;
+                if (sourceCard is not JackOfAllTrades) return null;
+                if (sourceCard.Owner != null && !ReferenceEquals(sourceCard.Owner, player)) return null;
+
+                return Canonical(sourceCard);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"CaptureJackOfAllTradesSource failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record one successful generated-card arrival caused by Jack of All
+    /// Trades. The result's card is the post-hook observed card that actually
+    /// entered combat, so its final rarity, type, and cost are authoritative.
+    /// </summary>
+    internal static void RecordJackOfAllTradesCardAdded(
+        CardModel sourceCard,
+        Player? player,
+        CardPileAddResult result)
+    {
+        if (player == null || !result.success || result.cardAdded == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+                if (!IsTrackedPlayer(player)) return;
+                if (sourceCard is not JackOfAllTrades) return;
+                if (sourceCard.Owner != null && !ReferenceEquals(sourceCard.Owner, player)) return;
+
+                var addedCard = result.cardAdded;
+                _pendingCombat ??= new PendingCombat();
+                var instanceId = GetOrAssignInstanceId(sourceCard);
+                var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
+                AccumulateJackOfAllTradesCardAdded(
+                    agg,
+                    addedCard.Rarity,
+                    addedCard.Type,
+                    GetJackOfAllTradesAddedCardCost(addedCard));
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordJackOfAllTradesCardAdded failed: {e.Message}");
+            }
+        }
+    }
+
+    private static int GetJackOfAllTradesAddedCardCost(CardModel card)
+    {
+        try
+        {
+            return Math.Max(0, card.EnergyCost.GetWithModifiers(CostModifiers.None));
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
+    private static void AccumulateJackOfAllTradesCardAdded(
+        CardAggregate agg,
+        CardRarity rarity,
+        CardType type,
+        int energyCost)
+    {
+        agg.JackColorlessCardsAdded++;
+        agg.JackAddedCardCostTotal += Math.Max(0, energyCost);
+
+        switch (rarity)
+        {
+            case CardRarity.Uncommon:
+                agg.JackUncommonCardsAdded++;
+                break;
+            case CardRarity.Rare:
+                agg.JackRareCardsAdded++;
+                break;
+        }
+
+        switch (type)
+        {
+            case CardType.Attack:
+                agg.JackAttacksAdded++;
+                break;
+            case CardType.Skill:
+                agg.JackSkillsAdded++;
+                break;
+            case CardType.Power:
+                agg.JackPowersAdded++;
+                break;
+        }
+    }
+
+    internal static void RecordJackOfAllTradesCardAddedForTest(
+        CardAggregate agg,
+        CardRarity rarity,
+        CardType type,
+        int energyCost)
+        => AccumulateJackOfAllTradesCardAdded(agg, rarity, type, energyCost);
+
+    /// <summary>
     /// Record one completed Debt end-of-turn effect. Debt clamps the amount
     /// passed to LoseGold to the owner's current balance, so the card's Gold
     /// dynamic var is the intended loss while the before/after balance delta
@@ -16396,6 +16517,13 @@ public static class RunTracker
         target.UncommonPotionsGained += source.UncommonPotionsGained;
         target.RarePotionsGained += source.RarePotionsGained;
         target.PotionsSkipped += source.PotionsSkipped;
+        target.JackColorlessCardsAdded += source.JackColorlessCardsAdded;
+        target.JackUncommonCardsAdded += source.JackUncommonCardsAdded;
+        target.JackRareCardsAdded += source.JackRareCardsAdded;
+        target.JackAttacksAdded += source.JackAttacksAdded;
+        target.JackSkillsAdded += source.JackSkillsAdded;
+        target.JackPowersAdded += source.JackPowersAdded;
+        target.JackAddedCardCostTotal += source.JackAddedCardCostTotal;
         target.DebtTriggers += source.DebtTriggers;
         target.DebtGoldLost += source.DebtGoldLost;
         target.DebtGoldLossBlocked += source.DebtGoldLossBlocked;

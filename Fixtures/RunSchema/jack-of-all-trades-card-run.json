@@ -1,0 +1,38 @@
+{
+  "run_id": "jack-of-all-trades-card-fixture",
+  "started_at": "2026-07-23T20:00:00Z",
+  "updated_at": "2026-07-23T20:12:00Z",
+  "character": "SILENT",
+  "ascension": 7,
+  "floor_reached": 11,
+  "outcome": "in_progress",
+  "game_start_time": 1784840400,
+  "aggregates": {
+    "CARD.JACK_OF_ALL_TRADES#1": {
+      "combats_in_deck": 4,
+      "plays": 8,
+      "times_drawn": 9,
+      "jack_colorless_cards_added": 5,
+      "jack_uncommon_cards_added": 3,
+      "jack_rare_cards_added": 2,
+      "jack_attacks_added": 2,
+      "jack_skills_added": 2,
+      "jack_powers_added": 1,
+      "jack_added_card_cost_total": 7,
+      "floor_added": 6,
+      "initial_upgrade_level": 0
+    }
+  },
+  "events": [],
+  "relic_aggregates": {},
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.JACK_OF_ALL_TRADES": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.JACK_OF_ALL_TRADES": 1
+  }
+}

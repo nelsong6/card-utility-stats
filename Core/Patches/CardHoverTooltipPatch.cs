@@ -352,6 +352,7 @@ public static class CardHoverShowPatch
         AppendOstySummonStats(sb, cardModel, agg, metaStats, compact: false);
         AppendUnmovablePowerStats(sb, cardModel, metaStats);
         AppendAlchemizePotionStats(sb, cardModel, agg, compact: false);
+        AppendJackOfAllTradesStats(sb, cardModel, agg, compact: false);
         AppendDebtStats(sb, cardModel, agg);
         AppendReplayStats(sb, agg);
 
@@ -555,6 +556,7 @@ public static class CardHoverShowPatch
         AppendOstySummonStats(sb, cardModel, agg, metaStats, compact: true);
         AppendUnmovablePowerStats(sb, cardModel, metaStats);
         AppendAlchemizePotionStats(sb, cardModel, agg, compact: true);
+        AppendJackOfAllTradesStats(sb, cardModel, agg, compact: true);
         AppendDebtStats(sb, cardModel, agg);
         AppendReplayStats(sb, agg);
 
@@ -698,6 +700,29 @@ public static class CardHoverShowPatch
         Row3(sb, "common potions", agg.CommonPotionsGained.ToString(), "");
         Row3(sb, "uncommon potions", agg.UncommonPotionsGained.ToString(), "");
         Row3(sb, "rare potions", agg.RarePotionsGained.ToString(), "");
+    }
+
+    private static void AppendJackOfAllTradesStats(
+        StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel card,
+        CardAggregate agg,
+        bool compact)
+    {
+        if (card is not JackOfAllTrades && !IsCardId(card, "CARD.JACK_OF_ALL_TRADES")) return;
+
+        Row3(sb, "Colorless cards added", agg.JackColorlessCardsAdded.ToString(), "");
+        if (compact) return;
+
+        Row3(sb, "uncommons added", agg.JackUncommonCardsAdded.ToString(), "");
+        Row3(sb, "rares added", agg.JackRareCardsAdded.ToString(), "");
+        Row3(sb, "Attacks added", agg.JackAttacksAdded.ToString(), "");
+        Row3(sb, "Skills added", agg.JackSkillsAdded.ToString(), "");
+        Row3(sb, "Powers added", agg.JackPowersAdded.ToString(), "");
+
+        var averageCost = agg.JackColorlessCardsAdded <= 0
+            ? 0m
+            : (decimal)agg.JackAddedCardCostTotal / agg.JackColorlessCardsAdded;
+        Row3(sb, "Avg cost of cards added", FormatDecimal(averageCost), "");
     }
 
     private static void AppendDebtStats(

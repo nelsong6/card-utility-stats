@@ -149,6 +149,18 @@ public class CardAggregate
     public int RarePotionsGained { get; set; }
     public int PotionsSkipped { get; set; }
 
+    // Jack of All Trades generated-card outcomes. The total counts only cards
+    // that the combat pile command confirms were added. Rarity/type buckets
+    // and energy cost are read from that actual added card, not the candidate
+    // Jack selected before add hooks and pile rules ran.
+    public int JackColorlessCardsAdded { get; set; }
+    public int JackUncommonCardsAdded { get; set; }
+    public int JackRareCardsAdded { get; set; }
+    public int JackAttacksAdded { get; set; }
+    public int JackSkillsAdded { get; set; }
+    public int JackPowersAdded { get; set; }
+    public int JackAddedCardCostTotal { get; set; }
+
     // Debt's end-of-turn curse effect. The intended amount comes from the
     // card's Gold dynamic var; actual loss is observed from the owner's gold
     // balance before/after the callback. Any unaffordable remainder is kept

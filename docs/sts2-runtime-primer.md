@@ -193,6 +193,14 @@ belt (currently a full belt or a `ShouldProcurePotion` blocker such as Sozu).
 Do not resolve the source after awaiting: `CardPlayFinished` can clear the
 current-card context as soon as Alchemize resumes.
 
+Jack of All Trades selects distinct cards from the unlocked colorless combat
+pool, then awaits `CardPileCmd.AddGeneratedCardToCombat` once for each selected
+card. Capture the currently resolving physical Jack before each async command,
+then classify only a successful returned `CardPileAddResult.cardAdded`. That
+post-hook card is the authoritative source for rarity, card type, and effective
+energy cost; the pre-command candidate is intent and can diverge from the card
+that pile/add hooks actually allow into combat.
+
 Debt applies its curse effect from the owner-specific
 `Debt.OnTurnEndInHand(PlayerChoiceContext)` callback. Its intended loss is the
 card's `Gold` dynamic var, but Debt clamps the amount passed to
