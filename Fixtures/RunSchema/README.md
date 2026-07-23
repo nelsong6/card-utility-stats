@@ -110,7 +110,8 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `open-branch-relic-stats-run.json`
   Adds consolidated relic aggregates rescued from stale open branches: Anchor,
   Letter Opener, Blood Vial, Akabeko, Booming Conch, Pendulum, Parrying
-  Shield, Horn Cleat, and Toolbox.
+  Shield, Horn Cleat, and Toolbox. Pendulum includes held-combat denominators
+  for its cards-drawn average.
 - `letter-opener-relic-run.json`
   Adds Letter Opener combat, turn, and skill-play denominators for average
   attempted damage, plus turn-end 1/2 charge buckets.

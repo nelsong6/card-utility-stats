@@ -412,6 +412,10 @@ public class RelicAggregate
     // combat start).
     public int AdditionalCardsDrawn { get; set; }
 
+    // Combats where Pendulum was held, including combats too short for it to
+    // activate. Used as the denominator for cards drawn per combat.
+    public int PendulumCombats { get; set; }
+
     // Total block gained from this relic across all combats.
     // Used by Orichalcum, Permafrost, The Abacus, Bone Flute, Cloak Clasp,
     // Anchor, Horn Cleat, Tuning Fork, Ornamental Fan, Regalite, and Vambrace's

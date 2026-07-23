@@ -1620,6 +1620,7 @@ public static class RunTracker
         target.WeakApplied += source.WeakApplied;
         MergeAppliedEffectsInto(target.AppliedEffects, source.AppliedEffects);
         target.AdditionalCardsDrawn += source.AdditionalCardsDrawn;
+        target.PendulumCombats += source.PendulumCombats;
         target.AdditionalBlockGained += source.AdditionalBlockGained;
         target.BlockedTriggers += source.BlockedTriggers;
         target.StrengthAdded += source.StrengthAdded;
@@ -9394,6 +9395,12 @@ public static class RunTracker
         }
     }
 
+    internal static void RecordPendulumCombatForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.PendulumCombats += Math.Max(0, count);
+    }
+
     /// <summary>
     /// Record Centennial Puzzle's once-per-combat HP-loss activation. The
     /// actual cards drawn are observed from the single-card draw command.
@@ -12177,6 +12184,7 @@ public static class RunTracker
             RecordRippleBasinCombatForPlayerLocked(player);
             RecordArtOfWarCombatForPlayerLocked(player);
             RecordHappyFlowerCombatForPlayerLocked(player);
+            RecordPendulumCombatForPlayerLocked(player);
             RecordSealOfGoldCombatForPlayerLocked(player);
             RecordNunchakuCombatForPlayerLocked(player);
             RecordIronClubCombatForPlayerLocked(player);
@@ -12657,6 +12665,16 @@ public static class RunTracker
         agg.EnergyGeneratedCombats += 1;
     }
 
+    private static void RecordPendulumCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasPendulum(player)) return;
+        if (!_pendingCombat.PendulumCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(PendulumRelicId);
+        RecordPendulumCombatForTest(agg);
+    }
+
     private static void RecordArtOfWarCombatForPlayerLocked(Player player)
     {
         if (_pendingCombat == null) return;
@@ -12973,6 +12991,18 @@ public static class RunTracker
         try
         {
             return player.Relics.Any(r => r is HappyFlower);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool PlayerHasPendulum(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is Pendulum);
         }
         catch
         {
@@ -16912,6 +16942,8 @@ internal class PendingCombat
     public Dictionary<Player, int> ArtOfWarTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> HappyFlowerCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> PendulumCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> SealOfGoldCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

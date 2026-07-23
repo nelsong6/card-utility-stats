@@ -1325,6 +1325,7 @@ public class SchemaLoadingTests
         var pendulumAgg = loaded.Data.RelicAggregates["RELIC.PENDULUM"];
         Assert.Equal(3, pendulumAgg.Activations);
         Assert.Equal(6, pendulumAgg.AdditionalCardsDrawn);
+        Assert.Equal(2, pendulumAgg.PendulumCombats);
         var parryingShieldAgg = loaded.Data.RelicAggregates["RELIC.PARRYING_SHIELD"];
         Assert.Equal(2, parryingShieldAgg.Activations);
         Assert.Equal(17, parryingShieldAgg.TotalDamageAttempted);
@@ -1356,6 +1357,7 @@ public class SchemaLoadingTests
         Assert.Equal(16, resumed.RelicAggregates["RELIC.AKABEKO"].VigorGained);
         Assert.Equal(4, resumed.RelicAggregates["RELIC.BOOMING_CONCH"].AdditionalCardsDrawn);
         Assert.Equal(6, resumed.RelicAggregates["RELIC.PENDULUM"].AdditionalCardsDrawn);
+        Assert.Equal(2, resumed.RelicAggregates["RELIC.PENDULUM"].PendulumCombats);
         Assert.Equal(11, resumed.RelicAggregates["RELIC.PARRYING_SHIELD"].TotalDamageDealt);
         Assert.Equal(4, resumed.RelicAggregates["RELIC.PARRYING_SHIELD"].TotalDamageBlocked);
         Assert.Equal(24, resumed.RelicAggregates["RELIC.HORN_CLEAT"].AdditionalBlockGained);

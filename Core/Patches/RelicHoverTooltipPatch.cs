@@ -2242,8 +2242,13 @@ public static class RelicHoverShowPatch
     private static string BuildPendulumBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
+        var cardsDrawnPerCombat = agg.PendulumCombats <= 0
+            ? 0m
+            : (decimal)agg.AdditionalCardsDrawn / agg.PendulumCombats;
+
         Row3(sb, "Activations", agg.Activations.ToString(), "");
         Row3(sb, "Cards drawn", agg.AdditionalCardsDrawn.ToString(), "");
+        Row3(sb, "Avg cards drawn per combat", FormatDecimal(cardsDrawnPerCombat), "");
         return sb.ToString();
     }
 

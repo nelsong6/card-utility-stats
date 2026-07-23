@@ -581,6 +581,12 @@ queried repeatedly for UI/playability, so count the offer from the counter
 transition and use the modifier only to measure energy saved by the card that
 later consumes the offer.
 
+Pendulum advances its persistent turn counter from its owner-specific
+`AfterPlayerTurnStart` callback and can activate multiple times in a long
+combat—or not at all in a short one. Observe the actual draw-command result for
+its cards-drawn numerator, and count every combat where the relic was held as
+the per-combat denominator rather than using activations.
+
 Mummified Hand resolves entirely inside its `AfterCardPlayed` callback despite
 returning `Task.CompletedTask`: after an owner Power play, it selects one card
 already in hand and calls that card's `SetToFreeThisTurn`. Observe the selected
