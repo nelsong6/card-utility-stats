@@ -33,6 +33,7 @@ public static class CardHoverShowPatch
     private const string BlockedDrawIconPath = DrawCardsNextTurnPowerIconPath;
     private const int DebtGoldLossPerTrigger = 5;
     private const string EnergyPotionIconPath = "res://images/atlases/potion_atlas.sprites/energy_potion.tres";
+    private const string JugglingPowerId = "POWER.JUGGLING";
     private const string StarIconPath = "res://images/packed/sprite_fonts/star_icon.png";
     private const string SovereignBladeMetaNote = "Reflects All Sovereign Blade Usage";
 
@@ -354,6 +355,7 @@ public static class CardHoverShowPatch
         AppendAlchemizePotionStats(sb, cardModel, agg, compact: false);
         AppendJackOfAllTradesStats(sb, cardModel, agg, compact: false);
         AppendDiscoveryStats(sb, cardModel, agg, compact: false);
+        AppendJugglingPowerStats(sb, cardModel, metaStats, compact: false);
         AppendDebtStats(sb, cardModel, agg);
         AppendReplayStats(sb, agg);
 
@@ -559,6 +561,7 @@ public static class CardHoverShowPatch
         AppendAlchemizePotionStats(sb, cardModel, agg, compact: true);
         AppendJackOfAllTradesStats(sb, cardModel, agg, compact: true);
         AppendDiscoveryStats(sb, cardModel, agg, compact: true);
+        AppendJugglingPowerStats(sb, cardModel, metaStats, compact: true);
         AppendDebtStats(sb, cardModel, agg);
         AppendReplayStats(sb, agg);
 
@@ -753,6 +756,42 @@ public static class CardHoverShowPatch
             GetEnergyStatLabel("avg discount of picked card"),
             FormatDecimal(averageDiscount),
             "");
+    }
+
+    private static void AppendJugglingPowerStats(
+        StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel card,
+        RunMetaStats metaStats,
+        bool compact)
+    {
+        if (card is not Juggling && !IsCardId(card, "CARD.JUGGLING")) return;
+
+        metaStats ??= new RunMetaStats();
+        PowerAggregate? powerAgg = null;
+        if (metaStats.PowerAggregates != null)
+        {
+            metaStats.PowerAggregates.TryGetValue(JugglingPowerId, out powerAgg);
+            powerAgg ??= metaStats.PowerAggregates.Values.FirstOrDefault(candidate =>
+                string.Equals(candidate.PowerId, JugglingPowerId, StringComparison.Ordinal)
+                || string.Equals(candidate.DisplayName, "Juggling", StringComparison.OrdinalIgnoreCase));
+        }
+        powerAgg ??= new PowerAggregate();
+
+        Row3(sb, "Total attacks copied", powerAgg.AttacksCopied.ToString(), "");
+        if (compact) return;
+
+        Row3(sb, "commons copied", powerAgg.CommonAttacksCopied.ToString(), "");
+        Row3(sb, "uncommons copied", powerAgg.UncommonAttacksCopied.ToString(), "");
+        Row3(sb, "rares copied", powerAgg.RareAttacksCopied.ToString(), "");
+
+        decimal averagePerTurn = powerAgg.TurnsActive > 0
+            ? (decimal)powerAgg.AttacksCopied / powerAgg.TurnsActive
+            : 0m;
+        decimal averagePerCombat = powerAgg.CombatsActive > 0
+            ? (decimal)powerAgg.AttacksCopied / powerAgg.CombatsActive
+            : 0m;
+        Row3(sb, "avg copies per turn", FormatDecimal(averagePerTurn), "");
+        Row3(sb, "avg copies per combat", FormatDecimal(averagePerCombat), "");
     }
 
     private static void AppendDebtStats(

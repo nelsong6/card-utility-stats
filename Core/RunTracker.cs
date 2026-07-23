@@ -2633,6 +2633,275 @@ public static class RunTracker
         => AccumulateJackOfAllTradesCardAdded(agg, rarity, type, energyCost);
 
     /// <summary>
+    /// Arm the exact generated-card calls made when Juggling's third owner
+    /// Attack resolves. The power's pre-increment internal counter is the
+    /// authoritative trigger boundary; Amount is the number of copies the
+    /// native callback is about to attempt.
+    /// </summary>
+    internal static PendingJugglingCopyWindow? ArmJugglingCopyAttribution(
+        JugglingPower? power,
+        CardPlay? cardPlay)
+    {
+        if (power?.Owner?.Player == null || cardPlay?.Card == null) return null;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return null;
+
+                var player = power.Owner.Player;
+                if (!IsTrackedPlayer(player)) return null;
+                if (!ReferenceEquals(cardPlay.Card.Owner, player)) return null;
+                if (cardPlay.Card.Type != CardType.Attack) return null;
+                if (power.Amount <= 0) return null;
+                if (power.GetInternalData<JugglingPower.Data>().attacksPlayedThisTurn != 2)
+                    return null;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordJugglingPowerActiveForPlayerLocked(power, player);
+
+                var window = new PendingJugglingCopyWindow
+                {
+                    Player = player,
+                    PowerId = power.Id.ToString(),
+                    DisplayName = GetPowerDisplayName(power),
+                    TriggerCardId = cardPlay.Card.Id.ToString(),
+                    RemainingAttempts = power.Amount,
+                };
+                _pendingCombat.PendingJugglingCopyWindows[player] = window;
+                return window;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"ArmJugglingCopyAttribution failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Match one generated-card add command to the currently resolving
+    /// Juggling trigger. The returned window survives the asynchronous pile
+    /// result so only a confirmed arrival is counted.
+    /// </summary>
+    internal static PendingJugglingCopyWindow? CaptureJugglingCopyAttempt(
+        CardModel? card,
+        Player? creator)
+    {
+        if (card == null || creator == null) return null;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return null;
+                if (_pendingCombat == null) return null;
+                if (!_pendingCombat.PendingJugglingCopyWindows.TryGetValue(
+                        creator,
+                        out var window))
+                    return null;
+                if (window.RemainingAttempts <= 0) return null;
+                if (card.Type != CardType.Attack) return null;
+                if (!string.Equals(
+                        card.Id.ToString(),
+                        window.TriggerCardId,
+                        StringComparison.Ordinal))
+                    return null;
+
+                window.RemainingAttempts--;
+                return window;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"CaptureJugglingCopyAttempt failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+    internal static void RecordJugglingCopyResult(
+        PendingJugglingCopyWindow? window,
+        CardPileAddResult result)
+    {
+        if (window == null || !result.success || result.cardAdded == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+                if (_pendingCombat == null || !IsTrackedPlayer(window.Player)) return;
+                if (!_pendingCombat.PendingJugglingCopyWindows.TryGetValue(
+                        window.Player,
+                        out var activeWindow)
+                    || !ReferenceEquals(activeWindow, window))
+                    return;
+
+                var agg = GetOrCreatePowerAggregate(
+                    _pendingCombat.MetaStats,
+                    window.PowerId,
+                    window.DisplayName);
+                AccumulateJugglingCopy(agg, success: true, result.cardAdded.Rarity);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordJugglingCopyResult failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void DisarmJugglingCopyAttribution(PendingJugglingCopyWindow? window)
+    {
+        if (window == null) return;
+
+        lock (_lock)
+        {
+            if (_pendingCombat == null) return;
+            if (_pendingCombat.PendingJugglingCopyWindows.TryGetValue(
+                    window.Player,
+                    out var activeWindow)
+                && ReferenceEquals(activeWindow, window))
+            {
+                _pendingCombat.PendingJugglingCopyWindows.Remove(window.Player);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Count the application turn and combat as held-power denominators.
+    /// Re-applying another Juggling stack in the same turn is deduplicated.
+    /// </summary>
+    internal static void RecordJugglingPowerApplied(JugglingPower? power)
+    {
+        if (power?.Owner?.Player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+                if (!IsTrackedPlayer(power.Owner.Player)) return;
+                _pendingCombat ??= new PendingCombat();
+                RecordJugglingPowerActiveForPlayerLocked(power, power.Owner.Player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordJugglingPowerApplied failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Count every player turn that begins with Juggling active, including
+    /// zero-copy turns. Mid-turn first applications are counted separately by
+    /// <see cref="RecordJugglingPowerApplied"/>.
+    /// </summary>
+    public static void RecordJugglingPowerTurnStarted(Player? player)
+    {
+        if (player?.Creature == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+                if (!IsTrackedPlayer(player)) return;
+                var power = player.Creature.GetPower<JugglingPower>();
+                if (power == null) return;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordJugglingPowerActiveForPlayerLocked(power, player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordJugglingPowerTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void RecordJugglingPowerActiveForPlayerLocked(
+        JugglingPower power,
+        Player player)
+    {
+        if (_pendingCombat == null) return;
+
+        var agg = GetOrCreatePowerAggregate(
+            _pendingCombat.MetaStats,
+            power.Id.ToString(),
+            GetPowerDisplayName(power));
+
+        if (_pendingCombat.JugglingPowerCombatCountedPlayers.Add(player))
+            agg.CombatsActive++;
+
+        int turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.JugglingPowerTurnCountedTurns.TryGetValue(
+                player,
+                out var recordedTurn)
+            && recordedTurn == turnNumber)
+            return;
+
+        _pendingCombat.JugglingPowerTurnCountedTurns[player] = turnNumber;
+        agg.TurnsActive++;
+    }
+
+    private static PowerAggregate GetOrCreatePowerAggregate(
+        RunMetaStats metaStats,
+        string powerId,
+        string displayName)
+    {
+        metaStats.PowerAggregates ??= new Dictionary<string, PowerAggregate>();
+        if (!metaStats.PowerAggregates.TryGetValue(powerId, out var agg))
+        {
+            agg = new PowerAggregate
+            {
+                PowerId = powerId,
+                DisplayName = displayName,
+            };
+            metaStats.PowerAggregates[powerId] = agg;
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(agg.PowerId))
+                agg.PowerId = powerId;
+            if (string.IsNullOrWhiteSpace(agg.DisplayName)
+                && !string.IsNullOrWhiteSpace(displayName))
+                agg.DisplayName = displayName;
+        }
+
+        return agg;
+    }
+
+    private static void AccumulateJugglingCopy(
+        PowerAggregate agg,
+        bool success,
+        CardRarity? rarity)
+    {
+        if (agg == null || !success) return;
+
+        agg.AttacksCopied++;
+        switch (rarity)
+        {
+            case CardRarity.Common:
+                agg.CommonAttacksCopied++;
+                break;
+            case CardRarity.Uncommon:
+                agg.UncommonAttacksCopied++;
+                break;
+            case CardRarity.Rare:
+                agg.RareAttacksCopied++;
+                break;
+        }
+    }
+
+    internal static void RecordJugglingCopyForTest(
+        PowerAggregate agg,
+        bool success,
+        CardRarity? rarity)
+        => AccumulateJugglingCopy(agg, success, rarity);
+
+    /// <summary>
     /// Capture Discovery at the exact SetToFreeThisTurn call it makes on the
     /// picked card. A skipped choice never reaches this boundary.
     /// </summary>
@@ -16686,6 +16955,40 @@ public static class RunTracker
         target.TotalOstyHpSummoned += source.TotalOstyHpSummoned;
         target.TotalOstyDamageAbsorbed += source.TotalOstyDamageAbsorbed;
         target.ExtraBlockGainedFromUnmovablePower += source.ExtraBlockGainedFromUnmovablePower;
+        MergePowerAggregatesInto(target.PowerAggregates, source.PowerAggregates);
+    }
+
+    private static void MergePowerAggregatesInto(
+        Dictionary<string, PowerAggregate> target,
+        Dictionary<string, PowerAggregate>? source)
+    {
+        if (source == null) return;
+
+        foreach (var (powerId, sourceAgg) in source)
+        {
+            if (!target.TryGetValue(powerId, out var targetAgg))
+            {
+                targetAgg = new PowerAggregate
+                {
+                    PowerId = sourceAgg.PowerId,
+                    DisplayName = sourceAgg.DisplayName,
+                };
+                target[powerId] = targetAgg;
+            }
+
+            if (string.IsNullOrWhiteSpace(targetAgg.PowerId))
+                targetAgg.PowerId = sourceAgg.PowerId;
+            if (string.IsNullOrWhiteSpace(targetAgg.DisplayName)
+                && !string.IsNullOrWhiteSpace(sourceAgg.DisplayName))
+                targetAgg.DisplayName = sourceAgg.DisplayName;
+
+            targetAgg.AttacksCopied += sourceAgg.AttacksCopied;
+            targetAgg.CommonAttacksCopied += sourceAgg.CommonAttacksCopied;
+            targetAgg.UncommonAttacksCopied += sourceAgg.UncommonAttacksCopied;
+            targetAgg.RareAttacksCopied += sourceAgg.RareAttacksCopied;
+            targetAgg.TurnsActive += sourceAgg.TurnsActive;
+            targetAgg.CombatsActive += sourceAgg.CombatsActive;
+        }
     }
 
     private static void MergeBlockedDrawReasonsInto(
@@ -17148,6 +17451,15 @@ internal sealed class PendingSilverCrucibleCard
     public int UpgradeLevel { get; init; }
 }
 
+internal sealed class PendingJugglingCopyWindow
+{
+    public required Player Player { get; init; }
+    public string PowerId { get; init; } = "";
+    public string DisplayName { get; init; } = "";
+    public string TriggerCardId { get; init; } = "";
+    public int RemainingAttempts { get; set; }
+}
+
 /// <summary>
 /// Holds per-combat stats and events while a combat is in progress.
 /// Discarded if the combat doesn't finish cleanly; promoted into the run on CombatEnded.
@@ -17219,6 +17531,12 @@ internal class PendingCombat
     public HashSet<Player> MummifiedHandCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> MummifiedHandTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> JugglingPowerCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> JugglingPowerTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, PendingJugglingCopyWindow> PendingJugglingCopyWindows { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> NutritiousSoupCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

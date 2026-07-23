@@ -551,6 +551,19 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsJugglingPowerFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("juggling-power-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        AssertJugglingPowerFixture(
+            loaded.Data.MetaStats.PowerAggregates["POWER.JUGGLING"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsDebtCardFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("debt-card-run.json"));
@@ -1223,6 +1236,16 @@ public class SchemaLoadingTests
         Assert.Equal(2, cardAgg.DiscoverySkillsPicked);
         Assert.Equal(1, cardAgg.DiscoveryPowersPicked);
         Assert.Equal(7, cardAgg.DiscoveryEnergyDiscountTotal);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsJugglingPowerFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("juggling-power-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertJugglingPowerFixture(
+            resumed!.MetaStats.PowerAggregates["POWER.JUGGLING"]);
     }
 
     [Fact]
@@ -3150,6 +3173,18 @@ public class SchemaLoadingTests
         Assert.Equal(4, relicAgg.PaelsClawGoopyCards);
         Assert.Equal(4, relicAgg.PaelsClawTurns);
         Assert.Equal(2, relicAgg.PaelsClawCombats);
+    }
+
+    private static void AssertJugglingPowerFixture(PowerAggregate powerAgg)
+    {
+        Assert.Equal("POWER.JUGGLING", powerAgg.PowerId);
+        Assert.Equal("Juggling", powerAgg.DisplayName);
+        Assert.Equal(7, powerAgg.AttacksCopied);
+        Assert.Equal(3, powerAgg.CommonAttacksCopied);
+        Assert.Equal(2, powerAgg.UncommonAttacksCopied);
+        Assert.Equal(2, powerAgg.RareAttacksCopied);
+        Assert.Equal(5, powerAgg.TurnsActive);
+        Assert.Equal(2, powerAgg.CombatsActive);
     }
 
     private static void AssertSturdyClampFixture(RelicAggregate relicAgg)

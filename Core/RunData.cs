@@ -339,6 +339,28 @@ public class RunMetaStats
     public decimal TotalOstyHpSummoned { get; set; }
     public decimal TotalOstyDamageAbsorbed { get; set; }
     public decimal ExtraBlockGainedFromUnmovablePower { get; set; }
+
+    // Power-owned outcomes that should not be attributed to one physical
+    // source-card instance. The related card can project these aggregate
+    // values in its tooltip without pretending that one copy of the card
+    // caused every later activation of the shared power.
+    public Dictionary<string, PowerAggregate> PowerAggregates { get; set; } = new();
+}
+
+public class PowerAggregate
+{
+    public string PowerId { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+
+    // Juggling tracking. Copies count only generated Attack cards confirmed
+    // by the combat-pile add result. Turns and combats are held-power
+    // denominators and include active periods with no copy.
+    public int AttacksCopied { get; set; }
+    public int CommonAttacksCopied { get; set; }
+    public int UncommonAttacksCopied { get; set; }
+    public int RareAttacksCopied { get; set; }
+    public int TurnsActive { get; set; }
+    public int CombatsActive { get; set; }
 }
 
 public class EnemyAggregate

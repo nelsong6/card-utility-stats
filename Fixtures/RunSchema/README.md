@@ -97,6 +97,10 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `discovery-card-run.json`
   Adds Discovery picked-card totals, common/uncommon/rare and
   attack/skill/power splits, plus the numerator for average energy discount.
+- `juggling-power-run.json`
+  Adds a power-ID-keyed Juggling aggregate with confirmed Attack copies,
+  rarity splits, and active turn/combat denominators. The related Juggling
+  card projects this shared power data rather than owning the counters.
 - `debt-card-run.json`
   Adds Debt end-of-turn trigger tracking with observed gold lost and the
   unaffordable portion blocked by the player being out of gold.

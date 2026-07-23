@@ -1,0 +1,44 @@
+{
+  "run_id": "juggling-power-fixture",
+  "started_at": "2026-07-23T22:00:00Z",
+  "updated_at": "2026-07-23T22:16:00Z",
+  "character": "REGENT",
+  "ascension": 9,
+  "floor_reached": 14,
+  "outcome": "in_progress",
+  "game_start_time": 1784847600,
+  "aggregates": {
+    "CARD.JUGGLING#1": {
+      "combats_in_deck": 4,
+      "plays": 3,
+      "times_drawn": 5,
+      "floor_added": 4,
+      "initial_upgrade_level": 0
+    }
+  },
+  "events": [],
+  "relic_aggregates": {},
+  "enemy_aggregates": {},
+  "meta_stats": {
+    "power_aggregates": {
+      "POWER.JUGGLING": {
+        "power_id": "POWER.JUGGLING",
+        "display_name": "Juggling",
+        "attacks_copied": 7,
+        "common_attacks_copied": 3,
+        "uncommon_attacks_copied": 2,
+        "rare_attacks_copied": 2,
+        "turns_active": 5,
+        "combats_active": 2
+      }
+    }
+  },
+  "instance_numbers_by_def": {
+    "CARD.JUGGLING": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.JUGGLING": 1
+  }
+}

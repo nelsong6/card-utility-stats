@@ -86,6 +86,8 @@ When attribution is not naturally one-card-to-one-outcome, the code prefers:
 - pooled summaries for combat-generated cards when they do not have stable deck identity
 - run-level meta-stats surfaced on related cards when the value describes all
   instances or occurrences of a mechanic rather than one card's own effect
+  (including power-ID-keyed aggregates such as Juggling's confirmed Attack
+  copies and active turn/combat denominators)
 - explicitly heuristic handling instead of pretending certainty
 
 ## UI Surface

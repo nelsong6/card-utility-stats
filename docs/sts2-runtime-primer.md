@@ -492,7 +492,14 @@ and `AfterSideTurnEnd` resets it. Surface that field through `DisplayAmount` and
 raise `DisplayAmountChanged` after each mutation; do not repurpose `Amount`,
 which remains Juggling's stack count and controls how many Attack copies it
 creates. The progress counter continues above the third-Attack trigger and does
-not belong in persisted run data.
+not belong in persisted run data. Juggling's outcomes are power-owned rather
+than source-card-owned: arm a narrow window when the pre-increment counter is
+`2`, observe each awaited `CardPileCmd.AddGeneratedCardToCombat` result, and
+count only copies that actually enter a pile. Persist those totals and rarity
+splits in the run meta-stats power aggregate keyed by `POWER.JUGGLING`; every
+Juggling card tooltip projects that shared record. Count the application turn
+and each later turn that starts with the power, plus each distinct combat, so
+the per-turn and per-combat averages include active zero-copy periods.
 
 For relics that emit damage commands, prefer the relic-owned callback plus the resolved `CreatureCmd.Damage` result. Mercury Hourglass arms from `MercuryHourglass.AfterPlayerTurnStart`, records the actual multi-target damage split from the command result on each turn, and counts the combat once so damage per combat is not confused with damage per turn-start trigger.
 
