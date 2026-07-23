@@ -1798,6 +1798,8 @@ public static class RunTracker
             target.DowsingQuestionRoomsRemaining = source.DowsingQuestionRoomsRemaining;
         if (source.FloorsAscendedBeforeFirstShop.HasValue && !target.FloorsAscendedBeforeFirstShop.HasValue)
             target.FloorsAscendedBeforeFirstShop = source.FloorsAscendedBeforeFirstShop;
+        if (source.FloorsTraveledUntilNextShop.HasValue && !target.FloorsTraveledUntilNextShop.HasValue)
+            target.FloorsTraveledUntilNextShop = source.FloorsTraveledUntilNextShop;
         MergeCardsRemovedInto(target, source);
         if (source.StartingMaxHp.HasValue) target.StartingMaxHp = source.StartingMaxHp;
         if (source.ResultingMaxHp.HasValue) target.ResultingMaxHp = source.ResultingMaxHp;
@@ -2598,6 +2600,7 @@ public static class RunTracker
     private const string SilverCrucibleRelicId = "RELIC.SILVER_CRUCIBLE";
     private const string BloodSoakedRoseRelicId = "RELIC.BLOOD_SOAKED_ROSE";
     private const string CursedPearlRelicId = "RELIC.CURSED_PEARL";
+    private const string SignetRingRelicId = "RELIC.SIGNET_RING";
     private const string CloakClaspRelicId = "RELIC.CLOAK_CLASP";
     private const string ReptileTrinketRelicId = "RELIC.REPTILE_TRINKET";
     private const string GorgetRelicId = "RELIC.GORGET";
@@ -4467,6 +4470,54 @@ public static class RunTracker
         if (agg == null || agg.FloorsAscendedBeforeFirstShop.HasValue) return false;
 
         agg.FloorsAscendedBeforeFirstShop = Math.Max(0, floorsAscended);
+        return true;
+    }
+
+    /// <summary>
+    /// Record the first actual merchant room reached after Signet Ring was
+    /// obtained. Hook.AfterRoomEntered runs after map history has appended the
+    /// destination, so TotalFloor is the reached shop floor rather than the
+    /// floor the player just left. RelicModel.FloorAddedToDeck is the game's
+    /// durable pickup-floor snapshot and survives save/continue and hot reload.
+    /// </summary>
+    public static void RecordSignetRingShopReached(IRunState runState, AbstractRoom room)
+    {
+        if (runState == null || room is not MerchantRoom) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var player = GetTrackedRunPlayerLocked();
+                if (player == null || !ReferenceEquals(player.RunState, runState)) return;
+
+                var signetRing = player.Relics.OfType<SignetRing>().FirstOrDefault();
+                if (signetRing == null) return;
+
+                var pickupFloor = RelicFloorAddedToDeckIncludingRunStart(signetRing);
+                if (!pickupFloor.HasValue) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(SignetRingRelicId);
+                if (!RecordSignetRingFloorsToNextShopForTest(agg, pickupFloor.Value, runState.TotalFloor))
+                    return;
+
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordSignetRingShopReached failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static bool RecordSignetRingFloorsToNextShopForTest(
+        RelicAggregate agg,
+        int pickupFloor,
+        int shopFloor)
+    {
+        if (agg == null || agg.FloorsTraveledUntilNextShop.HasValue) return false;
+
+        agg.FloorsTraveledUntilNextShop = Math.Max(0, shopFloor - pickupFloor);
         return true;
     }
 
@@ -11116,6 +11167,19 @@ public static class RunTracker
         {
             var floor = relic.FloorAddedToDeck;
             return floor > 0 ? floor : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static int? RelicFloorAddedToDeckIncludingRunStart(RelicModel relic)
+    {
+        try
+        {
+            var floor = relic.FloorAddedToDeck;
+            return floor >= 0 ? floor : null;
         }
         catch
         {

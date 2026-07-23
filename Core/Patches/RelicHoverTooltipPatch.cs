@@ -703,6 +703,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is SignetRing)
+            {
+                const string relicId = "RELIC.SIGNET_RING";
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+
+                var body = BuildSignetRingBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Signet Ring", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is LeafyPoultice)
             {
                 const string relicId = "RELIC.LEAFY_POULTICE";
@@ -1648,6 +1658,13 @@ public static class RelicHoverShowPatch
         {
             title = "Lucky Fysh";
             body = BuildLuckyFyshBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is SignetRing)
+        {
+            title = "Signet Ring";
+            body = BuildSignetRingBodyBBCode(agg);
             return true;
         }
 
@@ -2843,6 +2860,17 @@ public static class RelicHoverShowPatch
         var sb = new StringBuilder();
         Row3(sb, "Gold gained", agg.GoldGained.ToString(), "");
         Row3(sb, "Cards added to deck", agg.CardsAddedToDeck.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildSignetRingBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(
+            sb,
+            "Floors traveled until next shop reached",
+            (agg.FloorsTraveledUntilNextShop ?? 0).ToString(),
+            "");
         return sb.ToString();
     }
 

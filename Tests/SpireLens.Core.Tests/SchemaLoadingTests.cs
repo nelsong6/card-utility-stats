@@ -1690,6 +1690,17 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsSignetRingRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("signet-ring-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.SIGNET_RING"];
+        Assert.Equal(4, relicAgg.FloorsTraveledUntilNextShop);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsShovelRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("shovel-relic-run.json"));
@@ -1754,6 +1765,16 @@ public class SchemaLoadingTests
         var relicAgg = resumed!.RelicAggregates["RELIC.LUCKY_FYSH"];
         Assert.Equal(45, relicAgg.GoldGained);
         Assert.Equal(3, relicAgg.CardsAddedToDeck);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsSignetRingRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("signet-ring-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.SIGNET_RING"];
+        Assert.Equal(4, relicAgg.FloorsTraveledUntilNextShop);
     }
 
     [Fact]

@@ -804,6 +804,11 @@ public class RelicAggregate
     // the relic is held. Used by Cursed Pearl.
     public int? FloorsAscendedBeforeFirstShop { get; set; }
 
+    // Distance from Signet Ring's pickup floor to the first MerchantRoom
+    // entered afterward. Nullable distinguishes a pending search from a
+    // completed zero-floor result.
+    public int? FloorsTraveledUntilNextShop { get; set; }
+
     // Cards actually removed while Precarious Shears' pickup effect resolves.
     public List<string> CardsRemoved { get; set; } = new();
 
