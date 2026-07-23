@@ -1549,6 +1549,7 @@ public static class RunTracker
         RecordHeldCombatRelicBaselinesForTrackedPlayerLocked(requireActiveCombat: false, createPendingIfNeeded: false);
         RecordLetterOpenerTurnForTrackedPlayerLocked();
         RecordTuningForkTurnForTrackedPlayerLocked();
+        RecordRippleBasinTurnForTrackedPlayerLocked();
         RecordPaperPhrogTurnForTrackedPlayerLocked();
         RecordRazorToothTurnForTrackedPlayerLocked();
         RecordPaelsClawTurnForTrackedPlayerLocked();
@@ -1684,6 +1685,8 @@ public static class RunTracker
         target.TuningForkTurnsEndedOn9Charges += source.TuningForkTurnsEndedOn9Charges;
         target.TuningForkTurnEndChargeTotal += source.TuningForkTurnEndChargeTotal;
         target.TuningForkTurnEndChargeCount += source.TuningForkTurnEndChargeCount;
+        target.RippleBasinCombats += source.RippleBasinCombats;
+        target.RippleBasinTurns += source.RippleBasinTurns;
         target.PotionsGained += source.PotionsGained;
         target.CommonPotionsGained += source.CommonPotionsGained;
         target.UncommonPotionsGained += source.UncommonPotionsGained;
@@ -3044,6 +3047,41 @@ public static class RunTracker
             agg.TuningForkTurnsEndedOn8Charges += 1;
         else if (charge == 9)
             agg.TuningForkTurnsEndedOn9Charges += 1;
+    }
+
+    /// <summary>
+    /// Count a distinct player turn toward Ripple Basin's held-turn average,
+    /// whether or not the relic grants block at that turn's end.
+    /// </summary>
+    public static void RecordRippleBasinTurnStarted(Player player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                _pendingCombat ??= new PendingCombat();
+                RecordRippleBasinTurnForPlayerLocked(player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordRippleBasinTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordRippleBasinCombatForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.RippleBasinCombats += Math.Max(0, count);
+    }
+
+    internal static void RecordRippleBasinTurnForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.RippleBasinTurns += Math.Max(0, count);
     }
 
     /// <summary>
@@ -12133,6 +12171,7 @@ public static class RunTracker
 
             RecordLetterOpenerCombatForPlayerLocked(player);
             RecordTuningForkCombatForPlayerLocked(player);
+            RecordRippleBasinCombatForPlayerLocked(player);
             RecordArtOfWarCombatForPlayerLocked(player);
             RecordHappyFlowerCombatForPlayerLocked(player);
             RecordSealOfGoldCombatForPlayerLocked(player);
@@ -12256,6 +12295,50 @@ public static class RunTracker
 
         var agg = GetOrCreatePendingRelicAggregateLocked(TuningForkRelicId);
         RecordTuningForkTurnForTest(agg);
+    }
+
+    private static void RecordRippleBasinCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasRippleBasin(player)) return;
+        if (!_pendingCombat.RippleBasinCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(RippleBasinRelicId);
+        RecordRippleBasinCombatForTest(agg);
+    }
+
+    private static void RecordRippleBasinTurnForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordRippleBasinTurnForPlayerLocked(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordRippleBasinTurnForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordRippleBasinTurnForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasRippleBasin(player)) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.RippleBasinTurnCountedTurns.TryGetValue(player, out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.RippleBasinTurnCountedTurns[player] = turnNumber;
+        RecordRippleBasinCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(RippleBasinRelicId);
+        RecordRippleBasinTurnForTest(agg);
     }
 
     private static void RecordMiniatureCannonCombatForTrackedPlayerLocked()
@@ -12911,6 +12994,18 @@ public static class RunTracker
         try
         {
             return player.Relics.Any(r => r is SealOfGold);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool PlayerHasRippleBasin(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is RippleBasin);
         }
         catch
         {
@@ -16804,6 +16899,10 @@ internal class PendingCombat
     public Dictionary<Player, int> TuningForkTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> TuningForkTurnEndChargeRecordedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> RippleBasinCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> RippleBasinTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> ArtOfWarCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

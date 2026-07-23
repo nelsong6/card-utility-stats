@@ -6,9 +6,32 @@ using HarmonyLib;
 using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
+using MegaCrit.Sts2.Core.Entities.Players;
+using MegaCrit.Sts2.Core.Hooks;
 using MegaCrit.Sts2.Core.Models.Relics;
 
 namespace SpireLens.Core.Patches;
+
+/// <summary>
+/// Counts every distinct held player turn for Ripple Basin's per-turn average,
+/// including turns where an Attack prevents its turn-end block.
+/// </summary>
+[HarmonyPatch(typeof(Hook), nameof(Hook.AfterPlayerTurnStart))]
+public static class HookAfterPlayerTurnStartRippleBasinPatch
+{
+    [HarmonyPrefix]
+    public static void Prefix(Player player)
+    {
+        try
+        {
+            RunTracker.RecordRippleBasinTurnStarted(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"HookAfterPlayerTurnStartRippleBasinPatch failed: {e.Message}");
+        }
+    }
+}
 
 /// <summary>
 /// Records Ripple Basin when its owner-specific no-Attack turn-end callback

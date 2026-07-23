@@ -1995,10 +1995,18 @@ public static class RelicHoverShowPatch
         var blockPerActivation = agg.Activations <= 0
             ? 0m
             : (decimal)agg.AdditionalBlockGained / agg.Activations;
+        var blockPerTurn = agg.RippleBasinTurns <= 0
+            ? 0m
+            : (decimal)agg.AdditionalBlockGained / agg.RippleBasinTurns;
+        var blockPerCombat = agg.RippleBasinCombats <= 0
+            ? 0m
+            : (decimal)agg.AdditionalBlockGained / agg.RippleBasinCombats;
 
         Row3(sb, "Activations", agg.Activations.ToString(), "");
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
         Row3(sb, BlockLabel("block gained per activation"), FormatDecimal(blockPerActivation), "");
+        Row3(sb, BlockLabel("avg block gained per turn"), FormatDecimal(blockPerTurn), "");
+        Row3(sb, BlockLabel("avg block gained per combat"), FormatDecimal(blockPerCombat), "");
         return sb.ToString();
     }
 

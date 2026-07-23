@@ -2432,6 +2432,8 @@ public class SchemaLoadingTests
         var relicAgg = loaded.Data.RelicAggregates["RELIC.RIPPLE_BASIN"];
         Assert.Equal(3, relicAgg.Activations);
         Assert.Equal(12, relicAgg.AdditionalBlockGained);
+        Assert.Equal(2, relicAgg.RippleBasinCombats);
+        Assert.Equal(6, relicAgg.RippleBasinTurns);
     }
 
     [Fact]
@@ -2488,6 +2490,8 @@ public class SchemaLoadingTests
         var relicAgg = resumed!.RelicAggregates["RELIC.RIPPLE_BASIN"];
         Assert.Equal(3, relicAgg.Activations);
         Assert.Equal(12, relicAgg.AdditionalBlockGained);
+        Assert.Equal(2, relicAgg.RippleBasinCombats);
+        Assert.Equal(6, relicAgg.RippleBasinTurns);
     }
 
     [Fact]

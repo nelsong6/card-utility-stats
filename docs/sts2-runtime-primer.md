@@ -613,6 +613,15 @@ reading retained block because the relic asynchronously removes the amount over
 10. The pre-callback amount above 10 is the excess; the post-task block is the
 observed retained result.
 
+Ripple Basin checks its owner's finished card-play history in
+`BeforeSideTurnEnd` and grants block only when no Attack was played that turn.
+Use that exact owner-specific callback for activation and observed-block
+attribution, but do not use activations as a rate denominator. Count every
+distinct held player turn from `Hook.AfterPlayerTurnStart` and every combat
+where the relic was held, including periods where an Attack prevented the
+block. Reconcile the current turn at combat promotion so combat-ending paths do
+not omit the denominator.
+
 Ruined Helmet doubles the first positive Strength amount its owner receives in
 each combat through `TryModifyPowerAmountReceived`. Capture its exact local
 contribution as `modifiedAmount - amount` at that callback, but do not commit it

@@ -592,6 +592,12 @@ public class RelicAggregate
     public int TuningForkTurnEndChargeTotal { get; set; }
     public int TuningForkTurnEndChargeCount { get; set; }
 
+    // Ripple Basin tracking. Activations and AdditionalBlockGained preserve
+    // successful no-Attack turn-end outcomes; these held denominators include
+    // turns and combats where the relic granted no block.
+    public int RippleBasinCombats { get; set; }
+    public int RippleBasinTurns { get; set; }
+
     // Total potions gained from this relic, split by the potion rarity that
     // was actually claimed. Used by White Beast Statue.
     public int PotionsGained { get; set; }

@@ -312,7 +312,7 @@ New fixtures added going forward do not need a `v*-` prefix.
   enchantment was applied or increased by its pickup effect.
 - `ripple-basin-relic-run.json`
   Adds Ripple Basin no-attack turn-end activation tracking plus observed block
-  gained.
+  gained and held turn/combat denominators for its block averages.
 - `war-paint-relic-run.json`
   Adds War Paint pickup tracking: the actual skill cards upgraded by the relic.
 - `unmovable-power-meta-run.json`
