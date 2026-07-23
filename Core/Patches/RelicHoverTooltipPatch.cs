@@ -663,6 +663,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is Mango)
+            {
+                const string relicId = "RELIC.MANGO";
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+
+                var body = BuildMangoBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Mango", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is ChosenCheese)
             {
                 const string relicId = "RELIC.CHOSEN_CHEESE";
@@ -1572,6 +1582,13 @@ public static class RelicHoverShowPatch
         {
             title = "Nutritious Oyster";
             body = BuildNutritiousOysterBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is Mango)
+        {
+            title = "Mango";
+            body = BuildMangoBodyBBCode(agg);
             return true;
         }
 
@@ -2693,6 +2710,14 @@ public static class RelicHoverShowPatch
     }
 
     private static string BuildNutritiousOysterBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        AppendMaxHpChangeRows(sb, agg, "Max HP gained", agg.MaxHpGained);
+        return sb.ToString();
+    }
+
+    private static string BuildMangoBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
         Row3(sb, "Activations", agg.Activations.ToString(), "");

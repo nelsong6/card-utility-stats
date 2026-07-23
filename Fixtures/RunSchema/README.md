@@ -230,6 +230,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `pear-relic-run.json`
   Adds Pear pickup tracking: activations, observed max HP gained, and
   original/new max-HP snapshots.
+- `mango-relic-run.json`
+  Adds Mango pickup tracking: activations, observed max HP gained, and
+  original/new max-HP snapshots.
 - `nutritious-oyster-relic-run.json`
   Adds Nutritious Oyster pickup tracking: activations, observed max HP gained,
   and original/new max-HP snapshots.

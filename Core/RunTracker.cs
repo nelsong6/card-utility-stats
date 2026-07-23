@@ -2611,6 +2611,7 @@ public static class RunTracker
     private const string LeesWaffleRelicId = "RELIC.LEES_WAFFLE";
     private const string StrawberryRelicId = "RELIC.STRAWBERRY";
     private const string PearRelicId = "RELIC.PEAR";
+    private const string MangoRelicId = "RELIC.MANGO";
     private const string NutritiousOysterRelicId = "RELIC.NUTRITIOUS_OYSTER";
     private const string StoneHumidifierRelicId = "RELIC.STONE_HUMIDIFIER";
     private const string ChosenCheeseRelicId = "RELIC.CHOSEN_CHEESE";
@@ -5813,6 +5814,34 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Record Mango's observed pickup max-HP gain after its async pickup
+    /// effect resolves.
+    /// </summary>
+    public static void RecordMangoMaxHpGained(
+        Creature creature,
+        decimal maxHpGained,
+        decimal? originalMaxHp = null,
+        decimal? newMaxHp = null)
+    {
+        if (creature?.Player == null || maxHpGained < 0m) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(creature.Player)) return;
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(MangoRelicId);
+                RecordMangoMaxHpGainedForTest(agg, maxHpGained, originalMaxHp, newMaxHp);
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordMangoMaxHpGained failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Record Nutritious Oyster's observed pickup max-HP gain after its async
     /// pickup effect resolves.
     /// </summary>
@@ -6441,6 +6470,19 @@ public static class RunTracker
     }
 
     internal static void RecordPearMaxHpGainedForTest(
+        RelicAggregate agg,
+        decimal maxHpGained,
+        decimal? originalMaxHp = null,
+        decimal? newMaxHp = null)
+    {
+        if (agg == null || maxHpGained < 0m) return;
+
+        agg.Activations++;
+        agg.MaxHpGained += maxHpGained;
+        RecordRelicMaxHpChangeForTest(agg, originalMaxHp, newMaxHp);
+    }
+
+    internal static void RecordMangoMaxHpGainedForTest(
         RelicAggregate agg,
         decimal maxHpGained,
         decimal? originalMaxHp = null,

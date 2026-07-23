@@ -450,6 +450,20 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsMangoRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("mango-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.MANGO"];
+        Assert.Equal(1, relicAgg.Activations);
+        Assert.Equal(14m, relicAgg.MaxHpGained);
+        Assert.Equal(70m, relicAgg.OriginalMaxHp);
+        Assert.Equal(84m, relicAgg.NewMaxHp);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsNutritiousOysterRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("nutritious-oyster-relic-run.json"));
@@ -1083,6 +1097,19 @@ public class SchemaLoadingTests
         Assert.Equal(10m, relicAgg.MaxHpGained);
         Assert.Equal(70m, relicAgg.OriginalMaxHp);
         Assert.Equal(80m, relicAgg.NewMaxHp);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsMangoRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("mango-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.MANGO"];
+        Assert.Equal(1, relicAgg.Activations);
+        Assert.Equal(14m, relicAgg.MaxHpGained);
+        Assert.Equal(70m, relicAgg.OriginalMaxHp);
+        Assert.Equal(84m, relicAgg.NewMaxHp);
     }
 
     [Fact]
