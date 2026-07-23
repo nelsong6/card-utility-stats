@@ -2904,6 +2904,25 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsRuinedHelmetRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("ruined-helmet-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertRuinedHelmetFixture(loaded.Data.RelicAggregates["RELIC.RUINED_HELMET"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsRuinedHelmetRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("ruined-helmet-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertRuinedHelmetFixture(resumed!.RelicAggregates["RELIC.RUINED_HELMET"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsPaelsClawRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("paels-claw-relic-run.json"));
@@ -2937,6 +2956,12 @@ public class SchemaLoadingTests
         Assert.Equal(3, relicAgg.SturdyClampExcessBlockOverTen);
         Assert.Equal(3, relicAgg.SturdyClampTurns);
         Assert.Equal(2, relicAgg.SturdyClampCombats);
+    }
+
+    private static void AssertRuinedHelmetFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(7.5m, relicAgg.StrengthAdded);
+        Assert.Equal(3, relicAgg.RuinedHelmetCombats);
     }
 
     private static void AssertStoneHumidifierFixture(RelicAggregate relicAgg)

@@ -590,6 +590,15 @@ reading retained block because the relic asynchronously removes the amount over
 10. The pre-callback amount above 10 is the excess; the post-task block is the
 observed retained result.
 
+Ruined Helmet doubles the first positive Strength amount its owner receives in
+each combat through `TryModifyPowerAmountReceived`. Capture its exact local
+contribution as `modifiedAmount - amount` at that callback, but do not commit it
+there: a later power-application guard can still cancel the effect. Commit the
+staged bonus only from the relic's matching
+`AfterModifyingPowerAmountReceived` callback, which `PowerCmd` invokes after the
+Strength was actually applied. Use every combat where the relic was held,
+including zero-trigger combats, as the per-combat denominator.
+
 Shovel adds `DigRestSiteOption` from `TryModifyRestSiteOptions`; the relic
 itself does not receive the obtained relic payload. Patch
 `DigRestSiteOption.OnSelect`, snapshot the owner's relic inventory before the

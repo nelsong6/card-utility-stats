@@ -1249,6 +1249,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is RuinedHelmet)
+        {
+            title = "Ruined Helmet";
+            body = BuildRuinedHelmetBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is PaperPhrog)
         {
             title = "Paper Phrog";
@@ -3114,6 +3121,18 @@ public static class RelicHoverShowPatch
             agg.ShurikenTurnsEndedAt2Charges,
             agg.ShurikenTurnEndChargeTotal,
             agg.ShurikenTurnEndChargeCount);
+        return sb.ToString();
+    }
+
+    private static string BuildRuinedHelmetBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var strengthPerCombat = agg.RuinedHelmetCombats <= 0
+            ? 0m
+            : agg.StrengthAdded / agg.RuinedHelmetCombats;
+
+        Row3(sb, "Total strength gained", FormatDecimal(agg.StrengthAdded), "");
+        Row3(sb, "Avg strength gained per combat", FormatDecimal(strengthPerCombat), "");
         return sb.ToString();
     }
 

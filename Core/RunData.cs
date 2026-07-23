@@ -423,7 +423,8 @@ public class RelicAggregate
     // has block at end of turn.
     public int BlockedTriggers { get; set; }
 
-    // Total Strength this relic added. Used by Reptile Trinket and Shuriken.
+    // Total Strength this relic added. Used by Reptile Trinket, Shuriken,
+    // and Ruined Helmet.
     public decimal StrengthAdded { get; set; }
 
     // Total Plating this relic added. Used by Gorget.
@@ -712,6 +713,11 @@ public class RelicAggregate
     public int SturdyClampExcessBlockOverTen { get; set; }
     public int SturdyClampTurns { get; set; }
     public int SturdyClampCombats { get; set; }
+
+    // Ruined Helmet tracking. StrengthAdded is the observed extra Strength
+    // contributed by its doubling modifier; combats includes every combat
+    // where the relic was held, including zero-trigger combats.
+    public int RuinedHelmetCombats { get; set; }
 
     // Mummified Hand tracking. Activations is every qualifying owner Power
     // play, including triggers with no card left to discount. Power cost uses

@@ -1,0 +1,22 @@
+{
+  "run_id": "ruined-helmet-relic-fixture",
+  "started_at": "2026-07-22T23:00:00Z",
+  "updated_at": "2026-07-22T23:30:00Z",
+  "character": "CHAR.IRONCLAD",
+  "ascension": 6,
+  "floor_reached": 31,
+  "outcome": "in_progress",
+  "game_start_time": 1784761200,
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.RUINED_HELMET": {
+      "strength_added": 7.5,
+      "ruined_helmet_combats": 3
+    }
+  },
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

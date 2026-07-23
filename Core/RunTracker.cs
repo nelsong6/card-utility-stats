@@ -1752,6 +1752,7 @@ public static class RunTracker
         target.SturdyClampExcessBlockOverTen += source.SturdyClampExcessBlockOverTen;
         target.SturdyClampTurns += source.SturdyClampTurns;
         target.SturdyClampCombats += source.SturdyClampCombats;
+        target.RuinedHelmetCombats += source.RuinedHelmetCombats;
         target.MummifiedHandTriggeringPowerCostTotal += source.MummifiedHandTriggeringPowerCostTotal;
         target.MummifiedHandDiscountGivenTotal += source.MummifiedHandDiscountGivenTotal;
         target.MummifiedHandEnergySpentToDiscountedCostRatioTotal += source.MummifiedHandEnergySpentToDiscountedCostRatioTotal;
@@ -2641,6 +2642,7 @@ public static class RunTracker
     private const string RegaliteRelicId = "RELIC.REGALITE";
     private const string IntimidatingHelmetRelicId = "RELIC.INTIMIDATING_HELMET";
     private const string SturdyClampRelicId = "RELIC.STURDY_CLAMP";
+    private const string RuinedHelmetRelicId = "RELIC.RUINED_HELMET";
     private const string MummifiedHandRelicId = "RELIC.MUMMIFIED_HAND";
     private const string BookmarkRelicId = "RELIC.BOOKMARK";
     private const string BrilliantScarfRelicId = "RELIC.BRILLIANT_SCARF";
@@ -7690,6 +7692,76 @@ public static class RunTracker
         }
     }
 
+    /// <summary>
+    /// Stage Ruined Helmet's local contribution while its receiver-side
+    /// modifier still exposes both the requested and doubled amounts.
+    /// Completion is deferred until the game confirms the power application.
+    /// </summary>
+    public static void StageRuinedHelmetStrengthGain(
+        RuinedHelmet relic,
+        PowerModel canonicalPower,
+        Creature target,
+        decimal requestedAmount,
+        decimal modifiedAmount)
+    {
+        if (relic?.Owner == null || canonicalPower is not StrengthPower || target == null) return;
+        if (!ReferenceEquals(relic.Owner.Creature, target)) return;
+
+        var strengthAdded = modifiedAmount - requestedAmount;
+        if (strengthAdded <= 0m) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(relic.Owner)) return;
+                if (CombatManager.Instance?.IsInProgress != true) return;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordRuinedHelmetCombatForPlayerLocked(relic.Owner);
+                _pendingCombat.PendingRuinedHelmetStrengthGains[relic] = strengthAdded;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"StageRuinedHelmetStrengthGain failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Commit the staged Ruined Helmet bonus from the relic's own
+    /// AfterModifyingPowerAmountReceived callback. PowerCmd invokes this only
+    /// after the Strength application succeeds.
+    /// </summary>
+    public static void CompleteRuinedHelmetStrengthGain(RuinedHelmet relic, PowerModel power)
+    {
+        if (relic == null || power is not StrengthPower) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null) return;
+                if (!_pendingCombat.PendingRuinedHelmetStrengthGains.Remove(
+                        relic,
+                        out var strengthAdded))
+                {
+                    return;
+                }
+
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(relic.Owner)) return;
+                if (CombatManager.Instance?.IsInProgress != true) return;
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(RuinedHelmetRelicId);
+                RecordRuinedHelmetStrengthGainForTest(agg, strengthAdded);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"CompleteRuinedHelmetStrengthGain failed: {e.Message}");
+            }
+        }
+    }
+
     public static void RecordMummifiedHandTurnStarted(Player player)
     {
         if (player == null) return;
@@ -7832,6 +7904,20 @@ public static class RunTracker
     {
         if (agg == null) return;
         agg.SturdyClampCombats += Math.Max(0, count);
+    }
+
+    internal static void RecordRuinedHelmetStrengthGainForTest(
+        RelicAggregate agg,
+        decimal strengthGained)
+    {
+        if (agg == null || strengthGained <= 0m) return;
+        agg.StrengthAdded += strengthGained;
+    }
+
+    internal static void RecordRuinedHelmetCombatForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.RuinedHelmetCombats += Math.Max(0, count);
     }
 
     internal static void RecordMummifiedHandCombatForTest(RelicAggregate agg, int count = 1)
@@ -11134,6 +11220,18 @@ public static class RunTracker
         }
     }
 
+    private static bool PlayerHasRuinedHelmet(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is RuinedHelmet);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static bool PlayerHasJuzuBracelet(Player player)
     {
         try
@@ -11260,6 +11358,7 @@ public static class RunTracker
             RecordRegaliteCombatForPlayerLocked(player);
             RecordIntimidatingHelmetCombatForPlayerLocked(player);
             RecordSturdyClampCombatForPlayerLocked(player);
+            RecordRuinedHelmetCombatForPlayerLocked(player);
             RecordMummifiedHandCombatForPlayerLocked(player);
         }
         catch (Exception e)
@@ -11547,6 +11646,16 @@ public static class RunTracker
 
         var agg = GetOrCreatePendingRelicAggregateLocked(SturdyClampRelicId);
         RecordSturdyClampCombatForTest(agg);
+    }
+
+    private static void RecordRuinedHelmetCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasRuinedHelmet(player)) return;
+        if (!_pendingCombat.RuinedHelmetCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(RuinedHelmetRelicId);
+        RecordRuinedHelmetCombatForTest(agg);
     }
 
     private static void RecordMummifiedHandCombatForPlayerLocked(Player player)
@@ -15812,6 +15921,10 @@ internal class PendingCombat
     public HashSet<Player> SturdyClampCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> SturdyClampTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> RuinedHelmetCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<RuinedHelmet, decimal> PendingRuinedHelmetStrengthGains { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> MummifiedHandCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

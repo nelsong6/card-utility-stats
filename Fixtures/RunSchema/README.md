@@ -242,6 +242,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `sturdy-clamp-relic-run.json`
   Adds Sturdy Clamp's observed retained block, pre-cap excess block, and the
   turn/combat denominators used by its four average rows.
+- `ruined-helmet-relic-run.json`
+  Adds Ruined Helmet's observed bonus Strength and held-combat denominator for
+  its total and per-combat average rows.
 - `paels-claw-relic-run.json`
   Adds Pael's Claw's finished Goopy-card plays, observed earned Goopy
   enhancements, enchanted-card count, and held turn/combat denominators.
