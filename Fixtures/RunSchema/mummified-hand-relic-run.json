@@ -20,7 +20,10 @@
       "mummified_hand_turns": 5,
       "mummified_hand_discounted_powers": 1,
       "mummified_hand_discounted_attacks": 1,
-      "mummified_hand_discounted_skills": 1
+      "mummified_hand_discounted_skills": 1,
+      "mummified_hand_discounted_commons": 1,
+      "mummified_hand_discounted_uncommons": 1,
+      "mummified_hand_discounted_rares": 1
     }
   },
   "enemy_aggregates": {},

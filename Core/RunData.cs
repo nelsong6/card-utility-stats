@@ -757,6 +757,9 @@ public class RelicAggregate
     public int MummifiedHandDiscountedPowers { get; set; }
     public int MummifiedHandDiscountedAttacks { get; set; }
     public int MummifiedHandDiscountedSkills { get; set; }
+    public int MummifiedHandDiscountedCommons { get; set; }
+    public int MummifiedHandDiscountedUncommons { get; set; }
+    public int MummifiedHandDiscountedRares { get; set; }
 
     // Bookmark tracking. Activations is total cost-reduction activations;
     // BookmarkCombats is the denominator for average activations per combat.

@@ -48,6 +48,9 @@ public class MummifiedHandStatsTests
         Assert.Equal(0, agg.MummifiedHandDiscountedPowers);
         Assert.Equal(0, agg.MummifiedHandDiscountedAttacks);
         Assert.Equal(0, agg.MummifiedHandDiscountedSkills);
+        Assert.Equal(0, agg.MummifiedHandDiscountedCommons);
+        Assert.Equal(0, agg.MummifiedHandDiscountedUncommons);
+        Assert.Equal(0, agg.MummifiedHandDiscountedRares);
     }
 
     [Fact]
@@ -68,6 +71,9 @@ public class MummifiedHandStatsTests
         Assert.Contains("\"mummified_hand_discounted_powers\"", json);
         Assert.Contains("\"mummified_hand_discounted_attacks\"", json);
         Assert.Contains("\"mummified_hand_discounted_skills\"", json);
+        Assert.Contains("\"mummified_hand_discounted_commons\"", json);
+        Assert.Contains("\"mummified_hand_discounted_uncommons\"", json);
+        Assert.Contains("\"mummified_hand_discounted_rares\"", json);
         Assert.NotNull(restored);
 
         AssertAggregate(restored!.RelicAggregates[MummifiedHandRelicId]);
@@ -78,9 +84,30 @@ public class MummifiedHandStatsTests
     {
         var agg = new RelicAggregate();
 
-        RunTracker.RecordMummifiedHandTriggerForTest(agg, 2, 2, 2m, 0m, CardType.Attack);
-        RunTracker.RecordMummifiedHandTriggerForTest(agg, 1, 1, 4m, 0m, CardType.Skill);
-        RunTracker.RecordMummifiedHandTriggerForTest(agg, 0, 0, 0m, 0m, CardType.Power);
+        RunTracker.RecordMummifiedHandTriggerForTest(
+            agg,
+            2,
+            2,
+            2m,
+            0m,
+            CardType.Attack,
+            CardRarity.Common);
+        RunTracker.RecordMummifiedHandTriggerForTest(
+            agg,
+            1,
+            1,
+            4m,
+            0m,
+            CardType.Skill,
+            CardRarity.Uncommon);
+        RunTracker.RecordMummifiedHandTriggerForTest(
+            agg,
+            0,
+            0,
+            0m,
+            0m,
+            CardType.Power,
+            CardRarity.Rare);
         RunTracker.RecordMummifiedHandTriggerForTest(agg, 3, 3, 0m, 0m, null);
         RunTracker.RecordMummifiedHandCombatForTest(agg, 2);
         RunTracker.RecordMummifiedHandTurnForTest(agg, 5);
@@ -122,6 +149,9 @@ public class MummifiedHandStatsTests
         Assert.Equal(2, target.MummifiedHandDiscountedPowers);
         Assert.Equal(2, target.MummifiedHandDiscountedAttacks);
         Assert.Equal(2, target.MummifiedHandDiscountedSkills);
+        Assert.Equal(2, target.MummifiedHandDiscountedCommons);
+        Assert.Equal(2, target.MummifiedHandDiscountedUncommons);
+        Assert.Equal(2, target.MummifiedHandDiscountedRares);
     }
 
     [Fact]
@@ -138,6 +168,9 @@ public class MummifiedHandStatsTests
         Assert.Contains("Discounted Powers", body);
         Assert.Contains("Discounted Attacks", body);
         Assert.Contains("Discounted Skills", body);
+        Assert.Contains("Discounted Commons", body);
+        Assert.Contains("Discounted Uncommons", body);
+        Assert.Contains("Discounted Rares", body);
         Assert.Contains("[b]4[/b]", body);
         Assert.Contains("[b]1.5[/b]", body);
         Assert.Contains("[b]0.63[/b]", body);
@@ -189,6 +222,9 @@ public class MummifiedHandStatsTests
         Assert.Equal(0, agg.MummifiedHandDiscountedPowers);
         Assert.Equal(0, agg.MummifiedHandDiscountedAttacks);
         Assert.Equal(0, agg.MummifiedHandDiscountedSkills);
+        Assert.Equal(0, agg.MummifiedHandDiscountedCommons);
+        Assert.Equal(0, agg.MummifiedHandDiscountedUncommons);
+        Assert.Equal(0, agg.MummifiedHandDiscountedRares);
     }
 
     private static RelicAggregate PopulatedAggregate()
@@ -204,6 +240,9 @@ public class MummifiedHandStatsTests
             MummifiedHandDiscountedPowers = 1,
             MummifiedHandDiscountedAttacks = 1,
             MummifiedHandDiscountedSkills = 1,
+            MummifiedHandDiscountedCommons = 1,
+            MummifiedHandDiscountedUncommons = 1,
+            MummifiedHandDiscountedRares = 1,
         };
 
     private static void AssertAggregate(RelicAggregate agg)
@@ -218,6 +257,9 @@ public class MummifiedHandStatsTests
         Assert.Equal(1, agg.MummifiedHandDiscountedPowers);
         Assert.Equal(1, agg.MummifiedHandDiscountedAttacks);
         Assert.Equal(1, agg.MummifiedHandDiscountedSkills);
+        Assert.Equal(1, agg.MummifiedHandDiscountedCommons);
+        Assert.Equal(1, agg.MummifiedHandDiscountedUncommons);
+        Assert.Equal(1, agg.MummifiedHandDiscountedRares);
     }
 
     private static string BuildBody(RelicAggregate agg)

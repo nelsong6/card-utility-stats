@@ -578,6 +578,9 @@ already in hand and calls that card's `SetToFreeThisTurn`. Observe the selected
 card and its effective energy cost immediately around that exact call. The
 triggering `CardPlay.Resources.EnergyValue` is the Power's play-time cost, while
 `EnergySpent` is the distinct numerator for spend-to-discounted-cost ratios.
+Read both type and rarity from that exact selected card; a trigger with no card
+left to discount belongs in activation rates but not in either recipient
+breakdown.
 
 Pael's Claw applies Goopy with amount 1 to every eligible permanent deck card
 in its synchronous `AfterObtained` callback. That initial amount is the

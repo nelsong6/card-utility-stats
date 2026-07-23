@@ -3112,6 +3112,9 @@ public class SchemaLoadingTests
         Assert.Equal(1, relicAgg.MummifiedHandDiscountedPowers);
         Assert.Equal(1, relicAgg.MummifiedHandDiscountedAttacks);
         Assert.Equal(1, relicAgg.MummifiedHandDiscountedSkills);
+        Assert.Equal(1, relicAgg.MummifiedHandDiscountedCommons);
+        Assert.Equal(1, relicAgg.MummifiedHandDiscountedUncommons);
+        Assert.Equal(1, relicAgg.MummifiedHandDiscountedRares);
     }
 
     private static void AssertFresnelLensFixture(RelicAggregate relicAgg)

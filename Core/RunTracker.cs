@@ -1773,6 +1773,9 @@ public static class RunTracker
         target.MummifiedHandDiscountedPowers += source.MummifiedHandDiscountedPowers;
         target.MummifiedHandDiscountedAttacks += source.MummifiedHandDiscountedAttacks;
         target.MummifiedHandDiscountedSkills += source.MummifiedHandDiscountedSkills;
+        target.MummifiedHandDiscountedCommons += source.MummifiedHandDiscountedCommons;
+        target.MummifiedHandDiscountedUncommons += source.MummifiedHandDiscountedUncommons;
+        target.MummifiedHandDiscountedRares += source.MummifiedHandDiscountedRares;
 
         target.BookmarkCombats += source.BookmarkCombats;
         target.BookmarkCommonActivations += source.BookmarkCommonActivations;
@@ -7851,7 +7854,8 @@ public static class RunTracker
                     triggeringPowerEnergySpent: cardPlay.Resources.EnergySpent,
                     discountedCardCostBefore,
                     discountedCardCostAfter,
-                    discountedCard?.Type);
+                    discountedCard?.Type,
+                    discountedCard?.Rarity);
             }
             catch (Exception e)
             {
@@ -8093,7 +8097,8 @@ public static class RunTracker
         int triggeringPowerEnergySpent,
         decimal discountedCardCostBefore,
         decimal discountedCardCostAfter,
-        CardType? discountedCardType)
+        CardType? discountedCardType,
+        CardRarity? discountedCardRarity = null)
     {
         if (agg == null) return;
 
@@ -8122,6 +8127,19 @@ public static class RunTracker
                 break;
             case CardType.Skill:
                 agg.MummifiedHandDiscountedSkills += 1;
+                break;
+        }
+
+        switch (discountedCardRarity)
+        {
+            case CardRarity.Common:
+                agg.MummifiedHandDiscountedCommons += 1;
+                break;
+            case CardRarity.Uncommon:
+                agg.MummifiedHandDiscountedUncommons += 1;
+                break;
+            case CardRarity.Rare:
+                agg.MummifiedHandDiscountedRares += 1;
                 break;
         }
     }

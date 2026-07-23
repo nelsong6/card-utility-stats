@@ -3463,6 +3463,9 @@ public static class RelicHoverShowPatch
         Row3(sb, "Discounted Powers", agg.MummifiedHandDiscountedPowers.ToString(), "");
         Row3(sb, "Discounted Attacks", agg.MummifiedHandDiscountedAttacks.ToString(), "");
         Row3(sb, "Discounted Skills", agg.MummifiedHandDiscountedSkills.ToString(), "");
+        Row3(sb, "Discounted Commons", agg.MummifiedHandDiscountedCommons.ToString(), "");
+        Row3(sb, "Discounted Uncommons", agg.MummifiedHandDiscountedUncommons.ToString(), "");
+        Row3(sb, "Discounted Rares", agg.MummifiedHandDiscountedRares.ToString(), "");
         return sb.ToString();
     }
 
