@@ -248,6 +248,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `daughter-of-the-wind-relic-run.json`
   Adds Daughter of the Wind's observed block gain plus held turn/combat
   denominators for its total and average rows.
+- `art-of-war-relic-run.json`
+  Adds Art of War's observed energy gain plus held turn/combat denominators
+  for its total and average rows.
 - `paels-claw-relic-run.json`
   Adds Pael's Claw's finished Goopy-card plays, observed earned Goopy
   enhancements, enchanted-card count, and held turn/combat denominators.

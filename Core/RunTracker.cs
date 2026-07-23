@@ -1649,6 +1649,7 @@ public static class RunTracker
         target.GoldLost += source.GoldLost;
         target.GoldLossBlocked += source.GoldLossBlocked;
         target.EnergyGeneratedCombats += source.EnergyGeneratedCombats;
+        target.ArtOfWarTurns += source.ArtOfWarTurns;
         target.FirstTurnsEndedWithExcessEnergy += source.FirstTurnsEndedWithExcessEnergy;
         target.SecondTurnsEndedWithExcessEnergy += source.SecondTurnsEndedWithExcessEnergy;
         target.ThirdTurnsEndedWithExcessEnergy += source.ThirdTurnsEndedWithExcessEnergy;
@@ -2603,6 +2604,7 @@ public static class RunTracker
     private const string WhetstoneRelicId = "RELIC.WHETSTONE";
     private const string WarPaintRelicId = "RELIC.WAR_PAINT";
     private const string FragrantMushroomRelicId = "RELIC.FRAGRANT_MUSHROOM";
+    private const string ArtOfWarRelicId = "RELIC.ART_OF_WAR";
     private const string FishingRodRelicId = "RELIC.FISHING_ROD";
     private const string MoltenEggRelicId = "RELIC.MOLTEN_EGG";
     private const string ToxicEggRelicId = "RELIC.TOXIC_EGG";
@@ -8421,6 +8423,88 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Count Art of War's owner energy-reset boundary as one held player turn.
+    /// The patch snapshots energy only when this returns true.
+    /// </summary>
+    public static bool RecordArtOfWarTurnStarted(ArtOfWar relic, Player player)
+    {
+        if (relic?.Owner == null || player == null) return false;
+        if (!ReferenceEquals(relic.Owner, player)) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(player)) return false;
+                if (CombatManager.Instance?.IsInProgress != true) return false;
+                if ((player.PlayerCombatState?.TurnNumber ?? 0) <= 0) return false;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordArtOfWarCombatForPlayerLocked(player);
+                RecordArtOfWarTurnForPlayerLocked(player);
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordArtOfWarTurnStarted failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record the positive energy-pool delta observed across Art of War's own
+    /// successfully completed AfterEnergyReset callback.
+    /// </summary>
+    public static void RecordArtOfWarEnergyGain(
+        ArtOfWar relic,
+        PlayerCombatState combatState,
+        int startingEnergy,
+        int finalEnergy)
+    {
+        if (relic?.Owner == null || combatState == null) return;
+        if (!ReferenceEquals(relic.Owner, combatState._player)) return;
+
+        var energyGained = Math.Max(0, finalEnergy - startingEnergy);
+        if (energyGained <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(relic.Owner)) return;
+                if (CombatManager.Instance?.IsInProgress != true) return;
+
+                _pendingCombat ??= new PendingCombat();
+                var agg = GetOrCreatePendingRelicAggregateLocked(ArtOfWarRelicId);
+                RecordArtOfWarEnergyGainedForTest(agg, energyGained);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordArtOfWarEnergyGain failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordArtOfWarEnergyGainedForTest(RelicAggregate agg, int amount)
+    {
+        if (agg == null) return;
+        agg.EnergyGenerated += Math.Max(0, amount);
+    }
+
+    internal static void RecordArtOfWarCombatForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.EnergyGeneratedCombats += Math.Max(0, count);
+    }
+
+    internal static void RecordArtOfWarTurnForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.ArtOfWarTurns += Math.Max(0, count);
+    }
+
+    /// <summary>
     /// Record a Nunchaku-owned attack play and arm energy attribution if the
     /// relic's live counter is one attack away from its energy trigger.
     /// </summary>
@@ -11487,6 +11571,7 @@ public static class RunTracker
 
             RecordLetterOpenerCombatForPlayerLocked(player);
             RecordTuningForkCombatForPlayerLocked(player);
+            RecordArtOfWarCombatForPlayerLocked(player);
             RecordHappyFlowerCombatForPlayerLocked(player);
             RecordSealOfGoldCombatForPlayerLocked(player);
             RecordNunchakuCombatForPlayerLocked(player);
@@ -11924,6 +12009,36 @@ public static class RunTracker
         agg.EnergyGeneratedCombats += 1;
     }
 
+    private static void RecordArtOfWarCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasArtOfWar(player)) return;
+        if (!_pendingCombat.ArtOfWarCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(ArtOfWarRelicId);
+        RecordArtOfWarCombatForTest(agg);
+    }
+
+    private static void RecordArtOfWarTurnForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasArtOfWar(player)) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.ArtOfWarTurnCountedTurns.TryGetValue(player, out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.ArtOfWarTurnCountedTurns[player] = turnNumber;
+        RecordArtOfWarCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(ArtOfWarRelicId);
+        RecordArtOfWarTurnForTest(agg);
+    }
+
     private static void RecordSealOfGoldCombatForPlayerLocked(Player player)
     {
         if (_pendingCombat == null) return;
@@ -12210,6 +12325,18 @@ public static class RunTracker
         try
         {
             return player.Relics.Any(r => r is HappyFlower);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool PlayerHasArtOfWar(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is ArtOfWar);
         }
         catch
         {
@@ -16081,6 +16208,10 @@ internal class PendingCombat
     public Dictionary<Player, int> TuningForkTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> TuningForkTurnEndChargeRecordedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> ArtOfWarCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> ArtOfWarTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> HappyFlowerCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

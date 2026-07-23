@@ -606,6 +606,14 @@ that immediate command from the relic callback and record the command task's
 returned post-modifier block amount. Count every player turn and combat where
 the relic was held, including zero-Attack periods, as the average denominators.
 
+Art of War's owner-specific `AfterEnergyReset(Player)` callback runs at each
+owner energy reset, including turn one, but only calls `PlayerCmd.GainEnergy`
+after turn one when no Attack was played on the preceding turn. Snapshot the
+owner's energy pool around that callback and record the positive delta only
+after its task completes successfully. Count every callback turn and every
+combat where the relic was held, including non-trigger periods, as the average
+denominators.
+
 Shovel adds `DigRestSiteOption` from `TryModifyRestSiteOptions`; the relic
 itself does not receive the obtained relic payload. Patch
 `DigRestSiteOption.OnSelect`, snapshot the owner's relic inventory before the

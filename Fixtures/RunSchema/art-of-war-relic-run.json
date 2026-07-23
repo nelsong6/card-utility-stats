@@ -1,0 +1,23 @@
+{
+  "run_id": "art-of-war-relic-fixture",
+  "started_at": "2026-07-23T01:00:00Z",
+  "updated_at": "2026-07-23T01:30:00Z",
+  "character": "CHAR.IRONCLAD",
+  "ascension": 6,
+  "floor_reached": 31,
+  "outcome": "in_progress",
+  "game_start_time": 1784768400,
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.ART_OF_WAR": {
+      "energy_generated": 4,
+      "art_of_war_turns": 8,
+      "energy_generated_combats": 2
+    }
+  },
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

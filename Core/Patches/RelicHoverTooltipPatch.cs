@@ -1193,6 +1193,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is ArtOfWar)
+        {
+            title = "Art of War";
+            body = BuildArtOfWarBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is HappyFlower)
         {
             title = "Happy Flower";
@@ -2016,6 +2023,22 @@ public static class RelicHoverShowPatch
         var sb = new StringBuilder();
         Row3(sb, "Times triggered", agg.BoneFluteTriggers.ToString(), "");
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildArtOfWarBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var energyPerTurn = agg.ArtOfWarTurns <= 0
+            ? 0m
+            : (decimal)agg.EnergyGenerated / agg.ArtOfWarTurns;
+        var energyPerCombat = agg.EnergyGeneratedCombats <= 0
+            ? 0m
+            : (decimal)agg.EnergyGenerated / agg.EnergyGeneratedCombats;
+
+        Row3(sb, EnergyLabel("Total energy gained"), agg.EnergyGenerated.ToString(), "");
+        Row3(sb, EnergyLabel("Avg energy gained per turn"), FormatDecimal(energyPerTurn), "");
+        Row3(sb, EnergyLabel("Avg energy gained per combat"), FormatDecimal(energyPerCombat), "");
         return sb.ToString();
     }
 

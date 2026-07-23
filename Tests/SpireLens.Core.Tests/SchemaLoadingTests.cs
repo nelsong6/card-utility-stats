@@ -2944,6 +2944,25 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsArtOfWarRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("art-of-war-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertArtOfWarFixture(loaded.Data.RelicAggregates["RELIC.ART_OF_WAR"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsArtOfWarRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("art-of-war-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertArtOfWarFixture(resumed!.RelicAggregates["RELIC.ART_OF_WAR"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsPaelsClawRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("paels-claw-relic-run.json"));
@@ -2990,6 +3009,13 @@ public class SchemaLoadingTests
         Assert.Equal(24, relicAgg.AdditionalBlockGained);
         Assert.Equal(6, relicAgg.DaughterOfTheWindTurns);
         Assert.Equal(3, relicAgg.DaughterOfTheWindCombats);
+    }
+
+    private static void AssertArtOfWarFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(4, relicAgg.EnergyGenerated);
+        Assert.Equal(8, relicAgg.ArtOfWarTurns);
+        Assert.Equal(2, relicAgg.EnergyGeneratedCombats);
     }
 
     private static void AssertStoneHumidifierFixture(RelicAggregate relicAgg)
