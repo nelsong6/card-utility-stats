@@ -101,6 +101,10 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds a power-ID-keyed Juggling aggregate with confirmed Attack copies,
   rarity splits, and active turn/combat denominators. The related Juggling
   card projects this shared power data rather than owning the counters.
+- `unrelenting-free-attack-power-run.json`
+  Adds a power-ID-keyed Free Attack aggregate with charges granted and used,
+  observed energy savings, zero-savings uses, and discounted Attack rarity
+  splits. Every Unrelenting card projects this shared power data.
 - `debt-card-run.json`
   Adds Debt end-of-turn trigger tracking with observed gold lost and the
   unaffordable portion blocked by the player being out of gold.

@@ -2903,6 +2903,162 @@ public static class RunTracker
         => AccumulateJugglingCopy(agg, success, rarity);
 
     /// <summary>
+    /// Remember Free Attack's marginal energy-cost reduction for an exact
+    /// combat card. Cost modifiers are queried repeatedly, so this is only an
+    /// offer snapshot; the power's BeforeCardPlayed callback confirms whether
+    /// that card actually consumes a charge.
+    /// </summary>
+    internal static void RememberFreeAttackEnergySavings(
+        FreeAttackPower? power,
+        CardModel? card,
+        decimal originalCost,
+        decimal modifiedCost)
+    {
+        if (power?.Owner?.Player == null || card == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+                if (!IsTrackedPlayer(power.Owner.Player)) return;
+                if (!ReferenceEquals(card.Owner, power.Owner.Player)) return;
+                if (card.Type != CardType.Attack) return;
+                if (_pendingCombat == null) return;
+
+                _pendingCombat.FreeAttackEnergySavingsByCard[card] =
+                    Math.Max(0m, originalCost - modifiedCost);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RememberFreeAttackEnergySavings failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Capture the exact Attack that Free Attack is about to consume a charge
+    /// for. The returned observation is committed only after the native async
+    /// decrement completes and the power's amount actually falls.
+    /// </summary>
+    internal static PendingFreeAttackUse? CaptureFreeAttackUse(
+        FreeAttackPower? power,
+        CardPlay? cardPlay)
+    {
+        if (power?.Owner?.Player == null || cardPlay?.Card == null) return null;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return null;
+                if (!IsTrackedPlayer(power.Owner.Player)) return null;
+                if (!ReferenceEquals(cardPlay.Card.Owner, power.Owner.Player)) return null;
+                if (cardPlay.Card.Type != CardType.Attack) return null;
+                if (cardPlay.Card.Pile?.Type is not (PileType.Hand or PileType.Play)) return null;
+                if (power.Amount <= 0) return null;
+
+                _pendingCombat ??= new PendingCombat();
+                _pendingCombat.FreeAttackEnergySavingsByCard.Remove(
+                    cardPlay.Card,
+                    out var offeredEnergySavings);
+
+                return new PendingFreeAttackUse
+                {
+                    Power = power,
+                    Player = power.Owner.Player,
+                    Card = cardPlay.Card,
+                    StartingPowerAmount = power.Amount,
+                    OfferedEnergySavings = Math.Max(0m, offeredEnergySavings),
+                    IsAutoPlay = cardPlay.IsAutoPlay,
+                };
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"CaptureFreeAttackUse failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Commit one observed Free Attack charge consumption after the power's
+    /// decrement task succeeds.
+    /// </summary>
+    internal static void RecordFreeAttackUse(PendingFreeAttackUse? observation)
+    {
+        if (observation == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+                if (_pendingCombat == null || !IsTrackedPlayer(observation.Player)) return;
+                if (observation.Power.Amount >= observation.StartingPowerAmount) return;
+
+                var agg = GetOrCreatePowerAggregate(
+                    _pendingCombat.MetaStats,
+                    observation.Power.Id.ToString(),
+                    GetPowerDisplayName(observation.Power));
+                AccumulateFreeAttackUse(
+                    agg,
+                    observation.IsAutoPlay ? 0m : observation.OfferedEnergySavings,
+                    observation.Card.Rarity);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordFreeAttackUse failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void AccumulateFreeAttackGrant(PowerAggregate agg, int charges)
+    {
+        if (agg == null || charges <= 0) return;
+        agg.FreeAttackChargesGranted += charges;
+    }
+
+    private static void AccumulateFreeAttackUse(
+        PowerAggregate agg,
+        decimal energySaved,
+        CardRarity rarity)
+    {
+        if (agg == null) return;
+
+        var observedEnergySaved = Math.Max(0m, energySaved);
+        agg.FreeAttackChargesUsed++;
+        agg.FreeAttackEnergySaved += observedEnergySaved;
+        if (observedEnergySaved <= 0m)
+            agg.FreeAttackZeroEnergySavingsUses++;
+
+        switch (rarity)
+        {
+            case CardRarity.Basic:
+                agg.FreeAttackBasicAttacksDiscounted++;
+                break;
+            case CardRarity.Common:
+                agg.FreeAttackCommonAttacksDiscounted++;
+                break;
+            case CardRarity.Uncommon:
+                agg.FreeAttackUncommonAttacksDiscounted++;
+                break;
+            case CardRarity.Rare:
+                agg.FreeAttackRareAttacksDiscounted++;
+                break;
+        }
+    }
+
+    internal static void RecordFreeAttackGrantForTest(PowerAggregate agg, int charges)
+        => AccumulateFreeAttackGrant(agg, charges);
+
+    internal static void RecordFreeAttackUseForTest(
+        PowerAggregate agg,
+        decimal energySaved,
+        CardRarity rarity)
+        => AccumulateFreeAttackUse(agg, energySaved, rarity);
+
+    /// <summary>
     /// Capture Discovery at the exact SetToFreeThisTurn call it makes on the
     /// picked card. A skipped choice never reaches this boundary.
     /// </summary>
@@ -16111,6 +16267,20 @@ public static class RunTracker
                     effect.TotalAmountApplied += entry.Amount;
                 }
 
+                if (target?.IsPlayer == true
+                    && entry.Amount > 0m
+                    && entry.Power is FreeAttackPower
+                    && causingPlay.Card is Unrelenting)
+                {
+                    var powerAgg = GetOrCreatePowerAggregate(
+                        _pendingCombat.MetaStats,
+                        entry.Power.Id.ToString(),
+                        GetPowerDisplayName(entry.Power));
+                    AccumulateFreeAttackGrant(
+                        powerAgg,
+                        Math.Max(0, (int)Math.Floor(entry.Amount)));
+                }
+
                 if (target?.IsPlayer == true && entry.Amount > 0m)
                 {
                     var effect = GetOrCreateAppliedEffect(agg, entry.Power);
@@ -17034,6 +17204,14 @@ public static class RunTracker
             targetAgg.RareAttacksCopied += sourceAgg.RareAttacksCopied;
             targetAgg.TurnsActive += sourceAgg.TurnsActive;
             targetAgg.CombatsActive += sourceAgg.CombatsActive;
+            targetAgg.FreeAttackChargesGranted += sourceAgg.FreeAttackChargesGranted;
+            targetAgg.FreeAttackChargesUsed += sourceAgg.FreeAttackChargesUsed;
+            targetAgg.FreeAttackZeroEnergySavingsUses += sourceAgg.FreeAttackZeroEnergySavingsUses;
+            targetAgg.FreeAttackEnergySaved += sourceAgg.FreeAttackEnergySaved;
+            targetAgg.FreeAttackBasicAttacksDiscounted += sourceAgg.FreeAttackBasicAttacksDiscounted;
+            targetAgg.FreeAttackCommonAttacksDiscounted += sourceAgg.FreeAttackCommonAttacksDiscounted;
+            targetAgg.FreeAttackUncommonAttacksDiscounted += sourceAgg.FreeAttackUncommonAttacksDiscounted;
+            targetAgg.FreeAttackRareAttacksDiscounted += sourceAgg.FreeAttackRareAttacksDiscounted;
         }
     }
 
@@ -17506,6 +17684,16 @@ internal sealed class PendingJugglingCopyWindow
     public int RemainingAttempts { get; set; }
 }
 
+internal sealed class PendingFreeAttackUse
+{
+    public required FreeAttackPower Power { get; init; }
+    public required Player Player { get; init; }
+    public required CardModel Card { get; init; }
+    public int StartingPowerAmount { get; init; }
+    public decimal OfferedEnergySavings { get; init; }
+    public bool IsAutoPlay { get; init; }
+}
+
 /// <summary>
 /// Holds per-combat stats and events while a combat is in progress.
 /// Discarded if the combat doesn't finish cleanly; promoted into the run on CombatEnded.
@@ -17585,6 +17773,8 @@ internal class PendingCombat
     public Dictionary<Player, int> JugglingPowerTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, PendingJugglingCopyWindow> PendingJugglingCopyWindows { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<CardModel, decimal> FreeAttackEnergySavingsByCard { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> NutritiousSoupCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

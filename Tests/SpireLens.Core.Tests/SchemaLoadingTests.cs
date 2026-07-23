@@ -564,6 +564,20 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsUnrelentingFreeAttackPowerFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("unrelenting-free-attack-power-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        AssertUnrelentingFreeAttackPowerFixture(
+            loaded.Data.MetaStats.PowerAggregates["POWER.FREE_ATTACK_POWER"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsDebtCardFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("debt-card-run.json"));
@@ -1246,6 +1260,17 @@ public class SchemaLoadingTests
         Assert.NotNull(resumed);
         AssertJugglingPowerFixture(
             resumed!.MetaStats.PowerAggregates["POWER.JUGGLING"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsUnrelentingFreeAttackPowerFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("unrelenting-free-attack-power-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertUnrelentingFreeAttackPowerFixture(
+            resumed!.MetaStats.PowerAggregates["POWER.FREE_ATTACK_POWER"]);
     }
 
     [Fact]
@@ -3185,6 +3210,20 @@ public class SchemaLoadingTests
         Assert.Equal(2, powerAgg.RareAttacksCopied);
         Assert.Equal(5, powerAgg.TurnsActive);
         Assert.Equal(2, powerAgg.CombatsActive);
+    }
+
+    private static void AssertUnrelentingFreeAttackPowerFixture(PowerAggregate powerAgg)
+    {
+        Assert.Equal("POWER.FREE_ATTACK_POWER", powerAgg.PowerId);
+        Assert.Equal("Free Attack", powerAgg.DisplayName);
+        Assert.Equal(10, powerAgg.FreeAttackChargesGranted);
+        Assert.Equal(8, powerAgg.FreeAttackChargesUsed);
+        Assert.Equal(2, powerAgg.FreeAttackZeroEnergySavingsUses);
+        Assert.Equal(13m, powerAgg.FreeAttackEnergySaved);
+        Assert.Equal(2, powerAgg.FreeAttackBasicAttacksDiscounted);
+        Assert.Equal(2, powerAgg.FreeAttackCommonAttacksDiscounted);
+        Assert.Equal(3, powerAgg.FreeAttackUncommonAttacksDiscounted);
+        Assert.Equal(1, powerAgg.FreeAttackRareAttacksDiscounted);
     }
 
     private static void AssertSturdyClampFixture(RelicAggregate relicAgg)

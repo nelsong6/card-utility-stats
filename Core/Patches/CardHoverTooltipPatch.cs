@@ -33,6 +33,7 @@ public static class CardHoverShowPatch
     private const string BlockedDrawIconPath = DrawCardsNextTurnPowerIconPath;
     private const int DebtGoldLossPerTrigger = 5;
     private const string EnergyPotionIconPath = "res://images/atlases/potion_atlas.sprites/energy_potion.tres";
+    private const string FreeAttackPowerId = "POWER.FREE_ATTACK_POWER";
     private const string JugglingPowerId = "POWER.JUGGLING";
     private const string StarIconPath = "res://images/packed/sprite_fonts/star_icon.png";
     private const string SovereignBladeMetaNote = "Reflects All Sovereign Blade Usage";
@@ -356,6 +357,7 @@ public static class CardHoverShowPatch
         AppendJackOfAllTradesStats(sb, cardModel, agg, compact: false);
         AppendDiscoveryStats(sb, cardModel, agg, compact: false);
         AppendJugglingPowerStats(sb, cardModel, metaStats, compact: false);
+        AppendUnrelentingFreeAttackStats(sb, cardModel, metaStats, compact: false);
         AppendDebtStats(sb, cardModel, agg);
         AppendReplayStats(sb, agg);
 
@@ -562,6 +564,7 @@ public static class CardHoverShowPatch
         AppendJackOfAllTradesStats(sb, cardModel, agg, compact: true);
         AppendDiscoveryStats(sb, cardModel, agg, compact: true);
         AppendJugglingPowerStats(sb, cardModel, metaStats, compact: true);
+        AppendUnrelentingFreeAttackStats(sb, cardModel, metaStats, compact: true);
         AppendDebtStats(sb, cardModel, agg);
         AppendReplayStats(sb, agg);
 
@@ -792,6 +795,75 @@ public static class CardHoverShowPatch
             : 0m;
         Row3(sb, "avg copies per turn", FormatDecimal(averagePerTurn), "");
         Row3(sb, "avg copies per combat", FormatDecimal(averagePerCombat), "");
+    }
+
+    private static void AppendUnrelentingFreeAttackStats(
+        StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel card,
+        RunMetaStats metaStats,
+        bool compact)
+    {
+        if (card is not Unrelenting && !IsCardId(card, "CARD.UNRELENTING")) return;
+
+        metaStats ??= new RunMetaStats();
+        PowerAggregate? powerAgg = null;
+        if (metaStats.PowerAggregates != null)
+        {
+            metaStats.PowerAggregates.TryGetValue(FreeAttackPowerId, out powerAgg);
+            powerAgg ??= metaStats.PowerAggregates.Values.FirstOrDefault(candidate =>
+                string.Equals(candidate.PowerId, FreeAttackPowerId, StringComparison.Ordinal)
+                || string.Equals(candidate.DisplayName, "Free Attack", StringComparison.OrdinalIgnoreCase));
+        }
+        powerAgg ??= new PowerAggregate();
+
+        var utilization = powerAgg.FreeAttackChargesGranted <= 0
+            ? 0m
+            : 100m * powerAgg.FreeAttackChargesUsed / powerAgg.FreeAttackChargesGranted;
+        Row3(
+            sb,
+            "Free Attack charges used/granted",
+            $"{powerAgg.FreeAttackChargesUsed}/{powerAgg.FreeAttackChargesGranted}",
+            $"{utilization:F0}%");
+        Row3(
+            sb,
+            GetEnergyStatLabel("total saved"),
+            FormatDecimal(powerAgg.FreeAttackEnergySaved),
+            "");
+        if (compact) return;
+
+        var averageEnergySaved = powerAgg.FreeAttackChargesUsed <= 0
+            ? 0m
+            : powerAgg.FreeAttackEnergySaved / powerAgg.FreeAttackChargesUsed;
+        Row3(
+            sb,
+            "Charges used with 0 energy saved",
+            powerAgg.FreeAttackZeroEnergySavingsUses.ToString(),
+            "");
+        Row3(
+            sb,
+            GetEnergyStatLabel("avg saved per charge used"),
+            FormatDecimal(averageEnergySaved),
+            "");
+        Row3(
+            sb,
+            "Basic Attacks discounted",
+            powerAgg.FreeAttackBasicAttacksDiscounted.ToString(),
+            "");
+        Row3(
+            sb,
+            "Common Attacks discounted",
+            powerAgg.FreeAttackCommonAttacksDiscounted.ToString(),
+            "");
+        Row3(
+            sb,
+            "Uncommon Attacks discounted",
+            powerAgg.FreeAttackUncommonAttacksDiscounted.ToString(),
+            "");
+        Row3(
+            sb,
+            "Rare Attacks discounted",
+            powerAgg.FreeAttackRareAttacksDiscounted.ToString(),
+            "");
     }
 
     private static void AppendDebtStats(

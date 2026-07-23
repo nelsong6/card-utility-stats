@@ -1,0 +1,46 @@
+{
+  "run_id": "unrelenting-free-attack-power-fixture",
+  "started_at": "2026-07-23T23:00:00Z",
+  "updated_at": "2026-07-23T23:18:00Z",
+  "character": "IRONCLAD",
+  "ascension": 8,
+  "floor_reached": 16,
+  "outcome": "in_progress",
+  "game_start_time": 1784851200,
+  "aggregates": {
+    "CARD.UNRELENTING#1": {
+      "combats_in_deck": 5,
+      "plays": 10,
+      "times_drawn": 12,
+      "floor_added": 3,
+      "initial_upgrade_level": 0
+    }
+  },
+  "events": [],
+  "relic_aggregates": {},
+  "enemy_aggregates": {},
+  "meta_stats": {
+    "power_aggregates": {
+      "POWER.FREE_ATTACK_POWER": {
+        "power_id": "POWER.FREE_ATTACK_POWER",
+        "display_name": "Free Attack",
+        "free_attack_charges_granted": 10,
+        "free_attack_charges_used": 8,
+        "free_attack_zero_energy_savings_uses": 2,
+        "free_attack_energy_saved": 13,
+        "free_attack_basic_attacks_discounted": 2,
+        "free_attack_common_attacks_discounted": 2,
+        "free_attack_uncommon_attacks_discounted": 3,
+        "free_attack_rare_attacks_discounted": 1
+      }
+    }
+  },
+  "instance_numbers_by_def": {
+    "CARD.UNRELENTING": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.UNRELENTING": 1
+  }
+}

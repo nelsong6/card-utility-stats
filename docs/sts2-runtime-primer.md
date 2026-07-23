@@ -622,6 +622,16 @@ Read both type and rarity from that exact selected card; a trigger with no card
 left to discount belongs in activation rates but not in either recipient
 breakdown.
 
+Unrelenting applies one stack of the shared `FreeAttackPower`; multiple
+physical copies therefore lose distinct ownership once their stacks merge.
+Persist downstream charge use in a power-ID-keyed aggregate and project that
+shared record from every Unrelenting tooltip. The power's
+`TryModifyEnergyCostInCombatLate` method can be queried repeatedly for UI and
+playability, so its marginal cost reduction is only a snapshot. Confirm one
+use only after the exact Attack reaches `BeforeCardPlayed` and the awaited
+`PowerCmd.Decrement` actually lowers the stack. Naturally free and auto-played
+Attacks still consume a charge; count those uses with zero energy saved.
+
 Pael's Claw applies Goopy with amount 1 to every eligible permanent deck card
 in its synchronous `AfterObtained` callback. That initial amount is the
 enchantment baseline: Goopy's block bonus is `Amount - 1`. A finished Goopy

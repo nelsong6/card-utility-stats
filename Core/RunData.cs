@@ -361,6 +361,20 @@ public class PowerAggregate
     public int RareAttacksCopied { get; set; }
     public int TurnsActive { get; set; }
     public int CombatsActive { get; set; }
+
+    // Unrelenting / Free Attack tracking. The power owns these outcomes
+    // because multiple physical Unrelenting cards contribute to one shared
+    // stack. A use is confirmed only when FreeAttackPower completes its
+    // charge decrement. Energy saved is the power's observed marginal
+    // reduction from the cost immediately before its own late modifier.
+    public int FreeAttackChargesGranted { get; set; }
+    public int FreeAttackChargesUsed { get; set; }
+    public int FreeAttackZeroEnergySavingsUses { get; set; }
+    public decimal FreeAttackEnergySaved { get; set; }
+    public int FreeAttackBasicAttacksDiscounted { get; set; }
+    public int FreeAttackCommonAttacksDiscounted { get; set; }
+    public int FreeAttackUncommonAttacksDiscounted { get; set; }
+    public int FreeAttackRareAttacksDiscounted { get; set; }
 }
 
 public class EnemyAggregate
