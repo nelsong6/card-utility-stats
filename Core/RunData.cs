@@ -838,6 +838,11 @@ public class RelicAggregate
     // definitions can be offered and must remain distinct observations.
     public List<RelicCardRewardScreenAggregate> CardRewardScreens { get; set; } = new();
 
+    // Orrery's five card rewards in creation order. Each entry keeps its final
+    // handling (skipped, obtained card, or reward alternative) and persists
+    // the offered-card signature used to rebind a live reward after hot reload.
+    public List<OrreryRewardAggregate> OrreryRewards { get; set; } = new();
+
     // Observed card reward options by card pool while Prismatic Gem is owned.
     // This is intentionally meta: other reward modifiers may also affect the
     // final options. Used by Prismatic Gem.
@@ -901,6 +906,23 @@ public class RelicCardRewardOptionAggregate
     public string DisplayName { get; set; } = "";
     public int UpgradeLevel { get; set; }
     public bool Taken { get; set; }
+}
+
+public class OrreryRewardAggregate
+{
+    public int RewardNumber { get; set; }
+    public int? Floor { get; set; }
+    public string Outcome { get; set; } = "pending";
+    public string AlternativeId { get; set; } = "";
+    public List<string> OfferedCardIds { get; set; } = new();
+    public List<OrreryObtainedCardAggregate> CardsObtained { get; set; } = new();
+}
+
+public class OrreryObtainedCardAggregate
+{
+    public string CardId { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public int UpgradeLevel { get; set; }
 }
 
 public class RelicGrantedAggregate

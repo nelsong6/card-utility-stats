@@ -97,6 +97,8 @@ public static class RunTracker
     private static readonly Dictionary<CardReward, PendingPaelSacrificeReward> _paelSacrificeRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, PendingFresnelLensReward> _fresnelLensRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, PendingSilverCrucibleReward> _silverCrucibleRewards = new(ReferenceEqualityComparer.Instance);
+    private static readonly Dictionary<CardReward, PendingOrreryReward> _orreryRewards = new(ReferenceEqualityComparer.Instance);
+    private static Orrery? _orreryRewardRegistrationRelic;
     private static readonly List<int> _silverCrucibleRestoreBatchScreenNumbers = new();
     private static int _silverCrucibleRestoreBatchDepth;
     private static readonly Dictionary<Player, PendingRegalPillowRestHeal> _pendingRegalPillowRestHeals = new(ReferenceEqualityComparer.Instance);
@@ -972,6 +974,8 @@ public static class RunTracker
         _paelSacrificeRewards.Clear();
         _fresnelLensRewards.Clear();
         _silverCrucibleRewards.Clear();
+        _orreryRewards.Clear();
+        _orreryRewardRegistrationRelic = null;
         _silverCrucibleRestoreBatchScreenNumbers.Clear();
         _silverCrucibleRestoreBatchDepth = 0;
         _pendingRegalPillowRestHeals.Clear();
@@ -1811,6 +1815,7 @@ public static class RunTracker
         target.RewardScreensWithoutNimbleCards += source.RewardScreensWithoutNimbleCards;
         target.RewardScreensWithNimbleCardsButNoneTaken += source.RewardScreensWithNimbleCardsButNoneTaken;
         MergeCardRewardScreens(target, source);
+        MergeOrreryRewards(target, source);
         MergeCardRewardCategories(target.CardRewardCategories, source.CardRewardCategories);
         MergeRelicCardsGranted(target.CardsGranted, source.CardsGranted);
         MergeRelicCardsReturned(target, source);
@@ -2598,6 +2603,7 @@ public static class RunTracker
     private const string SealOfGoldRelicId = "RELIC.SEAL_OF_GOLD";
     private const string FresnelLensRelicId = "RELIC.FRESNEL_LENS";
     private const string SilverCrucibleRelicId = "RELIC.SILVER_CRUCIBLE";
+    private const string OrreryRelicId = "RELIC.ORRERY";
     private const string BloodSoakedRoseRelicId = "RELIC.BLOOD_SOAKED_ROSE";
     private const string CursedPearlRelicId = "RELIC.CURSED_PEARL";
     private const string SignetRingRelicId = "RELIC.SIGNET_RING";
@@ -10294,6 +10300,379 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Open the narrow synchronous registration window around Orrery's
+    /// AfterObtained method. Orrery constructs its five CardReward objects and
+    /// passes them to RewardsCmd.OfferCustom before its first await.
+    /// </summary>
+    public static bool BeginOrreryRewardRegistration(Orrery relic)
+    {
+        if (relic?.Owner == null) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic)) return false;
+                _orreryRewardRegistrationRelic = relic;
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"BeginOrreryRewardRegistration failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    public static void EndOrreryRewardRegistration()
+    {
+        lock (_lock)
+        {
+            _orreryRewardRegistrationRelic = null;
+        }
+    }
+
+    /// <summary>
+    /// Bind Orrery's exact custom CardReward instances in creation order. The
+    /// pending entries are persisted immediately so their numbering survives a
+    /// Core reload while the reward page is open.
+    /// </summary>
+    public static void RegisterOrreryCustomRewards(Player player, List<Reward> rewards)
+    {
+        if (player == null || rewards == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var relic = _orreryRewardRegistrationRelic;
+                if (relic?.Owner == null
+                    || !ReferenceEquals(relic.Owner, player)
+                    || !IsTrackedRelic(relic))
+                    return;
+
+                var cardRewards = rewards
+                    .OfType<CardReward>()
+                    .Where(reward => ReferenceEquals(reward.Player, player))
+                    .ToList();
+                var expectedRewards = Math.Max(1, relic.DynamicVars.Cards.IntValue);
+                if (cardRewards.Count != expectedRewards)
+                {
+                    CoreMain.LogDebug(
+                        $"RegisterOrreryCustomRewards expected {expectedRewards} card rewards, " +
+                        $"observed {cardRewards.Count}; registration skipped.");
+                    return;
+                }
+
+                var floor = CurrentRunFloorLocked();
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(OrreryRelicId);
+                for (var index = 0; index < cardRewards.Count; index++)
+                {
+                    var pending = new PendingOrreryReward(index + 1, floor, player);
+                    _orreryRewards[cardRewards[index]] = pending;
+                    RecordOrreryRewardForTest(
+                        agg,
+                        BuildOrreryRewardAggregateLocked(pending, "pending"));
+                }
+
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RegisterOrreryCustomRewards failed: {e.Message}");
+            }
+        }
+    }
+
+    public static bool IsTrackedOrreryReward(CardReward reward)
+    {
+        if (reward == null) return false;
+
+        lock (_lock)
+        {
+            return _orreryRewards.ContainsKey(reward);
+        }
+    }
+
+    /// <summary>
+    /// Capture the generated/rerolled option signature for hot-reload
+    /// re-association. Rerolling changes the options but not the Orrery reward
+    /// number or its eventual handling.
+    /// </summary>
+    public static void RefreshOrreryRewardOptions(CardReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_orreryRewards.TryGetValue(reward, out var pending)
+                    && !TryRestoreOrreryRewardLocked(reward, out pending))
+                    return;
+
+                CaptureOrreryOfferedCardsLocked(pending, reward);
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(OrreryRelicId);
+                RecordOrreryRewardForTest(
+                    agg,
+                    BuildOrreryRewardAggregateLocked(pending, "pending"));
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RefreshOrreryRewardOptions failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Snapshot the physical deck immediately before an Orrery card reward
+    /// opens. A successful CardReward completion can then identify the final
+    /// card object that actually entered the deck, including replacements.
+    /// </summary>
+    public static void NoteOrreryRewardOpened(CardReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_orreryRewards.TryGetValue(reward, out var pending)
+                    && !TryRestoreOrreryRewardLocked(reward, out pending))
+                    return;
+
+                CaptureOrreryOfferedCardsLocked(pending, reward);
+                pending.DeckBeforeSelection = new HashSet<CardModel>(
+                    SnapshotDeckCards(pending.Player),
+                    ReferenceEqualityComparer.Instance);
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(OrreryRelicId);
+                RecordOrreryRewardForTest(
+                    agg,
+                    BuildOrreryRewardAggregateLocked(pending, "pending"));
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"NoteOrreryRewardOpened failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordOrreryRewardObtainedCards(CardReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_orreryRewards.Remove(reward, out var pending)) return;
+                if (!IsTrackedPlayer(pending.Player)) return;
+
+                var obtainedCards = pending.DeckBeforeSelection == null
+                    ? new List<CardModel>()
+                    : NewDeckCardsSince(pending.Player, pending.DeckBeforeSelection);
+                var outcome = obtainedCards.Count > 0 ? "obtained" : "completed_without_card";
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(OrreryRelicId);
+                RecordOrreryRewardForTest(
+                    agg,
+                    BuildOrreryRewardAggregateLocked(pending, outcome, obtainedCards: obtainedCards));
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordOrreryRewardObtainedCards failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordOrreryRewardAlternative(CardReward reward, string? alternativeId)
+    {
+        if (reward == null || string.IsNullOrWhiteSpace(alternativeId)) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_orreryRewards.Remove(reward, out var pending)
+                    && !TryRestoreOrreryRewardLocked(reward, out pending))
+                    return;
+
+                _orreryRewards.Remove(reward);
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(OrreryRelicId);
+                RecordOrreryRewardForTest(
+                    agg,
+                    BuildOrreryRewardAggregateLocked(
+                        pending,
+                        "alternative",
+                        alternativeId: alternativeId));
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordOrreryRewardAlternative failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordOrreryRewardSkipped(CardReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_orreryRewards.Remove(reward, out var pending)
+                    && !TryRestoreOrreryRewardLocked(reward, out pending))
+                    return;
+
+                _orreryRewards.Remove(reward);
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(OrreryRelicId);
+                RecordOrreryRewardForTest(
+                    agg,
+                    BuildOrreryRewardAggregateLocked(pending, "skipped"));
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordOrreryRewardSkipped failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordOrreryRewardForTest(
+        RelicAggregate agg,
+        OrreryRewardAggregate reward)
+    {
+        if (agg == null || reward == null || reward.RewardNumber is < 1 or > 5) return;
+
+        var copy = new OrreryRewardAggregate
+        {
+            RewardNumber = reward.RewardNumber,
+            Floor = reward.Floor,
+            Outcome = string.IsNullOrWhiteSpace(reward.Outcome) ? "pending" : reward.Outcome,
+            AlternativeId = reward.AlternativeId ?? "",
+            OfferedCardIds = (reward.OfferedCardIds ?? new List<string>())
+                .Where(cardId => !string.IsNullOrWhiteSpace(cardId))
+                .ToList(),
+            CardsObtained = (reward.CardsObtained ?? new List<OrreryObtainedCardAggregate>())
+                .Where(card => card != null)
+                .Select(card => new OrreryObtainedCardAggregate
+                {
+                    CardId = card.CardId ?? "",
+                    DisplayName = card.DisplayName ?? "",
+                    UpgradeLevel = Math.Max(0, card.UpgradeLevel),
+                })
+                .ToList(),
+        };
+
+        agg.OrreryRewards ??= new List<OrreryRewardAggregate>();
+        var existingIndex = agg.OrreryRewards.FindIndex(candidate =>
+            candidate != null && candidate.RewardNumber == copy.RewardNumber);
+        if (existingIndex >= 0)
+        {
+            var existing = agg.OrreryRewards[existingIndex];
+            if (!string.Equals(existing.Outcome, "pending", StringComparison.Ordinal)
+                && string.Equals(copy.Outcome, "pending", StringComparison.Ordinal))
+                return;
+
+            agg.OrreryRewards[existingIndex] = copy;
+        }
+        else
+        {
+            agg.OrreryRewards.Add(copy);
+        }
+
+        agg.OrreryRewards.Sort((left, right) =>
+            (left?.RewardNumber ?? int.MaxValue).CompareTo(right?.RewardNumber ?? int.MaxValue));
+    }
+
+    private static OrreryRewardAggregate BuildOrreryRewardAggregateLocked(
+        PendingOrreryReward pending,
+        string outcome,
+        string? alternativeId = null,
+        IReadOnlyList<CardModel>? obtainedCards = null)
+    {
+        return new OrreryRewardAggregate
+        {
+            RewardNumber = pending.RewardNumber,
+            Floor = pending.Floor,
+            Outcome = outcome,
+            AlternativeId = alternativeId ?? "",
+            OfferedCardIds = pending.OfferedCardIds.ToList(),
+            CardsObtained = (obtainedCards ?? Array.Empty<CardModel>())
+                .Where(card => card != null)
+                .Select(card => new OrreryObtainedCardAggregate
+                {
+                    CardId = GetCardIdForStats(card),
+                    DisplayName = GetCardDisplayNameForStats(card),
+                    UpgradeLevel = GetRewardCardUpgradeLevelForStats(card),
+                })
+                .ToList(),
+        };
+    }
+
+    private static void CaptureOrreryOfferedCardsLocked(
+        PendingOrreryReward pending,
+        CardReward reward)
+    {
+        pending.OfferedCardIds.Clear();
+        pending.OfferedCardIds.AddRange(
+            reward._cards
+                .Where(option => option?.Card != null)
+                .Select(option => GetRewardCardIdForStats(option.Card)));
+    }
+
+    private static bool TryRestoreOrreryRewardLocked(
+        CardReward reward,
+        [NotNullWhen(true)] out PendingOrreryReward? pending)
+    {
+        pending = null;
+        if (!IsTrackedPlayer(reward.Player)) return false;
+
+        EnsureLazyCurrentRunLocked();
+        if (!_currentRun.RelicAggregates.TryGetValue(OrreryRelicId, out var agg))
+            return false;
+
+        var currentFloor = CurrentRunFloorLocked();
+        var offeredCardIds = reward._cards
+            .Where(option => option?.Card != null)
+            .Select(option => GetRewardCardIdForStats(option.Card))
+            .ToList();
+        var boundNumbers = _orreryRewards.Values
+            .Select(candidate => candidate.RewardNumber)
+            .ToHashSet();
+
+        var saved = (agg.OrreryRewards ?? new List<OrreryRewardAggregate>())
+            .Where(candidate => candidate != null
+                && string.Equals(candidate.Outcome, "pending", StringComparison.Ordinal)
+                && !boundNumbers.Contains(candidate.RewardNumber)
+                && (!candidate.Floor.HasValue
+                    || !currentFloor.HasValue
+                    || candidate.Floor.Value == currentFloor.Value)
+                && (candidate.OfferedCardIds ?? new List<string>())
+                    .SequenceEqual(offeredCardIds, StringComparer.Ordinal))
+            .OrderBy(candidate => candidate.RewardNumber)
+            .FirstOrDefault();
+        if (saved == null) return false;
+
+        pending = new PendingOrreryReward(saved.RewardNumber, saved.Floor, reward.Player);
+        pending.OfferedCardIds.AddRange(offeredCardIds);
+        _orreryRewards[reward] = pending;
+        return true;
+    }
+
+    /// <summary>
     /// Arm one of Silver Crucible's three charge-consuming card rewards after
     /// Populate has finished. The screen number comes from the relic's saved
     /// TimesUsed value, while the option snapshot preserves the final visible
@@ -12926,6 +13305,14 @@ public static class RunTracker
 
         foreach (var screen in source.CardRewardScreens)
             RecordSilverCrucibleRewardForTest(target, screen);
+    }
+
+    private static void MergeOrreryRewards(RelicAggregate target, RelicAggregate source)
+    {
+        if (source.OrreryRewards == null || source.OrreryRewards.Count == 0) return;
+
+        foreach (var reward in source.OrreryRewards)
+            RecordOrreryRewardForTest(target, reward);
     }
 
     private static void MergeCardRewardCategories(
@@ -16275,6 +16662,22 @@ internal sealed class PendingSilverCrucibleReward
     public int? Floor { get; }
     public bool SelectionOpened { get; set; }
     public List<PendingSilverCrucibleCard> Cards { get; } = new();
+}
+
+internal sealed class PendingOrreryReward
+{
+    public PendingOrreryReward(int rewardNumber, int? floor, Player player)
+    {
+        RewardNumber = rewardNumber;
+        Floor = floor;
+        Player = player;
+    }
+
+    public int RewardNumber { get; }
+    public int? Floor { get; }
+    public Player Player { get; }
+    public List<string> OfferedCardIds { get; } = new();
+    public HashSet<CardModel>? DeckBeforeSelection { get; set; }
 }
 
 internal sealed class PendingSilverCrucibleCard

@@ -2834,6 +2834,25 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsOrreryRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("orrery-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertOrreryFixture(loaded.Data.RelicAggregates["RELIC.ORRERY"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsOrreryRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("orrery-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertOrreryFixture(resumed!.RelicAggregates["RELIC.ORRERY"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsUnmovablePowerMetaFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("unmovable-power-meta-run.json"));
@@ -3175,5 +3194,47 @@ public class SchemaLoadingTests
         Assert.Equal(displayName, card.DisplayName);
         Assert.Equal(upgradeLevel, card.UpgradeLevel);
         Assert.Equal(taken, card.Taken);
+    }
+
+    private static void AssertOrreryFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(new[] { 1, 2, 3, 4, 5 }, relicAgg.OrreryRewards.Select(reward => reward.RewardNumber));
+
+        var skipped = relicAgg.OrreryRewards[0];
+        Assert.Equal(12, skipped.Floor);
+        Assert.Equal("skipped", skipped.Outcome);
+        Assert.Empty(skipped.CardsObtained);
+        Assert.Equal(
+            new[] { "CARD.BASH", "CARD.SHRUG_IT_OFF", "CARD.INFLAME" },
+            skipped.OfferedCardIds);
+
+        var obtained = relicAgg.OrreryRewards[1];
+        Assert.Equal("obtained", obtained.Outcome);
+        Assert.Collection(
+            obtained.CardsObtained,
+            card =>
+            {
+                Assert.Equal("CARD.POMMEL_STRIKE", card.CardId);
+                Assert.Equal("Pommel Strike", card.DisplayName);
+                Assert.Equal(0, card.UpgradeLevel);
+            });
+
+        var sacrificed = relicAgg.OrreryRewards[2];
+        Assert.Equal("alternative", sacrificed.Outcome);
+        Assert.Equal("SACRIFICE", sacrificed.AlternativeId);
+        Assert.Empty(sacrificed.CardsObtained);
+
+        Assert.Equal("pending", relicAgg.OrreryRewards[3].Outcome);
+
+        var upgraded = relicAgg.OrreryRewards[4];
+        Assert.Equal("obtained", upgraded.Outcome);
+        Assert.Collection(
+            upgraded.CardsObtained,
+            card =>
+            {
+                Assert.Equal("CARD.UPPERCUT", card.CardId);
+                Assert.Equal("Uppercut+", card.DisplayName);
+                Assert.Equal(1, card.UpgradeLevel);
+            });
     }
 }

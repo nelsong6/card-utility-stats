@@ -436,6 +436,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is Orrery)
+            {
+                const string relicId = "RELIC.ORRERY";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildOrreryBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Orrery", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is BloodSoakedRose)
             {
                 var relicId = relicNode.Model.Id.ToString();
@@ -1444,6 +1454,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is Orrery)
+        {
+            title = "Orrery";
+            body = BuildOrreryBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is BloodSoakedRose)
         {
             title = "Blood-Soaked Rose";
@@ -2426,6 +2443,75 @@ public static class RelicHoverShowPatch
         sb.Append($"[cell expand=4 padding=12,0,12,0][b]{displayName}[/b][/cell]");
         sb.Append($"[cell expand=2 padding=0,0,4,0][right][color=#b5b5b5]{outcome}[/color][/right][/cell]");
         sb.Append("[/table]\n");
+    }
+
+    private static string BuildOrreryBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var rewards = agg.OrreryRewards ?? new List<OrreryRewardAggregate>();
+
+        for (var rewardNumber = 1; rewardNumber <= 5; rewardNumber++)
+        {
+            var reward = rewards.LastOrDefault(candidate =>
+                candidate != null && candidate.RewardNumber == rewardNumber);
+            Row3(
+                sb,
+                $"Reward {rewardNumber}",
+                reward == null ? "not seen yet" : FormatOrreryRewardOutcome(reward),
+                "");
+        }
+
+        return sb.ToString();
+    }
+
+    private static string FormatOrreryRewardOutcome(OrreryRewardAggregate reward)
+    {
+        if (string.Equals(reward.Outcome, "skipped", StringComparison.OrdinalIgnoreCase))
+            return "skipped";
+
+        if (string.Equals(reward.Outcome, "alternative", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.Equals(
+                    reward.AlternativeId,
+                    PaelsWing.sacrificeAlternativeKey,
+                    StringComparison.OrdinalIgnoreCase))
+                return "sacrificed to Pael";
+
+            var alternative = string.IsNullOrWhiteSpace(reward.AlternativeId)
+                ? "alternative"
+                : reward.AlternativeId.Replace('_', ' ').ToLowerInvariant();
+            return $"selected {StatsTooltip.EscapeBbcode(alternative)}";
+        }
+
+        if (string.Equals(reward.Outcome, "obtained", StringComparison.OrdinalIgnoreCase))
+        {
+            var cards = (reward.CardsObtained ?? new List<OrreryObtainedCardAggregate>())
+                .Where(card => card != null)
+                .Select(card =>
+                {
+                    var displayName = !string.IsNullOrWhiteSpace(card.DisplayName)
+                        ? card.DisplayName
+                        : !string.IsNullOrWhiteSpace(card.CardId)
+                            ? RunTracker.FormatCardIdForDisplay(card.CardId)
+                            : "Unknown card";
+                    var upgradeSuffix = card.UpgradeLevel <= 0
+                        ? ""
+                        : new string('+', card.UpgradeLevel);
+                    return StatsTooltip.EscapeBbcode(displayName + upgradeSuffix);
+                })
+                .ToList();
+            return cards.Count == 0
+                ? "obtained card"
+                : $"obtained {string.Join(", ", cards)}";
+        }
+
+        if (string.Equals(
+                reward.Outcome,
+                "completed_without_card",
+                StringComparison.OrdinalIgnoreCase))
+            return "completed without obtaining a card";
+
+        return "pending";
     }
 
     private static string BuildBloodSoakedRoseBodyBBCode(RelicAggregate agg, CardAggregate curseAgg)

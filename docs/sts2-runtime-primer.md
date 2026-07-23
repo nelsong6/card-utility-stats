@@ -680,6 +680,18 @@ rather than `AfterModifyingCardRewardOptions`, so that free modification does
 not consume `TimesUsed`. Keep it outside the numbered three-use ledger unless
 the game changes its own counter behavior.
 
+Orrery constructs five distinct `CardReward` objects in creation order, then
+passes that exact list to `RewardsCmd.OfferCustom` before its first await.
+Register those object references inside a narrow `Orrery.AfterObtained`
+source window rather than inferring Orrery from generic `CardCreationSource.Other`
+rewards. A terminal outer `CardReward.OnSkipped` is an observed skip; a
+successful `CardReward.OnSelect` can be resolved to the physical cards newly
+present in the deck; and terminal reward alternatives should be wrapped at
+`CardRewardAlternative.Generate` so their exact option id remains available.
+Pael's Wing uses the `SACRIFICE` alternative. Inner card-screen Skip and
+Driftwood reroll do not consume the reward and must preserve its original
+Orrery number.
+
 ## Generated And Supplemental Cards
 
 Not every visible card should become a permanent per-instance deck card.

@@ -230,6 +230,10 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds Silver Crucible's ordered first, second, and third card-reward screens,
   including every offered card's displayed upgrade state and explicit
   taken/not-taken outcome.
+- `orrery-relic-run.json`
+  Adds Orrery's five ordered card rewards, including their final skipped,
+  obtained-card, Pael-sacrifice, or still-pending handling and the offered-card
+  signatures used for same-floor hot-reload recovery.
 - `strawberry-relic-run.json`
   Adds Strawberry pickup tracking: activations, observed max HP gained, and
   original/new max-HP snapshots.
