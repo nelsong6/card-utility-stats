@@ -568,6 +568,14 @@ before the callback and only record the resulting max HP after its returned
 task completes successfully; the callback awaits `CreatureCmd.GainMaxHp`, so
 the post-task value is the observed result after game modifiers or prevention.
 
+Sturdy Clamp prevents the normal player block clear in `ShouldClearBlock`, and
+its owner-specific `AfterPreventingBlockClear(AbstractModel, Creature)` callback
+runs from `Creature.AfterTurnStart` on every player turn after turn 1, including
+when block is zero. Capture the pre-callback block, then wait for its task before
+reading retained block because the relic asynchronously removes the amount over
+10. The pre-callback amount above 10 is the excess; the post-task block is the
+observed retained result.
+
 Shovel adds `DigRestSiteOption` from `TryModifyRestSiteOptions`; the relic
 itself does not receive the obtained relic payload. Patch
 `DigRestSiteOption.OnSelect`, snapshot the owner's relic inventory before the

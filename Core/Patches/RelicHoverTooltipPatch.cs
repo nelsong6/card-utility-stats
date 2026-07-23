@@ -460,6 +460,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is SturdyClamp)
+            {
+                const string relicId = "RELIC.STURDY_CLAMP";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildSturdyClampBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Sturdy Clamp", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is CloakClasp)
             {
                 const string relicId = "RELIC.CLOAK_CLASP";
@@ -1399,6 +1409,13 @@ public static class RelicHoverShowPatch
         {
             title = "Intimidating Helmet";
             body = BuildIntimidatingHelmetBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is SturdyClamp)
+        {
+            title = "Sturdy Clamp";
+            body = BuildSturdyClampBodyBBCode(agg);
             return true;
         }
 
@@ -2360,6 +2377,29 @@ public static class RelicHoverShowPatch
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
         Row3(sb, BlockLabel("avg block per turn"), FormatDecimal(blockPerTurn), "");
         Row3(sb, BlockLabel("avg block per combat"), FormatDecimal(blockPerCombat), "");
+        return sb.ToString();
+    }
+
+    private static string BuildSturdyClampBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var blockRetainedPerTurn = agg.SturdyClampTurns <= 0
+            ? 0m
+            : (decimal)agg.SturdyClampBlockRetained / agg.SturdyClampTurns;
+        var blockRetainedPerCombat = agg.SturdyClampCombats <= 0
+            ? 0m
+            : (decimal)agg.SturdyClampBlockRetained / agg.SturdyClampCombats;
+        var excessBlockPerTurn = agg.SturdyClampTurns <= 0
+            ? 0m
+            : (decimal)agg.SturdyClampExcessBlockOverTen / agg.SturdyClampTurns;
+        var excessBlockPerCombat = agg.SturdyClampCombats <= 0
+            ? 0m
+            : (decimal)agg.SturdyClampExcessBlockOverTen / agg.SturdyClampCombats;
+
+        Row3(sb, BlockLabel("avg block retained per turn"), FormatDecimal(blockRetainedPerTurn), "");
+        Row3(sb, BlockLabel("avg block retained per combat"), FormatDecimal(blockRetainedPerCombat), "");
+        Row3(sb, BlockLabel("avg excess block over 10 per turn"), FormatDecimal(excessBlockPerTurn), "");
+        Row3(sb, BlockLabel("avg excess block over 10 per combat"), FormatDecimal(excessBlockPerCombat), "");
         return sb.ToString();
     }
 

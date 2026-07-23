@@ -2857,6 +2857,33 @@ public class SchemaLoadingTests
         AssertStoneHumidifierFixture(resumed!.RelicAggregates["RELIC.STONE_HUMIDIFIER"]);
     }
 
+    [Fact]
+    public void HistoricalLoad_AcceptsSturdyClampRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("sturdy-clamp-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertSturdyClampFixture(loaded.Data.RelicAggregates["RELIC.STURDY_CLAMP"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsSturdyClampRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("sturdy-clamp-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertSturdyClampFixture(resumed!.RelicAggregates["RELIC.STURDY_CLAMP"]);
+    }
+
+    private static void AssertSturdyClampFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(17, relicAgg.SturdyClampBlockRetained);
+        Assert.Equal(3, relicAgg.SturdyClampExcessBlockOverTen);
+        Assert.Equal(3, relicAgg.SturdyClampTurns);
+        Assert.Equal(2, relicAgg.SturdyClampCombats);
+    }
+
     private static void AssertStoneHumidifierFixture(RelicAggregate relicAgg)
     {
         Assert.Equal(2, relicAgg.Activations);

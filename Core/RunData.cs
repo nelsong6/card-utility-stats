@@ -692,6 +692,16 @@ public class RelicAggregate
     public int IntimidatingHelmetCombats { get; set; }
     public int IntimidatingHelmetTurns { get; set; }
 
+    // Sturdy Clamp tracking. Block retained is the observed block remaining
+    // after its async block-clear prevention callback. Excess block is the
+    // pre-callback amount above the relic's 10-block retention cap. Turns count
+    // each callback opportunity, including zero-block turns; combats count
+    // every combat where the relic was held.
+    public int SturdyClampBlockRetained { get; set; }
+    public int SturdyClampExcessBlockOverTen { get; set; }
+    public int SturdyClampTurns { get; set; }
+    public int SturdyClampCombats { get; set; }
+
     // Mummified Hand tracking. Activations is every qualifying owner Power
     // play, including triggers with no card left to discount. Power cost uses
     // the play-time EnergyValue; the ratio uses actual EnergySpent divided by

@@ -236,6 +236,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `stone-humidifier-relic-run.json`
   Adds Stone Humidifier rest-site trigger tracking: observed max HP gained and
   an ordered starting/resulting max-HP snapshot for every activation.
+- `sturdy-clamp-relic-run.json`
+  Adds Sturdy Clamp's observed retained block, pre-cap excess block, and the
+  turn/combat denominators used by its four average rows.
 - `sand-castle-relic-run.json`
   Adds Sand Castle pickup tracking: the actual cards upgraded by the relic.
 - `fragrant-mushroom-relic-run.json`

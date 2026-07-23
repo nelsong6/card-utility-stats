@@ -1738,6 +1738,10 @@ public static class RunTracker
         target.RegaliteTurns += source.RegaliteTurns;
         target.IntimidatingHelmetCombats += source.IntimidatingHelmetCombats;
         target.IntimidatingHelmetTurns += source.IntimidatingHelmetTurns;
+        target.SturdyClampBlockRetained += source.SturdyClampBlockRetained;
+        target.SturdyClampExcessBlockOverTen += source.SturdyClampExcessBlockOverTen;
+        target.SturdyClampTurns += source.SturdyClampTurns;
+        target.SturdyClampCombats += source.SturdyClampCombats;
         target.MummifiedHandTriggeringPowerCostTotal += source.MummifiedHandTriggeringPowerCostTotal;
         target.MummifiedHandDiscountGivenTotal += source.MummifiedHandDiscountGivenTotal;
         target.MummifiedHandEnergySpentToDiscountedCostRatioTotal += source.MummifiedHandEnergySpentToDiscountedCostRatioTotal;
@@ -2623,6 +2627,7 @@ public static class RunTracker
     private const string PaperPhrogRelicId = "RELIC.PAPER_PHROG";
     private const string RegaliteRelicId = "RELIC.REGALITE";
     private const string IntimidatingHelmetRelicId = "RELIC.INTIMIDATING_HELMET";
+    private const string SturdyClampRelicId = "RELIC.STURDY_CLAMP";
     private const string MummifiedHandRelicId = "RELIC.MUMMIFIED_HAND";
     private const string BookmarkRelicId = "RELIC.BOOKMARK";
     private const string BrilliantScarfRelicId = "RELIC.BRILLIANT_SCARF";
@@ -7459,6 +7464,52 @@ public static class RunTracker
         }
     }
 
+    /// <summary>
+    /// Record one Sturdy Clamp retention boundary after the relic's async
+    /// callback has finished. The starting value is used for excess-over-cap;
+    /// the resulting value is the block the player actually retained.
+    /// </summary>
+    public static void RecordSturdyClampRetention(
+        SturdyClamp relic,
+        Creature creature,
+        int startingBlock,
+        int resultingBlock)
+    {
+        if (relic?.Owner == null || creature?.Player == null) return;
+        if (!ReferenceEquals(relic.Owner.Creature, creature)) return;
+        if (!ReferenceEquals(relic.Owner, creature.Player)) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(relic.Owner)) return;
+                if (CombatManager.Instance?.IsInProgress != true) return;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordSturdyClampCombatForPlayerLocked(relic.Owner);
+
+                var turnNumber = relic.Owner.PlayerCombatState?.TurnNumber ?? 0;
+                if (turnNumber <= 0) return;
+                if (_pendingCombat.SturdyClampTurnCountedTurns.TryGetValue(
+                        relic.Owner,
+                        out var recordedTurn)
+                    && recordedTurn == turnNumber)
+                {
+                    return;
+                }
+
+                _pendingCombat.SturdyClampTurnCountedTurns[relic.Owner] = turnNumber;
+                var agg = GetOrCreatePendingRelicAggregateLocked(SturdyClampRelicId);
+                RecordSturdyClampTurnForTest(agg, startingBlock, resultingBlock);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordSturdyClampRetention failed: {e.Message}");
+            }
+        }
+    }
+
     public static void RecordMummifiedHandTurnStarted(Player player)
     {
         if (player == null) return;
@@ -7583,6 +7634,24 @@ public static class RunTracker
                 agg.MummifiedHandDiscountedSkills += 1;
                 break;
         }
+    }
+
+    internal static void RecordSturdyClampTurnForTest(
+        RelicAggregate agg,
+        int startingBlock,
+        int resultingBlock)
+    {
+        if (agg == null) return;
+
+        agg.SturdyClampTurns += 1;
+        agg.SturdyClampBlockRetained += Math.Max(0, resultingBlock);
+        agg.SturdyClampExcessBlockOverTen += Math.Max(0, startingBlock - 10);
+    }
+
+    internal static void RecordSturdyClampCombatForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.SturdyClampCombats += Math.Max(0, count);
     }
 
     internal static void RecordMummifiedHandCombatForTest(RelicAggregate agg, int count = 1)
@@ -10790,6 +10859,18 @@ public static class RunTracker
         }
     }
 
+    private static bool PlayerHasSturdyClamp(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is SturdyClamp);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static bool PlayerHasJuzuBracelet(Player player)
     {
         try
@@ -10914,6 +10995,7 @@ public static class RunTracker
             RecordRazorToothCombatForPlayerLocked(player);
             RecordRegaliteCombatForPlayerLocked(player);
             RecordIntimidatingHelmetCombatForPlayerLocked(player);
+            RecordSturdyClampCombatForPlayerLocked(player);
             RecordMummifiedHandCombatForPlayerLocked(player);
         }
         catch (Exception e)
@@ -11191,6 +11273,16 @@ public static class RunTracker
 
         var agg = GetOrCreatePendingRelicAggregateLocked(IntimidatingHelmetRelicId);
         RecordIntimidatingHelmetTurnForTest(agg);
+    }
+
+    private static void RecordSturdyClampCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasSturdyClamp(player)) return;
+        if (!_pendingCombat.SturdyClampCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(SturdyClampRelicId);
+        RecordSturdyClampCombatForTest(agg);
     }
 
     private static void RecordMummifiedHandCombatForPlayerLocked(Player player)
@@ -15408,6 +15500,10 @@ internal class PendingCombat
     public HashSet<Player> IronClubCombatEndChargeRecordedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> BrilliantScarfCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> SturdyClampCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> SturdyClampTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> MummifiedHandCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
