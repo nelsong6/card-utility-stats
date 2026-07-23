@@ -1490,6 +1490,7 @@ public static class RunTracker
             // combat that didn't get a CombatEnded (shouldn't happen but defensive) is dropped.
             _pendingCombat = new PendingCombat();
             ResetCombatContextState();
+            RecordPantographCombatStartForTrackedPlayerLocked(state);
             if (ShouldTrackCardStatsDuringCombatLocked())
             {
                 RecordCombatsInDeckForCurrentDeckLocked();
@@ -5924,7 +5925,52 @@ public static class RunTracker
     /// </summary>
     public static void RecordPantographTrigger(Creature healedCreature, decimal attemptedHealing)
     {
-        RecordRelicHealingTrigger(PantographRelicId, healedCreature, attemptedHealing, nameof(RecordPantographTrigger));
+        if (healedCreature == null || attemptedHealing <= 0m) return;
+
+        lock (_lock)
+        {
+            // CombatSetUp establishes Pantograph's activation before the
+            // game's BeforeCombatStart hook runs. Keep the relic patch as a
+            // fallback for unusual setup/reload ordering, but do not let both
+            // observations count the same boss combat twice.
+            if (_pendingCombat != null
+                && !_pendingCombat.PantographActivationCountedCreatures.Add(healedCreature))
+            {
+                return;
+            }
+
+            RecordRelicHealingTrigger(
+                PantographRelicId,
+                healedCreature,
+                attemptedHealing,
+                nameof(RecordPantographTrigger));
+        }
+    }
+
+    /// <summary>
+    /// Establish Pantograph's activation and healing observation window once
+    /// per boss combat. CombatSetUp fires once for each Glory boss, before the
+    /// game's BeforeCombatStart callbacks, so chained bosses cannot collapse
+    /// into one activation.
+    /// </summary>
+    private static void RecordPantographCombatStartForTrackedPlayerLocked(CombatState state)
+    {
+        if (_pendingCombat == null || state?.Players == null) return;
+
+        foreach (var player in state.Players)
+        {
+            if (!IsTrackedPlayer(player) || player?.Creature == null || player.Creature.IsDead)
+                continue;
+
+            var pantograph = player.Relics?.OfType<Pantograph>().FirstOrDefault();
+            if (pantograph == null || !IsTrackedRelic(pantograph))
+                continue;
+            if (pantograph.Owner?.RunState?.CurrentRoom?.RoomType != RoomType.Boss)
+                continue;
+
+            decimal attemptedHealing = pantograph.DynamicVars?.Heal?.BaseValue ?? 0m;
+            RecordPantographTrigger(player.Creature, attemptedHealing);
+        }
     }
 
     /// <summary>
@@ -17485,6 +17531,8 @@ internal class PendingCombat
     public Dictionary<Player, PendingBrilliantScarfDiscount> BrilliantScarfDiscountOffers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> LetterOpenerCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Creature> PantographActivationCountedCreatures { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> LetterOpenerTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
