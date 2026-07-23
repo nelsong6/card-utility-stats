@@ -2923,6 +2923,27 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsDaughterOfTheWindRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("daughter-of-the-wind-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertDaughterOfTheWindFixture(
+            loaded.Data.RelicAggregates["RELIC.DAUGHTER_OF_THE_WIND"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsDaughterOfTheWindRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("daughter-of-the-wind-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertDaughterOfTheWindFixture(
+            resumed!.RelicAggregates["RELIC.DAUGHTER_OF_THE_WIND"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsPaelsClawRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("paels-claw-relic-run.json"));
@@ -2962,6 +2983,13 @@ public class SchemaLoadingTests
     {
         Assert.Equal(7.5m, relicAgg.StrengthAdded);
         Assert.Equal(3, relicAgg.RuinedHelmetCombats);
+    }
+
+    private static void AssertDaughterOfTheWindFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(24, relicAgg.AdditionalBlockGained);
+        Assert.Equal(6, relicAgg.DaughterOfTheWindTurns);
+        Assert.Equal(3, relicAgg.DaughterOfTheWindCombats);
     }
 
     private static void AssertStoneHumidifierFixture(RelicAggregate relicAgg)

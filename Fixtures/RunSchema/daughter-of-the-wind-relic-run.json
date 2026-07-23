@@ -1,0 +1,23 @@
+{
+  "run_id": "daughter-of-the-wind-relic-fixture",
+  "started_at": "2026-07-23T00:00:00Z",
+  "updated_at": "2026-07-23T00:30:00Z",
+  "character": "CHAR.REGENT",
+  "ascension": 6,
+  "floor_reached": 31,
+  "outcome": "in_progress",
+  "game_start_time": 1784764800,
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.DAUGHTER_OF_THE_WIND": {
+      "additional_block_gained": 24,
+      "daughter_of_the_wind_turns": 6,
+      "daughter_of_the_wind_combats": 3
+    }
+  },
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

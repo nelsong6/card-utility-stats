@@ -599,6 +599,13 @@ staged bonus only from the relic's matching
 Strength was actually applied. Use every combat where the relic was held,
 including zero-trigger combats, as the per-combat denominator.
 
+Daughter of the Wind's owner-specific `AfterCardPlayed` callback checks for an
+owner Attack, then issues and awaits exactly one
+`CreatureCmd.GainBlock(Creature, BlockVar, CardPlay, bool)` command. Arm only
+that immediate command from the relic callback and record the command task's
+returned post-modifier block amount. Count every player turn and combat where
+the relic was held, including zero-Attack periods, as the average denominators.
+
 Shovel adds `DigRestSiteOption` from `TryModifyRestSiteOptions`; the relic
 itself does not receive the obtained relic payload. Patch
 `DigRestSiteOption.OnSelect`, snapshot the owner's relic inventory before the

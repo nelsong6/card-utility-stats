@@ -83,6 +83,7 @@ public static class RunTracker
     private static readonly List<Creature> _pendingFestivePopperDamageAttributions = new();
     private static readonly List<Creature> _pendingOrnamentalFanBlockAttributions = new();
     private static readonly List<Creature> _pendingIntimidatingHelmetBlockAttributions = new();
+    private static readonly List<Creature> _pendingDaughterOfTheWindBlockAttributions = new();
     private static readonly List<Creature> _pendingMercuryHourglassDamageAttributions = new();
     private static readonly List<Creature> _pendingMrStrugglesDamageAttributions = new();
     private static readonly Dictionary<PowerModel, int> _bronzeScalesThornsContributions = new(ReferenceEqualityComparer.Instance);
@@ -941,6 +942,7 @@ public static class RunTracker
         _pendingFestivePopperDamageAttributions.Clear();
         _pendingOrnamentalFanBlockAttributions.Clear();
         _pendingIntimidatingHelmetBlockAttributions.Clear();
+        _pendingDaughterOfTheWindBlockAttributions.Clear();
         _pendingMercuryHourglassDamageAttributions.Clear();
         _pendingMrStrugglesDamageAttributions.Clear();
         _bronzeScalesThornsContributions.Clear();
@@ -1748,6 +1750,8 @@ public static class RunTracker
         target.RegaliteTurns += source.RegaliteTurns;
         target.IntimidatingHelmetCombats += source.IntimidatingHelmetCombats;
         target.IntimidatingHelmetTurns += source.IntimidatingHelmetTurns;
+        target.DaughterOfTheWindCombats += source.DaughterOfTheWindCombats;
+        target.DaughterOfTheWindTurns += source.DaughterOfTheWindTurns;
         target.SturdyClampBlockRetained += source.SturdyClampBlockRetained;
         target.SturdyClampExcessBlockOverTen += source.SturdyClampExcessBlockOverTen;
         target.SturdyClampTurns += source.SturdyClampTurns;
@@ -2641,6 +2645,7 @@ public static class RunTracker
     private const string PaperPhrogRelicId = "RELIC.PAPER_PHROG";
     private const string RegaliteRelicId = "RELIC.REGALITE";
     private const string IntimidatingHelmetRelicId = "RELIC.INTIMIDATING_HELMET";
+    private const string DaughterOfTheWindRelicId = "RELIC.DAUGHTER_OF_THE_WIND";
     private const string SturdyClampRelicId = "RELIC.STURDY_CLAMP";
     private const string RuinedHelmetRelicId = "RELIC.RUINED_HELMET";
     private const string MummifiedHandRelicId = "RELIC.MUMMIFIED_HAND";
@@ -7603,6 +7608,110 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Arm Daughter of the Wind's immediately following block command for an
+    /// owner Attack. The command result, not the relic's printed BlockVar, is
+    /// the amount credited.
+    /// </summary>
+    public static bool ArmDaughterOfTheWindBlockAttribution(
+        DaughterOfTheWind relic,
+        CardPlay cardPlay,
+        out Creature? ownerCreature)
+    {
+        ownerCreature = null;
+        if (relic?.Owner == null || cardPlay?.Card == null) return false;
+        if (!ReferenceEquals(cardPlay.Card.Owner, relic.Owner)) return false;
+        if (cardPlay.Card.Type != CardType.Attack) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(relic.Owner)) return false;
+                if (CombatManager.Instance?.IsInProgress != true) return false;
+
+                ownerCreature = relic.Owner.Creature;
+                if (ownerCreature == null) return false;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordDaughterOfTheWindCombatForPlayerLocked(relic.Owner);
+                RecordDaughterOfTheWindTurnForPlayerLocked(relic.Owner);
+                _pendingDaughterOfTheWindBlockAttributions.Add(ownerCreature);
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"ArmDaughterOfTheWindBlockAttribution failed: {e.Message}");
+                ownerCreature = null;
+                return false;
+            }
+        }
+    }
+
+    public static bool TryConsumeDaughterOfTheWindBlockAttribution(Creature creature)
+    {
+        if (creature == null) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                return ConsumePendingCreatureAttribution(
+                    _pendingDaughterOfTheWindBlockAttributions,
+                    creature);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"TryConsumeDaughterOfTheWindBlockAttribution failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    public static void DisarmDaughterOfTheWindBlockAttribution(Creature? creature)
+    {
+        if (creature == null) return;
+        lock (_lock)
+            ConsumePendingCreatureAttribution(_pendingDaughterOfTheWindBlockAttributions, creature);
+    }
+
+    public static void RecordDaughterOfTheWindBlockGained(decimal amount)
+    {
+        if (amount <= 0m) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateForCurrentContextLocked(DaughterOfTheWindRelicId);
+                RecordDaughterOfTheWindBlockGainedForTest(agg, amount);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordDaughterOfTheWindBlockGained failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordDaughterOfTheWindTurnStarted(Player player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                _pendingCombat ??= new PendingCombat();
+                RecordDaughterOfTheWindTurnForPlayerLocked(player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordDaughterOfTheWindTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Record Mummified Hand from the relic's completed AfterCardPlayed call.
     /// The selected card and its before/after effective energy costs are
     /// captured around the exact SetToFreeThisTurn invocation made by the
@@ -7847,6 +7956,30 @@ public static class RunTracker
     {
         if (agg == null) return;
         agg.IntimidatingHelmetTurns += Math.Max(0, count);
+    }
+
+    internal static void RecordDaughterOfTheWindBlockGainedForTest(
+        RelicAggregate agg,
+        decimal amount)
+    {
+        if (agg == null || amount <= 0m) return;
+        agg.AdditionalBlockGained += (int)amount;
+    }
+
+    internal static void RecordDaughterOfTheWindCombatForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.DaughterOfTheWindCombats += Math.Max(0, count);
+    }
+
+    internal static void RecordDaughterOfTheWindTurnForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.DaughterOfTheWindTurns += Math.Max(0, count);
     }
 
     internal static void RecordMummifiedHandTriggerForTest(
@@ -11208,6 +11341,18 @@ public static class RunTracker
         }
     }
 
+    private static bool PlayerHasDaughterOfTheWind(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is DaughterOfTheWind);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static bool PlayerHasSturdyClamp(Player player)
     {
         try
@@ -11357,6 +11502,7 @@ public static class RunTracker
             RecordRazorToothCombatForPlayerLocked(player);
             RecordRegaliteCombatForPlayerLocked(player);
             RecordIntimidatingHelmetCombatForPlayerLocked(player);
+            RecordDaughterOfTheWindCombatForPlayerLocked(player);
             RecordSturdyClampCombatForPlayerLocked(player);
             RecordRuinedHelmetCombatForPlayerLocked(player);
             RecordMummifiedHandCombatForPlayerLocked(player);
@@ -11636,6 +11782,38 @@ public static class RunTracker
 
         var agg = GetOrCreatePendingRelicAggregateLocked(IntimidatingHelmetRelicId);
         RecordIntimidatingHelmetTurnForTest(agg);
+    }
+
+    private static void RecordDaughterOfTheWindCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasDaughterOfTheWind(player)) return;
+        if (!_pendingCombat.DaughterOfTheWindCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(DaughterOfTheWindRelicId);
+        RecordDaughterOfTheWindCombatForTest(agg);
+    }
+
+    private static void RecordDaughterOfTheWindTurnForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasDaughterOfTheWind(player)) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.DaughterOfTheWindTurnCountedTurns.TryGetValue(
+                player,
+                out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.DaughterOfTheWindTurnCountedTurns[player] = turnNumber;
+        RecordDaughterOfTheWindCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(DaughterOfTheWindRelicId);
+        RecordDaughterOfTheWindTurnForTest(agg);
     }
 
     private static void RecordSturdyClampCombatForPlayerLocked(Player player)
@@ -15959,6 +16137,10 @@ internal class PendingCombat
     public HashSet<Player> IntimidatingHelmetCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> IntimidatingHelmetTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> DaughterOfTheWindCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> DaughterOfTheWindTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> PaelsEyeCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

@@ -1445,6 +1445,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is DaughterOfTheWind)
+        {
+            title = "Daughter of the Wind";
+            body = BuildDaughterOfTheWindBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is SturdyClamp)
         {
             title = "Sturdy Clamp";
@@ -2421,6 +2428,22 @@ public static class RelicHoverShowPatch
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
         Row3(sb, BlockLabel("avg block per turn"), FormatDecimal(blockPerTurn), "");
         Row3(sb, BlockLabel("avg block per combat"), FormatDecimal(blockPerCombat), "");
+        return sb.ToString();
+    }
+
+    private static string BuildDaughterOfTheWindBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var blockPerTurn = agg.DaughterOfTheWindTurns <= 0
+            ? 0m
+            : (decimal)agg.AdditionalBlockGained / agg.DaughterOfTheWindTurns;
+        var blockPerCombat = agg.DaughterOfTheWindCombats <= 0
+            ? 0m
+            : (decimal)agg.AdditionalBlockGained / agg.DaughterOfTheWindCombats;
+
+        Row3(sb, BlockLabel("Total block gained"), agg.AdditionalBlockGained.ToString(), "");
+        Row3(sb, BlockLabel("Avg block gained per turn"), FormatDecimal(blockPerTurn), "");
+        Row3(sb, BlockLabel("Avg block gained per combat"), FormatDecimal(blockPerCombat), "");
         return sb.ToString();
     }
 

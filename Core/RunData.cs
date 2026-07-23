@@ -704,6 +704,12 @@ public class RelicAggregate
     public int IntimidatingHelmetCombats { get; set; }
     public int IntimidatingHelmetTurns { get; set; }
 
+    // Daughter of the Wind tracking. AdditionalBlockGained is the observed
+    // post-modifier result of its owner-Attack block command. Turns and
+    // combats are held denominators, including zero-trigger periods.
+    public int DaughterOfTheWindCombats { get; set; }
+    public int DaughterOfTheWindTurns { get; set; }
+
     // Sturdy Clamp tracking. Block retained is the observed block remaining
     // after its async block-clear prevention callback. Excess block is the
     // pre-callback amount above the relic's 10-block retention cap. Turns count
