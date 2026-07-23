@@ -10738,6 +10738,8 @@ public static class RunTracker
             {
                 result ??= new RelicAggregate();
                 MergeRelicAggregateInto(result, pending);
+                if (string.Equals(relicId, RuinedHelmetRelicId, StringComparison.Ordinal))
+                    result.RuinedHelmetStrengthAddedThisCombat = pending.StrengthAdded;
             }
 
             return result;

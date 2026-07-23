@@ -3178,6 +3178,11 @@ public static class RelicHoverShowPatch
             : agg.StrengthAdded / agg.RuinedHelmetCombats;
 
         Row3(sb, "Total strength gained", FormatDecimal(agg.StrengthAdded), "");
+        Row3(
+            sb,
+            "Strength gained this combat",
+            FormatDecimal(agg.RuinedHelmetStrengthAddedThisCombat),
+            "");
         Row3(sb, "Avg strength gained per combat", FormatDecimal(strengthPerCombat), "");
         return sb.ToString();
     }

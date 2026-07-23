@@ -730,6 +730,10 @@ public class RelicAggregate
     // where the relic was held, including zero-trigger combats.
     public int RuinedHelmetCombats { get; set; }
 
+    // Tooltip-only projection populated from the live pending combat aggregate.
+    // Internal properties are not part of the persisted System.Text.Json shape.
+    internal decimal RuinedHelmetStrengthAddedThisCombat { get; set; }
+
     // Mummified Hand tracking. Activations is every qualifying owner Power
     // play, including triggers with no card left to discount. Power cost uses
     // the play-time EnergyValue; the ratio uses actual EnergySpent divided by

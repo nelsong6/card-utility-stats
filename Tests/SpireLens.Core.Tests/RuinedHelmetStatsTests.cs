@@ -68,6 +68,7 @@ public class RuinedHelmetStatsTests
 
         Assert.Contains("\"strength_added\"", json);
         Assert.Contains("\"ruined_helmet_combats\"", json);
+        Assert.DoesNotContain("ruined_helmet_strength_added_this_combat", json);
         Assert.NotNull(restored);
         AssertPopulatedAggregate(restored!.RelicAggregates[RuinedHelmetRelicId]);
     }
@@ -111,10 +112,15 @@ public class RuinedHelmetStatsTests
     [Fact]
     public void RelicTooltip_RuinedHelmet_ShowsTotalAndAveragePerHeldCombat()
     {
-        var body = BuildBody(PopulatedAggregate());
+        var agg = PopulatedAggregate();
+        agg.RuinedHelmetStrengthAddedThisCombat = 2m;
+
+        var body = BuildBody(agg);
 
         Assert.Contains("Total strength gained", body);
         Assert.Contains("[b]7.5[/b]", body);
+        Assert.Contains("Strength gained this combat", body);
+        Assert.Contains("[b]2[/b]", body);
         Assert.Contains("Avg strength gained per combat", body);
         Assert.Contains("[b]2.5[/b]", body);
     }
@@ -126,6 +132,7 @@ public class RuinedHelmetStatsTests
 
         Assert.Contains("Total strength gained", body);
         Assert.Contains("[b]4[/b]", body);
+        Assert.Contains("Strength gained this combat", body);
         Assert.Contains("Avg strength gained per combat", body);
         Assert.Contains("[b]0[/b]", body);
     }
