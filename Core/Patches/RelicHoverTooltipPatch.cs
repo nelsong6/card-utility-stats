@@ -1643,6 +1643,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is PaelsClaw)
+        {
+            title = "Pael's Claw";
+            body = BuildPaelsClawBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is PaelsWing)
         {
             title = "Pael's Wing";
@@ -2875,6 +2882,30 @@ public static class RelicHoverShowPatch
             Row3(sb, "Returned card", StatsTooltip.EscapeBbcode(displayName), "");
         }
 
+        return sb.ToString();
+    }
+
+    private static string BuildPaelsClawBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var goopyCardsPlayedPerTurn = agg.PaelsClawTurns <= 0
+            ? 0m
+            : (decimal)agg.PaelsClawGoopyCardsPlayed / agg.PaelsClawTurns;
+        var goopyCardsPlayedPerCombat = agg.PaelsClawCombats <= 0
+            ? 0m
+            : (decimal)agg.PaelsClawGoopyCardsPlayed / agg.PaelsClawCombats;
+        var enhancementsPerGoopyCard = agg.PaelsClawGoopyCards <= 0
+            ? 0m
+            : (decimal)agg.PaelsClawGoopyEnhancements / agg.PaelsClawGoopyCards;
+
+        Row3(sb, "Goopy cards played", agg.PaelsClawGoopyCardsPlayed.ToString(), "");
+        Row3(sb, "Avg Goopy cards played per turn", FormatDecimal(goopyCardsPlayedPerTurn), "");
+        Row3(sb, "Avg Goopy cards played per combat", FormatDecimal(goopyCardsPlayedPerCombat), "");
+        Row3(
+            sb,
+            "Avg number of Goopy enhancements per card with Goopy",
+            FormatDecimal(enhancementsPerGoopyCard),
+            "");
         return sb.ToString();
     }
 

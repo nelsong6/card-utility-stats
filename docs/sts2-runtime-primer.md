@@ -562,6 +562,16 @@ card and its effective energy cost immediately around that exact call. The
 triggering `CardPlay.Resources.EnergyValue` is the Power's play-time cost, while
 `EnergySpent` is the distinct numerator for spend-to-discounted-cost ratios.
 
+Pael's Claw applies Goopy with amount 1 to every eligible permanent deck card
+in its synchronous `AfterObtained` callback. That initial amount is the
+enchantment baseline: Goopy's block bonus is `Amount - 1`. A finished Goopy
+card play is observable from `CardPlayFinishedEntry`, but Goopy earns its
+permanent increment later in `Goopy.AfterCardPlayed`, where both the combat
+copy and `DeckVersion` amounts are incremented. The game skips the entire
+`Hook.AfterCardPlayed` dispatch once combat has ended, so count finished Goopy
+plays and observed earned enhancements separately rather than assuming they
+are identical.
+
 Stone Humidifier applies its repeatable max-HP gain from the owner-specific
 async `AfterRestSiteHeal(Player, bool)` callback. Snapshot the owner's max HP
 before the callback and only record the resulting max HP after its returned

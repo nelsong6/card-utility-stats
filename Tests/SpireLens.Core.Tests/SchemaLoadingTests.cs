@@ -2876,6 +2876,34 @@ public class SchemaLoadingTests
         AssertSturdyClampFixture(resumed!.RelicAggregates["RELIC.STURDY_CLAMP"]);
     }
 
+    [Fact]
+    public void HistoricalLoad_AcceptsPaelsClawRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("paels-claw-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertPaelsClawFixture(loaded.Data.RelicAggregates["RELIC.PAELS_CLAW"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsPaelsClawRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("paels-claw-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertPaelsClawFixture(resumed!.RelicAggregates["RELIC.PAELS_CLAW"]);
+    }
+
+    private static void AssertPaelsClawFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(7, relicAgg.PaelsClawGoopyCardsPlayed);
+        Assert.Equal(5, relicAgg.PaelsClawGoopyEnhancements);
+        Assert.Equal(4, relicAgg.PaelsClawGoopyCards);
+        Assert.Equal(4, relicAgg.PaelsClawTurns);
+        Assert.Equal(2, relicAgg.PaelsClawCombats);
+    }
+
     private static void AssertSturdyClampFixture(RelicAggregate relicAgg)
     {
         Assert.Equal(17, relicAgg.SturdyClampBlockRetained);

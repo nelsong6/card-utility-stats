@@ -614,6 +614,17 @@ public class RelicAggregate
     public int SacrificesMade { get; set; }
     public int SacrificesSkipped { get; set; }
 
+    // Pael's Claw tracking. Plays count every finished play of a Goopy card
+    // while the relic is held. Enhancements count the observed permanent
+    // Goopy amount gained after the enchantment's own post-play callback;
+    // the initial amount of 1 is the application baseline, not an earned
+    // enhancement. Cards is the stable denominator of cards given Goopy.
+    public int PaelsClawGoopyCardsPlayed { get; set; }
+    public int PaelsClawGoopyEnhancements { get; set; }
+    public int PaelsClawGoopyCards { get; set; }
+    public int PaelsClawTurns { get; set; }
+    public int PaelsClawCombats { get; set; }
+
     // Status/curse cards exhausted by Pael's Eye when it takes an extra turn.
     public int StatusCardsExhausted { get; set; }
     public int CurseCardsExhausted { get; set; }

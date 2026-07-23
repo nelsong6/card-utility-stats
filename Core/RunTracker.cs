@@ -1129,6 +1129,7 @@ public static class RunTracker
         bool strikeDummyDeckCountsChanged = RefreshStrikeDummyDeckCountsIfOwnedLocked();
         bool miniatureCannonDeckCountsChanged = RefreshMiniatureCannonDeckCountsIfOwnedLocked();
         bool dowsingRoomsChanged = RefreshDowsingRoomsRemainingIfOwnedLocked(player);
+        bool paelsClawSnapshotChanged = RefreshPaelsClawSnapshotIfOwnedLocked();
         int stillWaiting = _pendingRankRestores.Values.Sum(q => q.Count);
         int restored = seeded - stillWaiting;
         int unmatched = deckCards - restored;
@@ -1210,7 +1211,8 @@ public static class RunTracker
             || prunedGhosts > 0
             || strikeDummyDeckCountsChanged
             || miniatureCannonDeckCountsChanged
-            || dowsingRoomsChanged)
+            || dowsingRoomsChanged
+            || paelsClawSnapshotChanged)
         {
             SaveCurrentRun();
         }
@@ -1490,6 +1492,8 @@ public static class RunTracker
             {
                 CoreMain.Logger.Info("SpireLens card combat stats are disabled for this combat.");
             }
+            if (RefreshPaelsClawSnapshotIfOwnedLocked())
+                SaveCurrentRun();
             RecordHeldCombatRelicBaselinesForTrackedPlayerLocked(requireActiveCombat: false, createPendingIfNeeded: false);
         }
     }
@@ -1541,6 +1545,7 @@ public static class RunTracker
         RecordTuningForkTurnForTrackedPlayerLocked();
         RecordPaperPhrogTurnForTrackedPlayerLocked();
         RecordRazorToothTurnForTrackedPlayerLocked();
+        RecordPaelsClawTurnForTrackedPlayerLocked();
         RecordMummifiedHandTurnForTrackedPlayerLocked();
         RecordPaelsEyeCombatsWithoutActivationForTrackedPlayerLocked();
         RecordTurnEnergyRelicCombatsWithoutEnergyForTrackedPlayerLocked();
@@ -1690,6 +1695,11 @@ public static class RunTracker
         target.RareCardsConsumed += source.RareCardsConsumed;
         target.SacrificesMade += source.SacrificesMade;
         target.SacrificesSkipped += source.SacrificesSkipped;
+        target.PaelsClawGoopyCardsPlayed += source.PaelsClawGoopyCardsPlayed;
+        target.PaelsClawGoopyEnhancements += source.PaelsClawGoopyEnhancements;
+        target.PaelsClawGoopyCards = Math.Max(target.PaelsClawGoopyCards, source.PaelsClawGoopyCards);
+        target.PaelsClawTurns += source.PaelsClawTurns;
+        target.PaelsClawCombats += source.PaelsClawCombats;
         target.StatusCardsExhausted += source.StatusCardsExhausted;
         target.CurseCardsExhausted += source.CurseCardsExhausted;
         target.CombatsWithoutActivation += source.CombatsWithoutActivation;
@@ -1949,6 +1959,7 @@ public static class RunTracker
             RecordMiniatureCannonUpgradedAttackPlayedIfOwnedLocked(cardPlay.Card);
             RecordVajraAttackPlayedIfOwnedLocked(cardPlay.Card);
             RecordBrilliantScarfDiscountTaken(cardPlay);
+            RecordPaelsClawGoopyCardPlayedIfOwnedLocked(cardPlay.Card);
 
             if (!ShouldTrackCardStatsDuringCombatLocked()) return;
 
@@ -2615,6 +2626,7 @@ public static class RunTracker
     private const string ToolboxRelicId = "RELIC.TOOLBOX";
     private const string PaelsWingRelicId = "RELIC.PAELS_WING";
     private const string PaelsToothRelicId = "RELIC.PAELS_TOOTH";
+    private const string PaelsClawRelicId = "RELIC.PAELS_CLAW";
     private const string PaelsEyeRelicId = "RELIC.PAELS_EYE";
     private const string StrikeDummyRelicId = "RELIC.STRIKE_DUMMY";
     private const string NutritiousSoupRelicId = "RELIC.NUTRITIOUS_SOUP";
@@ -4780,6 +4792,86 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Snapshot the cards Pael's Claw actually gave Goopy after its pickup
+    /// callback completes. Pickup is a map event, so persist it directly.
+    /// </summary>
+    public static void RecordPaelsClawObtained(PaelsClaw relic)
+    {
+        if (relic?.Owner == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(relic.Owner)) return;
+                EnsureLazyCurrentRunLocked();
+                if (!RefreshPaelsClawSnapshotIfOwnedLocked(relic.Owner)) return;
+
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPaelsClawObtained failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record the observed permanent Goopy amount gained from the enchantment's
+    /// own completed post-play callback.
+    /// </summary>
+    public static void RecordPaelsClawGoopyEnhancement(
+        CardModel card,
+        int startingGoopyAmount,
+        int resultingGoopyAmount)
+    {
+        if (card?.Owner is not Player player) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player) || !PlayerHasPaelsClaw(player)) return;
+                if (CombatManager.Instance?.IsInProgress != true) return;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordPaelsClawCombatForPlayerLocked(player);
+                RecordPaelsClawTurnForPlayerLocked(player);
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(PaelsClawRelicId);
+                RecordPaelsClawEnhancementForTest(
+                    agg,
+                    startingGoopyAmount,
+                    resultingGoopyAmount);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPaelsClawGoopyEnhancement failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordPaelsClawTurnStarted(Player player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                _pendingCombat ??= new PendingCombat();
+                RecordPaelsClawTurnForPlayerLocked(player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPaelsClawTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Record Pael's Wing's Sacrifice option after the player's selected
     /// reward alternative invokes the relic-owned delegate.
     /// </summary>
@@ -6243,6 +6335,52 @@ public static class RunTracker
                 agg.BookmarkRareActivations += 1;
                 break;
         }
+    }
+
+    internal static void RecordPaelsClawSnapshotForTest(
+        RelicAggregate agg,
+        int goopyCards,
+        int earnedEnhancements)
+    {
+        if (agg == null) return;
+
+        agg.PaelsClawGoopyCards = Math.Max(
+            agg.PaelsClawGoopyCards,
+            Math.Max(0, goopyCards));
+        agg.PaelsClawGoopyEnhancements = Math.Max(
+            agg.PaelsClawGoopyEnhancements,
+            Math.Max(0, earnedEnhancements));
+    }
+
+    internal static void RecordPaelsClawGoopyCardPlayedForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.PaelsClawGoopyCardsPlayed += Math.Max(0, count);
+    }
+
+    internal static void RecordPaelsClawEnhancementForTest(
+        RelicAggregate agg,
+        int startingGoopyAmount,
+        int resultingGoopyAmount)
+    {
+        if (agg == null) return;
+        agg.PaelsClawGoopyEnhancements += Math.Max(
+            0,
+            resultingGoopyAmount - startingGoopyAmount);
+    }
+
+    internal static void RecordPaelsClawTurnForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.PaelsClawTurns += Math.Max(0, count);
+    }
+
+    internal static void RecordPaelsClawCombatForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.PaelsClawCombats += Math.Max(0, count);
     }
 
     internal static void RecordPaelsEyeActivationForTest(
@@ -10229,12 +10367,17 @@ public static class RunTracker
     {
         lock (_lock)
         {
-            RecordHeldCombatRelicBaselinesForTrackedPlayerLocked();
             if (string.Equals(relicId, DowsingRodRelicId, StringComparison.Ordinal)
                 && RefreshDowsingRoomsRemainingIfOwnedLocked())
             {
                 SaveCurrentRun();
             }
+            if (string.Equals(relicId, PaelsClawRelicId, StringComparison.Ordinal)
+                && RefreshPaelsClawSnapshotIfOwnedLocked())
+            {
+                SaveCurrentRun();
+            }
+            RecordHeldCombatRelicBaselinesForTrackedPlayerLocked();
 
             RelicAggregate? result = null;
 
@@ -10609,6 +10752,72 @@ public static class RunTracker
         RecordNutritiousSoupEnchantedStrikePlayedForTest(agg);
     }
 
+    private static void RecordPaelsClawGoopyCardPlayedIfOwnedLocked(CardModel card)
+    {
+        if (!IsGoopyCard(card)) return;
+
+        var owner = card.Owner;
+        if (owner == null || !IsTrackedPlayer(owner) || !PlayerHasPaelsClaw(owner)) return;
+
+        RecordPaelsClawCombatForPlayerLocked(owner);
+        RecordPaelsClawTurnForPlayerLocked(owner);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(PaelsClawRelicId);
+        RecordPaelsClawGoopyCardPlayedForTest(agg);
+    }
+
+    private static bool IsGoopyCard(CardModel card)
+    {
+        try
+        {
+            return card?.Enchantment is Goopy
+                   || (card?.DeckVersion ?? card)?.Enchantment is Goopy;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool RefreshPaelsClawSnapshotIfOwnedLocked(Player? player = null)
+    {
+        if (_currentRun == null || !CurrentRunMatchesLiveGameLocked()) return false;
+
+        player ??= GetTrackedRunPlayerLocked();
+        if (player?.Deck?.Cards == null
+            || !IsTrackedPlayer(player)
+            || !PlayerHasPaelsClaw(player))
+        {
+            return false;
+        }
+
+        var goopyCards = player.Deck.Cards
+            .Where(card => card?.Enchantment is Goopy)
+            .ToList();
+        if (goopyCards.Count == 0) return false;
+
+        var liveEnhancements = goopyCards.Sum(
+            card => Math.Max(0, ((Goopy)card.Enchantment!).Amount - 1));
+        var pendingEnhancements = _pendingCombat?.RelicAggregates.TryGetValue(
+            PaelsClawRelicId,
+            out var pending) == true
+            ? Math.Max(0, pending.PaelsClawGoopyEnhancements)
+            : 0;
+        var committedLiveEnhancements = Math.Max(0, liveEnhancements - pendingEnhancements);
+
+        var agg = GetOrCreateCurrentRunRelicAggregateLocked(PaelsClawRelicId);
+        var goopyCardCount = Math.Max(agg.PaelsClawGoopyCards, goopyCards.Count);
+        var enhancementCount = Math.Max(
+            agg.PaelsClawGoopyEnhancements,
+            committedLiveEnhancements);
+        var changed = agg.PaelsClawGoopyCards != goopyCardCount
+                      || agg.PaelsClawGoopyEnhancements != enhancementCount;
+
+        agg.PaelsClawGoopyCards = goopyCardCount;
+        agg.PaelsClawGoopyEnhancements = enhancementCount;
+        return changed;
+    }
+
     private static void RecordMiniatureCannonUpgradedAttackPlayedIfOwnedLocked(CardModel card)
     {
         if (!IsMiniatureCannonUpgradedAttackCard(card)) return;
@@ -10768,6 +10977,18 @@ public static class RunTracker
         try
         {
             return player.Relics.Any(r => r is NutritiousSoup);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool PlayerHasPaelsClaw(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is PaelsClaw);
         }
         catch
         {
@@ -10990,6 +11211,7 @@ public static class RunTracker
             RecordUnsettlingLampCombatForPlayerLocked(player);
             RecordMiniatureCannonCombatForPlayerLocked(player);
             RecordBookmarkCombatForPlayerLocked(player);
+            RecordPaelsClawCombatForPlayerLocked(player);
             RecordPaelsEyeCombatForPlayerLocked(player);
             RecordPaperPhrogCombatForPlayerLocked(player);
             RecordRazorToothCombatForPlayerLocked(player);
@@ -11503,6 +11725,50 @@ public static class RunTracker
 
         var agg = GetOrCreatePendingRelicAggregateLocked(BookmarkRelicId);
         agg.BookmarkCombats += 1;
+    }
+
+    private static void RecordPaelsClawCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasPaelsClaw(player)) return;
+        if (!_pendingCombat.PaelsClawCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(PaelsClawRelicId);
+        RecordPaelsClawCombatForTest(agg);
+    }
+
+    private static void RecordPaelsClawTurnForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordPaelsClawTurnForPlayerLocked(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordPaelsClawTurnForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordPaelsClawTurnForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasPaelsClaw(player)) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.PaelsClawTurnCountedTurns.TryGetValue(player, out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.PaelsClawTurnCountedTurns[player] = turnNumber;
+        RecordPaelsClawCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(PaelsClawRelicId);
+        RecordPaelsClawTurnForTest(agg);
     }
 
     private static void RecordPaelsEyeCombatForPlayerLocked(Player player)
@@ -15516,6 +15782,10 @@ internal class PendingCombat
     public HashSet<Player> MiniatureCannonCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> BookmarkCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> PaelsClawCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> PaelsClawTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> PaperPhrogCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

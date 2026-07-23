@@ -1,0 +1,25 @@
+{
+  "run_id": "paels-claw-relic-fixture",
+  "started_at": "2026-07-22T22:00:00Z",
+  "updated_at": "2026-07-22T22:30:00Z",
+  "character": "CHAR.NECROBINDER",
+  "ascension": 6,
+  "floor_reached": 34,
+  "outcome": "in_progress",
+  "game_start_time": 1784757600,
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.PAELS_CLAW": {
+      "paels_claw_goopy_cards_played": 7,
+      "paels_claw_goopy_enhancements": 5,
+      "paels_claw_goopy_cards": 4,
+      "paels_claw_turns": 4,
+      "paels_claw_combats": 2
+    }
+  },
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

@@ -239,6 +239,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `sturdy-clamp-relic-run.json`
   Adds Sturdy Clamp's observed retained block, pre-cap excess block, and the
   turn/combat denominators used by its four average rows.
+- `paels-claw-relic-run.json`
+  Adds Pael's Claw's finished Goopy-card plays, observed earned Goopy
+  enhancements, enchanted-card count, and held turn/combat denominators.
 - `sand-castle-relic-run.json`
   Adds Sand Castle pickup tracking: the actual cards upgraded by the relic.
 - `fragrant-mushroom-relic-run.json`
