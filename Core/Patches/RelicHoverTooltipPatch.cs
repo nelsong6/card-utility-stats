@@ -3312,15 +3312,24 @@ public static class RelicHoverShowPatch
     private static string BuildRuinedHelmetBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
+        var strengthPerActivation = agg.Activations <= 0
+            ? 0m
+            : agg.StrengthAdded / agg.Activations;
         var strengthPerCombat = agg.RuinedHelmetCombats <= 0
             ? 0m
             : agg.StrengthAdded / agg.RuinedHelmetCombats;
 
+        Row3(sb, "Times activated", agg.Activations.ToString(), "");
         Row3(sb, "Total strength gained", FormatDecimal(agg.StrengthAdded), "");
         Row3(
             sb,
             "Strength gained this combat",
             FormatDecimal(agg.RuinedHelmetStrengthAddedThisCombat),
+            "");
+        Row3(
+            sb,
+            "Avg strength gained per activation",
+            FormatDecimal(strengthPerActivation),
             "");
         Row3(sb, "Avg strength gained per combat", FormatDecimal(strengthPerCombat), "");
         return sb.ToString();

@@ -253,8 +253,8 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds Sturdy Clamp's observed retained block, pre-cap excess block, and the
   turn/combat denominators used by its four average rows.
 - `ruined-helmet-relic-run.json`
-  Adds Ruined Helmet's observed bonus Strength and held-combat denominator for
-  its total and per-combat average rows.
+  Adds Ruined Helmet's confirmed activation count, observed bonus Strength, and
+  held-combat denominator for its per-activation and per-combat average rows.
 - `daughter-of-the-wind-relic-run.json`
   Adds Daughter of the Wind's observed block gain plus held turn/combat
   denominators for its total and average rows.

@@ -733,9 +733,10 @@ public class RelicAggregate
     public int SturdyClampTurns { get; set; }
     public int SturdyClampCombats { get; set; }
 
-    // Ruined Helmet tracking. StrengthAdded is the observed extra Strength
-    // contributed by its doubling modifier; combats includes every combat
-    // where the relic was held, including zero-trigger combats.
+    // Ruined Helmet tracking. Activations counts confirmed successful
+    // applications; StrengthAdded is the observed extra Strength contributed
+    // by its doubling modifier. Combats includes every combat where the relic
+    // was held, including zero-trigger combats.
     public int RuinedHelmetCombats { get; set; }
 
     // Tooltip-only projection populated from the live pending combat aggregate.

@@ -3063,6 +3063,7 @@ public class SchemaLoadingTests
 
     private static void AssertRuinedHelmetFixture(RelicAggregate relicAgg)
     {
+        Assert.Equal(2, relicAgg.Activations);
         Assert.Equal(7.5m, relicAgg.StrengthAdded);
         Assert.Equal(3, relicAgg.RuinedHelmetCombats);
     }

@@ -53,6 +53,7 @@ public class RuinedHelmetStatsTests
     {
         var agg = new RelicAggregate();
 
+        Assert.Equal(0, agg.Activations);
         Assert.Equal(0m, agg.StrengthAdded);
         Assert.Equal(0, agg.RuinedHelmetCombats);
     }
@@ -66,6 +67,7 @@ public class RuinedHelmetStatsTests
         var json = JsonSerializer.Serialize(run, RunStorage.Options);
         var restored = JsonSerializer.Deserialize<RunData>(json, RunStorage.Options);
 
+        Assert.Contains("\"activations\"", json);
         Assert.Contains("\"strength_added\"", json);
         Assert.Contains("\"ruined_helmet_combats\"", json);
         Assert.DoesNotContain("ruined_helmet_strength_added_this_combat", json);
@@ -74,7 +76,7 @@ public class RuinedHelmetStatsTests
     }
 
     [Fact]
-    public void RunTracker_RuinedHelmetHelpers_AccumulateBonusAndHeldCombats()
+    public void RunTracker_RuinedHelmetHelpers_AccumulateActivationsBonusAndHeldCombats()
     {
         var agg = new RelicAggregate();
 
@@ -94,6 +96,7 @@ public class RuinedHelmetStatsTests
         RunTracker.RecordRuinedHelmetStrengthGainForTest(agg, 0m);
         RunTracker.RecordRuinedHelmetCombatForTest(agg, -1);
 
+        Assert.Equal(0, agg.Activations);
         Assert.Equal(0m, agg.StrengthAdded);
         Assert.Equal(0, agg.RuinedHelmetCombats);
     }
@@ -105,34 +108,41 @@ public class RuinedHelmetStatsTests
 
         RunTracker.MergeRelicAggregateInto(target, PopulatedAggregate());
 
+        Assert.Equal(4, target.Activations);
         Assert.Equal(15m, target.StrengthAdded);
         Assert.Equal(6, target.RuinedHelmetCombats);
     }
 
     [Fact]
-    public void RelicTooltip_RuinedHelmet_ShowsTotalAndAveragePerHeldCombat()
+    public void RelicTooltip_RuinedHelmet_ShowsActivationsAndStrengthAverages()
     {
         var agg = PopulatedAggregate();
         agg.RuinedHelmetStrengthAddedThisCombat = 2m;
 
         var body = BuildBody(agg);
 
+        Assert.Contains("Times activated", body);
+        Assert.Contains("[b]2[/b]", body);
         Assert.Contains("Total strength gained", body);
         Assert.Contains("[b]7.5[/b]", body);
         Assert.Contains("Strength gained this combat", body);
         Assert.Contains("[b]2[/b]", body);
+        Assert.Contains("Avg strength gained per activation", body);
+        Assert.Contains("[b]3.75[/b]", body);
         Assert.Contains("Avg strength gained per combat", body);
         Assert.Contains("[b]2.5[/b]", body);
     }
 
     [Fact]
-    public void RelicTooltip_RuinedHelmet_ShowsZeroAverageWithoutCombats()
+    public void RelicTooltip_RuinedHelmet_ShowsZeroAveragesWithoutDenominators()
     {
         var body = BuildBody(new RelicAggregate { StrengthAdded = 4m });
 
+        Assert.Contains("Times activated", body);
         Assert.Contains("Total strength gained", body);
         Assert.Contains("[b]4[/b]", body);
         Assert.Contains("Strength gained this combat", body);
+        Assert.Contains("Avg strength gained per activation", body);
         Assert.Contains("Avg strength gained per combat", body);
         Assert.Contains("[b]0[/b]", body);
     }
@@ -161,7 +171,8 @@ public class RuinedHelmetStatsTests
         var agg = JsonSerializer.Deserialize<RelicAggregate>("{}", RunStorage.Options);
 
         Assert.NotNull(agg);
-        Assert.Equal(0m, agg!.StrengthAdded);
+        Assert.Equal(0, agg!.Activations);
+        Assert.Equal(0m, agg.StrengthAdded);
         Assert.Equal(0, agg.RuinedHelmetCombats);
     }
 
@@ -176,6 +187,7 @@ public class RuinedHelmetStatsTests
 
     private static void AssertPopulatedAggregate(RelicAggregate agg)
     {
+        Assert.Equal(2, agg.Activations);
         Assert.Equal(7.5m, agg.StrengthAdded);
         Assert.Equal(3, agg.RuinedHelmetCombats);
     }

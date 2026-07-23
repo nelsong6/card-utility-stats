@@ -609,8 +609,10 @@ contribution as `modifiedAmount - amount` at that callback, but do not commit it
 there: a later power-application guard can still cancel the effect. Commit the
 staged bonus only from the relic's matching
 `AfterModifyingPowerAmountReceived` callback, which `PowerCmd` invokes after the
-Strength was actually applied. Use every combat where the relic was held,
-including zero-trigger combats, as the per-combat denominator.
+Strength was actually applied. Count that confirmed application as the
+activation denominator for bonus Strength per activation. Use every combat
+where the relic was held, including zero-trigger combats, as the separate
+per-combat denominator.
 
 Daughter of the Wind's owner-specific `AfterCardPlayed` callback checks for an
 owner Attack, then issues and awaits exactly one

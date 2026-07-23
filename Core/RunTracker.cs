@@ -8149,6 +8149,7 @@ public static class RunTracker
         decimal strengthGained)
     {
         if (agg == null || strengthGained <= 0m) return;
+        agg.Activations += 1;
         agg.StrengthAdded += strengthGained;
     }
 
