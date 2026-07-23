@@ -553,8 +553,10 @@ Count owner Attack plays at that callback, snapshot unused modulo charge from
 `Hook.BeforeSideTurnEnd` before the relic resets, and observe each payoff at its
 narrow outcome: power delta for Kunai/Shuriken, the resolved block-command
 result for Ornamental Fan, and the resolved single-target damage result for
-Kusarigama. Kusarigama only activates when its threshold play can choose a
-hittable enemy; do not infer an activation from the counter alone.
+Kusarigama. Ornamental Fan preserves zero-charge turn ends as an explicit
+bucket in addition to the shared average-charge sample. Kusarigama only
+activates when its threshold play can choose a hittable enemy; do not infer an
+activation from the counter alone.
 
 Razor Tooth upgrades eligible Attack and Skill cards synchronously inside its
 owner-specific `AfterCardPlayed` callback, after the finished card-play history

@@ -2626,6 +2626,7 @@ public class SchemaLoadingTests
         Assert.Equal(11, ornamentalFan.OrnamentalFanAttacksPlayed);
         Assert.Equal(3, ornamentalFan.Activations);
         Assert.Equal(13, ornamentalFan.AdditionalBlockGained);
+        Assert.Equal(1, ornamentalFan.OrnamentalFanTurnsEndedAt0Charges);
         Assert.Equal(1, ornamentalFan.OrnamentalFanTurnsEndedAt1Charge);
         Assert.Equal(3, ornamentalFan.OrnamentalFanTurnsEndedAt2Charges);
         Assert.Equal(7, ornamentalFan.OrnamentalFanTurnEndChargeTotal);
@@ -2666,6 +2667,7 @@ public class SchemaLoadingTests
         Assert.Equal(11, ornamentalFan.OrnamentalFanAttacksPlayed);
         Assert.Equal(3, ornamentalFan.Activations);
         Assert.Equal(13, ornamentalFan.AdditionalBlockGained);
+        Assert.Equal(1, ornamentalFan.OrnamentalFanTurnsEndedAt0Charges);
         Assert.Equal(1, ornamentalFan.OrnamentalFanTurnsEndedAt1Charge);
         Assert.Equal(3, ornamentalFan.OrnamentalFanTurnsEndedAt2Charges);
         Assert.Equal(7, ornamentalFan.OrnamentalFanTurnEndChargeTotal);

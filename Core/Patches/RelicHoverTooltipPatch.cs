@@ -3308,6 +3308,7 @@ public static class RelicHoverShowPatch
         Row3(sb, "Activations", agg.Activations.ToString(), "");
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
         Row3(sb, BlockLabel("block gained per activation"), FormatDecimal(blockPerActivation), "");
+        Row3(sb, "Turns ended at 0 charges", agg.OrnamentalFanTurnsEndedAt0Charges.ToString(), "");
         AppendTurnResetChargeRows(
             sb,
             agg.OrnamentalFanTurnsEndedAt1Charge,

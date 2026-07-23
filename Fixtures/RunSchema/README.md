@@ -300,6 +300,7 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds the remaining unlimited three-Attack turn counters: Kusarigama,
   Ornamental Fan, and Shuriken, including observed damage/block/Strength
   outcomes and 1/2 charge turn-end buckets with average charge samples.
+  Ornamental Fan additionally preserves turns that ended at 0 charges.
 - `tuning-fork-relic-run.json`
   Adds Tuning Fork owner Skill-play count, trigger count, observed block
   gained, held combat/turn denominators, and turn-end charge buckets.

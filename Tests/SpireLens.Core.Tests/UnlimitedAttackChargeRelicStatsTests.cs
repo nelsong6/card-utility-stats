@@ -38,6 +38,7 @@ public class UnlimitedAttackChargeRelicStatsTests
         Assert.Equal(0, agg.KusarigamaTurnEndChargeCount);
 
         Assert.Equal(0, agg.OrnamentalFanAttacksPlayed);
+        Assert.Equal(0, agg.OrnamentalFanTurnsEndedAt0Charges);
         Assert.Equal(0, agg.OrnamentalFanTurnsEndedAt1Charge);
         Assert.Equal(0, agg.OrnamentalFanTurnsEndedAt2Charges);
         Assert.Equal(0, agg.OrnamentalFanTurnEndChargeTotal);
@@ -73,6 +74,7 @@ public class UnlimitedAttackChargeRelicStatsTests
         Assert.Contains("kusarigama_turn_end_charge_total", json);
         Assert.Contains("kusarigama_turn_end_charge_count", json);
         Assert.Contains("ornamental_fan_attacks_played", json);
+        Assert.Contains("ornamental_fan_turns_ended_at0_charges", json);
         Assert.Contains("ornamental_fan_turns_ended_at1_charge", json);
         Assert.Contains("ornamental_fan_turns_ended_at2_charges", json);
         Assert.Contains("ornamental_fan_turn_end_charge_total", json);
@@ -130,6 +132,7 @@ public class UnlimitedAttackChargeRelicStatsTests
         RunTracker.RecordOrnamentalFanBlockGainedForTest(ornamentalFan, 4);
         RunTracker.RecordOrnamentalFanBlockGainedForTest(ornamentalFan, 5);
         RunTracker.RecordOrnamentalFanBlockGainedForTest(ornamentalFan, -2);
+        RunTracker.RecordOrnamentalFanTurnEndChargeForTest(ornamentalFan, 0);
         RunTracker.RecordOrnamentalFanTurnEndChargeForTest(ornamentalFan, 1);
         RunTracker.RecordOrnamentalFanTurnEndChargeForTest(ornamentalFan, 2);
         RunTracker.RecordOrnamentalFanTurnEndChargeForTest(ornamentalFan, 4);
@@ -138,10 +141,11 @@ public class UnlimitedAttackChargeRelicStatsTests
         Assert.Equal(8, ornamentalFan.OrnamentalFanAttacksPlayed);
         Assert.Equal(2, ornamentalFan.Activations);
         Assert.Equal(9, ornamentalFan.AdditionalBlockGained);
+        Assert.Equal(1, ornamentalFan.OrnamentalFanTurnsEndedAt0Charges);
         Assert.Equal(2, ornamentalFan.OrnamentalFanTurnsEndedAt1Charge);
         Assert.Equal(1, ornamentalFan.OrnamentalFanTurnsEndedAt2Charges);
         Assert.Equal(4, ornamentalFan.OrnamentalFanTurnEndChargeTotal);
-        Assert.Equal(3, ornamentalFan.OrnamentalFanTurnEndChargeCount);
+        Assert.Equal(4, ornamentalFan.OrnamentalFanTurnEndChargeCount);
 
         var shuriken = new RelicAggregate();
         RunTracker.RecordShurikenAttackPlayedForTest(shuriken, 11);
@@ -223,6 +227,7 @@ public class UnlimitedAttackChargeRelicStatsTests
             OrnamentalFanAttacksPlayed = 6,
             Activations = 2,
             AdditionalBlockGained = 9,
+            OrnamentalFanTurnsEndedAt0Charges = 1,
             OrnamentalFanTurnsEndedAt2Charges = 3,
             OrnamentalFanTurnEndChargeTotal = 6,
             OrnamentalFanTurnEndChargeCount = 4,
@@ -231,6 +236,7 @@ public class UnlimitedAttackChargeRelicStatsTests
         Assert.Equal(11, ornamentalFan.OrnamentalFanAttacksPlayed);
         Assert.Equal(3, ornamentalFan.Activations);
         Assert.Equal(13, ornamentalFan.AdditionalBlockGained);
+        Assert.Equal(1, ornamentalFan.OrnamentalFanTurnsEndedAt0Charges);
         Assert.Equal(1, ornamentalFan.OrnamentalFanTurnsEndedAt1Charge);
         Assert.Equal(3, ornamentalFan.OrnamentalFanTurnsEndedAt2Charges);
         Assert.Equal(7, ornamentalFan.OrnamentalFanTurnEndChargeTotal);
@@ -303,6 +309,7 @@ public class UnlimitedAttackChargeRelicStatsTests
             OrnamentalFanAttacksPlayed = 11,
             Activations = 3,
             AdditionalBlockGained = 13,
+            OrnamentalFanTurnsEndedAt0Charges = 1,
             OrnamentalFanTurnsEndedAt1Charge = 1,
             OrnamentalFanTurnsEndedAt2Charges = 3,
             OrnamentalFanTurnEndChargeTotal = 7,
@@ -312,6 +319,7 @@ public class UnlimitedAttackChargeRelicStatsTests
         Assert.Contains("Activations", ornamentalFanBody);
         Assert.Contains("[img=16x16]res://images/ui/combat/block.png[/img] block gained", ornamentalFanBody);
         Assert.Contains("block gained per activation", ornamentalFanBody);
+        Assert.Contains("Turns ended at 0 charges", ornamentalFanBody);
         Assert.Contains("Turns ended at 1 charge", ornamentalFanBody);
         Assert.Contains("Turns ended at 2 charges", ornamentalFanBody);
         Assert.Contains("Avg charge at turn end", ornamentalFanBody);
@@ -426,6 +434,7 @@ public class UnlimitedAttackChargeRelicStatsTests
 
         var ornamentalFan = run.RelicAggregates[OrnamentalFanRelicId];
         Assert.Equal(0, ornamentalFan.OrnamentalFanAttacksPlayed);
+        Assert.Equal(0, ornamentalFan.OrnamentalFanTurnsEndedAt0Charges);
         Assert.Equal(0, ornamentalFan.OrnamentalFanTurnsEndedAt1Charge);
         Assert.Equal(0, ornamentalFan.OrnamentalFanTurnsEndedAt2Charges);
         Assert.Equal(0, ornamentalFan.OrnamentalFanTurnEndChargeTotal);
@@ -464,6 +473,7 @@ public class UnlimitedAttackChargeRelicStatsTests
             OrnamentalFanAttacksPlayed = 11,
             Activations = 3,
             AdditionalBlockGained = 13,
+            OrnamentalFanTurnsEndedAt0Charges = 1,
             OrnamentalFanTurnsEndedAt1Charge = 1,
             OrnamentalFanTurnsEndedAt2Charges = 3,
             OrnamentalFanTurnEndChargeTotal = 7,
@@ -502,6 +512,7 @@ public class UnlimitedAttackChargeRelicStatsTests
         Assert.Equal(11, ornamentalFan.OrnamentalFanAttacksPlayed);
         Assert.Equal(3, ornamentalFan.Activations);
         Assert.Equal(13, ornamentalFan.AdditionalBlockGained);
+        Assert.Equal(1, ornamentalFan.OrnamentalFanTurnsEndedAt0Charges);
         Assert.Equal(1, ornamentalFan.OrnamentalFanTurnsEndedAt1Charge);
         Assert.Equal(3, ornamentalFan.OrnamentalFanTurnsEndedAt2Charges);
         Assert.Equal(7, ornamentalFan.OrnamentalFanTurnEndChargeTotal);

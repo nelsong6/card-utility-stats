@@ -1743,6 +1743,7 @@ public static class RunTracker
         target.KusarigamaTurnEndChargeTotal += source.KusarigamaTurnEndChargeTotal;
         target.KusarigamaTurnEndChargeCount += source.KusarigamaTurnEndChargeCount;
         target.OrnamentalFanAttacksPlayed += source.OrnamentalFanAttacksPlayed;
+        target.OrnamentalFanTurnsEndedAt0Charges += source.OrnamentalFanTurnsEndedAt0Charges;
         target.OrnamentalFanTurnsEndedAt1Charge += source.OrnamentalFanTurnsEndedAt1Charge;
         target.OrnamentalFanTurnsEndedAt2Charges += source.OrnamentalFanTurnsEndedAt2Charges;
         target.OrnamentalFanTurnEndChargeTotal += source.OrnamentalFanTurnEndChargeTotal;
@@ -7377,7 +7378,9 @@ public static class RunTracker
         charge %= 3;
         agg.OrnamentalFanTurnEndChargeTotal += charge;
         agg.OrnamentalFanTurnEndChargeCount += 1;
-        if (charge == 1)
+        if (charge == 0)
+            agg.OrnamentalFanTurnsEndedAt0Charges += 1;
+        else if (charge == 1)
             agg.OrnamentalFanTurnsEndedAt1Charge += 1;
         else if (charge == 2)
             agg.OrnamentalFanTurnsEndedAt2Charges += 1;

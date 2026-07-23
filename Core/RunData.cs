@@ -695,6 +695,7 @@ public class RelicAggregate
     public int KusarigamaTurnEndChargeTotal { get; set; }
     public int KusarigamaTurnEndChargeCount { get; set; }
     public int OrnamentalFanAttacksPlayed { get; set; }
+    public int OrnamentalFanTurnsEndedAt0Charges { get; set; }
     public int OrnamentalFanTurnsEndedAt1Charge { get; set; }
     public int OrnamentalFanTurnsEndedAt2Charges { get; set; }
     public int OrnamentalFanTurnEndChargeTotal { get; set; }
