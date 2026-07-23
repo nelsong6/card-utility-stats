@@ -353,6 +353,7 @@ public static class CardHoverShowPatch
         AppendUnmovablePowerStats(sb, cardModel, metaStats);
         AppendAlchemizePotionStats(sb, cardModel, agg, compact: false);
         AppendJackOfAllTradesStats(sb, cardModel, agg, compact: false);
+        AppendDiscoveryStats(sb, cardModel, agg, compact: false);
         AppendDebtStats(sb, cardModel, agg);
         AppendReplayStats(sb, agg);
 
@@ -557,6 +558,7 @@ public static class CardHoverShowPatch
         AppendUnmovablePowerStats(sb, cardModel, metaStats);
         AppendAlchemizePotionStats(sb, cardModel, agg, compact: true);
         AppendJackOfAllTradesStats(sb, cardModel, agg, compact: true);
+        AppendDiscoveryStats(sb, cardModel, agg, compact: true);
         AppendDebtStats(sb, cardModel, agg);
         AppendReplayStats(sb, agg);
 
@@ -723,6 +725,34 @@ public static class CardHoverShowPatch
             ? 0m
             : (decimal)agg.JackAddedCardCostTotal / agg.JackColorlessCardsAdded;
         Row3(sb, "Avg cost of cards added", FormatDecimal(averageCost), "");
+    }
+
+    private static void AppendDiscoveryStats(
+        StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel card,
+        CardAggregate agg,
+        bool compact)
+    {
+        if (card is not Discovery && !IsCardId(card, "CARD.DISCOVERY")) return;
+
+        Row3(sb, "Cards picked", agg.DiscoveryCardsPicked.ToString(), "");
+        if (compact) return;
+
+        Row3(sb, "commons picked", agg.DiscoveryCommonCardsPicked.ToString(), "");
+        Row3(sb, "uncommons picked", agg.DiscoveryUncommonCardsPicked.ToString(), "");
+        Row3(sb, "rares picked", agg.DiscoveryRareCardsPicked.ToString(), "");
+        Row3(sb, "Attacks picked", agg.DiscoveryAttacksPicked.ToString(), "");
+        Row3(sb, "Skills picked", agg.DiscoverySkillsPicked.ToString(), "");
+        Row3(sb, "Powers picked", agg.DiscoveryPowersPicked.ToString(), "");
+
+        var averageDiscount = agg.DiscoveryCardsPicked <= 0
+            ? 0m
+            : (decimal)agg.DiscoveryEnergyDiscountTotal / agg.DiscoveryCardsPicked;
+        Row3(
+            sb,
+            GetEnergyStatLabel("avg discount of picked card"),
+            FormatDecimal(averageDiscount),
+            "");
     }
 
     private static void AppendDebtStats(

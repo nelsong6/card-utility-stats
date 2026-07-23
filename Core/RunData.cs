@@ -161,6 +161,19 @@ public class CardAggregate
     public int JackPowersAdded { get; set; }
     public int JackAddedCardCostTotal { get; set; }
 
+    // Discovery choice outcomes. CardsPicked is the denominator for average
+    // discount and counts only non-null selections from Discovery's own
+    // choose-card screen. The discount is the selected card's observed
+    // effective energy-cost reduction when Discovery makes it free.
+    public int DiscoveryCardsPicked { get; set; }
+    public int DiscoveryCommonCardsPicked { get; set; }
+    public int DiscoveryUncommonCardsPicked { get; set; }
+    public int DiscoveryRareCardsPicked { get; set; }
+    public int DiscoveryAttacksPicked { get; set; }
+    public int DiscoverySkillsPicked { get; set; }
+    public int DiscoveryPowersPicked { get; set; }
+    public int DiscoveryEnergyDiscountTotal { get; set; }
+
     // Debt's end-of-turn curse effect. The intended amount comes from the
     // card's Gold dynamic var; actual loss is observed from the owner's gold
     // balance before/after the callback. Any unaffordable remainder is kept

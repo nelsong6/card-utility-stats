@@ -94,6 +94,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `jack-of-all-trades-card-run.json`
   Adds Jack of All Trades generated colorless-card totals, uncommon/rare and
   attack/skill/power splits, plus the numerator for average added-card cost.
+- `discovery-card-run.json`
+  Adds Discovery picked-card totals, common/uncommon/rare and
+  attack/skill/power splits, plus the numerator for average energy discount.
 - `debt-card-run.json`
   Adds Debt end-of-turn trigger tracking with observed gold lost and the
   unaffordable portion blocked by the player being out of gold.

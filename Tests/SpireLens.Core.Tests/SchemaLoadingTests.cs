@@ -531,6 +531,26 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsDiscoveryCardFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("discovery-card-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        var cardAgg = loaded.Data.Aggregates["CARD.DISCOVERY#1"];
+        Assert.Equal(5, cardAgg.DiscoveryCardsPicked);
+        Assert.Equal(2, cardAgg.DiscoveryCommonCardsPicked);
+        Assert.Equal(2, cardAgg.DiscoveryUncommonCardsPicked);
+        Assert.Equal(1, cardAgg.DiscoveryRareCardsPicked);
+        Assert.Equal(2, cardAgg.DiscoveryAttacksPicked);
+        Assert.Equal(2, cardAgg.DiscoverySkillsPicked);
+        Assert.Equal(1, cardAgg.DiscoveryPowersPicked);
+        Assert.Equal(7, cardAgg.DiscoveryEnergyDiscountTotal);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsDebtCardFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("debt-card-run.json"));
@@ -1186,6 +1206,23 @@ public class SchemaLoadingTests
         Assert.Equal(2, cardAgg.JackSkillsAdded);
         Assert.Equal(1, cardAgg.JackPowersAdded);
         Assert.Equal(7, cardAgg.JackAddedCardCostTotal);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsDiscoveryCardFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("discovery-card-run.json"));
+
+        Assert.NotNull(resumed);
+        var cardAgg = resumed!.Aggregates["CARD.DISCOVERY#1"];
+        Assert.Equal(5, cardAgg.DiscoveryCardsPicked);
+        Assert.Equal(2, cardAgg.DiscoveryCommonCardsPicked);
+        Assert.Equal(2, cardAgg.DiscoveryUncommonCardsPicked);
+        Assert.Equal(1, cardAgg.DiscoveryRareCardsPicked);
+        Assert.Equal(2, cardAgg.DiscoveryAttacksPicked);
+        Assert.Equal(2, cardAgg.DiscoverySkillsPicked);
+        Assert.Equal(1, cardAgg.DiscoveryPowersPicked);
+        Assert.Equal(7, cardAgg.DiscoveryEnergyDiscountTotal);
     }
 
     [Fact]

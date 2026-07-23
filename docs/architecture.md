@@ -70,6 +70,7 @@ Examples already implemented:
 - Regent stars spent / generated
 - forge granted from cards
 - Alchemize potions actually procured, failed procurements, and gained rarity splits
+- Discovery cards actually selected, including rarity/type and observed energy discount
 - observed cards drawn from draw effects
 - blocked draw attempts, categorized blocked reasons, and effect-side downstream blocked counts
 - successful self-summons to hand for recurring cards like Make It So

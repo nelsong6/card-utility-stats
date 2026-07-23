@@ -201,6 +201,13 @@ post-hook card is the authoritative source for rarity, card type, and effective
 energy cost; the pre-command candidate is intent and can diverge from the card
 that pile/add hooks actually allow into combat.
 
+Discovery awaits `CardSelectCmd.FromChooseACardScreen`, then calls
+`SetToFreeThisTurn` on the returned card before adding it to Hand. Wrap the
+exact `SetToFreeThisTurn` call only when Discovery is the currently resolving
+card, classify that card, and measure its effective energy cost before and
+after the call. A null/skip result never reaches this boundary and does not
+count as a pick.
+
 Debt applies its curse effect from the owner-specific
 `Debt.OnTurnEndInHand(PlayerChoiceContext)` callback. Its intended loss is the
 card's `Gold` dynamic var, but Debt clamps the amount passed to

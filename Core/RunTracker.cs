@@ -2633,6 +2633,121 @@ public static class RunTracker
         => AccumulateJackOfAllTradesCardAdded(agg, rarity, type, energyCost);
 
     /// <summary>
+    /// Capture Discovery at the exact SetToFreeThisTurn call it makes on the
+    /// picked card. A skipped choice never reaches this boundary.
+    /// </summary>
+    internal static CardModel? CaptureDiscoveryChoiceSource(CardModel? selectedCard)
+    {
+        if (selectedCard == null) return null;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return null;
+
+                var causingPlay = FindCurrentlyResolvingCardPlay();
+                var sourceCard = causingPlay?.Card;
+                if (sourceCard is not Discovery) return null;
+                var player = sourceCard.Owner;
+                if (player == null || !IsTrackedPlayer(player)) return null;
+                if (selectedCard.Owner != null && !ReferenceEquals(selectedCard.Owner, player)) return null;
+
+                return Canonical(sourceCard);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"CaptureDiscoveryChoiceSource failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record the picked card after Discovery makes it free. The discount is
+    /// the observed effective energy-cost reduction across that exact call.
+    /// </summary>
+    internal static void RecordDiscoveryCardPicked(
+        CardModel sourceCard,
+        CardModel? selectedCard,
+        int costBefore,
+        int costAfter)
+    {
+        if (selectedCard == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+                if (sourceCard is not Discovery) return;
+                if (!IsTrackedCard(sourceCard)) return;
+
+                _pendingCombat ??= new PendingCombat();
+                var instanceId = GetOrAssignInstanceId(sourceCard);
+                var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
+                AccumulateDiscoveryCardPicked(
+                    agg,
+                    selectedCard.Rarity,
+                    selectedCard.Type,
+                    Math.Max(0, costBefore - costAfter));
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordDiscoveryCardPicked failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void AccumulateDiscoveryCardPicked(
+        CardAggregate agg,
+        CardRarity rarity,
+        CardType type,
+        int energyDiscount)
+    {
+        agg.DiscoveryCardsPicked++;
+        agg.DiscoveryEnergyDiscountTotal += Math.Max(0, energyDiscount);
+
+        switch (rarity)
+        {
+            case CardRarity.Common:
+                agg.DiscoveryCommonCardsPicked++;
+                break;
+            case CardRarity.Uncommon:
+                agg.DiscoveryUncommonCardsPicked++;
+                break;
+            case CardRarity.Rare:
+                agg.DiscoveryRareCardsPicked++;
+                break;
+        }
+
+        switch (type)
+        {
+            case CardType.Attack:
+                agg.DiscoveryAttacksPicked++;
+                break;
+            case CardType.Skill:
+                agg.DiscoverySkillsPicked++;
+                break;
+            case CardType.Power:
+                agg.DiscoveryPowersPicked++;
+                break;
+        }
+    }
+
+    internal static void RecordDiscoveryCardPickedForTest(
+        CardAggregate agg,
+        CardRarity rarity,
+        CardType type,
+        int costBefore,
+        int costAfter)
+        => AccumulateDiscoveryCardPicked(
+            agg,
+            rarity,
+            type,
+            Math.Max(0, costBefore - costAfter));
+
+    /// <summary>
     /// Record one completed Debt end-of-turn effect. Debt clamps the amount
     /// passed to LoseGold to the owner's current balance, so the card's Gold
     /// dynamic var is the intended loss while the before/after balance delta
@@ -16524,6 +16639,14 @@ public static class RunTracker
         target.JackSkillsAdded += source.JackSkillsAdded;
         target.JackPowersAdded += source.JackPowersAdded;
         target.JackAddedCardCostTotal += source.JackAddedCardCostTotal;
+        target.DiscoveryCardsPicked += source.DiscoveryCardsPicked;
+        target.DiscoveryCommonCardsPicked += source.DiscoveryCommonCardsPicked;
+        target.DiscoveryUncommonCardsPicked += source.DiscoveryUncommonCardsPicked;
+        target.DiscoveryRareCardsPicked += source.DiscoveryRareCardsPicked;
+        target.DiscoveryAttacksPicked += source.DiscoveryAttacksPicked;
+        target.DiscoverySkillsPicked += source.DiscoverySkillsPicked;
+        target.DiscoveryPowersPicked += source.DiscoveryPowersPicked;
+        target.DiscoveryEnergyDiscountTotal += source.DiscoveryEnergyDiscountTotal;
         target.DebtTriggers += source.DebtTriggers;
         target.DebtGoldLost += source.DebtGoldLost;
         target.DebtGoldLossBlocked += source.DebtGoldLossBlocked;
