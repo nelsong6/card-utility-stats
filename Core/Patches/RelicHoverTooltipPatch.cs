@@ -2101,10 +2101,28 @@ public static class RelicHoverShowPatch
         var energyPerCombat = agg.EnergyGeneratedCombats <= 0
             ? 0m
             : (decimal)agg.EnergyGenerated / agg.EnergyGeneratedCombats;
+        var energyPerTurnThisCombat = agg.ArtOfWarTurnsThisCombat <= 0
+            ? 0m
+            : (decimal)agg.ArtOfWarEnergyAddedThisCombat / agg.ArtOfWarTurnsThisCombat;
 
         Row3(sb, EnergyLabel("Total energy gained"), agg.EnergyGenerated.ToString(), "");
         Row3(sb, EnergyLabel("Avg energy gained per turn"), FormatDecimal(energyPerTurn), "");
         Row3(sb, EnergyLabel("Avg energy gained per combat"), FormatDecimal(energyPerCombat), "");
+        Row3(
+            sb,
+            EnergyLabel("Energy added this combat"),
+            agg.ArtOfWarEnergyAddedThisCombat.ToString(),
+            "");
+        Row3(
+            sb,
+            EnergyLabel("Energy added this turn"),
+            agg.ArtOfWarEnergyAddedThisTurn.ToString(),
+            "");
+        Row3(
+            sb,
+            EnergyLabel("Avg energy added per turn this combat"),
+            FormatDecimal(energyPerTurnThisCombat),
+            "");
         return sb.ToString();
     }
 

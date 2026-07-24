@@ -699,7 +699,10 @@ after turn one when no Attack was played on the preceding turn. Snapshot the
 owner's energy pool around that callback and record the positive delta only
 after its task completes successfully. Count every callback turn and every
 combat where the relic was held, including non-trigger periods, as the average
-denominators.
+denominators. For live tooltip values, the pending relic aggregate is the
+current-combat energy numerator and turn denominator. Reset a separate
+combat-local, per-player turn bucket at each newly observed callback turn, then
+add the same observed positive delta to that bucket.
 
 Shovel adds `DigRestSiteOption` from `TryModifyRestSiteOptions`; the relic
 itself does not receive the obtained relic payload. Patch

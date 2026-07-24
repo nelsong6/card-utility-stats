@@ -40,6 +40,9 @@ public class ArtOfWarStatsTests
         Assert.Equal(0, agg.EnergyGenerated);
         Assert.Equal(0, agg.ArtOfWarTurns);
         Assert.Equal(0, agg.EnergyGeneratedCombats);
+        Assert.Equal(0, agg.ArtOfWarEnergyAddedThisCombat);
+        Assert.Equal(0, agg.ArtOfWarEnergyAddedThisTurn);
+        Assert.Equal(0, agg.ArtOfWarTurnsThisCombat);
     }
 
     [Fact]
@@ -100,7 +103,12 @@ public class ArtOfWarStatsTests
     [Fact]
     public void RelicTooltip_ArtOfWar_ShowsTotalAndHeldPeriodAverages()
     {
-        var body = BuildBody(PopulatedAggregate());
+        var agg = PopulatedAggregate();
+        agg.ArtOfWarEnergyAddedThisCombat = 3;
+        agg.ArtOfWarEnergyAddedThisTurn = 1;
+        agg.ArtOfWarTurnsThisCombat = 4;
+
+        var body = BuildBody(agg);
 
         Assert.Contains("Total energy gained", body);
         Assert.Contains("[b]4[/b]", body);
@@ -108,6 +116,12 @@ public class ArtOfWarStatsTests
         Assert.Contains("[b]0.5[/b]", body);
         Assert.Contains("Avg energy gained per combat", body);
         Assert.Contains("[b]2[/b]", body);
+        Assert.Contains("Energy added this combat", body);
+        Assert.Contains("[b]3[/b]", body);
+        Assert.Contains("Energy added this turn", body);
+        Assert.Contains("[b]1[/b]", body);
+        Assert.Contains("Avg energy added per turn this combat", body);
+        Assert.Contains("[b]0.75[/b]", body);
     }
 
     [Fact]
@@ -119,7 +133,10 @@ public class ArtOfWarStatsTests
         Assert.Contains("[b]2[/b]", body);
         Assert.Contains("Avg energy gained per turn", body);
         Assert.Contains("Avg energy gained per combat", body);
-        Assert.Equal(2, CountOccurrences(body, "[b]0[/b]"));
+        Assert.Contains("Energy added this combat", body);
+        Assert.Contains("Energy added this turn", body);
+        Assert.Contains("Avg energy added per turn this combat", body);
+        Assert.Equal(5, CountOccurrences(body, "[b]0[/b]"));
     }
 
     [Fact]

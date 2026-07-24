@@ -9539,6 +9539,11 @@ public static class RunTracker
                 _pendingCombat ??= new PendingCombat();
                 var agg = GetOrCreatePendingRelicAggregateLocked(ArtOfWarRelicId);
                 RecordArtOfWarEnergyGainedForTest(agg, energyGained);
+                _pendingCombat.ArtOfWarEnergyAddedThisTurn.TryGetValue(
+                    relic.Owner,
+                    out var energyAddedThisTurn);
+                _pendingCombat.ArtOfWarEnergyAddedThisTurn[relic.Owner] =
+                    energyAddedThisTurn + energyGained;
             }
             catch (Exception e)
             {
@@ -12180,6 +12185,20 @@ public static class RunTracker
                 MergeRelicAggregateInto(result, pending);
                 if (string.Equals(relicId, RuinedHelmetRelicId, StringComparison.Ordinal))
                     result.RuinedHelmetStrengthAddedThisCombat = pending.StrengthAdded;
+                if (string.Equals(relicId, ArtOfWarRelicId, StringComparison.Ordinal))
+                {
+                    result.ArtOfWarEnergyAddedThisCombat = pending.EnergyGenerated;
+                    result.ArtOfWarTurnsThisCombat = pending.ArtOfWarTurns;
+
+                    var player = GetTrackedRunPlayerLocked();
+                    if (player != null
+                        && _pendingCombat.ArtOfWarEnergyAddedThisTurn.TryGetValue(
+                            player,
+                            out var energyAddedThisTurn))
+                    {
+                        result.ArtOfWarEnergyAddedThisTurn = energyAddedThisTurn;
+                    }
+                }
             }
 
             return result;
@@ -13544,6 +13563,7 @@ public static class RunTracker
         }
 
         _pendingCombat.ArtOfWarTurnCountedTurns[player] = turnNumber;
+        _pendingCombat.ArtOfWarEnergyAddedThisTurn[player] = 0;
         RecordArtOfWarCombatForPlayerLocked(player);
 
         var agg = GetOrCreatePendingRelicAggregateLocked(ArtOfWarRelicId);
@@ -17881,6 +17901,8 @@ internal class PendingCombat
     public HashSet<Player> ArtOfWarCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> ArtOfWarTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> ArtOfWarEnergyAddedThisTurn { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> HappyFlowerCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

@@ -610,6 +610,12 @@ public class RelicAggregate
     // on the preceding turn prevented its energy gain.
     public int ArtOfWarTurns { get; set; }
 
+    // Tooltip-only projections populated from the live pending combat.
+    // Internal properties are not part of the persisted System.Text.Json shape.
+    internal int ArtOfWarEnergyAddedThisCombat { get; set; }
+    internal int ArtOfWarEnergyAddedThisTurn { get; set; }
+    internal int ArtOfWarTurnsThisCombat { get; set; }
+
     // Total relevant player turns that ended with unspent energy while the
     // matching turn-energy relic was held.
     public int FirstTurnsEndedWithExcessEnergy { get; set; }
