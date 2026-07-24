@@ -2774,8 +2774,27 @@ public static class RelicHoverShowPatch
     private static string BuildReptileTrinketBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
+        var activationsPerTurn = agg.ReptileTrinketTurns <= 0
+            ? 0m
+            : (decimal)agg.Activations / agg.ReptileTrinketTurns;
+        var activationsPerCombat = agg.ReptileTrinketCombats <= 0
+            ? 0m
+            : (decimal)agg.Activations / agg.ReptileTrinketCombats;
+
         Row3(sb, "Activations", agg.Activations.ToString(), "");
         Row3(sb, "Strength added", FormatDecimal(agg.StrengthAdded), "");
+        Row3(sb, "Avg activations per turn", FormatDecimal(activationsPerTurn), "");
+        Row3(sb, "Avg activations per combat", FormatDecimal(activationsPerCombat), "");
+        Row3(
+            sb,
+            "Turns with exactly 2 activations",
+            agg.ReptileTrinketTurnsWithExactlyTwoActivations.ToString(),
+            "");
+        Row3(
+            sb,
+            "Turns with more than 2 activations",
+            agg.ReptileTrinketTurnsWithMoreThanTwoActivations.ToString(),
+            "");
         return sb.ToString();
     }
 

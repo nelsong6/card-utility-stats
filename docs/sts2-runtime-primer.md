@@ -675,6 +675,18 @@ where the relic was held, including periods where an Attack prevented the
 block. Reconcile the current turn at combat promotion so combat-ending paths do
 not omit the denominator.
 
+Reptile Trinket's owner-specific `AfterPotionUsed` callback is the activation
+source of truth: it has already confirmed the potion owner and active combat,
+and its Strength dynamic variable supplies the amount actually requested.
+Count every held player turn at `Hook.AfterPlayerTurnStart` and every held
+combat in the combat baseline so zero-activation periods remain in both
+averages. Track the current turn live: activation two places that turn in the
+exactly-two bucket, while activation three moves the same turn into the
+more-than-two bucket. Later activations do not change its bucket. Because the
+bucket transition is complete when the activation occurs, no turn-end callback
+is needed and a combat-ending activation cannot be lost; the combat promotion
+boundary only reconciles a final held turn that missed the normal start hook.
+
 Ruined Helmet doubles the first positive Strength amount its owner receives in
 each combat through `TryModifyPowerAmountReceived`. Capture its exact local
 contribution as `modifiedAmount - amount` at that callback, but do not commit it

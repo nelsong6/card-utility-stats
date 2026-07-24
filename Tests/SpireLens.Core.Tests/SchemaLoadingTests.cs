@@ -1367,6 +1367,31 @@ public class SchemaLoadingTests
         var relicAgg = resumed!.RelicAggregates["RELIC.REPTILE_TRINKET"];
         Assert.Equal(3, relicAgg.Activations);
         Assert.Equal(6m, relicAgg.StrengthAdded);
+        Assert.Equal(0, relicAgg.ReptileTrinketTurns);
+        Assert.Equal(0, relicAgg.ReptileTrinketCombats);
+        Assert.Equal(0, relicAgg.ReptileTrinketTurnsWithExactlyTwoActivations);
+        Assert.Equal(0, relicAgg.ReptileTrinketTurnsWithMoreThanTwoActivations);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsReptileTrinketRatesFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("reptile-trinket-rates-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertReptileTrinketRatesFixture(
+            loaded.Data.RelicAggregates["RELIC.REPTILE_TRINKET"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsReptileTrinketRatesFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("reptile-trinket-rates-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertReptileTrinketRatesFixture(
+            resumed!.RelicAggregates["RELIC.REPTILE_TRINKET"]);
     }
 
     [Fact]
@@ -3229,6 +3254,16 @@ public class SchemaLoadingTests
 
         Assert.NotNull(resumed);
         AssertPaelsClawFixture(resumed!.RelicAggregates["RELIC.PAELS_CLAW"]);
+    }
+
+    private static void AssertReptileTrinketRatesFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(9, relicAgg.Activations);
+        Assert.Equal(18m, relicAgg.StrengthAdded);
+        Assert.Equal(6, relicAgg.ReptileTrinketTurns);
+        Assert.Equal(3, relicAgg.ReptileTrinketCombats);
+        Assert.Equal(2, relicAgg.ReptileTrinketTurnsWithExactlyTwoActivations);
+        Assert.Equal(1, relicAgg.ReptileTrinketTurnsWithMoreThanTwoActivations);
     }
 
     private static void AssertPaelsClawFixture(RelicAggregate relicAgg)

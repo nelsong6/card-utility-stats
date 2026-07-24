@@ -279,6 +279,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `cracked-core-relic-run.json`
   Adds lifecycle tracking for the exact Lightning orb Cracked Core channels:
   completed evokes, passive triggers, and non-evoke slot-removal fizzles.
+- `reptile-trinket-rates-run.json`
+  Adds Reptile Trinket's held turn/combat denominators plus mutually exclusive
+  turn buckets for exactly two and more than two activations.
 - `paels-claw-relic-run.json`
   Adds Pael's Claw's finished Goopy-card plays, observed earned Goopy
   enhancements, enchanted-card count, and held turn/combat denominators.

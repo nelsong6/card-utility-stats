@@ -502,6 +502,13 @@ public class RelicAggregate
     // and Ruined Helmet.
     public decimal StrengthAdded { get; set; }
 
+    // Reptile Trinket held-period denominators and per-turn activation
+    // distribution. The two turn buckets are mutually exclusive.
+    public int ReptileTrinketTurns { get; set; }
+    public int ReptileTrinketCombats { get; set; }
+    public int ReptileTrinketTurnsWithExactlyTwoActivations { get; set; }
+    public int ReptileTrinketTurnsWithMoreThanTwoActivations { get; set; }
+
     // Total Plating this relic added. Used by Gorget.
     public decimal PlatingAdded { get; set; }
 

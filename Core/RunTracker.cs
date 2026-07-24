@@ -1551,6 +1551,7 @@ public static class RunTracker
         RecordLetterOpenerTurnForTrackedPlayerLocked();
         RecordTuningForkTurnForTrackedPlayerLocked();
         RecordRippleBasinTurnForTrackedPlayerLocked();
+        RecordReptileTrinketTurnForTrackedPlayerLocked();
         RecordPaperPhrogTurnForTrackedPlayerLocked();
         RecordRazorToothTurnForTrackedPlayerLocked();
         RecordPaelsClawTurnForTrackedPlayerLocked();
@@ -1625,6 +1626,12 @@ public static class RunTracker
         target.AdditionalBlockGained += source.AdditionalBlockGained;
         target.BlockedTriggers += source.BlockedTriggers;
         target.StrengthAdded += source.StrengthAdded;
+        target.ReptileTrinketTurns += source.ReptileTrinketTurns;
+        target.ReptileTrinketCombats += source.ReptileTrinketCombats;
+        target.ReptileTrinketTurnsWithExactlyTwoActivations +=
+            source.ReptileTrinketTurnsWithExactlyTwoActivations;
+        target.ReptileTrinketTurnsWithMoreThanTwoActivations +=
+            source.ReptileTrinketTurnsWithMoreThanTwoActivations;
         target.PlatingAdded += source.PlatingAdded;
         target.CardsUpgraded += source.CardsUpgraded;
         MergeUpgradedCardsInto(target, source);
@@ -3956,23 +3963,108 @@ public static class RunTracker
     /// matching the game's owner/combat checks and reading the same Strength
     /// dynamic var that the relic applies.
     /// </summary>
-    public static void RecordReptileTrinketActivation(decimal strengthAdded)
+    public static void RecordReptileTrinketActivation(
+        ReptileTrinket relic,
+        decimal strengthAdded)
     {
-        if (strengthAdded <= 0m) return;
+        var owner = relic?.Owner;
+        if (owner == null || strengthAdded <= 0m) return;
 
         lock (_lock)
         {
             try
             {
-                var agg = GetOrCreateRelicAggregateLocked(ReptileTrinketRelicId);
-                agg.Activations += 1;
-                agg.StrengthAdded += strengthAdded;
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(owner)) return;
+                if (CombatManager.Instance?.IsInProgress != true) return;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordReptileTrinketTurnForPlayerLocked(owner);
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(ReptileTrinketRelicId);
+                RecordReptileTrinketActivationForTest(agg, strengthAdded);
+
+                _pendingCombat.ReptileTrinketActivationsThisTurn.TryGetValue(
+                    owner,
+                    out var previousTurnActivations);
+                var currentTurnActivations = previousTurnActivations + 1;
+                _pendingCombat.ReptileTrinketActivationsThisTurn[owner] =
+                    currentTurnActivations;
+                RecordReptileTrinketTurnActivationTransitionForTest(
+                    agg,
+                    previousTurnActivations,
+                    currentTurnActivations);
             }
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordReptileTrinketActivation failed: {e.Message}");
             }
         }
+    }
+
+    public static void RecordReptileTrinketTurnStarted(Player player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                if (CombatManager.Instance?.IsInProgress != true) return;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordReptileTrinketTurnForPlayerLocked(player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordReptileTrinketTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordReptileTrinketActivationForTest(
+        RelicAggregate agg,
+        decimal strengthAdded)
+    {
+        if (agg == null || strengthAdded <= 0m) return;
+        agg.Activations += 1;
+        agg.StrengthAdded += strengthAdded;
+    }
+
+    internal static void RecordReptileTrinketTurnActivationTransitionForTest(
+        RelicAggregate agg,
+        int previousTurnActivations,
+        int currentTurnActivations)
+    {
+        if (agg == null) return;
+
+        if (previousTurnActivations == 1 && currentTurnActivations == 2)
+        {
+            agg.ReptileTrinketTurnsWithExactlyTwoActivations += 1;
+        }
+        else if (previousTurnActivations == 2 && currentTurnActivations == 3)
+        {
+            agg.ReptileTrinketTurnsWithExactlyTwoActivations = Math.Max(
+                0,
+                agg.ReptileTrinketTurnsWithExactlyTwoActivations - 1);
+            agg.ReptileTrinketTurnsWithMoreThanTwoActivations += 1;
+        }
+    }
+
+    internal static void RecordReptileTrinketTurnForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.ReptileTrinketTurns += Math.Max(0, count);
+    }
+
+    internal static void RecordReptileTrinketCombatForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.ReptileTrinketCombats += Math.Max(0, count);
     }
 
     /// <summary>
@@ -13185,6 +13277,7 @@ public static class RunTracker
             RecordLetterOpenerCombatForPlayerLocked(player);
             RecordTuningForkCombatForPlayerLocked(player);
             RecordRippleBasinCombatForPlayerLocked(player);
+            RecordReptileTrinketCombatForPlayerLocked(player);
             RecordArtOfWarCombatForPlayerLocked(player);
             RecordHappyFlowerCombatForPlayerLocked(player);
             RecordPendulumCombatForPlayerLocked(player);
@@ -13353,6 +13446,53 @@ public static class RunTracker
 
         var agg = GetOrCreatePendingRelicAggregateLocked(RippleBasinRelicId);
         RecordRippleBasinTurnForTest(agg);
+    }
+
+    private static void RecordReptileTrinketCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasReptileTrinket(player)) return;
+        if (!_pendingCombat.ReptileTrinketCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(ReptileTrinketRelicId);
+        RecordReptileTrinketCombatForTest(agg);
+    }
+
+    private static void RecordReptileTrinketTurnForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordReptileTrinketTurnForPlayerLocked(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordReptileTrinketTurnForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordReptileTrinketTurnForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasReptileTrinket(player)) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.ReptileTrinketTurnCountedTurns.TryGetValue(
+                player,
+                out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.ReptileTrinketTurnCountedTurns[player] = turnNumber;
+        _pendingCombat.ReptileTrinketActivationsThisTurn[player] = 0;
+        RecordReptileTrinketCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(ReptileTrinketRelicId);
+        RecordReptileTrinketTurnForTest(agg);
     }
 
     private static void RecordMiniatureCannonCombatForTrackedPlayerLocked()
@@ -14043,6 +14183,18 @@ public static class RunTracker
         try
         {
             return player.Relics.Any(r => r is RippleBasin);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool PlayerHasReptileTrinket(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is ReptileTrinket);
         }
         catch
         {
@@ -18036,6 +18188,12 @@ internal class PendingCombat
     public HashSet<Player> RippleBasinCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> RippleBasinTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> ReptileTrinketCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> ReptileTrinketTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> ReptileTrinketActivationsThisTurn { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> ArtOfWarCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
