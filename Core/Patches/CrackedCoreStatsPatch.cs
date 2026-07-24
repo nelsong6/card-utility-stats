@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Entities.Creatures;
@@ -100,6 +101,8 @@ public static class CrackedCoreStartingOrbPassiveStatsPatch
     public static void Prefix(LightningOrb __instance, out bool __state)
     {
         __state = RunTracker.IsTrackedCrackedCoreStartingOrb(__instance);
+        CoreMain.Logger.Info(
+            $"[CrackedCore-diag] LightningOrb.Passive entered orb_ref={RuntimeHelpers.GetHashCode(__instance)} tracked={__state}");
     }
 
     [HarmonyPostfix]
