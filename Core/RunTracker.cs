@@ -1663,6 +1663,9 @@ public static class RunTracker
         target.WarHammerCombats += source.WarHammerCombats;
         target.WarHammerTurns += source.WarHammerTurns;
         MergeSharpEnchantedCardsInto(target, source);
+        MergeTriBoomerangInstinctCardsInto(target, source);
+        target.TriBoomerangInstinctCardPlays += source.TriBoomerangInstinctCardPlays;
+        target.TriBoomerangCombats += source.TriBoomerangCombats;
         target.RazorToothCombats += source.RazorToothCombats;
         target.RazorToothTurns += source.RazorToothTurns;
         target.RazorToothUpgradedCardPlays += source.RazorToothUpgradedCardPlays;
@@ -2019,6 +2022,7 @@ public static class RunTracker
             RecordStoneCrackerUpgradedCardPlayedLocked(cardPlay.Card);
             RecordRazorToothUpgradedCardPlayedLocked(cardPlay.Card);
             RecordWarHammerUpgradedCardPlayedLocked(cardPlay.Card);
+            RecordTriBoomerangInstinctCardPlayedLocked(cardPlay.Card);
             RecordStrikeDummyStrikePlayedIfOwnedLocked(cardPlay.Card);
             RecordNutritiousSoupEnchantedStrikePlayedIfOwnedLocked(cardPlay.Card);
             RecordMiniatureCannonUpgradedAttackPlayedIfOwnedLocked(cardPlay.Card);
@@ -3713,6 +3717,7 @@ public static class RunTracker
     private const string RuinedHelmetRelicId = "RELIC.RUINED_HELMET";
     private const string MummifiedHandRelicId = "RELIC.MUMMIFIED_HAND";
     private const string GnarledHammerRelicId = "RELIC.GNARLED_HAMMER";
+    private const string TriBoomerangRelicId = "RELIC.TRI_BOOMERANG";
     private const string BookmarkRelicId = "RELIC.BOOKMARK";
     private const string BrilliantScarfRelicId = "RELIC.BRILLIANT_SCARF";
     private const string JuzuBraceletRelicId = "RELIC.JUZU_BRACELET";
@@ -4712,6 +4717,40 @@ public static class RunTracker
 
         var agg = GetOrCreatePendingRelicAggregateLocked(WarHammerRelicId);
         RecordWarHammerUpgradedCardPlayForTest(agg);
+    }
+
+    private static void RecordTriBoomerangInstinctCardPlayedLocked(CardModel card)
+    {
+        if (_pendingCombat == null) return;
+        if (card?.Owner is not Player player || !IsTrackedPlayer(player)) return;
+        if (!PlayerHasTriBoomerang(player)) return;
+        if (card.Enchantment is not Instinct) return;
+        if (!TryGetInstanceId(card, out var instanceId)) return;
+
+        var enchantedByTriBoomerang =
+            (_currentRun?.RelicAggregates.TryGetValue(
+                    TriBoomerangRelicId,
+                    out var committed) == true
+                && committed.TriBoomerangInstinctCards?.Any(candidate =>
+                    candidate != null
+                    && string.Equals(
+                        candidate.CardInstanceId,
+                        instanceId,
+                        StringComparison.Ordinal)) == true)
+            || (_pendingCombat.RelicAggregates.TryGetValue(
+                    TriBoomerangRelicId,
+                    out var pending) == true
+                && pending.TriBoomerangInstinctCards?.Any(candidate =>
+                    candidate != null
+                    && string.Equals(
+                        candidate.CardInstanceId,
+                        instanceId,
+                        StringComparison.Ordinal)) == true);
+        if (!enchantedByTriBoomerang) return;
+
+        RecordTriBoomerangCombatForPlayerLocked(player);
+        var agg = GetOrCreatePendingRelicAggregateLocked(TriBoomerangRelicId);
+        RecordTriBoomerangInstinctCardPlayForTest(agg);
     }
 
     /// <summary>
@@ -9986,6 +10025,74 @@ public static class RunTracker
             cards.Where(card => !string.IsNullOrWhiteSpace(card)));
     }
 
+    /// <summary>
+    /// Persist the exact permanent-deck cards whose Instinct amount changed
+    /// across Tri-Boomerang's completed pickup callback.
+    /// </summary>
+    public static void RecordTriBoomerangInstinctCards(
+        TriBoomerang relic,
+        IEnumerable<CardModel> cards)
+    {
+        if (relic?.Owner == null || cards == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(relic.Owner)) return;
+
+                var observedCards = cards
+                    .Where(card =>
+                        card != null
+                        && ReferenceEquals(card.Owner, relic.Owner)
+                        && card.Pile?.Type == PileType.Deck
+                        && card.Enchantment is Instinct)
+                    .Select(card => new RelicEnchantedCardAggregate
+                    {
+                        CardInstanceId = GetOrAssignInstanceId(card),
+                        DisplayName = GetCardDisplayNameForStats(card),
+                    })
+                    .ToList();
+                if (observedCards.Count == 0) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(
+                    TriBoomerangRelicId);
+                RecordTriBoomerangInstinctCardsForTest(agg, observedCards);
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordTriBoomerangInstinctCards failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordTriBoomerangInstinctCardsForTest(
+        RelicAggregate agg,
+        IEnumerable<RelicEnchantedCardAggregate>? cards)
+    {
+        if (agg == null || cards == null) return;
+        AddUniqueTriBoomerangInstinctCards(agg, cards);
+    }
+
+    internal static void RecordTriBoomerangInstinctCardPlayForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.TriBoomerangInstinctCardPlays += Math.Max(0, count);
+    }
+
+    internal static void RecordTriBoomerangCombatForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.TriBoomerangCombats += Math.Max(0, count);
+    }
+
     internal static void RecordBookmarkCombatForTest(RelicAggregate agg, int count = 1)
     {
         if (agg == null) return;
@@ -13902,6 +14009,18 @@ public static class RunTracker
         }
     }
 
+    private static bool PlayerHasTriBoomerang(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is TriBoomerang);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static bool PlayerHasPaperPhrog(Player player)
     {
         try
@@ -14116,6 +14235,7 @@ public static class RunTracker
             RecordPaperPhrogCombatForPlayerLocked(player);
             RecordRazorToothCombatForPlayerLocked(player);
             RecordWarHammerCombatForPlayerLocked(player);
+            RecordTriBoomerangCombatForPlayerLocked(player);
             RecordRegaliteCombatForPlayerLocked(player);
             RecordIntimidatingHelmetCombatForPlayerLocked(player);
             RecordDaughterOfTheWindCombatForPlayerLocked(player);
@@ -14587,6 +14707,16 @@ public static class RunTracker
 
         var agg = GetOrCreatePendingRelicAggregateLocked(WarHammerRelicId);
         RecordWarHammerTurnForTest(agg);
+    }
+
+    private static void RecordTriBoomerangCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasTriBoomerang(player)) return;
+        if (!_pendingCombat.TriBoomerangCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(TriBoomerangRelicId);
+        RecordTriBoomerangCombatForTest(agg);
     }
 
     private static void RecordRegaliteCombatForPlayerLocked(Player player)
@@ -15713,6 +15843,52 @@ public static class RunTracker
         target.SharpEnchantedCards ??= new List<string>();
         target.SharpEnchantedCards.AddRange(
             source.SharpEnchantedCards.Where(card => !string.IsNullOrWhiteSpace(card)));
+    }
+
+    private static void MergeTriBoomerangInstinctCardsInto(
+        RelicAggregate target,
+        RelicAggregate source)
+        => AddUniqueTriBoomerangInstinctCards(
+            target,
+            source.TriBoomerangInstinctCards);
+
+    private static void AddUniqueTriBoomerangInstinctCards(
+        RelicAggregate target,
+        IEnumerable<RelicEnchantedCardAggregate>? cards)
+    {
+        if (cards == null) return;
+
+        target.TriBoomerangInstinctCards ??= new List<RelicEnchantedCardAggregate>();
+        var byInstanceId = target.TriBoomerangInstinctCards
+            .Where(card =>
+                card != null
+                && !string.IsNullOrWhiteSpace(card.CardInstanceId))
+            .GroupBy(card => card.CardInstanceId, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+
+        foreach (var card in cards)
+        {
+            if (card == null || string.IsNullOrWhiteSpace(card.CardInstanceId))
+                continue;
+
+            if (byInstanceId.TryGetValue(card.CardInstanceId, out var existing))
+            {
+                if (string.IsNullOrWhiteSpace(existing.DisplayName)
+                    && !string.IsNullOrWhiteSpace(card.DisplayName))
+                {
+                    existing.DisplayName = card.DisplayName;
+                }
+                continue;
+            }
+
+            var added = new RelicEnchantedCardAggregate
+            {
+                CardInstanceId = card.CardInstanceId,
+                DisplayName = card.DisplayName ?? "",
+            };
+            target.TriBoomerangInstinctCards.Add(added);
+            byInstanceId[added.CardInstanceId] = added;
+        }
     }
 
     private static void MergeCardRewardScreens(RelicAggregate target, RelicAggregate source)
@@ -19439,6 +19615,8 @@ internal class PendingCombat
     public HashSet<Player> WarHammerCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> WarHammerTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> TriBoomerangCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> RegaliteCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

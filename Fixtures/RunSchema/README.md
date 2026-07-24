@@ -356,6 +356,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `gnarled-hammer-relic-run.json`
   Adds Gnarled Hammer's observed list of permanent deck cards whose Sharp
   enchantment was applied or increased by its pickup effect.
+- `tri-boomerang-relic-run.json`
+  Adds Tri-Boomerang's observed Instinct-enchanted permanent-card ledger,
+  later plays of those same card instances, and held-combat denominator.
 - `ripple-basin-relic-run.json`
   Adds Ripple Basin no-attack turn-end activation tracking plus observed block
   gained and held turn/combat denominators for its block averages.

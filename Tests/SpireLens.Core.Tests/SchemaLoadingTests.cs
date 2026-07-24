@@ -3265,6 +3265,29 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsTriBoomerangRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("tri-boomerang-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertTriBoomerangFixture(
+            loaded.Data.RelicAggregates["RELIC.TRI_BOOMERANG"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsTriBoomerangRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("tri-boomerang-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertTriBoomerangFixture(
+            resumed!.RelicAggregates["RELIC.TRI_BOOMERANG"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsStoneHumidifierRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("stone-humidifier-relic-run.json"));
@@ -3592,6 +3615,29 @@ public class SchemaLoadingTests
         Assert.Equal(
             new[] { "Pommel Strike", "Uppercut+", "Pommel Strike" },
             relicAgg.SharpEnchantedCards);
+    }
+
+    private static void AssertTriBoomerangFixture(RelicAggregate relicAgg)
+    {
+        Assert.Collection(
+            relicAgg.TriBoomerangInstinctCards,
+            card =>
+            {
+                Assert.Equal("CARD.REAP#1", card.CardInstanceId);
+                Assert.Equal("Reap", card.DisplayName);
+            },
+            card =>
+            {
+                Assert.Equal("CARD.GRAVE_WARDEN#1", card.CardInstanceId);
+                Assert.Equal("Grave Warden", card.DisplayName);
+            },
+            card =>
+            {
+                Assert.Equal("CARD.SEVERANCE#2", card.CardInstanceId);
+                Assert.Equal("Severance+", card.DisplayName);
+            });
+        Assert.Equal(7, relicAgg.TriBoomerangInstinctCardPlays);
+        Assert.Equal(3, relicAgg.TriBoomerangCombats);
     }
 
     private static void AssertWarHammerFixture(RelicAggregate relicAgg)

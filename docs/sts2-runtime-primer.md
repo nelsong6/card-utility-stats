@@ -567,6 +567,15 @@ then compare them after its task completes successfully. A transition to Sharp
 or an increased Sharp amount is an observed enchantment; the selector's
 three-card maximum is not itself evidence that three cards changed.
 
+Tri-Boomerang uses the same `AfterObtained` lifecycle with Instinct. Snapshot
+the permanent deck's exact card references and optional Instinct amounts, then
+persist only cards whose Instinct amount actually changed. Keep each card's
+stable SpireLens instance ID with its display name: later completed combat
+plays arrive on clones, so canonical instance identity—not a name or card
+definition—is what proves the played card was enchanted by Tri-Boomerang.
+Count held combats at combat setup so zero-play combats remain in the
+Instinct-card-play average.
+
 Darkstone Periapt is owned by `DarkstonePeriapt.AfterCardChangedPiles`. Mirror
 the relic's own final-pile condition (`card.Pile.Type == Deck`, same owner,
 `CardType.Curse`), then record the actual max-HP delta after the async

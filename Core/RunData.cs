@@ -574,6 +574,13 @@ public class RelicAggregate
     // by Gnarled Hammer's pickup effect.
     public List<string> SharpEnchantedCards { get; set; } = new();
 
+    // Permanent deck cards whose Instinct enchantment was applied or increased
+    // by Tri-Boomerang. Stable instance ids let later combat-copy plays remain
+    // attributable across combats, saves, and hot reloads.
+    public List<RelicEnchantedCardAggregate> TriBoomerangInstinctCards { get; set; } = new();
+    public int TriBoomerangInstinctCardPlays { get; set; }
+    public int TriBoomerangCombats { get; set; }
+
     // Razor Tooth tracking. Combats/turns are held denominators for averages.
     // Plays and draws count only events after the exact combat card was
     // successfully upgraded by Razor Tooth; the triggering play is excluded.
@@ -1041,6 +1048,12 @@ public class RelicCardAggregate
     public string CardId { get; set; } = "";
     public string DisplayName { get; set; } = "";
     public int Count { get; set; }
+}
+
+public class RelicEnchantedCardAggregate
+{
+    public string CardInstanceId { get; set; } = "";
+    public string DisplayName { get; set; } = "";
 }
 
 public class RelicCardReturnAggregate

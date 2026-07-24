@@ -1605,6 +1605,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is TriBoomerang)
+        {
+            title = "Tri-Boomerang";
+            body = BuildTriBoomerangBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is Whetstone)
         {
             title = "Whetstone";
@@ -3042,6 +3049,45 @@ public static class RelicHoverShowPatch
         Row3(sb, "Cards enchanted with Sharp", cards.Count.ToString(), "");
         foreach (var card in cards)
             RowFlow(sb, "Sharp-enchanted card", StatsTooltip.EscapeBbcode(card), "");
+        return sb.ToString();
+    }
+
+    private static string BuildTriBoomerangBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var cards = (agg.TriBoomerangInstinctCards
+                ?? new List<RelicEnchantedCardAggregate>())
+            .Where(card =>
+                card != null
+                && !string.IsNullOrWhiteSpace(card.CardInstanceId))
+            .ToList();
+        decimal playsPerCombat = agg.TriBoomerangCombats > 0
+            ? (decimal)agg.TriBoomerangInstinctCardPlays
+                / agg.TriBoomerangCombats
+            : 0m;
+
+        Row3(sb, "Cards enchanted with Instinct", cards.Count.ToString(), "");
+        foreach (var card in cards)
+        {
+            var displayName = string.IsNullOrWhiteSpace(card.DisplayName)
+                ? card.CardInstanceId
+                : card.DisplayName;
+            RowFlow(
+                sb,
+                "Instinct-enchanted card",
+                StatsTooltip.EscapeBbcode(displayName),
+                "");
+        }
+        Row3(
+            sb,
+            "Times Instinct cards were played",
+            agg.TriBoomerangInstinctCardPlays.ToString(),
+            "");
+        Row3(
+            sb,
+            "Avg Instinct-card plays per combat",
+            FormatDecimal(playsPerCombat),
+            "");
         return sb.ToString();
     }
 
