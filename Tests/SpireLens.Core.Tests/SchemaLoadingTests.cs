@@ -3194,6 +3194,25 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsCrackedCoreRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("cracked-core-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertCrackedCoreFixture(loaded.Data.RelicAggregates["RELIC.CRACKED_CORE"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsCrackedCoreRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("cracked-core-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertCrackedCoreFixture(resumed!.RelicAggregates["RELIC.CRACKED_CORE"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsPaelsClawRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("paels-claw-relic-run.json"));
@@ -3282,6 +3301,13 @@ public class SchemaLoadingTests
         Assert.Equal(4, relicAgg.EnergyGenerated);
         Assert.Equal(8, relicAgg.ArtOfWarTurns);
         Assert.Equal(2, relicAgg.EnergyGeneratedCombats);
+    }
+
+    private static void AssertCrackedCoreFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(3, relicAgg.CrackedCoreOrbEvokes);
+        Assert.Equal(7, relicAgg.CrackedCoreOrbPassiveTriggers);
+        Assert.Equal(1, relicAgg.CrackedCoreOrbFizzles);
     }
 
     private static void AssertStoneHumidifierFixture(RelicAggregate relicAgg)

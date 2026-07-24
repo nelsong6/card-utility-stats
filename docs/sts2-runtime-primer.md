@@ -704,6 +704,16 @@ current-combat energy numerator and turn denominator. Reset a separate
 combat-local, per-player turn bucket at each newly observed callback turn, then
 add the same observed positive delta to that bucket.
 
+Cracked Core channels its starting Lightning orb from its owner-specific
+`BeforeSideTurnStart` callback on turn one. Snapshot the owner's orb queue
+around that completed callback and retain the exact newly added mutable
+`LightningOrb` reference for the combat. Count each successfully completed
+`LightningOrb.Passive` and `LightningOrb.Evoke` call carrying that reference;
+multi-evoke effects therefore count every actual evoke. The gameplay
+non-evoke removal path is `OrbQueue.RemoveCapacity`, currently used by Bulk
+Up, so compare raw queue references around that method for fizzles. Normal
+combat cleanup uses `OrbQueue.Clear` and must not count as a fizzle.
+
 Shovel adds `DigRestSiteOption` from `TryModifyRestSiteOptions`; the relic
 itself does not receive the obtained relic payload. Patch
 `DigRestSiteOption.OnSelect`, snapshot the owner's relic inventory before the

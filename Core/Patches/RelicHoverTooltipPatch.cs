@@ -1230,6 +1230,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is CrackedCore)
+        {
+            title = "Cracked Core";
+            body = BuildCrackedCoreBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is HappyFlower)
         {
             title = "Happy Flower";
@@ -2123,6 +2130,19 @@ public static class RelicHoverShowPatch
             EnergyLabel("Avg energy added per turn this combat"),
             FormatDecimal(energyPerTurnThisCombat),
             "");
+        return sb.ToString();
+    }
+
+    private static string BuildCrackedCoreBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Times orb was evoked", agg.CrackedCoreOrbEvokes.ToString(), "");
+        Row3(
+            sb,
+            "Times orb passive triggered",
+            agg.CrackedCoreOrbPassiveTriggers.ToString(),
+            "");
+        Row3(sb, "Times orb fizzled", agg.CrackedCoreOrbFizzles.ToString(), "");
         return sb.ToString();
     }
 

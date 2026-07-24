@@ -1660,6 +1660,9 @@ public static class RunTracker
         target.GoldLossBlocked += source.GoldLossBlocked;
         target.EnergyGeneratedCombats += source.EnergyGeneratedCombats;
         target.ArtOfWarTurns += source.ArtOfWarTurns;
+        target.CrackedCoreOrbEvokes += source.CrackedCoreOrbEvokes;
+        target.CrackedCoreOrbPassiveTriggers += source.CrackedCoreOrbPassiveTriggers;
+        target.CrackedCoreOrbFizzles += source.CrackedCoreOrbFizzles;
         target.FirstTurnsEndedWithExcessEnergy += source.FirstTurnsEndedWithExcessEnergy;
         target.SecondTurnsEndedWithExcessEnergy += source.SecondTurnsEndedWithExcessEnergy;
         target.ThirdTurnsEndedWithExcessEnergy += source.ThirdTurnsEndedWithExcessEnergy;
@@ -3425,6 +3428,7 @@ public static class RunTracker
     private const string WarPaintRelicId = "RELIC.WAR_PAINT";
     private const string FragrantMushroomRelicId = "RELIC.FRAGRANT_MUSHROOM";
     private const string ArtOfWarRelicId = "RELIC.ART_OF_WAR";
+    private const string CrackedCoreRelicId = "RELIC.CRACKED_CORE";
     private const string FishingRodRelicId = "RELIC.FISHING_ROD";
     private const string MoltenEggRelicId = "RELIC.MOLTEN_EGG";
     private const string ToxicEggRelicId = "RELIC.TOXIC_EGG";
@@ -9568,6 +9572,141 @@ public static class RunTracker
     {
         if (agg == null) return;
         agg.ArtOfWarTurns += Math.Max(0, count);
+    }
+
+    /// <summary>
+    /// Retain the exact mutable Lightning orb instances created during
+    /// Cracked Core's owner callback. Later orb callbacks are attributed only
+    /// when they carry one of these references.
+    /// </summary>
+    public static void TrackCrackedCoreStartingOrbs(
+        CrackedCore relic,
+        IEnumerable<OrbModel> orbs)
+    {
+        var owner = relic?.Owner;
+        var orbQueue = owner?.PlayerCombatState?.OrbQueue;
+        if (owner == null || orbQueue == null || orbs == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(owner)) return;
+                if (CombatManager.Instance?.IsInProgress != true) return;
+
+                _pendingCombat ??= new PendingCombat();
+                foreach (var orb in orbs)
+                {
+                    if (orb == null || !ReferenceEquals(orb.Owner, owner)) continue;
+                    if (!orbQueue.Orbs.Any(
+                            queuedOrb => ReferenceEquals(queuedOrb, orb)))
+                    {
+                        continue;
+                    }
+                    _pendingCombat.CrackedCoreStartingOrbs.Add(orb);
+                }
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"TrackCrackedCoreStartingOrbs failed: {e.Message}");
+            }
+        }
+    }
+
+    public static bool IsTrackedCrackedCoreStartingOrb(OrbModel orb)
+    {
+        if (orb == null) return false;
+
+        lock (_lock)
+        {
+            return _pendingCombat?.CrackedCoreStartingOrbs.Contains(orb) == true;
+        }
+    }
+
+    public static void RecordCrackedCoreStartingOrbPassive(OrbModel orb)
+    {
+        if (orb == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat?.CrackedCoreStartingOrbs.Contains(orb) != true) return;
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(CrackedCoreRelicId);
+                RecordCrackedCoreOrbPassiveForTest(agg);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordCrackedCoreStartingOrbPassive failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordCrackedCoreStartingOrbEvoked(OrbModel orb)
+    {
+        if (orb == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat?.CrackedCoreStartingOrbs.Contains(orb) != true) return;
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(CrackedCoreRelicId);
+                RecordCrackedCoreOrbEvokedForTest(agg);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordCrackedCoreStartingOrbEvoked failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordCrackedCoreStartingOrbsFizzled(IEnumerable<OrbModel> removedOrbs)
+    {
+        if (removedOrbs == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null) return;
+
+                var fizzled = 0;
+                foreach (var orb in removedOrbs)
+                {
+                    if (orb != null && _pendingCombat.CrackedCoreStartingOrbs.Remove(orb))
+                        fizzled++;
+                }
+
+                if (fizzled <= 0) return;
+                var agg = GetOrCreatePendingRelicAggregateLocked(CrackedCoreRelicId);
+                RecordCrackedCoreOrbFizzledForTest(agg, fizzled);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordCrackedCoreStartingOrbsFizzled failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordCrackedCoreOrbPassiveForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.CrackedCoreOrbPassiveTriggers += Math.Max(0, count);
+    }
+
+    internal static void RecordCrackedCoreOrbEvokedForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.CrackedCoreOrbEvokes += Math.Max(0, count);
+    }
+
+    internal static void RecordCrackedCoreOrbFizzledForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.CrackedCoreOrbFizzles += Math.Max(0, count);
     }
 
     /// <summary>
@@ -17903,6 +18042,8 @@ internal class PendingCombat
     public Dictionary<Player, int> ArtOfWarTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> ArtOfWarEnergyAddedThisTurn { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<OrbModel> CrackedCoreStartingOrbs { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> HappyFlowerCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

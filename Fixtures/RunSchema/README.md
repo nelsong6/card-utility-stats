@@ -276,6 +276,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `art-of-war-relic-run.json`
   Adds Art of War's observed energy gain plus held turn/combat denominators
   for its total and average rows.
+- `cracked-core-relic-run.json`
+  Adds lifecycle tracking for the exact Lightning orb Cracked Core channels:
+  completed evokes, passive triggers, and non-evoke slot-removal fizzles.
 - `paels-claw-relic-run.json`
   Adds Pael's Claw's finished Goopy-card plays, observed earned Goopy
   enhancements, enchanted-card count, and held turn/combat denominators.

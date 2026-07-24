@@ -616,6 +616,12 @@ public class RelicAggregate
     internal int ArtOfWarEnergyAddedThisTurn { get; set; }
     internal int ArtOfWarTurnsThisCombat { get; set; }
 
+    // Lifecycle outcomes for the exact Lightning orb instance created by
+    // Cracked Core at the start of combat.
+    public int CrackedCoreOrbEvokes { get; set; }
+    public int CrackedCoreOrbPassiveTriggers { get; set; }
+    public int CrackedCoreOrbFizzles { get; set; }
+
     // Total relevant player turns that ended with unspent energy while the
     // matching turn-energy relic was held.
     public int FirstTurnsEndedWithExcessEnergy { get; set; }
