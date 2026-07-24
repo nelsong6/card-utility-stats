@@ -1554,6 +1554,7 @@ public static class RunTracker
         RecordHeldCombatRelicBaselinesForTrackedPlayerLocked(requireActiveCombat: false, createPendingIfNeeded: false);
         RecordLetterOpenerTurnForTrackedPlayerLocked();
         RecordTuningForkTurnForTrackedPlayerLocked();
+        RecordCloakClaspTurnForTrackedPlayerLocked();
         RecordRippleBasinTurnForTrackedPlayerLocked();
         RecordReptileTrinketTurnForTrackedPlayerLocked();
         RecordBeatingRemnantTurnForTrackedPlayerLocked();
@@ -1637,6 +1638,8 @@ public static class RunTracker
         target.PendulumCombatEndChargeTotal += source.PendulumCombatEndChargeTotal;
         target.PendulumCombatEndChargeCount += source.PendulumCombatEndChargeCount;
         target.AdditionalBlockGained += source.AdditionalBlockGained;
+        target.CloakClaspTurns += source.CloakClaspTurns;
+        target.CloakClaspCombats += source.CloakClaspCombats;
         target.PermafrostCombats += source.PermafrostCombats;
         target.BlockedTriggers += source.BlockedTriggers;
         target.StrengthAdded += source.StrengthAdded;
@@ -13232,6 +13235,41 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Count a distinct player turn toward Cloak Clasp's held-turn average,
+    /// including turns where it ultimately grants no block.
+    /// </summary>
+    public static void RecordCloakClaspTurnStarted(Player player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                _pendingCombat ??= new PendingCombat();
+                RecordCloakClaspTurnForPlayerLocked(player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordCloakClaspTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordCloakClaspCombatForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.CloakClaspCombats += Math.Max(0, count);
+    }
+
+    internal static void RecordCloakClaspTurnForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.CloakClaspTurns += Math.Max(0, count);
+    }
+
+    /// <summary>
     /// No-op safety reset kept wired at <c>Hook.AfterSideTurnEnd</c>. Cloak Clasp's
     /// attribution now lives entirely in the per-combat registry (see
     /// <see cref="ArmCloakClaspBlockAttribution"/>); the window closes on
@@ -14216,6 +14254,7 @@ public static class RunTracker
             RecordPermafrostCombatForPlayerLocked(player);
             RecordLetterOpenerCombatForPlayerLocked(player);
             RecordTuningForkCombatForPlayerLocked(player);
+            RecordCloakClaspCombatForPlayerLocked(player);
             RecordRippleBasinCombatForPlayerLocked(player);
             RecordReptileTrinketCombatForPlayerLocked(player);
             RecordArtOfWarCombatForPlayerLocked(player);
@@ -14366,6 +14405,50 @@ public static class RunTracker
 
         var agg = GetOrCreatePendingRelicAggregateLocked(TuningForkRelicId);
         RecordTuningForkTurnForTest(agg);
+    }
+
+    private static void RecordCloakClaspCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasCloakClasp(player)) return;
+        if (!_pendingCombat.CloakClaspCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(CloakClaspRelicId);
+        RecordCloakClaspCombatForTest(agg);
+    }
+
+    private static void RecordCloakClaspTurnForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordCloakClaspTurnForPlayerLocked(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordCloakClaspTurnForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordCloakClaspTurnForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasCloakClasp(player)) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.CloakClaspTurnCountedTurns.TryGetValue(player, out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.CloakClaspTurnCountedTurns[player] = turnNumber;
+        RecordCloakClaspCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(CloakClaspRelicId);
+        RecordCloakClaspTurnForTest(agg);
     }
 
     private static void RecordRippleBasinCombatForPlayerLocked(Player player)
@@ -15328,6 +15411,18 @@ public static class RunTracker
         try
         {
             return player.Relics.Any(r => r is RippleBasin);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool PlayerHasCloakClasp(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is CloakClasp);
         }
         catch
         {
@@ -19515,6 +19610,10 @@ internal class PendingCombat
     public Dictionary<Player, int> TuningForkTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> TuningForkTurnEndChargeRecordedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> CloakClaspCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> CloakClaspTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> RippleBasinCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

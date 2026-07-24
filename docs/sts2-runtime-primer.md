@@ -492,6 +492,13 @@ result reports failure.
 
 For relics that grant block after a specific owner-owned condition, arm a narrow block-gain window at the relic callback and let `Hook.AfterBlockGained` record the modified amount. Permafrost follows this pattern from `Permafrost.AfterCardPlayed`: mirror the first-owned-Power condition, count that combat trigger, then derive block per triggered combat from observed block gained divided by triggers. Count every combat where Permafrost was held, including zero-trigger combats, as the separate trigger-rate denominator. Older runs predate that denominator; because Permafrost can trigger at most once per combat, backfill the minimum known historical combat count from its activation total before adding newly observed combats. Its private `_activatedThisCombat` field is the authoritative live source for whether it has triggered in the current combat; display that state directly rather than inferring it from persisted activation totals.
 
+Cloak Clasp's owner-specific `BeforeSideTurnEnd` callback makes exactly one
+block command for `cards in hand * Block`, and skips the command when the hand
+is empty. Keep its existing one-shot observed-block attribution window for the
+numerator. Count every player turn and combat where the relic was held as the
+average denominators, including empty-hand turns and turns where combat ended
+before the end-turn callback could run.
+
 Intimidating Helmet's `BeforeCardPlayed` condition uses the frozen play-time
 `cardPlay.Resources.EnergyValue`, not printed cost or `EnergySpent`. Normal
 plays therefore use the energy actually paid, resolved X-cost plays use their

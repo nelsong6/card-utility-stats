@@ -2864,7 +2864,16 @@ public static class RelicHoverShowPatch
     private static string BuildCloakClaspBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
+        var blockPerTurn = agg.CloakClaspTurns <= 0
+            ? 0m
+            : (decimal)agg.AdditionalBlockGained / agg.CloakClaspTurns;
+        var blockPerCombat = agg.CloakClaspCombats <= 0
+            ? 0m
+            : (decimal)agg.AdditionalBlockGained / agg.CloakClaspCombats;
+
         Row3(sb, BlockLabel("Block gained"), agg.AdditionalBlockGained.ToString(), "");
+        Row3(sb, BlockLabel("avg block gained per turn"), FormatDecimal(blockPerTurn), "");
+        Row3(sb, BlockLabel("avg block gained per combat"), FormatDecimal(blockPerCombat), "");
         return sb.ToString();
     }
 

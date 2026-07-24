@@ -28,16 +28,24 @@ public class CloakClaspStatsTests
     };
 
     [Fact]
-    public void RelicAggregate_AdditionalBlockGained_DefaultsToZero()
+    public void RelicAggregate_CloakClaspFields_DefaultToZero()
     {
         var agg = new RelicAggregate();
+
         Assert.Equal(0, agg.AdditionalBlockGained);
+        Assert.Equal(0, agg.CloakClaspTurns);
+        Assert.Equal(0, agg.CloakClaspCombats);
     }
 
     [Fact]
-    public void RelicAggregate_AdditionalBlockGained_JsonRoundtrip_PreservesField()
+    public void RelicAggregate_CloakClaspFields_JsonRoundtrip_PreservesFields()
     {
-        var agg = new RelicAggregate { AdditionalBlockGained = 21 };
+        var agg = new RelicAggregate
+        {
+            AdditionalBlockGained = 21,
+            CloakClaspTurns = 7,
+            CloakClaspCombats = 3,
+        };
         var run = new RunData();
         run.RelicAggregates[CloakClaspRelicId] = agg;
 
@@ -45,12 +53,16 @@ public class CloakClaspStatsTests
 
         Assert.Contains("relic_aggregates", json);
         Assert.Contains("additional_block_gained", json);
+        Assert.Contains("cloak_clasp_turns", json);
+        Assert.Contains("cloak_clasp_combats", json);
 
         var restored = JsonSerializer.Deserialize<RunData>(json, SerializerOptions);
         Assert.NotNull(restored);
         Assert.True(restored!.RelicAggregates.ContainsKey(CloakClaspRelicId));
         var restoredAgg = restored.RelicAggregates[CloakClaspRelicId];
         Assert.Equal(21, restoredAgg.AdditionalBlockGained);
+        Assert.Equal(7, restoredAgg.CloakClaspTurns);
+        Assert.Equal(3, restoredAgg.CloakClaspCombats);
     }
 
     [Fact]
@@ -73,15 +85,61 @@ public class CloakClaspStatsTests
     }
 
     [Fact]
-    public void RelicTooltip_AdditionalBlockGained_ShowsBlockIconAndTotal()
+    public void MergeRelicAggregateInto_CloakClaspFields_Accumulates()
     {
-        var agg = new RelicAggregate { AdditionalBlockGained = 21 };
+        var target = new RelicAggregate
+        {
+            AdditionalBlockGained = 8,
+            CloakClaspTurns = 3,
+            CloakClaspCombats = 1,
+        };
+        var source = new RelicAggregate
+        {
+            AdditionalBlockGained = 13,
+            CloakClaspTurns = 4,
+            CloakClaspCombats = 2,
+        };
+
+        RunTracker.MergeRelicAggregateInto(target, source);
+
+        Assert.Equal(21, target.AdditionalBlockGained);
+        Assert.Equal(7, target.CloakClaspTurns);
+        Assert.Equal(3, target.CloakClaspCombats);
+    }
+
+    [Fact]
+    public void RecordCloakClaspDenominators_IncludeHeldTurnsAndCombats()
+    {
+        var agg = new RelicAggregate();
+
+        RunTracker.RecordCloakClaspTurnForTest(agg, 7);
+        RunTracker.RecordCloakClaspCombatForTest(agg, 3);
+        RunTracker.RecordCloakClaspTurnForTest(agg, -1);
+        RunTracker.RecordCloakClaspCombatForTest(agg, -1);
+
+        Assert.Equal(7, agg.CloakClaspTurns);
+        Assert.Equal(3, agg.CloakClaspCombats);
+    }
+
+    [Fact]
+    public void RelicTooltip_CloakClasp_ShowsBlockTotalAndAverages()
+    {
+        var agg = new RelicAggregate
+        {
+            AdditionalBlockGained = 21,
+            CloakClaspTurns = 7,
+            CloakClaspCombats = 3,
+        };
 
         var body = (string)(BuildCloakClaspBodyMethod.Invoke(null, new object?[] { agg })
             ?? throw new InvalidOperationException("BuildCloakClaspBodyBBCode returned null."));
 
         Assert.Contains("[img=16x16]res://images/ui/combat/block.png[/img] Block gained", body);
         Assert.Contains("[b]21[/b]", body);
+        Assert.Contains("[img=16x16]res://images/ui/combat/block.png[/img] avg block gained per turn", body);
+        Assert.Contains("[b]3[/b]", body);
+        Assert.Contains("[img=16x16]res://images/ui/combat/block.png[/img] avg block gained per combat", body);
+        Assert.Contains("[b]7[/b]", body);
     }
 
     [Fact]
@@ -113,5 +171,35 @@ public class CloakClaspStatsTests
         Assert.NotNull(run);
         Assert.False(run!.RelicAggregates.ContainsKey(CloakClaspRelicId));
         Assert.Equal(6, run.RelicAggregates["RELIC.ORICHALCUM"].AdditionalBlockGained);
+    }
+
+    [Fact]
+    public void RunData_OlderCloakClaspShape_DeserializesWithZeroDenominators()
+    {
+        const string json = """
+            {
+              "run_id": "test",
+              "started_at": "2026-01-01T00:00:00Z",
+              "updated_at": "2026-01-01T00:00:00Z",
+              "outcome": "in_progress",
+              "aggregates": {},
+              "events": [],
+              "instance_numbers_by_def": {},
+              "def_counters": {},
+              "relic_aggregates": {
+                "RELIC.CLOAK_CLASP": {
+                  "additional_block_gained": 6
+                }
+              }
+            }
+            """;
+
+        var run = JsonSerializer.Deserialize<RunData>(json, SerializerOptions);
+
+        Assert.NotNull(run);
+        var agg = run!.RelicAggregates[CloakClaspRelicId];
+        Assert.Equal(6, agg.AdditionalBlockGained);
+        Assert.Equal(0, agg.CloakClaspTurns);
+        Assert.Equal(0, agg.CloakClaspCombats);
     }
 }

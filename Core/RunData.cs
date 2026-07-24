@@ -515,6 +515,12 @@ public class RelicAggregate
     // extra block from its multiplier.
     public int AdditionalBlockGained { get; set; }
 
+    // Cloak Clasp held-period denominators. Turns include every player turn
+    // where the relic was held, even when combat ended before its turn-end
+    // callback or the player had no cards in hand.
+    public int CloakClaspTurns { get; set; }
+    public int CloakClaspCombats { get; set; }
+
     // Combats where Permafrost was held, including combats where no Power was
     // played. Used as the zero-inclusive denominator for triggers per combat.
     public int PermafrostCombats { get; set; }

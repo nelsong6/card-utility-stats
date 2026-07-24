@@ -49,6 +49,8 @@
       "vulnerable_applied": 0,
       "weak_applied": 0,
       "additional_block_gained": 21,
+      "cloak_clasp_turns": 7,
+      "cloak_clasp_combats": 3,
       "additional_cards_drawn": 0,
       "energy_generated": 0
     }

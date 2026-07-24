@@ -1074,6 +1074,8 @@ public class SchemaLoadingTests
         Assert.True(loaded.HasPerInstanceIdentity);
         var relicAgg = loaded.Data.RelicAggregates["RELIC.CLOAK_CLASP"];
         Assert.Equal(21, relicAgg.AdditionalBlockGained);
+        Assert.Equal(7, relicAgg.CloakClaspTurns);
+        Assert.Equal(3, relicAgg.CloakClaspCombats);
     }
 
     [Fact]
@@ -1094,6 +1096,8 @@ public class SchemaLoadingTests
         Assert.NotNull(resumed);
         var relicAgg = resumed!.RelicAggregates["RELIC.CLOAK_CLASP"];
         Assert.Equal(21, relicAgg.AdditionalBlockGained);
+        Assert.Equal(7, relicAgg.CloakClaspTurns);
+        Assert.Equal(3, relicAgg.CloakClaspCombats);
     }
 
     [Fact]
