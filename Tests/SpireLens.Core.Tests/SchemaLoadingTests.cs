@@ -2910,6 +2910,31 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsToastyMittensRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("toasty-mittens-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.TOASTY_MITTENS"];
+        Assert.Equal(7, relicAgg.ToastyMittensCardsExhausted);
+        Assert.Equal(10m, relicAgg.StrengthAdded);
+        Assert.Equal(4, relicAgg.ToastyMittensCombats);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsToastyMittensRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("toasty-mittens-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.TOASTY_MITTENS"];
+        Assert.Equal(7, relicAgg.ToastyMittensCardsExhausted);
+        Assert.Equal(10m, relicAgg.StrengthAdded);
+        Assert.Equal(4, relicAgg.ToastyMittensCombats);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsKunaiRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("kunai-relic-run.json"));

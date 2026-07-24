@@ -190,6 +190,9 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds active-charge-only Ember Tea attack plays and observed enemy hits plus
   active turn/combat denominators. Its fifth combat remains active even though
   consuming that charge immediately leaves the visible counter at zero.
+- `toasty-mittens-relic-run.json`
+  Adds Toasty Mittens' completed direct card exhausts, observed Strength
+  applications, and zero-inclusive held-combat denominator.
 - `paper-phrog-relic-run.json`
   Adds Paper Phrog tracking for bonus damage added by its Vulnerable multiplier,
   vulnerable-enhanced attack counts, and held combat/turn denominators for

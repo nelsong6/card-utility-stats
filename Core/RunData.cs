@@ -531,8 +531,12 @@ public class RelicAggregate
     public int BlockedTriggers { get; set; }
 
     // Total Strength this relic added. Used by Reptile Trinket, Shuriken,
-    // and Ruined Helmet.
+    // Ruined Helmet, and Toasty Mittens.
     public decimal StrengthAdded { get; set; }
+
+    // Toasty Mittens outcomes and its zero-inclusive held-combat denominator.
+    public int ToastyMittensCardsExhausted { get; set; }
+    public int ToastyMittensCombats { get; set; }
 
     // Reptile Trinket held-period denominators and per-turn activation
     // distribution. The two turn buckets are mutually exclusive.

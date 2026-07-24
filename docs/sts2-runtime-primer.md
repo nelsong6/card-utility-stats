@@ -766,6 +766,16 @@ bucket transition is complete when the activation occurs, no turn-end callback
 is needed and a combat-ending activation cannot be lost; the combat promotion
 boundary only reconciles a final held turn that missed the normal start hook.
 
+Toasty Mittens exhausts one selected draw-pile card and then applies Strength
+inside its async `BeforeHandDraw` callback. Keep an async-flow-local scope
+around that callback. Observe the completed direct `CardCmd.Exhaust` call, not
+the later exhaust hook, so nested exhausts are excluded. Arm Strength only
+after `ShuffleIfNecessary` completes, suspend it while the direct exhaust and
+its hooks resolve, then read the matching post-modifier `PowerReceivedEntry`
+for the owner's `StrengthPower`; this preserves modified Strength amounts
+without stealing Strength caused by shuffle or exhaust reactions. Count every
+combat where the relic was held as the zero-inclusive per-combat denominator.
+
 Beating Remnant caps post-Osty HP loss in its owner-specific
 `ModifyHpLostAfterOsty` modifier. The positive difference between that method's
 input and output is the HP loss prevented by Beating Remnant itself; do not

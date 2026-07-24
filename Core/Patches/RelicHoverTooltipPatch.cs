@@ -1303,6 +1303,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is ToastyMittens)
+        {
+            title = "Toasty Mittens";
+            body = BuildToastyMittensBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is Kunai)
         {
             title = "Kunai";
@@ -3605,6 +3612,23 @@ public static class RelicHoverShowPatch
         Row3(sb, "Hits while active", agg.EmberTeaHitsWhileActive.ToString(), "");
         Row3(sb, "Avg hits per turn while active", FormatDecimal(hitsPerTurn), "");
         Row3(sb, "Avg hits per combat while active", FormatDecimal(hitsPerCombat), "");
+        return sb.ToString();
+    }
+
+    private static string BuildToastyMittensBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var cardsPerCombat = agg.ToastyMittensCombats <= 0
+            ? 0m
+            : (decimal)agg.ToastyMittensCardsExhausted / agg.ToastyMittensCombats;
+        var strengthPerCombat = agg.ToastyMittensCombats <= 0
+            ? 0m
+            : agg.StrengthAdded / agg.ToastyMittensCombats;
+
+        Row3(sb, "Cards exhausted total", agg.ToastyMittensCardsExhausted.ToString(), "");
+        Row3(sb, "Strength added total", FormatDecimal(agg.StrengthAdded), "");
+        Row3(sb, "Cards exhausted per combat", FormatDecimal(cardsPerCombat), "");
+        Row3(sb, "Strength added per combat", FormatDecimal(strengthPerCombat), "");
         return sb.ToString();
     }
 

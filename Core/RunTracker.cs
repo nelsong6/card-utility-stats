@@ -73,6 +73,7 @@ public static class RunTracker
     private static readonly List<PendingPowerChangeAttempt> _pendingPowerChangeAttempts = new();
     private static readonly List<PendingUnsettlingLampDebuff> _pendingUnsettlingLampDebuffs = new();
     private static readonly System.Threading.AsyncLocal<EnemyStatusSourceFrame?> _enemyStatusSourceFrame = new();
+    private static readonly System.Threading.AsyncLocal<PendingToastyMittensActivation?> _toastyMittensActivation = new();
     private static int _pendingPlayerBlockClearAmount;
     private static bool _pendingPlayerBlockClearArmed;
     private static bool _pendingAkabekoVigorAttribution;
@@ -933,6 +934,7 @@ public static class RunTracker
         _pendingEffectSourceHistoryCount = 0;
         _pendingPowerChangeAttempts.Clear();
         _pendingUnsettlingLampDebuffs.Clear();
+        _toastyMittensActivation.Value = null;
         _pendingPlayerBlockClearAmount = 0;
         _pendingPlayerBlockClearArmed = false;
         // Ported windows (Orichalcum, Anchor, Abacus, BoneFlute, CloakClasp,
@@ -1644,6 +1646,8 @@ public static class RunTracker
         target.PermafrostCombats += source.PermafrostCombats;
         target.BlockedTriggers += source.BlockedTriggers;
         target.StrengthAdded += source.StrengthAdded;
+        target.ToastyMittensCardsExhausted += source.ToastyMittensCardsExhausted;
+        target.ToastyMittensCombats += source.ToastyMittensCombats;
         target.ReptileTrinketTurns += source.ReptileTrinketTurns;
         target.ReptileTrinketCombats += source.ReptileTrinketCombats;
         target.ReptileTrinketTurnsWithExactlyTwoActivations +=
@@ -3715,6 +3719,7 @@ public static class RunTracker
     private const string MiniatureCannonRelicId = "RELIC.MINIATURE_CANNON";
     private const string VajraRelicId = "RELIC.VAJRA";
     private const string EmberTeaRelicId = "RELIC.EMBER_TEA";
+    private const string ToastyMittensRelicId = "RELIC.TOASTY_MITTENS";
     private const string KunaiRelicId = "RELIC.KUNAI";
     private const string KusarigamaRelicId = "RELIC.KUSARIGAMA";
     private const string OrnamentalFanRelicId = "RELIC.ORNAMENTAL_FAN";
@@ -8778,6 +8783,152 @@ public static class RunTracker
     {
         if (agg == null) return;
         agg.EmberTeaActiveCombats += Math.Max(0, count);
+    }
+
+    internal static void RecordToastyMittensForTest(
+        RelicAggregate agg,
+        int cardsExhausted,
+        decimal strengthAdded,
+        int combats)
+    {
+        if (agg == null) return;
+        agg.ToastyMittensCardsExhausted += Math.Max(0, cardsExhausted);
+        agg.StrengthAdded += Math.Max(0m, strengthAdded);
+        agg.ToastyMittensCombats += Math.Max(0, combats);
+    }
+
+    /// <summary>
+    /// Open an async-flow-local window around Toasty Mittens' own hand-draw
+    /// callback. Nested shuffle/exhaust hooks inherit the window, while the
+    /// caller's context is restored as soon as the callback returns its Task.
+    /// </summary>
+    internal static PendingToastyMittensActivation? BeginToastyMittensActivation(
+        ToastyMittens relic,
+        Player player)
+    {
+        if (relic?.Owner == null || player == null) return null;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null) return null;
+                if (!ReferenceEquals(relic.Owner, player)) return null;
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(player)) return null;
+
+                var frame = new PendingToastyMittensActivation(
+                    relic,
+                    player,
+                    _toastyMittensActivation.Value);
+                _toastyMittensActivation.Value = frame;
+                return frame;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"BeginToastyMittensActivation failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+    internal static void RestoreToastyMittensActivation(
+        PendingToastyMittensActivation? frame)
+    {
+        if (frame != null && ReferenceEquals(_toastyMittensActivation.Value, frame))
+            _toastyMittensActivation.Value = frame.Previous;
+    }
+
+    internal static PendingToastyMittensActivation? ClaimToastyMittensShuffle(Player player)
+    {
+        var frame = _toastyMittensActivation.Value;
+        if (frame == null
+            || frame.ShuffleClaimed
+            || !ReferenceEquals(frame.Player, player))
+        {
+            return null;
+        }
+
+        frame.ShuffleClaimed = true;
+        frame.StrengthReady = false;
+        return frame;
+    }
+
+    internal static void CompleteToastyMittensShuffle(PendingToastyMittensActivation? frame)
+    {
+        if (frame != null)
+            frame.StrengthReady = true;
+    }
+
+    internal static PendingToastyMittensActivation? ClaimToastyMittensExhaust(CardModel card)
+    {
+        var frame = _toastyMittensActivation.Value;
+        if (frame == null
+            || frame.ExhaustClaimed
+            || !frame.StrengthReady
+            || card == null
+            || !ReferenceEquals(card.Owner, frame.Player)
+            || card.Pile?.Type != PileType.Draw)
+        {
+            return null;
+        }
+
+        frame.ExhaustClaimed = true;
+        frame.StrengthReady = false;
+        return frame;
+    }
+
+    internal static void CompleteToastyMittensExhaust(
+        PendingToastyMittensActivation? frame)
+    {
+        if (frame == null) return;
+        frame.StrengthReady = true;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null || !IsTrackedRelic(frame.Relic)) return;
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(ToastyMittensRelicId);
+                RecordToastyMittensForTest(
+                    agg,
+                    cardsExhausted: 1,
+                    strengthAdded: 0m,
+                    combats: 0);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"CompleteToastyMittensExhaust failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void RecordToastyMittensStrengthReceivedLocked(
+        PowerModel power,
+        Creature target,
+        Creature? applier,
+        decimal amount)
+    {
+        var frame = _toastyMittensActivation.Value;
+        if (frame == null
+            || frame.StrengthClaimed
+            || !frame.StrengthReady
+            || power is not StrengthPower
+            || !ReferenceEquals(target, frame.Player.Creature)
+            || !ReferenceEquals(applier, frame.Player.Creature))
+        {
+            return;
+        }
+
+        frame.StrengthClaimed = true;
+        if (amount <= 0m || _pendingCombat == null) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(ToastyMittensRelicId);
+        RecordToastyMittensForTest(
+            agg,
+            cardsExhausted: 0,
+            strengthAdded: amount,
+            combats: 0);
     }
 
     /// <summary>
@@ -14417,6 +14568,7 @@ public static class RunTracker
             RecordBeatingRemnantCombatForPlayerLocked(player);
             RecordRuinedHelmetCombatForPlayerLocked(player);
             RecordMummifiedHandCombatForPlayerLocked(player);
+            RecordToastyMittensCombatForPlayerLocked(player);
         }
         catch (Exception e)
         {
@@ -15059,6 +15211,20 @@ public static class RunTracker
         RecordMummifiedHandCombatForTest(agg);
     }
 
+    private static void RecordToastyMittensCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasToastyMittens(player)) return;
+        if (!_pendingCombat.ToastyMittensCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(ToastyMittensRelicId);
+        RecordToastyMittensForTest(
+            agg,
+            cardsExhausted: 0,
+            strengthAdded: 0m,
+            combats: 1);
+    }
+
     private static void RecordMummifiedHandTurnForTrackedPlayerLocked()
     {
         try
@@ -15453,6 +15619,18 @@ public static class RunTracker
         try
         {
             return player.Relics.Any(r => r is MummifiedHand);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool PlayerHasToastyMittens(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is ToastyMittens);
         }
         catch
         {
@@ -18216,6 +18394,12 @@ public static class RunTracker
                 var target = TryResolvePowerReceivedTarget(entry);
                 if (target != null && entry.Amount > 0m)
                     RecordUnsettlingLampPowerReceivedLocked(entry.Power, target, entry.Applier, entry.Amount);
+                if (target != null)
+                    RecordToastyMittensStrengthReceivedLocked(
+                        entry.Power,
+                        target,
+                        entry.Applier,
+                        entry.Amount);
 
                 if (!ShouldTrackCardStatsDuringCombatLocked()) return;
 
@@ -19807,6 +19991,8 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> MummifiedHandTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> ToastyMittensCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> JugglingPowerCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> JugglingPowerTurnCountedTurns { get; }
@@ -19921,6 +20107,27 @@ internal sealed class EnemyStatusSourceFrame
 {
     public required Creature Source { get; init; }
     public EnemyStatusSourceFrame? Previous { get; init; }
+}
+
+internal sealed class PendingToastyMittensActivation
+{
+    public PendingToastyMittensActivation(
+        ToastyMittens relic,
+        Player player,
+        PendingToastyMittensActivation? previous)
+    {
+        Relic = relic;
+        Player = player;
+        Previous = previous;
+    }
+
+    public ToastyMittens Relic { get; }
+    public Player Player { get; }
+    public PendingToastyMittensActivation? Previous { get; }
+    public bool ShuffleClaimed { get; set; }
+    public bool ExhaustClaimed { get; set; }
+    public bool StrengthReady { get; set; }
+    public bool StrengthClaimed { get; set; }
 }
 
 internal sealed class BlockChunk
