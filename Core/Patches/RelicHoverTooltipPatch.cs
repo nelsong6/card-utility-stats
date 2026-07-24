@@ -2089,10 +2089,14 @@ public static class RelicHoverShowPatch
         var averageDamagePerSkill = agg.LetterOpenerSkillsPlayed <= 0
             ? 0m
             : (decimal)agg.TotalDamageAttempted / agg.LetterOpenerSkillsPlayed;
+        var targetsHitPerActivation = agg.Activations <= 0
+            ? 0m
+            : (decimal)agg.TotalTargets / agg.Activations;
 
         Row3(sb, "Activations", agg.Activations.ToString(), "");
         Row3(sb, "Damage attempted", agg.TotalDamageAttempted.ToString(), "");
         Row3(sb, "Targets hit", agg.TotalTargets.ToString(), "");
+        Row3(sb, "Targets hit per activation", FormatDecimal(targetsHitPerActivation), "");
         Row3(sb, "Avg damage per combat", FormatDecimal(averageDamagePerCombat), "");
         Row3(sb, "Avg damage per turn", FormatDecimal(averageDamagePerTurn), "");
         Row3(sb, "Turns ended at 1 charge", agg.LetterOpenerTurnsEndedAt1Charge.ToString(), "");

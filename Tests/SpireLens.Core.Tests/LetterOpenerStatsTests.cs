@@ -155,6 +155,7 @@ public class LetterOpenerStatsTests
         Assert.Contains("Activations", body);
         Assert.Contains("Damage attempted", body);
         Assert.Contains("Targets hit", body);
+        Assert.Contains("Targets hit per activation", body);
         Assert.Contains("Avg damage per combat", body);
         Assert.Contains("Avg damage per turn", body);
         Assert.Contains("Turns ended at 1 charge", body);
@@ -173,10 +174,24 @@ public class LetterOpenerStatsTests
 
         Assert.Contains("Avg damage per combat", body);
         Assert.Contains("Avg damage per turn", body);
+        Assert.Contains("Targets hit per activation", body);
         Assert.Contains("Turns ended at 1 charge", body);
         Assert.Contains("Turns ended at 2 charges", body);
         Assert.Contains("Avg damage per skill played", body);
-        Assert.Equal(8, CountOccurrences(body, "[b]0[/b]"));
+        Assert.Equal(9, CountOccurrences(body, "[b]0[/b]"));
+    }
+
+    [Fact]
+    public void RelicTooltip_LetterOpener_ShowsTargetsHitPerActivation()
+    {
+        var body = BuildBody(new RelicAggregate
+        {
+            Activations = 2,
+            TotalTargets = 5,
+        });
+
+        Assert.Contains("Targets hit per activation", body);
+        Assert.Contains("[b]2.5[/b]", body);
     }
 
     private static string BuildBody(RelicAggregate agg)
