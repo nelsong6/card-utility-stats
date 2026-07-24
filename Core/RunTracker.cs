@@ -1670,6 +1670,7 @@ public static class RunTracker
         target.EnergyGenerated += source.EnergyGenerated;
         target.GoldGained += source.GoldGained;
         target.CardsAddedToDeck += source.CardsAddedToDeck;
+        target.CardRewardsSkipped += source.CardRewardsSkipped;
         target.GoldLost += source.GoldLost;
         target.GoldLossBlocked += source.GoldLossBlocked;
         target.EnergyGeneratedCombats += source.EnergyGeneratedCombats;
@@ -3406,6 +3407,7 @@ public static class RunTracker
     private const string PenNibRelicId = "RELIC.PEN_NIB";
     private const string AkabekoRelicId = "RELIC.AKABEKO";
     private const string BookRepairKnifeRelicId = "RELIC.BOOK_REPAIR_KNIFE";
+    private const string BookOfFiveRingsRelicId = "RELIC.BOOK_OF_FIVE_RINGS";
     private const string EternalFeatherRelicId = "RELIC.ETERNAL_FEATHER";
     private const string BoneFluteRelicId = "RELIC.BONE_FLUTE";
     private const string HealingLostFullHpReasonId = "full_hp";
@@ -7206,6 +7208,126 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Record Book of Five Rings at the successful relic-obtain boundary so
+    /// its cards-per-floor denominator exists even before the first card is
+    /// added to the deck.
+    /// </summary>
+    public static void RecordBookOfFiveRingsObtained(BookOfFiveRings relic, Player player)
+    {
+        if (relic == null || player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ReferenceEquals(relic.Owner, player)
+                    || !IsTrackedRelic(relic)
+                    || !IsTrackedPlayer(player))
+                    return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(BookOfFiveRingsRelicId);
+                RecordRelicFloorAcquiredForTest(
+                    agg,
+                    RelicFloorAddedToDeck(relic) ?? CurrentRunFloorLocked());
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordBookOfFiveRingsObtained failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record a confirmed permanent-deck addition from Book of Five Rings's
+    /// owner-specific pile callback. When the native saved counter reaches its
+    /// five-card threshold, also arm the shared observed-healing ledger before
+    /// the relic starts its heal command.
+    /// </summary>
+    public static void RecordBookOfFiveRingsCardAdded(
+        BookOfFiveRings relic,
+        bool triggered,
+        decimal attemptedHealing)
+    {
+        if (relic?.Owner?.Creature == null) return;
+
+        Creature? healedCreature = null;
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(relic.Owner)) return;
+
+                var persistDirectlyToRun = _pendingCombat == null;
+                var agg = GetOrCreateRelicAggregateForCurrentContextLocked(BookOfFiveRingsRelicId);
+                RecordRelicFloorAcquiredForTest(
+                    agg,
+                    RelicFloorAddedToDeck(relic) ?? CurrentRunFloorLocked());
+                RecordBookOfFiveRingsCardAddedForTest(agg);
+
+                if (!triggered && persistDirectlyToRun)
+                    SaveCurrentRun();
+
+                if (triggered)
+                    healedCreature = relic.Owner.Creature;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordBookOfFiveRingsCardAdded failed: {e.Message}");
+                return;
+            }
+        }
+
+        if (healedCreature == null) return;
+        RecordRelicHealingTrigger(
+            BookOfFiveRingsRelicId,
+            healedCreature,
+            attemptedHealing,
+            nameof(RecordBookOfFiveRingsCardAdded),
+            configureAggregate: agg =>
+                RecordRelicFloorAcquiredForTest(
+                    agg,
+                    RelicFloorAddedToDeck(relic) ?? CurrentRunFloorLocked()));
+    }
+
+    /// <summary>
+    /// Count one completed outer card reward skip while the tracked player
+    /// owns Book of Five Rings.
+    /// </summary>
+    public static void RecordBookOfFiveRingsCardRewardSkipped(CardReward reward)
+    {
+        var player = reward?.Player;
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+
+                var relic = player.Relics?
+                    .OfType<BookOfFiveRings>()
+                    .FirstOrDefault(candidate => IsTrackedRelic(candidate));
+                if (relic == null) return;
+
+                var persistDirectlyToRun = _pendingCombat == null;
+                var agg = GetOrCreateRelicAggregateForCurrentContextLocked(BookOfFiveRingsRelicId);
+                RecordRelicFloorAcquiredForTest(
+                    agg,
+                    RelicFloorAddedToDeck(relic) ?? CurrentRunFloorLocked());
+                RecordBookOfFiveRingsCardRewardSkippedForTest(agg);
+
+                if (persistDirectlyToRun)
+                    SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordBookOfFiveRingsCardRewardSkipped failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Arm Leafy Poultice pickup attribution. The pickup loses max HP and then
     /// transforms up to two basic cards through <c>CardCmd.Transform</c>.
     /// </summary>
@@ -7946,6 +8068,22 @@ public static class RunTracker
 
         agg.CardsAddedToDeck++;
         agg.GoldGained += Math.Max(0, currentGold - initialGold);
+    }
+
+    internal static void RecordBookOfFiveRingsCardAddedForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.CardsAddedToDeck += Math.Max(0, count);
+    }
+
+    internal static void RecordBookOfFiveRingsCardRewardSkippedForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.CardRewardsSkipped += Math.Max(0, count);
     }
 
     internal static void RecordChosenCheeseMaxHpGainedForTest(

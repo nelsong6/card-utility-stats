@@ -115,6 +115,9 @@ averages per physical Drain Power.
 War Hammer records each Elite-victory activation, every permanent deck card it
 actually upgraded, and later plays of those exact physical cards, with
 per-activation upgrade value and held-turn/combat play averages.
+Book of Five Rings records permanent-deck additions, cards added per held
+floor, five-card healing triggers and observed healing outcomes, and skipped
+card rewards.
 
 Run outcome detection (win/loss/abandoned) is implemented ([#10](https://github.com/romaine-life/spirelens/issues/10), closed) via the run-history entry hook.
 

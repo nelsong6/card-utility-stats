@@ -1,0 +1,30 @@
+{
+  "run_id": "book-of-five-rings-relic-fixture",
+  "started_at": "2026-07-23T20:00:00Z",
+  "updated_at": "2026-07-23T20:20:00Z",
+  "outcome": "in_progress",
+  "floor_reached": 11,
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.BOOK_OF_FIVE_RINGS": {
+      "activations": 1,
+      "total_healing_attempted": 20,
+      "total_healing_restored": 12,
+      "total_healing_lost": 8,
+      "healing_lost_reasons": {
+        "full_hp": {
+          "reason_id": "full_hp",
+          "display_name": "full HP",
+          "amount": 8
+        }
+      },
+      "floor_acquired": 8,
+      "cards_added_to_deck": 8,
+      "card_rewards_skipped": 3
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

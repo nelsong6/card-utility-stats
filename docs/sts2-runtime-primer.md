@@ -564,6 +564,17 @@ task, count the confirmed deck addition only after successful completion, and
 measure the owner's completed gold-balance delta so gold modifiers or
 prevention are reflected instead of assuming its base 15 gold.
 
+Book of Five Rings also owns an `AfterCardChangedPiles` callback for every
+same-owner card whose final pile is the permanent Deck. Its saved `CardsAdded`
+counter advances on each callback and triggers healing whenever the post-add
+counter is divisible by its five-card threshold. Mirror that exact transition
+before the async callback starts so the shared relic-healing ledger is armed
+before `CreatureCmd.Heal`; finalize after the callback task completes to retain
+actual healing and the blocked remainder. Count outer `CardReward.OnSkipped`
+calls separately while the tracked owner holds the book. For cards added per
+floor, use inclusive floors held from the relic's pickup floor rather than all
+floors in the run.
+
 Chosen Cheese gains max HP from `AfterCombatEnd`, then the game heals the same
 amount as part of `CreatureCmd.GainMaxHp`. Snapshot the owner's max HP before
 the async relic callback and record only the actual max-HP delta after

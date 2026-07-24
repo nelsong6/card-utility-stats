@@ -607,8 +607,11 @@ public class RelicAggregate
     public int GoldGained { get; set; }
 
     // Permanent deck additions confirmed by a relic-owned pile-change
-    // callback. Lucky Fysh is the first relic using this field.
+    // callback. Used by Lucky Fysh and Book of Five Rings.
     public int CardsAddedToDeck { get; set; }
+
+    // Completed outer card rewards skipped while Book of Five Rings was held.
+    public int CardRewardsSkipped { get; set; }
 
     // Gold actually lost to a relic effect and the portion of its attempted
     // loss that did not leave the player's balance. Seal of Gold is the first

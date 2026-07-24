@@ -198,6 +198,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `lucky-fysh-relic-run.json`
   Adds Lucky Fysh permanent-deck additions and the actual gold gained from
   those owner-specific callbacks.
+- `book-of-five-rings-relic-run.json`
+  Adds Book of Five Rings permanent-deck additions, held-floor rate context,
+  five-card healing triggers and outcomes, and skipped card rewards.
 - `signet-ring-relic-run.json`
   Adds Signet Ring's observed floor distance from pickup to the first merchant
   room reached afterward.

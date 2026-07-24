@@ -713,6 +713,19 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is BookOfFiveRings bookOfFiveRings)
+            {
+                const string relicId = "RELIC.BOOK_OF_FIVE_RINGS";
+                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
+
+                var body = BuildBookOfFiveRingsBodyBBCode(
+                    agg,
+                    RunTracker.GetCurrentFloorForRateStats(),
+                    RelicFloorAddedToDeck(bookOfFiveRings));
+                StatsTooltip.Show(tree, __instance, "Book of Five Rings", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is SignetRing)
             {
                 const string relicId = "RELIC.SIGNET_RING";
@@ -1696,6 +1709,16 @@ public static class RelicHoverShowPatch
         {
             title = "Lucky Fysh";
             body = BuildLuckyFyshBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is BookOfFiveRings)
+        {
+            title = "Book of Five Rings";
+            body = BuildBookOfFiveRingsBodyBBCode(
+                agg,
+                floorCount,
+                RelicFloorAddedToDeck(relicModel));
             return true;
         }
 
@@ -3070,6 +3093,27 @@ public static class RelicHoverShowPatch
         var sb = new StringBuilder();
         Row3(sb, "Gold gained", agg.GoldGained.ToString(), "");
         Row3(sb, "Cards added to deck", agg.CardsAddedToDeck.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildBookOfFiveRingsBodyBBCode(
+        RelicAggregate agg,
+        int? currentFloor,
+        int? floorAcquiredFallback = null)
+    {
+        var sb = new StringBuilder();
+        var floorAcquired = agg.FloorAcquired ?? floorAcquiredFallback;
+        var floorsHeld = currentFloor.HasValue && floorAcquired.HasValue
+            ? Math.Max(1, currentFloor.Value - floorAcquired.Value + 1)
+            : Math.Max(1, currentFloor ?? 1);
+        var cardsPerFloor = (decimal)agg.CardsAddedToDeck / floorsHeld;
+
+        Row3(sb, "Total cards added to deck", agg.CardsAddedToDeck.ToString(), "");
+        Row3(sb, "Avg cards added per floor", FormatDecimal(cardsPerFloor), "");
+        Row3(sb, "Total times triggered", agg.Activations.ToString(), "");
+        Row3(sb, "Total HP healed", FormatDecimal(agg.TotalHealingRestored), "");
+        Row3(sb, "Total HP healing blocked", FormatDecimal(agg.TotalHealingLost), "");
+        Row3(sb, "Card rewards skipped", agg.CardRewardsSkipped.ToString(), "");
         return sb.ToString();
     }
 

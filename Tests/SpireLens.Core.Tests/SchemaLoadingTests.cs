@@ -1858,6 +1858,16 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsBookOfFiveRingsRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("book-of-five-rings-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertBookOfFiveRingsFixture(loaded.Data.RelicAggregates["RELIC.BOOK_OF_FIVE_RINGS"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsSignetRingRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("signet-ring-relic-run.json"));
@@ -1933,6 +1943,15 @@ public class SchemaLoadingTests
         var relicAgg = resumed!.RelicAggregates["RELIC.LUCKY_FYSH"];
         Assert.Equal(45, relicAgg.GoldGained);
         Assert.Equal(3, relicAgg.CardsAddedToDeck);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsBookOfFiveRingsRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("book-of-five-rings-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertBookOfFiveRingsFixture(resumed!.RelicAggregates["RELIC.BOOK_OF_FIVE_RINGS"]);
     }
 
     [Fact]
@@ -3550,5 +3569,17 @@ public class SchemaLoadingTests
                 Assert.Equal("Uppercut+", card.DisplayName);
                 Assert.Equal(1, card.UpgradeLevel);
             });
+    }
+
+    private static void AssertBookOfFiveRingsFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(8, relicAgg.CardsAddedToDeck);
+        Assert.Equal(1, relicAgg.Activations);
+        Assert.Equal(20m, relicAgg.TotalHealingAttempted);
+        Assert.Equal(12m, relicAgg.TotalHealingRestored);
+        Assert.Equal(8m, relicAgg.TotalHealingLost);
+        Assert.Equal(8m, relicAgg.HealingLostReasons["full_hp"].Amount);
+        Assert.Equal(8, relicAgg.FloorAcquired);
+        Assert.Equal(3, relicAgg.CardRewardsSkipped);
     }
 }
