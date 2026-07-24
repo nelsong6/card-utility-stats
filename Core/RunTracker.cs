@@ -84,6 +84,7 @@ public static class RunTracker
     private static readonly List<Creature> _pendingOrnamentalFanBlockAttributions = new();
     private static readonly List<Creature> _pendingIntimidatingHelmetBlockAttributions = new();
     private static readonly List<Creature> _pendingDaughterOfTheWindBlockAttributions = new();
+    private static readonly List<PendingDanseMacabreBlockAttribution> _pendingDanseMacabreBlockAttributions = new();
     private static readonly List<Creature> _pendingMercuryHourglassDamageAttributions = new();
     private static readonly List<Creature> _pendingMrStrugglesDamageAttributions = new();
     private static readonly Dictionary<PowerModel, int> _bronzeScalesThornsContributions = new(ReferenceEqualityComparer.Instance);
@@ -946,6 +947,7 @@ public static class RunTracker
         _pendingOrnamentalFanBlockAttributions.Clear();
         _pendingIntimidatingHelmetBlockAttributions.Clear();
         _pendingDaughterOfTheWindBlockAttributions.Clear();
+        _pendingDanseMacabreBlockAttributions.Clear();
         _pendingMercuryHourglassDamageAttributions.Clear();
         _pendingMrStrugglesDamageAttributions.Clear();
         _bronzeScalesThornsContributions.Clear();
@@ -2884,6 +2886,202 @@ public static class RunTracker
 
         _pendingCombat.JugglingPowerTurnCountedTurns[player] = turnNumber;
         agg.TurnsActive++;
+    }
+
+    /// <summary>
+    /// Count Danse Macabre's exact owner-card trigger and arm only the
+    /// immediately issued decimal/ValueProp gain-block command.
+    /// </summary>
+    internal static PendingDanseMacabreBlockAttribution?
+        RecordDanseMacabreTriggerAndArmBlockAttribution(
+            DanseMacabrePower? power,
+            CardPlay? cardPlay)
+    {
+        if (power?.Owner?.Player == null || cardPlay?.Card?.Owner?.Creature == null)
+            return null;
+        if (!ReferenceEquals(cardPlay.Card.Owner.Creature, power.Owner))
+            return null;
+
+        int resolvedEnergyCost;
+        int triggerThreshold;
+        try
+        {
+            resolvedEnergyCost = cardPlay.Card.EnergyCost.GetResolved();
+            triggerThreshold = power.DynamicVars.Energy.IntValue;
+        }
+        catch
+        {
+            return null;
+        }
+
+        if (!DanseMacabreCardQualifiesForTest(resolvedEnergyCost, triggerThreshold))
+            return null;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return null;
+                if (CombatManager.Instance?.IsInProgress != true) return null;
+
+                var player = power.Owner.Player;
+                if (!IsTrackedPlayer(player)) return null;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordDanseMacabrePowerActiveForPlayerLocked(power, player);
+
+                var agg = GetOrCreatePowerAggregate(
+                    _pendingCombat.MetaStats,
+                    power.Id.ToString(),
+                    GetPowerDisplayName(power));
+                RecordDanseMacabreTriggerForTest(agg);
+
+                var attribution = new PendingDanseMacabreBlockAttribution
+                {
+                    PendingCombat = _pendingCombat,
+                    Owner = power.Owner,
+                    PowerId = power.Id.ToString(),
+                    DisplayName = GetPowerDisplayName(power),
+                };
+                _pendingDanseMacabreBlockAttributions.Add(attribution);
+                return attribution;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordDanseMacabreTriggerAndArmBlockAttribution failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+    internal static PendingDanseMacabreBlockAttribution?
+        TryConsumeDanseMacabreBlockAttribution(Creature? creature)
+    {
+        if (creature == null) return null;
+
+        lock (_lock)
+        {
+            for (int i = 0; i < _pendingDanseMacabreBlockAttributions.Count; i++)
+            {
+                var attribution = _pendingDanseMacabreBlockAttributions[i];
+                if (!ReferenceEquals(attribution.Owner, creature)) continue;
+                if (!ReferenceEquals(attribution.PendingCombat, _pendingCombat)) continue;
+
+                _pendingDanseMacabreBlockAttributions.RemoveAt(i);
+                return attribution;
+            }
+
+            return null;
+        }
+    }
+
+    internal static void DisarmDanseMacabreBlockAttribution(
+        PendingDanseMacabreBlockAttribution? attribution)
+    {
+        if (attribution == null) return;
+        lock (_lock)
+            _pendingDanseMacabreBlockAttributions.Remove(attribution);
+    }
+
+    internal static void RecordDanseMacabreBlockGained(
+        PendingDanseMacabreBlockAttribution? attribution,
+        decimal amount)
+    {
+        if (attribution == null || amount <= 0m) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+                if (!ReferenceEquals(attribution.PendingCombat, _pendingCombat)) return;
+
+                var agg = GetOrCreatePowerAggregate(
+                    _pendingCombat!.MetaStats,
+                    attribution.PowerId,
+                    attribution.DisplayName);
+                RecordDanseMacabreBlockGainedForTest(agg, amount);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordDanseMacabreBlockGained failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Count every player turn that begins with Danse Macabre active. Its
+    /// first application turn is counted from the observed power application.
+    /// </summary>
+    public static void RecordDanseMacabrePowerTurnStarted(Player? player)
+    {
+        if (player?.Creature == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+                if (!IsTrackedPlayer(player)) return;
+                var power = player.Creature.GetPower<DanseMacabrePower>();
+                if (power == null) return;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordDanseMacabrePowerActiveForPlayerLocked(power, player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordDanseMacabrePowerTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void RecordDanseMacabrePowerActiveForPlayerLocked(
+        DanseMacabrePower power,
+        Player player)
+    {
+        if (_pendingCombat == null) return;
+
+        var agg = GetOrCreatePowerAggregate(
+            _pendingCombat.MetaStats,
+            power.Id.ToString(),
+            GetPowerDisplayName(power));
+
+        if (_pendingCombat.DanseMacabrePowerCombatCountedPlayers.Add(player))
+            agg.CombatsActive++;
+
+        int turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.DanseMacabrePowerTurnCountedTurns.TryGetValue(
+                player,
+                out var recordedTurn)
+            && recordedTurn == turnNumber)
+            return;
+
+        _pendingCombat.DanseMacabrePowerTurnCountedTurns[player] = turnNumber;
+        agg.TurnsActive++;
+    }
+
+    internal static bool DanseMacabreCardQualifiesForTest(
+        int resolvedEnergyCost,
+        int triggerThreshold)
+        => resolvedEnergyCost >= triggerThreshold;
+
+    internal static void RecordDanseMacabreTriggerForTest(
+        PowerAggregate agg,
+        int count = 1)
+    {
+        if (agg == null || count <= 0) return;
+        agg.TimesTriggered += count;
+    }
+
+    internal static void RecordDanseMacabreBlockGainedForTest(
+        PowerAggregate agg,
+        decimal amount)
+    {
+        if (agg == null || amount <= 0m) return;
+        agg.BlockGained += amount;
     }
 
     private static PowerAggregate GetOrCreatePowerAggregate(
@@ -17615,6 +17813,16 @@ public static class RunTracker
 
                 if (!ShouldTrackCardStatsDuringCombatLocked()) return;
 
+                if (entry.Amount > 0m
+                    && entry.Power is DanseMacabrePower danseMacabre
+                    && danseMacabre.Owner?.Player != null
+                    && IsTrackedPlayer(danseMacabre.Owner.Player))
+                {
+                    RecordDanseMacabrePowerActiveForPlayerLocked(
+                        danseMacabre,
+                        danseMacabre.Owner.Player);
+                }
+
                 var causingPlay = FindCurrentlyResolvingCardPlay();
                 if (causingPlay?.Card == null)
                 {
@@ -18592,6 +18800,8 @@ public static class RunTracker
             targetAgg.RareAttacksCopied += sourceAgg.RareAttacksCopied;
             targetAgg.TurnsActive += sourceAgg.TurnsActive;
             targetAgg.CombatsActive += sourceAgg.CombatsActive;
+            targetAgg.TimesTriggered += sourceAgg.TimesTriggered;
+            targetAgg.BlockGained += sourceAgg.BlockGained;
             targetAgg.FreeAttackChargesGranted += sourceAgg.FreeAttackChargesGranted;
             targetAgg.FreeAttackChargesUsed += sourceAgg.FreeAttackChargesUsed;
             targetAgg.FreeAttackZeroEnergySavingsUses += sourceAgg.FreeAttackZeroEnergySavingsUses;
@@ -19082,6 +19292,14 @@ internal sealed class PendingFreeAttackUse
     public bool IsAutoPlay { get; init; }
 }
 
+internal sealed class PendingDanseMacabreBlockAttribution
+{
+    public required PendingCombat PendingCombat { get; init; }
+    public required Creature Owner { get; init; }
+    public required string PowerId { get; init; }
+    public required string DisplayName { get; init; }
+}
+
 /// <summary>
 /// Holds per-combat stats and events while a combat is in progress.
 /// Discarded if the combat doesn't finish cleanly; promoted into the run on CombatEnded.
@@ -19179,6 +19397,10 @@ internal class PendingCombat
     public Dictionary<Player, int> JugglingPowerTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, PendingJugglingCopyWindow> PendingJugglingCopyWindows { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> DanseMacabrePowerCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> DanseMacabrePowerTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<CardModel, decimal> FreeAttackEnergySavingsByCard { get; }
         = new(ReferenceEqualityComparer.Instance);

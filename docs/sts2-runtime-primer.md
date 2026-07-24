@@ -518,6 +518,17 @@ Juggling card tooltip projects that shared record. Count the application turn
 and each later turn that starts with the power, plus each distinct combat, so
 the per-turn and per-combat averages include active zero-copy periods.
 
+`DanseMacabrePower.BeforeCardPlayed` owns both the exact trigger condition and
+the block command: an owner card whose resolved energy cost is at least the
+power's Energy dynamic variable causes one flash and one awaited
+`CreatureCmd.GainBlock(Creature, decimal, ValueProp, CardPlay, bool)`. Count
+the callback trigger there, arm only that immediate overload, and use its
+returned post-modifier amount as block gained. The application turn is
+observed from the successful `PowerReceivedEntry`; later turns come from
+`Hook.AfterPlayerTurnStart`. Persist the shared totals and active
+turn/combat denominators under the power ID, and project them on every Danse
+Macabre card rather than assigning later power behavior to one physical copy.
+
 For relics that emit damage commands, prefer the relic-owned callback plus the resolved `CreatureCmd.Damage` result. Mercury Hourglass arms from `MercuryHourglass.AfterPlayerTurnStart`, records the actual multi-target damage split from the command result on each turn, and counts the combat once so damage per combat is not confused with damage per turn-start trigger.
 
 Gremlin Horn's `AfterDeath` callback still runs for the combat-ending enemy and

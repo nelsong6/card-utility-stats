@@ -576,6 +576,20 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsDanseMacabrePowerFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("danse-macabre-power-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        AssertDanseMacabrePowerFixture(
+            loaded.Data.MetaStats.PowerAggregates["POWER.DANSE_MACABRE"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsUnrelentingFreeAttackPowerFixture()
     {
         var loaded = RunStorage.LoadHistorical(
@@ -1316,6 +1330,17 @@ public class SchemaLoadingTests
         Assert.NotNull(resumed);
         AssertJugglingPowerFixture(
             resumed!.MetaStats.PowerAggregates["POWER.JUGGLING"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsDanseMacabrePowerFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("danse-macabre-power-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertDanseMacabrePowerFixture(
+            resumed!.MetaStats.PowerAggregates["POWER.DANSE_MACABRE"]);
     }
 
     [Fact]
@@ -3451,6 +3476,16 @@ public class SchemaLoadingTests
         Assert.Equal(2, powerAgg.RareAttacksCopied);
         Assert.Equal(5, powerAgg.TurnsActive);
         Assert.Equal(2, powerAgg.CombatsActive);
+    }
+
+    private static void AssertDanseMacabrePowerFixture(PowerAggregate powerAgg)
+    {
+        Assert.Equal("POWER.DANSE_MACABRE", powerAgg.PowerId);
+        Assert.Equal("Danse Macabre", powerAgg.DisplayName);
+        Assert.Equal(9, powerAgg.TimesTriggered);
+        Assert.Equal(45m, powerAgg.BlockGained);
+        Assert.Equal(6, powerAgg.TurnsActive);
+        Assert.Equal(3, powerAgg.CombatsActive);
     }
 
     private static void AssertUnrelentingFreeAttackPowerFixture(PowerAggregate powerAgg)

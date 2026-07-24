@@ -101,6 +101,10 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds a power-ID-keyed Juggling aggregate with confirmed Attack copies,
   rarity splits, and active turn/combat denominators. The related Juggling
   card projects this shared power data rather than owning the counters.
+- `danse-macabre-power-run.json`
+  Adds a power-ID-keyed Danse Macabre aggregate with observed triggers,
+  post-modifier block gained, and active turn/combat denominators. The related
+  Danse Macabre card projects this shared power data.
 - `unrelenting-free-attack-power-run.json`
   Adds a power-ID-keyed Free Attack aggregate with charges granted and used,
   observed energy savings, zero-savings uses, and discounted Attack rarity

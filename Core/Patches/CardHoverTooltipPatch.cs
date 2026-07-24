@@ -28,6 +28,7 @@ public static class CardHoverShowPatch
     private const string DrawCardsNextTurnPowerIconPath = "res://images/atlases/power_atlas.sprites/draw_cards_next_turn_power.tres";
     private const string BlockedDrawIconPath = DrawCardsNextTurnPowerIconPath;
     private const int DebtGoldLossPerTrigger = 5;
+    private const string DanseMacabrePowerId = "POWER.DANSE_MACABRE";
     private const string EnergyPotionIconPath = "res://images/atlases/potion_atlas.sprites/energy_potion.tres";
     private const string FreeAttackPowerId = "POWER.FREE_ATTACK_POWER";
     private const string JugglingPowerId = "POWER.JUGGLING";
@@ -355,6 +356,7 @@ public static class CardHoverShowPatch
         AppendDiscoveryStats(sb, cardModel, agg, compact: false);
         AppendDrainPowerStats(sb, cardModel, agg, compact: false);
         AppendJugglingPowerStats(sb, cardModel, metaStats, compact: false);
+        AppendDanseMacabrePowerStats(sb, cardModel, metaStats, compact: false);
         AppendUnrelentingFreeAttackStats(sb, cardModel, metaStats, compact: false);
         AppendDebtStats(sb, cardModel, agg);
         AppendReplayStats(sb, agg);
@@ -564,6 +566,7 @@ public static class CardHoverShowPatch
         AppendDiscoveryStats(sb, cardModel, agg, compact: true);
         AppendDrainPowerStats(sb, cardModel, agg, compact: true);
         AppendJugglingPowerStats(sb, cardModel, metaStats, compact: true);
+        AppendDanseMacabrePowerStats(sb, cardModel, metaStats, compact: true);
         AppendUnrelentingFreeAttackStats(sb, cardModel, metaStats, compact: true);
         AppendDebtStats(sb, cardModel, agg);
         AppendReplayStats(sb, agg);
@@ -835,6 +838,86 @@ public static class CardHoverShowPatch
             : 0m;
         Row3(sb, "avg copies per turn", FormatDecimal(averagePerTurn), "");
         Row3(sb, "avg copies per combat", FormatDecimal(averagePerCombat), "");
+    }
+
+    private static void AppendDanseMacabrePowerStats(
+        StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel card,
+        RunMetaStats metaStats,
+        bool compact)
+    {
+        if (card is not DanseMacabre
+            && !IsCardId(card, "CARD.DANSE_MACABRE"))
+            return;
+
+        metaStats ??= new RunMetaStats();
+        PowerAggregate? powerAgg = null;
+        if (metaStats.PowerAggregates != null)
+        {
+            metaStats.PowerAggregates.TryGetValue(
+                DanseMacabrePowerId,
+                out powerAgg);
+            powerAgg ??= metaStats.PowerAggregates.Values.FirstOrDefault(candidate =>
+                string.Equals(
+                    candidate.PowerId,
+                    DanseMacabrePowerId,
+                    StringComparison.Ordinal)
+                || string.Equals(
+                    candidate.DisplayName,
+                    "Danse Macabre",
+                    StringComparison.OrdinalIgnoreCase));
+        }
+        powerAgg ??= new PowerAggregate();
+
+        Row3(sb, "Times triggered", powerAgg.TimesTriggered.ToString(), "");
+        if (compact)
+        {
+            Row3(
+                sb,
+                GetBlockStatLabel("Block gained"),
+                FormatDecimal(powerAgg.BlockGained),
+                "");
+            return;
+        }
+
+        decimal triggersPerTurn = powerAgg.TurnsActive > 0
+            ? (decimal)powerAgg.TimesTriggered / powerAgg.TurnsActive
+            : 0m;
+        decimal triggersPerCombat = powerAgg.CombatsActive > 0
+            ? (decimal)powerAgg.TimesTriggered / powerAgg.CombatsActive
+            : 0m;
+        decimal blockPerTurn = powerAgg.TurnsActive > 0
+            ? powerAgg.BlockGained / powerAgg.TurnsActive
+            : 0m;
+        decimal blockPerCombat = powerAgg.CombatsActive > 0
+            ? powerAgg.BlockGained / powerAgg.CombatsActive
+            : 0m;
+
+        Row3(
+            sb,
+            "Avg triggers per turn once active",
+            FormatDecimal(triggersPerTurn),
+            "");
+        Row3(
+            sb,
+            "Avg triggers per combat",
+            FormatDecimal(triggersPerCombat),
+            "");
+        Row3(
+            sb,
+            GetBlockStatLabel("Block gained"),
+            FormatDecimal(powerAgg.BlockGained),
+            "");
+        Row3(
+            sb,
+            GetBlockStatLabel("Avg block gained per turn once active"),
+            FormatDecimal(blockPerTurn),
+            "");
+        Row3(
+            sb,
+            GetBlockStatLabel("Avg block gained per combat"),
+            FormatDecimal(blockPerCombat),
+            "");
     }
 
     private static void AppendUnrelentingFreeAttackStats(

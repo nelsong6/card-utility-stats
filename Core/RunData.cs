@@ -380,6 +380,13 @@ public class PowerAggregate
     public int TurnsActive { get; set; }
     public int CombatsActive { get; set; }
 
+    // Danse Macabre tracking. A trigger is one qualifying owner card observed
+    // by the shared power. Block is the post-modifier amount returned by the
+    // power's exact gain-block command. Active denominators include the
+    // application turn and later zero-trigger turns while the power remains.
+    public int TimesTriggered { get; set; }
+    public decimal BlockGained { get; set; }
+
     // Unrelenting / Free Attack tracking. The power owns these outcomes
     // because multiple physical Unrelenting cards contribute to one shared
     // stack. A use is confirmed only when FreeAttackPower completes its
