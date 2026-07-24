@@ -3794,6 +3794,9 @@ public static class RelicHoverShowPatch
     private static string BuildBrilliantScarfBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
+        var energySavedPerTurn = agg.DiscountTurns <= 0
+            ? 0m
+            : (decimal)agg.BrilliantScarfEnergySavedForTurnAverage / agg.DiscountTurns;
         var energySavedPerCombat = agg.DiscountCombats <= 0
             ? 0m
             : (decimal)agg.EnergySavedByDiscount / agg.DiscountCombats;
@@ -3804,6 +3807,7 @@ public static class RelicHoverShowPatch
         Row3(sb, "Discounts offered", agg.DiscountsOffered.ToString(), "");
         Row3(sb, "Discounts taken", agg.DiscountsTaken.ToString(), "");
         Row3(sb, EnergyLabel("Energy saved"), agg.EnergySavedByDiscount.ToString(), "");
+        Row3(sb, EnergyLabel("saved / turn"), FormatDecimal(energySavedPerTurn), "");
         Row3(sb, EnergyLabel("saved / combat"), FormatDecimal(energySavedPerCombat), "");
         Row3(sb, EnergyLabel("saved / use"), FormatDecimal(energySavedPerUse), "");
 

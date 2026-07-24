@@ -1567,6 +1567,7 @@ public static class RunTracker
         RecordWarHammerTurnForTrackedPlayerLocked();
         RecordPaelsClawTurnForTrackedPlayerLocked();
         RecordMummifiedHandTurnForTrackedPlayerLocked();
+        RecordBrilliantScarfTurnForTrackedPlayerLocked();
         RecordPaelsEyeCombatsWithoutActivationForTrackedPlayerLocked();
         RecordTurnEnergyRelicCombatsWithoutEnergyForTrackedPlayerLocked();
         RecordPendulumCombatEndChargeForTrackedPlayerLocked();
@@ -1855,9 +1856,12 @@ public static class RunTracker
         target.IronClubCombatEndChargeCount += source.IronClubCombatEndChargeCount;
 
         target.DiscountCombats += source.DiscountCombats;
+        target.DiscountTurns += source.DiscountTurns;
         target.DiscountsOffered += source.DiscountsOffered;
         target.DiscountsTaken += source.DiscountsTaken;
         target.EnergySavedByDiscount += source.EnergySavedByDiscount;
+        target.BrilliantScarfEnergySavedForTurnAverage +=
+            source.BrilliantScarfEnergySavedForTurnAverage;
         MergeDiscountedCardCosts(target, source);
         target.CardsDiscarded += source.CardsDiscarded;
         target.QuestionMarkSitesEntered += source.QuestionMarkSitesEntered;
@@ -5658,6 +5662,7 @@ public static class RunTracker
                 _pendingCombat ??= new PendingCombat();
                 var player = cardPlay.Card.Owner;
                 RecordBrilliantScarfCombatForPlayerLocked(player);
+                RecordBrilliantScarfTurnForPlayerLocked(player);
 
                 int turnNumber = GetCardOwnerTurnNumber(cardPlay.Card);
                 if (_pendingCombat.BrilliantScarfDiscountOffers.TryGetValue(player, out var existing)
@@ -5758,6 +5763,7 @@ public static class RunTracker
                 var agg = GetOrCreateRelicAggregateLocked(BrilliantScarfRelicId);
                 agg.DiscountsTaken += 1;
                 agg.EnergySavedByDiscount += energySaved;
+                agg.BrilliantScarfEnergySavedForTurnAverage += energySaved;
                 AddDiscountedCardCost(
                     agg,
                     cardPlay.Resources.EnergySpent + energySaved,
@@ -5775,13 +5781,35 @@ public static class RunTracker
         int offers,
         int taken,
         int energySaved,
-        int combats = 0)
+        int combats = 0,
+        int turns = 0)
     {
         if (agg == null) return;
         agg.DiscountCombats += Math.Max(0, combats);
+        agg.DiscountTurns += Math.Max(0, turns);
         agg.DiscountsOffered += Math.Max(0, offers);
         agg.DiscountsTaken += Math.Max(0, taken);
-        agg.EnergySavedByDiscount += Math.Max(0, energySaved);
+        var observedEnergySaved = Math.Max(0, energySaved);
+        agg.EnergySavedByDiscount += observedEnergySaved;
+        agg.BrilliantScarfEnergySavedForTurnAverage += observedEnergySaved;
+    }
+
+    public static void RecordBrilliantScarfTurnStarted(Player player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                RecordBrilliantScarfTurnForPlayerLocked(player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordBrilliantScarfTurnStarted failed: {e.Message}");
+            }
+        }
     }
 
     internal static void RecordBrilliantScarfDiscountCostForTest(
@@ -15602,6 +15630,42 @@ public static class RunTracker
         agg.DiscountCombats += 1;
     }
 
+    private static void RecordBrilliantScarfTurnForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordBrilliantScarfTurnForPlayerLocked(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordBrilliantScarfTurnForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordBrilliantScarfTurnForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasBrilliantScarf(player)) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.BrilliantScarfTurnCountedTurns.TryGetValue(
+                player,
+                out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.BrilliantScarfTurnCountedTurns[player] = turnNumber;
+        RecordBrilliantScarfCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(BrilliantScarfRelicId);
+        agg.DiscountTurns += 1;
+    }
+
     private static bool PlayerHasBrilliantScarf(Player player)
     {
         try
@@ -19978,6 +20042,8 @@ internal class PendingCombat
     public HashSet<Player> IronClubCombatEndChargeRecordedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> BrilliantScarfCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> BrilliantScarfTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> SturdyClampCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

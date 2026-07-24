@@ -683,7 +683,14 @@ discounts happen through `TryModifyEnergyCostInCombatLate` and `TryModifyStarCos
 when that counter is one short of the configured threshold. Cost modifiers are
 queried repeatedly for UI/playability, so count the offer from the counter
 transition and use the modifier only to measure energy saved by the card that
-later consumes the offer.
+later consumes the offer. Count every distinct held player turn from
+`Hook.AfterPlayerTurnStart`, and reconcile the current turn at combat
+promotion, so average energy saved per turn includes zero-offer and
+zero-saving turns as well as combat-ending turns. Persist a matching
+observation-era saved-energy numerator for this new denominator; historic run
+files can already contain total saved energy but cannot reconstruct their
+earlier held turns, so mixing that total with only newly observed turns would
+inflate the average after an upgrade or hot reload.
 
 Pendulum advances its persistent turn counter from its owner-specific
 `AfterPlayerTurnStart` callback and can activate multiple times in a long

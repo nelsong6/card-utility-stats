@@ -30,9 +30,11 @@ public class BrilliantScarfStatsTests
         var agg = new RelicAggregate();
 
         Assert.Equal(0, agg.DiscountCombats);
+        Assert.Equal(0, agg.DiscountTurns);
         Assert.Equal(0, agg.DiscountsOffered);
         Assert.Equal(0, agg.DiscountsTaken);
         Assert.Equal(0, agg.EnergySavedByDiscount);
+        Assert.Equal(0, agg.BrilliantScarfEnergySavedForTurnAverage);
         Assert.Empty(agg.DiscountedCardCosts);
     }
 
@@ -45,9 +47,11 @@ public class BrilliantScarfStatsTests
         run.RelicAggregates[BrilliantScarfRelicId] = new RelicAggregate
         {
             DiscountCombats = 2,
+            DiscountTurns = 6,
             DiscountsOffered = 5,
             DiscountsTaken = 3,
             EnergySavedByDiscount = 7,
+            BrilliantScarfEnergySavedForTurnAverage = 7,
             DiscountedCardCosts =
             {
                 [energyTwoKey] = new DiscountedCardCostAggregate
@@ -68,9 +72,11 @@ public class BrilliantScarfStatsTests
         var json = JsonSerializer.Serialize(run, SerializerOptions);
 
         Assert.Contains("discount_combats", json);
+        Assert.Contains("discount_turns", json);
         Assert.Contains("discounts_offered", json);
         Assert.Contains("discounts_taken", json);
         Assert.Contains("energy_saved_by_discount", json);
+        Assert.Contains("brilliant_scarf_energy_saved_for_turn_average", json);
         Assert.Contains("discounted_card_costs", json);
         Assert.Contains("energy_cost", json);
         Assert.Contains("star_cost", json);
@@ -80,9 +86,11 @@ public class BrilliantScarfStatsTests
         Assert.NotNull(restored);
         var restoredAgg = restored!.RelicAggregates[BrilliantScarfRelicId];
         Assert.Equal(2, restoredAgg.DiscountCombats);
+        Assert.Equal(6, restoredAgg.DiscountTurns);
         Assert.Equal(5, restoredAgg.DiscountsOffered);
         Assert.Equal(3, restoredAgg.DiscountsTaken);
         Assert.Equal(7, restoredAgg.EnergySavedByDiscount);
+        Assert.Equal(7, restoredAgg.BrilliantScarfEnergySavedForTurnAverage);
         Assert.Equal(2, restoredAgg.DiscountedCardCosts[energyTwoKey].EnergyCost);
         Assert.Equal(0, restoredAgg.DiscountedCardCosts[energyTwoKey].StarCost);
         Assert.Equal(2, restoredAgg.DiscountedCardCosts[energyTwoKey].Count);
@@ -96,13 +104,47 @@ public class BrilliantScarfStatsTests
     {
         var agg = new RelicAggregate();
 
-        RunTracker.RecordBrilliantScarfDiscountForTest(agg, offers: 5, taken: 3, energySaved: 7, combats: 2);
-        RunTracker.RecordBrilliantScarfDiscountForTest(agg, offers: -1, taken: -2, energySaved: -3, combats: -4);
+        RunTracker.RecordBrilliantScarfDiscountForTest(
+            agg,
+            offers: 5,
+            taken: 3,
+            energySaved: 7,
+            combats: 2,
+            turns: 6);
+        RunTracker.RecordBrilliantScarfDiscountForTest(
+            agg,
+            offers: -1,
+            taken: -2,
+            energySaved: -3,
+            combats: -4,
+            turns: -5);
 
         Assert.Equal(2, agg.DiscountCombats);
+        Assert.Equal(6, agg.DiscountTurns);
         Assert.Equal(5, agg.DiscountsOffered);
         Assert.Equal(3, agg.DiscountsTaken);
         Assert.Equal(7, agg.EnergySavedByDiscount);
+        Assert.Equal(7, agg.BrilliantScarfEnergySavedForTurnAverage);
+    }
+
+    [Fact]
+    public void RelicAggregate_BrilliantScarfTurnDenominator_Merges()
+    {
+        var target = new RelicAggregate
+        {
+            DiscountTurns = 2,
+            BrilliantScarfEnergySavedForTurnAverage = 2,
+        };
+        var source = new RelicAggregate
+        {
+            DiscountTurns = 4,
+            BrilliantScarfEnergySavedForTurnAverage = 5,
+        };
+
+        RunTracker.MergeRelicAggregateInto(target, source);
+
+        Assert.Equal(6, target.DiscountTurns);
+        Assert.Equal(7, target.BrilliantScarfEnergySavedForTurnAverage);
     }
 
     [Fact]
@@ -138,9 +180,11 @@ public class BrilliantScarfStatsTests
         var agg = new RelicAggregate
         {
             DiscountCombats = 2,
+            DiscountTurns = 4,
             DiscountsOffered = 5,
             DiscountsTaken = 3,
             EnergySavedByDiscount = 7,
+            BrilliantScarfEnergySavedForTurnAverage = 7,
         };
 
         var body = (string)(BuildBrilliantScarfBodyMethod.Invoke(null, new object?[] { agg })
@@ -150,12 +194,14 @@ public class BrilliantScarfStatsTests
         Assert.Contains("Discounts offered", body);
         Assert.Contains("Discounts taken", body);
         Assert.Contains("Energy saved", body);
+        Assert.Contains("saved / turn", body);
         Assert.Contains("saved / combat", body);
         Assert.Contains("saved / use", body);
         Assert.Contains("[b]2[/b]", body);
         Assert.Contains("[b]5[/b]", body);
         Assert.Contains("[b]3[/b]", body);
         Assert.Contains("[b]7[/b]", body);
+        Assert.Contains("[b]1.75[/b]", body);
         Assert.Contains("[b]3.5[/b]", body);
         Assert.Contains("[b]2.33[/b]", body);
     }
@@ -167,6 +213,7 @@ public class BrilliantScarfStatsTests
             ?? throw new InvalidOperationException("BuildBrilliantScarfBodyBBCode returned null."));
 
         Assert.Contains("Combats held", body);
+        Assert.Contains("saved / turn", body);
         Assert.Contains("saved / combat", body);
         Assert.Contains("saved / use", body);
         Assert.Contains("[b]0[/b]", body);

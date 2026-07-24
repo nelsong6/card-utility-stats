@@ -1,0 +1,32 @@
+{
+  "run_id": "brilliant-scarf-turn-average-fixture",
+  "started_at": "2026-07-24T21:00:00Z",
+  "updated_at": "2026-07-24T21:10:00Z",
+  "outcome": "in_progress",
+  "aggregates": {
+    "CARD.STRIKE_IRONCLAD#1": {
+      "plays": 4,
+      "total_energy_spent": 4
+    }
+  },
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.BRILLIANT_SCARF": {
+      "discount_combats": 2,
+      "discount_turns": 6,
+      "discounts_offered": 5,
+      "discounts_taken": 3,
+      "energy_saved_by_discount": 7,
+      "brilliant_scarf_energy_saved_for_turn_average": 7
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.STRIKE_IRONCLAD": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.STRIKE_IRONCLAD": 1
+  }
+}

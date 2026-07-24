@@ -971,11 +971,15 @@ public class RelicAggregate
     public int IronClubCombatEndChargeTotal { get; set; }
     public int IronClubCombatEndChargeCount { get; set; }
 
-    // Cost-discount tracking. Used by Brilliant Scarf.
+    // Cost-discount tracking. Used by Brilliant Scarf. The turn-average
+    // numerator starts with its additive turn denominator so an older run's
+    // historical saved-energy total is not divided by only newly seen turns.
     public int DiscountCombats { get; set; }
+    public int DiscountTurns { get; set; }
     public int DiscountsOffered { get; set; }
     public int DiscountsTaken { get; set; }
     public int EnergySavedByDiscount { get; set; }
+    public int BrilliantScarfEnergySavedForTurnAverage { get; set; }
     public Dictionary<string, DiscountedCardCostAggregate> DiscountedCardCosts { get; set; } = new();
 
     // Total cards actually discarded while Gambling Chip's combat-start

@@ -1,6 +1,8 @@
 using System;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Entities.Cards;
+using MegaCrit.Sts2.Core.Entities.Players;
+using MegaCrit.Sts2.Core.Hooks;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Relics;
 
@@ -79,6 +81,27 @@ public static class BrilliantScarfAfterCardPlayedPatch
         catch (Exception e)
         {
             CoreMain.LogDebug($"BrilliantScarfAfterCardPlayedPatch failed: {e.Message}");
+        }
+    }
+}
+
+/// <summary>
+/// Counts every distinct player turn where Brilliant Scarf is held, including
+/// turns with no discount offer or saved energy.
+/// </summary>
+[HarmonyPatch(typeof(Hook), nameof(Hook.AfterPlayerTurnStart))]
+public static class HookAfterPlayerTurnStartBrilliantScarfPatch
+{
+    [HarmonyPrefix]
+    public static void Prefix(Player player)
+    {
+        try
+        {
+            RunTracker.RecordBrilliantScarfTurnStarted(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"HookAfterPlayerTurnStartBrilliantScarfPatch failed: {e.Message}");
         }
     }
 }
