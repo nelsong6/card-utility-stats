@@ -1,0 +1,72 @@
+{
+  "run_id": "war-hammer-relic-fixture",
+  "started_at": "2026-07-23T17:00:00Z",
+  "updated_at": "2026-07-23T17:30:00Z",
+  "character": "CHARACTER.IRONCLAD",
+  "ascension": 8,
+  "floor_reached": 28,
+  "outcome": "in_progress",
+  "game_start_time": 1784840400,
+  "aggregates": {
+    "CARD.GRAVE_WARDEN#1": {
+      "initial_upgrade_level": 0,
+      "plays": 4
+    },
+    "CARD.REAP#1": {
+      "initial_upgrade_level": 0,
+      "plays": 3
+    },
+    "CARD.DEFY#1": {
+      "initial_upgrade_level": 0,
+      "plays": 3
+    },
+    "CARD.BASH#1": {
+      "initial_upgrade_level": 0,
+      "plays": 2
+    }
+  },
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.WAR_HAMMER": {
+      "activations": 2,
+      "cards_upgraded": 4,
+      "upgraded_cards": [
+        "Grave Warden+",
+        "Reap+",
+        "Defy+",
+        "Bash+"
+      ],
+      "war_hammer_upgraded_card_instance_ids": [
+        "CARD.GRAVE_WARDEN#1",
+        "CARD.REAP#1",
+        "CARD.DEFY#1",
+        "CARD.BASH#1"
+      ],
+      "war_hammer_upgraded_card_plays": 12,
+      "war_hammer_combats": 3,
+      "war_hammer_turns": 6
+    }
+  },
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.GRAVE_WARDEN": [
+      1
+    ],
+    "CARD.REAP": [
+      1
+    ],
+    "CARD.DEFY": [
+      1
+    ],
+    "CARD.BASH": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.GRAVE_WARDEN": 1,
+    "CARD.REAP": 1,
+    "CARD.DEFY": 1,
+    "CARD.BASH": 1
+  }
+}

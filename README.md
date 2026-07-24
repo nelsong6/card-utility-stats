@@ -112,6 +112,9 @@ Additional shipped: discard count, pile-top placements (from hand / from discard
 Drain Power additionally tracks its observed discard-pile upgrades and later
 plays of the exact combat cards it upgraded, with held-turn and held-combat
 averages per physical Drain Power.
+War Hammer records each Elite-victory activation, every permanent deck card it
+actually upgraded, and later plays of those exact physical cards, with
+per-activation upgrade value and held-turn/combat play averages.
 
 Run outcome detection (win/loss/abandoned) is implemented ([#10](https://github.com/romaine-life/spirelens/issues/10), closed) via the run-history entry hook.
 

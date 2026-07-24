@@ -292,6 +292,10 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `fishing-rod-relic-run.json`
   Adds Fishing Rod tracking: every card actually upgraded at its three-combat
   interval, retained in upgrade order.
+- `war-hammer-relic-run.json`
+  Adds War Hammer's Elite-victory activations, observed permanent-deck
+  upgrades, stable upgraded-card instance IDs, later upgraded-card plays, and
+  held turn/combat denominators.
 - `egg-relic-offers-run.json`
   Adds Molten, Toxic, and Frozen Egg tracking: every matching choosable card
   option the egg actually upgraded across rewards, shops, and other offers.

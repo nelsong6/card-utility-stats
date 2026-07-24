@@ -2226,6 +2226,25 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsWarHammerRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("war-hammer-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertWarHammerFixture(loaded.Data.RelicAggregates["RELIC.WAR_HAMMER"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsWarHammerRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("war-hammer-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertWarHammerFixture(resumed!.RelicAggregates["RELIC.WAR_HAMMER"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsEggRelicOffersFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("egg-relic-offers-run.json"));
@@ -3385,6 +3404,27 @@ public class SchemaLoadingTests
         Assert.Equal(
             new[] { "Pommel Strike", "Uppercut+", "Pommel Strike" },
             relicAgg.SharpEnchantedCards);
+    }
+
+    private static void AssertWarHammerFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(2, relicAgg.Activations);
+        Assert.Equal(4, relicAgg.CardsUpgraded);
+        Assert.Equal(
+            new[] { "Grave Warden+", "Reap+", "Defy+", "Bash+" },
+            relicAgg.UpgradedCards);
+        Assert.Equal(
+            new[]
+            {
+                "CARD.GRAVE_WARDEN#1",
+                "CARD.REAP#1",
+                "CARD.DEFY#1",
+                "CARD.BASH#1",
+            },
+            relicAgg.WarHammerUpgradedCardInstanceIds);
+        Assert.Equal(12, relicAgg.WarHammerUpgradedCardPlays);
+        Assert.Equal(3, relicAgg.WarHammerCombats);
+        Assert.Equal(6, relicAgg.WarHammerTurns);
     }
 
     private static void AssertFresnelLensFixture(RelicAggregate relicAgg)

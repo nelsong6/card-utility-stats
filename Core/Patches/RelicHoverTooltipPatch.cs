@@ -1559,6 +1559,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is WarHammer)
+        {
+            title = "War Hammer";
+            body = BuildWarHammerBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is GnarledHammer)
         {
             title = "Gnarled Hammer";
@@ -2845,6 +2852,33 @@ public static class RelicHoverShowPatch
         Row3(sb, "Upgraded-card draws", agg.RazorToothUpgradedCardDraws.ToString(), "");
         Row3(sb, "Avg upgraded draws/turn", FormatDecimal(upgradedDrawsPerTurn), "");
         Row3(sb, "Avg upgraded draws/combat", FormatDecimal(upgradedDrawsPerCombat), "");
+        return sb.ToString();
+    }
+
+    private static string BuildWarHammerBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var cardsPerActivation = agg.Activations <= 0
+            ? 0m
+            : (decimal)agg.CardsUpgraded / agg.Activations;
+        var upgradedPlaysPerTurn = agg.WarHammerTurns <= 0
+            ? 0m
+            : (decimal)agg.WarHammerUpgradedCardPlays / agg.WarHammerTurns;
+        var upgradedPlaysPerCombat = agg.WarHammerCombats <= 0
+            ? 0m
+            : (decimal)agg.WarHammerUpgradedCardPlays / agg.WarHammerCombats;
+
+        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        Row3(sb, "Cards upgraded", agg.CardsUpgraded.ToString(), "");
+        Row3(sb, "Avg cards upgraded/activation", FormatDecimal(cardsPerActivation), "");
+        foreach (var card in (agg.UpgradedCards ?? new List<string>())
+                     .Where(card => !string.IsNullOrWhiteSpace(card)))
+        {
+            RowFlow(sb, "Upgraded card", StatsTooltip.EscapeBbcode(card), "");
+        }
+        Row3(sb, "Upgraded-card plays", agg.WarHammerUpgradedCardPlays.ToString(), "");
+        Row3(sb, "Avg upgraded plays/turn", FormatDecimal(upgradedPlaysPerTurn), "");
+        Row3(sb, "Avg upgraded plays/combat", FormatDecimal(upgradedPlaysPerCombat), "");
         return sb.ToString();
     }
 

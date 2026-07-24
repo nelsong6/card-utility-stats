@@ -513,10 +513,19 @@ public class RelicAggregate
     public decimal PlatingAdded { get; set; }
 
     // Total cards this relic upgraded. Used by Stone Cracker, Razor Tooth,
-    // Sand Castle, Whetstone, War Paint, Fishing Rod, and other
+    // Sand Castle, Whetstone, War Paint, Fishing Rod, War Hammer, and other
     // upgrade-granting relics.
     public int CardsUpgraded { get; set; }
     public List<string> UpgradedCards { get; set; } = new();
+
+    // War Hammer tracking. The id list preserves the exact permanent deck
+    // cards upgraded after Elite victories so their later completed plays can
+    // be recognized across combats and hot reloads. Combats/turns are held
+    // denominators and include zero-play periods.
+    public List<string> WarHammerUpgradedCardInstanceIds { get; set; } = new();
+    public int WarHammerUpgradedCardPlays { get; set; }
+    public int WarHammerCombats { get; set; }
+    public int WarHammerTurns { get; set; }
 
     // Permanent deck cards whose Sharp enchantment was applied or increased
     // by Gnarled Hammer's pickup effect.

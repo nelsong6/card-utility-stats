@@ -440,6 +440,16 @@ arming a window around that exact callback and consuming the existing
 `CardModel.UpgradeInternal` observation; do not infer the chosen card from deck
 state or independently reproduce the relic's RNG selection.
 
+War Hammer's `AfterCombatVictory` callback runs after an Elite victory, before
+the game's later `CombatEnded` event promotes SpireLens's pending combat. It
+selects up to four random upgradable permanent-deck cards and calls
+`CardCmd.Upgrade` synchronously. Wrap the callback's returned task so attribution
+finishes before promotion, and consume the existing `CardModel.UpgradeInternal`
+observation. Persist each upgraded card's stable deck instance id as well as
+its display name; later completed plays can then be attributed to the exact
+physical cards across combats and hot reloads. Use every player turn and combat
+where War Hammer was held as the zero-inclusive play-rate denominators.
+
 Molten Egg, Toxic Egg, and Frozen Egg share `EggRelicHelper.UpgradeValidCards`
 for both late card-reward modification and merchant inventory modification.
 For each matching upgradable option, that helper calls the two-argument

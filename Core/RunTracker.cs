@@ -109,6 +109,7 @@ public static class RunTracker
     private static readonly Dictionary<Player, PendingWarPaintPickup> _pendingWarPaintPickups = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<Player, PendingFragrantMushroomPickup> _pendingFragrantMushroomPickups = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<Player, PendingFishingRodUpgrade> _pendingFishingRodUpgrades = new(ReferenceEqualityComparer.Instance);
+    private static readonly Dictionary<Player, PendingWarHammerActivation> _pendingWarHammerActivations = new(ReferenceEqualityComparer.Instance);
     private static bool _shivAvailableThisRun;
     private static CardModel? _shivDeckViewCard;
     private const decimal PoisonOwnershipEpsilon = 0.0001m;
@@ -951,6 +952,7 @@ public static class RunTracker
         _pendingBronzeScalesDamageAttributions.Clear();
         _pendingHornCleatBlockAttributions.Clear();
         _lastEnergyResetRoundByRelicAndPlayer.Clear();
+        _pendingWarHammerActivations.Clear();
         _pendingToolboxOfferScreens = 0;
         _pendingMakeItSoSummons.Clear();
         _pendingReplayExtraPlaySources.Clear();
@@ -1554,6 +1556,7 @@ public static class RunTracker
         RecordReptileTrinketTurnForTrackedPlayerLocked();
         RecordPaperPhrogTurnForTrackedPlayerLocked();
         RecordRazorToothTurnForTrackedPlayerLocked();
+        RecordWarHammerTurnForTrackedPlayerLocked();
         RecordPaelsClawTurnForTrackedPlayerLocked();
         RecordMummifiedHandTurnForTrackedPlayerLocked();
         RecordPaelsEyeCombatsWithoutActivationForTrackedPlayerLocked();
@@ -1635,6 +1638,10 @@ public static class RunTracker
         target.PlatingAdded += source.PlatingAdded;
         target.CardsUpgraded += source.CardsUpgraded;
         MergeUpgradedCardsInto(target, source);
+        MergeWarHammerUpgradedCardInstanceIdsInto(target, source);
+        target.WarHammerUpgradedCardPlays += source.WarHammerUpgradedCardPlays;
+        target.WarHammerCombats += source.WarHammerCombats;
+        target.WarHammerTurns += source.WarHammerTurns;
         MergeSharpEnchantedCardsInto(target, source);
         target.RazorToothCombats += source.RazorToothCombats;
         target.RazorToothTurns += source.RazorToothTurns;
@@ -1989,6 +1996,7 @@ public static class RunTracker
             _pendingCombat ??= new PendingCombat();
 
             RecordRazorToothUpgradedCardPlayedLocked(cardPlay.Card);
+            RecordWarHammerUpgradedCardPlayedLocked(cardPlay.Card);
             RecordStrikeDummyStrikePlayedIfOwnedLocked(cardPlay.Card);
             RecordNutritiousSoupEnchantedStrikePlayedIfOwnedLocked(cardPlay.Card);
             RecordMiniatureCannonUpgradedAttackPlayedIfOwnedLocked(cardPlay.Card);
@@ -3431,6 +3439,7 @@ public static class RunTracker
     private const string GorgetRelicId = "RELIC.GORGET";
     private const string StoneCrackerRelicId = "RELIC.STONE_CRACKER";
     private const string RazorToothRelicId = "RELIC.RAZOR_TOOTH";
+    private const string WarHammerRelicId = "RELIC.WAR_HAMMER";
     private const string WhetstoneRelicId = "RELIC.WHETSTONE";
     private const string WarPaintRelicId = "RELIC.WAR_PAINT";
     private const string FragrantMushroomRelicId = "RELIC.FRAGRANT_MUSHROOM";
@@ -4199,6 +4208,30 @@ public static class RunTracker
 
         var agg = GetOrCreatePendingRelicAggregateLocked(RazorToothRelicId);
         RecordRazorToothUpgradedCardDrawForTest(agg);
+    }
+
+    private static void RecordWarHammerUpgradedCardPlayedLocked(CardModel card)
+    {
+        if (_pendingCombat == null) return;
+        if (card.Owner is not Player player || !IsTrackedPlayer(player)) return;
+        if (!TryGetInstanceId(card, out var instanceId)) return;
+
+        var upgradedByWarHammer =
+            (_currentRun?.RelicAggregates.TryGetValue(WarHammerRelicId, out var committed) == true
+                && committed.WarHammerUpgradedCardInstanceIds?.Contains(
+                    instanceId,
+                    StringComparer.Ordinal) == true)
+            || (_pendingCombat.RelicAggregates.TryGetValue(WarHammerRelicId, out var pending) == true
+                && pending.WarHammerUpgradedCardInstanceIds?.Contains(
+                    instanceId,
+                    StringComparer.Ordinal) == true);
+        if (!upgradedByWarHammer) return;
+
+        RecordWarHammerCombatForPlayerLocked(player);
+        RecordWarHammerTurnForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(WarHammerRelicId);
+        RecordWarHammerUpgradedCardPlayForTest(agg);
     }
 
     /// <summary>
@@ -6788,6 +6821,87 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Arm an attribution window around War Hammer's Elite-victory callback.
+    /// The callback upgrades permanent deck cards synchronously, so
+    /// <see cref="RecordUpgrade"/> can capture both their display names and
+    /// stable instance ids before combat promotion.
+    /// </summary>
+    public static bool BeginWarHammerActivation(
+        WarHammer relic,
+        CombatRoom room,
+        out Player? player)
+    {
+        player = null;
+        if (relic?.Owner == null || room == null || room.RoomType != RoomType.Elite)
+            return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic)) return false;
+                if (!IsTrackedPlayer(relic.Owner)) return false;
+
+                player = relic.Owner;
+                _pendingCombat ??= new PendingCombat();
+                RecordWarHammerCombatForPlayerLocked(player);
+                RecordWarHammerTurnForPlayerLocked(player);
+                _pendingWarHammerActivations[player] = new PendingWarHammerActivation();
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"BeginWarHammerActivation failed: {e.Message}");
+                player = null;
+                return false;
+            }
+        }
+    }
+
+    public static void CompleteWarHammerActivation(Player? player, bool succeeded)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_pendingWarHammerActivations.Remove(player, out var pending)) return;
+                if (!succeeded) return;
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(WarHammerRelicId);
+                RecordWarHammerActivationForTest(
+                    agg,
+                    pending.UpgradedCards,
+                    pending.UpgradedCardInstanceIds);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"CompleteWarHammerActivation failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordWarHammerTurnStarted(Player player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                _pendingCombat ??= new PendingCombat();
+                RecordWarHammerTurnForPlayerLocked(player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordWarHammerTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Record Lee's Waffle's observed pickup HP gain. The relic first grants
     /// max HP, which itself heals, then heals to full; the full pickup delta is
     /// clearer than splitting those two game commands into separate attempts.
@@ -7747,6 +7861,38 @@ public static class RunTracker
         RelicAggregate agg,
         IEnumerable<string>? upgradedCards)
         => RecordRelicUpgradedCards(agg, upgradedCards);
+
+    internal static void RecordWarHammerActivationForTest(
+        RelicAggregate agg,
+        IEnumerable<string>? upgradedCards,
+        IEnumerable<string>? upgradedCardInstanceIds)
+    {
+        if (agg == null) return;
+
+        agg.Activations++;
+        RecordRelicUpgradedCards(agg, upgradedCards);
+        AddUniqueWarHammerCardInstanceIds(agg, upgradedCardInstanceIds);
+    }
+
+    internal static void RecordWarHammerCombatForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.WarHammerCombats += Math.Max(0, count);
+    }
+
+    internal static void RecordWarHammerTurnForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.WarHammerTurns += Math.Max(0, count);
+    }
+
+    internal static void RecordWarHammerUpgradedCardPlayForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.WarHammerUpgradedCardPlays += Math.Max(0, count);
+    }
 
     internal static void RecordEggUpgradedCardOfferedForTest(RelicAggregate agg, int count = 1)
     {
@@ -13094,6 +13240,18 @@ public static class RunTracker
         }
     }
 
+    private static bool PlayerHasWarHammer(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is WarHammer);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static bool PlayerHasPaperPhrog(Player player)
     {
         try
@@ -13293,6 +13451,7 @@ public static class RunTracker
             RecordPaelsEyeCombatForPlayerLocked(player);
             RecordPaperPhrogCombatForPlayerLocked(player);
             RecordRazorToothCombatForPlayerLocked(player);
+            RecordWarHammerCombatForPlayerLocked(player);
             RecordRegaliteCombatForPlayerLocked(player);
             RecordIntimidatingHelmetCombatForPlayerLocked(player);
             RecordDaughterOfTheWindCombatForPlayerLocked(player);
@@ -13606,6 +13765,50 @@ public static class RunTracker
 
         var agg = GetOrCreatePendingRelicAggregateLocked(RazorToothRelicId);
         RecordRazorToothTurnForTest(agg);
+    }
+
+    private static void RecordWarHammerCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasWarHammer(player)) return;
+        if (!_pendingCombat.WarHammerCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(WarHammerRelicId);
+        RecordWarHammerCombatForTest(agg);
+    }
+
+    private static void RecordWarHammerTurnForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordWarHammerTurnForPlayerLocked(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordWarHammerTurnForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordWarHammerTurnForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasWarHammer(player)) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.WarHammerTurnCountedTurns.TryGetValue(player, out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.WarHammerTurnCountedTurns[player] = turnNumber;
+        RecordWarHammerCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(WarHammerRelicId);
+        RecordWarHammerTurnForTest(agg);
     }
 
     private static void RecordRegaliteCombatForPlayerLocked(Player player)
@@ -14654,6 +14857,30 @@ public static class RunTracker
         target.UpgradedCards.AddRange(source.UpgradedCards.Where(card => !string.IsNullOrWhiteSpace(card)));
     }
 
+    private static void MergeWarHammerUpgradedCardInstanceIdsInto(
+        RelicAggregate target,
+        RelicAggregate source)
+        => AddUniqueWarHammerCardInstanceIds(
+            target,
+            source.WarHammerUpgradedCardInstanceIds);
+
+    private static void AddUniqueWarHammerCardInstanceIds(
+        RelicAggregate target,
+        IEnumerable<string>? instanceIds)
+    {
+        if (instanceIds == null) return;
+
+        target.WarHammerUpgradedCardInstanceIds ??= new List<string>();
+        var seen = new HashSet<string>(
+            target.WarHammerUpgradedCardInstanceIds,
+            StringComparer.Ordinal);
+        foreach (var instanceId in instanceIds)
+        {
+            if (string.IsNullOrWhiteSpace(instanceId) || !seen.Add(instanceId)) continue;
+            target.WarHammerUpgradedCardInstanceIds.Add(instanceId);
+        }
+    }
+
     private static void MergeSharpEnchantedCardsInto(RelicAggregate target, RelicAggregate source)
     {
         if (source.SharpEnchantedCards == null || source.SharpEnchantedCards.Count == 0)
@@ -15148,6 +15375,7 @@ public static class RunTracker
             RecordWarPaintCardUpgradedLocked(card);
             RecordFragrantMushroomCardUpgradedLocked(card);
             RecordFishingRodCardUpgradedLocked(card);
+            RecordWarHammerCardUpgradedLocked(card);
             RecordDrainPowerCardUpgradedLocked(card);
 
             // Non-assigning: skip upgrades on cards we haven't seen enter
@@ -15302,6 +15530,23 @@ public static class RunTracker
         catch (Exception e)
         {
             CoreMain.LogDebug($"RecordFishingRodCardUpgradedLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordWarHammerCardUpgradedLocked(CardModel card)
+    {
+        try
+        {
+            if (card?.Owner is not Player owner) return;
+            if (!_pendingWarHammerActivations.TryGetValue(owner, out var pending)) return;
+
+            pending.UpgradedCards.Add(GetCardDisplayNameForStats(card));
+            if (TryGetInstanceId(card, out var instanceId))
+                pending.UpgradedCardInstanceIds.Add(instanceId);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordWarHammerCardUpgradedLocked failed: {e.Message}");
         }
     }
 
@@ -18265,6 +18510,10 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<CardModel> RazorToothUpgradedCards { get; }
         = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> WarHammerCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> WarHammerTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> RegaliteCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> RegaliteTurnCountedTurns { get; }
@@ -18422,6 +18671,12 @@ internal sealed class PendingFragrantMushroomPickup
 internal sealed class PendingFishingRodUpgrade
 {
     public List<string> UpgradedCards { get; } = new();
+}
+
+internal sealed class PendingWarHammerActivation
+{
+    public List<string> UpgradedCards { get; } = new();
+    public HashSet<string> UpgradedCardInstanceIds { get; } = new(StringComparer.Ordinal);
 }
 
 internal sealed class PlayerPowerOwnershipShare
