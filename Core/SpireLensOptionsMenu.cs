@@ -16,6 +16,7 @@ public static class SpireLensOptionsMenu
     private static CanvasLayer? _layer;
     private static readonly List<Button> Checkboxes = new();
     private static readonly List<Button> CheckboxIndicators = new();
+    private static readonly List<Panel> SelectionHighlights = new();
     private static int _selectedIndex;
     private static int _leftStickVerticalDirection;
     private static int _leftStickHorizontalDirection;
@@ -46,8 +47,7 @@ public static class SpireLensOptionsMenu
         _leftStickVerticalDirection = 0;
         _leftStickHorizontalDirection = 0;
         _leftTriggerPressed = false;
-        Checkboxes[_selectedIndex].GrabFocus();
-        StatsTooltip.Hide();
+        RefreshSelectionHighlight();
         CoreMain.Logger.Info($"SpireLens options menu opened ({source})");
     }
 
@@ -109,6 +109,7 @@ public static class SpireLensOptionsMenu
         _layer = null;
         Checkboxes.Clear();
         CheckboxIndicators.Clear();
+        SelectionHighlights.Clear();
         _selectedIndex = 0;
         _leftStickVerticalDirection = 0;
         _leftStickHorizontalDirection = 0;
@@ -179,6 +180,7 @@ public static class SpireLensOptionsMenu
         {
             Text = "Close  —  RS / Left Shift / Esc",
             CustomMinimumSize = new Vector2(0, 56),
+            FocusMode = Control.FocusModeEnum.None,
             MouseDefaultCursorShape = Control.CursorShape.PointingHand,
         };
         close.AddThemeFontSizeOverride("font_size", 20);
@@ -203,9 +205,31 @@ public static class SpireLensOptionsMenu
         parent.AddChild(row);
 
         var indicator = CreateCheckboxIndicator();
-        indicator.Pressed += () => ToggleOption(index, "menu checkbox icon");
+        indicator.MouseEntered += () => SetSelectedIndex(index);
+        indicator.Pressed += () =>
+        {
+            SetSelectedIndex(index);
+            ToggleOption(index, "menu checkbox icon");
+        };
         CheckboxIndicators.Add(indicator);
         row.AddChild(indicator);
+
+        var optionHost = new Control
+        {
+            CustomMinimumSize = new Vector2(0, 54),
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+        };
+        row.AddChild(optionHost);
+
+        var selectionHighlight = new Panel
+        {
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            Visible = false,
+        };
+        selectionHighlight.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        SelectionHighlights.Add(selectionHighlight);
+        optionHost.AddChild(selectionHighlight);
 
         var checkbox = new Button
         {
@@ -213,19 +237,20 @@ public static class SpireLensOptionsMenu
             ToggleMode = true,
             Flat = true,
             Alignment = HorizontalAlignment.Left,
-            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
-            CustomMinimumSize = new Vector2(0, 54),
+            FocusMode = Control.FocusModeEnum.None,
             MouseDefaultCursorShape = Control.CursorShape.PointingHand,
         };
+        checkbox.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         checkbox.AddThemeFontSizeOverride("font_size", 23);
         checkbox.Toggled += enabled =>
         {
+            SetSelectedIndex(index);
             UpdateIndicator(index, enabled);
             SetOption(index, enabled, "menu checkbox");
         };
-        checkbox.FocusEntered += () => _selectedIndex = index;
+        checkbox.MouseEntered += () => SetSelectedIndex(index);
         Checkboxes.Add(checkbox);
-        row.AddChild(checkbox);
+        optionHost.AddChild(checkbox);
 
     }
 
@@ -270,15 +295,46 @@ public static class SpireLensOptionsMenu
     private static void MoveFocus(int delta)
     {
         if (Checkboxes.Count == 0) return;
-        _selectedIndex = (_selectedIndex + delta + Checkboxes.Count) % Checkboxes.Count;
-        Checkboxes[_selectedIndex].GrabFocus();
+        SetSelectedIndex((_selectedIndex + delta + Checkboxes.Count) % Checkboxes.Count);
     }
 
     private static void JumpToEdge(bool first)
     {
         if (Checkboxes.Count == 0) return;
-        _selectedIndex = first ? 0 : Checkboxes.Count - 1;
-        Checkboxes[_selectedIndex].GrabFocus();
+        SetSelectedIndex(first ? 0 : Checkboxes.Count - 1);
+    }
+
+    private static void SetSelectedIndex(int index)
+    {
+        if (Checkboxes.Count == 0) return;
+        _selectedIndex = Math.Clamp(index, 0, Checkboxes.Count - 1);
+        RefreshSelectionHighlight();
+    }
+
+    private static void RefreshSelectionHighlight()
+    {
+        if (Checkboxes.Count != SelectionHighlights.Count) return;
+
+        for (var i = 0; i < SelectionHighlights.Count; i++)
+        {
+            var highlight = SelectionHighlights[i];
+            if (!GodotObject.IsInstanceValid(highlight)) continue;
+
+            if (i == _selectedIndex)
+            {
+                // Reuse the game's Button focus art without giving this modal
+                // Godot focus. The gameplay control beneath the overlay keeps
+                // its exact focus, highlight, and hover state.
+                highlight.AddThemeStyleboxOverride(
+                    "panel",
+                    Checkboxes[i].GetThemeStylebox("focus"));
+                highlight.Visible = true;
+            }
+            else
+            {
+                highlight.Visible = false;
+            }
+        }
     }
 
     private static bool HandleLeftStick(InputEventJoypadMotion motion)

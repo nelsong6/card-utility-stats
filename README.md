@@ -44,11 +44,13 @@ screens, or on main-menu surfaces such as the compendium or run history.
 Shift-based chords such as Steam's Shift+Tab are left alone.
 
 The modal blocks normal game input while open and contains the master stats
-visibility, card stats, monster stats, and removed-card checkboxes. The D-pad
-and left stick move focus between rows, and `A` toggles the highlighted option.
-Any other non-direction controller button closes the menu. Mouse selection
-remains fully supported; Escape, Left Shift, or the window's Close button also
-closes it.
+visibility, card stats, monster stats, and removed-card checkboxes. It does not
+take Godot focus from the game screen beneath it, so closing the menu returns
+to the exact selection and highlight that were already active. The D-pad and
+left stick move the menu's independent highlight between rows, and `A` toggles
+the highlighted option. Any other non-direction controller button closes the
+menu. Mouse selection remains fully supported; Escape, Left Shift, or the
+window's Close button also closes it.
 
 The optional, mutually exclusive relic-bar filters hide already-resolved relics
 while leaving them owned, functional, and visible on every other relic surface.
