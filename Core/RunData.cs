@@ -520,6 +520,13 @@ public class RelicAggregate
     public int ReptileTrinketTurnsWithExactlyTwoActivations { get; set; }
     public int ReptileTrinketTurnsWithMoreThanTwoActivations { get; set; }
 
+    // Beating Remnant tracking. The prevented amount is the positive
+    // before/after delta at the relic's own post-Osty HP-loss modifier.
+    // Turns and combats are zero-inclusive held denominators.
+    public decimal BeatingRemnantHpLossPrevented { get; set; }
+    public int BeatingRemnantTurns { get; set; }
+    public int BeatingRemnantCombats { get; set; }
+
     // Total Plating this relic added. Used by Gorget.
     public decimal PlatingAdded { get; set; }
 

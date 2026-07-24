@@ -515,6 +515,16 @@ public static class RelicHoverShowPatch
                 return;
             }
 
+            if (relicNode.Model is BeatingRemnant)
+            {
+                const string relicId = "RELIC.BEATING_REMNANT";
+                var agg = RelicAgg(relicId);
+
+                var body = BuildBeatingRemnantBodyBBCode(agg);
+                StatsTooltip.Show(tree, __instance, "Beating Remnant", "SpireLens", body);
+                return;
+            }
+
             if (relicNode.Model is Gorget)
             {
                 const string relicId = "RELIC.GORGET";
@@ -1550,6 +1560,13 @@ public static class RelicHoverShowPatch
         {
             title = "Reptile Trinket";
             body = BuildReptileTrinketBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is BeatingRemnant)
+        {
+            title = "Beating Remnant";
+            body = BuildBeatingRemnantBodyBBCode(agg);
             return true;
         }
 
@@ -2876,6 +2893,34 @@ public static class RelicHoverShowPatch
         var sb = new StringBuilder();
         Row3(sb, "Activations", agg.Activations.ToString(), "");
         Row3(sb, "Plating added", FormatDecimal(agg.PlatingAdded), "");
+        return sb.ToString();
+    }
+
+    private static string BuildBeatingRemnantBodyBBCode(RelicAggregate agg)
+    {
+        var preventedPerTurn = agg.BeatingRemnantTurns <= 0
+            ? 0m
+            : agg.BeatingRemnantHpLossPrevented / agg.BeatingRemnantTurns;
+        var preventedPerCombat = agg.BeatingRemnantCombats <= 0
+            ? 0m
+            : agg.BeatingRemnantHpLossPrevented / agg.BeatingRemnantCombats;
+
+        var sb = new StringBuilder();
+        Row3(
+            sb,
+            "HP loss prevented",
+            FormatDecimal(agg.BeatingRemnantHpLossPrevented),
+            "");
+        Row3(
+            sb,
+            "Avg HP loss prevented per turn",
+            FormatDecimal(preventedPerTurn),
+            "");
+        Row3(
+            sb,
+            "Avg HP loss prevented per combat",
+            FormatDecimal(preventedPerCombat),
+            "");
         return sb.ToString();
     }
 

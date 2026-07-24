@@ -3278,6 +3278,27 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsBeatingRemnantRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("beating-remnant-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertBeatingRemnantFixture(
+            loaded.Data.RelicAggregates["RELIC.BEATING_REMNANT"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsBeatingRemnantRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("beating-remnant-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertBeatingRemnantFixture(
+            resumed!.RelicAggregates["RELIC.BEATING_REMNANT"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsRuinedHelmetRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("ruined-helmet-relic-run.json"));
@@ -3433,6 +3454,13 @@ public class SchemaLoadingTests
         Assert.Equal(3, relicAgg.SturdyClampExcessBlockOverTen);
         Assert.Equal(3, relicAgg.SturdyClampTurns);
         Assert.Equal(2, relicAgg.SturdyClampCombats);
+    }
+
+    private static void AssertBeatingRemnantFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(18m, relicAgg.BeatingRemnantHpLossPrevented);
+        Assert.Equal(6, relicAgg.BeatingRemnantTurns);
+        Assert.Equal(3, relicAgg.BeatingRemnantCombats);
     }
 
     private static void AssertRuinedHelmetFixture(RelicAggregate relicAgg)

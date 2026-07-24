@@ -724,6 +724,15 @@ bucket transition is complete when the activation occurs, no turn-end callback
 is needed and a combat-ending activation cannot be lost; the combat promotion
 boundary only reconciles a final held turn that missed the normal start hook.
 
+Beating Remnant caps post-Osty HP loss in its owner-specific
+`ModifyHpLostAfterOsty` modifier. The positive difference between that method's
+input and output is the HP loss prevented by Beating Remnant itself; do not
+credit it with prevention performed elsewhere in the damage pipeline. Its
+`BeforeSideTurnStart` callback resets the internal received-damage counter when
+the participants include its owner, making that the matching held-turn
+boundary. Count held combats at setup so both averages include zero-prevention
+periods.
+
 Ruined Helmet doubles the first positive Strength amount its owner receives in
 each combat through `TryModifyPowerAmountReceived`. Capture its exact local
 contribution as `modifiedAmount - amount` at that callback, but do not commit it

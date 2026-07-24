@@ -280,6 +280,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `sturdy-clamp-relic-run.json`
   Adds Sturdy Clamp's observed retained block, pre-cap excess block, and the
   turn/combat denominators used by its four average rows.
+- `beating-remnant-relic-run.json`
+  Adds Beating Remnant's observed prevented HP loss plus zero-inclusive held
+  turn/combat denominators for its total and average rows.
 - `ruined-helmet-relic-run.json`
   Adds Ruined Helmet's confirmed activation count, observed bonus Strength, and
   held-combat denominator for its per-activation and per-combat average rows.

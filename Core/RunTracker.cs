@@ -1554,6 +1554,7 @@ public static class RunTracker
         RecordTuningForkTurnForTrackedPlayerLocked();
         RecordRippleBasinTurnForTrackedPlayerLocked();
         RecordReptileTrinketTurnForTrackedPlayerLocked();
+        RecordBeatingRemnantTurnForTrackedPlayerLocked();
         RecordStoneCrackerTurnForTrackedPlayerLocked();
         RecordPaperPhrogTurnForTrackedPlayerLocked();
         RecordRazorToothTurnForTrackedPlayerLocked();
@@ -1643,6 +1644,9 @@ public static class RunTracker
             source.ReptileTrinketTurnsWithExactlyTwoActivations;
         target.ReptileTrinketTurnsWithMoreThanTwoActivations +=
             source.ReptileTrinketTurnsWithMoreThanTwoActivations;
+        target.BeatingRemnantHpLossPrevented += source.BeatingRemnantHpLossPrevented;
+        target.BeatingRemnantTurns += source.BeatingRemnantTurns;
+        target.BeatingRemnantCombats += source.BeatingRemnantCombats;
         target.PlatingAdded += source.PlatingAdded;
         target.CardsUpgraded += source.CardsUpgraded;
         MergeUpgradedCardsInto(target, source);
@@ -3453,6 +3457,7 @@ public static class RunTracker
     private const string SignetRingRelicId = "RELIC.SIGNET_RING";
     private const string CloakClaspRelicId = "RELIC.CLOAK_CLASP";
     private const string ReptileTrinketRelicId = "RELIC.REPTILE_TRINKET";
+    private const string BeatingRemnantRelicId = "RELIC.BEATING_REMNANT";
     private const string GorgetRelicId = "RELIC.GORGET";
     private const string StoneCrackerRelicId = "RELIC.STONE_CRACKER";
     private const string RazorToothRelicId = "RELIC.RAZOR_TOOTH";
@@ -4100,6 +4105,103 @@ public static class RunTracker
     {
         if (agg == null) return;
         agg.ReptileTrinketCombats += Math.Max(0, count);
+    }
+
+    /// <summary>
+    /// Records the positive input/output delta at Beating Remnant's own
+    /// post-Osty HP-loss modifier.
+    /// </summary>
+    public static void RecordBeatingRemnantHpLossPrevented(
+        BeatingRemnant relic,
+        Creature target,
+        decimal amountBefore,
+        decimal amountAfter)
+    {
+        var owner = relic?.Owner;
+        if (owner?.Creature == null || target != owner.Creature) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(owner)) return;
+                if (CombatManager.Instance?.IsInProgress != true) return;
+
+                var prevented = CalculateBeatingRemnantHpLossPreventedForTest(
+                    amountBefore,
+                    amountAfter);
+                if (prevented <= 0m) return;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordBeatingRemnantCombatForPlayerLocked(owner);
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(BeatingRemnantRelicId);
+                agg.BeatingRemnantHpLossPrevented += prevented;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordBeatingRemnantHpLossPrevented failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordBeatingRemnantTurnStarted(BeatingRemnant relic)
+    {
+        var owner = relic?.Owner;
+        if (owner == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(owner)) return;
+                if (CombatManager.Instance?.IsInProgress != true) return;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordBeatingRemnantTurnForPlayerLocked(owner);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordBeatingRemnantTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static decimal CalculateBeatingRemnantHpLossPreventedForTest(
+        decimal amountBefore,
+        decimal amountAfter)
+    {
+        if (amountBefore <= 0m) return 0m;
+
+        var appliedAmount = Math.Clamp(amountAfter, 0m, amountBefore);
+        return amountBefore - appliedAmount;
+    }
+
+    internal static void RecordBeatingRemnantHpLossPreventedForTest(
+        RelicAggregate agg,
+        decimal amountBefore,
+        decimal amountAfter)
+    {
+        if (agg == null) return;
+        agg.BeatingRemnantHpLossPrevented +=
+            CalculateBeatingRemnantHpLossPreventedForTest(amountBefore, amountAfter);
+    }
+
+    internal static void RecordBeatingRemnantTurnForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.BeatingRemnantTurns += Math.Max(0, count);
+    }
+
+    internal static void RecordBeatingRemnantCombatForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.BeatingRemnantCombats += Math.Max(0, count);
     }
 
     /// <summary>
@@ -13604,6 +13706,18 @@ public static class RunTracker
         }
     }
 
+    private static bool PlayerHasBeatingRemnant(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is BeatingRemnant);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static bool PlayerHasRuinedHelmet(Player player)
     {
         try
@@ -13750,6 +13864,7 @@ public static class RunTracker
             RecordIntimidatingHelmetCombatForPlayerLocked(player);
             RecordDaughterOfTheWindCombatForPlayerLocked(player);
             RecordSturdyClampCombatForPlayerLocked(player);
+            RecordBeatingRemnantCombatForPlayerLocked(player);
             RecordRuinedHelmetCombatForPlayerLocked(player);
             RecordMummifiedHandCombatForPlayerLocked(player);
         }
@@ -13966,6 +14081,53 @@ public static class RunTracker
 
         var agg = GetOrCreatePendingRelicAggregateLocked(ReptileTrinketRelicId);
         RecordReptileTrinketTurnForTest(agg);
+    }
+
+    private static void RecordBeatingRemnantCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasBeatingRemnant(player)) return;
+        if (!_pendingCombat.BeatingRemnantCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(BeatingRemnantRelicId);
+        RecordBeatingRemnantCombatForTest(agg);
+    }
+
+    private static void RecordBeatingRemnantTurnForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordBeatingRemnantTurnForPlayerLocked(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug(
+                $"RecordBeatingRemnantTurnForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordBeatingRemnantTurnForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasBeatingRemnant(player)) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.BeatingRemnantTurnCountedTurns.TryGetValue(
+                player,
+                out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.BeatingRemnantTurnCountedTurns[player] = turnNumber;
+        RecordBeatingRemnantCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(BeatingRemnantRelicId);
+        RecordBeatingRemnantTurnForTest(agg);
     }
 
     private static void RecordMiniatureCannonCombatForTrackedPlayerLocked()
@@ -18847,6 +19009,10 @@ internal class PendingCombat
     public Dictionary<Player, int> ReptileTrinketTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> ReptileTrinketActivationsThisTurn { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> BeatingRemnantCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> BeatingRemnantTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> ArtOfWarCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
