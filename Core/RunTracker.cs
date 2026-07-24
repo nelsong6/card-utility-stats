@@ -1987,6 +1987,7 @@ public static class RunTracker
             RecordPaelsClawGoopyCardPlayedIfOwnedLocked(cardPlay.Card);
 
             if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+            RecordDrainPowerUpgradedCardPlayedLocked(cardPlay.Card);
 
             // Per-instance tracking: each physical card in the deck gets its
             // own aggregates bucket. First play assigns its instance id.
@@ -3172,6 +3173,143 @@ public static class RunTracker
             rarity,
             type,
             Math.Max(0, costBefore - costAfter));
+
+    /// <summary>
+    /// Count every player turn that starts while each physical Drain Power is
+    /// in the permanent deck. This is the zero-inclusive turn denominator for
+    /// its upgrade and upgraded-card-play averages.
+    /// </summary>
+    public static void RecordDrainPowerTurnStarted(Player? player)
+    {
+        if (player?.Deck?.Cards == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+                if (!IsTrackedPlayer(player)) return;
+
+                var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+                if (turnNumber <= 0) return;
+
+                _pendingCombat ??= new PendingCombat();
+                foreach (var card in player.Deck.Cards)
+                {
+                    if (!IsDrainPowerCard(card)) continue;
+
+                    var sourceId = GetOrAssignInstanceId(card);
+                    if (_pendingCombat.DrainPowerTurnCountedTurns.TryGetValue(
+                            sourceId,
+                            out var recordedTurn)
+                        && recordedTurn == turnNumber)
+                    {
+                        continue;
+                    }
+
+                    _pendingCombat.DrainPowerTurnCountedTurns[sourceId] = turnNumber;
+                    var agg = GetOrCreateAggregate(_pendingCombat, sourceId);
+                    AccumulateDrainPowerTurn(agg);
+                }
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordDrainPowerTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void RecordDrainPowerCardUpgradedLocked(CardModel upgradedCard)
+    {
+        if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+
+        var causingPlay = FindCurrentlyResolvingCardPlay();
+        var sourceCard = causingPlay?.Card;
+        if (!IsDrainPowerCard(sourceCard)) return;
+        if (!IsTrackedCard(sourceCard)) return;
+        if (sourceCard!.Owner == null || upgradedCard.Owner == null) return;
+        if (!ReferenceEquals(sourceCard.Owner, upgradedCard.Owner)) return;
+
+        _pendingCombat ??= new PendingCombat();
+        var sourceId = GetOrAssignInstanceId(sourceCard);
+        var sourceAgg = GetOrCreateAggregate(_pendingCombat, sourceId);
+        AccumulateDrainPowerUpgrade(sourceAgg);
+
+        if (!_pendingCombat.DrainPowerSourcesByUpgradedCard.TryGetValue(
+                upgradedCard,
+                out var sourceIds))
+        {
+            sourceIds = new HashSet<string>(StringComparer.Ordinal);
+            _pendingCombat.DrainPowerSourcesByUpgradedCard[upgradedCard] = sourceIds;
+        }
+
+        sourceIds.Add(sourceId);
+    }
+
+    private static void RecordDrainPowerUpgradedCardPlayedLocked(CardModel card)
+    {
+        if (_pendingCombat == null) return;
+        if (!_pendingCombat.DrainPowerSourcesByUpgradedCard.TryGetValue(
+                card,
+                out var sourceIds))
+        {
+            return;
+        }
+
+        foreach (var sourceId in sourceIds)
+        {
+            var sourceAgg = GetOrCreateAggregate(_pendingCombat, sourceId);
+            AccumulateDrainPowerUpgradedCardPlay(sourceAgg);
+        }
+    }
+
+    private static bool IsDrainPowerCard(CardModel? card)
+    {
+        if (card is DrainPower) return true;
+
+        try
+        {
+            return string.Equals(
+                card?.Id?.ToString(),
+                "CARD.DRAIN_POWER",
+                StringComparison.Ordinal);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static void AccumulateDrainPowerUpgrade(CardAggregate agg, int count = 1)
+    {
+        if (agg == null || count <= 0) return;
+        agg.DrainPowerCardsUpgraded += count;
+    }
+
+    private static void AccumulateDrainPowerTurn(CardAggregate agg, int count = 1)
+    {
+        if (agg == null || count <= 0) return;
+        agg.DrainPowerTurnsInDeck += count;
+    }
+
+    private static void AccumulateDrainPowerUpgradedCardPlay(
+        CardAggregate agg,
+        int count = 1)
+    {
+        if (agg == null || count <= 0) return;
+        agg.DrainPowerUpgradedCardPlays += count;
+    }
+
+    internal static void RecordDrainPowerUpgradeForTest(CardAggregate agg, int count = 1)
+        => AccumulateDrainPowerUpgrade(agg, count);
+
+    internal static void RecordDrainPowerTurnForTest(CardAggregate agg, int count = 1)
+        => AccumulateDrainPowerTurn(agg, count);
+
+    internal static void RecordDrainPowerUpgradedCardPlayForTest(
+        CardAggregate agg,
+        int count = 1)
+        => AccumulateDrainPowerUpgradedCardPlay(agg, count);
 
     /// <summary>
     /// Record one completed Debt end-of-turn effect. Debt clamps the amount
@@ -14699,6 +14837,7 @@ public static class RunTracker
             RecordWarPaintCardUpgradedLocked(card);
             RecordFragrantMushroomCardUpgradedLocked(card);
             RecordFishingRodCardUpgradedLocked(card);
+            RecordDrainPowerCardUpgradedLocked(card);
 
             // Non-assigning: skip upgrades on cards we haven't seen enter
             // the deck. This is what fixes the "starters begin at #5" bug
@@ -17132,6 +17271,9 @@ public static class RunTracker
         target.DiscoverySkillsPicked += source.DiscoverySkillsPicked;
         target.DiscoveryPowersPicked += source.DiscoveryPowersPicked;
         target.DiscoveryEnergyDiscountTotal += source.DiscoveryEnergyDiscountTotal;
+        target.DrainPowerCardsUpgraded += source.DrainPowerCardsUpgraded;
+        target.DrainPowerTurnsInDeck += source.DrainPowerTurnsInDeck;
+        target.DrainPowerUpgradedCardPlays += source.DrainPowerUpgradedCardPlays;
         target.DebtTriggers += source.DebtTriggers;
         target.DebtGoldLost += source.DebtGoldLost;
         target.DebtGoldLossBlocked += source.DebtGoldLossBlocked;
@@ -17775,6 +17917,10 @@ internal class PendingCombat
     public Dictionary<Player, PendingJugglingCopyWindow> PendingJugglingCopyWindows { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<CardModel, decimal> FreeAttackEnergySavingsByCard { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<string, int> DrainPowerTurnCountedTurns { get; }
+        = new(StringComparer.Ordinal);
+    public Dictionary<CardModel, HashSet<string>> DrainPowerSourcesByUpgradedCard { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> NutritiousSoupCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

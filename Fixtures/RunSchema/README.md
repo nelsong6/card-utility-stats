@@ -335,6 +335,9 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds run-level Unmovable power tracking for the extra block produced by the
   power's block multiplier, surfaced on Unmovable card tooltips rather than
   attributed to one physical card instance.
+- `drain-power-card-run.json`
+  Adds Drain Power's confirmed discard-pile upgrade count, held-turn
+  denominator, and later plays of the exact combat cards it upgraded.
 
 Why these exist:
 

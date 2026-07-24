@@ -551,6 +551,18 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsDrainPowerCardFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("drain-power-card-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        AssertDrainPowerFixture(loaded.Data.Aggregates["CARD.DRAIN_POWER#1"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsJugglingPowerFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("juggling-power-run.json"));
@@ -1250,6 +1262,15 @@ public class SchemaLoadingTests
         Assert.Equal(2, cardAgg.DiscoverySkillsPicked);
         Assert.Equal(1, cardAgg.DiscoveryPowersPicked);
         Assert.Equal(7, cardAgg.DiscoveryEnergyDiscountTotal);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsDrainPowerCardFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("drain-power-card-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertDrainPowerFixture(resumed!.Aggregates["CARD.DRAIN_POWER#1"]);
     }
 
     [Fact]
@@ -3198,6 +3219,14 @@ public class SchemaLoadingTests
         Assert.Equal(4, relicAgg.PaelsClawGoopyCards);
         Assert.Equal(4, relicAgg.PaelsClawTurns);
         Assert.Equal(2, relicAgg.PaelsClawCombats);
+    }
+
+    private static void AssertDrainPowerFixture(CardAggregate cardAgg)
+    {
+        Assert.Equal(3, cardAgg.CombatsInDeck);
+        Assert.Equal(8, cardAgg.DrainPowerCardsUpgraded);
+        Assert.Equal(6, cardAgg.DrainPowerTurnsInDeck);
+        Assert.Equal(9, cardAgg.DrainPowerUpgradedCardPlays);
     }
 
     private static void AssertJugglingPowerFixture(PowerAggregate powerAgg)

@@ -174,6 +174,16 @@ public class CardAggregate
     public int DiscoveryPowersPicked { get; set; }
     public int DiscoveryEnergyDiscountTotal { get; set; }
 
+    // Drain Power outcomes. CardsUpgraded counts only UpgradeInternal calls
+    // observed while this physical Drain Power is resolving. The raw combat
+    // cards it upgraded are remembered for the rest of that combat so their
+    // later completed plays can be credited back to this source instance.
+    // TurnsInDeck and the shared CombatsInDeck field are held denominators,
+    // including turns/combats where Drain Power produces no upgrade or play.
+    public int DrainPowerCardsUpgraded { get; set; }
+    public int DrainPowerTurnsInDeck { get; set; }
+    public int DrainPowerUpgradedCardPlays { get; set; }
+
     // Debt's end-of-turn curse effect. The intended amount comes from the
     // card's Gold dynamic var; actual loss is observed from the owner's gold
     // balance before/after the callback. Any unaffordable remainder is kept

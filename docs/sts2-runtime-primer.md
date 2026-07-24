@@ -598,6 +598,16 @@ triggering play is not an upgraded-card play; later finished replay iterations
 are. Count later successful draws only from `Hook.AfterCardDrawn`, and use held
 player turns/combats (including zero-result ones) as rate denominators.
 
+Drain Power awaits its attack, then synchronously calls `CardCmd.Upgrade` on
+random upgradable cards in its owner's Discard pile before its `OnPlay`
+finishes. The existing `CardModel.UpgradeInternal` postfix is therefore the
+observed upgrade boundary, and `FindCurrentlyResolvingCardPlay` still resolves
+the physical Drain Power source there. Retain each upgraded combat card by raw
+reference and associate it with that source instance; later completed plays of
+the exact same combat card count for the source, while copies do not. Use every
+turn and combat where that physical Drain Power was in the permanent deck as
+the zero-inclusive average denominators.
+
 Brilliant Scarf increments its per-turn card counter from `AfterCardPlayed`,
 after `CardPlayFinished` has already entered combat history. Its actual cost
 discounts happen through `TryModifyEnergyCostInCombatLate` and `TryModifyStarCost`

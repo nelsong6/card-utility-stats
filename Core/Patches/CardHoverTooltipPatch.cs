@@ -352,6 +352,7 @@ public static class CardHoverShowPatch
         AppendAlchemizePotionStats(sb, cardModel, agg, compact: false);
         AppendJackOfAllTradesStats(sb, cardModel, agg, compact: false);
         AppendDiscoveryStats(sb, cardModel, agg, compact: false);
+        AppendDrainPowerStats(sb, cardModel, agg, compact: false);
         AppendJugglingPowerStats(sb, cardModel, metaStats, compact: false);
         AppendUnrelentingFreeAttackStats(sb, cardModel, metaStats, compact: false);
         AppendDebtStats(sb, cardModel, agg);
@@ -559,6 +560,7 @@ public static class CardHoverShowPatch
         AppendAlchemizePotionStats(sb, cardModel, agg, compact: true);
         AppendJackOfAllTradesStats(sb, cardModel, agg, compact: true);
         AppendDiscoveryStats(sb, cardModel, agg, compact: true);
+        AppendDrainPowerStats(sb, cardModel, agg, compact: true);
         AppendJugglingPowerStats(sb, cardModel, metaStats, compact: true);
         AppendUnrelentingFreeAttackStats(sb, cardModel, metaStats, compact: true);
         AppendDebtStats(sb, cardModel, agg);
@@ -755,6 +757,36 @@ public static class CardHoverShowPatch
             GetEnergyStatLabel("avg discount of picked card"),
             FormatDecimal(averageDiscount),
             "");
+    }
+
+    private static void AppendDrainPowerStats(
+        StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel card,
+        CardAggregate agg,
+        bool compact)
+    {
+        if (card is not DrainPower && !IsCardId(card, "CARD.DRAIN_POWER")) return;
+
+        Row3(sb, "Cards upgraded", agg.DrainPowerCardsUpgraded.ToString(), "");
+        if (compact) return;
+
+        var upgradesPerTurn = agg.DrainPowerTurnsInDeck <= 0
+            ? 0m
+            : (decimal)agg.DrainPowerCardsUpgraded / agg.DrainPowerTurnsInDeck;
+        var upgradesPerCombat = agg.CombatsInDeck <= 0
+            ? 0m
+            : (decimal)agg.DrainPowerCardsUpgraded / agg.CombatsInDeck;
+        var upgradedPlaysPerTurn = agg.DrainPowerTurnsInDeck <= 0
+            ? 0m
+            : (decimal)agg.DrainPowerUpgradedCardPlays / agg.DrainPowerTurnsInDeck;
+        var upgradedPlaysPerCombat = agg.CombatsInDeck <= 0
+            ? 0m
+            : (decimal)agg.DrainPowerUpgradedCardPlays / agg.CombatsInDeck;
+
+        Row3(sb, "Avg cards upgraded per turn", FormatDecimal(upgradesPerTurn), "");
+        Row3(sb, "Avg cards upgraded per combat", FormatDecimal(upgradesPerCombat), "");
+        Row3(sb, "Avg upgraded-card plays per turn", FormatDecimal(upgradedPlaysPerTurn), "");
+        Row3(sb, "Avg upgraded-card plays per combat", FormatDecimal(upgradedPlaysPerCombat), "");
     }
 
     private static void AppendJugglingPowerStats(
