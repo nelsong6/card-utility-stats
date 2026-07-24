@@ -108,9 +108,8 @@ internal static class RunHistoryStatsContext
         title = BuildCardDisplayName(card, keys, amount);
         var upgradeEvents = keys.Count == 0
             ? Enumerable.Empty<CardEvent>()
-            : run.Events
-                .Where(e => string.Equals(e.Type, "card_upgraded", StringComparison.Ordinal)
-                    && keys.Contains(e.CardId))
+            : keys
+                .SelectMany(key => GetPermanentUpgradeEvents(run, key))
                 .OrderBy(e => e.Floor ?? int.MaxValue)
                 .ThenBy(e => e.T)
                 .ToList();
@@ -282,15 +281,26 @@ internal static class RunHistoryStatsContext
     private static int GetFinalUpgradeLevel(RunData run, string key, CardAggregate agg)
     {
         var level = agg.InitialUpgradeLevel;
-        foreach (var e in run.Events)
+        foreach (var e in GetPermanentUpgradeEvents(run, key))
         {
-            if (!string.Equals(e.Type, "card_upgraded", StringComparison.Ordinal)) continue;
-            if (!string.Equals(e.CardId, key, StringComparison.Ordinal)) continue;
-            if (e.UpgradeLevel.HasValue)
-                level = e.UpgradeLevel.Value;
+            level = e.UpgradeLevel!.Value;
         }
 
         return level;
+    }
+
+    private static IReadOnlyList<CardEvent> GetPermanentUpgradeEvents(
+        RunData run,
+        string key)
+    {
+        var initialUpgradeLevel = run.Aggregates.TryGetValue(key, out var agg)
+            ? agg.InitialUpgradeLevel
+            : 0;
+        return RunTracker.FilterPermanentUpgradeEvents(
+            run.Events.Where(e =>
+                string.Equals(e.Type, "card_upgraded", StringComparison.Ordinal)
+                && string.Equals(e.CardId, key, StringComparison.Ordinal)),
+            initialUpgradeLevel);
     }
 
     private static CardAggregate CombineCardAggregates(RunData run, IReadOnlyList<string> keys)

@@ -4205,6 +4205,64 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Attribute an observed generated Soul arrival to the card play that is
+    /// still resolving. The Soul's current pile is authoritative, so hand-full
+    /// or other redirections are counted at their actual destination.
+    /// </summary>
+    public static void RecordSoulAddedToCombatPile(
+        CardModel soul,
+        Player? creator)
+    {
+        if (soul is not Soul || creator == null) return;
+        var pileType = soul.Pile?.Type;
+        if (pileType is not (PileType.Draw or PileType.Hand or PileType.Discard))
+            return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+
+                var sourceCard = FindCurrentlyResolvingCardPlay()?.Card;
+                if (sourceCard?.Owner == null) return;
+                if (!ReferenceEquals(sourceCard.Owner, creator)) return;
+                if (!IsTrackedCard(sourceCard)) return;
+
+                _pendingCombat ??= new PendingCombat();
+                var sourceId = GetOrAssignInstanceId(sourceCard);
+                var agg = GetOrCreateAggregate(_pendingCombat, sourceId);
+                RecordSoulAddedToPileForTest(agg, pileType.Value);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordSoulAddedToCombatPile failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordSoulAddedToPileForTest(
+        CardAggregate agg,
+        PileType pileType,
+        int count = 1)
+    {
+        if (agg == null || count <= 0) return;
+
+        switch (pileType)
+        {
+            case PileType.Draw:
+                agg.SoulsAddedToDrawPile += count;
+                break;
+            case PileType.Hand:
+                agg.SoulsAddedToHand += count;
+                break;
+            case PileType.Discard:
+                agg.SoulsAddedToDiscardPile += count;
+                break;
+        }
+    }
+
+    /// <summary>
     /// Record Gorget's owner-specific combat-room activation. Called from
     /// <see cref="Patches.GorgetAfterRoomEnteredPatch"/> after matching the
     /// game's CombatRoom check and reading the same Plating dynamic var that
@@ -15934,10 +15992,37 @@ public static class RunTracker
         catch { return int.MaxValue; }
     }
 
-    public static void RecordUpgrade(CardModel card)
+    /// <summary>
+    /// True only when <paramref name="card"/> is the exact object currently
+    /// stored in its owner's permanent deck. A combat clone whose DeckVersion
+    /// points at that object is intentionally false.
+    /// </summary>
+    internal static bool IsExactPermanentDeckCard(CardModel card)
+    {
+        try
+        {
+            return IsExactPermanentDeckCardForTest(card, card?.Owner?.Deck?.Cards);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    internal static bool IsExactPermanentDeckCardForTest(
+        CardModel? card,
+        IEnumerable<CardModel>? permanentDeckCards)
+    {
+        if (card == null || permanentDeckCards == null) return false;
+        return permanentDeckCards.Any(deckCard => ReferenceEquals(deckCard, card));
+    }
+
+    public static void RecordUpgrade(CardModel card, bool isPermanentDeckUpgrade)
     {
         lock (_lock)
         {
+            // These attribution paths intentionally observe their own source
+            // mechanics, including temporary combat-copy upgrades.
             RecordSandCastleCardUpgradedLocked(card);
             RecordWhetstoneCardUpgradedLocked(card);
             RecordWarPaintCardUpgradedLocked(card);
@@ -15945,6 +16030,11 @@ public static class RunTracker
             RecordFishingRodCardUpgradedLocked(card);
             RecordWarHammerCardUpgradedLocked(card);
             RecordDrainPowerCardUpgradedLocked(card);
+
+            // Card lineage is different: only mutation of the exact object in
+            // the permanent deck counts. Do not canonicalize a combat clone
+            // through DeckVersion and make its temporary upgrade look lasting.
+            if (!isPermanentDeckUpgrade) return;
 
             // Non-assigning: skip upgrades on cards we haven't seen enter
             // the deck. This is what fixes the "starters begin at #5" bug
@@ -16191,13 +16281,42 @@ public static class RunTracker
             if (!_instanceNumbers.TryGetValue(key, out var n)) return Array.Empty<CardEvent>();
             var instanceId = $"{key.Id}#{n}";
 
-            var result = new List<CardEvent>();
-            foreach (var e in _currentRun.Events)
-            {
-                if (e.Type == "card_upgraded" && e.CardId == instanceId) result.Add(e);
-            }
-            return result;
+            var initialUpgradeLevel = _currentRun.Aggregates.TryGetValue(
+                instanceId,
+                out var agg)
+                ? agg.InitialUpgradeLevel
+                : 0;
+            return FilterPermanentUpgradeEvents(
+                _currentRun.Events.Where(e =>
+                    e.Type == "card_upgraded" && e.CardId == instanceId),
+                initialUpgradeLevel);
         }
+    }
+
+    /// <summary>
+    /// Filters legacy upgrade events that could only have come from the old
+    /// combat-clone canonicalization bug. A real permanent upgrade advances
+    /// the deck card's level; temporary clone events repeat or lower the deck
+    /// card's recorded level.
+    /// </summary>
+    internal static IReadOnlyList<CardEvent> FilterPermanentUpgradeEvents(
+        IEnumerable<CardEvent>? events,
+        int initialUpgradeLevel)
+    {
+        if (events == null) return Array.Empty<CardEvent>();
+
+        var result = new List<CardEvent>();
+        var lastPermanentLevel = Math.Max(0, initialUpgradeLevel);
+        foreach (var cardEvent in events)
+        {
+            if (!cardEvent.UpgradeLevel.HasValue) continue;
+            if (cardEvent.UpgradeLevel.Value <= lastPermanentLevel) continue;
+
+            result.Add(cardEvent);
+            lastPermanentLevel = cardEvent.UpgradeLevel.Value;
+        }
+
+        return result;
     }
 
     private static void RecordCardDrawn(CardDrawnEntry entry)
@@ -18420,6 +18539,9 @@ public static class RunTracker
         target.TimesOstyHpAttackBonusApplied += source.TimesOstyHpAttackBonusApplied;
         target.TimesOstySummoned += source.TimesOstySummoned;
         target.TotalOstyHpSummoned += source.TotalOstyHpSummoned;
+        target.SoulsAddedToDrawPile += source.SoulsAddedToDrawPile;
+        target.SoulsAddedToHand += source.SoulsAddedToHand;
+        target.SoulsAddedToDiscardPile += source.SoulsAddedToDiscardPile;
         target.TimesReplayExtraPlanned += source.TimesReplayExtraPlanned;
         target.TimesReplayExtraPlayed += source.TimesReplayExtraPlayed;
         target.TimesReplayAttackNoDamage += source.TimesReplayAttackNoDamage;

@@ -292,6 +292,13 @@ public class CardAggregate
     public int TimesOstySummoned { get; set; }
     public decimal TotalOstyHpSummoned { get; set; }
 
+    // Successful generated/transformed Soul arrivals caused while this card
+    // was resolving. The final combat pile is observed after the game's add
+    // and redirection hooks, rather than inferred from card text.
+    public int SoulsAddedToDrawPile { get; set; }
+    public int SoulsAddedToHand { get; set; }
+    public int SoulsAddedToDiscardPile { get; set; }
+
     // M3p: Extra plays caused by the game's replay/multi-play series. Total
     // Plays already includes these; this field tracks the subset where the
     // finished CardPlay was not the first play in its series.
@@ -320,9 +327,10 @@ public class CardAggregate
     //   InitialUpgradeLevel: CurrentUpgradeLevel at first observation.
     //                       If > 0, the card arrived already upgraded.
     //
-    // Subsequent upgrades are recorded in the Events log as "card_upgraded"
-    // entries with Floor + UpgradeLevel, so the tooltip can render a full
-    // lineage like "Arrived: floor 3, +1" followed by "Upgraded: floor 6 → +2".
+    // Subsequent permanent-deck upgrades are recorded in the Events log as
+    // "card_upgraded" entries with Floor + UpgradeLevel, so the tooltip can
+    // render a full lineage like "Arrived: floor 3, +1" followed by
+    // "Upgraded: floor 6 → +2". Temporary combat-copy upgrades are excluded.
     public int? FloorAdded { get; set; }
     public int InitialUpgradeLevel { get; set; }
 

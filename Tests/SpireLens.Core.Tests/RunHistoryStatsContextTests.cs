@@ -47,6 +47,46 @@ public class RunHistoryStatsContextTests
     }
 
     [Fact]
+    public void SelectAggregateKeysForHistoryEntry_IgnoresLegacyTemporaryUpgradeEvents()
+    {
+        var run = new RunData();
+        run.InstanceNumbersByDef["CARD.STRIKE"] = new List<int> { 1, 2 };
+        run.Aggregates["CARD.STRIKE#1"] = new CardAggregate
+        {
+            FloorAdded = 1,
+            InitialUpgradeLevel = 0,
+        };
+        run.Aggregates["CARD.STRIKE#2"] = new CardAggregate
+        {
+            FloorAdded = 1,
+            InitialUpgradeLevel = 0,
+        };
+        run.Events.Add(new CardEvent
+        {
+            Type = "card_upgraded",
+            CardId = "CARD.STRIKE#1",
+            Floor = 3,
+            UpgradeLevel = 1,
+        });
+        run.Events.Add(new CardEvent
+        {
+            Type = "card_upgraded",
+            CardId = "CARD.STRIKE#1",
+            Floor = 4,
+            UpgradeLevel = 0,
+        });
+
+        var keys = RunHistoryStatsContext.SelectAggregateKeysForHistoryEntry(
+            run,
+            "CARD.STRIKE",
+            amount: 1,
+            currentUpgradeLevel: 1,
+            floorsAdded: new[] { 1 });
+
+        Assert.Equal(new[] { "CARD.STRIKE#1" }, keys);
+    }
+
+    [Fact]
     public void SelectAggregateKeysForHistoryEntry_AcceptsHistoricPooledShape()
     {
         var run = new RunData();

@@ -364,6 +364,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `drain-power-card-run.json`
   Adds Drain Power's confirmed discard-pile upgrade count, held-turn
   denominator, and later plays of the exact combat cards it upgraded.
+- `soul-pile-card-run.json`
+  Adds per-source card tracking for generated or transformed Souls that
+  actually arrived in the draw pile, hand, or discard pile.
 
 Why these exist:
 

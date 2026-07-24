@@ -348,6 +348,7 @@ public static class CardHoverShowPatch
         AppendMakeItSoStats(sb, cardModel, agg, compact: false);
         AppendUnleashStats(sb, cardModel, agg, compact: false);
         AppendOstySummonStats(sb, cardModel, agg, metaStats, compact: false);
+        AppendSoulPileStats(sb, agg);
         AppendUnmovablePowerStats(sb, cardModel, metaStats);
         AppendAlchemizePotionStats(sb, cardModel, agg, compact: false);
         AppendJackOfAllTradesStats(sb, cardModel, agg, compact: false);
@@ -556,6 +557,7 @@ public static class CardHoverShowPatch
         AppendMakeItSoStats(sb, cardModel, agg, compact: true);
         AppendUnleashStats(sb, cardModel, agg, compact: true);
         AppendOstySummonStats(sb, cardModel, agg, metaStats, compact: true);
+        AppendSoulPileStats(sb, agg);
         AppendUnmovablePowerStats(sb, cardModel, metaStats);
         AppendAlchemizePotionStats(sb, cardModel, agg, compact: true);
         AppendJackOfAllTradesStats(sb, cardModel, agg, compact: true);
@@ -661,6 +663,16 @@ public static class CardHoverShowPatch
 
         if (metaStats.TotalOstyDamageAbsorbed > 0m)
             Row3(sb, "All Osty damage absorbed", FormatDecimal(metaStats.TotalOstyDamageAbsorbed), "");
+    }
+
+    private static void AppendSoulPileStats(StringBuilder sb, CardAggregate agg)
+    {
+        if (agg.SoulsAddedToDrawPile > 0)
+            Row3(sb, "Souls added to draw pile", agg.SoulsAddedToDrawPile.ToString(), "");
+        if (agg.SoulsAddedToHand > 0)
+            Row3(sb, "Souls added to hand", agg.SoulsAddedToHand.ToString(), "");
+        if (agg.SoulsAddedToDiscardPile > 0)
+            Row3(sb, "Souls added to discard pile", agg.SoulsAddedToDiscardPile.ToString(), "");
     }
 
     private static bool IsOstySummonStatsHome(

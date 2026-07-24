@@ -3395,6 +3395,25 @@ public class SchemaLoadingTests
         AssertPaelsClawFixture(resumed!.RelicAggregates["RELIC.PAELS_CLAW"]);
     }
 
+    [Fact]
+    public void HistoricalLoad_AcceptsSoulPileCardFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("soul-pile-card-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertSoulPileCardFixture(loaded.Data.Aggregates["CARD.SEVERANCE#1"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsSoulPileCardFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("soul-pile-card-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertSoulPileCardFixture(resumed!.Aggregates["CARD.SEVERANCE#1"]);
+    }
+
     private static void AssertReptileTrinketRatesFixture(RelicAggregate relicAgg)
     {
         Assert.Equal(9, relicAgg.Activations);
@@ -3454,6 +3473,13 @@ public class SchemaLoadingTests
         Assert.Equal(3, relicAgg.SturdyClampExcessBlockOverTen);
         Assert.Equal(3, relicAgg.SturdyClampTurns);
         Assert.Equal(2, relicAgg.SturdyClampCombats);
+    }
+
+    private static void AssertSoulPileCardFixture(CardAggregate cardAgg)
+    {
+        Assert.Equal(4, cardAgg.SoulsAddedToDrawPile);
+        Assert.Equal(2, cardAgg.SoulsAddedToHand);
+        Assert.Equal(3, cardAgg.SoulsAddedToDiscardPile);
     }
 
     private static void AssertBeatingRemnantFixture(RelicAggregate relicAgg)

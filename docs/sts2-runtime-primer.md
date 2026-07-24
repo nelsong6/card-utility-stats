@@ -103,6 +103,10 @@ Key facts:
 - Combat clones point back to the deck original through `CardModel.DeckVersion`.
 - Deck-view cards are already the original and usually have `DeckVersion == null`.
 - `RunTracker.Canonical(card)` uses `card.DeckVersion ?? card` so combat-time and hover-time references converge.
+- Canonicalization is for identity and attribution, not proof that a mutation
+  was permanent. For card upgrade lineage, snapshot whether the exact object
+  passed to `UpgradeInternal` is present in the permanent deck; a combat clone
+  pointing at a deck original remains only a temporary upgrade.
 - Aggregates are keyed as `{card_definition_id}#{monotonic_number}`.
 - The monotonic number is per card definition and is never reused within a run.
 - Removed cards keep their aggregate and removal snapshot rather than being deleted.
@@ -955,6 +959,10 @@ Good hook surfaces already proven useful:
 - `Hook.AfterCardDrawn`: reliable card draw arrival.
 - `Hook.ShouldDraw`: draw attempts and blocked draw modifier.
 - `Hook.AfterCardChangedPiles`: final pile result.
+- `Hook.AfterCardGeneratedForCombat`: a generated or transformed card has
+  already reached its final combat pile. This is the reliable boundary for
+  per-source Soul destination counts; use the still-resolving card play as the
+  source and the generated Soul's actual pile as the destination.
 - `PlayerCombatState.GainEnergy`: actual energy delta.
 - `PlayerCombatState.GainStars`: actual star delta.
 - `Hook.AfterForge`: actual forge gain/source.
@@ -963,7 +971,10 @@ Good hook surfaces already proven useful:
 - `Hook.ShouldClearBlock`, `Hook.AfterBlockCleared`, `Hook.AfterPreventingBlockClear`: block expiry/waste window.
 - `CardPile.AddInternal` filtered to Deck: permanent card entry.
 - `CardPileCmd.RemoveFromDeck` prefix: permanent card removal.
-- `CardModel.UpgradeInternal` postfix: upgrades from all sources.
+- `CardModel.UpgradeInternal` prefix/postfix: source-specific stats can observe
+  upgrades from all sources, but card lineage must first snapshot that the
+  exact upgraded object is in the permanent deck. Do not canonicalize a combat
+  clone through `DeckVersion` for the “Upgraded floor…” lineage.
 - `RunManager.EnterMapPointInternal`: original map point entry, before `?`
   points resolve into concrete room types.
 - Specific power/relic methods via `AccessTools.TypeByName`: useful when no public compile-time type is safe or when patching optional/specific models.

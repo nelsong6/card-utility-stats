@@ -19,24 +19,32 @@ namespace SpireLens.Core.Patches;
 /// useful for understanding the cost curve over a run: "I upgraded my
 /// Strike at floor 6, so any play before that counted at full cost."
 ///
-/// Hook scope: any upgrade path routes through <c>UpgradeInternal</c> —
-/// rest-site upgrades, in-combat Armaments / Apotheosis, event rewards,
-/// all of it. One hook, all upgrade sources covered.
+/// Hook scope: any upgrade path routes through <c>UpgradeInternal</c>. The
+/// prefix snapshots whether the exact object being upgraded is a permanent
+/// deck member before the upgrade can mutate or replace it. Source-specific
+/// combat stats still observe combat-copy upgrades, but card lineage records
+/// only upgrades to that exact deck object.
 ///
-/// Canonicalization: the card that gets upgraded might be a combat clone
-/// or the deck original; <c>RunTracker.RecordUpgrade</c> resolves to the
-/// canonical deck ref just like play and damage attribution, so the event
-/// is always attributed to the same instance-id that hover shows.
+/// This deliberately does not canonicalize a combat clone through
+/// <c>DeckVersion</c> for lineage. Canonicalization is correct for plays, but
+/// would turn a temporary combat-copy upgrade into a fake permanent upgrade
+/// on the deck card's tooltip.
 /// </summary>
 [HarmonyPatch(typeof(CardModel), nameof(CardModel.UpgradeInternal))]
 public static class CardUpgradePatch
 {
+    [HarmonyPrefix]
+    public static void Prefix(CardModel __instance, out bool __state)
+    {
+        __state = RunTracker.IsExactPermanentDeckCard(__instance);
+    }
+
     [HarmonyPostfix]
-    public static void Postfix(CardModel __instance)
+    public static void Postfix(CardModel __instance, bool __state)
     {
         try
         {
-            RunTracker.RecordUpgrade(__instance);
+            RunTracker.RecordUpgrade(__instance, __state);
         }
         catch (Exception e)
         {
