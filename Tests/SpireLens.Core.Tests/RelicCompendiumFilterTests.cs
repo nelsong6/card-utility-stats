@@ -22,6 +22,42 @@ public class RelicCompendiumFilterTests
         Assert.True(RelicBarFilterPatch.IsBeforeCombatRelevanceCutoff(3, null));
     }
 
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(1, 2)]
+    [InlineData(2, 0)]
+    public void HiddenRelicFocus_PrefersNearestVisibleRelicToTheRight(
+        int sourceIndex,
+        int expectedIndex)
+    {
+        var visibility = new[] { true, true, true };
+        visibility[sourceIndex] = false;
+
+        Assert.Equal(
+            expectedIndex,
+            RelicBarFilterPatch.FindNearestVisibleIndex(visibility, sourceIndex));
+    }
+
+    [Fact]
+    public void HiddenRelicFocus_FallsBackLeftWhenNoVisibleRelicRemainsToTheRight()
+    {
+        Assert.Equal(
+            0,
+            RelicBarFilterPatch.FindNearestVisibleIndex(
+                new[] { true, false, false },
+                sourceIndex: 2));
+    }
+
+    [Fact]
+    public void HiddenRelicFocus_ReturnsNoTargetWhenEveryRelicIsHidden()
+    {
+        Assert.Equal(
+            -1,
+            RelicBarFilterPatch.FindNearestVisibleIndex(
+                new[] { false, false, false },
+                sourceIndex: 0));
+    }
+
     [Fact]
     public void Taxonomy_OmitsRemovedEnergyCategory()
     {
