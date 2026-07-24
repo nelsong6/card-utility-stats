@@ -7,6 +7,7 @@ using HarmonyLib;
 using MegaCrit.Sts2.Core.Entities.UI;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Relics;
+using MegaCrit.Sts2.Core.Nodes.HoverTips;
 using MegaCrit.Sts2.Core.Nodes.Screens.RelicCollection;
 
 namespace SpireLens.Core.Patches;
@@ -808,7 +809,7 @@ internal static class RelicCompendiumFilterUi
             case CompendiumRelicEntryVisualAction.Hidden:
                 entry.Modulate = original.Modulate with { A = 1f };
                 entry.Visible = false;
-                StatsTooltip.HideIfAnchoredTo(entry);
+                NHoverTipSet.Remove(entry);
                 break;
             case CompendiumRelicEntryVisualAction.Dim:
                 entry.Visible = original.Visible;

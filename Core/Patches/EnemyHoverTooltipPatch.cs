@@ -1,54 +1,44 @@
 using System;
 using System.Linq;
 using System.Text;
-using Godot;
-using HarmonyLib;
+using MegaCrit.Sts2.Core.HoverTips;
 using MegaCrit.Sts2.Core.Nodes.Combat;
 
 namespace SpireLens.Core.Patches;
 
-[HarmonyPatch(typeof(NCreature), nameof(NCreature.OnFocus))]
 public static class EnemyHoverShowPatch
 {
-    [HarmonyPostfix]
-    public static void Postfix(NCreature __instance)
+    internal static bool TryBuildNativeHoverTip(
+        NCreature creatureNode,
+        out HoverTip statsTip)
     {
-        try
+        statsTip = default;
+        var viewStatsEnabled = ViewStatsInjectorPatch.StatsVisibilityEnabled;
+        if (!ResolveEnemyStatsEnabled(
+                viewStatsEnabled,
+                ViewStatsInjectorPatch.EnemyStatsEnabled,
+                RuntimeOptionsProvider.Current.ShowEnemyStatsOnHover))
         {
-            var viewStatsEnabled = ViewStatsInjectorPatch.StatsVisibilityEnabled;
-            if (!ResolveEnemyStatsEnabled(
-                    viewStatsEnabled,
-                    ViewStatsInjectorPatch.EnemyStatsEnabled,
-                    RuntimeOptionsProvider.Current.ShowEnemyStatsOnHover)) return;
-
-            var creature = __instance.Entity;
-            var monster = creature?.Monster;
-            if (monster == null || creature!.IsPlayer) return;
-            if (!ShouldShowForCreature(__instance, creature))
-            {
-                StatsTooltip.HideIfAnchoredTo(__instance);
-                return;
-            }
-
-            var enemyId = monster.Id.ToString();
-            var agg = RunTracker.GetEnemyAggregate(enemyId) ?? new EnemyAggregate
-            {
-                EnemyId = enemyId,
-                DisplayName = FormatEnemyIdForDisplay(enemyId),
-            };
-
-            var tree = Engine.GetMainLoop() as SceneTree;
-            if (tree == null) return;
-
-            var title = string.IsNullOrWhiteSpace(agg.DisplayName)
-                ? FormatEnemyIdForDisplay(enemyId)
-                : agg.DisplayName;
-            StatsTooltip.Show(tree, __instance, title, "SpireLens", BuildEnemyBodyBBCode(agg));
+            return false;
         }
-        catch (Exception e)
+
+        var creature = creatureNode.Entity;
+        var monster = creature?.Monster;
+        if (monster == null || creature!.IsPlayer) return false;
+        if (!ShouldShowForCreature(creatureNode, creature)) return false;
+
+        var enemyId = monster.Id.ToString();
+        var agg = RunTracker.GetEnemyAggregate(enemyId) ?? new EnemyAggregate
         {
-            CoreMain.Logger.Error($"EnemyHoverShowPatch failed: {e.Message}");
-        }
+            EnemyId = enemyId,
+            DisplayName = FormatEnemyIdForDisplay(enemyId),
+        };
+
+        var title = string.IsNullOrWhiteSpace(agg.DisplayName)
+            ? FormatEnemyIdForDisplay(enemyId)
+            : agg.DisplayName;
+        statsTip = StatsTooltip.CreateNativeTip(title, BuildEnemyBodyBBCode(agg));
+        return true;
     }
 
     internal static bool ResolveEnemyStatsEnabled(
@@ -131,38 +121,5 @@ public static class EnemyHoverShowPatch
         sb.Append($"[cell expand=1 padding=0,0,12,0][right][b]{value}[/b][/right][/cell]");
         sb.Append($"[cell expand=1 padding=0,0,4,0][right][color=#b5b5b5]{pct}[/color][/right][/cell]");
         sb.Append("[/table]\n");
-    }
-}
-
-[HarmonyPatch(typeof(NCreature), nameof(NCreature.HideHoverTips))]
-public static class EnemyHoverHidePatch
-{
-    [HarmonyPostfix]
-    public static void Postfix(NCreature __instance)
-    {
-        try { StatsTooltip.HideIfAnchoredTo(__instance); }
-        catch (Exception e) { CoreMain.Logger.Error($"EnemyHoverHidePatch failed: {e.Message}"); }
-    }
-}
-
-[HarmonyPatch(typeof(NCreature), nameof(NCreature.OnUnfocus))]
-public static class EnemyHoverHideOnUnfocusPatch
-{
-    [HarmonyPostfix]
-    public static void Postfix(NCreature __instance)
-    {
-        try { StatsTooltip.HideIfAnchoredTo(__instance); }
-        catch (Exception e) { CoreMain.Logger.Error($"EnemyHoverHideOnUnfocusPatch failed: {e.Message}"); }
-    }
-}
-
-[HarmonyPatch(typeof(NCreature), nameof(NCreature.StartDeathAnim))]
-public static class EnemyHoverHideOnDeathPatch
-{
-    [HarmonyPrefix]
-    public static void Prefix(NCreature __instance)
-    {
-        try { StatsTooltip.HideIfAnchoredTo(__instance); }
-        catch (Exception e) { CoreMain.Logger.Error($"EnemyHoverHideOnDeathPatch failed: {e.Message}"); }
     }
 }

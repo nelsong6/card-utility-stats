@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using Godot;
 using HarmonyLib;
+using MegaCrit.Sts2.Core.HoverTips;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Relics;
 using MegaCrit.Sts2.Core.Nodes.Relics;
@@ -27,6 +28,46 @@ internal static class RunHistoryStatsContext
     private static bool _loadAttempted;
 
     public static bool HasCurrent => EnsureLoaded()?.Data != null;
+
+    public static bool TryBuildNativeCardHoverTip(
+        NDeckHistoryEntry entry,
+        out HoverTip statsTip)
+    {
+        statsTip = default;
+        if (!CardHoverShowPatch.ResolveCardStatsEnabled(
+                ViewStatsInjectorPatch.StatsVisibilityEnabled,
+                ViewStatsInjectorPatch.CardStatsEnabled))
+        {
+            return false;
+        }
+
+        if (!HasCurrent || !TryBuildCardTooltip(entry, out var title, out var body))
+            return false;
+
+        statsTip = StatsTooltip.CreateNativeTip(title, body);
+        return true;
+    }
+
+    public static bool TryBuildNativeRelicHoverTip(
+        NRelicBasicHolder holder,
+        out HoverTip statsTip)
+    {
+        statsTip = default;
+        if (!ViewStatsInjectorPatch.StatsVisibilityEnabled
+            || !HasCurrent
+            || !HasAncestor<NRelicHistory>(holder)
+            || !TryBuildRelicTooltip(holder, out var title, out var body))
+        {
+            return false;
+        }
+
+        statsTip = StatsTooltip.CreateNativeTip(
+            title,
+            body,
+            stretchHorizontally:
+                RelicHoverShowPatch.GetPreferredStatsTooltipWidth(holder.Relic?.Model).HasValue);
+        return true;
+    }
 
     public static void SetRun(RunHistory? history)
     {
@@ -394,85 +435,5 @@ public static class RunHistoryHiddenStatsContextPatch
     public static void Postfix()
     {
         PatchGuard.Run(nameof(RunHistoryHiddenStatsContextPatch), RunHistoryStatsContext.Clear);
-    }
-}
-
-[HarmonyPatch(typeof(NDeckHistoryEntry), "OnFocus")]
-public static class RunHistoryDeckEntryStatsTooltipShowPatch
-{
-    [HarmonyPostfix]
-    public static void Postfix(NDeckHistoryEntry __instance)
-    {
-        PatchGuard.Run(nameof(RunHistoryDeckEntryStatsTooltipShowPatch), () =>
-        {
-            if (!CardHoverShowPatch.ResolveCardStatsEnabled(
-                    ViewStatsInjectorPatch.StatsVisibilityEnabled,
-                    ViewStatsInjectorPatch.CardStatsEnabled)) return;
-            if (!RunHistoryStatsContext.HasCurrent) return;
-
-            var tree = Engine.GetMainLoop() as SceneTree;
-            if (tree == null) return;
-
-            if (!RunHistoryStatsContext.TryBuildCardTooltip(__instance, out var title, out var body))
-                return;
-
-            StatsTooltip.Show(tree, __instance, title, "SpireLens", body);
-        });
-    }
-}
-
-[HarmonyPatch(typeof(NDeckHistoryEntry), "OnUnfocus")]
-public static class RunHistoryDeckEntryStatsTooltipHidePatch
-{
-    [HarmonyPostfix]
-    public static void Postfix(NDeckHistoryEntry __instance)
-    {
-        PatchGuard.Run(nameof(RunHistoryDeckEntryStatsTooltipHidePatch), () =>
-        {
-            StatsTooltip.HideIfAnchoredTo(__instance);
-        });
-    }
-}
-
-[HarmonyPatch(typeof(NRelicBasicHolder), "OnFocus")]
-public static class RunHistoryRelicStatsTooltipShowPatch
-{
-    [HarmonyPostfix]
-    public static void Postfix(NRelicBasicHolder __instance)
-    {
-        PatchGuard.Run(nameof(RunHistoryRelicStatsTooltipShowPatch), () =>
-        {
-            if (!ViewStatsInjectorPatch.StatsVisibilityEnabled) return;
-            if (!RunHistoryStatsContext.HasCurrent) return;
-            if (!RunHistoryStatsContext.HasAncestor<NRelicHistory>(__instance)) return;
-
-            var tree = Engine.GetMainLoop() as SceneTree;
-            if (tree == null) return;
-
-            if (!RunHistoryStatsContext.TryBuildRelicTooltip(__instance, out var title, out var body))
-                return;
-
-            StatsTooltip.Show(
-                tree,
-                __instance,
-                title,
-                "SpireLens",
-                body,
-                panelWidth: RelicHoverShowPatch.GetPreferredStatsTooltipWidth(__instance.Relic?.Model));
-        });
-    }
-}
-
-[HarmonyPatch(typeof(NRelicBasicHolder), "OnUnfocus")]
-public static class RunHistoryRelicStatsTooltipHidePatch
-{
-    [HarmonyPostfix]
-    public static void Postfix(NRelicBasicHolder __instance)
-    {
-        PatchGuard.Run(nameof(RunHistoryRelicStatsTooltipHidePatch), () =>
-        {
-            if (!RunHistoryStatsContext.HasAncestor<NRelicHistory>(__instance)) return;
-            StatsTooltip.HideIfAnchoredTo(__instance);
-        });
     }
 }

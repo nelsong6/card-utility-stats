@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Godot;
-using HarmonyLib;
 using MegaCrit.Sts2.Core.Entities.Cards;
+using MegaCrit.Sts2.Core.HoverTips;
 using MegaCrit.Sts2.Core.Models.Cards;
 using MegaCrit.Sts2.Core.Nodes.Cards.Holders;
 using MegaCrit.Sts2.Core.Nodes.Screens.CardSelection;
@@ -12,14 +12,9 @@ using MegaCrit.Sts2.Core.Nodes.Screens.CardSelection;
 namespace SpireLens.Core.Patches;
 
 /// <summary>
-/// Shows our per-card stats tooltip when the user hovers a card in the deck
-/// view (or other card-holder surfaces) AND the ViewStats checkbox is on.
-///
-/// Hook surfaces:
-///   NCardHolder.CreateHoverTips  (postfix) — show on hover
-///   NCardHolder.ClearHoverTips   (postfix) — hide on unhover
+/// Builds the native SpireLens hover-tip entry for a physical card holder.
+/// NHoverTipSet owns the rendered node and its complete lifecycle.
 /// </summary>
-[HarmonyPatch(typeof(NCardHolder), "CreateHoverTips")]
 public static class CardHoverShowPatch
 {
     private const int InlineKeywordIconSize = 16;
@@ -35,78 +30,49 @@ public static class CardHoverShowPatch
     private const string StarIconPath = "res://images/packed/sprite_fonts/star_icon.png";
     private const string SovereignBladeMetaNote = "Reflects All Sovereign Blade Usage";
 
-    [HarmonyPostfix]
-    public static void Postfix(NCardHolder __instance)
+    internal static bool TryBuildNativeHoverTip(
+        NCardHolder holder,
+        out HoverTip statsTip)
     {
+        statsTip = default;
+
         // Card tooltips are an explicit display-only opt-in on every surface.
         // Keep this gate ahead of tracker locks, aggregate merging, and tooltip
         // markup; attribution continues normally while the UI is disabled.
         var cardStatsEnabled = ViewStatsInjectorPatch.CardStatsEnabled;
         var viewStatsEnabled = ViewStatsInjectorPatch.StatsVisibilityEnabled;
-        if (!ResolveCardStatsEnabled(viewStatsEnabled, cardStatsEnabled)) return;
+        if (!ResolveCardStatsEnabled(viewStatsEnabled, cardStatsEnabled)) return false;
 
-        if (IsCardRewardSelectionSurface(__instance))
+        if (IsCardRewardSelectionSurface(holder)) return false;
+
+        var cardModel = holder.CardModel;
+        if (cardModel == null) return false;
+
+        // Per-instance display: every deck card gets a stable "#N" number
+        // assigned at RunStarted for the starting deck and lazily for cards
+        // added mid-run.
+        //
+        // The game's Title includes a trailing "+" when upgraded. Strip it
+        // here so the physical card's SpireLens identity remains stable.
+        var rawTitle = cardModel.Title;
+        if (cardModel.CurrentUpgradeLevel > 0 && !string.IsNullOrEmpty(rawTitle))
         {
-            StatsTooltip.HideIfAnchoredTo(__instance);
-            return;
+            rawTitle = rawTitle.TrimEnd('+').TrimEnd();
         }
+        var title = !string.IsNullOrWhiteSpace(rawTitle) ? rawTitle : cardModel.Id.ToString();
+        var instanceNum = RunTracker.GetInstanceNumber(cardModel);
+        var displayName = instanceNum > 0 ? $"{title} #{instanceNum}" : title;
 
-        try
-        {
-            var tree = Engine.GetMainLoop() as SceneTree;
-            if (tree == null) return;
+        CoreMain.LogDebug(
+            $"hover: id={cardModel.Id} rawTitle='{rawTitle}' instance={instanceNum} " +
+            $"displayName='{displayName}' hash={cardModel.GetHashCode()} " +
+            $"deckVersionNull={cardModel.DeckVersion == null}");
 
-            var cardModel = __instance.CardModel;
-            if (cardModel == null) return;
-
-            // Per-instance display: every deck card gets a stable "#N" number
-            // (per Nelson: "all cards should have a bit of an ID attached"),
-            // assigned at RunStarted for the starting deck and lazily for
-            // any card added mid-run.
-            //
-            // Upgrade marker strip: the game's Title field includes a trailing
-            // "+" (or "++") when the card is upgraded — "Defend" becomes
-            // "Defend+" in the game's rendering. Per Nelson's call, we strip
-            // that for the tooltip header so the instance name stays stable
-            // across upgrade ("Defend #1" is always "Defend #1"). Upgrade
-            // state is already shown in the Lineage section below.
-            // Gated on CurrentUpgradeLevel > 0 so we don't accidentally
-            // strip a legitimate trailing "+" from a card whose base name
-            // happens to end that way.
-            var rawTitle = cardModel.Title;
-            if (cardModel.CurrentUpgradeLevel > 0 && !string.IsNullOrEmpty(rawTitle))
-            {
-                rawTitle = rawTitle.TrimEnd('+').TrimEnd();
-            }
-            var title = !string.IsNullOrWhiteSpace(rawTitle) ? rawTitle : cardModel.Id.ToString();
-            var instanceNum = RunTracker.GetInstanceNumber(cardModel);
-            var displayName = instanceNum > 0 ? $"{title} #{instanceNum}" : title;
-
-            // The hover card is the deck original (DeckVersion is null), so
-            // its hash IS the canonical hash. Compare against the play-time
-            // log's canonicalHash to verify attribution lands on the right
-            // key. If they match → dict lookup must succeed.
-            CoreMain.LogDebug($"hover: id={cardModel.Id} rawTitle='{rawTitle}' instance={instanceNum} displayName='{displayName}' hash={cardModel.GetHashCode()} deckVersionNull={cardModel.DeckVersion == null}");
-
-            // Hand hovers stay compact by default. Automated verify runs and
-            // power users can opt into the full breakdown for hand tooltips.
-            bool compact = __instance is NHandCardHolder
-                && !RuntimeOptionsProvider.Current.UseVerboseHandStats;
-            var body = BuildBodyBBCode(cardModel, displayName, compact);
-            // Reuse the gold title slot for the hovered card's instance name
-            // on every surface. That's the highest-signal identity marker,
-            // and it keeps the compact and full tooltips visually aligned.
-            StatsTooltip.Show(
-                tree,
-                __instance,
-                displayName,
-                "SpireLens",
-                body);
-        }
-        catch (System.Exception e)
-        {
-            CoreMain.Logger.Error($"CardHoverShow failed: {e.Message}");
-        }
+        bool compact = holder is NHandCardHolder
+            && !RuntimeOptionsProvider.Current.UseVerboseHandStats;
+        var body = BuildBodyBBCode(cardModel, displayName, compact);
+        statsTip = StatsTooltip.CreateNativeTip(displayName, body);
+        return true;
     }
 
     internal static bool ResolveCardStatsEnabled(
@@ -131,10 +97,9 @@ public static class CardHoverShowPatch
     }
 
     /// <summary>
-    /// Render the BODY portion of the tooltip — the stats block. Title and
-    /// brand are set separately on the Label nodes inside StatsTooltip so
-    /// they can use proper Kreon font + gold/grey coloring instead of BBCode
-    /// inline hacks. This method only produces what goes in the RichTextLabel.
+    /// Render the BODY portion of the native hover tip. The physical card
+    /// identity is supplied separately through HoverTip.Title; this method
+    /// produces HoverTip.Description BBCode.
     ///
     /// <paramref name="compact"/> controls density:
     ///   - true (hand hovers): just the high-signal numbers the player
@@ -1594,14 +1559,3 @@ internal readonly record struct PoisonEffectSummary(
     decimal TotalTriggeredEffectiveDamage,
     decimal TotalTriggeredOverkill,
     string? IconPath);
-
-[HarmonyPatch(typeof(NCardHolder), "ClearHoverTips")]
-public static class CardHoverHidePatch
-{
-    [HarmonyPostfix]
-    public static void Postfix(NCardHolder __instance)
-    {
-        try { StatsTooltip.HideIfAnchoredTo(__instance); }
-        catch (System.Exception e) { CoreMain.Logger.Error($"CardHoverHide failed: {e.Message}"); }
-    }
-}

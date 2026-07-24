@@ -82,12 +82,17 @@ leaf category. Every relic ID appears exactly once and each list is alphabetical
 Move IDs between lists, then rebuild and hot-reload the Core to apply changes;
 display names remain defined in `Core/RelicTaxonomy.cs`.
 
-Turning stats off hides any open SpireLens panel and skips aggregate
-lookup and tooltip construction while stats are hidden; attribution continues
-in the background. Controller Left Trigger remains the game's Draw Pile input,
-and Left Stick press remains Peek, so neither is claimed by SpireLens.
+Turning stats off closes the current native hover-tip set and skips aggregate
+lookup and SpireLens hover-tip construction while stats are hidden; attribution
+continues in the background. Controller Left Trigger remains the game's Draw
+Pile input, and Left Stick press remains Peek, so neither is claimed by
+SpireLens.
 
-A separate, default-off **"SpireLens: card stats"** checkbox controls per-card panels on every supported card surface, including the deck, hand, combat piles, and run history. It changes presentation only: card attribution continues to be recorded while the checkbox is off. Hand hovers stay compact unless verbose hand stats are enabled.
+A separate, default-off **"SpireLens: card stats"** checkbox controls per-card
+native hover-tip entries on every supported card surface, including the deck,
+hand, combat piles, and run history. It changes presentation only: card
+attribution continues to be recorded while the checkbox is off. Hand hovers
+stay compact unless verbose hand stats are enabled.
 
 A separate **"show removed cards"** checkbox controls the removed-card overlay: cards you've removed this run (Smith, events, curse dispose) appear inline in the deck grid, marked with a red "Card Removed" banner in their tooltip so you can review their stats post-removal. Generated combat-only cards that do not live in the deck permanently can also render as pooled summaries when that is a better representation than pretending each temporary copy is a normal deck instance. Checkbox state persists across hot reloads through the mod configuration.
 

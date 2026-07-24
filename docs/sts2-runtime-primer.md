@@ -939,19 +939,22 @@ Card stats are exposed through Godot UI patches, not through game combat state a
 
 Important surfaces:
 
-- `ViewStatsInjectorPatch` hooks `NCardsViewScreen.ConnectSignals`, gates to `NDeckViewScreen`, clones the existing View Upgrades tickbox, rewires duplicated node internals, persists preferences, and reinjects on hot reload if the deck view is already open. The master on/off control gates every SpireLens stats surface, while separate default-off controls gate card stats and monster hover stats. Gate both `NCardHolder.CreateHoverTips` and run-history deck-entry focus before aggregate lookup or tooltip construction when Card Stats is off. The Card Stats control is presentation-only and must not be wired to `DisableCardStatsDuringCombat`, which suppresses attribution itself.
+- `ViewStatsInjectorPatch` hooks `NCardsViewScreen.ConnectSignals`, gates to `NDeckViewScreen`, persists preferences, and reinjects its menu shortcut on hot reload if the deck view is already open. The master on/off control gates every SpireLens stats surface, while separate default-off controls gate card stats and monster hover stats. Gate `NativeStatsHoverTipFactory` before aggregate lookup or tooltip construction when the relevant stats option is off. The Card Stats control is presentation-only and must not be wired to `DisableCardStatsDuringCombat`, which suppresses attribution itself.
 - `StatsVisibilityHotkeyPatch` postfixes the stable Loader input node so hot-reloaded Core code can handle both keyboard and controller events. A standalone Left Shift tap and raw Right Stick (R3) press share the persisted master toggle and the same focus/overlay/transition/rebind guards. Left Stick press is the game's Peek action; R3 is absent from the shipped and saved controller action maps. Native Steam Input layouts must expose R3 as a virtual joypad button for the raw event to reach the mod.
 - `NCardsViewScreen.ConnectSignals` calls its controller-state update before the SpireLens postfix. Controller mode hides the built-in `%Upgrades` tickbox, so clones of that subtree inherit `Visible=false` unless SpireLens explicitly restores visibility. Any injected deck controls cloned from View Upgrades must set their own visibility rather than inherit the source's controller-specific state.
-- `CardHoverTooltipPatch` hooks `NCardHolder.CreateHoverTips` and `ClearHoverTips` to show/hide the SpireLens tooltip.
-- `StatsTooltip` mirrors the game's owner-scoped `NHoverTipSet` lifecycle:
-  native `CreateAndShow(owner, ...)` claims the shared SpireLens panel and
-  clears any previous content, while `Remove(owner)` hides it only when that
-  same control still owns it. Keep per-surface cleanup owner-aware as well; an
-  unconditional hide from an old unfocus can erase a newer tooltip. Position
-  the SpireLens panel against the native `NHoverTipSet` with that same owner,
-  never merely the newest native tooltip node. If that matching native set no
-  longer exists, hide the SpireLens panel immediately; it is a companion
-  panel, not a standalone fallback popup.
+- `CardHoverTooltipPatch` builds compact/full card titles and BBCode bodies; it
+  does not create or remove UI nodes.
+- `NativeHoverTipAugmentationPatch` prefixes the game's nontrivial
+  `NHoverTipSet.CreateAndShow(Control, IEnumerable<IHoverTip>,
+  HoverTipAlignment)` overload and appends at most one SpireLens `HoverTip` to
+  that owner’s native sequence. Owner-specific builders cover card holders,
+  owned relics, enemies, visible compendium relics, and run-history cards and
+  relics.
+- `StatsTooltip` only constructs the native `HoverTip` value and escapes
+  dynamic BBCode. It must not retain a `Control`, create a scene-root panel,
+  position UI per frame, or mirror native focus/unfocus cleanup. `NHoverTipSet`
+  owns the stats node together with the rest of that owner’s tips, so the
+  game’s ordinary `Remove(owner)` and tree-exit paths remove it.
 - Hand hovers are compact unless verbose hand stats are enabled.
 - Deck view and other card-view hovers can show full lineage and stat breakdown.
 - Tooltip aggregate display merges committed run data plus current pending combat so combat stats appear immediately.

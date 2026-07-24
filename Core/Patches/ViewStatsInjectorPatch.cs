@@ -4,6 +4,7 @@ using Godot;
 using HarmonyLib;
 using MegaCrit.Sts2.addons.mega_text;
 using MegaCrit.Sts2.Core.Nodes.CommonUi;
+using MegaCrit.Sts2.Core.Nodes.HoverTips;
 using MegaCrit.Sts2.Core.Nodes.Screens;
 using MegaCrit.Sts2.Core.Nodes.Screens.InspectScreens;
 
@@ -148,7 +149,7 @@ public static class ViewStatsInjectorPatch
         SavePreferences();
 
         if (!isEnabled)
-            StatsTooltip.Hide();
+            NHoverTipSet.Clear();
 
         CoreMain.Logger.Info($"Stats visibility set to {isEnabled} ({source})");
     }
@@ -160,7 +161,7 @@ public static class ViewStatsInjectorPatch
         SetTickboxVisualState(LastInjectedCardStatsTickbox, isEnabled);
         SavePreferences();
         if (!isEnabled)
-            StatsTooltip.HideIfAnchoredToCard();
+            NHoverTipSet.Clear();
         CoreMain.Logger.Info($"Card stats set to {isEnabled} ({source})");
     }
 
@@ -171,7 +172,7 @@ public static class ViewStatsInjectorPatch
         SetTickboxVisualState(LastInjectedEnemyStatsTickbox, isEnabled);
         SavePreferences();
         if (!isEnabled)
-            StatsTooltip.HideIfAnchoredToCreature();
+            NHoverTipSet.Clear();
         CoreMain.Logger.Info($"Monster stats set to {isEnabled} ({source})");
     }
 
@@ -193,7 +194,7 @@ public static class ViewStatsInjectorPatch
             _persistedShowCombatOnlyRelicsAtCombatScreen = false;
         SavePreferences();
         if (isEnabled)
-            StatsTooltip.Hide();
+            NHoverTipSet.Clear();
         RelicBarFilterPatch.RefreshAll();
         CoreMain.Logger.Info($"Force combat-only relic bar set to {isEnabled} ({source})");
     }

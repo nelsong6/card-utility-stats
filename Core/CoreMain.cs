@@ -141,7 +141,6 @@ public static class CoreMain
         Patches.RelicBarFilterPatch.InitializeHooks();
         Patches.RelicBarFilterPatch.RefreshAll("core initialized");
         Patches.RelicCompendiumFilterUi.ReinjectIntoActiveCollections();
-        Patches.RelicCompendiumStatsSignals.ReattachToActiveEntries();
 
         // Visible confirmation on screen so hot reload has immediate feedback.
         // Kept in Core (not Loader) so toast text/style can be tweaked and
@@ -184,14 +183,8 @@ public static class CoreMain
         try { RelicClassificationStore.Shutdown(); }
         catch (Exception e) { Logger.Error($"Shutdown: relic classification teardown failed: {e}"); }
 
-        try { RelicCompendiumStatsSignals.TeardownAttachedSignals(); }
-        catch (Exception e) { Logger.Error($"Shutdown: relic compendium signal teardown failed: {e}"); }
-
         try { RelicCompendiumFilterUi.TeardownInjectedUI(); }
         catch (Exception e) { Logger.Error($"Shutdown: relic compendium filter teardown failed: {e}"); }
-
-        try { StatsTooltip.Destroy(); }
-        catch (Exception e) { Logger.Error($"Shutdown: StatsTooltip teardown failed: {e}"); }
 
         try { RunTracker.TeardownHooks(); }
         catch (Exception e) { Logger.Error($"Shutdown: TeardownHooks failed: {e}"); }

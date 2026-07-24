@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
-using System.Runtime.CompilerServices;
 using Godot;
 using MegaCrit.Sts2.Core.HoverTips;
 using MegaCrit.Sts2.Core.Nodes.HoverTips;
@@ -10,31 +10,36 @@ using Xunit;
 
 namespace SpireLens.Core.Tests;
 
-public sealed class StatsTooltipOwnershipTests : IDisposable
+public sealed class StatsTooltipOwnershipTests
 {
-    private static readonly FieldInfo AnchorField =
-        typeof(StatsTooltip).GetField("_anchor", BindingFlags.NonPublic | BindingFlags.Static)
-        ?? throw new InvalidOperationException("StatsTooltip._anchor not found.");
-
     [Fact]
-    public void NativeLifecycle_OldOwnerCannotHideNewOwner()
+    public void StatsTooltip_CreatesNativeHoverTipData()
     {
-        var oldOwner = UninitializedControl();
-        var newOwner = UninitializedControl();
+        var tip = StatsTooltip.CreateNativeTip(
+            "Wrought in War #1",
+            "[b]Played[/b] 2",
+            stretchHorizontally: true);
 
-        StatsTooltip.BeginNativeHover(oldOwner);
-        StatsTooltip.BeginNativeHover(newOwner);
-        StatsTooltip.HideIfAnchoredTo(oldOwner);
-
-        Assert.Same(newOwner, AnchorField.GetValue(null));
-
-        StatsTooltip.HideIfAnchoredTo(newOwner);
-
-        Assert.Null(AnchorField.GetValue(null));
+        Assert.Equal("Wrought in War #1", tip.Title);
+        Assert.Equal("[b]Played[/b] 2", tip.Description);
+        Assert.Equal("SPIRELENS.STATS", tip.Id);
+        Assert.True(tip.ShouldOverrideTextOverflow);
     }
 
     [Fact]
-    public void NativeLifecyclePatch_TargetMethodsHaveExpectedSignatures()
+    public void StatsTooltip_DoesNotOwnGodotUiState()
+    {
+        var uiStateFields = typeof(StatsTooltip)
+            .GetFields(BindingFlags.NonPublic | BindingFlags.Static)
+            .Where(field => typeof(Node).IsAssignableFrom(field.FieldType)
+                            || field.FieldType == typeof(SceneTree))
+            .ToArray();
+
+        Assert.Empty(uiStateFields);
+    }
+
+    [Fact]
+    public void NativeAugmentationPatch_TargetMethodHasExpectedSignature()
     {
         Assert.NotNull(typeof(NHoverTipSet).GetMethod(
             nameof(NHoverTipSet.CreateAndShow),
@@ -44,22 +49,5 @@ public sealed class StatsTooltipOwnershipTests : IDisposable
                 typeof(IEnumerable<IHoverTip>),
                 typeof(HoverTipAlignment),
             }));
-        Assert.NotNull(typeof(NHoverTipSet).GetMethod(
-            nameof(NHoverTipSet.CreateAndShowMapPointHistory),
-            new[] { typeof(Control), typeof(NMapPointHistoryHoverTip) }));
-        Assert.NotNull(typeof(NHoverTipSet).GetMethod(
-            nameof(NHoverTipSet.Remove),
-            new[] { typeof(Control) }));
-        Assert.NotNull(typeof(NHoverTipSet).GetMethod(
-            nameof(NHoverTipSet.Clear),
-            Type.EmptyTypes));
     }
-
-    public void Dispose()
-    {
-        StatsTooltip.Hide();
-    }
-
-    private static Control UninitializedControl()
-        => (Control)RuntimeHelpers.GetUninitializedObject(typeof(Control));
 }
