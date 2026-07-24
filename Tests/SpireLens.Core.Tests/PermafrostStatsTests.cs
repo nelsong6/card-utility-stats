@@ -73,7 +73,18 @@ public class PermafrostStatsTests
         Assert.Contains("block gained per combat", body);
     }
 
-    private static string BuildBody(RelicAggregate agg)
-        => (string)(BuildPermafrostBodyMethod.Invoke(null, new object?[] { agg })
+    [Theory]
+    [InlineData(true, "true")]
+    [InlineData(false, "false")]
+    public void RelicTooltip_PermafrostFields_ShowTriggeredThisCombat(bool triggeredThisCombat, string expected)
+    {
+        var body = BuildBody(new RelicAggregate(), triggeredThisCombat);
+
+        Assert.Contains("Triggered this combat", body);
+        Assert.Contains($"[b]{expected}[/b]", body);
+    }
+
+    private static string BuildBody(RelicAggregate agg, bool triggeredThisCombat = false)
+        => (string)(BuildPermafrostBodyMethod.Invoke(null, new object?[] { agg, triggeredThisCombat })
             ?? throw new InvalidOperationException("BuildPermafrostBodyBBCode returned null."));
 }

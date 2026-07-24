@@ -36,6 +36,8 @@ public static class RelicHoverShowPatch
     private const float SturdyClampTooltipWidth = 420f;
     private static readonly System.Reflection.FieldInfo? VambraceBlockGainedThisCombatField =
         AccessTools.Field(typeof(Vambrace), "_blockGainedThisCombat");
+    private static readonly System.Reflection.FieldInfo? PermafrostActivatedThisCombatField =
+        AccessTools.Field(typeof(Permafrost), "_activatedThisCombat");
 
     [HarmonyPostfix]
     public static void Postfix(NRelicInventoryHolder __instance)
@@ -105,12 +107,12 @@ public static class RelicHoverShowPatch
                 return;
             }
 
-            if (relicNode.Model is Permafrost)
+            if (relicNode.Model is Permafrost permafrost)
             {
                 const string relicId = "RELIC.PERMAFROST";
                 var agg = RelicAgg(relicId);
 
-                var body = BuildPermafrostBodyBBCode(agg);
+                var body = BuildPermafrostBodyBBCode(agg, IsPermafrostActivatedThisCombat(permafrost));
                 StatsTooltip.Show(tree, __instance, "Permafrost", "SpireLens", body);
                 return;
             }
@@ -1159,10 +1161,10 @@ public static class RelicHoverShowPatch
             return true;
         }
 
-        if (relicModel is Permafrost)
+        if (relicModel is Permafrost permafrost)
         {
             title = "Permafrost";
-            body = BuildPermafrostBodyBBCode(agg);
+            body = BuildPermafrostBodyBBCode(agg, IsPermafrostActivatedThisCombat(permafrost));
             return true;
         }
 
@@ -1973,16 +1975,29 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
-    private static string BuildPermafrostBodyBBCode(RelicAggregate agg)
+    private static string BuildPermafrostBodyBBCode(RelicAggregate agg, bool triggeredThisCombat)
     {
         var sb = new StringBuilder();
         var blockPerCombat = agg.Activations <= 0
             ? 0m
             : (decimal)agg.AdditionalBlockGained / agg.Activations;
+        Row3(sb, "Triggered this combat", triggeredThisCombat ? "true" : "false", "");
         Row3(sb, "Combats triggered", agg.Activations.ToString(), "");
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
         Row3(sb, BlockLabel("block gained per combat"), FormatDecimal(blockPerCombat), "");
         return sb.ToString();
+    }
+
+    private static bool IsPermafrostActivatedThisCombat(Permafrost permafrost)
+    {
+        try
+        {
+            return PermafrostActivatedThisCombatField?.GetValue(permafrost) is true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static string BuildVambraceBodyBBCode(RelicAggregate agg, bool usedThisCombat = false)

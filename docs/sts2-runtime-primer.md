@@ -486,7 +486,7 @@ and deck-add replacement modifiers. Do not infer a successful return merely
 from the stored entry disappearing; Tooth removes it even when the deck-add
 result reports failure.
 
-For relics that grant block after a specific owner-owned condition, arm a narrow block-gain window at the relic callback and let `Hook.AfterBlockGained` record the modified amount. Permafrost follows this pattern from `Permafrost.AfterCardPlayed`: mirror the first-owned-Power condition, count that combat trigger, then derive block per combat from observed block gained divided by triggers.
+For relics that grant block after a specific owner-owned condition, arm a narrow block-gain window at the relic callback and let `Hook.AfterBlockGained` record the modified amount. Permafrost follows this pattern from `Permafrost.AfterCardPlayed`: mirror the first-owned-Power condition, count that combat trigger, then derive block per combat from observed block gained divided by triggers. Its private `_activatedThisCombat` field is the authoritative live source for whether it has triggered in the current combat; display that state directly rather than inferring it from persisted activation totals.
 
 Intimidating Helmet's `BeforeCardPlayed` condition uses the frozen play-time
 `cardPlay.Resources.EnergyValue`, not printed cost or `EnergySpent`. Normal
