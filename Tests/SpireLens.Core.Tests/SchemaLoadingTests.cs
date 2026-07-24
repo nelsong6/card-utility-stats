@@ -2883,6 +2883,33 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsEmberTeaRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("ember-tea-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.EMBER_TEA"];
+        Assert.Equal(14, relicAgg.EmberTeaAttacksPlayedWhileActive);
+        Assert.Equal(22, relicAgg.EmberTeaHitsWhileActive);
+        Assert.Equal(6, relicAgg.EmberTeaActiveTurns);
+        Assert.Equal(2, relicAgg.EmberTeaActiveCombats);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsEmberTeaRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("ember-tea-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.EMBER_TEA"];
+        Assert.Equal(14, relicAgg.EmberTeaAttacksPlayedWhileActive);
+        Assert.Equal(22, relicAgg.EmberTeaHitsWhileActive);
+        Assert.Equal(6, relicAgg.EmberTeaActiveTurns);
+        Assert.Equal(2, relicAgg.EmberTeaActiveCombats);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsKunaiRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("kunai-relic-run.json"));

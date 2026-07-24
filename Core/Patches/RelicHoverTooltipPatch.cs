@@ -34,6 +34,7 @@ public static class RelicHoverShowPatch
     private const int InlineIconSize = 16;
     private const int MaxTableLabelVisibleChars = 28;
     private const float SturdyClampTooltipWidth = 420f;
+    private const float EmberTeaTooltipWidth = 500f;
     private static readonly System.Reflection.FieldInfo? VambraceBlockGainedThisCombatField =
         AccessTools.Field(typeof(Vambrace), "_blockGainedThisCombat");
     private static readonly System.Reflection.FieldInfo? PermafrostActivatedThisCombatField =
@@ -1097,7 +1098,12 @@ public static class RelicHoverShowPatch
     }
 
     internal static float? GetPreferredStatsTooltipWidth(RelicModel? relicModel)
-        => relicModel is SturdyClamp ? SturdyClampTooltipWidth : null;
+        => relicModel switch
+        {
+            SturdyClamp => SturdyClampTooltipWidth,
+            EmberTea => EmberTeaTooltipWidth,
+            _ => null,
+        };
 
     internal static bool TryBuildBodyBBCode(
         RelicModel relicModel,
@@ -1287,6 +1293,13 @@ public static class RelicHoverShowPatch
         {
             title = "Vajra";
             body = BuildVajraBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is EmberTea)
+        {
+            title = "Ember Tea";
+            body = BuildEmberTeaBodyBBCode(agg);
             return true;
         }
 
@@ -3567,6 +3580,31 @@ public static class RelicHoverShowPatch
         var sb = new StringBuilder();
         Row3(sb, "Attacks played", agg.VajraAttacksPlayed.ToString(), "");
         Row3(sb, "Attack hits", agg.VajraAttackHits.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildEmberTeaBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var attacksPerTurn = agg.EmberTeaActiveTurns <= 0
+            ? 0m
+            : (decimal)agg.EmberTeaAttacksPlayedWhileActive / agg.EmberTeaActiveTurns;
+        var attacksPerCombat = agg.EmberTeaActiveCombats <= 0
+            ? 0m
+            : (decimal)agg.EmberTeaAttacksPlayedWhileActive / agg.EmberTeaActiveCombats;
+        var hitsPerTurn = agg.EmberTeaActiveTurns <= 0
+            ? 0m
+            : (decimal)agg.EmberTeaHitsWhileActive / agg.EmberTeaActiveTurns;
+        var hitsPerCombat = agg.EmberTeaActiveCombats <= 0
+            ? 0m
+            : (decimal)agg.EmberTeaHitsWhileActive / agg.EmberTeaActiveCombats;
+
+        Row3(sb, "Attacks played while active", agg.EmberTeaAttacksPlayedWhileActive.ToString(), "");
+        Row3(sb, "Avg attacks played per turn while active", FormatDecimal(attacksPerTurn), "");
+        Row3(sb, "Avg attacks played per combat while active", FormatDecimal(attacksPerCombat), "");
+        Row3(sb, "Hits while active", agg.EmberTeaHitsWhileActive.ToString(), "");
+        Row3(sb, "Avg hits per turn while active", FormatDecimal(hitsPerTurn), "");
+        Row3(sb, "Avg hits per combat while active", FormatDecimal(hitsPerCombat), "");
         return sb.ToString();
     }
 

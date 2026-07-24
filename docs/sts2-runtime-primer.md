@@ -666,6 +666,17 @@ same combat card rather than its canonical deck version. Permanent upgrades are
 copied onto combat cards, while combat-only upgrades such as Drain Power exist
 only on the raw combat card.
 
+Ember Tea's `AfterRoomEntered` callback runs after `CombatSetUp`, applies
+Strength for a combat while `CombatsLeft` is positive, and immediately
+decrements the saved counter. The fifth activation therefore spends the last
+charge and leaves `CombatsLeft == 0` before turn one even though Tea is active
+for that combat. Wrap the callback and retain a combat-local active-player
+marker only after the awaited callback successfully consumes a charge. Count
+finished owner Attack plays and each observed enemy damage entry from those
+Attacks while that marker exists; multi-hit and multi-target Attacks contribute
+one hit per resolved entry. Active turn/combat denominators include marked
+periods with zero attacks or hits.
+
 Brilliant Scarf increments its per-turn card counter from `AfterCardPlayed`,
 after `CardPlayFinished` has already entered combat history. Its actual cost
 discounts happen through `TryModifyEnergyCostInCombatLate` and `TryModifyStarCost`

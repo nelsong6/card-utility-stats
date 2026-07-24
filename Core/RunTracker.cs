@@ -1555,6 +1555,7 @@ public static class RunTracker
         RecordLetterOpenerTurnForTrackedPlayerLocked();
         RecordTuningForkTurnForTrackedPlayerLocked();
         RecordCloakClaspTurnForTrackedPlayerLocked();
+        RecordEmberTeaActiveTurnForTrackedPlayerLocked();
         RecordRippleBasinTurnForTrackedPlayerLocked();
         RecordReptileTrinketTurnForTrackedPlayerLocked();
         RecordBeatingRemnantTurnForTrackedPlayerLocked();
@@ -1777,6 +1778,10 @@ public static class RunTracker
         target.MiniatureCannonUpgradedAttackHits += source.MiniatureCannonUpgradedAttackHits;
         target.VajraAttacksPlayed += source.VajraAttacksPlayed;
         target.VajraAttackHits += source.VajraAttackHits;
+        target.EmberTeaAttacksPlayedWhileActive += source.EmberTeaAttacksPlayedWhileActive;
+        target.EmberTeaHitsWhileActive += source.EmberTeaHitsWhileActive;
+        target.EmberTeaActiveTurns += source.EmberTeaActiveTurns;
+        target.EmberTeaActiveCombats += source.EmberTeaActiveCombats;
         target.KunaiAttacksPlayed += source.KunaiAttacksPlayed;
         target.KunaiDexterityGained += source.KunaiDexterityGained;
         target.KunaiTurnsEndedAt1Charge += source.KunaiTurnsEndedAt1Charge;
@@ -2030,6 +2035,7 @@ public static class RunTracker
             RecordNutritiousSoupEnchantedStrikePlayedIfOwnedLocked(cardPlay.Card);
             RecordMiniatureCannonUpgradedAttackPlayedIfOwnedLocked(cardPlay.Card);
             RecordVajraAttackPlayedIfOwnedLocked(cardPlay.Card);
+            RecordEmberTeaAttackPlayedIfActiveLocked(cardPlay.Card);
             RecordBrilliantScarfDiscountTaken(cardPlay);
             RecordPaelsClawGoopyCardPlayedIfOwnedLocked(cardPlay.Card);
 
@@ -3708,6 +3714,7 @@ public static class RunTracker
     private const string NutritiousSoupRelicId = "RELIC.NUTRITIOUS_SOUP";
     private const string MiniatureCannonRelicId = "RELIC.MINIATURE_CANNON";
     private const string VajraRelicId = "RELIC.VAJRA";
+    private const string EmberTeaRelicId = "RELIC.EMBER_TEA";
     private const string KunaiRelicId = "RELIC.KUNAI";
     private const string KusarigamaRelicId = "RELIC.KUSARIGAMA";
     private const string OrnamentalFanRelicId = "RELIC.ORNAMENTAL_FAN";
@@ -8747,6 +8754,77 @@ public static class RunTracker
     {
         if (agg == null) return;
         agg.VajraAttackHits += Math.Max(0, count);
+    }
+
+    internal static void RecordEmberTeaAttackPlayedForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.EmberTeaAttacksPlayedWhileActive += Math.Max(0, count);
+    }
+
+    internal static void RecordEmberTeaAttackHitForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.EmberTeaHitsWhileActive += Math.Max(0, count);
+    }
+
+    internal static void RecordEmberTeaActiveTurnForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.EmberTeaActiveTurns += Math.Max(0, count);
+    }
+
+    internal static void RecordEmberTeaActiveCombatForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.EmberTeaActiveCombats += Math.Max(0, count);
+    }
+
+    /// <summary>
+    /// Mark Ember Tea active for the current combat after its room-entry
+    /// callback successfully consumes a charge.
+    /// </summary>
+    public static void RecordEmberTeaCombatActivated(EmberTea relic)
+    {
+        if (relic?.Owner == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null) return;
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(relic.Owner)) return;
+                if (!_pendingCombat.EmberTeaActivePlayers.Add(relic.Owner)) return;
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(EmberTeaRelicId);
+                RecordEmberTeaActiveCombatForTest(agg);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordEmberTeaCombatActivated failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Count one distinct turn in a combat where Ember Tea consumed a charge.
+    /// </summary>
+    public static void RecordEmberTeaActiveTurnStarted(Player player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                RecordEmberTeaActiveTurnForPlayerLocked(player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordEmberTeaActiveTurnStarted failed: {e.Message}");
+            }
+        }
     }
 
     /// <summary>
@@ -13841,6 +13919,63 @@ public static class RunTracker
         RecordVajraAttackHitForTest(agg);
     }
 
+    private static void RecordEmberTeaAttackPlayedIfActiveLocked(CardModel card)
+    {
+        if (card.Type != CardType.Attack) return;
+
+        var owner = card.Owner;
+        if (owner == null || !IsTrackedPlayer(owner)) return;
+        if (_pendingCombat?.EmberTeaActivePlayers.Contains(owner) != true) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(EmberTeaRelicId);
+        RecordEmberTeaAttackPlayedForTest(agg);
+    }
+
+    private static void RecordEmberTeaAttackHitIfActiveLocked(CardModel card)
+    {
+        if (card.Type != CardType.Attack) return;
+
+        var owner = card.Owner;
+        if (owner == null || !IsTrackedPlayer(owner)) return;
+        if (_pendingCombat?.EmberTeaActivePlayers.Contains(owner) != true) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(EmberTeaRelicId);
+        RecordEmberTeaAttackHitForTest(agg);
+    }
+
+    private static void RecordEmberTeaActiveTurnForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordEmberTeaActiveTurnForPlayerLocked(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordEmberTeaActiveTurnForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordEmberTeaActiveTurnForPlayerLocked(Player player)
+    {
+        if (_pendingCombat?.EmberTeaActivePlayers.Contains(player) != true) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.EmberTeaActiveTurnCountedTurns.TryGetValue(
+                player,
+                out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.EmberTeaActiveTurnCountedTurns[player] = turnNumber;
+        var agg = GetOrCreatePendingRelicAggregateLocked(EmberTeaRelicId);
+        RecordEmberTeaActiveTurnForTest(agg);
+    }
+
     private static bool RefreshStrikeDummyDeckCountsIfOwnedLocked()
     {
         if (_currentRun == null) return false;
@@ -18605,6 +18740,7 @@ public static class RunTracker
             {
                 RecordMiniatureCannonUpgradedAttackHitIfOwnedLocked(entry.CardSource!);
                 RecordVajraAttackHitIfOwnedLocked(entry.CardSource!);
+                RecordEmberTeaAttackHitIfActiveLocked(entry.CardSource!);
             }
 
             if (!ShouldTrackCardStatsDuringCombatLocked()) return;
@@ -19614,6 +19750,10 @@ internal class PendingCombat
     public HashSet<Player> CloakClaspCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> CloakClaspTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> EmberTeaActivePlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> EmberTeaActiveTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> RippleBasinCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

@@ -186,6 +186,10 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `vajra-relic-run.json`
   Adds Vajra tracking for attack cards played while held plus actual enemy
   damage hits from those attacks, with multi-hit attacks counted per hit.
+- `ember-tea-relic-run.json`
+  Adds active-charge-only Ember Tea attack plays and observed enemy hits plus
+  active turn/combat denominators. Its fifth combat remains active even though
+  consuming that charge immediately leaves the visible counter at zero.
 - `paper-phrog-relic-run.json`
   Adds Paper Phrog tracking for bonus damage added by its Vulnerable multiplier,
   vulnerable-enhanced attack counts, and held combat/turn denominators for

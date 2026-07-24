@@ -838,6 +838,14 @@ public class RelicAggregate
     public int VajraAttacksPlayed { get; set; }
     public int VajraAttackHits { get; set; }
 
+    // Ember Tea tracking is limited to combats where the relic successfully
+    // consumed a charge. The active-combat marker survives the fifth charge
+    // reaching zero immediately after Strength is applied.
+    public int EmberTeaAttacksPlayedWhileActive { get; set; }
+    public int EmberTeaHitsWhileActive { get; set; }
+    public int EmberTeaActiveTurns { get; set; }
+    public int EmberTeaActiveCombats { get; set; }
+
     // Kunai tracking. Counts owner attack plays, actual Dexterity gained from
     // activation resolution, and player-turn-end charge snapshots.
     public int KunaiAttacksPlayed { get; set; }
