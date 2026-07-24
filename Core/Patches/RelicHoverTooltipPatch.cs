@@ -4298,9 +4298,9 @@ public static class RelicHoverShowPatch
 public static class RelicHoverHidePatch
 {
     [HarmonyPostfix]
-    public static void Postfix()
+    public static void Postfix(NRelicInventoryHolder __instance)
     {
-        try { StatsTooltip.Hide(); }
+        try { StatsTooltip.HideIfAnchoredTo(__instance); }
         catch (Exception e) { CoreMain.Logger.Error($"RelicHoverHidePatch failed: {e.Message}"); }
     }
 }

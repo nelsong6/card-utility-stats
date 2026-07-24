@@ -38,6 +38,10 @@ namespace SpireLens.Core;
 /// game's NHoverTipSet textHoverTipContainer (the HUD slot where "Deal 6
 /// damage" appears). Third-party tooltip integration is intentionally
 /// unsupported.
+///
+/// Ownership follows NHoverTipSet: native CreateAndShow claims the owner for
+/// this shared panel, and native Remove releases only that same owner. This
+/// prevents an old control's late unfocus from hiding a newer tooltip.
 /// </summary>
 public static class StatsTooltip
 {
@@ -346,6 +350,23 @@ public static class StatsTooltip
     public static void Hide()
     {
         _anchor = null;
+        HidePanel();
+    }
+
+    /// <summary>
+    /// Begin the same owner-scoped hover session that the game begins through
+    /// NHoverTipSet.CreateAndShow. Claiming an owner clears the previous
+    /// panel content even when the new native hover has no SpireLens stats.
+    /// </summary>
+    internal static void BeginNativeHover(Control owner)
+    {
+        if (owner == null) return;
+        _anchor = owner;
+        HidePanel();
+    }
+
+    private static void HidePanel()
+    {
         if (_panel != null && GodotObject.IsInstanceValid(_panel)) _panel.Visible = false;
         if (_shadow != null && GodotObject.IsInstanceValid(_shadow)) _shadow.Visible = false;
     }
@@ -417,7 +438,7 @@ public static class StatsTooltip
             float anchorX = 0f, anchorTopY = 0f, anchorBottomY = 0f;
             bool anchorFound = false;
 
-            var tipSet = FindHoverTipSet();
+            var tipSet = FindHoverTipSet(_anchor);
             if (tipSet != null && GodotObject.IsInstanceValid(tipSet))
             {
                 var textContainer = tipSet._textHoverTipContainer;
@@ -475,16 +496,22 @@ public static class StatsTooltip
         }
     }
 
-    private static NHoverTipSet? FindHoverTipSet()
+    private static NHoverTipSet? FindHoverTipSet(Control? owner)
     {
+        if (owner == null) return null;
+
         var container = NGame.Instance?.HoverTipsContainer;
         if (container == null) return null;
         int count = container.GetChildCount();
         for (int i = count - 1; i >= 0; i--)
         {
             var child = container.GetChild(i);
-            if (child is NHoverTipSet tipSet && GodotObject.IsInstanceValid(tipSet))
+            if (child is NHoverTipSet tipSet
+                && GodotObject.IsInstanceValid(tipSet)
+                && ReferenceEquals(tipSet._owner, owner))
+            {
                 return tipSet;
+            }
         }
         return null;
     }

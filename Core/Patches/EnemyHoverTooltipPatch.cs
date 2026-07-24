@@ -24,7 +24,11 @@ public static class EnemyHoverShowPatch
             var creature = __instance.Entity;
             var monster = creature?.Monster;
             if (monster == null || creature!.IsPlayer) return;
-            if (!ShouldShowForCreature(__instance, creature)) { StatsTooltip.Hide(); return; }
+            if (!ShouldShowForCreature(__instance, creature))
+            {
+                StatsTooltip.HideIfAnchoredTo(__instance);
+                return;
+            }
 
             var enemyId = monster.Id.ToString();
             var agg = RunTracker.GetEnemyAggregate(enemyId) ?? new EnemyAggregate

@@ -47,7 +47,7 @@ public static class CardHoverShowPatch
 
         if (IsCardRewardSelectionSurface(__instance))
         {
-            StatsTooltip.Hide();
+            StatsTooltip.HideIfAnchoredTo(__instance);
             return;
         }
 
@@ -1599,9 +1599,9 @@ internal readonly record struct PoisonEffectSummary(
 public static class CardHoverHidePatch
 {
     [HarmonyPostfix]
-    public static void Postfix()
+    public static void Postfix(NCardHolder __instance)
     {
-        try { StatsTooltip.Hide(); }
+        try { StatsTooltip.HideIfAnchoredTo(__instance); }
         catch (System.Exception e) { CoreMain.Logger.Error($"CardHoverHide failed: {e.Message}"); }
     }
 }

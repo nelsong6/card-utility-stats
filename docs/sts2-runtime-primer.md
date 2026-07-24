@@ -943,6 +943,13 @@ Important surfaces:
 - `StatsVisibilityHotkeyPatch` postfixes the stable Loader input node so hot-reloaded Core code can handle both keyboard and controller events. A standalone Left Shift tap and raw Right Stick (R3) press share the persisted master toggle and the same focus/overlay/transition/rebind guards. Left Stick press is the game's Peek action; R3 is absent from the shipped and saved controller action maps. Native Steam Input layouts must expose R3 as a virtual joypad button for the raw event to reach the mod.
 - `NCardsViewScreen.ConnectSignals` calls its controller-state update before the SpireLens postfix. Controller mode hides the built-in `%Upgrades` tickbox, so clones of that subtree inherit `Visible=false` unless SpireLens explicitly restores visibility. Any injected deck controls cloned from View Upgrades must set their own visibility rather than inherit the source's controller-specific state.
 - `CardHoverTooltipPatch` hooks `NCardHolder.CreateHoverTips` and `ClearHoverTips` to show/hide the SpireLens tooltip.
+- `StatsTooltip` mirrors the game's owner-scoped `NHoverTipSet` lifecycle:
+  native `CreateAndShow(owner, ...)` claims the shared SpireLens panel and
+  clears any previous content, while `Remove(owner)` hides it only when that
+  same control still owns it. Keep per-surface cleanup owner-aware as well; an
+  unconditional hide from an old unfocus can erase a newer tooltip. Position
+  the SpireLens panel against the native `NHoverTipSet` with that same owner,
+  never merely the newest native tooltip node.
 - Hand hovers are compact unless verbose hand stats are enabled.
 - Deck view and other card-view hovers can show full lineage and stat breakdown.
 - Tooltip aggregate display merges committed run data plus current pending combat so combat stats appear immediately.
