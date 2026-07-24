@@ -3,6 +3,8 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Models.Cards;
 using MegaCrit.Sts2.Core.Models.Relics;
 using SpireLens.Core;
 using SpireLens.Core.Patches;
@@ -21,6 +23,20 @@ public class MiniatureCannonStatsTests
     private static readonly MethodInfo IsMiniatureCannonStatsRelicModelMethod =
         typeof(RelicHoverShowPatch).GetMethod("IsMiniatureCannonStatsRelicModel", BindingFlags.NonPublic | BindingFlags.Static)
         ?? throw new InvalidOperationException("IsMiniatureCannonStatsRelicModel not found.");
+
+    private static readonly MethodInfo IsMiniatureCannonUpgradedAttackCardMethod =
+        typeof(RunTracker).GetMethod(
+            "IsMiniatureCannonUpgradedAttackCard",
+            BindingFlags.NonPublic | BindingFlags.Static)
+        ?? throw new InvalidOperationException("IsMiniatureCannonUpgradedAttackCard not found.");
+
+    private static readonly FieldInfo CurrentUpgradeLevelField =
+        typeof(CardModel).GetField("_currentUpgradeLevel", BindingFlags.NonPublic | BindingFlags.Instance)
+        ?? throw new InvalidOperationException("CardModel._currentUpgradeLevel not found.");
+
+    private static readonly FieldInfo DeckVersionField =
+        typeof(CardModel).GetField("_deckVersion", BindingFlags.NonPublic | BindingFlags.Instance)
+        ?? throw new InvalidOperationException("CardModel._deckVersion not found.");
 
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
@@ -92,6 +108,24 @@ public class MiniatureCannonStatsTests
     }
 
     [Fact]
+    public void RunTracker_MiniatureCannonUpgradePredicate_UsesCombatCardUpgradeState()
+    {
+        var unupgradedDeckCard = Uninitialized<DrainPower>();
+        var upgradedCombatCard = Uninitialized<DrainPower>();
+        SetUpgradeLevel(upgradedCombatCard, 1);
+        DeckVersionField.SetValue(upgradedCombatCard, unupgradedDeckCard);
+
+        Assert.True(IsMiniatureCannonUpgradedAttackCard(upgradedCombatCard));
+
+        var upgradedDeckCard = Uninitialized<DrainPower>();
+        var unupgradedCombatCard = Uninitialized<DrainPower>();
+        SetUpgradeLevel(upgradedDeckCard, 1);
+        DeckVersionField.SetValue(unupgradedCombatCard, upgradedDeckCard);
+
+        Assert.False(IsMiniatureCannonUpgradedAttackCard(unupgradedCombatCard));
+    }
+
+    [Fact]
     public void RelicTooltip_MiniatureCannonModelRecognition_RecognizesRelic()
     {
         var recognized = (bool)(IsMiniatureCannonStatsRelicModelMethod.Invoke(null, new object[] { Uninitialized<MiniatureCannon>() })
@@ -144,5 +178,16 @@ public class MiniatureCannonStatsTests
     private static T Uninitialized<T>() where T : class
     {
         return (T)RuntimeHelpers.GetUninitializedObject(typeof(T));
+    }
+
+    private static bool IsMiniatureCannonUpgradedAttackCard(CardModel card)
+    {
+        return (bool)(IsMiniatureCannonUpgradedAttackCardMethod.Invoke(null, new object?[] { card })
+            ?? throw new InvalidOperationException("IsMiniatureCannonUpgradedAttackCard returned null."));
+    }
+
+    private static void SetUpgradeLevel(CardModel card, int upgradeLevel)
+    {
+        CurrentUpgradeLevelField.SetValue(card, upgradeLevel);
     }
 }

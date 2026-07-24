@@ -14897,7 +14897,7 @@ public static class RunTracker
         try
         {
             if (card == null || card.Type != CardType.Attack) return false;
-            return Canonical(card).CurrentUpgradeLevel > 0;
+            return card.IsUpgraded;
         }
         catch
         {

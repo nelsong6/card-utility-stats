@@ -629,6 +629,12 @@ the exact same combat card count for the source, while copies do not. Use every
 turn and combat where that physical Drain Power was in the permanent deck as
 the zero-inclusive average denominators.
 
+Miniature Cannon checks the live attack source's `IsUpgraded` property when
+modifying powered Attack damage. Its play and hit attribution must inspect that
+same combat card rather than its canonical deck version. Permanent upgrades are
+copied onto combat cards, while combat-only upgrades such as Drain Power exist
+only on the raw combat card.
+
 Brilliant Scarf increments its per-turn card counter from `AfterCardPlayed`,
 after `CardPlayFinished` has already entered combat history. Its actual cost
 discounts happen through `TryModifyEnergyCostInCombatLate` and `TryModifyStarCost`
