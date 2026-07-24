@@ -775,13 +775,14 @@ boundary only reconciles a final held turn that missed the normal start hook.
 
 Toasty Mittens exhausts one selected draw-pile card and then applies Strength
 inside its async `BeforeHandDraw` callback. Keep an async-flow-local scope
-around that callback. Observe the completed direct `CardCmd.Exhaust` call, not
-the later exhaust hook, so nested exhausts are excluded. Arm Strength only
-after `ShuffleIfNecessary` completes, suspend it while the direct exhaust and
-its hooks resolve, then read the matching post-modifier `PowerReceivedEntry`
-for the owner's `StrengthPower`; this preserves modified Strength amounts
-without stealing Strength caused by shuffle or exhaust reactions. Count every
-combat where the relic was held as the zero-inclusive per-combat denominator.
+around that callback. `CardCmd.Exhaust` writes `CardExhaustedEntry` only after
+the card reaches the exhaust pile and before dispatching nested exhaust hooks,
+so the first matching owner-card entry in the scope is the relic's confirmed
+direct exhaust. Retain the last matching owner-to-owner `StrengthPower`
+`PowerReceivedEntry`: Toasty Mittens applies its own Strength as the callback's
+final operation, after the exhaust and its nested hooks. Commit both observed
+outcomes only after the callback task succeeds. Count every combat where the
+relic was held as the zero-inclusive per-combat denominator.
 
 Beating Remnant caps post-Osty HP loss in its owner-specific
 `ModifyHpLostAfterOsty` modifier. The positive difference between that method's

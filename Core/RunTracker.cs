@@ -8866,69 +8866,48 @@ public static class RunTracker
             _toastyMittensActivation.Value = frame.Previous;
     }
 
-    internal static PendingToastyMittensActivation? ClaimToastyMittensShuffle(Player player)
-    {
-        var frame = _toastyMittensActivation.Value;
-        if (frame == null
-            || frame.ShuffleClaimed
-            || !ReferenceEquals(frame.Player, player))
-        {
-            return null;
-        }
-
-        frame.ShuffleClaimed = true;
-        frame.StrengthReady = false;
-        return frame;
-    }
-
-    internal static void CompleteToastyMittensShuffle(PendingToastyMittensActivation? frame)
-    {
-        if (frame != null)
-            frame.StrengthReady = true;
-    }
-
-    internal static PendingToastyMittensActivation? ClaimToastyMittensExhaust(CardModel card)
-    {
-        var frame = _toastyMittensActivation.Value;
-        if (frame == null
-            || frame.ExhaustClaimed
-            || !frame.StrengthReady
-            || card == null
-            || !ReferenceEquals(card.Owner, frame.Player)
-            || card.Pile?.Type != PileType.Draw)
-        {
-            return null;
-        }
-
-        frame.ExhaustClaimed = true;
-        frame.StrengthReady = false;
-        return frame;
-    }
-
-    internal static void CompleteToastyMittensExhaust(
+    internal static void CompleteToastyMittensActivation(
         PendingToastyMittensActivation? frame)
     {
         if (frame == null) return;
-        frame.StrengthReady = true;
 
         lock (_lock)
         {
             try
             {
-                if (_pendingCombat == null || !IsTrackedRelic(frame.Relic)) return;
+                if (_pendingCombat == null
+                    || !IsTrackedRelic(frame.Relic)
+                    || !IsTrackedPlayer(frame.Player))
+                {
+                    return;
+                }
 
                 var agg = GetOrCreatePendingRelicAggregateLocked(ToastyMittensRelicId);
                 RecordToastyMittensForTest(
                     agg,
-                    cardsExhausted: 1,
-                    strengthAdded: 0m,
+                    cardsExhausted: frame.CardExhausted ? 1 : 0,
+                    strengthAdded: frame.LastStrengthReceived ?? 0m,
                     combats: 0);
             }
             catch (Exception e)
             {
-                CoreMain.LogDebug($"CompleteToastyMittensExhaust failed: {e.Message}");
+                CoreMain.LogDebug($"CompleteToastyMittensActivation failed: {e.Message}");
             }
         }
+    }
+
+    private static void ObserveToastyMittensCardExhaustedLocked(CardModel exhaustedCard)
+    {
+        var frame = _toastyMittensActivation.Value;
+        if (frame == null
+            || frame.CardExhausted
+            || exhaustedCard == null
+            || !ReferenceEquals(exhaustedCard.Owner, frame.Player))
+        {
+            return;
+        }
+
+        frame.CardExhausted = true;
     }
 
     private static void RecordToastyMittensStrengthReceivedLocked(
@@ -8939,8 +8918,6 @@ public static class RunTracker
     {
         var frame = _toastyMittensActivation.Value;
         if (frame == null
-            || frame.StrengthClaimed
-            || !frame.StrengthReady
             || power is not StrengthPower
             || !ReferenceEquals(target, frame.Player.Creature)
             || !ReferenceEquals(applier, frame.Player.Creature))
@@ -8948,15 +8925,10 @@ public static class RunTracker
             return;
         }
 
-        frame.StrengthClaimed = true;
-        if (amount <= 0m || _pendingCombat == null) return;
-
-        var agg = GetOrCreatePendingRelicAggregateLocked(ToastyMittensRelicId);
-        RecordToastyMittensForTest(
-            agg,
-            cardsExhausted: 0,
-            strengthAdded: amount,
-            combats: 0);
+        // Toasty Mittens applies its own Strength as the callback's final
+        // operation. Keep the last matching observed amount, then commit it
+        // only if the full callback completes successfully.
+        frame.LastStrengthReceived = Math.Max(0m, amount);
     }
 
     /// <summary>
@@ -17248,6 +17220,11 @@ public static class RunTracker
     {
         lock (_lock)
         {
+            // Relic tracking is independent from the Card Stats preference.
+            // CardCmd.Exhaust emits this entry only after the card reaches the
+            // exhaust pile, so this is Toasty Mittens' confirmed outcome.
+            ObserveToastyMittensCardExhaustedLocked(exhaustedCard);
+
             if (!ShouldTrackCardStatsDuringCombatLocked()) return;
 
             _pendingCombat ??= new PendingCombat();
@@ -20190,10 +20167,8 @@ internal sealed class PendingToastyMittensActivation
     public ToastyMittens Relic { get; }
     public Player Player { get; }
     public PendingToastyMittensActivation? Previous { get; }
-    public bool ShuffleClaimed { get; set; }
-    public bool ExhaustClaimed { get; set; }
-    public bool StrengthReady { get; set; }
-    public bool StrengthClaimed { get; set; }
+    public bool CardExhausted { get; set; }
+    public decimal? LastStrengthReceived { get; set; }
 }
 
 internal sealed class BlockChunk
