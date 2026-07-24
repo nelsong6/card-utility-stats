@@ -435,44 +435,38 @@ public static class StatsTooltip
             // (common in hand hovers on cards with many keyword tooltips —
             // Coolheaded shows Channel + Frost, which fills most of the
             // vertical space).
-            float anchorX = 0f, anchorTopY = 0f, anchorBottomY = 0f;
-            bool anchorFound = false;
-
             var tipSet = FindHoverTipSet(_anchor);
-            if (tipSet != null && GodotObject.IsInstanceValid(tipSet))
+            if (tipSet == null || !GodotObject.IsInstanceValid(tipSet))
             {
-                var textContainer = tipSet._textHoverTipContainer;
-                if (textContainer != null && GodotObject.IsInstanceValid(textContainer))
-                {
-                    anchorX = textContainer.GlobalPosition.X;
-                    anchorTopY = textContainer.GlobalPosition.Y;
-                    anchorBottomY = anchorTopY + textContainer.Size.Y;
-                    anchorFound = true;
-                }
+                // A SpireLens panel is a companion to a native owner tooltip,
+                // never a standalone popup. If the game no longer has that
+                // owner's tooltip, the SpireLens panel is stale.
+                Hide();
+                return;
             }
 
+            var textContainer = tipSet._textHoverTipContainer;
+            if (textContainer == null || !GodotObject.IsInstanceValid(textContainer))
+            {
+                Hide();
+                return;
+            }
+
+            float anchorX = textContainer.GlobalPosition.X;
+            float anchorTopY = textContainer.GlobalPosition.Y;
+            float anchorBottomY = anchorTopY + textContainer.Size.Y;
             var panelSize = _panel.Size;
 
-            float x, y;
-            if (anchorFound)
-            {
-                x = anchorX;
+            float x = anchorX;
 
-                // Prefer below. If below doesn't fit, flip to above. If
-                // above also doesn't fit (tiny viewport or gigantic panel),
-                // keep below and let the final clamp sort it out.
-                float belowY = anchorBottomY + StackGap;
-                float aboveY = anchorTopY - panelSize.Y - StackGap;
-                bool belowOverflows = belowY + panelSize.Y > viewport.End.Y - ViewportPad;
-                bool aboveFits = aboveY >= ViewportPad;
-
-                y = (belowOverflows && aboveFits) ? aboveY : belowY;
-            }
-            else
-            {
-                x = viewport.End.X - panelSize.X - 20f;
-                y = viewport.Position.Y + 80f;
-            }
+            // Prefer below. If below doesn't fit, flip to above. If above
+            // also doesn't fit (tiny viewport or gigantic panel), keep below
+            // and let the final clamp sort it out.
+            float belowY = anchorBottomY + StackGap;
+            float aboveY = anchorTopY - panelSize.Y - StackGap;
+            bool belowOverflows = belowY + panelSize.Y > viewport.End.Y - ViewportPad;
+            bool aboveFits = aboveY >= ViewportPad;
+            float y = (belowOverflows && aboveFits) ? aboveY : belowY;
 
             x = Math.Clamp(x, ViewportPad, Math.Max(ViewportPad, viewport.End.X - panelSize.X - ViewportPad));
             // Final clamp: never render off-screen. Shift up if we'd bottom

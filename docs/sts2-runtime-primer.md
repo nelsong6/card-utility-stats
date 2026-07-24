@@ -949,7 +949,9 @@ Important surfaces:
   same control still owns it. Keep per-surface cleanup owner-aware as well; an
   unconditional hide from an old unfocus can erase a newer tooltip. Position
   the SpireLens panel against the native `NHoverTipSet` with that same owner,
-  never merely the newest native tooltip node.
+  never merely the newest native tooltip node. If that matching native set no
+  longer exists, hide the SpireLens panel immediately; it is a companion
+  panel, not a standalone fallback popup.
 - Hand hovers are compact unless verbose hand stats are enabled.
 - Deck view and other card-view hovers can show full lineage and stat breakdown.
 - Tooltip aggregate display merges committed run data plus current pending combat so combat stats appear immediately.
