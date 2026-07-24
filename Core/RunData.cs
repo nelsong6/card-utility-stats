@@ -529,6 +529,16 @@ public class RelicAggregate
     public int CardsUpgraded { get; set; }
     public List<string> UpgradedCards { get; set; } = new();
 
+    // Stone Cracker tracking. The upgraded-card set itself is combat-local
+    // because the relic upgrades draw-pile combat instances, not permanent
+    // deck cards. Combats/turns are zero-inclusive held denominators.
+    public int StoneCrackerUpgradedCommons { get; set; }
+    public int StoneCrackerUpgradedUncommons { get; set; }
+    public int StoneCrackerUpgradedRares { get; set; }
+    public int StoneCrackerUpgradedCardPlays { get; set; }
+    public int StoneCrackerCombats { get; set; }
+    public int StoneCrackerTurns { get; set; }
+
     // War Hammer tracking. The id list preserves the exact permanent deck
     // cards upgraded after Elite victories so their later completed plays can
     // be recognized across combats and hot reloads. Combats/turns are held

@@ -189,6 +189,10 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `razor-tooth-relic-run.json`
   Adds Razor Tooth held combat/turn denominators plus later finished plays and
   successful draws of the exact combat cards it was observed upgrading.
+- `stone-cracker-play-tracking-run.json`
+  Adds Stone Cracker's observed common/uncommon/rare upgrade counts, later
+  finished plays of those exact combat cards, and held turn/combat
+  denominators for zero-inclusive play averages.
 - `storybook-relic-run.json`
   Adds Brightest Flame's observed max-HP-loss card aggregate, which Storybook
   surfaces through a definition-pooled view with play, draw, energy, and

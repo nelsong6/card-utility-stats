@@ -1554,6 +1554,7 @@ public static class RunTracker
         RecordTuningForkTurnForTrackedPlayerLocked();
         RecordRippleBasinTurnForTrackedPlayerLocked();
         RecordReptileTrinketTurnForTrackedPlayerLocked();
+        RecordStoneCrackerTurnForTrackedPlayerLocked();
         RecordPaperPhrogTurnForTrackedPlayerLocked();
         RecordRazorToothTurnForTrackedPlayerLocked();
         RecordWarHammerTurnForTrackedPlayerLocked();
@@ -1645,6 +1646,12 @@ public static class RunTracker
         target.PlatingAdded += source.PlatingAdded;
         target.CardsUpgraded += source.CardsUpgraded;
         MergeUpgradedCardsInto(target, source);
+        target.StoneCrackerUpgradedCommons += source.StoneCrackerUpgradedCommons;
+        target.StoneCrackerUpgradedUncommons += source.StoneCrackerUpgradedUncommons;
+        target.StoneCrackerUpgradedRares += source.StoneCrackerUpgradedRares;
+        target.StoneCrackerUpgradedCardPlays += source.StoneCrackerUpgradedCardPlays;
+        target.StoneCrackerCombats += source.StoneCrackerCombats;
+        target.StoneCrackerTurns += source.StoneCrackerTurns;
         MergeWarHammerUpgradedCardInstanceIdsInto(target, source);
         target.WarHammerUpgradedCardPlays += source.WarHammerUpgradedCardPlays;
         target.WarHammerCombats += source.WarHammerCombats;
@@ -2003,6 +2010,7 @@ public static class RunTracker
             // Defensive: if CombatSetUp never fired (unusual), allocate lazily.
             _pendingCombat ??= new PendingCombat();
 
+            RecordStoneCrackerUpgradedCardPlayedLocked(cardPlay.Card);
             RecordRazorToothUpgradedCardPlayedLocked(cardPlay.Card);
             RecordWarHammerUpgradedCardPlayedLocked(cardPlay.Card);
             RecordStrikeDummyStrikePlayedIfOwnedLocked(cardPlay.Card);
@@ -4121,27 +4129,123 @@ public static class RunTracker
 
     /// <summary>
     /// Record Stone Cracker's owner-specific combat-room activation and the
-    /// number of upgradeable deck cards selected for upgrade. The game filters
-    /// the owner's deck by <c>IsUpgradable</c>, shuffles, then takes the relic's
-    /// Cards dynamic var count; callers pass that selected count.
+    /// exact combat card instances whose upgrade level actually increased.
+    /// Those raw references remain stable as cards move between combat piles,
+    /// allowing later finished plays to be attributed without treating the
+    /// temporary upgrades as permanent deck changes.
     /// </summary>
-    public static void RecordStoneCrackerActivation(int cardsUpgraded)
+    public static void RecordStoneCrackerActivation(
+        StoneCracker relic,
+        IReadOnlyCollection<CardModel> upgradedCards)
     {
-        if (cardsUpgraded < 0) return;
+        if (relic?.Owner == null || upgradedCards == null) return;
 
         lock (_lock)
         {
             try
             {
-                var agg = GetOrCreateRelicAggregateLocked(StoneCrackerRelicId);
-                agg.Activations += 1;
-                agg.CardsUpgraded += cardsUpgraded;
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(relic.Owner)) return;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordStoneCrackerCombatForPlayerLocked(relic.Owner);
+
+                var observedCards = new HashSet<CardModel>(ReferenceEqualityComparer.Instance);
+                foreach (var card in upgradedCards)
+                {
+                    if (card != null && ReferenceEquals(card.Owner, relic.Owner))
+                        observedCards.Add(card);
+                }
+                var agg = GetOrCreatePendingRelicAggregateLocked(StoneCrackerRelicId);
+                RecordStoneCrackerActivationForTest(
+                    agg,
+                    observedCards.Select(card => card.Rarity));
+                foreach (var card in observedCards)
+                    _pendingCombat.StoneCrackerUpgradedCards.Add(card);
             }
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordStoneCrackerActivation failed: {e.Message}");
             }
         }
+    }
+
+    public static void RecordStoneCrackerTurnStarted(Player player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                _pendingCombat ??= new PendingCombat();
+                RecordStoneCrackerTurnForPlayerLocked(player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordStoneCrackerTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void RecordStoneCrackerUpgradedCardPlayedLocked(CardModel card)
+    {
+        if (_pendingCombat == null) return;
+        if (!_pendingCombat.StoneCrackerUpgradedCards.Contains(card)) return;
+        if (card.Owner is not Player player || !IsTrackedPlayer(player)) return;
+
+        RecordStoneCrackerCombatForPlayerLocked(player);
+        RecordStoneCrackerTurnForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(StoneCrackerRelicId);
+        RecordStoneCrackerUpgradedCardPlayForTest(agg);
+    }
+
+    internal static void RecordStoneCrackerActivationForTest(
+        RelicAggregate agg,
+        IEnumerable<CardRarity>? upgradedCardRarities)
+    {
+        if (agg == null) return;
+
+        agg.Activations += 1;
+        if (upgradedCardRarities == null) return;
+
+        foreach (var rarity in upgradedCardRarities)
+        {
+            agg.CardsUpgraded += 1;
+            switch (rarity)
+            {
+                case CardRarity.Common:
+                    agg.StoneCrackerUpgradedCommons += 1;
+                    break;
+                case CardRarity.Uncommon:
+                    agg.StoneCrackerUpgradedUncommons += 1;
+                    break;
+                case CardRarity.Rare:
+                    agg.StoneCrackerUpgradedRares += 1;
+                    break;
+            }
+        }
+    }
+
+    internal static void RecordStoneCrackerCombatForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.StoneCrackerCombats += Math.Max(0, count);
+    }
+
+    internal static void RecordStoneCrackerTurnForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.StoneCrackerTurns += Math.Max(0, count);
+    }
+
+    internal static void RecordStoneCrackerUpgradedCardPlayForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.StoneCrackerUpgradedCardPlays += Math.Max(0, count);
     }
 
     /// <summary>
@@ -13416,6 +13520,18 @@ public static class RunTracker
         }
     }
 
+    private static bool PlayerHasStoneCracker(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is StoneCracker);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static bool PlayerHasWarHammer(Player player)
     {
         try
@@ -13624,6 +13740,7 @@ public static class RunTracker
             RecordUnsettlingLampCombatForPlayerLocked(player);
             RecordMiniatureCannonCombatForPlayerLocked(player);
             RecordBookmarkCombatForPlayerLocked(player);
+            RecordStoneCrackerCombatForPlayerLocked(player);
             RecordPaelsClawCombatForPlayerLocked(player);
             RecordPaelsEyeCombatForPlayerLocked(player);
             RecordPaperPhrogCombatForPlayerLocked(player);
@@ -13918,6 +14035,52 @@ public static class RunTracker
 
         var agg = GetOrCreatePendingRelicAggregateLocked(PaperPhrogRelicId);
         RecordPaperPhrogTurnForTest(agg);
+    }
+
+    private static void RecordStoneCrackerCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasStoneCracker(player)) return;
+        if (!_pendingCombat.StoneCrackerCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(StoneCrackerRelicId);
+        RecordStoneCrackerCombatForTest(agg);
+    }
+
+    private static void RecordStoneCrackerTurnForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordStoneCrackerTurnForPlayerLocked(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordStoneCrackerTurnForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordStoneCrackerTurnForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasStoneCracker(player)) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.StoneCrackerTurnCountedTurns.TryGetValue(
+                player,
+                out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.StoneCrackerTurnCountedTurns[player] = turnNumber;
+        RecordStoneCrackerCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(StoneCrackerRelicId);
+        RecordStoneCrackerTurnForTest(agg);
     }
 
     private static void RecordRazorToothCombatForPlayerLocked(Player player)
@@ -18750,6 +18913,12 @@ internal class PendingCombat
     public HashSet<Player> PaperPhrogCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> PaperPhrogTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> StoneCrackerCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> StoneCrackerTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<CardModel> StoneCrackerUpgradedCards { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> RazorToothCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

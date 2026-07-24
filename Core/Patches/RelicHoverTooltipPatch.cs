@@ -2882,8 +2882,33 @@ public static class RelicHoverShowPatch
     private static string BuildStoneCrackerBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
+        var upgradedPlaysPerTurn = agg.StoneCrackerTurns <= 0
+            ? 0m
+            : (decimal)agg.StoneCrackerUpgradedCardPlays / agg.StoneCrackerTurns;
+        var upgradedPlaysPerCombat = agg.StoneCrackerCombats <= 0
+            ? 0m
+            : (decimal)agg.StoneCrackerUpgradedCardPlays / agg.StoneCrackerCombats;
+
         Row3(sb, "Activations", agg.Activations.ToString(), "");
         Row3(sb, "Cards upgraded", agg.CardsUpgraded.ToString(), "");
+        Row3(sb, "Upgraded commons", agg.StoneCrackerUpgradedCommons.ToString(), "");
+        Row3(sb, "Upgraded uncommons", agg.StoneCrackerUpgradedUncommons.ToString(), "");
+        Row3(sb, "Upgraded rares", agg.StoneCrackerUpgradedRares.ToString(), "");
+        Row3(
+            sb,
+            "Cards played upgraded by Stone Cracker",
+            agg.StoneCrackerUpgradedCardPlays.ToString(),
+            "");
+        Row3(
+            sb,
+            "Avg cards played upgraded by Stone Cracker per turn",
+            FormatDecimal(upgradedPlaysPerTurn),
+            "");
+        Row3(
+            sb,
+            "Avg cards played upgraded by Stone Cracker per combat",
+            FormatDecimal(upgradedPlaysPerCombat),
+            "");
         return sb.ToString();
     }
 

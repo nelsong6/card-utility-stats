@@ -652,6 +652,13 @@ the per-combat denominator rather than using activations. Its public
 once during combat promotion, before the pending aggregate is merged into the
 run, for combat-end charge buckets and averages.
 
+Stone Cracker selects and upgrades combat-card instances from the owner's draw
+pile inside `AfterRoomEntered`; it does not upgrade the permanent deck cards.
+All upgrades occur synchronously before that async callback's first await, so
+snapshot draw-pile card references and upgrade levels in a prefix, compare them
+in the immediate postfix, and retain the positively changed raw references for
+later finished-play attribution during that combat.
+
 Mummified Hand resolves entirely inside its `AfterCardPlayed` callback despite
 returning `Task.CompletedTask`: after an owner Power play, it selects one card
 already in hand and calls that card's `SetToFreeThisTurn`. Observe the selected

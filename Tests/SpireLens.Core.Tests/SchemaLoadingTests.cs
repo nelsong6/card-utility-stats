@@ -1452,6 +1452,25 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsStoneCrackerPlayTrackingFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("stone-cracker-play-tracking-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertStoneCrackerPlayTracking(loaded.Data.RelicAggregates["RELIC.STONE_CRACKER"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsStoneCrackerPlayTrackingFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("stone-cracker-play-tracking-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertStoneCrackerPlayTracking(resumed!.RelicAggregates["RELIC.STONE_CRACKER"]);
+    }
+
+    [Fact]
     public void ResumableLoad_AcceptsV31PrismaticGemRewardCategoriesFixture()
     {
         var resumed = RunStorage.LoadResumable(FixturePath("v31-prismatic-gem-reward-categories-run.json"));
@@ -3575,6 +3594,18 @@ public class SchemaLoadingTests
             Assert.Equal(1, card.UpgradeLevel);
             Assert.False(card.Taken);
         });
+    }
+
+    private static void AssertStoneCrackerPlayTracking(RelicAggregate relicAgg)
+    {
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(6, relicAgg.CardsUpgraded);
+        Assert.Equal(3, relicAgg.StoneCrackerUpgradedCommons);
+        Assert.Equal(2, relicAgg.StoneCrackerUpgradedUncommons);
+        Assert.Equal(1, relicAgg.StoneCrackerUpgradedRares);
+        Assert.Equal(9, relicAgg.StoneCrackerUpgradedCardPlays);
+        Assert.Equal(3, relicAgg.StoneCrackerCombats);
+        Assert.Equal(6, relicAgg.StoneCrackerTurns);
     }
 
     private static void AssertSilverCrucibleCard(
