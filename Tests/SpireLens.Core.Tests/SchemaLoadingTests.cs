@@ -1016,6 +1016,41 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsPendulumCombatEndChargeFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("pendulum-combat-end-charge-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.PENDULUM"];
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(6, relicAgg.AdditionalCardsDrawn);
+        Assert.Equal(4, relicAgg.PendulumCombats);
+        Assert.Equal(1, relicAgg.PendulumCombatsEndedOn0Charges);
+        Assert.Equal(1, relicAgg.PendulumCombatsEndedOn1Charge);
+        Assert.Equal(2, relicAgg.PendulumCombatsEndedOn2Charges);
+        Assert.Equal(5, relicAgg.PendulumCombatEndChargeTotal);
+        Assert.Equal(4, relicAgg.PendulumCombatEndChargeCount);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsPendulumCombatEndChargeFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("pendulum-combat-end-charge-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.PENDULUM"];
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(6, relicAgg.AdditionalCardsDrawn);
+        Assert.Equal(4, relicAgg.PendulumCombats);
+        Assert.Equal(1, relicAgg.PendulumCombatsEndedOn0Charges);
+        Assert.Equal(1, relicAgg.PendulumCombatsEndedOn1Charge);
+        Assert.Equal(2, relicAgg.PendulumCombatsEndedOn2Charges);
+        Assert.Equal(5, relicAgg.PendulumCombatEndChargeTotal);
+        Assert.Equal(4, relicAgg.PendulumCombatEndChargeCount);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsV20CloakClaspFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("v20-cloak-clasp-run.json"));

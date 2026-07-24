@@ -2337,10 +2337,29 @@ public static class RelicHoverShowPatch
         var cardsDrawnPerCombat = agg.PendulumCombats <= 0
             ? 0m
             : (decimal)agg.AdditionalCardsDrawn / agg.PendulumCombats;
+        var chargeSamples = agg.PendulumCombatEndChargeCount;
+        var chargeTotal = agg.PendulumCombatEndChargeTotal;
+        if (chargeSamples <= 0)
+        {
+            chargeSamples =
+                agg.PendulumCombatsEndedOn0Charges
+                + agg.PendulumCombatsEndedOn1Charge
+                + agg.PendulumCombatsEndedOn2Charges;
+            chargeTotal =
+                agg.PendulumCombatsEndedOn1Charge
+                + (agg.PendulumCombatsEndedOn2Charges * 2);
+        }
+        var averageEndCharge = chargeSamples <= 0
+            ? 0m
+            : (decimal)chargeTotal / chargeSamples;
 
         Row3(sb, "Activations", agg.Activations.ToString(), "");
         Row3(sb, "Cards drawn", agg.AdditionalCardsDrawn.ToString(), "");
         Row3(sb, "Avg cards drawn per combat", FormatDecimal(cardsDrawnPerCombat), "");
+        Row3(sb, "Combats ended on 0 charges", agg.PendulumCombatsEndedOn0Charges.ToString(), "");
+        Row3(sb, "Combats ended on 1 charge", agg.PendulumCombatsEndedOn1Charge.ToString(), "");
+        Row3(sb, "Combats ended on 2 charges", agg.PendulumCombatsEndedOn2Charges.ToString(), "");
+        Row3(sb, "Avg charge at combat end", FormatDecimal(averageEndCharge), "");
         return sb.ToString();
     }
 

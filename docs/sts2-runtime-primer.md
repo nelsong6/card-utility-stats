@@ -647,7 +647,10 @@ Pendulum advances its persistent turn counter from its owner-specific
 `AfterPlayerTurnStart` callback and can activate multiple times in a long
 combat—or not at all in a short one. Observe the actual draw-command result for
 its cards-drawn numerator, and count every combat where the relic was held as
-the per-combat denominator rather than using activations.
+the per-combat denominator rather than using activations. Its public
+`TurnsSeen` counter is always modulo three, so snapshot that live 0/1/2 value
+once during combat promotion, before the pending aggregate is merged into the
+run, for combat-end charge buckets and averages.
 
 Mummified Hand resolves entirely inside its `AfterCardPlayed` callback despite
 returning `Task.CompletedTask`: after an owner Power play, it selects one card

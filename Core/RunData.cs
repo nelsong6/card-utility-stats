@@ -487,6 +487,13 @@ public class RelicAggregate
     // activate. Used as the denominator for cards drawn per combat.
     public int PendulumCombats { get; set; }
 
+    // Pendulum's live 0-2 turn counter at the end of each completed combat.
+    public int PendulumCombatsEndedOn0Charges { get; set; }
+    public int PendulumCombatsEndedOn1Charge { get; set; }
+    public int PendulumCombatsEndedOn2Charges { get; set; }
+    public int PendulumCombatEndChargeTotal { get; set; }
+    public int PendulumCombatEndChargeCount { get; set; }
+
     // Total block gained from this relic across all combats.
     // Used by Orichalcum, Permafrost, The Abacus, Bone Flute, Cloak Clasp,
     // Anchor, Horn Cleat, Tuning Fork, Ornamental Fan, Regalite, and Vambrace's

@@ -155,6 +155,9 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds Iron Club tracking: actual cards drawn, completed combats held for the
   average cards-drawn rate, combat-end 0/1/2/3 charge counts, and explicit
   combat-end charge samples for average charge.
+- `pendulum-combat-end-charge-run.json`
+  Adds Pendulum combat-end 0/1/2 charge counts and explicit combat-end charge
+  samples for average charge.
 - `paels-wing-sacrifice-relic-run.json`
   Adds Pael's Wing sacrifice tracking: consumed card reward options split by
   common, uncommon, and rare, sacrifices made and skipped, and the total and

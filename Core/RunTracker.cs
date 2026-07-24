@@ -1561,6 +1561,7 @@ public static class RunTracker
         RecordMummifiedHandTurnForTrackedPlayerLocked();
         RecordPaelsEyeCombatsWithoutActivationForTrackedPlayerLocked();
         RecordTurnEnergyRelicCombatsWithoutEnergyForTrackedPlayerLocked();
+        RecordPendulumCombatEndChargeForTrackedPlayerLocked();
         RecordNunchakuCombatEndChargeForTrackedPlayerLocked();
         RecordIronClubCombatEndChargeForTrackedPlayerLocked();
 
@@ -1626,6 +1627,11 @@ public static class RunTracker
         MergeAppliedEffectsInto(target.AppliedEffects, source.AppliedEffects);
         target.AdditionalCardsDrawn += source.AdditionalCardsDrawn;
         target.PendulumCombats += source.PendulumCombats;
+        target.PendulumCombatsEndedOn0Charges += source.PendulumCombatsEndedOn0Charges;
+        target.PendulumCombatsEndedOn1Charge += source.PendulumCombatsEndedOn1Charge;
+        target.PendulumCombatsEndedOn2Charges += source.PendulumCombatsEndedOn2Charges;
+        target.PendulumCombatEndChargeTotal += source.PendulumCombatEndChargeTotal;
+        target.PendulumCombatEndChargeCount += source.PendulumCombatEndChargeCount;
         target.AdditionalBlockGained += source.AdditionalBlockGained;
         target.PermafrostCombats += source.PermafrostCombats;
         target.BlockedTriggers += source.BlockedTriggers;
@@ -10776,6 +10782,28 @@ public static class RunTracker
         agg.PendulumCombats += Math.Max(0, count);
     }
 
+    internal static void RecordPendulumCombatEndChargeForTest(RelicAggregate agg, int charge)
+    {
+        if (agg == null) return;
+        if (charge < 0 || charge > 2) return;
+
+        agg.PendulumCombatEndChargeTotal += charge;
+        agg.PendulumCombatEndChargeCount += 1;
+
+        switch (charge)
+        {
+            case 0:
+                agg.PendulumCombatsEndedOn0Charges += 1;
+                break;
+            case 1:
+                agg.PendulumCombatsEndedOn1Charge += 1;
+                break;
+            case 2:
+                agg.PendulumCombatsEndedOn2Charges += 1;
+                break;
+        }
+    }
+
     /// <summary>
     /// Record Centennial Puzzle's once-per-combat HP-loss activation. The
     /// actual cards drawn are observed from the single-card draw command.
@@ -14190,6 +14218,31 @@ public static class RunTracker
         RecordPendulumCombatForTest(agg);
     }
 
+    private static void RecordPendulumCombatEndChargeForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordPendulumCombatEndChargeForPlayerLocked(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordPendulumCombatEndChargeForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordPendulumCombatEndChargeForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!TryGetPendulum(player, out var pendulum) || pendulum == null) return;
+        if (!_pendingCombat.PendulumCombatEndChargeRecordedPlayers.Add(player)) return;
+
+        RecordPendulumCombatForPlayerLocked(player);
+        var agg = GetOrCreatePendingRelicAggregateLocked(PendulumRelicId);
+        RecordPendulumCombatEndChargeForTest(agg, pendulum.TurnsSeen);
+    }
+
     private static void RecordArtOfWarCombatForPlayerLocked(Player player)
     {
         if (_pendingCombat == null) return;
@@ -14516,12 +14569,21 @@ public static class RunTracker
 
     private static bool PlayerHasPendulum(Player player)
     {
+        return TryGetPendulum(player, out _);
+    }
+
+    private static bool TryGetPendulum(Player player, out Pendulum? pendulum)
+    {
+        pendulum = null;
+
         try
         {
-            return player.Relics.Any(r => r is Pendulum);
+            pendulum = player?.Relics?.OfType<Pendulum>().FirstOrDefault();
+            return pendulum != null;
         }
         catch
         {
+            pendulum = null;
             return false;
         }
     }
@@ -18634,6 +18696,8 @@ internal class PendingCombat
     public HashSet<Player> HappyFlowerCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> PendulumCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> PendulumCombatEndChargeRecordedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> SealOfGoldCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
