@@ -26,7 +26,7 @@ public static class PermafrostAfterCardPlayedPatch
         try
         {
             if (!ShouldArm(__instance, cardPlay)) return;
-            RunTracker.RecordPermafrostActivationAndArmBlockAttribution();
+            RunTracker.RecordPermafrostActivationAndArmBlockAttribution(__instance);
             __state = true;
         }
         catch (Exception e)

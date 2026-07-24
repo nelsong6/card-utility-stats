@@ -1981,8 +1981,13 @@ public static class RelicHoverShowPatch
         var blockPerCombat = agg.Activations <= 0
             ? 0m
             : (decimal)agg.AdditionalBlockGained / agg.Activations;
+        var effectivePermafrostCombats = Math.Max(agg.PermafrostCombats, agg.Activations);
+        var triggersPerCombat = effectivePermafrostCombats <= 0
+            ? 0m
+            : (decimal)agg.Activations / effectivePermafrostCombats;
         Row3(sb, "Triggered this combat", triggeredThisCombat ? "true" : "false", "");
         Row3(sb, "Combats triggered", agg.Activations.ToString(), "");
+        Row3(sb, "Avg times triggered per combat", FormatDecimal(triggersPerCombat), "");
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
         Row3(sb, BlockLabel("block gained per combat"), FormatDecimal(blockPerCombat), "");
         return sb.ToString();

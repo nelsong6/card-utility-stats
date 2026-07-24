@@ -1627,6 +1627,7 @@ public static class RunTracker
         target.AdditionalCardsDrawn += source.AdditionalCardsDrawn;
         target.PendulumCombats += source.PendulumCombats;
         target.AdditionalBlockGained += source.AdditionalBlockGained;
+        target.PermafrostCombats += source.PermafrostCombats;
         target.BlockedTriggers += source.BlockedTriggers;
         target.StrengthAdded += source.StrengthAdded;
         target.ReptileTrinketTurns += source.ReptileTrinketTurns;
@@ -3696,12 +3697,15 @@ public static class RunTracker
     /// observed block gain. The actual block amount is observed by
     /// <see cref="Patches.HookAfterBlockGainedPatch"/>.
     /// </summary>
-    public static void RecordPermafrostActivationAndArmBlockAttribution()
+    public static void RecordPermafrostActivationAndArmBlockAttribution(Permafrost relic)
     {
         lock (_lock)
         {
             try
             {
+                if (relic?.Owner == null) return;
+                _pendingCombat ??= new PendingCombat();
+                RecordPermafrostCombatForPlayerLocked(relic.Owner);
                 var agg = GetOrCreateRelicAggregateLocked(PermafrostRelicId);
                 agg.Activations += 1;
                 _pendingCombat!.Windows.Arm(PermafrostRelicId, AttributionEventKind.PlayerBlockGain,
@@ -3712,6 +3716,12 @@ public static class RunTracker
                 CoreMain.LogDebug($"RecordPermafrostActivationAndArmBlockAttribution failed: {e.Message}");
             }
         }
+    }
+
+    internal static void RecordPermafrostCombatForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.PermafrostCombats += Math.Max(0, count);
     }
 
     public static void DisarmPermafrostBlockAttribution()
@@ -13570,6 +13580,7 @@ public static class RunTracker
             var player = GetTrackedRunPlayerLocked();
             if (player == null) return;
 
+            RecordPermafrostCombatForPlayerLocked(player);
             RecordLetterOpenerCombatForPlayerLocked(player);
             RecordTuningForkCombatForPlayerLocked(player);
             RecordRippleBasinCombatForPlayerLocked(player);
@@ -13601,6 +13612,26 @@ public static class RunTracker
         {
             CoreMain.LogDebug($"RecordHeldCombatRelicBaselinesForTrackedPlayerLocked failed: {e.Message}");
         }
+    }
+
+    private static void RecordPermafrostCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasPermafrost(player)) return;
+        if (!_pendingCombat.PermafrostCombatCountedPlayers.Add(player)) return;
+
+        // Older run files predate the held-combat denominator. Permafrost can
+        // trigger at most once per combat, so its existing trigger count is
+        // the minimum number of historical combats we can reconstruct.
+        if (_currentRun?.RelicAggregates.TryGetValue(PermafrostRelicId, out var committed) == true)
+        {
+            committed.PermafrostCombats = Math.Max(
+                committed.PermafrostCombats,
+                committed.Activations);
+        }
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(PermafrostRelicId);
+        RecordPermafrostCombatForTest(agg);
     }
 
     private static void RecordLetterOpenerCombatForPlayerLocked(Player player)
@@ -14524,6 +14555,18 @@ public static class RunTracker
         try
         {
             return player.Relics.Any(r => r is RippleBasin);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool PlayerHasPermafrost(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is Permafrost);
         }
         catch
         {
@@ -18553,6 +18596,8 @@ internal class PendingCombat
     public Dictionary<Creature, PendingPoisonTick> PendingPoisonTicks { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, PendingBrilliantScarfDiscount> BrilliantScarfDiscountOffers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> PermafrostCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> LetterOpenerCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

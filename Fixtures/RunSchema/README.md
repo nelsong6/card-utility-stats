@@ -129,6 +129,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `letter-opener-relic-run.json`
   Adds Letter Opener combat, turn, and skill-play denominators for average
   attempted damage, plus turn-end 1/2 charge buckets.
+- `permafrost-combat-average-run.json`
+  Adds Permafrost's held-combat denominator for its zero-inclusive average
+  trigger rate.
 - `bronze-scales-relic-run.json`
   Adds Bronze Scales Thorns damage tracking with observed damage, blocked
   damage, overkill, kills, and target count.

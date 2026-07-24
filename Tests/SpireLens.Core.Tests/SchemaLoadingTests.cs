@@ -1569,6 +1569,32 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsPermafrostCombatAverageFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("permafrost-combat-average-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.PERMAFROST"];
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(21, relicAgg.AdditionalBlockGained);
+        Assert.Equal(5, relicAgg.PermafrostCombats);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsPermafrostCombatAverageFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("permafrost-combat-average-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.PERMAFROST"];
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(21, relicAgg.AdditionalBlockGained);
+        Assert.Equal(5, relicAgg.PermafrostCombats);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsBronzeScalesRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("bronze-scales-relic-run.json"));

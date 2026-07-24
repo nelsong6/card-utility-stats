@@ -493,6 +493,10 @@ public class RelicAggregate
     // extra block from its multiplier.
     public int AdditionalBlockGained { get; set; }
 
+    // Combats where Permafrost was held, including combats where no Power was
+    // played. Used as the zero-inclusive denominator for triggers per combat.
+    public int PermafrostCombats { get; set; }
+
     // Total times this relic got its own trigger check but was blocked by
     // its condition not being met. Used by Orichalcum when the player already
     // has block at end of turn.
