@@ -995,12 +995,15 @@ Important surfaces:
   HoverTipAlignment)` overload and appends at most one SpireLens `HoverTip` to
   that owner’s native sequence. Owner-specific builders cover card holders,
   owned relics, enemies, visible compendium relics, and run-history cards and
-  relics.
+  relics. Its postfix styles only the final native text control created for
+  that appended tip: the SpireLens blue background tint and top-right brand
+  return without creating a parallel panel or retaining the control.
 - `StatsTooltip` only constructs the native `HoverTip` value and escapes
-  dynamic BBCode. It must not retain a `Control`, create a scene-root panel,
-  position UI per frame, or mirror native focus/unfocus cleanup. `NHoverTipSet`
-  owns the stats node together with the rest of that owner’s tips, so the
-  game’s ordinary `Remove(owner)` and tree-exit paths remove it.
+  dynamic BBCode. It also wraps the stats description in the established 20px
+  body size. It must not retain a `Control`, create a scene-root panel, position
+  UI per frame, or mirror native focus/unfocus cleanup. `NHoverTipSet` owns the
+  stats node together with the rest of that owner’s tips, so the game’s
+  ordinary `Remove(owner)` and tree-exit paths remove it.
 - Hand hovers are compact unless verbose hand stats are enabled.
 - Deck view and other card-view hovers can show full lineage and stat breakdown.
 - Tooltip aggregate display merges committed run data plus current pending combat so combat stats appear immediately.

@@ -21,7 +21,9 @@ public sealed class StatsTooltipOwnershipTests
             stretchHorizontally: true);
 
         Assert.Equal("Wrought in War #1", tip.Title);
-        Assert.Equal("[b]Played[/b] 2", tip.Description);
+        Assert.Equal(
+            "[font_size=20][b]Played[/b] 2[/font_size]",
+            tip.Description);
         Assert.Equal("SPIRELENS.STATS", tip.Id);
         Assert.True(tip.ShouldOverrideTextOverflow);
     }

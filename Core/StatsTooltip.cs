@@ -15,6 +15,7 @@ namespace SpireLens.Core;
 public static class StatsTooltip
 {
     private const string NativeStatsTipId = "SPIRELENS.STATS";
+    private const int BodyFontSize = 20;
 
     private static readonly PropertyInfo TitleProperty =
         AccessTools.Property(typeof(HoverTip), nameof(HoverTip.Title));
@@ -38,7 +39,9 @@ public static class StatsTooltip
         // game can be populated without inventing a parallel UI node.
         object boxed = tip;
         TitleProperty.SetValue(boxed, titleText);
-        DescriptionProperty.SetValue(boxed, bodyBBCode);
+        DescriptionProperty.SetValue(
+            boxed,
+            $"[font_size={BodyFontSize}]{bodyBBCode}[/font_size]");
         return (HoverTip)boxed;
     }
 
