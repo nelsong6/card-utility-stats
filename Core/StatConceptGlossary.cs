@@ -242,6 +242,12 @@ internal static class StatConceptGlossary
                 sourceImage,
                 visibleAlphaThreshold,
                 margin: 1);
+            var cropMode = "alpha";
+            if (CoversNearlyEntireImage(usedRect, sourceImage))
+            {
+                usedRect = CombatArtworkFallbackBounds(sourceImage);
+                cropMode = "centered artwork fallback";
+            }
             if (usedRect.Size.X <= 0 || usedRect.Size.Y <= 0)
             {
                 throw new InvalidOperationException(
@@ -269,6 +275,7 @@ internal static class StatConceptGlossary
                 + $"used={usedRect.Position.X},{usedRect.Position.Y},"
                 + $"{usedRect.Size.X}x{usedRect.Size.Y}, "
                 + $"alpha_threshold={visibleAlphaThreshold:0.##}, "
+                + $"crop_mode={cropMode}, "
                 + $"output={outputSize}x{outputSize}");
         }
         catch (Exception e)
@@ -276,6 +283,31 @@ internal static class StatConceptGlossary
             CoreMain.Logger.Error(
                 $"Could not crop stat concept game resource '{conceptId}': {e.Message}");
         }
+    }
+
+    private static bool CoversNearlyEntireImage(Rect2I rect, Image image)
+    {
+        if (rect.Size.X <= 0 || rect.Size.Y <= 0) return false;
+
+        var sourceArea = (long)image.GetWidth() * image.GetHeight();
+        var rectArea = (long)rect.Size.X * rect.Size.Y;
+        return sourceArea > 0 && rectArea >= sourceArea * 0.9d;
+    }
+
+    private static Rect2I CombatArtworkFallbackBounds(Image image)
+    {
+        // The map-monster resource includes an opaque map-sized canvas, so
+        // alpha cannot isolate the recognizable enemy mark. These normalized
+        // insets retain the complete mark and discard that surrounding canvas.
+        var left = (int)Math.Round(image.GetWidth() * 0.2d);
+        var top = (int)Math.Round(image.GetHeight() * 0.12d);
+        var right = (int)Math.Round(image.GetWidth() * 0.8d);
+        var bottom = (int)Math.Round(image.GetHeight() * 0.78d);
+        return new Rect2I(
+            left,
+            top,
+            Math.Max(1, right - left),
+            Math.Max(1, bottom - top));
     }
 
     private static Rect2I FindVisiblePixelBounds(
