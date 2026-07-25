@@ -122,6 +122,9 @@ public class ArtOfWarStatsTests
         Assert.Contains("[b]1[/b]", body);
         Assert.Contains("Avg energy added per turn this combat", body);
         Assert.Contains("[b]0.75[/b]", body);
+        Assert.Equal(5, CountOccurrences(body, "[table=4]"));
+        Assert.Equal(1, CountOccurrences(body, "[table=2]"));
+        Assert.Contains("align=center", body);
     }
 
     [Fact]

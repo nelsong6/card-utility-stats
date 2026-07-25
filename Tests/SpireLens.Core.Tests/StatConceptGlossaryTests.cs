@@ -35,7 +35,7 @@ public class StatConceptGlossaryTests
             StatConceptDisplayType.GameResource,
             StatConceptGlossary.Concepts.Single(concept => concept.Id == "healing_gained").Display.Type);
         Assert.Equal(
-            40,
+            20,
             StatConceptGlossary.Concepts.Single(concept => concept.Id == "combat").Display.Size);
     }
 
@@ -69,6 +69,7 @@ public class StatConceptGlossaryTests
         Assert.Contains("[hint=\"Charge:", charge);
         Assert.Contains("[color=#7FD6FF][b]●³[/b][/color]", charge);
         Assert.Contains("[hint=\"Combat:", combat);
+        Assert.Contains("[img width=20 height=20 align=center]", combat);
         Assert.Contains(
             "res://images/atlases/ui_atlas.sprites/map/icons/map_monster.tres",
             combat);

@@ -11,8 +11,12 @@ namespace SpireLens.Core.Tests;
 public class BrilliantScarfStatsTests
 {
     private const string BrilliantScarfRelicId = "RELIC.BRILLIANT_SCARF";
-    private const string EnergyIcon = "[img=16x16]res://images/atlases/potion_atlas.sprites/energy_potion.tres[/img]";
-    private const string StarIcon = "[img=16x16]res://images/packed/sprite_fonts/star_icon.png[/img]";
+    private const string EnergyIcon =
+        "[img width=16 height=16 align=center]"
+        + "res://images/atlases/potion_atlas.sprites/energy_potion.tres[/img]";
+    private const string StarIcon =
+        "[img width=16 height=16 align=center]"
+        + "res://images/packed/sprite_fonts/star_icon.png[/img]";
 
     private static readonly MethodInfo BuildBrilliantScarfBodyMethod =
         typeof(RelicHoverShowPatch).GetMethod("BuildBrilliantScarfBodyBBCode", BindingFlags.NonPublic | BindingFlags.Static)

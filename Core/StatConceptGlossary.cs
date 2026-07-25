@@ -47,9 +47,9 @@ internal static class StatConceptGlossary
 
     private static readonly IReadOnlyDictionary<string, StatConcept> ConceptsById =
         LoadConcepts();
-    private static readonly Dictionary<string, string> EmbeddedImagePaths =
+    private static readonly Dictionary<string, string> GeneratedImagePaths =
         new(StringComparer.OrdinalIgnoreCase);
-    private static readonly List<ImageTexture> EmbeddedImageTextures = [];
+    private static readonly List<ImageTexture> GeneratedImageTextures = [];
 
     public static IReadOnlyList<StatConcept> Concepts { get; } =
         ConceptsById.Values
@@ -59,10 +59,10 @@ internal static class StatConceptGlossary
 
     public static void Initialize()
     {
-        BuildEmbeddedImageResources();
+        BuildGeneratedImageResources();
         CoreMain.Logger.Info(
             $"Stat concept glossary loaded: concepts={Concepts.Count}, "
-            + $"embedded_images={EmbeddedImagePaths.Count}");
+            + $"generated_images={GeneratedImagePaths.Count}");
     }
 
     public static bool TryGet(string conceptId, out StatConcept concept)
@@ -120,7 +120,7 @@ internal static class StatConceptGlossary
             StatConceptDisplayType.StyledText =>
                 RenderStyledText(concept.Display, size),
             StatConceptDisplayType.GameResource =>
-                $"[img={size}x{size}]{concept.Display.Value}[/img]",
+                RenderGameResource(concept, size),
             StatConceptDisplayType.GameResourceGroup =>
                 RenderGameResourceGroup(concept.Display, size),
             StatConceptDisplayType.EmbeddedImage =>
@@ -136,6 +136,14 @@ internal static class StatConceptGlossary
         return $"[font_size={size}][color={display.Color}]{styled}[/color][/font_size]";
     }
 
+    private static string RenderGameResource(StatConcept concept, int size)
+    {
+        var path = GeneratedImagePaths.TryGetValue(concept.Id, out var generatedPath)
+            ? generatedPath
+            : concept.Display.Value;
+        return RenderImage(path, size);
+    }
+
     private static string RenderGameResourceGroup(StatConceptDisplay display, int size)
     {
         return string.Concat(display.Resources.Select(resource =>
@@ -144,30 +152,40 @@ internal static class StatConceptGlossary
                 (int)Math.Round(size * resource.Scale, MidpointRounding.AwayFromZero),
                 8,
                 64);
-            return $"[img={resourceSize}x{resourceSize}]{resource.Path}[/img]";
+            return RenderImage(resource.Path, resourceSize);
         }));
     }
 
     private static string RenderEmbeddedImage(StatConcept concept, int size)
     {
-        var path = EmbeddedImagePaths.TryGetValue(concept.Id, out var generatedPath)
+        var path = GeneratedImagePaths.TryGetValue(concept.Id, out var generatedPath)
             ? generatedPath
             : GetGeneratedImagePath(concept.Id);
-        return $"[img={size}x{size}]{path}[/img]";
+        return RenderImage(path, size);
+    }
+
+    internal static string RenderImage(string path, int size)
+        => $"[img width={size} height={size} align=center]{path}[/img]";
+
+    private static void BuildGeneratedImageResources()
+    {
+        GeneratedImagePaths.Clear();
+        GeneratedImageTextures.Clear();
+
+        System.IO.Directory.CreateDirectory(
+            ProjectSettings.GlobalizePath(GeneratedIconDirectory));
+
+        BuildEmbeddedImageResources();
+        BuildCroppedGameResource("combat");
     }
 
     private static void BuildEmbeddedImageResources()
     {
-        EmbeddedImagePaths.Clear();
-        EmbeddedImageTextures.Clear();
-
         var embeddedConcepts = Concepts
             .Where(concept => concept.Display.Type == StatConceptDisplayType.EmbeddedImage)
             .ToArray();
         if (embeddedConcepts.Length == 0) return;
 
-        System.IO.Directory.CreateDirectory(
-            ProjectSettings.GlobalizePath(GeneratedIconDirectory));
         var assembly = typeof(StatConceptGlossary).Assembly;
         var manifestNames = assembly.GetManifestResourceNames();
         foreach (var concept in embeddedConcepts)
@@ -191,25 +209,7 @@ internal static class StatConceptGlossary
                         $"Image.LoadPngFromBuffer returned {loadError}.");
                 }
 
-                var texture = ImageTexture.CreateFromImage(image);
-                var path = GetGeneratedImagePath(concept.Id);
-                var saveError = ResourceSaver.Save(
-                    texture,
-                    path,
-                    ResourceSaver.SaverFlags.ChangePath);
-                if (saveError != Error.Ok)
-                {
-                    texture.Dispose();
-                    throw new InvalidOperationException(
-                        $"ResourceSaver returned {saveError} for '{path}'.");
-                }
-
-                texture.TakeOverPath(path);
-                EmbeddedImageTextures.Add(texture);
-                EmbeddedImagePaths.Add(concept.Id, path);
-                CoreMain.Logger.Info(
-                    $"Stat concept embedded image loaded: id={concept.Id}, "
-                    + $"size={texture.GetWidth()}x{texture.GetHeight()}");
+                SaveGeneratedImage(concept.Id, image, "embedded");
             }
             catch (Exception e)
             {
@@ -217,6 +217,83 @@ internal static class StatConceptGlossary
                     $"Could not load stat concept embedded image '{concept.Id}': {e.Message}");
             }
         }
+    }
+
+    private static void BuildCroppedGameResource(string conceptId)
+    {
+        try
+        {
+            if (!TryGet(conceptId, out var concept)
+                || concept.Display.Type != StatConceptDisplayType.GameResource)
+            {
+                throw new InvalidOperationException(
+                    $"Concept '{conceptId}' is not a game-resource image.");
+            }
+
+            var sourceTexture = ResourceLoader.Load<Texture2D>(
+                concept.Display.Value,
+                null,
+                ResourceLoader.CacheMode.Reuse)
+                ?? throw new InvalidOperationException(
+                    $"ResourceLoader could not load '{concept.Display.Value}'.");
+            using var sourceImage = sourceTexture.GetImage();
+            var usedRect = sourceImage.GetUsedRect();
+            if (usedRect.Size.X <= 0 || usedRect.Size.Y <= 0)
+            {
+                throw new InvalidOperationException(
+                    $"Game resource '{concept.Display.Value}' has no visible pixels.");
+            }
+
+            const int transparentPadding = 1;
+            var squareContentSize = Math.Max(usedRect.Size.X, usedRect.Size.Y);
+            var outputSize = squareContentSize + (transparentPadding * 2);
+            using var croppedImage = Image.CreateEmpty(
+                outputSize,
+                outputSize,
+                false,
+                Image.Format.Rgba8);
+            croppedImage.Fill(new Color(0f, 0f, 0f, 0f));
+            var destination = new Vector2I(
+                transparentPadding + ((squareContentSize - usedRect.Size.X) / 2),
+                transparentPadding + ((squareContentSize - usedRect.Size.Y) / 2));
+            croppedImage.BlitRect(sourceImage, usedRect, destination);
+
+            SaveGeneratedImage(concept.Id, croppedImage, "cropped game resource");
+            CoreMain.Logger.Info(
+                $"Stat concept game resource cropped: id={concept.Id}, "
+                + $"source={sourceImage.GetWidth()}x{sourceImage.GetHeight()}, "
+                + $"used={usedRect.Position.X},{usedRect.Position.Y},"
+                + $"{usedRect.Size.X}x{usedRect.Size.Y}, "
+                + $"output={outputSize}x{outputSize}");
+        }
+        catch (Exception e)
+        {
+            CoreMain.Logger.Error(
+                $"Could not crop stat concept game resource '{conceptId}': {e.Message}");
+        }
+    }
+
+    private static void SaveGeneratedImage(string conceptId, Image image, string sourceKind)
+    {
+        var texture = ImageTexture.CreateFromImage(image);
+        var path = GetGeneratedImagePath(conceptId);
+        var saveError = ResourceSaver.Save(
+            texture,
+            path,
+            ResourceSaver.SaverFlags.ChangePath);
+        if (saveError != Error.Ok)
+        {
+            texture.Dispose();
+            throw new InvalidOperationException(
+                $"ResourceSaver returned {saveError} for '{path}'.");
+        }
+
+        texture.TakeOverPath(path);
+        GeneratedImageTextures.Add(texture);
+        GeneratedImagePaths.Add(conceptId, path);
+        CoreMain.Logger.Info(
+            $"Stat concept generated image loaded: id={conceptId}, "
+            + $"source={sourceKind}, size={texture.GetWidth()}x{texture.GetHeight()}");
     }
 
     private static string GetGeneratedImagePath(string conceptId)
