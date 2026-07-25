@@ -108,33 +108,46 @@ internal static class NativeStatsHoverTipStyler
         if (background != null)
             background.SelfModulate = PanelTint;
 
-        AddBrand(statsTip);
+        AddBrand(statsTip, background as Control);
     }
 
-    private static void AddBrand(Control statsTip)
+    private static void AddBrand(Control statsTip, Control? background)
     {
         if (statsTip.GetNodeOrNull<Label>(BrandNodeName) != null) return;
 
         LoadFontOnce();
 
         var title = statsTip.GetNodeOrNull<Control>("%Title");
-        var rightInset = Math.Max(12f, title?.Position.X ?? 18f);
-        var top = title?.Position.Y ?? 0f;
+        var panelTopLeft = background == null
+            ? Vector2.Zero
+            : ConvertPointToTip(statsTip, background, Vector2.Zero);
+        var panelTopRight = background == null
+            ? new Vector2(statsTip.Size.X, 0f)
+            : ConvertPointToTip(
+                statsTip,
+                background,
+                new Vector2(background.Size.X, 0f));
+        var titleTopLeft = title == null
+            ? panelTopLeft + new Vector2(18f, 18f)
+            : ConvertPointToTip(statsTip, title, Vector2.Zero);
+
+        var rightInset = Math.Max(12f, titleTopLeft.X - panelTopLeft.X);
+        var right = panelTopRight.X - rightInset;
+        var top = titleTopLeft.Y;
 
         var brand = new Label
         {
             Name = BrandNodeName,
             Text = "SpireLens",
             MouseFilter = Control.MouseFilterEnum.Ignore,
-            AnchorLeft = 1f,
-            AnchorRight = 1f,
+            AnchorLeft = 0f,
+            AnchorRight = 0f,
             AnchorTop = 0f,
             AnchorBottom = 0f,
-            OffsetLeft = -rightInset - BrandWidth,
-            OffsetRight = -rightInset,
+            OffsetLeft = right - BrandWidth,
+            OffsetRight = right,
             OffsetTop = top,
             OffsetBottom = top + BrandHeight,
-            GrowHorizontal = Control.GrowDirection.Begin,
             HorizontalAlignment = HorizontalAlignment.Right,
             VerticalAlignment = VerticalAlignment.Top,
             ZIndex = 1,
@@ -149,6 +162,15 @@ internal static class NativeStatsHoverTipStyler
         brand.AddThemeConstantOverride("shadow_offset_y", 2);
 
         statsTip.AddChild(brand);
+    }
+
+    private static Vector2 ConvertPointToTip(
+        Control statsTip,
+        Control child,
+        Vector2 point)
+    {
+        var globalPoint = child.GetGlobalTransformWithCanvas() * point;
+        return statsTip.GetGlobalTransformWithCanvas().AffineInverse() * globalPoint;
     }
 
     private static void LoadFontOnce()
