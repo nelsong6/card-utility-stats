@@ -70,7 +70,7 @@ public class StatConceptGlossaryTests
         Assert.Contains("[color=#7FD6FF][b]●³[/b][/color]", charge);
         Assert.Contains("[hint=\"Combat:", combat);
         Assert.Contains(
-            "[img width=20 height=20 region=13,8,40,45 align=center]",
+            "[img width=20 height=20 region=30,29,62,60 align=center]",
             combat);
         Assert.Contains(
             "res://images/atlases/ui_atlas.sprites/map/icons/map_monster.tres",

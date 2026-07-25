@@ -45,7 +45,7 @@ internal static class StatConceptGlossary
     private const string InformationColor = "#94A0AE";
     private const string GeneratedIconDirectory = "user://SpireLens/generated-icons";
     private const string CombatConceptId = "combat";
-    private const string CombatIconRegion = "13,8,40,45";
+    private const string CombatIconRegion = "30,29,62,60";
 
     private static readonly IReadOnlyDictionary<string, StatConcept> ConceptsById =
         LoadConcepts();
