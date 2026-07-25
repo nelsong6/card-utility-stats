@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Godot;
+using MegaCrit.Sts2.Core.HoverTips;
 using MegaCrit.Sts2.Core.Nodes.HoverTips;
 using MegaCrit.Sts2.Core.Nodes.Relics;
 
@@ -17,6 +18,7 @@ internal static class RelicTooltipPinManager
     private const string LockIconNodeName = "SpireLensRelicTooltipLock";
     private const string LockIconPath =
         "res://images/ui/top_panel/reminder_lock.png";
+    private const string HintOwnerNodeName = "SpireLensPinnedRelicHintOwner";
 
     private sealed class HolderSubscription
     {
@@ -41,10 +43,11 @@ internal static class RelicTooltipPinManager
     private static Control? _pinOwner;
     private static NHoverTipSet? _pinnedTipSet;
     private static RichTextLabel? _pinnedStatsDescription;
+    private static Control? _hintOwner;
+    private static string? _visibleHintText;
     private static Texture2D? _lockTexture;
     private static bool _lockLoadAttempted;
     private static ulong _dismissedInputEventId;
-    private static string? _lastHintProbeSignature;
 
     public static void Attach(NRelicInventoryHolder? holder)
     {
@@ -132,13 +135,7 @@ internal static class RelicTooltipPinManager
         ClearPin(restoreOrdinaryHover: false);
     }
 
-    /// <summary>
-    /// Observes the live pointer/BBCode state without changing any native
-    /// mouse filters. One movement over a pinned stats description tells us
-    /// both which Control Godot considers hovered and whether RichTextLabel
-    /// resolves a [hint] value at that exact position.
-    /// </summary>
-    internal static void ProbePinnedHint(InputEvent inputEvent)
+    internal static void HandlePinnedHintHover(InputEvent inputEvent)
     {
         if (inputEvent is not InputEventMouseMotion mouseMotion
             || !IsLive(_pinnedStatsDescription)
@@ -150,31 +147,19 @@ internal static class RelicTooltipPinManager
         var description = _pinnedStatsDescription;
         if (!description.GetGlobalRect().HasPoint(mouseMotion.Position))
         {
-            _lastHintProbeSignature = null;
+            ClearHintPopup();
             return;
         }
 
-        var hovered = description.GetViewport()?.GuiGetHoveredControl();
         var localPosition = description.GetLocalMousePosition();
         var tooltip = description.GetTooltip(localPosition) ?? string.Empty;
-        var signature =
-            $"{hovered?.GetInstanceId() ?? 0}|{tooltip}";
-        if (string.Equals(signature, _lastHintProbeSignature, StringComparison.Ordinal))
+        if (string.IsNullOrEmpty(tooltip))
+        {
+            ClearHintPopup();
             return;
+        }
 
-        _lastHintProbeSignature = signature;
-        var hoveredDescription = hovered == null
-            ? "<none>"
-            : $"{hovered.GetType().Name}:{hovered.GetPath()}";
-        var tooltipDescription = string.IsNullOrEmpty(tooltip)
-            ? "<empty>"
-            : tooltip.Replace('\r', ' ').Replace('\n', ' ');
-        CoreMain.Logger.Info(
-            "Pinned hint probe: "
-            + $"hovered={hoveredDescription}, "
-            + $"description_filter={description.GetMouseFilterWithOverride()}, "
-            + $"local=({localPosition.X:F1},{localPosition.Y:F1}), "
-            + $"tooltip={tooltipDescription}");
+        ShowHintPopup(tooltip, mouseMotion.Position);
     }
 
     internal static bool ShouldSuppressOrdinaryHoverTip(Control owner)
@@ -286,19 +271,6 @@ internal static class RelicTooltipPinManager
             tipSet.SetAlignmentForRelic(holder.Relic);
             _pinnedStatsDescription =
                 NativeStatsHoverTipStyler.GetLastStatsDescription(tipSet);
-            _lastHintProbeSignature = null;
-            if (IsLive(_pinnedStatsDescription))
-            {
-                CoreMain.Logger.Info(
-                    "Pinned hint probe armed: "
-                    + $"description_filter={_pinnedStatsDescription!.GetMouseFilterWithOverride()}, "
-                    + $"hint_markup={_pinnedStatsDescription.Text.Contains("[hint=", StringComparison.Ordinal)}");
-            }
-            else
-            {
-                CoreMain.Logger.Info(
-                    "Pinned hint probe armed: stats description not found.");
-            }
             AddLockIcon(holder);
             CoreMain.LogDebug(
                 $"Pinned relic tooltip: {holder.Relic.Model.Id}");
@@ -319,7 +291,7 @@ internal static class RelicTooltipPinManager
         _pinOwner = null;
         _pinnedTipSet = null;
         _pinnedStatsDescription = null;
-        _lastHintProbeSignature = null;
+        ClearHintPopup();
 
         if (IsLive(pinOwner))
         {
@@ -343,6 +315,57 @@ internal static class RelicTooltipPinManager
             holder,
             holder.Relic.Model.HoverTips);
         ordinaryTipSet?.SetAlignmentForRelic(holder.Relic);
+    }
+
+    private static void ShowHintPopup(string tooltip, Vector2 pointerPosition)
+    {
+        if (string.Equals(tooltip, _visibleHintText, StringComparison.Ordinal)
+            && IsLive(_hintOwner))
+        {
+            return;
+        }
+
+        ClearHintPopup();
+        if (!IsLive(_pinOwner)) return;
+
+        var hintOwner = new Control
+        {
+            Name = HintOwnerNodeName,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            FocusMode = Control.FocusModeEnum.None,
+            Size = Vector2.One,
+        };
+        _pinOwner!.AddChild(hintOwner);
+        hintOwner.GlobalPosition = pointerPosition + new Vector2(18f, 18f);
+
+        _hintOwner = hintOwner;
+        _visibleHintText = tooltip;
+        try
+        {
+            var hintSet = NHoverTipSet.CreateAndShow(
+                hintOwner,
+                StatsTooltip.CreateNativeHint(tooltip),
+                HoverTipAlignment.Right);
+            if (hintSet == null)
+                ClearHintPopup();
+        }
+        catch
+        {
+            ClearHintPopup();
+            throw;
+        }
+    }
+
+    private static void ClearHintPopup()
+    {
+        var hintOwner = _hintOwner;
+        _hintOwner = null;
+        _visibleHintText = null;
+        if (!IsLive(hintOwner)) return;
+
+        NHoverTipSet.Remove(hintOwner!);
+        hintOwner!.GetParent()?.RemoveChild(hintOwner);
+        hintOwner.QueueFree();
     }
 
     private static void AddLockIcon(NRelicInventoryHolder holder)

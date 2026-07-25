@@ -36,7 +36,7 @@ public static class StatsVisibilityHotkeyPatch
     {
         try
         {
-            RelicTooltipPinManager.ProbePinnedHint(evt);
+            RelicTooltipPinManager.HandlePinnedHintHover(evt);
             RelicTooltipPinManager.DismissOnGlobalAction(evt);
 
             var inputManager = NInputManager.Instance;

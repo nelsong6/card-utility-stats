@@ -15,6 +15,7 @@ namespace SpireLens.Core;
 public static class StatsTooltip
 {
     private const string NativeStatsTipId = "SPIRELENS.STATS";
+    private const string NativeHintTipId = "SPIRELENS.HINT";
     private const int BodyFontSize = 20;
 
     private static readonly PropertyInfo TitleProperty =
@@ -42,6 +43,21 @@ public static class StatsTooltip
         DescriptionProperty.SetValue(
             boxed,
             $"[font_size={BodyFontSize}]{bodyBBCode}[/font_size]");
+        return (HoverTip)boxed;
+    }
+
+    internal static HoverTip CreateNativeHint(string bodyText)
+    {
+        var tip = new HoverTip
+        {
+            Id = NativeHintTipId,
+        };
+
+        // Leave Title null so the native scene omits its header entirely.
+        object boxed = tip;
+        DescriptionProperty.SetValue(
+            boxed,
+            $"[font_size={BodyFontSize}]{EscapeBbcode(bodyText)}[/font_size]");
         return (HoverTip)boxed;
     }
 

@@ -29,6 +29,18 @@ public sealed class StatsTooltipOwnershipTests
     }
 
     [Fact]
+    public void StatsTooltip_CreatesTitlelessEscapedNativeHintData()
+    {
+        var tip = StatsTooltip.CreateNativeHint("Activation [observed]");
+
+        Assert.Null(tip.Title);
+        Assert.Equal(
+            "[font_size=20]Activation [lb]observed][/font_size]",
+            tip.Description);
+        Assert.Equal("SPIRELENS.HINT", tip.Id);
+    }
+
+    [Fact]
     public void StatsTooltip_DoesNotOwnGodotUiState()
     {
         var uiStateFields = typeof(StatsTooltip)
