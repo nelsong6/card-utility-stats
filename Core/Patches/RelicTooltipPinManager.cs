@@ -105,9 +105,16 @@ internal static class RelicTooltipPinManager
 
     internal static bool ShouldSuppressOrdinaryHoverTip(Control owner)
     {
+        // A pinned set is created through a surrogate Control owner. During
+        // that CreateAndShow call, _pinnedTipSet cannot be assigned until the
+        // call returns, so reconciling the surrogate here would mistake the
+        // in-progress pin for a dead one and remove the SpireLens page before
+        // NativeStatsHoverTipFactory can append it.
+        if (owner is not NRelicInventoryHolder holder)
+            return false;
+
         ReconcilePinnedState();
-        return owner is NRelicInventoryHolder holder
-               && ReferenceEquals(_pinnedHolder, holder);
+        return ReferenceEquals(_pinnedHolder, holder);
     }
 
     internal static bool TryGetPinnedHolder(
