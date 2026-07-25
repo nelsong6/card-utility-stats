@@ -53,6 +53,40 @@ When adding a hook:
 - If it subscribes to game events or Godot signals directly, add teardown.
 - If it creates UI nodes, make hot-reload reinjection and `QueueFree()` behavior explicit.
 
+### Newly Added Harmony Targets Need One Full Restart
+
+Core hot reload can install a Harmony detour, but it cannot reliably invalidate
+machine code the CLR already generated for callers of that game method. A
+caller may already have inlined the original method or devirtualized a virtual
+call to it. In that case Harmony lists the target as patched, while the existing
+compiled caller continues to execute the original path and never enters the new
+prefix or postfix.
+
+This matters specifically when a build introduces a Harmony patch for a game
+method that was unpatched earlier in the same Slay the Spire 2 process:
+
+- hot reload is sufficient to prove that patch discovery and initialization
+  succeeded;
+- a new combat or a new run is not sufficient, because both reuse the same CLR
+  process and its compiled code;
+- fully restart Slay the Spire 2 once before behavioral verification of that
+  newly introduced target;
+- after restart, the loader installs the patch during startup before ordinary
+  gameplay compiles the relevant caller path.
+
+Changes behind a hook that was already established before its caller compiled
+can usually use the normal hot-reload loop. The restart rule is for newly added
+targets and for any diagnostic where Harmony reports the target as patched but
+an entry log proves the prefix/postfix never runs.
+
+Cracked Core exposed this boundary. Its `LightningOrb.Passive` target was first
+added at Core hot reload 39 in an already-running game process. Harmony listed
+the patch, but the diagnostic prefix never ran while the already-compiled
+`OrbModel.TriggerPassive` async path continued to execute. Starting new combats
+and runs did not change that. A full game restart cleared the compiled call
+site; the same patch then began recording passive activations without a code
+change.
+
 ## Run And Combat Boundaries
 
 SpireLens persistence is combat-boundary based.
@@ -1064,6 +1098,8 @@ Good hook surfaces already proven useful:
 When a new stat does not work, first determine which of these failed:
 
 - The patch did not install.
+- The patch installed after its caller was already JIT-compiled and needs one
+  full game restart before its behavior can be judged.
 - The target method never fires for this mechanic.
 - The target fires but before/after timing is wrong.
 - The outcome has no card source at that point.
@@ -1073,7 +1109,10 @@ When a new stat does not work, first determine which of these failed:
 - The data was recorded but shape/default/merge omitted it.
 - The stat is correct but compact tooltip intentionally hides it.
 
-`CoreMain.Initialize()` logs Harmony-patched methods for diagnostics. Use that list to confirm a hook exists before chasing tracker logic.
+`CoreMain.Initialize()` logs Harmony-patched methods for diagnostics. Use that
+list to confirm a hook exists before chasing tracker logic. For a newly added
+target, “listed as patched” plus “entry diagnostic never fires” is a restart
+signal before it is evidence that the target method is wrong.
 
 For source/context debugging, log compact identifiers that line up with JSON events: card id, instance id, card hash, `DeckVersion` status, creature id, history count, current/pending play, and current floor.
 

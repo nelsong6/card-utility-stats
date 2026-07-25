@@ -46,11 +46,25 @@ After commit and push, validate the exact pushed code path as far as local tooli
 3. Reload SpireLens through automation, not by asking the user to press F5.
    - Prefer MCP tool `reload_spirelens_core` when available.
    - Equivalent bridge call: `POST http://localhost:15526/api/v1/singleplayer` with `{"action":"dev_reload_spirelens_core"}`.
-4. Inspect `%APPDATA%\SlayTheSpire2\logs\godot.log`.
+4. Treat a newly introduced Harmony target as requiring one full Slay the
+   Spire 2 restart before behavioral verification.
+   - Hot reload proves that Harmony discovered and installed the patch, but it
+     cannot invalidate caller code the CLR already inlined or devirtualized.
+   - A new combat or new run is not a substitute; both remain in the same
+     process.
+   - Under the repo's user-owned verification rule, explain the restart
+     requirement and do not restart an active game unless the user explicitly
+     requests verification or authorizes the restart.
+   - Changes to code behind an already-established patch can normally use the
+     regular hot-reload loop.
+5. Inspect `%APPDATA%\SlayTheSpire2\logs\godot.log`.
    - Require `Core.Initialize complete`.
    - Treat `Core.Initialize threw` as a failed validation.
    - For Harmony changes, reflection-check target method names and parameter names before relying on reload.
-5. For UI/tooltip changes, use SpireLensMcp live tools/screenshots when practical.
+   - For a new Harmony target, a patched-method listing without any expected
+     entry diagnostic is a restart signal before it is evidence that the hook
+     target is wrong.
+6. For UI/tooltip changes, use SpireLensMcp live tools/screenshots when practical.
 
 If validation fails, fix it, commit, push, and repeat the validation loop. Ask the user for help only when automated tooling is unavailable, the game state genuinely needs human setup, or the decision is product-level.
 
