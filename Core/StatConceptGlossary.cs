@@ -195,6 +195,9 @@ internal static class StatConceptGlossary
                 texture.TakeOverPath(path);
                 GeneratedOverlayTextures.Add(texture);
                 GeneratedOverlayPaths.Add(concept.Id, path);
+                CoreMain.Logger.Info(
+                    $"Stat concept overlay generated: id={concept.Id}, "
+                    + $"size={texture.GetWidth()}x{texture.GetHeight()}");
             }
             catch (Exception e)
             {
@@ -228,8 +231,8 @@ internal static class StatConceptGlossary
                 $"Could not load overlay texture '{overlay.OverlayPath}'.");
         }
 
-        using var baseImage = baseTexture.GetImage();
-        using var badgeImage = badgeTexture.GetImage();
+        using var baseImage = ExtractTextureImage(baseTexture);
+        using var badgeImage = ExtractTextureImage(badgeTexture);
         if (baseImage.IsEmpty() || badgeImage.IsEmpty())
         {
             throw new InvalidOperationException(
@@ -277,6 +280,52 @@ internal static class StatConceptGlossary
             badgeDestination);
 
         return ImageTexture.CreateFromImage(canvas);
+    }
+
+    private static Image ExtractTextureImage(Texture2D texture)
+    {
+        if (texture is not AtlasTexture atlasTexture)
+            return texture.GetImage();
+
+        var atlas = atlasTexture.Atlas
+            ?? throw new InvalidOperationException(
+                $"Atlas texture '{texture.ResourcePath}' has no source atlas.");
+        using var atlasImage = ExtractTextureImage(atlas);
+        var region = atlasTexture.Region;
+        var sourceRect = new Rect2I(
+            new Vector2I(
+                (int)Math.Round(region.Position.X, MidpointRounding.AwayFromZero),
+                (int)Math.Round(region.Position.Y, MidpointRounding.AwayFromZero)),
+            new Vector2I(
+                (int)Math.Round(region.Size.X, MidpointRounding.AwayFromZero),
+                (int)Math.Round(region.Size.Y, MidpointRounding.AwayFromZero)));
+        using var cropped = atlasImage.GetRegion(sourceRect);
+
+        var margin = atlasTexture.Margin;
+        var left = Math.Max(
+            0,
+            (int)Math.Round(margin.Position.X, MidpointRounding.AwayFromZero));
+        var top = Math.Max(
+            0,
+            (int)Math.Round(margin.Position.Y, MidpointRounding.AwayFromZero));
+        var right = Math.Max(
+            0,
+            (int)Math.Round(margin.Size.X, MidpointRounding.AwayFromZero));
+        var bottom = Math.Max(
+            0,
+            (int)Math.Round(margin.Size.Y, MidpointRounding.AwayFromZero));
+        var result = Image.CreateEmpty(
+            cropped.GetWidth() + left + right,
+            cropped.GetHeight() + top + bottom,
+            false,
+            Image.Format.Rgba8);
+        result.Fill(Colors.Transparent);
+        cropped.Convert(Image.Format.Rgba8);
+        result.BlendRect(
+            cropped,
+            new Rect2I(Vector2I.Zero, cropped.GetSize()),
+            new Vector2I(left, top));
+        return result;
     }
 
     private static string EscapeHint(string? text)
