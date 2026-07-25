@@ -14,6 +14,37 @@
         "description": "An activation occurs when an effect successfully triggers."
       }
     },
+    "healing_blocked": {
+      "display": {
+        "type": "game_resource_group",
+        "resources": [
+          {
+            "path": "res://images/atlases/ui_atlas.sprites/top_bar/top_bar_heart.tres",
+            "scale": 1.0
+          },
+          {
+            "path": "res://images/ui/combat/block.png",
+            "scale": 0.65
+          }
+        ],
+        "size": 20
+      },
+      "help": {
+        "label": "Healing blocked",
+        "description": "Healing that was attempted but did not restore HP."
+      }
+    },
+    "healing_gained": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/atlases/power_atlas.sprites/regen_power.tres",
+        "size": 20
+      },
+      "help": {
+        "label": "Healing gained",
+        "description": "HP successfully restored by a healing effect."
+      }
+    },
     "osty_summon_gained": {
       "display": {
         "type": "game_resource",

@@ -2306,8 +2306,39 @@ public static class RelicHoverShowPatch
     private static string BuildBurningBloodBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
-        AppendHealingStats(sb, agg);
+        ConceptRow(
+            sb,
+            "activation",
+            agg.Activations.ToString(),
+            "Times Burning Blood has activated.");
+        ConceptRow(
+            sb,
+            "healing_gained",
+            FormatDecimal(agg.TotalHealingRestored),
+            "Total HP restored by Burning Blood.");
+        ConceptRow(
+            sb,
+            "healing_blocked",
+            FormatDecimal(agg.TotalHealingLost),
+            "Total Burning Blood healing that did not restore HP.");
+
+        if (agg.TotalHealingLost <= 0m) return sb.ToString();
+
+        foreach (var reason in agg.HealingLostReasons.Values
+                     .OrderByDescending(r => r.Amount)
+                     .ThenBy(r => r.DisplayName))
+        {
+            if (reason.Amount <= 0m) continue;
+            var reasonName = string.IsNullOrWhiteSpace(reason.DisplayName)
+                ? "other/prevented causes"
+                : StatsTooltip.EscapeBbcode(reason.DisplayName);
+            DetailedTextRow(
+                sb,
+                $"blocked by {reasonName}",
+                FormatDecimal(reason.Amount),
+                $"Burning Blood healing that did not restore HP because of {reasonName}.");
+        }
+
         return sb.ToString();
     }
 
@@ -3422,6 +3453,23 @@ public static class RelicHoverShowPatch
         sb.Append("[cell expand=4 padding=0,0,12,0]");
         sb.Append(StatConceptGlossary.RenderHintedGlyph(conceptId));
         sb.Append("[/cell]");
+        sb.Append($"[cell expand=1 padding=0,0,12,0][right][b]{value}[/b][/right][/cell]");
+        sb.Append($"[cell expand=1 padding=0,0,4,0][right][color=#b5b5b5]{pct}[/color][/right][/cell]");
+        sb.Append("[/table]\n");
+    }
+
+    private static void DetailedTextRow(
+        StringBuilder sb,
+        string label,
+        string value,
+        string fullDescription,
+        string pct = "")
+    {
+        sb.Append("[table=4]");
+        sb.Append("[cell expand=0 padding=0,0,10,0]");
+        sb.Append(StatConceptGlossary.RenderInformationHint(fullDescription));
+        sb.Append("[/cell]");
+        sb.Append($"[cell expand=4 padding=0,0,12,0][color=#e0e0e0]{label}[/color][/cell]");
         sb.Append($"[cell expand=1 padding=0,0,12,0][right][b]{value}[/b][/right][/cell]");
         sb.Append($"[cell expand=1 padding=0,0,4,0][right][color=#b5b5b5]{pct}[/color][/right][/cell]");
         sb.Append("[/table]\n");

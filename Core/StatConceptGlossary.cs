@@ -9,14 +9,20 @@ internal enum StatConceptDisplayType
 {
     StyledText,
     GameResource,
+    GameResourceGroup,
 }
+
+internal sealed record StatConceptResource(
+    string Path,
+    decimal Scale);
 
 internal sealed record StatConceptDisplay(
     StatConceptDisplayType Type,
     string Value,
     string Color,
     bool Bold,
-    int Size);
+    int Size,
+    IReadOnlyList<StatConceptResource> Resources);
 
 internal sealed record StatConcept(
     string Id,
@@ -86,6 +92,8 @@ internal static class StatConceptGlossary
                 RenderStyledText(concept.Display, size),
             StatConceptDisplayType.GameResource =>
                 $"[img={size}x{size}]{concept.Display.Value}[/img]",
+            StatConceptDisplayType.GameResourceGroup =>
+                RenderGameResourceGroup(concept.Display, size),
             _ => StatsTooltip.EscapeBbcode(concept.Label),
         };
         var hint = EscapeHint($"{concept.Label}: {concept.Description}");
@@ -104,6 +112,18 @@ internal static class StatConceptGlossary
         var value = StatsTooltip.EscapeBbcode(display.Value);
         var styled = display.Bold ? $"[b]{value}[/b]" : value;
         return $"[font_size={size}][color={display.Color}]{styled}[/color][/font_size]";
+    }
+
+    private static string RenderGameResourceGroup(StatConceptDisplay display, int size)
+    {
+        return string.Concat(display.Resources.Select(resource =>
+        {
+            var resourceSize = Math.Clamp(
+                (int)Math.Round(size * resource.Scale, MidpointRounding.AwayFromZero),
+                8,
+                64);
+            return $"[img={resourceSize}x{resourceSize}]{resource.Path}[/img]";
+        }));
     }
 
     private static string EscapeHint(string? text)
@@ -230,7 +250,8 @@ internal static class StatConceptGlossary
                 value,
                 color,
                 boldElement.GetBoolean(),
-                size);
+                size,
+                Array.Empty<StatConceptResource>());
         }
 
         if (string.Equals(type, "game_resource", StringComparison.Ordinal))
@@ -253,11 +274,73 @@ internal static class StatConceptGlossary
                 path,
                 string.Empty,
                 false,
-                size);
+                size,
+                Array.Empty<StatConceptResource>());
+        }
+
+        if (string.Equals(type, "game_resource_group", StringComparison.Ordinal))
+        {
+            RequireOnlyProperties(
+                element,
+                $"{id}.display",
+                "type",
+                "resources",
+                "size");
+            var resourcesElement = RequireProperty(element, "resources", $"{id}.display");
+            if (resourcesElement.ValueKind != JsonValueKind.Array)
+            {
+                throw new InvalidOperationException(
+                    $"Stat concept '{id}' display 'resources' must be an array.");
+            }
+
+            var resources = resourcesElement.EnumerateArray()
+                .Select((resource, index) => ParseResource(id, resource, index))
+                .ToArray();
+            if (resources.Length < 2)
+            {
+                throw new InvalidOperationException(
+                    $"Stat concept '{id}' game resource group must contain at least two resources.");
+            }
+
+            return new StatConceptDisplay(
+                StatConceptDisplayType.GameResourceGroup,
+                string.Empty,
+                string.Empty,
+                false,
+                size,
+                resources);
         }
 
         throw new InvalidOperationException(
             $"Stat concept '{id}' has unsupported display type '{type}'.");
+    }
+
+    private static StatConceptResource ParseResource(
+        string id,
+        JsonElement element,
+        int index)
+    {
+        var context = $"{id}.display.resources[{index}]";
+        RequireObject(element, $"Stat concept '{context}'");
+        RequireOnlyProperties(element, context, "path", "scale");
+
+        var path = RequireString(element, "path", context);
+        if (!path.StartsWith("res://", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Stat concept '{id}' game resource must use a res:// path.");
+        }
+
+        var scaleElement = RequireProperty(element, "scale", context);
+        if (scaleElement.ValueKind != JsonValueKind.Number
+            || !scaleElement.TryGetDecimal(out var scale)
+            || scale is < 0.25m or > 1m)
+        {
+            throw new InvalidOperationException(
+                $"Stat concept '{context}.scale' must be between 0.25 and 1.");
+        }
+
+        return new StatConceptResource(path, scale);
     }
 
     private static bool IsHexColor(string value)
