@@ -18,6 +18,7 @@ internal enum CompendiumRelicFilterMode
     Compare = 1,
     Filter = 2,
     EditCombatRelevance = 3,
+    IconGlossary = 4,
 }
 
 internal enum CompendiumRelicEntryVisualAction
@@ -90,7 +91,8 @@ internal static class RelicCompendiumFilterContext
         bool matchesSelectedCategories)
     {
         if (mode is CompendiumRelicFilterMode.Off
-            or CompendiumRelicFilterMode.EditCombatRelevance)
+            or CompendiumRelicFilterMode.EditCombatRelevance
+            or CompendiumRelicFilterMode.IconGlossary)
             return CompendiumRelicEntryVisualAction.Normal;
 
         if (!isVisibleRelic)
@@ -111,6 +113,7 @@ internal static class RelicCompendiumFilterUi
 {
     private const string PanelName = "SpireLensRelicFilterPanel";
     private const string FlatGridName = "SpireLensFlatRelicGrid";
+    private const string GlossaryRootName = "SpireLensIconGlossary";
     private const int CategoryTreeColumn = 0;
     private const int MaxVisibleCategoryTreeRows = 8;
     private const float CategoryTreeRowHeight = 24f;
@@ -143,6 +146,7 @@ internal static class RelicCompendiumFilterUi
     private static readonly List<InjectedPanel> InjectedPanels = new();
     private static readonly List<EntryOriginalVisual> EntryOriginals = new();
     private static readonly List<FlatCollectionLayout> FlatLayouts = new();
+    private static readonly List<GlossaryCollectionLayout> GlossaryLayouts = new();
     private static readonly HashSet<string> SelectedCategoryIds =
         new(RelicTaxonomy.LeafCategories.Select(c => c.Id), StringComparer.OrdinalIgnoreCase);
 
@@ -157,6 +161,9 @@ internal static class RelicCompendiumFilterUi
 
     internal static bool IsEditingCombatRelevance =>
         _mode == CompendiumRelicFilterMode.EditCombatRelevance;
+
+    internal static bool IsViewingIconGlossary =>
+        _mode == CompendiumRelicFilterMode.IconGlossary;
 
     public static void Inject(NRelicCollection? collection)
     {
@@ -334,6 +341,9 @@ internal static class RelicCompendiumFilterUi
         modeDropdown.AddItem(
             "Edit combat relevance",
             (int)CompendiumRelicFilterMode.EditCombatRelevance);
+        modeDropdown.AddItem(
+            "Icon glossary",
+            (int)CompendiumRelicFilterMode.IconGlossary);
         modeDropdown.Connect(
             OptionButton.SignalName.ItemSelected,
             Callable.From<long>(index => OnModeSelected(modeDropdown, index)));
@@ -347,6 +357,23 @@ internal static class RelicCompendiumFilterUi
         editHint.Visible = false;
         vbox.AddChild(editHint);
 
+        var glossaryHint = NewLabel(
+            "Browse SpireLens symbols and their definitions in the compendium.",
+            12,
+            new Color(0.82f, 0.78f, 0.68f, 1f));
+        glossaryHint.Name = "IconGlossaryHint";
+        glossaryHint.Visible = false;
+        vbox.AddChild(glossaryHint);
+
+        var filterControls = new VBoxContainer
+        {
+            Name = "FilterControls",
+            MouseFilter = Control.MouseFilterEnum.Pass,
+            SizeFlagsHorizontal = Control.SizeFlags.Fill | Control.SizeFlags.Expand,
+        };
+        filterControls.AddThemeConstantOverride("separation", 6);
+        vbox.AddChild(filterControls);
+
         var showUndiscovered = new CheckBox
         {
             Name = "ShowUndiscovered",
@@ -358,7 +385,7 @@ internal static class RelicCompendiumFilterUi
         showUndiscovered.Connect(
             BaseButton.SignalName.Toggled,
             Callable.From<bool>(OnShowUndiscoveredToggled));
-        vbox.AddChild(showUndiscovered);
+        filterControls.AddChild(showUndiscovered);
 
         var singleRelicGrid = new CheckBox
         {
@@ -371,10 +398,10 @@ internal static class RelicCompendiumFilterUi
         singleRelicGrid.Connect(
             BaseButton.SignalName.Toggled,
             Callable.From<bool>(OnSingleRelicGridToggled));
-        vbox.AddChild(singleRelicGrid);
+        filterControls.AddChild(singleRelicGrid);
 
         var categoriesLabel = NewLabel("SpireLens categories", 13, new Color(0.78f, 0.73f, 0.64f, 1f));
-        vbox.AddChild(categoriesLabel);
+        filterControls.AddChild(categoriesLabel);
 
         var categoryTree = new Tree
         {
@@ -402,7 +429,7 @@ internal static class RelicCompendiumFilterUi
         categoryTree.Connect(
             Tree.SignalName.ItemEdited,
             Callable.From(() => OnCategoryTreeItemEdited(categoryTree, categoryItems)));
-        vbox.AddChild(categoryTree);
+        filterControls.AddChild(categoryTree);
 
         var buttons = new HBoxContainer
         {
@@ -411,7 +438,7 @@ internal static class RelicCompendiumFilterUi
             SizeFlagsHorizontal = Control.SizeFlags.Fill | Control.SizeFlags.Expand,
         };
         buttons.AddThemeConstantOverride("separation", 6);
-        vbox.AddChild(buttons);
+        filterControls.AddChild(buttons);
 
         var selectAll = NewButton("Select All");
         selectAll.Connect(BaseButton.SignalName.Pressed, Callable.From(SelectAllCategories));
@@ -425,6 +452,8 @@ internal static class RelicCompendiumFilterUi
             null,
             root,
             editHint,
+            glossaryHint,
+            filterControls,
             modeDropdown,
             showUndiscovered,
             singleRelicGrid,
@@ -488,6 +517,8 @@ internal static class RelicCompendiumFilterUi
             : CompendiumRelicFilterMode.Off;
 
         SyncAllControls();
+        NHoverTipSet.Clear();
+        ApplyLayoutToActiveCollections();
         ApplyToActiveEntries();
         RelicInspectionClassificationUi.RefreshActiveScreen();
     }
@@ -582,10 +613,17 @@ internal static class RelicCompendiumFilterUi
 
         try
         {
+            if (IsViewingIconGlossary)
+            {
+                ShowGlossary(collection);
+                return;
+            }
+
+            RestoreGlossaryLayout(collection);
             if (_useSingleRelicGrid)
                 FlattenCollectionLayout(collection);
             else
-                RestoreCollectionLayout(collection);
+                RestoreFlatCollectionLayout(collection);
         }
         catch (Exception e)
         {
@@ -597,6 +635,12 @@ internal static class RelicCompendiumFilterUi
     {
         if (collection == null) return;
 
+        RestoreGlossaryLayout(collection);
+        RestoreFlatCollectionLayout(collection);
+    }
+
+    private static void RestoreFlatCollectionLayout(NRelicCollection collection)
+    {
         for (var i = FlatLayouts.Count - 1; i >= 0; i--)
         {
             var layout = FlatLayouts[i];
@@ -617,6 +661,7 @@ internal static class RelicCompendiumFilterUi
             foreach (var collection in FindRelicCollections(tree.Root))
                 ApplyLayoutToCollection(collection);
             CleanupInvalidFlatLayouts();
+            CleanupInvalidGlossaryLayouts();
         }
         catch (Exception e)
         {
@@ -634,7 +679,7 @@ internal static class RelicCompendiumFilterUi
                 return;
         }
 
-        RestoreCollectionLayout(collection);
+        RestoreFlatCollectionLayout(collection);
 
         var categories = GetBuiltInCategories(collection).ToList();
         if (categories.Count == 0) return;
@@ -693,9 +738,177 @@ internal static class RelicCompendiumFilterUi
 
     private static void RestoreAllCollectionLayouts()
     {
+        foreach (var layout in GlossaryLayouts.ToArray())
+            layout.Restore();
+        GlossaryLayouts.Clear();
+
         foreach (var layout in FlatLayouts.ToArray())
             layout.Restore();
         FlatLayouts.Clear();
+    }
+
+    private static void ShowGlossary(NRelicCollection collection)
+    {
+        CleanupInvalidGlossaryLayouts();
+
+        foreach (var existing in GlossaryLayouts)
+        {
+            if (existing.IsFor(collection) && existing.IsValid)
+                return;
+        }
+
+        RestoreCollectionLayout(collection);
+
+        var categories = GetBuiltInCategories(collection).ToList();
+        var firstCategory = categories.FirstOrDefault(category => category.GetParent() != null);
+        var hostParent = firstCategory?.GetParent();
+        if (hostParent == null || !GodotObject.IsInstanceValid(hostParent)) return;
+
+        RemoveExistingGlossary(hostParent);
+
+        var categoryStates = categories
+            .Select(category => new OriginalCategoryState(category, category.Visible))
+            .ToList();
+        foreach (var categoryState in categoryStates)
+            categoryState.Category.Visible = false;
+
+        var glossaryRoot = BuildGlossaryRoot();
+        var firstIndex = firstCategory != null
+            ? GetChildIndex(hostParent, firstCategory)
+            : hostParent.GetChildCount();
+        hostParent.AddChild(glossaryRoot);
+        hostParent.MoveChild(
+            glossaryRoot,
+            Math.Clamp(firstIndex, 0, hostParent.GetChildCount() - 1));
+
+        GlossaryLayouts.Add(
+            new GlossaryCollectionLayout(collection, glossaryRoot, categoryStates));
+        CoreMain.Logger.Info(
+            $"RelicCompendiumFilter: showing icon glossary concepts={StatConceptGlossary.Concepts.Count}");
+    }
+
+    private static VBoxContainer BuildGlossaryRoot()
+    {
+        var root = new VBoxContainer
+        {
+            Name = GlossaryRootName,
+            CustomMinimumSize = new Vector2(1020f, 0f),
+            MouseFilter = Control.MouseFilterEnum.Pass,
+            SizeFlagsHorizontal = Control.SizeFlags.Fill | Control.SizeFlags.Expand,
+        };
+        root.AddThemeConstantOverride("separation", 12);
+
+        root.AddChild(NewLabel(
+            "SpireLens icon glossary",
+            28,
+            new Color(0.918f, 0.745f, 0.318f, 1f)));
+        root.AddChild(NewLabel(
+            "These are the symbols used in SpireLens stat rows. Hover a symbol to see its short definition.",
+            17,
+            new Color(0.88f, 0.86f, 0.81f, 1f)));
+
+        foreach (var concept in StatConceptGlossary.Concepts)
+            root.AddChild(BuildGlossaryConceptRow(concept));
+
+        return root;
+    }
+
+    private static PanelContainer BuildGlossaryConceptRow(StatConcept concept)
+    {
+        var panel = new PanelContainer
+        {
+            MouseFilter = Control.MouseFilterEnum.Pass,
+            SizeFlagsHorizontal = Control.SizeFlags.Fill | Control.SizeFlags.Expand,
+        };
+        panel.AddThemeStyleboxOverride("panel", new StyleBoxFlat
+        {
+            BgColor = new Color(0.055f, 0.09f, 0.14f, 0.9f),
+            BorderColor = new Color(0.19f, 0.31f, 0.47f, 0.9f),
+            BorderWidthLeft = 2,
+            BorderWidthRight = 2,
+            BorderWidthTop = 2,
+            BorderWidthBottom = 2,
+            ContentMarginLeft = 18,
+            ContentMarginRight = 18,
+            ContentMarginTop = 12,
+            ContentMarginBottom = 12,
+            CornerRadiusTopLeft = 5,
+            CornerRadiusTopRight = 5,
+            CornerRadiusBottomLeft = 5,
+            CornerRadiusBottomRight = 5,
+        });
+
+        var row = new HBoxContainer
+        {
+            MouseFilter = Control.MouseFilterEnum.Pass,
+            SizeFlagsHorizontal = Control.SizeFlags.Fill | Control.SizeFlags.Expand,
+        };
+        row.AddThemeConstantOverride("separation", 18);
+        panel.AddChild(row);
+
+        var glyph = new RichTextLabel
+        {
+            BbcodeEnabled = true,
+            Text = $"[center]{StatConceptGlossary.RenderHintedGlyph(concept.Id, 36)}[/center]",
+            FitContent = true,
+            ScrollActive = false,
+            MouseFilter = Control.MouseFilterEnum.Stop,
+            CustomMinimumSize = new Vector2(68f, 54f),
+            SizeFlagsVertical = Control.SizeFlags.ShrinkCenter,
+        };
+        row.AddChild(glyph);
+
+        var text = new VBoxContainer
+        {
+            MouseFilter = Control.MouseFilterEnum.Pass,
+            SizeFlagsHorizontal = Control.SizeFlags.Fill | Control.SizeFlags.Expand,
+        };
+        text.AddThemeConstantOverride("separation", 2);
+        row.AddChild(text);
+        text.AddChild(NewLabel(
+            concept.Label,
+            20,
+            new Color(0.94f, 0.83f, 0.52f, 1f)));
+        text.AddChild(NewLabel(
+            concept.Description,
+            17,
+            new Color(0.88f, 0.86f, 0.81f, 1f)));
+
+        return panel;
+    }
+
+    private static void RestoreGlossaryLayout(NRelicCollection collection)
+    {
+        for (var i = GlossaryLayouts.Count - 1; i >= 0; i--)
+        {
+            var layout = GlossaryLayouts[i];
+            if (!layout.IsFor(collection)) continue;
+
+            layout.Restore();
+            GlossaryLayouts.RemoveAt(i);
+        }
+    }
+
+    private static void RemoveExistingGlossary(Node hostParent)
+    {
+        for (var i = hostParent.GetChildCount() - 1; i >= 0; i--)
+        {
+            var child = hostParent.GetChild(i);
+            if (!string.Equals(child.Name.ToString(), GlossaryRootName, StringComparison.Ordinal))
+                continue;
+
+            hostParent.RemoveChild(child);
+            child.QueueFree();
+        }
+    }
+
+    private static void CleanupInvalidGlossaryLayouts()
+    {
+        for (var i = GlossaryLayouts.Count - 1; i >= 0; i--)
+        {
+            if (GlossaryLayouts[i].IsValid) continue;
+            GlossaryLayouts.RemoveAt(i);
+        }
     }
 
     private static IEnumerable<NRelicCollectionCategory> GetBuiltInCategories(NRelicCollection collection)
@@ -919,6 +1132,8 @@ internal static class RelicCompendiumFilterUi
         NRelicCollection? Collection,
         PanelContainer Root,
         Label EditCombatRelevanceHint,
+        Label IconGlossaryHint,
+        VBoxContainer FilterControls,
         OptionButton ModeDropdown,
         CheckBox ShowUndiscoveredCheckbox,
         CheckBox SingleRelicGridCheckbox,
@@ -945,6 +1160,18 @@ internal static class RelicCompendiumFilterUi
                 && GodotObject.IsInstanceValid(EditCombatRelevanceHint))
             {
                 EditCombatRelevanceHint.Visible = IsEditingCombatRelevance;
+            }
+
+            if (IconGlossaryHint != null
+                && GodotObject.IsInstanceValid(IconGlossaryHint))
+            {
+                IconGlossaryHint.Visible = IsViewingIconGlossary;
+            }
+
+            if (FilterControls != null
+                && GodotObject.IsInstanceValid(FilterControls))
+            {
+                FilterControls.Visible = !IsViewingIconGlossary;
             }
 
             var selectedIndex = 0;
@@ -1041,6 +1268,39 @@ internal static class RelicCompendiumFilterUi
 
             if (GodotObject.IsInstanceValid(_flatGrid))
                 _flatGrid.QueueFree();
+        }
+    }
+
+    private sealed class GlossaryCollectionLayout
+    {
+        private readonly NRelicCollection _collection;
+        private readonly VBoxContainer _glossaryRoot;
+        private readonly IReadOnlyList<OriginalCategoryState> _categories;
+
+        public GlossaryCollectionLayout(
+            NRelicCollection collection,
+            VBoxContainer glossaryRoot,
+            IReadOnlyList<OriginalCategoryState> categories)
+        {
+            _collection = collection;
+            _glossaryRoot = glossaryRoot;
+            _categories = categories;
+        }
+
+        public bool IsValid =>
+            GodotObject.IsInstanceValid(_collection)
+            && GodotObject.IsInstanceValid(_glossaryRoot);
+
+        public bool IsFor(NRelicCollection collection) =>
+            ReferenceEquals(_collection, collection);
+
+        public void Restore()
+        {
+            foreach (var category in _categories)
+                category.Restore();
+
+            if (GodotObject.IsInstanceValid(_glossaryRoot))
+                _glossaryRoot.QueueFree();
         }
     }
 

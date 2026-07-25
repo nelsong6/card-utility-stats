@@ -97,6 +97,7 @@ When attribution is not naturally one-card-to-one-outcome, the code prefers:
 - [Core/Patches/RelicBarFilterPatch.cs](../Core/Patches/RelicBarFilterPatch.cs) optionally hides classified, already-resolved relics from the standard in-run relic bar without changing ownership, effects, or any other relic surface, then rewires top-bar controller navigation across the remaining visible relics.
 - [Core/RelicClassificationStore.cs](../Core/RelicClassificationStore.cs) loads the embedded combat/non-combat JSON, normalizes it against the current game relic database, persists the editable AppData copy, and applies compendium changes immediately.
 - [Core/Patches/RelicCompendiumClassificationPatch.cs](../Core/Patches/RelicCompendiumClassificationPatch.cs) turns compendium mouse/controller presses into classification toggles while edit mode is active and renders the classification badges.
+- [Core/StatConceptGlossary.cs](../Core/StatConceptGlossary.cs) validates and caches the embedded [Core/Config/stat-concepts.json](../Core/Config/stat-concepts.json) vocabulary once per Core load, then renders the same native rich-text hint markup for stat rows and the relic compendium's **Icon glossary** mode.
 - [Core/Patches/StatsVisibilityHotkeyPatch.cs](../Core/Patches/StatsVisibilityHotkeyPatch.cs) maps a standalone Left Shift tap and Right Stick (R3) press to opening/closing that menu while preserving Shift-based chords regardless of whether another modifier was pressed before or after Shift; Left Trigger remains Draw Pile and Left Stick press remains Peek.
 - [Core/Patches/CardHoverTooltipPatch.cs](../Core/Patches/CardHoverTooltipPatch.cs) builds compact and full tooltip bodies.
 - [Core/Patches/NativeHoverTipAugmentationPatch.cs](../Core/Patches/NativeHoverTipAugmentationPatch.cs) appends owner-specific SpireLens data to the game's `IHoverTip` sequence immediately before `NHoverTipSet` renders it, then applies the SpireLens blue panel tint and brand to only the resulting native stats control.
@@ -113,6 +114,7 @@ Current UI conventions:
 - rows should be self-describing
 - loud section headers are discouraged unless they add real clarity
 - inline icons are preferred for keyword-like effects when they improve scanning
+- every icon-driven stat row can pair a left-side information hint for the full row meaning with a separate semantic concept hint; the central compendium glossary describes those same concept symbols
 - when the game already exposes a recognizable asset, prefer the in-game block/draw/energy/star iconography over generic text-only rows
 - native lifecycle does not erase visual ownership: SpireLens stats tips retain
   their larger body text, blue background treatment, and top-right brand while

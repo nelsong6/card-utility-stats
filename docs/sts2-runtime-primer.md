@@ -1014,6 +1014,12 @@ Important surfaces:
   UI per frame, or mirror native focus/unfocus cleanup. `NHoverTipSet` owns the
   stats node together with the rest of that owner’s tips, so the game’s
   ordinary `Remove(owner)` and tree-exit paths remove it.
+- Reusable stat concepts are loaded once from the embedded
+  `Core/Config/stat-concepts.json`. Inline symbols and their short definitions
+  use Godot `RichTextLabel` `[hint]` markup, while the relic compendium's
+  **Icon glossary** mode renders the same cached definitions in its existing
+  scrollable content area. This is interactive content inside the pinned native
+  SpireLens page, not a second `NHoverTipSet` page.
 - Hand hovers are compact unless verbose hand stats are enabled.
 - Deck view and other card-view hovers can show full lineage and stat breakdown.
 - Tooltip aggregate display merges committed run data plus current pending combat so combat stats appear immediately.

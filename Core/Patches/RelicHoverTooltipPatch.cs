@@ -3099,8 +3099,16 @@ public static class RelicHoverShowPatch
     private static string BuildPhylacteryBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
-        Row3(sb, "Osty summon gained", FormatDecimal(agg.TotalOstyHpSummoned), "");
+        ConceptRow(
+            sb,
+            "activation",
+            agg.Activations.ToString(),
+            "Times this relic has been activated.");
+        ConceptRow(
+            sb,
+            "osty_summon_gained",
+            FormatDecimal(agg.TotalOstyHpSummoned),
+            "Total Osty summon gained from this relic.");
         return sb.ToString();
     }
 
@@ -3395,6 +3403,25 @@ public static class RelicHoverShowPatch
 
         sb.Append("[table=3]");
         sb.Append($"[cell expand=4 padding=0,0,12,0][color=#e0e0e0]{label}[/color][/cell]");
+        sb.Append($"[cell expand=1 padding=0,0,12,0][right][b]{value}[/b][/right][/cell]");
+        sb.Append($"[cell expand=1 padding=0,0,4,0][right][color=#b5b5b5]{pct}[/color][/right][/cell]");
+        sb.Append("[/table]\n");
+    }
+
+    private static void ConceptRow(
+        StringBuilder sb,
+        string conceptId,
+        string value,
+        string fullDescription,
+        string pct = "")
+    {
+        sb.Append("[table=4]");
+        sb.Append("[cell expand=0 padding=0,0,10,0]");
+        sb.Append(StatConceptGlossary.RenderInformationHint(fullDescription));
+        sb.Append("[/cell]");
+        sb.Append("[cell expand=4 padding=0,0,12,0]");
+        sb.Append(StatConceptGlossary.RenderHintedGlyph(conceptId));
+        sb.Append("[/cell]");
         sb.Append($"[cell expand=1 padding=0,0,12,0][right][b]{value}[/b][/right][/cell]");
         sb.Append($"[cell expand=1 padding=0,0,4,0][right][color=#b5b5b5]{pct}[/color][/right][/cell]");
         sb.Append("[/table]\n");

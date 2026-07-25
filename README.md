@@ -83,6 +83,13 @@ Changes apply immediately and are saved under
 `scripts/sync-relic-classifications.ps1` to promote the working file into the
 repository's shipped default.
 
+The same relic-view mode dropdown includes **Icon glossary**. It replaces the
+relic grid with the SpireLens symbol vocabulary and its definitions; the
+glossary and inline stat-row symbols both render from the cached definitions in
+`Core/Config/stat-concepts.json`. Concept symbols use Godot's native rich-text
+hover hints, so pinned relic stats can expose short concept help without
+creating another tooltip page.
+
 The relic compendium's charge taxonomy is maintained in
 `Core/Config/relic-taxonomy.json`. Its nested objects mirror the category tree,
 and its top-level `uncategorized` list contains every relic not assigned to a

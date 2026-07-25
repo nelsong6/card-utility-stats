@@ -463,6 +463,13 @@ public class RelicCompendiumFilterTests
             RelicCompendiumFilterContext.GetVisualAction(CompendiumRelicFilterMode.Off, false, false, false));
         Assert.Equal(
             CompendiumRelicEntryVisualAction.Normal,
+            RelicCompendiumFilterContext.GetVisualAction(
+                CompendiumRelicFilterMode.IconGlossary,
+                true,
+                false,
+                false));
+        Assert.Equal(
+            CompendiumRelicEntryVisualAction.Normal,
             RelicCompendiumFilterContext.GetVisualAction(CompendiumRelicFilterMode.Compare, true, true, true));
         Assert.Equal(
             CompendiumRelicEntryVisualAction.Dim,

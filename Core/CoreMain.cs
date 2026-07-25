@@ -82,6 +82,8 @@ public static class CoreMain
 
         Logger.Info($"Core.Initialize starting (harmony_id={_harmonyId}, debug={DebugLogging})");
 
+        StatConceptGlossary.Initialize();
+
         _harmony = new Harmony(_harmonyId);
 
         // Install each patch class in its own try/catch instead of a bare

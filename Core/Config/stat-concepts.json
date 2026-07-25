@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "concepts": {
+    "activation": {
+      "display": {
+        "type": "styled_text",
+        "value": "A",
+        "color": "#F4C95D",
+        "bold": true,
+        "size": 20
+      },
+      "help": {
+        "label": "Activation",
+        "description": "An activation occurs when an effect successfully triggers."
+      }
+    },
+    "osty_summon_gained": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/atlases/relic_atlas.sprites/bound_phylactery.tres",
+        "size": 20
+      },
+      "help": {
+        "label": "Osty summon gained",
+        "description": "An increase to Osty's summon amount."
+      }
+    }
+  }
+}
