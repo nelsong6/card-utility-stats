@@ -75,15 +75,8 @@
     },
     "healing_blocked": {
       "display": {
-        "type": "game_resource_overlay",
-        "base": {
-          "path": "res://images/atlases/ui_atlas.sprites/top_bar/top_bar_heart.tres"
-        },
-        "overlay": {
-          "path": "res://images/ui/combat/block.png",
-          "scale": 0.6,
-          "anchor": "lower_right"
-        },
+        "type": "embedded_image",
+        "resource": "Assets.healing-blocked.png",
         "size": 20
       },
       "help": {
