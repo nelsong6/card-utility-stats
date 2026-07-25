@@ -237,7 +237,11 @@ internal static class StatConceptGlossary
                 ?? throw new InvalidOperationException(
                     $"ResourceLoader could not load '{concept.Display.Value}'.");
             using var sourceImage = sourceTexture.GetImage();
-            var usedRect = sourceImage.GetUsedRect();
+            const float visibleAlphaThreshold = 0.1f;
+            var usedRect = FindVisiblePixelBounds(
+                sourceImage,
+                visibleAlphaThreshold,
+                margin: 1);
             if (usedRect.Size.X <= 0 || usedRect.Size.Y <= 0)
             {
                 throw new InvalidOperationException(
@@ -264,6 +268,7 @@ internal static class StatConceptGlossary
                 + $"source={sourceImage.GetWidth()}x{sourceImage.GetHeight()}, "
                 + $"used={usedRect.Position.X},{usedRect.Position.Y},"
                 + $"{usedRect.Size.X}x{usedRect.Size.Y}, "
+                + $"alpha_threshold={visibleAlphaThreshold:0.##}, "
                 + $"output={outputSize}x{outputSize}");
         }
         catch (Exception e)
@@ -271,6 +276,43 @@ internal static class StatConceptGlossary
             CoreMain.Logger.Error(
                 $"Could not crop stat concept game resource '{conceptId}': {e.Message}");
         }
+    }
+
+    private static Rect2I FindVisiblePixelBounds(
+        Image image,
+        float alphaThreshold,
+        int margin)
+    {
+        var minX = image.GetWidth();
+        var minY = image.GetHeight();
+        var maxX = -1;
+        var maxY = -1;
+
+        for (var y = 0; y < image.GetHeight(); y++)
+        {
+            for (var x = 0; x < image.GetWidth(); x++)
+            {
+                if (image.GetPixel(x, y).A < alphaThreshold) continue;
+
+                minX = Math.Min(minX, x);
+                minY = Math.Min(minY, y);
+                maxX = Math.Max(maxX, x);
+                maxY = Math.Max(maxY, y);
+            }
+        }
+
+        if (maxX < minX || maxY < minY)
+            return new Rect2I();
+
+        var left = Math.Max(0, minX - margin);
+        var top = Math.Max(0, minY - margin);
+        var right = Math.Min(image.GetWidth() - 1, maxX + margin);
+        var bottom = Math.Min(image.GetHeight() - 1, maxY + margin);
+        return new Rect2I(
+            left,
+            top,
+            right - left + 1,
+            bottom - top + 1);
     }
 
     private static void SaveGeneratedImage(string conceptId, Image image, string sourceKind)
