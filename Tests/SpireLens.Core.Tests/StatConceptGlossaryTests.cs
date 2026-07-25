@@ -11,9 +11,16 @@ public class StatConceptGlossaryTests
         Assert.Equal(
             [
                 "activation",
+                "average",
+                "card",
+                "charge",
+                "combat",
+                "floor",
                 "healing_blocked",
                 "healing_gained",
                 "osty_summon_gained",
+                "turn",
+                "upgraded",
             ],
             StatConceptGlossary.Concepts.Select(concept => concept.Id));
         Assert.Equal(
@@ -31,14 +38,35 @@ public class StatConceptGlossaryTests
     public void Glossary_RenderersIncludeNativeHintsAndConfiguredGlyphs()
     {
         var activation = StatConceptGlossary.RenderHintedGlyph("activation");
+        var average = StatConceptGlossary.RenderHintedGlyph("average");
+        var card = StatConceptGlossary.RenderHintedGlyph("card");
+        var charge = StatConceptGlossary.RenderHintedGlyph("charge");
+        var combat = StatConceptGlossary.RenderHintedGlyph("combat");
+        var floor = StatConceptGlossary.RenderHintedGlyph("floor");
         var healingBlocked = StatConceptGlossary.RenderHintedGlyph("healing_blocked");
         var healingGained = StatConceptGlossary.RenderHintedGlyph("healing_gained");
         var summon = StatConceptGlossary.RenderHintedGlyph("osty_summon_gained");
+        var turn = StatConceptGlossary.RenderHintedGlyph("turn");
+        var upgraded = StatConceptGlossary.RenderHintedGlyph("upgraded");
         var information = StatConceptGlossary.RenderInformationHint(
             "Times this relic has been activated.");
 
         Assert.Contains("[hint=\"Activation:", activation);
         Assert.Contains("[color=#F4C95D][b]A[/b][/color]", activation);
+        Assert.Contains("[hint=\"Average:", average);
+        Assert.Contains("[color=#8FD3FF][b]x̄[/b][/color]", average);
+        Assert.Contains("[hint=\"Card:", card);
+        Assert.Contains("res://images/ui/reward_screen/reward_icon_card.png", card);
+        Assert.Contains("[hint=\"Charge:", charge);
+        Assert.Contains("[color=#7FD6FF][b]●³[/b][/color]", charge);
+        Assert.Contains("[hint=\"Combat:", combat);
+        Assert.Contains(
+            "res://images/atlases/ui_atlas.sprites/map/icons/map_monster.tres",
+            combat);
+        Assert.Contains("[hint=\"Floor:", floor);
+        Assert.Contains(
+            "res://images/atlases/ui_atlas.sprites/top_bar/top_bar_floor.tres",
+            floor);
         Assert.Contains("[hint=\"Osty summon gained:", summon);
         Assert.Contains("[hint=\"Healing blocked:", healingBlocked);
         Assert.Contains(
@@ -52,6 +80,12 @@ public class StatConceptGlossaryTests
         Assert.Contains(
             "res://images/atlases/relic_atlas.sprites/bound_phylactery.tres",
             summon);
+        Assert.Contains("[hint=\"Turn:", turn);
+        Assert.Contains("[color=#7FE0C3][b]↻[/b][/color]", turn);
+        Assert.Contains("[hint=\"Upgraded:", upgraded);
+        Assert.Contains(
+            "res://images/ui/cards/upgrade_preview/upgrade_arrow.png",
+            upgraded);
         Assert.Contains("ⓘ", information);
         Assert.Contains("Times this relic has been activated.", information);
     }

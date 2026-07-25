@@ -14,6 +14,65 @@
         "description": "An activation occurs when an effect successfully triggers."
       }
     },
+    "average": {
+      "display": {
+        "type": "styled_text",
+        "value": "x̄",
+        "color": "#8FD3FF",
+        "bold": true,
+        "size": 20
+      },
+      "help": {
+        "label": "Average",
+        "description": "A mean value: the total divided by the relevant number of turns, combats, floors, or activations."
+      }
+    },
+    "card": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/ui/reward_screen/reward_icon_card.png",
+        "size": 20
+      },
+      "help": {
+        "label": "Card",
+        "description": "A card or a count of cards."
+      }
+    },
+    "charge": {
+      "display": {
+        "type": "styled_text",
+        "value": "●³",
+        "color": "#7FD6FF",
+        "bold": true,
+        "size": 20
+      },
+      "help": {
+        "label": "Charge",
+        "description": "A stored charge accumulated or used by a relic."
+      }
+    },
+    "combat": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/atlases/ui_atlas.sprites/map/icons/map_monster.tres",
+        "size": 20
+      },
+      "help": {
+        "label": "Combat",
+        "description": "A combat encounter or a value measured across combats."
+      }
+    },
+    "floor": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/atlases/ui_atlas.sprites/top_bar/top_bar_floor.tres",
+        "size": 20
+      },
+      "help": {
+        "label": "Floor",
+        "description": "A run floor or a value measured across floors."
+      }
+    },
     "healing_blocked": {
       "display": {
         "type": "game_resource_group",
@@ -54,6 +113,30 @@
       "help": {
         "label": "Osty summon gained",
         "description": "An increase to Osty's summon amount."
+      }
+    },
+    "turn": {
+      "display": {
+        "type": "styled_text",
+        "value": "↻",
+        "color": "#7FE0C3",
+        "bold": true,
+        "size": 20
+      },
+      "help": {
+        "label": "Turn",
+        "description": "A combat turn or a value measured across turns."
+      }
+    },
+    "upgraded": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/ui/cards/upgrade_preview/upgrade_arrow.png",
+        "size": 20
+      },
+      "help": {
+        "label": "Upgraded",
+        "description": "A card that received an upgrade, or an upgrade applied to a card."
       }
     }
   }
