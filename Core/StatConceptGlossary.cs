@@ -246,7 +246,9 @@ internal static class StatConceptGlossary
                     ResourceLoader.CacheMode.Reuse)
                     ?? throw new InvalidOperationException(
                         $"ResourceLoader could not load '{resource.Path}'.");
-                loaded.Add((texture.GetImage(), resource.Scale));
+                var image = texture.GetImage();
+                EnsureImageReadable(image);
+                loaded.Add((image, resource.Scale));
             }
 
             var targetHeight = loaded.Max(entry =>
@@ -344,6 +346,7 @@ internal static class StatConceptGlossary
 
     private static Rect2I FindVisiblePixelBounds(Image image, float alphaThreshold)
     {
+        EnsureImageReadable(image);
         var minX = image.GetWidth();
         var minY = image.GetHeight();
         var maxX = -1;
@@ -365,6 +368,18 @@ internal static class StatConceptGlossary
         return maxX < minX || maxY < minY
             ? new Rect2I()
             : new Rect2I(minX, minY, maxX - minX + 1, maxY - minY + 1);
+    }
+
+    private static void EnsureImageReadable(Image image)
+    {
+        if (!image.IsCompressed()) return;
+
+        var error = image.Decompress();
+        if (error != Error.Ok)
+        {
+            throw new InvalidOperationException(
+                $"Image.Decompress returned {error}.");
+        }
     }
 
     private static void BuildGameResourceRegions()
