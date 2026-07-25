@@ -41,6 +41,8 @@ internal static class StatConceptGlossary
     private const int IconArtworkSize = 16;
     private const string InformationColor = "#94A0AE";
     private const string GeneratedIconDirectory = "user://SpireLens/generated-icons";
+    private static readonly string GeneratedIconGeneration =
+        Guid.NewGuid().ToString("N");
     private static readonly string[] RelicInlineGameResources =
     [
         "res://images/atlases/potion_atlas.sprites/energy_potion.tres",
@@ -426,15 +428,20 @@ internal static class StatConceptGlossary
     private static Rect2I FindSquareContentRegion(Texture2D texture)
     {
         Rect2I content;
-        if (texture is AtlasTexture atlas
-            && atlas.Margin.Size.X > 0f
-            && atlas.Margin.Size.Y > 0f)
+        if (texture is AtlasTexture atlas)
         {
-            content = new Rect2I(
-                (int)Math.Round(atlas.Margin.Position.X),
-                (int)Math.Round(atlas.Margin.Position.Y),
-                Math.Max(1, (int)Math.Round(atlas.Margin.Size.X)),
-                Math.Max(1, (int)Math.Round(atlas.Margin.Size.Y)));
+            content = atlas.Margin.Size.X > 0f
+                      && atlas.Margin.Size.Y > 0f
+                ? new Rect2I(
+                    (int)Math.Round(atlas.Margin.Position.X),
+                    (int)Math.Round(atlas.Margin.Position.Y),
+                    Math.Max(1, (int)Math.Round(atlas.Margin.Size.X)),
+                    Math.Max(1, (int)Math.Round(atlas.Margin.Size.Y)))
+                : new Rect2I(
+                    0,
+                    0,
+                    texture.GetWidth(),
+                    texture.GetHeight());
         }
         else
         {
@@ -482,17 +489,6 @@ internal static class StatConceptGlossary
     {
         var texture = ImageTexture.CreateFromImage(image);
         var path = GetGeneratedImagePath(conceptId);
-        var saveError = ResourceSaver.Save(
-            texture,
-            path,
-            ResourceSaver.SaverFlags.ChangePath);
-        if (saveError != Error.Ok)
-        {
-            texture.Dispose();
-            throw new InvalidOperationException(
-                $"ResourceSaver returned {saveError} for '{path}'.");
-        }
-
         texture.TakeOverPath(path);
         GeneratedImageTextures.Add(texture);
         GeneratedImagePaths.Add(conceptId, path);
@@ -503,7 +499,7 @@ internal static class StatConceptGlossary
 
     private static string GetGeneratedImagePath(string conceptId)
     {
-        return $"{GeneratedIconDirectory}/{conceptId}.tres";
+        return $"{GeneratedIconDirectory}/{conceptId}-{GeneratedIconGeneration}.tres";
     }
 
     private static string EscapeHint(string? text)

@@ -81,11 +81,11 @@ public class StatConceptGlossaryTests
 
         Assert.Contains("[hint=\"Activation:", activation);
         Assert.Contains(
-            "user://SpireLens/generated-icons/activation.tres",
+            "user://SpireLens/generated-icons/activation-",
             activation);
         Assert.Contains("[hint=\"Average:", average);
         Assert.Contains(
-            "user://SpireLens/generated-icons/average.tres",
+            "user://SpireLens/generated-icons/average-",
             average);
         Assert.Contains("[hint=\"Block:", block);
         Assert.Contains("res://images/ui/combat/block.png", block);
@@ -93,7 +93,7 @@ public class StatConceptGlossaryTests
         Assert.Contains("res://images/ui/reward_screen/reward_icon_card.png", card);
         Assert.Contains("[hint=\"Charge:", charge);
         Assert.Contains(
-            "user://SpireLens/generated-icons/charge.tres",
+            "user://SpireLens/generated-icons/charge-",
             charge);
         Assert.Contains("[hint=\"Combat:", combat);
         Assert.Contains(
@@ -110,7 +110,7 @@ public class StatConceptGlossaryTests
             .Display;
         Assert.Equal("Assets.healing-blocked.png", healingBlockedDisplay.Value);
         Assert.Contains(
-            "user://SpireLens/generated-icons/healing_blocked.tres",
+            "user://SpireLens/generated-icons/healing_blocked-",
             healingBlocked);
         Assert.Contains("[hint=\"Healing gained:", healingGained);
         Assert.Contains(
@@ -118,14 +118,14 @@ public class StatConceptGlossaryTests
             healingGained);
         Assert.Contains("[hint=\"Information:", informationConcept);
         Assert.Contains(
-            "user://SpireLens/generated-icons/information.tres",
+            "user://SpireLens/generated-icons/information-",
             informationConcept);
         Assert.Contains(
             "res://images/atlases/relic_atlas.sprites/bound_phylactery.tres",
             summon);
         Assert.Contains("[hint=\"Turn:", turn);
         Assert.Contains(
-            "user://SpireLens/generated-icons/turn.tres",
+            "user://SpireLens/generated-icons/turn-",
             turn);
         Assert.Contains("[hint=\"Upgraded:", upgraded);
         Assert.Contains(
@@ -133,7 +133,7 @@ public class StatConceptGlossaryTests
             upgraded);
         Assert.Contains("[img width=20 height=20", information);
         Assert.Contains(
-            "user://SpireLens/generated-icons/information.tres",
+            "user://SpireLens/generated-icons/information-",
             information);
         Assert.Contains("Times this relic has been activated.", information);
     }
