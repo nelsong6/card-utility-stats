@@ -50,6 +50,36 @@ public class StatsVisibilityHotkeyTests
     }
 
     [Fact]
+    public void Process_ModifierHeldBeforeLeftShiftDoesNotToggle()
+    {
+        var tracker = new LeftShiftTapTracker();
+
+        Assert.False(Process(
+            tracker,
+            Key.Shift,
+            pressed: true,
+            otherModifierPressed: true));
+        Assert.False(Process(
+            tracker,
+            Key.Shift,
+            pressed: false,
+            otherModifierPressed: false));
+    }
+
+    [Fact]
+    public void Process_ModifierHeldAtLeftShiftReleaseDoesNotToggle()
+    {
+        var tracker = new LeftShiftTapTracker();
+
+        Assert.False(Process(tracker, Key.Shift, pressed: true));
+        Assert.False(Process(
+            tracker,
+            Key.Shift,
+            pressed: false,
+            otherModifierPressed: true));
+    }
+
+    [Fact]
     public void Process_RightShiftNeverStartsTap()
     {
         var tracker = new LeftShiftTapTracker();
@@ -88,8 +118,15 @@ public class StatsVisibilityHotkeyTests
         Key key,
         bool pressed,
         KeyLocation location = KeyLocation.Left,
-        bool echo = false)
+        bool echo = false,
+        bool otherModifierPressed = false)
     {
-        return tracker.Process(key, key, location, pressed, echo);
+        return tracker.Process(
+            key,
+            key,
+            location,
+            pressed,
+            echo,
+            otherModifierPressed);
     }
 }

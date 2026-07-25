@@ -41,7 +41,8 @@ modal options window can be opened from gameplay screens by tapping **Left
 Shift** on keyboard or pressing **Right Stick (R3)** on controller. The
 shortcuts do nothing on the run's Pause, Settings, Compendium, or Feedback
 screens, or on main-menu surfaces such as the compendium or run history.
-Shift-based chords such as Steam's Shift+Tab are left alone.
+Shift-based chords such as Steam's Shift+Tab and Windows+Shift+S are left
+alone, including chords whose other modifier was pressed before Left Shift.
 
 The modal blocks normal game input while open and contains the master stats
 visibility, card stats, monster stats, and removed-card checkboxes. It does not

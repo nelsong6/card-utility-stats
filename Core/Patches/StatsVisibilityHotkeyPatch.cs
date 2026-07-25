@@ -55,7 +55,10 @@ public static class StatsVisibilityHotkeyPatch
                         keyEvent.PhysicalKeycode,
                         keyEvent.Location,
                         keyEvent.Pressed,
-                        keyEvent.Echo))
+                        keyEvent.Echo,
+                        keyEvent.CtrlPressed
+                        || keyEvent.AltPressed
+                        || keyEvent.MetaPressed))
                 {
                     if (SpireLensOptionsMenu.IsOpen)
                         inputManager.GetViewport()?.SetInputAsHandled();
@@ -151,8 +154,9 @@ public static class StatsVisibilityHotkeyPatch
 
 /// <summary>
 /// Recognizes a tap of Left Shift without claiming Shift-based chords such as
-/// Steam's Shift+Tab overlay shortcut. The toggle fires on release only when
-/// no other key was pressed during the hold.
+/// Steam's Shift+Tab overlay shortcut or Windows+Shift+S. The toggle fires on
+/// release only when no other modifier was already held and no other key was
+/// pressed during the hold.
 /// </summary>
 internal sealed class LeftShiftTapTracker
 {
@@ -164,7 +168,8 @@ internal sealed class LeftShiftTapTracker
         Key physicalKeycode,
         KeyLocation location,
         bool pressed,
-        bool echo)
+        bool echo,
+        bool otherModifierPressed)
     {
         if (echo) return false;
 
@@ -173,11 +178,17 @@ internal sealed class LeftShiftTapTracker
             if (pressed)
             {
                 _leftShiftHeld = true;
-                _usedAsModifier = false;
+                // A chord may start before Shift (for example
+                // Windows+Shift+S), so the later key-event check alone is
+                // insufficient. Capture modifiers already held when Shift
+                // arrives.
+                _usedAsModifier = otherModifierPressed;
                 return false;
             }
 
-            var isTap = _leftShiftHeld && !_usedAsModifier;
+            var isTap = _leftShiftHeld
+                        && !_usedAsModifier
+                        && !otherModifierPressed;
             _leftShiftHeld = false;
             _usedAsModifier = false;
             return isTap;
