@@ -31,7 +31,7 @@ public static class RelicHoverShowPatch
     private const string StarIconPath = "res://images/packed/sprite_fonts/star_icon.png";
     private const string VigorIconPath = "res://images/atlases/power_atlas.sprites/vigor_power.tres";
     private const int SealOfGoldLossPerTrigger = 5;
-    private const int InlineIconSize = 16;
+    private const int InlineIconSize = StatConceptGlossary.IconSlotSize;
     private const double MaxTableLabelWidthUnits = 28d;
     private const float SturdyClampTooltipWidth = 420f;
     private const float EmberTeaTooltipWidth = 500f;
@@ -3191,13 +3191,13 @@ public static class RelicHoverShowPatch
     private static string VulnerableLabel(string suffix)
     {
         var path = NormalizeResourcePath(VulnerableIconPath);
-        return $"{StatConceptGlossary.RenderImage(path, InlineIconSize)} {suffix}";
+        return $"{StatConceptGlossary.RenderInlineImage(path)} {suffix}";
     }
 
     private static string WeakLabel(string suffix)
     {
         var path = NormalizeResourcePath(WeakIconPath);
-        return $"{StatConceptGlossary.RenderImage(path, InlineIconSize)} {suffix}";
+        return $"{StatConceptGlossary.RenderInlineImage(path)} {suffix}";
     }
 
     private static IEnumerable<AppliedEffectAggregate> OtherUnsettlingLampDebuffs(RelicAggregate agg)
@@ -3226,7 +3226,7 @@ public static class RelicHoverShowPatch
     private static string BlockLabel(string suffix)
     {
         var path = NormalizeResourcePath(BlockIconPath);
-        return $"{StatConceptGlossary.RenderImage(path, InlineIconSize)} {suffix}";
+        return $"{StatConceptGlossary.RenderInlineImage(path)} {suffix}";
     }
 
     private static void AppendHealingStats(
@@ -3345,13 +3345,13 @@ public static class RelicHoverShowPatch
     private static string EnergyLabel(string suffix)
     {
         var path = NormalizeResourcePath(EnergyIconPath);
-        return $"{StatConceptGlossary.RenderImage(path, InlineIconSize)} {suffix}";
+        return $"{StatConceptGlossary.RenderInlineImage(path)} {suffix}";
     }
 
     private static string DrawLabel(string suffix)
     {
         var path = NormalizeResourcePath(DrawIconPath);
-        return $"{StatConceptGlossary.RenderImage(path, InlineIconSize)} {suffix}";
+        return $"{StatConceptGlossary.RenderInlineImage(path)} {suffix}";
     }
 
     private static string BrilliantScarfCostLabel(int energyCost, int starCost)
@@ -3412,13 +3412,13 @@ public static class RelicHoverShowPatch
     private static string InlineIcon(string path)
     {
         var normalized = NormalizeResourcePath(path);
-        return StatConceptGlossary.RenderImage(normalized, InlineIconSize);
+        return StatConceptGlossary.RenderInlineImage(normalized);
     }
 
     private static string VigorLabel(string suffix)
     {
         var path = NormalizeResourcePath(VigorIconPath);
-        return $"{StatConceptGlossary.RenderImage(path, InlineIconSize)} {suffix}";
+        return $"{StatConceptGlossary.RenderInlineImage(path)} {suffix}";
     }
 
     private static bool IsRelicModel(object model, string typeName)
@@ -3640,18 +3640,7 @@ public static class RelicHoverShowPatch
 
     private static double EstimatedConceptWidthUnits(string conceptId)
     {
-        if (!StatConceptGlossary.TryGet(conceptId, out var concept))
-            return 2d;
-
-        return concept.Display.Type switch
-        {
-            StatConceptDisplayType.StyledText =>
-                Math.Max(1.5d, concept.Display.Value.Length),
-            StatConceptDisplayType.GameResourceGroup =>
-                concept.Display.Resources.Sum(resource =>
-                    (double)(concept.Display.Size * resource.Scale) / 9d),
-            _ => concept.Display.Size / 9d,
-        };
+        return StatConceptGlossary.IconSlotSize / 9d;
     }
 
     private static int CountInlineImages(string bbcode)

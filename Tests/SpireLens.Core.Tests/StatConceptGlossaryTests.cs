@@ -26,7 +26,7 @@ public class StatConceptGlossaryTests
             ],
             StatConceptGlossary.Concepts.Select(concept => concept.Id));
         Assert.Equal(
-            StatConceptDisplayType.StyledText,
+            StatConceptDisplayType.EmbeddedImage,
             StatConceptGlossary.Concepts.Single(concept => concept.Id == "activation").Display.Type);
         Assert.Equal(
             StatConceptDisplayType.EmbeddedImage,
@@ -34,9 +34,7 @@ public class StatConceptGlossaryTests
         Assert.Equal(
             StatConceptDisplayType.GameResource,
             StatConceptGlossary.Concepts.Single(concept => concept.Id == "healing_gained").Display.Type);
-        Assert.Equal(
-            20,
-            StatConceptGlossary.Concepts.Single(concept => concept.Id == "combat").Display.Size);
+        Assert.Equal(20, StatConceptGlossary.IconSlotSize);
     }
 
     [Fact]
@@ -58,20 +56,46 @@ public class StatConceptGlossaryTests
         var information = StatConceptGlossary.RenderInformationHint(
             "Times this relic has been activated.");
 
+        var defaultGlyphs = new[]
+        {
+            activation,
+            average,
+            block,
+            card,
+            charge,
+            combat,
+            floor,
+            healingBlocked,
+            healingGained,
+            informationConcept,
+            summon,
+            turn,
+            upgraded,
+        };
+        Assert.All(
+            defaultGlyphs,
+            glyph => Assert.Contains("[img width=20 height=20", glyph));
+        Assert.All(
+            defaultGlyphs,
+            glyph => Assert.DoesNotContain("[font_size=", glyph));
+
         Assert.Contains("[hint=\"Activation:", activation);
-        Assert.Contains("[color=#F4C95D][b]A[/b][/color]", activation);
+        Assert.Contains(
+            "user://SpireLens/generated-icons/activation.tres",
+            activation);
         Assert.Contains("[hint=\"Average:", average);
-        Assert.Contains("[color=#8FD3FF][b]x̄[/b][/color]", average);
+        Assert.Contains(
+            "user://SpireLens/generated-icons/average.tres",
+            average);
         Assert.Contains("[hint=\"Block:", block);
         Assert.Contains("res://images/ui/combat/block.png", block);
         Assert.Contains("[hint=\"Card:", card);
         Assert.Contains("res://images/ui/reward_screen/reward_icon_card.png", card);
         Assert.Contains("[hint=\"Charge:", charge);
-        Assert.Contains("[color=#7FD6FF][b]●³[/b][/color]", charge);
-        Assert.Contains("[hint=\"Combat:", combat);
         Assert.Contains(
-            "[img width=20 height=20 region=30,29,62,60 align=center]",
-            combat);
+            "user://SpireLens/generated-icons/charge.tres",
+            charge);
+        Assert.Contains("[hint=\"Combat:", combat);
         Assert.Contains(
             "res://images/atlases/ui_atlas.sprites/map/icons/map_monster.tres",
             combat);
@@ -93,17 +117,24 @@ public class StatConceptGlossaryTests
             "res://images/atlases/power_atlas.sprites/regen_power.tres",
             healingGained);
         Assert.Contains("[hint=\"Information:", informationConcept);
-        Assert.Contains("[color=#94A0AE][b]ⓘ[/b][/color]", informationConcept);
+        Assert.Contains(
+            "user://SpireLens/generated-icons/information.tres",
+            informationConcept);
         Assert.Contains(
             "res://images/atlases/relic_atlas.sprites/bound_phylactery.tres",
             summon);
         Assert.Contains("[hint=\"Turn:", turn);
-        Assert.Contains("[color=#7FE0C3][b]↻[/b][/color]", turn);
+        Assert.Contains(
+            "user://SpireLens/generated-icons/turn.tres",
+            turn);
         Assert.Contains("[hint=\"Upgraded:", upgraded);
         Assert.Contains(
             "res://images/ui/cards/upgrade_preview/upgrade_arrow.png",
             upgraded);
-        Assert.Contains("ⓘ", information);
+        Assert.Contains("[img width=20 height=20", information);
+        Assert.Contains(
+            "user://SpireLens/generated-icons/information.tres",
+            information);
         Assert.Contains("Times this relic has been activated.", information);
     }
 }

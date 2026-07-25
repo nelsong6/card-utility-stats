@@ -8,7 +8,6 @@ namespace SpireLens.Core;
 
 internal enum StatConceptDisplayType
 {
-    StyledText,
     GameResource,
     GameResourceGroup,
     EmbeddedImage,
@@ -21,9 +20,6 @@ internal sealed record StatConceptResource(
 internal sealed record StatConceptDisplay(
     StatConceptDisplayType Type,
     string Value,
-    string Color,
-    bool Bold,
-    int Size,
     IReadOnlyList<StatConceptResource> Resources);
 
 internal sealed record StatConcept(
@@ -41,17 +37,28 @@ internal static class StatConceptGlossary
 {
     private const string EmbeddedFileSuffix = "Config.stat-concepts.json";
     private const int SupportedSchemaVersion = 1;
-    private const int DefaultGlyphSize = 20;
+    internal const int IconSlotSize = 20;
+    private const int IconArtworkSize = 16;
     private const string InformationColor = "#94A0AE";
     private const string GeneratedIconDirectory = "user://SpireLens/generated-icons";
-    private const string CombatConceptId = "combat";
-    private const string CombatIconRegion = "30,29,62,60";
+    private static readonly string[] RelicInlineGameResources =
+    [
+        "res://images/atlases/potion_atlas.sprites/energy_potion.tres",
+        "res://images/atlases/power_atlas.sprites/draw_cards_next_turn_power.tres",
+        "res://images/atlases/power_atlas.sprites/vigor_power.tres",
+        "res://images/atlases/power_atlas.sprites/vulnerable_power.tres",
+        "res://images/atlases/power_atlas.sprites/weak_power.tres",
+        "res://images/packed/sprite_fonts/star_icon.png",
+        "res://images/ui/combat/block.png",
+    ];
 
     private static readonly IReadOnlyDictionary<string, StatConcept> ConceptsById =
         LoadConcepts();
     private static readonly Dictionary<string, string> GeneratedImagePaths =
         new(StringComparer.OrdinalIgnoreCase);
     private static readonly List<ImageTexture> GeneratedImageTextures = [];
+    private static readonly Dictionary<string, string> GameResourceRegions =
+        new(StringComparer.Ordinal);
 
     public static IReadOnlyList<StatConcept> Concepts { get; } =
         ConceptsById.Values
@@ -61,10 +68,13 @@ internal static class StatConceptGlossary
 
     public static void Initialize()
     {
-        BuildEmbeddedImageResources();
+        BuildGeneratedConceptImages();
+        BuildGameResourceRegions();
         CoreMain.Logger.Info(
             $"Stat concept glossary loaded: concepts={Concepts.Count}, "
-            + $"generated_images={GeneratedImagePaths.Count}");
+            + $"generated_images={GeneratedImagePaths.Count}, "
+            + $"slot={IconSlotSize}x{IconSlotSize}, "
+            + $"artwork={IconArtworkSize}x{IconArtworkSize}");
     }
 
     public static bool TryGet(string conceptId, out StatConcept concept)
@@ -91,12 +101,12 @@ internal static class StatConceptGlossary
         {
             var missingId = StatsTooltip.EscapeBbcode(conceptId);
             return $"[hint=\"Unknown stat concept: {EscapeHint(conceptId)}\"]"
-                   + $"[font_size={DefaultGlyphSize}][color={InformationColor}][b]?"
+                   + $"[font_size={IconSlotSize}][color={InformationColor}][b]?"
                    + $"[/b][/color][/font_size][/hint]"
                    + $"[color={InformationColor}] {missingId}[/color]";
         }
 
-        var size = Math.Clamp(sizeOverride ?? concept.Display.Size, 8, 64);
+        var size = Math.Clamp(sizeOverride ?? IconSlotSize, 8, 64);
         var rawGlyph = RenderGlyph(concept, size);
         var hint = EscapeHint($"{concept.Label}: {concept.Description}");
         return $"[hint=\"{hint}\"]{rawGlyph}[/hint]";
@@ -111,53 +121,29 @@ internal static class StatConceptGlossary
                    + "[b]ⓘ[/b][/color][/font_size][/hint]";
         }
 
-        var size = Math.Clamp(concept.Display.Size, 8, 64);
-        return $"[hint=\"{hint}\"]{RenderGlyph(concept, size)}[/hint]";
+        return $"[hint=\"{hint}\"]{RenderGlyph(concept, IconSlotSize)}[/hint]";
     }
 
     private static string RenderGlyph(StatConcept concept, int size)
     {
         return concept.Display.Type switch
         {
-            StatConceptDisplayType.StyledText =>
-                RenderStyledText(concept.Display, size),
             StatConceptDisplayType.GameResource =>
                 RenderGameResource(concept, size),
             StatConceptDisplayType.GameResourceGroup =>
-                RenderGameResourceGroup(concept.Display, size),
+                RenderGeneratedConceptImage(concept, size),
             StatConceptDisplayType.EmbeddedImage =>
-                RenderEmbeddedImage(concept, size),
+                RenderGeneratedConceptImage(concept, size),
             _ => StatsTooltip.EscapeBbcode(concept.Label),
         };
     }
 
-    private static string RenderStyledText(StatConceptDisplay display, int size)
-    {
-        var value = StatsTooltip.EscapeBbcode(display.Value);
-        var styled = display.Bold ? $"[b]{value}[/b]" : value;
-        return $"[font_size={size}][color={display.Color}]{styled}[/color][/font_size]";
-    }
-
     private static string RenderGameResource(StatConcept concept, int size)
     {
-        return string.Equals(concept.Id, CombatConceptId, StringComparison.Ordinal)
-            ? RenderImage(concept.Display.Value, size, CombatIconRegion)
-            : RenderImage(concept.Display.Value, size);
+        return RenderImage(concept.Display.Value, size);
     }
 
-    private static string RenderGameResourceGroup(StatConceptDisplay display, int size)
-    {
-        return string.Concat(display.Resources.Select(resource =>
-        {
-            var resourceSize = Math.Clamp(
-                (int)Math.Round(size * resource.Scale, MidpointRounding.AwayFromZero),
-                8,
-                64);
-            return RenderImage(resource.Path, resourceSize);
-        }));
-    }
-
-    private static string RenderEmbeddedImage(StatConcept concept, int size)
+    private static string RenderGeneratedConceptImage(StatConcept concept, int size)
     {
         var path = GeneratedImagePaths.TryGetValue(concept.Id, out var generatedPath)
             ? generatedPath
@@ -166,55 +152,315 @@ internal static class StatConceptGlossary
     }
 
     internal static string RenderImage(string path, int size)
-        => $"[img width={size} height={size} align=center]{path}[/img]";
+    {
+        return GameResourceRegions.TryGetValue(path, out var region)
+            ? RenderImage(path, size, region)
+            : $"[img width={size} height={size} align=center]{path}[/img]";
+    }
 
     private static string RenderImage(string path, int size, string region)
         => $"[img width={size} height={size} region={region} align=center]{path}[/img]";
 
-    private static void BuildEmbeddedImageResources()
+    internal static string RenderInlineImage(string path)
+        => RenderImage(path, IconSlotSize);
+
+    private static void BuildGeneratedConceptImages()
     {
         GeneratedImagePaths.Clear();
         GeneratedImageTextures.Clear();
 
-        var embeddedConcepts = Concepts
-            .Where(concept => concept.Display.Type == StatConceptDisplayType.EmbeddedImage)
+        var generatedConcepts = Concepts
+            .Where(concept =>
+                concept.Display.Type is StatConceptDisplayType.EmbeddedImage
+                    or StatConceptDisplayType.GameResourceGroup)
             .ToArray();
-        if (embeddedConcepts.Length == 0) return;
+        if (generatedConcepts.Length == 0) return;
 
         System.IO.Directory.CreateDirectory(
             ProjectSettings.GlobalizePath(GeneratedIconDirectory));
 
         var assembly = typeof(StatConceptGlossary).Assembly;
         var manifestNames = assembly.GetManifestResourceNames();
-        foreach (var concept in embeddedConcepts)
+        foreach (var concept in generatedConcepts)
         {
             try
             {
-                var manifestName = manifestNames.FirstOrDefault(name =>
-                    name.EndsWith(concept.Display.Value, StringComparison.Ordinal))
-                    ?? throw new InvalidOperationException(
-                        $"Embedded image '{concept.Display.Value}' was not found.");
-                using var stream = assembly.GetManifestResourceStream(manifestName)
-                    ?? throw new InvalidOperationException(
-                        $"Embedded image '{manifestName}' could not be opened.");
-                using var buffer = new System.IO.MemoryStream();
-                stream.CopyTo(buffer);
-                using var image = Image.CreateEmpty(1, 1, false, Image.Format.Rgba8);
-                var loadError = image.LoadPngFromBuffer(buffer.ToArray());
-                if (loadError != Error.Ok)
+                using var sourceImage = concept.Display.Type switch
                 {
-                    throw new InvalidOperationException(
-                        $"Image.LoadPngFromBuffer returned {loadError}.");
-                }
-
-                SaveGeneratedImage(concept.Id, image, "embedded");
+                    StatConceptDisplayType.EmbeddedImage =>
+                        LoadEmbeddedImage(concept, assembly, manifestNames),
+                    StatConceptDisplayType.GameResourceGroup =>
+                        BuildGroupedSourceImage(concept),
+                    _ => throw new InvalidOperationException(
+                        $"Concept '{concept.Id}' does not require a generated image."),
+                };
+                using var normalizedImage = NormalizeToIconSlot(sourceImage);
+                SaveGeneratedImage(concept.Id, normalizedImage, concept.Display.Type.ToString());
             }
             catch (Exception e)
             {
                 CoreMain.Logger.Error(
-                    $"Could not load stat concept embedded image '{concept.Id}': {e.Message}");
+                    $"Could not build stat concept image '{concept.Id}': {e.Message}");
             }
         }
+    }
+
+    private static Image LoadEmbeddedImage(
+        StatConcept concept,
+        System.Reflection.Assembly assembly,
+        IReadOnlyList<string> manifestNames)
+    {
+        var manifestName = manifestNames.FirstOrDefault(name =>
+            name.EndsWith(concept.Display.Value, StringComparison.Ordinal))
+            ?? throw new InvalidOperationException(
+                $"Embedded image '{concept.Display.Value}' was not found.");
+        using var stream = assembly.GetManifestResourceStream(manifestName)
+            ?? throw new InvalidOperationException(
+                $"Embedded image '{manifestName}' could not be opened.");
+        using var buffer = new System.IO.MemoryStream();
+        stream.CopyTo(buffer);
+        var bytes = buffer.ToArray();
+        var image = Image.CreateEmpty(1, 1, false, Image.Format.Rgba8);
+        var loadError = concept.Display.Value.EndsWith(
+            ".svg",
+            StringComparison.OrdinalIgnoreCase)
+            ? image.LoadSvgFromBuffer(bytes, 1f)
+            : image.LoadPngFromBuffer(bytes);
+        if (loadError == Error.Ok) return image;
+
+        image.Dispose();
+        throw new InvalidOperationException(
+            $"Image loader returned {loadError} for '{manifestName}'.");
+    }
+
+    private static Image BuildGroupedSourceImage(StatConcept concept)
+    {
+        var loaded = new List<(Image Image, decimal Scale)>();
+        try
+        {
+            foreach (var resource in concept.Display.Resources)
+            {
+                var texture = ResourceLoader.Load<Texture2D>(
+                    resource.Path,
+                    null,
+                    ResourceLoader.CacheMode.Reuse)
+                    ?? throw new InvalidOperationException(
+                        $"ResourceLoader could not load '{resource.Path}'.");
+                loaded.Add((texture.GetImage(), resource.Scale));
+            }
+
+            var targetHeight = loaded.Max(entry =>
+                Math.Max(
+                    1,
+                    (int)Math.Round(
+                        entry.Image.GetHeight() * (double)entry.Scale,
+                        MidpointRounding.AwayFromZero)));
+            var widths = loaded.Select(entry =>
+                Math.Max(
+                    1,
+                    (int)Math.Round(
+                        entry.Image.GetWidth() * (double)entry.Scale,
+                        MidpointRounding.AwayFromZero)))
+                .ToArray();
+            var combined = Image.CreateEmpty(
+                widths.Sum(),
+                targetHeight,
+                false,
+                Image.Format.Rgba8);
+            combined.Fill(new Color(0f, 0f, 0f, 0f));
+
+            var x = 0;
+            for (var index = 0; index < loaded.Count; index++)
+            {
+                var entry = loaded[index];
+                var targetWidth = widths[index];
+                var targetImageHeight = Math.Max(
+                    1,
+                    (int)Math.Round(
+                        entry.Image.GetHeight() * (double)entry.Scale,
+                        MidpointRounding.AwayFromZero));
+                entry.Image.Resize(
+                    targetWidth,
+                    targetImageHeight,
+                    Image.Interpolation.Lanczos);
+                combined.BlitRect(
+                    entry.Image,
+                    new Rect2I(0, 0, targetWidth, targetImageHeight),
+                    new Vector2I(x, (targetHeight - targetImageHeight) / 2));
+                x += targetWidth;
+            }
+
+            return combined;
+        }
+        finally
+        {
+            foreach (var entry in loaded)
+                entry.Image.Dispose();
+        }
+    }
+
+    private static Image NormalizeToIconSlot(Image source)
+    {
+        var usedRect = FindVisiblePixelBounds(source, 0.02f);
+        if (usedRect.Size.X <= 0 || usedRect.Size.Y <= 0)
+        {
+            throw new InvalidOperationException(
+                "Source image does not contain visible pixels.");
+        }
+
+        using var cropped = Image.CreateEmpty(
+            usedRect.Size.X,
+            usedRect.Size.Y,
+            false,
+            Image.Format.Rgba8);
+        cropped.Fill(new Color(0f, 0f, 0f, 0f));
+        cropped.BlitRect(source, usedRect, Vector2I.Zero);
+
+        var scale = Math.Min(
+            IconArtworkSize / (double)usedRect.Size.X,
+            IconArtworkSize / (double)usedRect.Size.Y);
+        var width = Math.Max(
+            1,
+            (int)Math.Round(usedRect.Size.X * scale, MidpointRounding.AwayFromZero));
+        var height = Math.Max(
+            1,
+            (int)Math.Round(usedRect.Size.Y * scale, MidpointRounding.AwayFromZero));
+        cropped.Resize(width, height, Image.Interpolation.Lanczos);
+
+        var normalized = Image.CreateEmpty(
+            IconSlotSize,
+            IconSlotSize,
+            false,
+            Image.Format.Rgba8);
+        normalized.Fill(new Color(0f, 0f, 0f, 0f));
+        normalized.BlitRect(
+            cropped,
+            new Rect2I(0, 0, width, height),
+            new Vector2I(
+                (IconSlotSize - width) / 2,
+                (IconSlotSize - height) / 2));
+        return normalized;
+    }
+
+    private static Rect2I FindVisiblePixelBounds(Image image, float alphaThreshold)
+    {
+        var minX = image.GetWidth();
+        var minY = image.GetHeight();
+        var maxX = -1;
+        var maxY = -1;
+
+        for (var y = 0; y < image.GetHeight(); y++)
+        {
+            for (var x = 0; x < image.GetWidth(); x++)
+            {
+                if (image.GetPixel(x, y).A < alphaThreshold) continue;
+
+                minX = Math.Min(minX, x);
+                minY = Math.Min(minY, y);
+                maxX = Math.Max(maxX, x);
+                maxY = Math.Max(maxY, y);
+            }
+        }
+
+        return maxX < minX || maxY < minY
+            ? new Rect2I()
+            : new Rect2I(minX, minY, maxX - minX + 1, maxY - minY + 1);
+    }
+
+    private static void BuildGameResourceRegions()
+    {
+        GameResourceRegions.Clear();
+        var resources = Concepts
+            .Where(concept =>
+                concept.Display.Type == StatConceptDisplayType.GameResource)
+            .Select(concept => concept.Display.Value)
+            .Concat(Concepts
+                .Where(concept =>
+                    concept.Display.Type == StatConceptDisplayType.GameResourceGroup)
+                .SelectMany(concept =>
+                    concept.Display.Resources.Select(resource => resource.Path)))
+            .Concat(RelicInlineGameResources)
+            .Distinct(StringComparer.Ordinal);
+
+        foreach (var path in resources)
+        {
+            try
+            {
+                var texture = ResourceLoader.Load<Texture2D>(
+                    path,
+                    null,
+                    ResourceLoader.CacheMode.Reuse)
+                    ?? throw new InvalidOperationException(
+                        $"ResourceLoader could not load '{path}'.");
+                var region = FindSquareContentRegion(texture);
+                GameResourceRegions[path] = string.Join(
+                    ",",
+                    region.Position.X,
+                    region.Position.Y,
+                    region.Size.X,
+                    region.Size.Y);
+            }
+            catch (Exception e)
+            {
+                CoreMain.Logger.Error(
+                    $"Could not normalize stat concept game resource '{path}': {e.Message}");
+            }
+        }
+    }
+
+    private static Rect2I FindSquareContentRegion(Texture2D texture)
+    {
+        Rect2I content;
+        if (texture is AtlasTexture atlas
+            && atlas.Margin.Size.X > 0f
+            && atlas.Margin.Size.Y > 0f)
+        {
+            content = new Rect2I(
+                (int)Math.Round(atlas.Margin.Position.X),
+                (int)Math.Round(atlas.Margin.Position.Y),
+                Math.Max(1, (int)Math.Round(atlas.Margin.Size.X)),
+                Math.Max(1, (int)Math.Round(atlas.Margin.Size.Y)));
+        }
+        else
+        {
+            using var image = texture.GetImage();
+            content = image.GetWidth() == texture.GetWidth()
+                      && image.GetHeight() == texture.GetHeight()
+                ? FindVisiblePixelBounds(image, 0.02f)
+                : new Rect2I(
+                    0,
+                    0,
+                    texture.GetWidth(),
+                    texture.GetHeight());
+        }
+
+        if (content.Size.X <= 0 || content.Size.Y <= 0)
+        {
+            content = new Rect2I(
+                0,
+                0,
+                texture.GetWidth(),
+                texture.GetHeight());
+        }
+
+        var contentSide = Math.Max(content.Size.X, content.Size.Y);
+        var side = Math.Min(
+            Math.Min(texture.GetWidth(), texture.GetHeight()),
+            Math.Max(
+                contentSide,
+                (int)Math.Ceiling(
+                    contentSide * (IconSlotSize / (double)IconArtworkSize))));
+        var centerX = content.Position.X + (content.Size.X / 2d);
+        var centerY = content.Position.Y + (content.Size.Y / 2d);
+        var left = Math.Clamp(
+            (int)Math.Round(centerX - (side / 2d)),
+            0,
+            Math.Max(0, texture.GetWidth() - side));
+        var top = Math.Clamp(
+            (int)Math.Round(centerY - (side / 2d)),
+            0,
+            Math.Max(0, texture.GetHeight() - side));
+        return new Rect2I(left, top, side, side);
     }
 
     private static void SaveGeneratedImage(string conceptId, Image image, string sourceKind)
@@ -332,46 +578,6 @@ internal static class StatConceptGlossary
     {
         RequireObject(element, $"Stat concept '{id}' display");
         var type = RequireString(element, "type", $"{id}.display");
-        var size = RequireInt(element, "size", $"{id}.display");
-        if (size is < 8 or > 64)
-        {
-            throw new InvalidOperationException(
-                $"Stat concept '{id}' display size must be between 8 and 64.");
-        }
-
-        if (string.Equals(type, "styled_text", StringComparison.Ordinal))
-        {
-            RequireOnlyProperties(
-                element,
-                $"{id}.display",
-                "type",
-                "value",
-                "color",
-                "bold",
-                "size");
-            var value = RequireString(element, "value", $"{id}.display");
-            var color = RequireString(element, "color", $"{id}.display");
-            if (!IsHexColor(color))
-            {
-                throw new InvalidOperationException(
-                    $"Stat concept '{id}' color '{color}' must be #RRGGBB or #RRGGBBAA.");
-            }
-
-            var boldElement = RequireProperty(element, "bold", $"{id}.display");
-            if (boldElement.ValueKind is not JsonValueKind.True and not JsonValueKind.False)
-            {
-                throw new InvalidOperationException(
-                    $"Stat concept '{id}' display 'bold' must be a boolean.");
-            }
-
-            return new StatConceptDisplay(
-                StatConceptDisplayType.StyledText,
-                value,
-                color,
-                boldElement.GetBoolean(),
-                size,
-                Array.Empty<StatConceptResource>());
-        }
 
         if (string.Equals(type, "game_resource", StringComparison.Ordinal))
         {
@@ -379,8 +585,7 @@ internal static class StatConceptGlossary
                 element,
                 $"{id}.display",
                 "type",
-                "path",
-                "size");
+                "path");
             var path = RequireString(element, "path", $"{id}.display");
             if (!path.StartsWith("res://", StringComparison.Ordinal))
             {
@@ -391,9 +596,6 @@ internal static class StatConceptGlossary
             return new StatConceptDisplay(
                 StatConceptDisplayType.GameResource,
                 path,
-                string.Empty,
-                false,
-                size,
                 Array.Empty<StatConceptResource>());
         }
 
@@ -403,8 +605,7 @@ internal static class StatConceptGlossary
                 element,
                 $"{id}.display",
                 "type",
-                "resources",
-                "size");
+                "resources");
             var resourcesElement = RequireProperty(element, "resources", $"{id}.display");
             if (resourcesElement.ValueKind != JsonValueKind.Array)
             {
@@ -424,9 +625,6 @@ internal static class StatConceptGlossary
             return new StatConceptDisplay(
                 StatConceptDisplayType.GameResourceGroup,
                 string.Empty,
-                string.Empty,
-                false,
-                size,
                 resources);
         }
 
@@ -436,16 +634,12 @@ internal static class StatConceptGlossary
                 element,
                 $"{id}.display",
                 "type",
-                "resource",
-                "size");
+                "resource");
             var resource = RequireString(element, "resource", $"{id}.display");
 
             return new StatConceptDisplay(
                 StatConceptDisplayType.EmbeddedImage,
                 resource,
-                string.Empty,
-                false,
-                size,
                 Array.Empty<StatConceptResource>());
         }
 
@@ -479,12 +673,6 @@ internal static class StatConceptGlossary
         }
 
         return new StatConceptResource(path, scale);
-    }
-
-    private static bool IsHexColor(string value)
-    {
-        if (value.Length is not 7 and not 9 || value[0] != '#') return false;
-        return value.Skip(1).All(Uri.IsHexDigit);
     }
 
     private static void RequireObject(JsonElement element, string context)

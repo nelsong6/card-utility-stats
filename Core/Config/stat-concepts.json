@@ -3,11 +3,8 @@
   "concepts": {
     "activation": {
       "display": {
-        "type": "styled_text",
-        "value": "A",
-        "color": "#F4C95D",
-        "bold": true,
-        "size": 20
+        "type": "embedded_image",
+        "resource": "Assets.stat-activation.svg"
       },
       "help": {
         "label": "Activation",
@@ -16,11 +13,8 @@
     },
     "average": {
       "display": {
-        "type": "styled_text",
-        "value": "x̄",
-        "color": "#8FD3FF",
-        "bold": true,
-        "size": 20
+        "type": "embedded_image",
+        "resource": "Assets.stat-average.svg"
       },
       "help": {
         "label": "Average",
@@ -30,8 +24,7 @@
     "block": {
       "display": {
         "type": "game_resource",
-        "path": "res://images/ui/combat/block.png",
-        "size": 16
+        "path": "res://images/ui/combat/block.png"
       },
       "help": {
         "label": "Block",
@@ -41,8 +34,7 @@
     "card": {
       "display": {
         "type": "game_resource",
-        "path": "res://images/ui/reward_screen/reward_icon_card.png",
-        "size": 20
+        "path": "res://images/ui/reward_screen/reward_icon_card.png"
       },
       "help": {
         "label": "Card",
@@ -51,11 +43,8 @@
     },
     "charge": {
       "display": {
-        "type": "styled_text",
-        "value": "●³",
-        "color": "#7FD6FF",
-        "bold": true,
-        "size": 20
+        "type": "embedded_image",
+        "resource": "Assets.stat-charge.svg"
       },
       "help": {
         "label": "Charge",
@@ -65,8 +54,7 @@
     "combat": {
       "display": {
         "type": "game_resource",
-        "path": "res://images/atlases/ui_atlas.sprites/map/icons/map_monster.tres",
-        "size": 20
+        "path": "res://images/atlases/ui_atlas.sprites/map/icons/map_monster.tres"
       },
       "help": {
         "label": "Combat",
@@ -76,8 +64,7 @@
     "floor": {
       "display": {
         "type": "game_resource",
-        "path": "res://images/atlases/ui_atlas.sprites/top_bar/top_bar_floor.tres",
-        "size": 20
+        "path": "res://images/atlases/ui_atlas.sprites/top_bar/top_bar_floor.tres"
       },
       "help": {
         "label": "Floor",
@@ -87,8 +74,7 @@
     "healing_blocked": {
       "display": {
         "type": "embedded_image",
-        "resource": "Assets.healing-blocked.png",
-        "size": 20
+        "resource": "Assets.healing-blocked.png"
       },
       "help": {
         "label": "Healing blocked",
@@ -98,8 +84,7 @@
     "healing_gained": {
       "display": {
         "type": "game_resource",
-        "path": "res://images/atlases/power_atlas.sprites/regen_power.tres",
-        "size": 20
+        "path": "res://images/atlases/power_atlas.sprites/regen_power.tres"
       },
       "help": {
         "label": "Healing gained",
@@ -108,11 +93,8 @@
     },
     "information": {
       "display": {
-        "type": "styled_text",
-        "value": "ⓘ",
-        "color": "#94A0AE",
-        "bold": true,
-        "size": 16
+        "type": "embedded_image",
+        "resource": "Assets.stat-information.svg"
       },
       "help": {
         "label": "Information",
@@ -122,8 +104,7 @@
     "osty_summon_gained": {
       "display": {
         "type": "game_resource",
-        "path": "res://images/atlases/relic_atlas.sprites/bound_phylactery.tres",
-        "size": 20
+        "path": "res://images/atlases/relic_atlas.sprites/bound_phylactery.tres"
       },
       "help": {
         "label": "Osty summon gained",
@@ -132,11 +113,8 @@
     },
     "turn": {
       "display": {
-        "type": "styled_text",
-        "value": "↻",
-        "color": "#7FE0C3",
-        "bold": true,
-        "size": 20
+        "type": "embedded_image",
+        "resource": "Assets.stat-turn.svg"
       },
       "help": {
         "label": "Turn",
@@ -146,8 +124,7 @@
     "upgraded": {
       "display": {
         "type": "game_resource",
-        "path": "res://images/ui/cards/upgrade_preview/upgrade_arrow.png",
-        "size": 20
+        "path": "res://images/ui/cards/upgrade_preview/upgrade_arrow.png"
       },
       "help": {
         "label": "Upgraded",
