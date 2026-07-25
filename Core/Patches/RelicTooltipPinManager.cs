@@ -40,9 +40,11 @@ internal static class RelicTooltipPinManager
     private static NRelicInventoryHolder? _pinnedHolder;
     private static Control? _pinOwner;
     private static NHoverTipSet? _pinnedTipSet;
+    private static RichTextLabel? _pinnedStatsDescription;
     private static Texture2D? _lockTexture;
     private static bool _lockLoadAttempted;
     private static ulong _dismissedInputEventId;
+    private static string? _lastHintProbeSignature;
 
     public static void Attach(NRelicInventoryHolder? holder)
     {
@@ -128,6 +130,51 @@ internal static class RelicTooltipPinManager
         // dispatch and immediately create a new pin.
         _dismissedInputEventId = inputEvent.GetInstanceId();
         ClearPin(restoreOrdinaryHover: false);
+    }
+
+    /// <summary>
+    /// Observes the live pointer/BBCode state without changing any native
+    /// mouse filters. One movement over a pinned stats description tells us
+    /// both which Control Godot considers hovered and whether RichTextLabel
+    /// resolves a [hint] value at that exact position.
+    /// </summary>
+    internal static void ProbePinnedHint(InputEvent inputEvent)
+    {
+        if (inputEvent is not InputEventMouseMotion mouseMotion
+            || !IsLive(_pinnedStatsDescription)
+            || !_pinnedStatsDescription!.IsVisibleInTree())
+        {
+            return;
+        }
+
+        var description = _pinnedStatsDescription;
+        if (!description.GetGlobalRect().HasPoint(mouseMotion.Position))
+        {
+            _lastHintProbeSignature = null;
+            return;
+        }
+
+        var hovered = description.GetViewport()?.GuiGetHoveredControl();
+        var localPosition = description.GetLocalMousePosition();
+        var tooltip = description.GetTooltip(localPosition) ?? string.Empty;
+        var signature =
+            $"{hovered?.GetInstanceId() ?? 0}|{tooltip}";
+        if (string.Equals(signature, _lastHintProbeSignature, StringComparison.Ordinal))
+            return;
+
+        _lastHintProbeSignature = signature;
+        var hoveredDescription = hovered == null
+            ? "<none>"
+            : $"{hovered.GetType().Name}:{hovered.GetPath()}";
+        var tooltipDescription = string.IsNullOrEmpty(tooltip)
+            ? "<empty>"
+            : tooltip.Replace('\r', ' ').Replace('\n', ' ');
+        CoreMain.Logger.Info(
+            "Pinned hint probe: "
+            + $"hovered={hoveredDescription}, "
+            + $"description_filter={description.GetMouseFilterWithOverride()}, "
+            + $"local=({localPosition.X:F1},{localPosition.Y:F1}), "
+            + $"tooltip={tooltipDescription}");
     }
 
     internal static bool ShouldSuppressOrdinaryHoverTip(Control owner)
@@ -237,7 +284,21 @@ internal static class RelicTooltipPinManager
 
             _pinnedTipSet = tipSet;
             tipSet.SetAlignmentForRelic(holder.Relic);
-            NativeStatsHoverTipStyler.MakePinnedTipInteractive(tipSet);
+            _pinnedStatsDescription =
+                NativeStatsHoverTipStyler.GetLastStatsDescription(tipSet);
+            _lastHintProbeSignature = null;
+            if (IsLive(_pinnedStatsDescription))
+            {
+                CoreMain.Logger.Info(
+                    "Pinned hint probe armed: "
+                    + $"description_filter={_pinnedStatsDescription!.GetMouseFilterWithOverride()}, "
+                    + $"hint_markup={_pinnedStatsDescription.Text.Contains("[hint=", StringComparison.Ordinal)}");
+            }
+            else
+            {
+                CoreMain.Logger.Info(
+                    "Pinned hint probe armed: stats description not found.");
+            }
             AddLockIcon(holder);
             CoreMain.LogDebug(
                 $"Pinned relic tooltip: {holder.Relic.Model.Id}");
@@ -257,6 +318,8 @@ internal static class RelicTooltipPinManager
         _pinnedHolder = null;
         _pinOwner = null;
         _pinnedTipSet = null;
+        _pinnedStatsDescription = null;
+        _lastHintProbeSignature = null;
 
         if (IsLive(pinOwner))
         {

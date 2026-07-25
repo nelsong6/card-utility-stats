@@ -119,57 +119,15 @@ internal static class NativeStatsHoverTipStyler
         AddBrand(statsTip);
     }
 
-    public static void MakePinnedTipInteractive(NHoverTipSet tipSet)
+    public static RichTextLabel? GetLastStatsDescription(NHoverTipSet tipSet)
     {
         var container = tipSet._textHoverTipContainer;
-        if (container == null || container.GetChildCount() == 0) return;
+        if (container == null || container.GetChildCount() == 0) return null;
 
         if (container.GetChild(container.GetChildCount() - 1) is not Control statsTip)
-            return;
+            return null;
 
-        var description = statsTip.GetNodeOrNull<Control>("%Description");
-        if (description == null) return;
-
-        // The native hover-tip scene is intentionally display-only: its root,
-        // TextContainer, VBoxContainer, and Description all ship with
-        // mouse_filter=Ignore. Make only the SpireLens description an input
-        // target. Decorative siblings such as the panel background must stay
-        // inert, while every Control on the route to the RichTextLabel must
-        // pass pointer input through.
-        MakeControlTreeMouseInert(statsTip);
-
-        Node? current = description.GetParent();
-        while (current != null)
-        {
-            if (current is Control control)
-                EnableMouseInput(control, Control.MouseFilterEnum.Pass);
-
-            if (ReferenceEquals(current, tipSet))
-                break;
-
-            current = current.GetParent();
-        }
-
-        EnableMouseInput(description, Control.MouseFilterEnum.Stop);
-    }
-
-    private static void MakeControlTreeMouseInert(Node root)
-    {
-        if (root is Control control)
-            EnableMouseInput(control, Control.MouseFilterEnum.Ignore);
-
-        foreach (var child in root.GetChildren())
-            MakeControlTreeMouseInert(child);
-    }
-
-    private static void EnableMouseInput(
-        Control control,
-        Control.MouseFilterEnum mouseFilter)
-    {
-        // Enabled explicitly overrides any recursive mouse-disable setting on
-        // an ancestor in the game's display-only hover-tip layer.
-        control.MouseBehaviorRecursive = Control.MouseBehaviorRecursiveEnum.Enabled;
-        control.MouseFilter = mouseFilter;
+        return statsTip.GetNodeOrNull<RichTextLabel>("%Description");
     }
 
     private static void AddBrand(Control statsTip)
