@@ -237,7 +237,7 @@ internal static class StatConceptGlossary
                 ?? throw new InvalidOperationException(
                     $"ResourceLoader could not load '{concept.Display.Value}'.");
             using var sourceImage = sourceTexture.GetImage();
-            const float visibleAlphaThreshold = 0.1f;
+            const float visibleAlphaThreshold = 0.5f;
             var usedRect = FindVisiblePixelBounds(
                 sourceImage,
                 visibleAlphaThreshold,
