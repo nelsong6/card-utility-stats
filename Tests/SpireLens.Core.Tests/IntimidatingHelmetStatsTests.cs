@@ -110,9 +110,13 @@ public class IntimidatingHelmetStatsTests
         var body = BuildBody(BuildPopulatedAggregate());
 
         Assert.Contains("Cards played costing 2+", body);
-        Assert.Contains("[img=16x16]res://images/ui/combat/block.png[/img] block gained", body);
-        Assert.Contains("[img=16x16]res://images/ui/combat/block.png[/img] avg block per turn", body);
-        Assert.Contains("[img=16x16]res://images/ui/combat/block.png[/img] avg block per combat", body);
+        Assert.Contains("[hint=\"Block:", body);
+        Assert.Contains("[hint=\"Average:", body);
+        Assert.Contains("[hint=\"Turn:", body);
+        Assert.Contains("[hint=\"Combat:", body);
+        Assert.Contains("block gained", body);
+        Assert.Contains("avg block per turn", body);
+        Assert.Contains("avg block per combat", body);
         Assert.Contains("[b]6[/b]", body);
         Assert.Contains("[b]30[/b]", body);
         Assert.Contains("[b]3.75[/b]", body);

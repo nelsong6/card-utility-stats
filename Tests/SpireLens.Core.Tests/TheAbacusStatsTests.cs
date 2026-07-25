@@ -79,7 +79,8 @@ public class TheAbacusStatsTests
         var body = (string)(BuildTheAbacusBodyMethod.Invoke(null, new object?[] { agg })
             ?? throw new InvalidOperationException("BuildTheAbacusBodyBBCode returned null."));
 
-        Assert.Contains("[img=16x16]res://images/ui/combat/block.png[/img] block gained", body);
+        Assert.Contains("[hint=\"Block:", body);
+        Assert.Contains("block gained", body);
         Assert.Contains("[b]12[/b]", body);
     }
 

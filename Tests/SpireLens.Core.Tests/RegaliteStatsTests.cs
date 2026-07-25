@@ -117,9 +117,13 @@ public class RegaliteStatsTests
         });
 
         Assert.Contains("Cards created", body);
-        Assert.Contains("[img=16x16]res://images/ui/combat/block.png[/img] block gained", body);
-        Assert.Contains("[img=16x16]res://images/ui/combat/block.png[/img] avg block per turn", body);
-        Assert.Contains("[img=16x16]res://images/ui/combat/block.png[/img] avg block per combat", body);
+        Assert.Contains("[hint=\"Block:", body);
+        Assert.Contains("[hint=\"Average:", body);
+        Assert.Contains("[hint=\"Turn:", body);
+        Assert.Contains("[hint=\"Combat:", body);
+        Assert.Contains("block gained", body);
+        Assert.Contains("avg block per turn", body);
+        Assert.Contains("avg block per combat", body);
         Assert.Contains("[b]6[/b]", body);
         Assert.Contains("[b]12[/b]", body);
         Assert.Contains("[b]3[/b]", body);

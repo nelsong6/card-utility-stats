@@ -83,8 +83,10 @@ public class PermafrostStatsTests
 
         Assert.Contains("Combats triggered", body);
         Assert.Contains("Avg times triggered per combat", body);
-        Assert.Contains("[img=16x16]res://images/ui/combat/block.png[/img] block gained", body);
-        Assert.Contains("[img=16x16]res://images/ui/combat/block.png[/img] block gained per combat", body);
+        Assert.Contains("[hint=\"Block:", body);
+        Assert.Contains("[hint=\"Combat:", body);
+        Assert.Contains("block gained", body);
+        Assert.Contains("block gained per combat", body);
         Assert.Contains("[b]2[/b]", body);
         Assert.Contains("[b]0.4[/b]", body);
         Assert.Contains("[b]15[/b]", body);

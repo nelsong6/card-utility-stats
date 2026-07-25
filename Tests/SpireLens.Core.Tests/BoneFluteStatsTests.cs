@@ -75,7 +75,8 @@ public class BoneFluteStatsTests
 
         Assert.Contains("Times triggered", body);
         Assert.Contains("[b]2[/b]", body);
-        Assert.Contains("[img=16x16]res://images/ui/combat/block.png[/img] block gained", body);
+        Assert.Contains("[hint=\"Block:", body);
+        Assert.Contains("block gained", body);
         Assert.Contains("[b]14[/b]", body);
     }
 

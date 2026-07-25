@@ -317,7 +317,8 @@ public class UnlimitedAttackChargeRelicStatsTests
         });
         Assert.Contains("Attacks played", ornamentalFanBody);
         Assert.Contains("Activations", ornamentalFanBody);
-        Assert.Contains("[img=16x16]res://images/ui/combat/block.png[/img] block gained", ornamentalFanBody);
+        Assert.Contains("[hint=\"Block:", ornamentalFanBody);
+        Assert.Contains("block gained", ornamentalFanBody);
         Assert.Contains("block gained per activation", ornamentalFanBody);
         Assert.Contains("Turns ended at 0 charges", ornamentalFanBody);
         Assert.Contains("Turns ended at 1 charge", ornamentalFanBody);

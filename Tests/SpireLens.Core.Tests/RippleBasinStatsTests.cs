@@ -115,13 +115,18 @@ public class RippleBasinStatsTests
 
         Assert.Contains("Activations", body);
         Assert.Contains("[b]3[/b]", body);
-        Assert.Contains("[img=16x16]res://images/ui/combat/block.png[/img] block gained", body);
+        Assert.Contains("[hint=\"Block:", body);
+        Assert.Contains("block gained", body);
         Assert.Contains("[b]12[/b]", body);
-        Assert.Contains("[img=16x16]res://images/ui/combat/block.png[/img] block gained per activation", body);
+        Assert.Contains("[hint=\"Activation:", body);
+        Assert.Contains("block gained per activation", body);
         Assert.Contains("[b]4[/b]", body);
-        Assert.Contains("[img=16x16]res://images/ui/combat/block.png[/img] avg block gained per turn", body);
+        Assert.Contains("[hint=\"Average:", body);
+        Assert.Contains("[hint=\"Turn:", body);
+        Assert.Contains("avg block gained per turn", body);
         Assert.Contains("[b]2[/b]", body);
-        Assert.Contains("[img=16x16]res://images/ui/combat/block.png[/img] avg block gained per combat", body);
+        Assert.Contains("[hint=\"Combat:", body);
+        Assert.Contains("avg block gained per combat", body);
         Assert.Contains("[b]6[/b]", body);
     }
 

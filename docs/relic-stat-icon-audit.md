@@ -108,11 +108,16 @@ should remain text.
 
 Progress:
 
-- activation and trigger totals now use the activation symbol and a full-row
-  information hint throughout the relic-stat renderer
-- Sturdy Clamp is the initial multi-concept example
+- every ordinary relic-stat row now receives a left-side information hint
+- every ordinary relic-stat row is matched against all currently available
+  glossary concepts; recognized repeated wording is replaced with the
+  corresponding hinted symbols in its original order
+- existing non-glossary native icons such as Energy, Draw, Vulnerable, Weak,
+  and effect icons remain visible alongside the glossary symbols
+- explicitly authored concept rows remain available for descriptions that need
+  more specificity than the shared row vocabulary
 
-The information description should be authored at the call site. It should
-not be generated from the visible label: the full sentence often needs to say
-what was counted, what the denominator is, and whether the value is attempted,
-successful, blocked, current-combat, or lifetime.
+The shared vocabulary supplies a readable fallback information description for
+every row. Rows whose meaning depends on attempted versus successful outcomes,
+blocked values, current-combat state, or another special denominator should
+override that fallback with an authored sentence at the call site.

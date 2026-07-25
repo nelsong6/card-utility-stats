@@ -1713,7 +1713,12 @@ public static class RelicHoverShowPatch
                 continue;
             }
 
-            sb.Append($"[color=#e0e0e0]Card reward {screenNumber}[/color]\n");
+            Row3(
+                sb,
+                $"Card reward {screenNumber}",
+                string.Empty,
+                "",
+                $"The cards offered in Silver Crucible reward {screenNumber}.");
             foreach (var card in cards)
             {
                 if (card == null) continue;
@@ -1738,13 +1743,12 @@ public static class RelicHoverShowPatch
         string displayName,
         string outcome)
     {
-        // Card names need substantially more room than ordinary numeric stat
-        // values. Keeping them out of Row3's narrow middle column prevents
-        // multi-word names such as Grave Warden from wrapping and staggering.
-        sb.Append("[table=2]");
-        sb.Append($"[cell expand=4 padding=12,0,12,0][b]{displayName}[/b][/cell]");
-        sb.Append($"[cell expand=2 padding=0,0,4,0][right][color=#b5b5b5]{outcome}[/color][/right][/cell]");
-        sb.Append("[/table]\n");
+        DescribedIconFlowRow(
+            sb,
+            ["card"],
+            $"[b]{displayName}[/b]",
+            outcome,
+            $"This card was offered by Silver Crucible and was {outcome}.");
     }
 
     private static string BuildOrreryBodyBBCode(RelicAggregate agg)
@@ -2358,8 +2362,9 @@ public static class RelicHoverShowPatch
             var reasonName = string.IsNullOrWhiteSpace(reason.DisplayName)
                 ? "other/prevented causes"
                 : StatsTooltip.EscapeBbcode(reason.DisplayName);
-            DetailedTextRow(
+            DescribedIconRow(
                 sb,
+                ["healing_blocked"],
                 $"blocked by {reasonName}",
                 FormatDecimal(reason.Amount),
                 $"Burning Blood healing that did not restore HP because of {reasonName}.");
@@ -3040,7 +3045,8 @@ public static class RelicHoverShowPatch
                 sb,
                 BrilliantScarfCostLabel(energyCost, starCost: 0),
                 BrilliantScarfCostCount(agg, energyCost, starCost: 0).ToString(),
-                "");
+                "",
+                BrilliantScarfCostDescription(energyCost, starCost: 0));
         }
 
         foreach (var bucket in DynamicBrilliantScarfCostBuckets(agg))
@@ -3049,7 +3055,8 @@ public static class RelicHoverShowPatch
                 sb,
                 BrilliantScarfCostLabel(bucket.EnergyCost, bucket.StarCost),
                 bucket.Count.ToString(),
-                "");
+                "",
+                BrilliantScarfCostDescription(bucket.EnergyCost, bucket.StarCost));
         }
 
         return sb.ToString();
@@ -3238,10 +3245,15 @@ public static class RelicHoverShowPatch
                      .ThenBy(r => r.DisplayName))
         {
             if (reason.Amount <= 0m) continue;
-            var label = string.IsNullOrWhiteSpace(reason.DisplayName)
-                ? $"{reasonPrefix} other/prevented"
-                : $"{reasonPrefix} {StatsTooltip.EscapeBbcode(reason.DisplayName)}";
-            Row3(sb, label, FormatDecimal(reason.Amount), "");
+            var reasonName = string.IsNullOrWhiteSpace(reason.DisplayName)
+                ? "other/prevented causes"
+                : StatsTooltip.EscapeBbcode(reason.DisplayName);
+            DescribedIconRow(
+                sb,
+                ["healing_blocked"],
+                $"{reasonPrefix} {reasonName}",
+                FormatDecimal(reason.Amount),
+                $"Healing from this relic that did not restore HP because of {reasonName}.");
         }
     }
 
@@ -3354,6 +3366,17 @@ public static class RelicHoverShowPatch
         return $"{Math.Max(0, energyCost)} {energyIcon} cost reduced";
     }
 
+    private static string BrilliantScarfCostDescription(int energyCost, int starCost)
+    {
+        var normalizedEnergy = Math.Max(0, energyCost);
+        var normalizedStars = Math.Max(0, starCost);
+        var starPart = normalizedStars > 0
+            ? $" and {normalizedStars} Star{(normalizedStars == 1 ? string.Empty : "s")}"
+            : string.Empty;
+        return $"Cards discounted by Brilliant Scarf with a cost of "
+               + $"{normalizedEnergy} Energy{starPart}.";
+    }
+
     private static int BrilliantScarfCostCount(RelicAggregate agg, int energyCost, int starCost)
     {
         if (agg.DiscountedCardCosts == null) return 0;
@@ -3462,19 +3485,33 @@ public static class RelicHoverShowPatch
             : $"res://{path.TrimStart('/')}";
     }
 
-    private static void Row3(StringBuilder sb, string label, string value, string pct)
+    private static void Row3(
+        StringBuilder sb,
+        string label,
+        string value,
+        string pct,
+        string? fullDescription = null)
     {
-        if (VisibleTextLength(label) > MaxTableLabelVisibleChars)
+        var presentation = RelicStatRowVocabulary.Create(label, fullDescription);
+        if (VisibleTextLength(presentation.Label) > MaxTableLabelVisibleChars)
         {
-            RowFlow(sb, label, value, pct);
+            DescribedIconFlowRow(
+                sb,
+                presentation.ConceptIds,
+                presentation.Label,
+                value,
+                presentation.FullDescription,
+                pct);
             return;
         }
 
-        sb.Append("[table=3]");
-        sb.Append($"[cell expand=4 padding=0,0,12,0][color=#e0e0e0]{label}[/color][/cell]");
-        sb.Append($"[cell expand=1 padding=0,0,12,0][right][b]{value}[/b][/right][/cell]");
-        sb.Append($"[cell expand=1 padding=0,0,4,0][right][color=#b5b5b5]{pct}[/color][/right][/cell]");
-        sb.Append("[/table]\n");
+        DescribedIconRow(
+            sb,
+            presentation.ConceptIds,
+            presentation.Label,
+            value,
+            presentation.FullDescription,
+            pct);
     }
 
     private static void ConceptRow(
@@ -3518,41 +3555,39 @@ public static class RelicHoverShowPatch
         sb.Append(StatConceptGlossary.RenderInformationHint(fullDescription));
         sb.Append("[/cell]");
         sb.Append("[cell expand=4 padding=0,0,12,0]");
-        for (var i = 0; i < conceptIds.Count; i++)
-        {
-            if (i > 0) sb.Append(' ');
-            sb.Append(StatConceptGlossary.RenderHintedGlyph(conceptIds[i]));
-        }
-        if (!string.IsNullOrWhiteSpace(label))
-        {
-            if (conceptIds.Count > 0) sb.Append(' ');
-            sb.Append($"[color=#e0e0e0]{label}[/color]");
-        }
+        AppendConceptLabel(sb, conceptIds, label);
         sb.Append("[/cell]");
         sb.Append($"[cell expand=1 padding=0,0,12,0][right][b]{value}[/b][/right][/cell]");
         sb.Append($"[cell expand=1 padding=0,0,4,0][right][color=#b5b5b5]{pct}[/color][/right][/cell]");
         sb.Append("[/table]\n");
     }
 
-    private static void DetailedTextRow(
+    private static void RowFlow(StringBuilder sb, string label, string value, string pct)
+    {
+        var presentation = RelicStatRowVocabulary.Create(label);
+        DescribedIconFlowRow(
+            sb,
+            presentation.ConceptIds,
+            presentation.Label,
+            value,
+            presentation.FullDescription,
+            pct);
+    }
+
+    private static void DescribedIconFlowRow(
         StringBuilder sb,
+        IReadOnlyList<string> conceptIds,
         string label,
         string value,
         string fullDescription,
         string pct = "")
     {
-        DescribedIconRow(
-            sb,
-            Array.Empty<string>(),
-            label,
-            value,
-            fullDescription,
-            pct);
-    }
-
-    private static void RowFlow(StringBuilder sb, string label, string value, string pct)
-    {
-        sb.Append($"[color=#e0e0e0]{label}[/color]");
+        sb.Append("[table=2]");
+        sb.Append("[cell expand=0 padding=0,0,10,0]");
+        sb.Append(StatConceptGlossary.RenderInformationHint(fullDescription));
+        sb.Append("[/cell]");
+        sb.Append("[cell expand=4 padding=0,0,4,0]");
+        AppendConceptLabel(sb, conceptIds, label);
         if (!string.IsNullOrEmpty(value))
         {
             sb.Append($"  [b]{value}[/b]");
@@ -3561,7 +3596,25 @@ public static class RelicHoverShowPatch
         {
             sb.Append($"  [color=#b5b5b5]{pct}[/color]");
         }
-        sb.Append('\n');
+        sb.Append("[/cell]");
+        sb.Append("[/table]\n");
+    }
+
+    private static void AppendConceptLabel(
+        StringBuilder sb,
+        IReadOnlyList<string> conceptIds,
+        string label)
+    {
+        for (var index = 0; index < conceptIds.Count; index++)
+        {
+            if (index > 0) sb.Append(' ');
+            sb.Append(StatConceptGlossary.RenderHintedGlyph(conceptIds[index]));
+        }
+
+        if (string.IsNullOrWhiteSpace(label)) return;
+
+        if (conceptIds.Count > 0) sb.Append(' ');
+        sb.Append($"[color=#e0e0e0]{label}[/color]");
     }
 
     private static int VisibleTextLength(string bbcode)
