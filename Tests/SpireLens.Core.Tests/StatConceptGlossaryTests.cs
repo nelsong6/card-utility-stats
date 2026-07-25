@@ -12,12 +12,14 @@ public class StatConceptGlossaryTests
             [
                 "activation",
                 "average",
+                "block",
                 "card",
                 "charge",
                 "combat",
                 "floor",
                 "healing_blocked",
                 "healing_gained",
+                "information",
                 "osty_summon_gained",
                 "turn",
                 "upgraded",
@@ -39,12 +41,14 @@ public class StatConceptGlossaryTests
     {
         var activation = StatConceptGlossary.RenderHintedGlyph("activation");
         var average = StatConceptGlossary.RenderHintedGlyph("average");
+        var block = StatConceptGlossary.RenderHintedGlyph("block");
         var card = StatConceptGlossary.RenderHintedGlyph("card");
         var charge = StatConceptGlossary.RenderHintedGlyph("charge");
         var combat = StatConceptGlossary.RenderHintedGlyph("combat");
         var floor = StatConceptGlossary.RenderHintedGlyph("floor");
         var healingBlocked = StatConceptGlossary.RenderHintedGlyph("healing_blocked");
         var healingGained = StatConceptGlossary.RenderHintedGlyph("healing_gained");
+        var informationConcept = StatConceptGlossary.RenderHintedGlyph("information");
         var summon = StatConceptGlossary.RenderHintedGlyph("osty_summon_gained");
         var turn = StatConceptGlossary.RenderHintedGlyph("turn");
         var upgraded = StatConceptGlossary.RenderHintedGlyph("upgraded");
@@ -55,6 +59,8 @@ public class StatConceptGlossaryTests
         Assert.Contains("[color=#F4C95D][b]A[/b][/color]", activation);
         Assert.Contains("[hint=\"Average:", average);
         Assert.Contains("[color=#8FD3FF][b]x̄[/b][/color]", average);
+        Assert.Contains("[hint=\"Block:", block);
+        Assert.Contains("res://images/ui/combat/block.png", block);
         Assert.Contains("[hint=\"Card:", card);
         Assert.Contains("res://images/ui/reward_screen/reward_icon_card.png", card);
         Assert.Contains("[hint=\"Charge:", charge);
@@ -80,6 +86,8 @@ public class StatConceptGlossaryTests
         Assert.Contains(
             "res://images/atlases/power_atlas.sprites/regen_power.tres",
             healingGained);
+        Assert.Contains("[hint=\"Information:", informationConcept);
+        Assert.Contains("[color=#94A0AE][b]ⓘ[/b][/color]", informationConcept);
         Assert.Contains(
             "res://images/atlases/relic_atlas.sprites/bound_phylactery.tres",
             summon);

@@ -95,7 +95,27 @@ internal static class StatConceptGlossary
         }
 
         var size = Math.Clamp(sizeOverride ?? concept.Display.Size, 8, 64);
-        var rawGlyph = concept.Display.Type switch
+        var rawGlyph = RenderGlyph(concept, size);
+        var hint = EscapeHint($"{concept.Label}: {concept.Description}");
+        return $"[hint=\"{hint}\"]{rawGlyph}[/hint]";
+    }
+
+    public static string RenderInformationHint(string rowDescription)
+    {
+        var hint = EscapeHint(rowDescription);
+        if (!TryGet("information", out var concept))
+        {
+            return $"[hint=\"{hint}\"][font_size=16][color={InformationColor}]"
+                   + "[b]ⓘ[/b][/color][/font_size][/hint]";
+        }
+
+        var size = Math.Clamp(concept.Display.Size, 8, 64);
+        return $"[hint=\"{hint}\"]{RenderGlyph(concept, size)}[/hint]";
+    }
+
+    private static string RenderGlyph(StatConcept concept, int size)
+    {
+        return concept.Display.Type switch
         {
             StatConceptDisplayType.StyledText =>
                 RenderStyledText(concept.Display, size),
@@ -107,15 +127,6 @@ internal static class StatConceptGlossary
                 RenderEmbeddedImage(concept, size),
             _ => StatsTooltip.EscapeBbcode(concept.Label),
         };
-        var hint = EscapeHint($"{concept.Label}: {concept.Description}");
-        return $"[hint=\"{hint}\"]{rawGlyph}[/hint]";
-    }
-
-    public static string RenderInformationHint(string rowDescription)
-    {
-        var hint = EscapeHint(rowDescription);
-        return $"[hint=\"{hint}\"][font_size=16][color={InformationColor}]"
-               + "[b]ⓘ[/b][/color][/font_size][/hint]";
     }
 
     private static string RenderStyledText(StatConceptDisplay display, int size)

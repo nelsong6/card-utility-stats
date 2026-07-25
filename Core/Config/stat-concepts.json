@@ -27,6 +27,17 @@
         "description": "A mean value: the total divided by the relevant number of turns, combats, floors, or activations."
       }
     },
+    "block": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/ui/combat/block.png",
+        "size": 20
+      },
+      "help": {
+        "label": "Block",
+        "description": "Block gained, retained, spent, or otherwise measured by a stat."
+      }
+    },
     "card": {
       "display": {
         "type": "game_resource",
@@ -93,6 +104,19 @@
       "help": {
         "label": "Healing gained",
         "description": "HP successfully restored by a healing effect."
+      }
+    },
+    "information": {
+      "display": {
+        "type": "styled_text",
+        "value": "ⓘ",
+        "color": "#94A0AE",
+        "bold": true,
+        "size": 16
+      },
+      "help": {
+        "label": "Information",
+        "description": "Hover this symbol beside a stat to read the row's full description."
       }
     },
     "osty_summon_gained": {

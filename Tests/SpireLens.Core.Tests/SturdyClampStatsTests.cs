@@ -151,7 +151,11 @@ public class SturdyClampStatsTests
 
         Assert.True(recognized);
         Assert.Equal("Sturdy Clamp", title);
-        Assert.Contains("avg block retained per turn", body);
+        Assert.Contains("Average block retained by Sturdy Clamp per turn.", body);
+        Assert.Contains("Average block above 10 retained by Sturdy Clamp per combat.", body);
+        Assert.Contains("res://images/ui/combat/block.png", body);
+        Assert.Contains("retained", body);
+        Assert.Contains("excess over 10", body);
     }
 
     [Fact]

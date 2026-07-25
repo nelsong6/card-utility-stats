@@ -1902,10 +1902,30 @@ public static class RelicHoverShowPatch
             ? 0m
             : (decimal)agg.SturdyClampExcessBlockOverTen / agg.SturdyClampCombats;
 
-        Row3(sb, BlockLabel("avg block retained per turn"), FormatDecimal(blockRetainedPerTurn), "");
-        Row3(sb, BlockLabel("avg block retained per combat"), FormatDecimal(blockRetainedPerCombat), "");
-        Row3(sb, BlockLabel("avg excess block over 10 per turn"), FormatDecimal(excessBlockPerTurn), "");
-        Row3(sb, BlockLabel("avg excess block over 10 per combat"), FormatDecimal(excessBlockPerCombat), "");
+        DescribedIconRow(
+            sb,
+            ["average", "block", "turn"],
+            "retained",
+            FormatDecimal(blockRetainedPerTurn),
+            "Average block retained by Sturdy Clamp per turn.");
+        DescribedIconRow(
+            sb,
+            ["average", "block", "combat"],
+            "retained",
+            FormatDecimal(blockRetainedPerCombat),
+            "Average block retained by Sturdy Clamp per combat.");
+        DescribedIconRow(
+            sb,
+            ["average", "block", "turn"],
+            "excess over 10",
+            FormatDecimal(excessBlockPerTurn),
+            "Average block above 10 retained by Sturdy Clamp per turn.");
+        DescribedIconRow(
+            sb,
+            ["average", "block", "combat"],
+            "excess over 10",
+            FormatDecimal(excessBlockPerCombat),
+            "Average block above 10 retained by Sturdy Clamp per combat.");
         return sb.ToString();
     }
 
@@ -3446,12 +3466,38 @@ public static class RelicHoverShowPatch
         string fullDescription,
         string pct = "")
     {
+        DescribedIconRow(
+            sb,
+            [conceptId],
+            string.Empty,
+            value,
+            fullDescription,
+            pct);
+    }
+
+    private static void DescribedIconRow(
+        StringBuilder sb,
+        IReadOnlyList<string> conceptIds,
+        string label,
+        string value,
+        string fullDescription,
+        string pct = "")
+    {
         sb.Append("[table=4]");
         sb.Append("[cell expand=0 padding=0,0,10,0]");
         sb.Append(StatConceptGlossary.RenderInformationHint(fullDescription));
         sb.Append("[/cell]");
         sb.Append("[cell expand=4 padding=0,0,12,0]");
-        sb.Append(StatConceptGlossary.RenderHintedGlyph(conceptId));
+        for (var i = 0; i < conceptIds.Count; i++)
+        {
+            if (i > 0) sb.Append(' ');
+            sb.Append(StatConceptGlossary.RenderHintedGlyph(conceptIds[i]));
+        }
+        if (!string.IsNullOrWhiteSpace(label))
+        {
+            if (conceptIds.Count > 0) sb.Append(' ');
+            sb.Append($"[color=#e0e0e0]{label}[/color]");
+        }
         sb.Append("[/cell]");
         sb.Append($"[cell expand=1 padding=0,0,12,0][right][b]{value}[/b][/right][/cell]");
         sb.Append($"[cell expand=1 padding=0,0,4,0][right][color=#b5b5b5]{pct}[/color][/right][/cell]");
@@ -3465,14 +3511,13 @@ public static class RelicHoverShowPatch
         string fullDescription,
         string pct = "")
     {
-        sb.Append("[table=4]");
-        sb.Append("[cell expand=0 padding=0,0,10,0]");
-        sb.Append(StatConceptGlossary.RenderInformationHint(fullDescription));
-        sb.Append("[/cell]");
-        sb.Append($"[cell expand=4 padding=0,0,12,0][color=#e0e0e0]{label}[/color][/cell]");
-        sb.Append($"[cell expand=1 padding=0,0,12,0][right][b]{value}[/b][/right][/cell]");
-        sb.Append($"[cell expand=1 padding=0,0,4,0][right][color=#b5b5b5]{pct}[/color][/right][/cell]");
-        sb.Append("[/table]\n");
+        DescribedIconRow(
+            sb,
+            Array.Empty<string>(),
+            label,
+            value,
+            fullDescription,
+            pct);
     }
 
     private static void RowFlow(StringBuilder sb, string label, string value, string pct)
