@@ -1005,6 +1005,9 @@ Important surfaces:
   another transient set for that same holder are suppressed. The surrogate,
   its mouse-input signal, and the lock badge are all removed during Core
   shutdown so hot reload cannot leave callbacks from an orphaned assembly.
+  Pointer motion is the only input that preserves a pin: the stable Loader
+  input postfix dismisses it before the next mouse, keyboard, or controller
+  action continues through the game's normal input path.
 - `StatsTooltip` only constructs the native `HoverTip` value and escapes
   dynamic BBCode. It also wraps the stats description in the established 20px
   body size. It must not retain a `Control`, create a scene-root panel, position

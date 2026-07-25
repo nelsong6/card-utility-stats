@@ -42,6 +42,7 @@ internal static class RelicTooltipPinManager
     private static NHoverTipSet? _pinnedTipSet;
     private static Texture2D? _lockTexture;
     private static bool _lockLoadAttempted;
+    private static ulong _dismissedInputEventId;
 
     public static void Attach(NRelicInventoryHolder? holder)
     {
@@ -101,6 +102,25 @@ internal static class RelicTooltipPinManager
         Subscriptions.Clear();
         _lockTexture = null;
         _lockLoadAttempted = false;
+        _dismissedInputEventId = 0;
+    }
+
+    /// <summary>
+    /// A pin exists only to let the pointer travel from the relic into its
+    /// stats page. Pointer motion is therefore allowed, but the next actual
+    /// mouse, keyboard, or controller action dismisses the pin without
+    /// consuming the action that the game is about to handle.
+    /// </summary>
+    internal static void DismissOnGlobalAction(InputEvent inputEvent)
+    {
+        if (_pinnedHolder == null || !IsDismissAction(inputEvent))
+            return;
+
+        // _Input runs before _GuiInput. Remember the event so a right click
+        // that dismissed a pin cannot reach a relic holder later in the same
+        // dispatch and immediately create a new pin.
+        _dismissedInputEventId = inputEvent.GetInstanceId();
+        ClearPin(restoreOrdinaryHover: false);
     }
 
     internal static bool ShouldSuppressOrdinaryHoverTip(Control owner)
@@ -139,6 +159,13 @@ internal static class RelicTooltipPinManager
                 Pressed: true,
             })
         {
+            return;
+        }
+
+        if (_dismissedInputEventId == inputEvent.GetInstanceId())
+        {
+            _dismissedInputEventId = 0;
+            holder.GetViewport()?.SetInputAsHandled();
             return;
         }
 
@@ -308,6 +335,22 @@ internal static class RelicTooltipPinManager
             ClearPin(restoreOrdinaryHover: false);
 
         Subscriptions.Remove(instanceId);
+    }
+
+    private static bool IsDismissAction(InputEvent inputEvent)
+    {
+        return inputEvent switch
+        {
+            InputEventMouseButton mouseButton => mouseButton.Pressed,
+            InputEventKey key => key.Pressed && !key.Echo,
+            InputEventJoypadButton button => button.Pressed,
+            InputEventJoypadMotion motion => Math.Abs(motion.AxisValue) >= 0.5f,
+            InputEventScreenTouch touch => touch.Pressed,
+            InputEventScreenDrag => true,
+            InputEventGesture => true,
+            InputEventAction action => action.Pressed,
+            _ => false,
+        };
     }
 
     private static bool IsLive(GodotObject? instance)
