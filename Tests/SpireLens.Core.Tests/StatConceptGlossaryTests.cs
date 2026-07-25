@@ -34,6 +34,9 @@ public class StatConceptGlossaryTests
         Assert.Equal(
             StatConceptDisplayType.GameResource,
             StatConceptGlossary.Concepts.Single(concept => concept.Id == "healing_gained").Display.Type);
+        Assert.Equal(
+            40,
+            StatConceptGlossary.Concepts.Single(concept => concept.Id == "combat").Display.Size);
     }
 
     [Fact]

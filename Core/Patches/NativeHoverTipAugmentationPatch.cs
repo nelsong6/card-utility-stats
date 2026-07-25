@@ -116,6 +116,13 @@ internal static class NativeStatsHoverTipStyler
         if (background != null)
             background.SelfModulate = PanelTint;
 
+        // Godot underlines [hint] spans with a dotted rule by default. The
+        // symbols already communicate interactivity, so retain their hover
+        // hints without adding that visual noise to every stats row.
+        var description = statsTip.GetNodeOrNull<RichTextLabel>("%Description");
+        if (description != null)
+            description.HintUnderlined = false;
+
         AddBrand(statsTip);
     }
 

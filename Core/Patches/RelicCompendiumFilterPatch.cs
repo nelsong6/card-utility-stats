@@ -852,6 +852,7 @@ internal static class RelicCompendiumFilterUi
             Text = $"[center]{StatConceptGlossary.RenderHintedGlyph(concept.Id, 36)}[/center]",
             FitContent = true,
             ScrollActive = false,
+            HintUnderlined = false,
             MouseFilter = Control.MouseFilterEnum.Stop,
             CustomMinimumSize = new Vector2(68f, 54f),
             SizeFlagsVertical = Control.SizeFlags.ShrinkCenter,
