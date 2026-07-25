@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
+using Godot;
 
 namespace SpireLens.Core;
 
@@ -10,11 +11,23 @@ internal enum StatConceptDisplayType
     StyledText,
     GameResource,
     GameResourceGroup,
+    GameResourceOverlay,
 }
 
 internal sealed record StatConceptResource(
     string Path,
     decimal Scale);
+
+internal enum StatConceptOverlayAnchor
+{
+    LowerRight,
+}
+
+internal sealed record StatConceptOverlay(
+    string BasePath,
+    string OverlayPath,
+    decimal OverlayScale,
+    StatConceptOverlayAnchor Anchor);
 
 internal sealed record StatConceptDisplay(
     StatConceptDisplayType Type,
@@ -22,7 +35,8 @@ internal sealed record StatConceptDisplay(
     string Color,
     bool Bold,
     int Size,
-    IReadOnlyList<StatConceptResource> Resources);
+    IReadOnlyList<StatConceptResource> Resources,
+    StatConceptOverlay? Overlay);
 
 internal sealed record StatConcept(
     string Id,
@@ -41,9 +55,13 @@ internal static class StatConceptGlossary
     private const int SupportedSchemaVersion = 1;
     private const int DefaultGlyphSize = 20;
     private const string InformationColor = "#94A0AE";
+    private const string GeneratedIconDirectory = "user://SpireLens/generated-icons";
 
     private static readonly IReadOnlyDictionary<string, StatConcept> ConceptsById =
         LoadConcepts();
+    private static readonly Dictionary<string, string> GeneratedOverlayPaths =
+        new(StringComparer.OrdinalIgnoreCase);
+    private static readonly List<ImageTexture> GeneratedOverlayTextures = [];
 
     public static IReadOnlyList<StatConcept> Concepts { get; } =
         ConceptsById.Values
@@ -53,7 +71,10 @@ internal static class StatConceptGlossary
 
     public static void Initialize()
     {
-        CoreMain.Logger.Info($"Stat concept glossary loaded: concepts={Concepts.Count}");
+        BuildOverlayResources();
+        CoreMain.Logger.Info(
+            $"Stat concept glossary loaded: concepts={Concepts.Count}, "
+            + $"overlays={GeneratedOverlayPaths.Count}");
     }
 
     public static bool TryGet(string conceptId, out StatConcept concept)
@@ -94,6 +115,8 @@ internal static class StatConceptGlossary
                 $"[img={size}x{size}]{concept.Display.Value}[/img]",
             StatConceptDisplayType.GameResourceGroup =>
                 RenderGameResourceGroup(concept.Display, size),
+            StatConceptDisplayType.GameResourceOverlay =>
+                RenderGameResourceOverlay(concept, size),
             _ => StatsTooltip.EscapeBbcode(concept.Label),
         };
         var hint = EscapeHint($"{concept.Label}: {concept.Description}");
@@ -124,6 +147,136 @@ internal static class StatConceptGlossary
                 64);
             return $"[img={resourceSize}x{resourceSize}]{resource.Path}[/img]";
         }));
+    }
+
+    private static string RenderGameResourceOverlay(StatConcept concept, int size)
+    {
+        var overlay = concept.Display.Overlay
+            ?? throw new InvalidOperationException(
+                $"Stat concept '{concept.Id}' has no overlay definition.");
+        var path = GeneratedOverlayPaths.TryGetValue(concept.Id, out var generatedPath)
+            ? generatedPath
+            : overlay.BasePath;
+        return $"[img={size}x{size}]{path}[/img]";
+    }
+
+    private static void BuildOverlayResources()
+    {
+        GeneratedOverlayPaths.Clear();
+        GeneratedOverlayTextures.Clear();
+
+        var overlayConcepts = Concepts
+            .Where(concept => concept.Display.Type == StatConceptDisplayType.GameResourceOverlay)
+            .ToArray();
+        if (overlayConcepts.Length == 0) return;
+
+        System.IO.Directory.CreateDirectory(
+            ProjectSettings.GlobalizePath(GeneratedIconDirectory));
+        foreach (var concept in overlayConcepts)
+        {
+            try
+            {
+                var overlay = concept.Display.Overlay
+                    ?? throw new InvalidOperationException(
+                        $"Stat concept '{concept.Id}' has no overlay definition.");
+                var texture = CreateOverlayTexture(concept.Id, overlay);
+                var path = $"{GeneratedIconDirectory}/{concept.Id}.tres";
+                var saveError = ResourceSaver.Save(
+                    texture,
+                    path,
+                    ResourceSaver.SaverFlags.ChangePath);
+                if (saveError != Error.Ok)
+                {
+                    texture.Dispose();
+                    throw new InvalidOperationException(
+                        $"ResourceSaver returned {saveError} for '{path}'.");
+                }
+
+                texture.TakeOverPath(path);
+                GeneratedOverlayTextures.Add(texture);
+                GeneratedOverlayPaths.Add(concept.Id, path);
+            }
+            catch (Exception e)
+            {
+                CoreMain.Logger.Error(
+                    $"Could not build stat concept overlay '{concept.Id}': {e.Message}");
+            }
+        }
+    }
+
+    private static ImageTexture CreateOverlayTexture(
+        string conceptId,
+        StatConceptOverlay overlay)
+    {
+        var baseTexture = ResourceLoader.Load<Texture2D>(
+            overlay.BasePath,
+            null,
+            ResourceLoader.CacheMode.Reuse);
+        var badgeTexture = ResourceLoader.Load<Texture2D>(
+            overlay.OverlayPath,
+            null,
+            ResourceLoader.CacheMode.Reuse);
+        if (baseTexture == null)
+        {
+            throw new InvalidOperationException(
+                $"Could not load base texture '{overlay.BasePath}'.");
+        }
+
+        if (badgeTexture == null)
+        {
+            throw new InvalidOperationException(
+                $"Could not load overlay texture '{overlay.OverlayPath}'.");
+        }
+
+        using var baseImage = baseTexture.GetImage();
+        using var badgeImage = badgeTexture.GetImage();
+        if (baseImage.IsEmpty() || badgeImage.IsEmpty())
+        {
+            throw new InvalidOperationException(
+                $"One or more textures for '{conceptId}' returned an empty image.");
+        }
+
+        baseImage.Convert(Image.Format.Rgba8);
+        badgeImage.Convert(Image.Format.Rgba8);
+        var canvasSize = Math.Max(baseImage.GetWidth(), baseImage.GetHeight());
+        using var canvas = Image.CreateEmpty(
+            canvasSize,
+            canvasSize,
+            false,
+            Image.Format.Rgba8);
+        canvas.Fill(Colors.Transparent);
+
+        var baseDestination = new Vector2I(
+            (canvasSize - baseImage.GetWidth()) / 2,
+            Math.Max(0, (canvasSize - baseImage.GetHeight()) / 6));
+        canvas.BlendRect(
+            baseImage,
+            new Rect2I(Vector2I.Zero, baseImage.GetSize()),
+            baseDestination);
+
+        var badgeSize = Math.Clamp(
+            (int)Math.Round(
+                canvasSize * overlay.OverlayScale,
+                MidpointRounding.AwayFromZero),
+            1,
+            canvasSize);
+        badgeImage.Resize(
+            badgeSize,
+            badgeSize,
+            Image.Interpolation.Lanczos);
+        var badgeDestination = overlay.Anchor switch
+        {
+            StatConceptOverlayAnchor.LowerRight =>
+                new Vector2I(canvasSize - badgeSize, canvasSize - badgeSize),
+            _ => throw new InvalidOperationException(
+                $"Unsupported overlay anchor '{overlay.Anchor}'."),
+        };
+        canvas.BlendRect(
+            badgeImage,
+            new Rect2I(Vector2I.Zero, badgeImage.GetSize()),
+            badgeDestination);
+
+        return ImageTexture.CreateFromImage(canvas);
     }
 
     private static string EscapeHint(string? text)
@@ -251,7 +404,8 @@ internal static class StatConceptGlossary
                 color,
                 boldElement.GetBoolean(),
                 size,
-                Array.Empty<StatConceptResource>());
+                Array.Empty<StatConceptResource>(),
+                null);
         }
 
         if (string.Equals(type, "game_resource", StringComparison.Ordinal))
@@ -275,7 +429,8 @@ internal static class StatConceptGlossary
                 string.Empty,
                 false,
                 size,
-                Array.Empty<StatConceptResource>());
+                Array.Empty<StatConceptResource>(),
+                null);
         }
 
         if (string.Equals(type, "game_resource_group", StringComparison.Ordinal))
@@ -308,7 +463,74 @@ internal static class StatConceptGlossary
                 string.Empty,
                 false,
                 size,
-                resources);
+                resources,
+                null);
+        }
+
+        if (string.Equals(type, "game_resource_overlay", StringComparison.Ordinal))
+        {
+            RequireOnlyProperties(
+                element,
+                $"{id}.display",
+                "type",
+                "base",
+                "overlay",
+                "size");
+            var baseElement = RequireProperty(element, "base", $"{id}.display");
+            RequireObject(baseElement, $"Stat concept '{id}' display base");
+            RequireOnlyProperties(baseElement, $"{id}.display.base", "path");
+            var basePath = RequireResourcePath(
+                baseElement,
+                "path",
+                $"{id}.display.base");
+
+            var overlayElement = RequireProperty(element, "overlay", $"{id}.display");
+            RequireObject(overlayElement, $"Stat concept '{id}' display overlay");
+            RequireOnlyProperties(
+                overlayElement,
+                $"{id}.display.overlay",
+                "path",
+                "scale",
+                "anchor");
+            var overlayPath = RequireResourcePath(
+                overlayElement,
+                "path",
+                $"{id}.display.overlay");
+            var scaleElement = RequireProperty(
+                overlayElement,
+                "scale",
+                $"{id}.display.overlay");
+            if (scaleElement.ValueKind != JsonValueKind.Number
+                || !scaleElement.TryGetDecimal(out var overlayScale)
+                || overlayScale is < 0.25m or > 1m)
+            {
+                throw new InvalidOperationException(
+                    $"Stat concept '{id}.display.overlay.scale' must be between 0.25 and 1.");
+            }
+
+            var anchorValue = RequireString(
+                overlayElement,
+                "anchor",
+                $"{id}.display.overlay");
+            var anchor = anchorValue switch
+            {
+                "lower_right" => StatConceptOverlayAnchor.LowerRight,
+                _ => throw new InvalidOperationException(
+                    $"Stat concept '{id}' has unsupported overlay anchor '{anchorValue}'."),
+            };
+
+            return new StatConceptDisplay(
+                StatConceptDisplayType.GameResourceOverlay,
+                string.Empty,
+                string.Empty,
+                false,
+                size,
+                Array.Empty<StatConceptResource>(),
+                new StatConceptOverlay(
+                    basePath,
+                    overlayPath,
+                    overlayScale,
+                    anchor));
         }
 
         throw new InvalidOperationException(
@@ -341,6 +563,21 @@ internal static class StatConceptGlossary
         }
 
         return new StatConceptResource(path, scale);
+    }
+
+    private static string RequireResourcePath(
+        JsonElement element,
+        string propertyName,
+        string context)
+    {
+        var path = RequireString(element, propertyName, context);
+        if (!path.StartsWith("res://", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Stat concept glossary '{context}.{propertyName}' must use a res:// path.");
+        }
+
+        return path;
     }
 
     private static bool IsHexColor(string value)

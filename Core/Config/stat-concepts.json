@@ -75,17 +75,15 @@
     },
     "healing_blocked": {
       "display": {
-        "type": "game_resource_group",
-        "resources": [
-          {
-            "path": "res://images/atlases/ui_atlas.sprites/top_bar/top_bar_heart.tres",
-            "scale": 1.0
-          },
-          {
-            "path": "res://images/ui/combat/block.png",
-            "scale": 0.65
-          }
-        ],
+        "type": "game_resource_overlay",
+        "base": {
+          "path": "res://images/atlases/ui_atlas.sprites/top_bar/top_bar_heart.tres"
+        },
+        "overlay": {
+          "path": "res://images/ui/combat/block.png",
+          "scale": 0.6,
+          "anchor": "lower_right"
+        },
         "size": 20
       },
       "help": {

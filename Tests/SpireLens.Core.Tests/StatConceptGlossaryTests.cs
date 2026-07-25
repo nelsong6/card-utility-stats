@@ -27,7 +27,7 @@ public class StatConceptGlossaryTests
             StatConceptDisplayType.StyledText,
             StatConceptGlossary.Concepts.Single(concept => concept.Id == "activation").Display.Type);
         Assert.Equal(
-            StatConceptDisplayType.GameResourceGroup,
+            StatConceptDisplayType.GameResourceOverlay,
             StatConceptGlossary.Concepts.Single(concept => concept.Id == "healing_blocked").Display.Type);
         Assert.Equal(
             StatConceptDisplayType.GameResource,
@@ -72,7 +72,19 @@ public class StatConceptGlossaryTests
         Assert.Contains(
             "res://images/atlases/ui_atlas.sprites/top_bar/top_bar_heart.tres",
             healingBlocked);
-        Assert.Contains("res://images/ui/combat/block.png", healingBlocked);
+        var healingBlockedDisplay = StatConceptGlossary.Concepts
+            .Single(concept => concept.Id == "healing_blocked")
+            .Display;
+        Assert.Equal(
+            "res://images/atlases/ui_atlas.sprites/top_bar/top_bar_heart.tres",
+            healingBlockedDisplay.Overlay?.BasePath);
+        Assert.Equal(
+            "res://images/ui/combat/block.png",
+            healingBlockedDisplay.Overlay?.OverlayPath);
+        Assert.Equal(0.6m, healingBlockedDisplay.Overlay?.OverlayScale);
+        Assert.Equal(
+            StatConceptOverlayAnchor.LowerRight,
+            healingBlockedDisplay.Overlay?.Anchor);
         Assert.Contains("[hint=\"Healing gained:", healingGained);
         Assert.Contains(
             "res://images/atlases/power_atlas.sprites/regen_power.tres",
