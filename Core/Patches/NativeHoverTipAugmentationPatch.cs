@@ -82,6 +82,7 @@ internal static class NativeHoverTipCreateStatsPatch
 internal static class NativeStatsHoverTipStyler
 {
     private const string BrandNodeName = "SpireLensBrand";
+    private const string BrandSpacerNodeName = "SpireLensBrandSpacer";
     private const string RegularFontPath =
         "res://themes/kreon_regular_glyph_space_one.tres";
 
@@ -124,11 +125,15 @@ internal static class NativeStatsHoverTipStyler
         LoadFontOnce();
 
         // The native hover-tip scene is a MarginContainer whose header is an
-        // HBoxContainer. Let that header own positioning: the expanding title
-        // consumes the free width and leaves the brand at the header's right
-        // edge. Direct offsets on the MarginContainer are invalidated by
-        // Godot's container layout.
-        title.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        // HBoxContainer. Preserve every native title setting and give the
+        // header a separate expanding spacer; that pushes only the brand to
+        // the right edge without widening or re-aligning the title control.
+        var spacer = new Control
+        {
+            Name = BrandSpacerNodeName,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+        };
 
         var brand = new Label
         {
@@ -149,6 +154,7 @@ internal static class NativeStatsHoverTipStyler
         brand.AddThemeConstantOverride("shadow_offset_x", 3);
         brand.AddThemeConstantOverride("shadow_offset_y", 2);
 
+        header.AddChild(spacer);
         header.AddChild(brand);
     }
 
