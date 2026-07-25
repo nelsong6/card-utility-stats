@@ -831,10 +831,16 @@ public class RelicAggregate
     public int NutritiousSoupEnchantedStrikesPlayed { get; set; }
 
     // Miniature Cannon tracking. Plays and hits are cumulative while the relic
-    // is held; deck count is the current permanent-deck snapshot.
+    // is held; deck counts are current permanent-deck snapshots.
     public int MiniatureCannonUpgradedAttacksInDeck { get; set; }
+    public int MiniatureCannonNonUpgradedAttacksInDeck { get; set; }
     public int MiniatureCannonUpgradedAttackPlays { get; set; }
     public int MiniatureCannonUpgradedAttackHits { get; set; }
+
+    // Tooltip-only projections from the live combat-card piles. Internal
+    // properties are intentionally excluded from persisted run JSON.
+    internal int MiniatureCannonUpgradedAttacksInCombat { get; set; }
+    internal int MiniatureCannonNonUpgradedAttacksInCombat { get; set; }
 
     // Vajra tracking. Counts attack cards played while held, and actual enemy
     // damage hits from those attacks. Multi-hit attacks increment hits per

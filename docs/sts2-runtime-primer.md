@@ -672,7 +672,11 @@ Miniature Cannon checks the live attack source's `IsUpgraded` property when
 modifying powered Attack damage. Its play and hit attribution must inspect that
 same combat card rather than its canonical deck version. Permanent upgrades are
 copied onto combat cards, while combat-only upgrades such as Drain Power exist
-only on the raw combat card.
+only on the raw combat card. Its deck composition rows inspect the permanent
+deck, while its combat composition rows inspect every live card across the
+owner's hand, draw, discard, exhaust, and play piles. Use each card's live
+`IsUpgraded` value for both splits so generated cards and temporary combat
+upgrades are represented exactly as Miniature Cannon sees them.
 
 Ember Tea's `AfterRoomEntered` callback runs after `CombatSetUp`, applies
 Strength for a combat while `CombatsLeft` is positive, and immediately

@@ -1779,6 +1779,8 @@ public static class RunTracker
 
         if (source.MiniatureCannonUpgradedAttacksInDeck != 0 || target.MiniatureCannonUpgradedAttacksInDeck == 0)
             target.MiniatureCannonUpgradedAttacksInDeck = source.MiniatureCannonUpgradedAttacksInDeck;
+        if (source.MiniatureCannonNonUpgradedAttacksInDeck != 0 || target.MiniatureCannonNonUpgradedAttacksInDeck == 0)
+            target.MiniatureCannonNonUpgradedAttacksInDeck = source.MiniatureCannonNonUpgradedAttacksInDeck;
         target.MiniatureCannonUpgradedAttackPlays += source.MiniatureCannonUpgradedAttackPlays;
         target.MiniatureCannonUpgradedAttackHits += source.MiniatureCannonUpgradedAttackHits;
         target.VajraAttacksPlayed += source.VajraAttacksPlayed;
@@ -8219,7 +8221,7 @@ public static class RunTracker
 
     /// <summary>
     /// Return Miniature Cannon stats after refreshing the current permanent-
-    /// deck upgraded-attack count.
+    /// deck split and projecting the live combat-card split.
     /// </summary>
     public static RelicAggregate GetMiniatureCannonAggregate()
     {
@@ -8242,7 +8244,16 @@ public static class RunTracker
                     MergeRelicAggregateInto(result, pending);
                 }
 
-                return result ?? new RelicAggregate();
+                result ??= new RelicAggregate();
+                var player = GetTrackedRunPlayerLocked();
+                if (player != null && PlayerHasMiniatureCannon(player))
+                {
+                    SetMiniatureCannonCombatCountsForTest(
+                        result,
+                        player.PlayerCombatState?.AllCards);
+                }
+
+                return result;
             }
             catch (Exception e)
             {
@@ -8852,10 +8863,37 @@ public static class RunTracker
         agg.MiniatureCannonUpgradedAttackHits += Math.Max(0, count);
     }
 
-    internal static void SetMiniatureCannonDeckCountForTest(RelicAggregate agg, int upgradedAttacksInDeck)
+    internal static void SetMiniatureCannonDeckCountsForTest(
+        RelicAggregate agg,
+        int upgradedAttacksInDeck,
+        int nonUpgradedAttacksInDeck = 0)
     {
         if (agg == null) return;
         agg.MiniatureCannonUpgradedAttacksInDeck = Math.Max(0, upgradedAttacksInDeck);
+        agg.MiniatureCannonNonUpgradedAttacksInDeck = Math.Max(0, nonUpgradedAttacksInDeck);
+    }
+
+    internal static void SetMiniatureCannonCombatCountsForTest(
+        RelicAggregate agg,
+        IEnumerable<CardModel>? combatCards)
+    {
+        if (agg == null) return;
+
+        var upgradedAttacks = 0;
+        var nonUpgradedAttacks = 0;
+        if (combatCards != null)
+        {
+            foreach (var combatCard in combatCards)
+            {
+                if (IsMiniatureCannonUpgradedAttackCard(combatCard))
+                    upgradedAttacks++;
+                else if (IsMiniatureCannonNonUpgradedAttackCard(combatCard))
+                    nonUpgradedAttacks++;
+            }
+        }
+
+        agg.MiniatureCannonUpgradedAttacksInCombat = upgradedAttacks;
+        agg.MiniatureCannonNonUpgradedAttacksInCombat = nonUpgradedAttacks;
     }
 
     internal static void RecordVajraAttackPlayedForTest(RelicAggregate agg, int count = 1)
@@ -14276,14 +14314,20 @@ public static class RunTracker
         if (player?.Deck?.Cards == null) return false;
 
         int upgradedAttacks = 0;
+        int nonUpgradedAttacks = 0;
         foreach (var deckCard in player.Deck.Cards)
         {
             if (IsMiniatureCannonUpgradedAttackCard(deckCard))
                 upgradedAttacks++;
+            else if (IsMiniatureCannonNonUpgradedAttackCard(deckCard))
+                nonUpgradedAttacks++;
         }
 
-        bool changed = agg.MiniatureCannonUpgradedAttacksInDeck != upgradedAttacks;
+        bool changed =
+            agg.MiniatureCannonUpgradedAttacksInDeck != upgradedAttacks ||
+            agg.MiniatureCannonNonUpgradedAttacksInDeck != nonUpgradedAttacks;
         agg.MiniatureCannonUpgradedAttacksInDeck = upgradedAttacks;
+        agg.MiniatureCannonNonUpgradedAttacksInDeck = nonUpgradedAttacks;
         return changed;
     }
 
@@ -16239,6 +16283,19 @@ public static class RunTracker
         {
             if (card == null || card.Type != CardType.Attack) return false;
             return card.IsUpgraded;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool IsMiniatureCannonNonUpgradedAttackCard(CardModel? card)
+    {
+        try
+        {
+            if (card == null || card.Type != CardType.Attack) return false;
+            return !card.IsUpgraded;
         }
         catch
         {

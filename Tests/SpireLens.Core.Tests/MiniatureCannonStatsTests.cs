@@ -50,6 +50,9 @@ public class MiniatureCannonStatsTests
         var agg = new RelicAggregate();
 
         Assert.Equal(0, agg.MiniatureCannonUpgradedAttacksInDeck);
+        Assert.Equal(0, agg.MiniatureCannonNonUpgradedAttacksInDeck);
+        Assert.Equal(0, agg.MiniatureCannonUpgradedAttacksInCombat);
+        Assert.Equal(0, agg.MiniatureCannonNonUpgradedAttacksInCombat);
         Assert.Equal(0, agg.MiniatureCannonUpgradedAttackPlays);
         Assert.Equal(0, agg.MiniatureCannonUpgradedAttackHits);
     }
@@ -62,6 +65,7 @@ public class MiniatureCannonStatsTests
         {
             Activations = 4,
             MiniatureCannonUpgradedAttacksInDeck = 3,
+            MiniatureCannonNonUpgradedAttacksInDeck = 5,
             MiniatureCannonUpgradedAttackPlays = 10,
             MiniatureCannonUpgradedAttackHits = 17,
         };
@@ -69,6 +73,7 @@ public class MiniatureCannonStatsTests
         var json = JsonSerializer.Serialize(run, SerializerOptions);
 
         Assert.Contains("miniature_cannon_upgraded_attacks_in_deck", json);
+        Assert.Contains("miniature_cannon_non_upgraded_attacks_in_deck", json);
         Assert.Contains("miniature_cannon_upgraded_attack_plays", json);
         Assert.Contains("miniature_cannon_upgraded_attack_hits", json);
 
@@ -78,6 +83,7 @@ public class MiniatureCannonStatsTests
         var restoredAgg = restored!.RelicAggregates[MiniatureCannonRelicId];
         Assert.Equal(4, restoredAgg.Activations);
         Assert.Equal(3, restoredAgg.MiniatureCannonUpgradedAttacksInDeck);
+        Assert.Equal(5, restoredAgg.MiniatureCannonNonUpgradedAttacksInDeck);
         Assert.Equal(10, restoredAgg.MiniatureCannonUpgradedAttackPlays);
         Assert.Equal(17, restoredAgg.MiniatureCannonUpgradedAttackHits);
     }
@@ -89,14 +95,15 @@ public class MiniatureCannonStatsTests
 
         RunTracker.RecordMiniatureCannonUpgradedAttackPlayedForTest(agg, 2);
         RunTracker.RecordMiniatureCannonUpgradedAttackHitForTest(agg, 5);
-        RunTracker.SetMiniatureCannonDeckCountForTest(agg, 3);
+        RunTracker.SetMiniatureCannonDeckCountsForTest(agg, 3, 6);
         RunTracker.RecordMiniatureCannonUpgradedAttackPlayedForTest(agg, -1);
         RunTracker.RecordMiniatureCannonUpgradedAttackHitForTest(agg, -2);
-        RunTracker.SetMiniatureCannonDeckCountForTest(agg, -3);
+        RunTracker.SetMiniatureCannonDeckCountsForTest(agg, -3, -6);
 
         Assert.Equal(2, agg.MiniatureCannonUpgradedAttackPlays);
         Assert.Equal(5, agg.MiniatureCannonUpgradedAttackHits);
         Assert.Equal(0, agg.MiniatureCannonUpgradedAttacksInDeck);
+        Assert.Equal(0, agg.MiniatureCannonNonUpgradedAttacksInDeck);
     }
 
     [Fact]
@@ -126,6 +133,30 @@ public class MiniatureCannonStatsTests
     }
 
     [Fact]
+    public void RunTracker_MiniatureCannonCombatCounts_UseEachLiveCombatCard()
+    {
+        var upgradedDeckCard = Uninitialized<DrainPower>();
+        SetUpgradeLevel(upgradedDeckCard, 1);
+
+        var temporarilyUpgradedCombatCard = Uninitialized<DrainPower>();
+        SetUpgradeLevel(temporarilyUpgradedCombatCard, 1);
+        DeckVersionField.SetValue(
+            temporarilyUpgradedCombatCard,
+            Uninitialized<DrainPower>());
+
+        var nonUpgradedCombatCard = Uninitialized<DrainPower>();
+        DeckVersionField.SetValue(nonUpgradedCombatCard, upgradedDeckCard);
+
+        var agg = new RelicAggregate();
+        RunTracker.SetMiniatureCannonCombatCountsForTest(
+            agg,
+            new CardModel[] { temporarilyUpgradedCombatCard, nonUpgradedCombatCard });
+
+        Assert.Equal(1, agg.MiniatureCannonUpgradedAttacksInCombat);
+        Assert.Equal(1, agg.MiniatureCannonNonUpgradedAttacksInCombat);
+    }
+
+    [Fact]
     public void RelicTooltip_MiniatureCannonModelRecognition_RecognizesRelic()
     {
         var recognized = (bool)(IsMiniatureCannonStatsRelicModelMethod.Invoke(null, new object[] { Uninitialized<MiniatureCannon>() })
@@ -141,6 +172,9 @@ public class MiniatureCannonStatsTests
         {
             Activations = 4,
             MiniatureCannonUpgradedAttacksInDeck = 3,
+            MiniatureCannonNonUpgradedAttacksInDeck = 5,
+            MiniatureCannonUpgradedAttacksInCombat = 4,
+            MiniatureCannonNonUpgradedAttacksInCombat = 6,
             MiniatureCannonUpgradedAttackPlays = 10,
             MiniatureCannonUpgradedAttackHits = 17,
         };
@@ -150,11 +184,17 @@ public class MiniatureCannonStatsTests
 
         Assert.Contains("Combats held", body);
         Assert.Contains("Upgraded attacks in deck", body);
+        Assert.Contains("Non-upgraded attacks in deck", body);
+        Assert.Contains("Upgraded attacks in combat", body);
+        Assert.Contains("Non-upgraded attacks in combat", body);
         Assert.Contains("Upgraded attack plays", body);
         Assert.Contains("Upgraded attack hits", body);
         Assert.Contains("Avg plays per combat", body);
         Assert.Contains("Avg hits per combat", body);
         Assert.Contains("[b]3[/b]", body);
+        Assert.Contains("[b]5[/b]", body);
+        Assert.Contains("[b]4[/b]", body);
+        Assert.Contains("[b]6[/b]", body);
         Assert.Contains("[b]10[/b]", body);
         Assert.Contains("[b]17[/b]", body);
         Assert.Contains("[b]2.5[/b]", body);
@@ -168,6 +208,9 @@ public class MiniatureCannonStatsTests
             ?? throw new InvalidOperationException("BuildMiniatureCannonBodyBBCode returned null."));
 
         Assert.Contains("Upgraded attacks in deck", body);
+        Assert.Contains("Non-upgraded attacks in deck", body);
+        Assert.Contains("Upgraded attacks in combat", body);
+        Assert.Contains("Non-upgraded attacks in combat", body);
         Assert.Contains("Upgraded attack plays", body);
         Assert.Contains("Upgraded attack hits", body);
         Assert.Contains("Avg plays per combat", body);

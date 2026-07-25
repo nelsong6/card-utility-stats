@@ -2729,6 +2729,9 @@ public static class RelicHoverShowPatch
 
         Row3(sb, "Combats held", agg.Activations.ToString(), "");
         Row3(sb, "Upgraded attacks in deck", agg.MiniatureCannonUpgradedAttacksInDeck.ToString(), "");
+        Row3(sb, "Non-upgraded attacks in deck", agg.MiniatureCannonNonUpgradedAttacksInDeck.ToString(), "");
+        Row3(sb, "Upgraded attacks in combat", agg.MiniatureCannonUpgradedAttacksInCombat.ToString(), "");
+        Row3(sb, "Non-upgraded attacks in combat", agg.MiniatureCannonNonUpgradedAttacksInCombat.ToString(), "");
         Row3(sb, "Upgraded attack plays", agg.MiniatureCannonUpgradedAttackPlays.ToString(), "");
         Row3(sb, "Upgraded attack hits", agg.MiniatureCannonUpgradedAttackHits.ToString(), "");
         Row3(sb, "Avg plays per combat", FormatDecimal(averagePlays), "");

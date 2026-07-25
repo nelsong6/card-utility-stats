@@ -2877,6 +2877,7 @@ public class SchemaLoadingTests
         var relicAgg = loaded.Data.RelicAggregates["RELIC.MINIATURE_CANNON"];
         Assert.Equal(4, relicAgg.Activations);
         Assert.Equal(3, relicAgg.MiniatureCannonUpgradedAttacksInDeck);
+        Assert.Equal(5, relicAgg.MiniatureCannonNonUpgradedAttacksInDeck);
         Assert.Equal(10, relicAgg.MiniatureCannonUpgradedAttackPlays);
         Assert.Equal(17, relicAgg.MiniatureCannonUpgradedAttackHits);
     }
@@ -2890,6 +2891,7 @@ public class SchemaLoadingTests
         var relicAgg = resumed!.RelicAggregates["RELIC.MINIATURE_CANNON"];
         Assert.Equal(4, relicAgg.Activations);
         Assert.Equal(3, relicAgg.MiniatureCannonUpgradedAttacksInDeck);
+        Assert.Equal(5, relicAgg.MiniatureCannonNonUpgradedAttacksInDeck);
         Assert.Equal(10, relicAgg.MiniatureCannonUpgradedAttackPlays);
         Assert.Equal(17, relicAgg.MiniatureCannonUpgradedAttackHits);
     }
