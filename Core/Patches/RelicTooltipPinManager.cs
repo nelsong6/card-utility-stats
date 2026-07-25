@@ -116,6 +116,13 @@ internal static class RelicTooltipPinManager
         if (_pinnedHolder == null || !IsDismissAction(inputEvent))
             return;
 
+        // A right press inside the pinned relic belongs to that holder's
+        // _GuiInput toggle. Do not clear it here first: Godot dispatches
+        // _Input before _GuiInput, and clearing globally would make the
+        // holder see an unpinned relic and pin it again.
+        if (IsRightClickInsidePinnedHolder(inputEvent))
+            return;
+
         // _Input runs before _GuiInput. Remember the event so a right click
         // that dismissed a pin cannot reach a relic holder later in the same
         // dispatch and immediately create a new pin.
@@ -351,6 +358,18 @@ internal static class RelicTooltipPinManager
             InputEventAction action => action.Pressed,
             _ => false,
         };
+    }
+
+    private static bool IsRightClickInsidePinnedHolder(InputEvent inputEvent)
+    {
+        return inputEvent is InputEventMouseButton
+               {
+                   ButtonIndex: MouseButton.Right,
+                   Pressed: true,
+               } mouseButton
+               && IsLive(_pinnedHolder)
+               && _pinnedHolder!.IsVisibleInTree()
+               && _pinnedHolder.GetGlobalRect().HasPoint(mouseButton.Position);
     }
 
     private static bool IsLive(GodotObject? instance)
