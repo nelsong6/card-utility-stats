@@ -149,7 +149,10 @@ public static class ViewStatsInjectorPatch
         SavePreferences();
 
         if (!isEnabled)
+        {
+            RelicTooltipPinManager.ClearPin();
             NHoverTipSet.Clear();
+        }
 
         CoreMain.Logger.Info($"Stats visibility set to {isEnabled} ({source})");
     }

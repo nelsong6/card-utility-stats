@@ -177,6 +177,9 @@ public static class CoreMain
         try { SpireLensOptionsMenu.Destroy(); }
         catch (Exception e) { Logger.Error($"Shutdown: options menu teardown failed: {e}"); }
 
+        try { RelicTooltipPinManager.Teardown(); }
+        catch (Exception e) { Logger.Error($"Shutdown: relic tooltip pin teardown failed: {e}"); }
+
         try { RelicBarFilterPatch.TeardownHooks(); }
         catch (Exception e) { Logger.Error($"Shutdown: relic bar filter hook teardown failed: {e}"); }
 

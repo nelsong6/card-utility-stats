@@ -100,6 +100,7 @@ When attribution is not naturally one-card-to-one-outcome, the code prefers:
 - [Core/Patches/StatsVisibilityHotkeyPatch.cs](../Core/Patches/StatsVisibilityHotkeyPatch.cs) maps a standalone Left Shift tap and Right Stick (R3) press to opening/closing that menu while preserving Shift-based chords regardless of whether another modifier was pressed before or after Shift; Left Trigger remains Draw Pile and Left Stick press remains Peek.
 - [Core/Patches/CardHoverTooltipPatch.cs](../Core/Patches/CardHoverTooltipPatch.cs) builds compact and full tooltip bodies.
 - [Core/Patches/NativeHoverTipAugmentationPatch.cs](../Core/Patches/NativeHoverTipAugmentationPatch.cs) appends owner-specific SpireLens data to the game's `IHoverTip` sequence immediately before `NHoverTipSet` renders it, then applies the SpireLens blue panel tint and brand to only the resulting native stats control.
+- [Core/Patches/RelicTooltipPinManager.cs](../Core/Patches/RelicTooltipPinManager.cs) attaches right-click handling to owned relic holders, pins one native relic tooltip set under a dedicated surrogate owner, and displays the game's top-panel lock icon on the pinned relic.
 - [Core/StatsTooltip.cs](../Core/StatsTooltip.cs) creates native `HoverTip` values with the established 20px stats typography and owns no scene-tree nodes or hover lifecycle.
 - [Config/SpireLensConfig.cs](../Config/SpireLensConfig.cs) provides the persistent mod-settings UI for runtime display options.
 

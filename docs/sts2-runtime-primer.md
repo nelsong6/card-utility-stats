@@ -998,6 +998,13 @@ Important surfaces:
   relics. Its postfix styles only the final native text control created for
   that appended tip: the SpireLens blue background tint and top-right brand
   return without creating a parallel panel or retaining the control.
+- Owned-relic pinning does not override `NRelicInventoryHolder.OnUnfocus` or
+  `NHoverTipSet.Remove`. A right-clicked relic receives a dedicated surrogate
+  `Control` owner for a second native tooltip set; ordinary relic unfocus
+  removes only the transient holder-owned set. While pinned, attempts to create
+  another transient set for that same holder are suppressed. The surrogate,
+  its mouse-input signal, and the lock badge are all removed during Core
+  shutdown so hot reload cannot leave callbacks from an orphaned assembly.
 - `StatsTooltip` only constructs the native `HoverTip` value and escapes
   dynamic BBCode. It also wraps the stats description in the established 20px
   body size. It must not retain a `Control`, create a scene-root panel, position

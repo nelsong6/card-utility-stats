@@ -30,16 +30,23 @@ namespace SpireLens.Core.Patches;
 internal static class NativeHoverTipCreateStatsPatch
 {
     [HarmonyPrefix]
-    public static void Prefix(
+    public static bool Prefix(
         Control owner,
         ref IEnumerable<IHoverTip> hoverTips,
+        ref NHoverTipSet? __result,
         out bool __state)
     {
         __state = false;
+        if (RelicTooltipPinManager.ShouldSuppressOrdinaryHoverTip(owner))
+        {
+            __result = null;
+            return false;
+        }
+
         try
         {
             if (!NativeStatsHoverTipFactory.TryCreate(owner, out var statsTip))
-                return;
+                return true;
 
             // Materialize the sequence before native rendering. NHoverTipSet
             // preserves this order, so the SpireLens tip becomes the final
@@ -54,6 +61,8 @@ internal static class NativeHoverTipCreateStatsPatch
             // Stats presentation must never prevent the game's own tooltip.
             CoreMain.Logger.Error($"Native stats hover-tip creation failed: {e}");
         }
+
+        return true;
     }
 
     [HarmonyPostfix]
@@ -108,6 +117,21 @@ internal static class NativeStatsHoverTipStyler
             background.SelfModulate = PanelTint;
 
         AddBrand(statsTip);
+    }
+
+    public static void MakePinnedTipInteractive(NHoverTipSet tipSet)
+    {
+        var container = tipSet._textHoverTipContainer;
+        if (container == null || container.GetChildCount() == 0) return;
+
+        if (container.GetChild(container.GetChildCount() - 1) is not Control statsTip)
+            return;
+
+        container.MouseFilter = Control.MouseFilterEnum.Pass;
+        statsTip.MouseFilter = Control.MouseFilterEnum.Pass;
+        var description = statsTip.GetNodeOrNull<Control>("%Description");
+        if (description != null)
+            description.MouseFilter = Control.MouseFilterEnum.Stop;
     }
 
     private static void AddBrand(Control statsTip)
@@ -183,6 +207,13 @@ internal static class NativeStatsHoverTipFactory
             return false;
 
         HoverTip tip;
+        if (RelicTooltipPinManager.TryGetPinnedHolder(owner, out var pinnedHolder)
+            && RelicHoverShowPatch.TryBuildNativeHoverTip(pinnedHolder, out tip))
+        {
+            statsTip = tip;
+            return true;
+        }
+
         switch (owner)
         {
             case NCardHolder cardHolder

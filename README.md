@@ -61,6 +61,12 @@ throughout the active run. The category includes already-resolved max-HP
 relics, permanent inventory upgrades, card-reward upgrades, and other relics
 whose effects do not need combat-bar attention.
 
+Right-click an owned relic with SpireLens stats to pin its complete native
+tooltip set. The game's compact top-panel lock icon appears on the pinned relic,
+and the tooltip remains visible and mouse-interactive after the pointer leaves
+the relic. Right-click that relic again to unpin it; right-clicking another
+stats-enabled relic transfers the pin.
+
 The relic compendium's **Edit combat relevance** mode shows each discovered
 relic's classification with the game's enemy-map icon for combat or top-bar
 map icon for non-combat. Inspecting a discovered relic opens explicit **Combat**
