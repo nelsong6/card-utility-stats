@@ -445,15 +445,11 @@ internal static class StatConceptGlossary
         }
         else
         {
-            using var image = texture.GetImage();
-            content = image.GetWidth() == texture.GetWidth()
-                      && image.GetHeight() == texture.GetHeight()
-                ? FindVisiblePixelBounds(image, 0.02f)
-                : new Rect2I(
-                    0,
-                    0,
-                    texture.GetWidth(),
-                    texture.GetHeight());
+            content = new Rect2I(
+                0,
+                0,
+                texture.GetWidth(),
+                texture.GetHeight());
         }
 
         if (content.Size.X <= 0 || content.Size.Y <= 0)
