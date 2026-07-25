@@ -44,6 +44,8 @@ internal static class StatConceptGlossary
     private const int DefaultGlyphSize = 20;
     private const string InformationColor = "#94A0AE";
     private const string GeneratedIconDirectory = "user://SpireLens/generated-icons";
+    private const string CombatConceptId = "combat";
+    private const string CombatIconRegion = "13,8,40,45";
 
     private static readonly IReadOnlyDictionary<string, StatConcept> ConceptsById =
         LoadConcepts();
@@ -59,7 +61,7 @@ internal static class StatConceptGlossary
 
     public static void Initialize()
     {
-        BuildGeneratedImageResources();
+        BuildEmbeddedImageResources();
         CoreMain.Logger.Info(
             $"Stat concept glossary loaded: concepts={Concepts.Count}, "
             + $"generated_images={GeneratedImagePaths.Count}");
@@ -138,10 +140,9 @@ internal static class StatConceptGlossary
 
     private static string RenderGameResource(StatConcept concept, int size)
     {
-        var path = GeneratedImagePaths.TryGetValue(concept.Id, out var generatedPath)
-            ? generatedPath
-            : concept.Display.Value;
-        return RenderImage(path, size);
+        return string.Equals(concept.Id, CombatConceptId, StringComparison.Ordinal)
+            ? RenderImage(concept.Display.Value, size, CombatIconRegion)
+            : RenderImage(concept.Display.Value, size);
     }
 
     private static string RenderGameResourceGroup(StatConceptDisplay display, int size)
@@ -167,24 +168,21 @@ internal static class StatConceptGlossary
     internal static string RenderImage(string path, int size)
         => $"[img width={size} height={size} align=center]{path}[/img]";
 
-    private static void BuildGeneratedImageResources()
+    private static string RenderImage(string path, int size, string region)
+        => $"[img width={size} height={size} region={region} align=center]{path}[/img]";
+
+    private static void BuildEmbeddedImageResources()
     {
         GeneratedImagePaths.Clear();
         GeneratedImageTextures.Clear();
 
-        System.IO.Directory.CreateDirectory(
-            ProjectSettings.GlobalizePath(GeneratedIconDirectory));
-
-        BuildEmbeddedImageResources();
-        BuildCroppedGameResource("combat");
-    }
-
-    private static void BuildEmbeddedImageResources()
-    {
         var embeddedConcepts = Concepts
             .Where(concept => concept.Display.Type == StatConceptDisplayType.EmbeddedImage)
             .ToArray();
         if (embeddedConcepts.Length == 0) return;
+
+        System.IO.Directory.CreateDirectory(
+            ProjectSettings.GlobalizePath(GeneratedIconDirectory));
 
         var assembly = typeof(StatConceptGlossary).Assembly;
         var manifestNames = assembly.GetManifestResourceNames();
@@ -217,134 +215,6 @@ internal static class StatConceptGlossary
                     $"Could not load stat concept embedded image '{concept.Id}': {e.Message}");
             }
         }
-    }
-
-    private static void BuildCroppedGameResource(string conceptId)
-    {
-        try
-        {
-            if (!TryGet(conceptId, out var concept)
-                || concept.Display.Type != StatConceptDisplayType.GameResource)
-            {
-                throw new InvalidOperationException(
-                    $"Concept '{conceptId}' is not a game-resource image.");
-            }
-
-            var sourceTexture = ResourceLoader.Load<Texture2D>(
-                concept.Display.Value,
-                null,
-                ResourceLoader.CacheMode.Reuse)
-                ?? throw new InvalidOperationException(
-                    $"ResourceLoader could not load '{concept.Display.Value}'.");
-            using var sourceImage = sourceTexture.GetImage();
-            const float visibleAlphaThreshold = 0.5f;
-            var usedRect = FindVisiblePixelBounds(
-                sourceImage,
-                visibleAlphaThreshold,
-                margin: 1);
-            var cropMode = "alpha";
-            if (CoversNearlyEntireImage(usedRect, sourceImage))
-            {
-                usedRect = CombatArtworkFallbackBounds(sourceImage);
-                cropMode = "centered artwork fallback";
-            }
-            if (usedRect.Size.X <= 0 || usedRect.Size.Y <= 0)
-            {
-                throw new InvalidOperationException(
-                    $"Game resource '{concept.Display.Value}' has no visible pixels.");
-            }
-
-            const int transparentPadding = 1;
-            var squareContentSize = Math.Max(usedRect.Size.X, usedRect.Size.Y);
-            var outputSize = squareContentSize + (transparentPadding * 2);
-            using var croppedImage = Image.CreateEmpty(
-                outputSize,
-                outputSize,
-                false,
-                Image.Format.Rgba8);
-            croppedImage.Fill(new Color(0f, 0f, 0f, 0f));
-            var destination = new Vector2I(
-                transparentPadding + ((squareContentSize - usedRect.Size.X) / 2),
-                transparentPadding + ((squareContentSize - usedRect.Size.Y) / 2));
-            croppedImage.BlitRect(sourceImage, usedRect, destination);
-
-            SaveGeneratedImage(concept.Id, croppedImage, "cropped game resource");
-            CoreMain.Logger.Info(
-                $"Stat concept game resource cropped: id={concept.Id}, "
-                + $"source={sourceImage.GetWidth()}x{sourceImage.GetHeight()}, "
-                + $"used={usedRect.Position.X},{usedRect.Position.Y},"
-                + $"{usedRect.Size.X}x{usedRect.Size.Y}, "
-                + $"alpha_threshold={visibleAlphaThreshold:0.##}, "
-                + $"crop_mode={cropMode}, "
-                + $"output={outputSize}x{outputSize}");
-        }
-        catch (Exception e)
-        {
-            CoreMain.Logger.Error(
-                $"Could not crop stat concept game resource '{conceptId}': {e.Message}");
-        }
-    }
-
-    private static bool CoversNearlyEntireImage(Rect2I rect, Image image)
-    {
-        if (rect.Size.X <= 0 || rect.Size.Y <= 0) return false;
-
-        var sourceArea = (long)image.GetWidth() * image.GetHeight();
-        var rectArea = (long)rect.Size.X * rect.Size.Y;
-        return sourceArea > 0 && rectArea >= sourceArea * 0.9d;
-    }
-
-    private static Rect2I CombatArtworkFallbackBounds(Image image)
-    {
-        // The map-monster resource includes an opaque map-sized canvas, so
-        // alpha cannot isolate the recognizable enemy mark. These normalized
-        // insets retain the complete mark and discard that surrounding canvas.
-        var left = (int)Math.Round(image.GetWidth() * 0.2d);
-        var top = (int)Math.Round(image.GetHeight() * 0.12d);
-        var right = (int)Math.Round(image.GetWidth() * 0.8d);
-        var bottom = (int)Math.Round(image.GetHeight() * 0.78d);
-        return new Rect2I(
-            left,
-            top,
-            Math.Max(1, right - left),
-            Math.Max(1, bottom - top));
-    }
-
-    private static Rect2I FindVisiblePixelBounds(
-        Image image,
-        float alphaThreshold,
-        int margin)
-    {
-        var minX = image.GetWidth();
-        var minY = image.GetHeight();
-        var maxX = -1;
-        var maxY = -1;
-
-        for (var y = 0; y < image.GetHeight(); y++)
-        {
-            for (var x = 0; x < image.GetWidth(); x++)
-            {
-                if (image.GetPixel(x, y).A < alphaThreshold) continue;
-
-                minX = Math.Min(minX, x);
-                minY = Math.Min(minY, y);
-                maxX = Math.Max(maxX, x);
-                maxY = Math.Max(maxY, y);
-            }
-        }
-
-        if (maxX < minX || maxY < minY)
-            return new Rect2I();
-
-        var left = Math.Max(0, minX - margin);
-        var top = Math.Max(0, minY - margin);
-        var right = Math.Min(image.GetWidth() - 1, maxX + margin);
-        var bottom = Math.Min(image.GetHeight() - 1, maxY + margin);
-        return new Rect2I(
-            left,
-            top,
-            right - left + 1,
-            bottom - top + 1);
     }
 
     private static void SaveGeneratedImage(string conceptId, Image image, string sourceKind)

@@ -28,7 +28,7 @@ public class RelicStatRowVocabularyTests
         "card,upgraded")]
     [InlineData(
         "Triggered this combat",
-        "current",
+        "",
         "activation,combat")]
     [InlineData(
         "HP healed",

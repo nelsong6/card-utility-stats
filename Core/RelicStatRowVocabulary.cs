@@ -43,7 +43,7 @@ internal static class RelicStatRowVocabulary
         RegexOptions.CultureInvariant);
 
     private static readonly Regex PrecedingDenominatorRegex = new(
-        @"(?:\b(?:per|in)\s*|/\s*)$",
+        @"(?:\b(?:per|in|this)\s*|/\s*)$",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     private static readonly IReadOnlyList<ConceptRule> Rules =
@@ -101,11 +101,7 @@ internal static class RelicStatRowVocabulary
             ? BuildDefaultDescription(descriptionText)
             : fullDescription.Trim();
 
-        var workingText = Regex.Replace(
-            plainSuffix,
-            @"\bthis\s+(?=(?:combat|turn)\b)",
-            "current ",
-            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        var workingText = plainSuffix;
         var removed = new bool[workingText.Length];
         var occurrences = new List<ConceptOccurrence>();
 
@@ -240,18 +236,6 @@ internal static class RelicStatRowVocabulary
             RegexOptions.CultureInvariant);
         cleaned = NormalizeSpaces(cleaned);
 
-        if ((conceptIds.Contains("combat", StringComparer.Ordinal)
-             || conceptIds.Contains("turn", StringComparer.Ordinal))
-            && string.Equals(cleaned, "this", StringComparison.OrdinalIgnoreCase))
-        {
-            return "current";
-        }
-
-        cleaned = Regex.Replace(
-            cleaned,
-            @"\bthis\b",
-            "current",
-            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
         return NormalizeSpaces(cleaned);
     }
 
