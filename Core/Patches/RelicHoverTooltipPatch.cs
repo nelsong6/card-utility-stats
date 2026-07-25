@@ -1176,7 +1176,7 @@ public static class RelicHoverShowPatch
         var blockPerActivation = agg.Activations <= 0
             ? 0m
             : (decimal)agg.AdditionalBlockGained / agg.Activations;
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, "Used this combat", usedThisCombat ? "true" : "false", "");
         Row3(sb, BlockLabel("extra block gained"), agg.AdditionalBlockGained.ToString(), "");
         Row3(sb, BlockLabel("extra block per activation"), FormatDecimal(blockPerActivation), "");
@@ -1200,7 +1200,7 @@ public static class RelicHoverShowPatch
             : (decimal)agg.TuningForkTurnEndChargeTotal / agg.TuningForkTurnEndChargeCount;
 
         Row3(sb, "Skills played", agg.TuningForkSkillsPlayed.ToString(), "");
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
         Row3(sb, BlockLabel("block gained per activation"), FormatDecimal(blockPerActivation), "");
         Row3(sb, "Avg skills played per combat", FormatDecimal(skillsPerCombat), "");
@@ -1224,7 +1224,7 @@ public static class RelicHoverShowPatch
             ? 0m
             : (decimal)agg.AdditionalBlockGained / agg.RippleBasinCombats;
 
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
         Row3(sb, BlockLabel("block gained per activation"), FormatDecimal(blockPerActivation), "");
         Row3(sb, BlockLabel("avg block gained per turn"), FormatDecimal(blockPerTurn), "");
@@ -1242,7 +1242,7 @@ public static class RelicHoverShowPatch
     private static string BuildAnchorBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
         return sb.ToString();
     }
@@ -1263,7 +1263,7 @@ public static class RelicHoverShowPatch
             ? 0m
             : (decimal)agg.TotalTargets / agg.Activations;
 
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, "Damage attempted", agg.TotalDamageAttempted.ToString(), "");
         Row3(sb, "Targets hit", agg.TotalTargets.ToString(), "");
         Row3(sb, "Targets hit per activation", FormatDecimal(targetsHitPerActivation), "");
@@ -1288,7 +1288,7 @@ public static class RelicHoverShowPatch
         AppendRelicDamageStats(
             sb,
             agg,
-            triggerLabel: "Times triggered",
+            triggerDescription: "Times triggered — the number of times this relic has activated.",
             averageLabel: "Damage per trigger",
             averageDenominator: agg.Activations);
         return sb.ToString();
@@ -1305,7 +1305,7 @@ public static class RelicHoverShowPatch
     private static string BuildEternalFeatherBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         AppendHealingStats(sb, agg);
         return sb.ToString();
     }
@@ -1313,7 +1313,10 @@ public static class RelicHoverShowPatch
     private static string BuildBoneFluteBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Times triggered", agg.BoneFluteTriggers.ToString(), "");
+        RelicActivationRow(
+            sb,
+            agg.BoneFluteTriggers.ToString(),
+            "Times triggered — the number of times this relic has activated.");
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
         return sb.ToString();
     }
@@ -1471,7 +1474,7 @@ public static class RelicHoverShowPatch
         bool includeCombatsWithEnergyNotGained)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         AppendEnergyGeneratedStats(sb, agg);
         Row3(sb, excessEnergyLabel, turnsEndedWithExcessEnergy.ToString(), "");
         if (includeCombatsWithEnergyNotGained)
@@ -1490,7 +1493,7 @@ public static class RelicHoverShowPatch
     private static string BuildGremlinHornBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         AppendEnergyGeneratedStats(sb, agg);
         Row3(sb, "Cards drawn", agg.AdditionalCardsDrawn.ToString(), "");
         return sb.ToString();
@@ -1518,7 +1521,7 @@ public static class RelicHoverShowPatch
             ? 0m
             : (decimal)chargeTotal / chargeSamples;
 
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, "Cards drawn", agg.AdditionalCardsDrawn.ToString(), "");
         Row3(sb, "Avg cards drawn per combat", FormatDecimal(cardsDrawnPerCombat), "");
         Row3(sb, "Combats ended on 0 charges", agg.PendulumCombatsEndedOn0Charges.ToString(), "");
@@ -1534,7 +1537,7 @@ public static class RelicHoverShowPatch
         AppendRelicDamageStats(
             sb,
             agg,
-            triggerLabel: "Combats triggered",
+            triggerDescription: "Combats triggered — the number of combats in which this relic activated.",
             averageLabel: "Damage per combat",
             averageDenominator: agg.Activations);
         return sb.ToString();
@@ -1546,7 +1549,7 @@ public static class RelicHoverShowPatch
         AppendRelicDamageStats(
             sb,
             agg,
-            triggerLabel: "Activations",
+            triggerDescription: "Activations — the number of times this relic has activated.",
             averageLabel: "Damage per activation",
             averageDenominator: agg.Activations);
         return sb.ToString();
@@ -1558,7 +1561,7 @@ public static class RelicHoverShowPatch
         AppendRelicDamageStats(
             sb,
             agg,
-            triggerLabel: "Activations",
+            triggerDescription: "Activations — the number of times this relic has activated.",
             averageLabel: "Damage per activation",
             averageDenominator: agg.Activations);
         return sb.ToString();
@@ -1570,7 +1573,7 @@ public static class RelicHoverShowPatch
         AppendRelicDamageStats(
             sb,
             agg,
-            triggerLabel: "Combats triggered",
+            triggerDescription: "Combats triggered — the number of combats in which this relic activated.",
             averageLabel: "Damage per combat",
             averageDenominator: agg.Activations);
         return sb.ToString();
@@ -1579,11 +1582,11 @@ public static class RelicHoverShowPatch
     private static void AppendRelicDamageStats(
         StringBuilder sb,
         RelicAggregate agg,
-        string triggerLabel,
+        string triggerDescription,
         string? averageLabel = null,
         int averageDenominator = 0)
     {
-        Row3(sb, triggerLabel, agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString(), triggerDescription);
         Row3(sb, "Damage attempted", agg.TotalDamageAttempted.ToString(), "");
         Row3(sb, "Damage dealt", agg.TotalDamageDealt.ToString(), "");
         Row3(sb, "Damage blocked", agg.TotalDamageBlocked.ToString(), "");
@@ -1622,7 +1625,7 @@ public static class RelicHoverShowPatch
     private static string BuildHornCleatBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
         return sb.ToString();
     }
@@ -1645,7 +1648,10 @@ public static class RelicHoverShowPatch
     private static string BuildSealOfGoldBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Times triggered", agg.Activations.ToString(), "");
+        RelicActivationRow(
+            sb,
+            agg.Activations.ToString(),
+            "Times triggered — the number of times this relic has activated.");
         Row3(sb, "Gold loss attempted", (agg.Activations * SealOfGoldLossPerTrigger).ToString(), "");
         Row3(sb, "Gold lost", agg.GoldLost.ToString(), "");
         Row3(sb, "Gold loss blocked", agg.GoldLossBlocked.ToString(), "");
@@ -2048,7 +2054,7 @@ public static class RelicHoverShowPatch
             ? 0m
             : (decimal)agg.Activations / agg.ReptileTrinketCombats;
 
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, "Strength added", FormatDecimal(agg.StrengthAdded), "");
         Row3(sb, "Avg activations per turn", FormatDecimal(activationsPerTurn), "");
         Row3(sb, "Avg activations per combat", FormatDecimal(activationsPerCombat), "");
@@ -2068,7 +2074,7 @@ public static class RelicHoverShowPatch
     private static string BuildGorgetBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, "Plating added", FormatDecimal(agg.PlatingAdded), "");
         return sb.ToString();
     }
@@ -2111,7 +2117,7 @@ public static class RelicHoverShowPatch
             ? 0m
             : (decimal)agg.StoneCrackerUpgradedCardPlays / agg.StoneCrackerCombats;
 
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, "Cards upgraded", agg.CardsUpgraded.ToString(), "");
         Row3(sb, "Upgraded commons", agg.StoneCrackerUpgradedCommons.ToString(), "");
         Row3(sb, "Upgraded uncommons", agg.StoneCrackerUpgradedUncommons.ToString(), "");
@@ -2181,7 +2187,7 @@ public static class RelicHoverShowPatch
             ? 0m
             : (decimal)agg.WarHammerUpgradedCardPlays / agg.WarHammerCombats;
 
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, "Cards upgraded", agg.CardsUpgraded.ToString(), "");
         Row3(sb, "Avg cards upgraded/activation", FormatDecimal(cardsPerActivation), "");
         foreach (var card in (agg.UpgradedCards ?? new List<string>())
@@ -2289,7 +2295,7 @@ public static class RelicHoverShowPatch
     private static string BuildMealTicketBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         AppendHealingStats(sb, agg);
         return sb.ToString();
     }
@@ -2318,7 +2324,7 @@ public static class RelicHoverShowPatch
     private static string BuildPantographBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         AppendHealingStats(sb, agg, lostLabel: "healing wasted", reasonPrefix: "wasted to");
         return sb.ToString();
     }
@@ -2373,7 +2379,7 @@ public static class RelicHoverShowPatch
     private static string BuildStrawberryBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         AppendMaxHpChangeRows(sb, agg, "Max HP gained", agg.MaxHpGained);
         return sb.ToString();
     }
@@ -2381,7 +2387,7 @@ public static class RelicHoverShowPatch
     private static string BuildPearBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         AppendMaxHpChangeRows(sb, agg, "Max HP gained", agg.MaxHpGained);
         return sb.ToString();
     }
@@ -2389,7 +2395,7 @@ public static class RelicHoverShowPatch
     private static string BuildNutritiousOysterBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         AppendMaxHpChangeRows(sb, agg, "Max HP gained", agg.MaxHpGained);
         return sb.ToString();
     }
@@ -2397,7 +2403,7 @@ public static class RelicHoverShowPatch
     private static string BuildMangoBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         AppendMaxHpChangeRows(sb, agg, "Max HP gained", agg.MaxHpGained);
         return sb.ToString();
     }
@@ -2408,7 +2414,10 @@ public static class RelicHoverShowPatch
         var activations = agg.MaxHpActivations
             ?? new List<RelicMaxHpActivationAggregate>();
 
-        Row3(sb, "Times triggered", agg.Activations.ToString(), "");
+        RelicActivationRow(
+            sb,
+            agg.Activations.ToString(),
+            "Times triggered — the number of times this relic has activated.");
         Row3(sb, "Max HP gained", FormatDecimal(Math.Max(0m, agg.MaxHpGained)), "");
 
         for (var index = 0; index < activations.Count; index++)
@@ -2470,7 +2479,10 @@ public static class RelicHoverShowPatch
 
         Row3(sb, "Total cards added to deck", agg.CardsAddedToDeck.ToString(), "");
         Row3(sb, "Avg cards added per floor", FormatDecimal(cardsPerFloor), "");
-        Row3(sb, "Total times triggered", agg.Activations.ToString(), "");
+        RelicActivationRow(
+            sb,
+            agg.Activations.ToString(),
+            "Total times triggered — the number of times this relic has activated.");
         Row3(sb, "Total HP healed", FormatDecimal(agg.TotalHealingRestored), "");
         Row3(sb, "Total HP healing blocked", FormatDecimal(agg.TotalHealingLost), "");
         Row3(sb, "Card rewards skipped", agg.CardRewardsSkipped.ToString(), "");
@@ -2524,7 +2536,7 @@ public static class RelicHoverShowPatch
     private static string BuildLeafyPoulticeBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         AppendMaxHpChangeRows(sb, agg, "Max HP lost", MaxHpLost(agg));
         AppendCardTransformationRows(sb, agg, expectedCount: 2);
         return sb.ToString();
@@ -2533,7 +2545,7 @@ public static class RelicHoverShowPatch
     private static string BuildRegalPillowBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         AppendHealingStats(sb, agg);
         return sb.ToString();
     }
@@ -2556,7 +2568,7 @@ public static class RelicHoverShowPatch
     private static string BuildBloodVialBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         AppendHealingStats(sb, agg);
         return sb.ToString();
     }
@@ -2564,7 +2576,7 @@ public static class RelicHoverShowPatch
     private static string BuildToolboxBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, "Uncommon cards offered", agg.UncommonCardsOffered.ToString(), "");
         Row3(sb, "Rare cards offered", agg.RareCardsOffered.ToString(), "");
         Row3(sb, "Uncommon cards taken", agg.UncommonCardsTaken.ToString(), "");
@@ -2738,7 +2750,7 @@ public static class RelicHoverShowPatch
     private static string BuildPaelsEyeBodyBBCode(RelicAggregate agg, bool activatedThisCombat = false)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, "Activated this combat", activatedThisCombat ? "true" : "false", "");
         Row3(sb, "Combats without activation", agg.CombatsWithoutActivation.ToString(), "");
         Row3(sb, "Statuses exhausted", agg.StatusCardsExhausted.ToString(), "");
@@ -2848,7 +2860,7 @@ public static class RelicHoverShowPatch
             : (decimal)agg.KunaiTurnEndChargeTotal / agg.KunaiTurnEndChargeCount;
 
         Row3(sb, "Attacks played", agg.KunaiAttacksPlayed.ToString(), "");
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, "Dexterity gained", agg.KunaiDexterityGained.ToString(), "");
         Row3(sb, "Turns ended at 1 charge", agg.KunaiTurnsEndedAt1Charge.ToString(), "");
         Row3(sb, "Turns ended at 2 charges", agg.KunaiTurnsEndedAt2Charges.ToString(), "");
@@ -2863,7 +2875,7 @@ public static class RelicHoverShowPatch
         AppendRelicDamageStats(
             sb,
             agg,
-            triggerLabel: "Activations",
+            triggerDescription: "Activations — the number of times this relic has activated.",
             averageLabel: "Damage per activation",
             averageDenominator: agg.Activations);
         AppendTurnResetChargeRows(
@@ -2883,7 +2895,7 @@ public static class RelicHoverShowPatch
             : (decimal)agg.AdditionalBlockGained / agg.Activations;
 
         Row3(sb, "Attacks played", agg.OrnamentalFanAttacksPlayed.ToString(), "");
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
         Row3(sb, BlockLabel("block gained per activation"), FormatDecimal(blockPerActivation), "");
         Row3(sb, "Turns ended at 0 charges", agg.OrnamentalFanTurnsEndedAt0Charges.ToString(), "");
@@ -2904,7 +2916,7 @@ public static class RelicHoverShowPatch
             : agg.StrengthAdded / agg.Activations;
 
         Row3(sb, "Attacks played", agg.ShurikenAttacksPlayed.ToString(), "");
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, "Strength gained", FormatDecimal(agg.StrengthAdded), "");
         Row3(sb, "Strength gained per activation", FormatDecimal(strengthPerActivation), "");
         AppendTurnResetChargeRows(
@@ -2926,7 +2938,10 @@ public static class RelicHoverShowPatch
             ? 0m
             : agg.StrengthAdded / agg.RuinedHelmetCombats;
 
-        Row3(sb, "Times activated", agg.Activations.ToString(), "");
+        RelicActivationRow(
+            sb,
+            agg.Activations.ToString(),
+            "Times activated — the number of times this relic has activated.");
         Row3(sb, "Total strength gained", FormatDecimal(agg.StrengthAdded), "");
         Row3(
             sb,
@@ -2990,7 +3005,7 @@ public static class RelicHoverShowPatch
             ? 0m
             : (decimal)agg.Activations / agg.BookmarkCombats;
 
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, "common activations", agg.BookmarkCommonActivations.ToString(), "");
         Row3(sb, "uncommon activations", agg.BookmarkUncommonActivations.ToString(), "");
         Row3(sb, "rare activations", agg.BookmarkRareActivations.ToString(), "");
@@ -3061,7 +3076,10 @@ public static class RelicHoverShowPatch
             ? 0m
             : (decimal)agg.Activations / agg.MummifiedHandTurns;
 
-        Row3(sb, "Times triggered", agg.Activations.ToString(), "");
+        RelicActivationRow(
+            sb,
+            agg.Activations.ToString(),
+            "Times triggered — the number of times this relic has activated.");
         Row3(sb, EnergyLabel("Avg cost of triggering Power"), FormatDecimal(averageTriggeringPowerCost), "");
         Row3(sb, EnergyLabel("Avg discount given"), FormatDecimal(averageDiscountGiven), "");
         Row3(
@@ -3118,7 +3136,7 @@ public static class RelicHoverShowPatch
         var averageDrawn = agg.Activations <= 0
             ? 0m
             : (decimal)agg.AdditionalCardsDrawn / agg.Activations;
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, "Triggered this combat", triggeredThisCombat ? "true" : "false", "");
         Row3(sb, "Cards drawn total", agg.AdditionalCardsDrawn.ToString(), "");
         Row3(sb, "Avg cards drawn per combat", FormatDecimal(averageDrawn), "");
@@ -3473,6 +3491,18 @@ public static class RelicHoverShowPatch
             value,
             fullDescription,
             pct);
+    }
+
+    private static void RelicActivationRow(
+        StringBuilder sb,
+        string value,
+        string fullDescription = "Activations — the number of times this relic has activated.")
+    {
+        ConceptRow(
+            sb,
+            "activation",
+            value,
+            fullDescription);
     }
 
     private static void DescribedIconRow(

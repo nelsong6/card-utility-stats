@@ -4,6 +4,10 @@ This is the migration map for replacing repeated relic-stat vocabulary with
 tooltip-backed symbols. It is intentionally an audit of presentation, not a
 change to tracking or persisted data.
 
+This audit is limited to relic-stat popups. “Card” rows below are relic stats
+about cards, such as cards upgraded or cards offered. Card-stat popups are
+explicitly tabled until they have a mouse-accessible pinning interaction.
+
 ## Current surface
 
 A static scan of `Core/Patches/RelicHoverTooltipPatch.cs` found:
@@ -101,6 +105,12 @@ should remain text.
    full sentence for every information hint.
 5. Leave bespoke history and proper-name rows as text, but still give each one
    a left-side information hint.
+
+Progress:
+
+- activation and trigger totals now use the activation symbol and a full-row
+  information hint throughout the relic-stat renderer
+- Sturdy Clamp is the initial multi-concept example
 
 The information description should be authored at the call site. It should
 not be generated from the visible label: the full sentence often needs to say
