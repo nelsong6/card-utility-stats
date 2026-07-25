@@ -3304,6 +3304,33 @@ public class SchemaLoadingTests
             resumed!.RelicAggregates["RELIC.DOWSING_ROD"].DowsingQuestionRoomsRemaining);
     }
 
+    [Fact]
+    public void HistoricalLoad_AcceptsWingedBootsRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("winged-boots-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.Collection(
+            loaded.Data.RelicAggregates["RELIC.WINGED_BOOTS"].WingedBootsDestinations,
+            entry => Assert.Equal((1, "combat"), (entry.UseNumber, entry.Destination)),
+            entry => Assert.Equal((2, "shop"), (entry.UseNumber, entry.Destination)),
+            entry => Assert.Equal((3, "question_mark"), (entry.UseNumber, entry.Destination)));
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsWingedBootsRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("winged-boots-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        Assert.Equal(
+            new[] { "combat", "shop", "question_mark" },
+            resumed!.RelicAggregates["RELIC.WINGED_BOOTS"]
+                .WingedBootsDestinations
+                .Select(entry => entry.Destination));
+    }
+
     private static void AssertLeafyPoulticeTransformations(RelicAggregate relicAgg)
     {
         Assert.Equal(2, relicAgg.CardTransformations.Count);

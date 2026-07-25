@@ -1871,6 +1871,7 @@ public static class RunTracker
             target.FloorsAscendedBeforeFirstShop = source.FloorsAscendedBeforeFirstShop;
         if (source.FloorsTraveledUntilNextShop.HasValue && !target.FloorsTraveledUntilNextShop.HasValue)
             target.FloorsTraveledUntilNextShop = source.FloorsTraveledUntilNextShop;
+        MergeWingedBootsDestinations(target, source);
         MergeCardsRemovedInto(target, source);
         if (source.StartingMaxHp.HasValue) target.StartingMaxHp = source.StartingMaxHp;
         if (source.ResultingMaxHp.HasValue) target.ResultingMaxHp = source.ResultingMaxHp;
@@ -3674,6 +3675,7 @@ public static class RunTracker
     private const string BloodSoakedRoseRelicId = "RELIC.BLOOD_SOAKED_ROSE";
     private const string CursedPearlRelicId = "RELIC.CURSED_PEARL";
     private const string SignetRingRelicId = "RELIC.SIGNET_RING";
+    private const string WingedBootsRelicId = "RELIC.WINGED_BOOTS";
     private const string CloakClaspRelicId = "RELIC.CLOAK_CLASP";
     private const string ReptileTrinketRelicId = "RELIC.REPTILE_TRINKET";
     private const string BeatingRemnantRelicId = "RELIC.BEATING_REMNANT";
@@ -6062,6 +6064,85 @@ public static class RunTracker
         agg.FloorsTraveledUntilNextShop = Math.Max(0, shopFloor - pickupFloor);
         return true;
     }
+
+    /// <summary>
+    /// Persist the original map-point category reached by a confirmed Winged
+    /// Boots charge. TimesUsed is the authoritative use number and is saved by
+    /// the game itself.
+    /// </summary>
+    public static void RecordWingedBootsDestination(
+        WingedBoots relic,
+        int useNumber,
+        MapPointType pointType)
+    {
+        if (relic == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(relic.Owner)) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(WingedBootsRelicId);
+                if (!RecordWingedBootsDestinationForTest(agg, useNumber, pointType)) return;
+
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordWingedBootsDestination failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static bool RecordWingedBootsDestinationForTest(
+        RelicAggregate agg,
+        int useNumber,
+        MapPointType pointType)
+    {
+        if (agg == null || useNumber is < 1 or > 3) return false;
+
+        agg.WingedBootsDestinations ??= new List<WingedBootsDestinationAggregate>();
+        if (agg.WingedBootsDestinations.Any(entry => entry.UseNumber == useNumber))
+            return false;
+
+        agg.WingedBootsDestinations.Add(new WingedBootsDestinationAggregate
+        {
+            UseNumber = useNumber,
+            Destination = WingedBootsDestinationId(pointType),
+        });
+        agg.WingedBootsDestinations.Sort((left, right) => left.UseNumber.CompareTo(right.UseNumber));
+        return true;
+    }
+
+    internal static string FormatWingedBootsDestination(string? destination)
+        => destination switch
+        {
+            "combat" => "combat",
+            "shop" => "shop",
+            "question_mark" => "?",
+            "elite" => "elite",
+            "treasure" => "treasure",
+            "rest_site" => "rest site",
+            "boss" => "boss",
+            "ancient" => "ancient",
+            "unassigned" => "unknown",
+            _ => "unknown",
+        };
+
+    private static string WingedBootsDestinationId(MapPointType pointType)
+        => pointType switch
+        {
+            MapPointType.Monster => "combat",
+            MapPointType.Shop => "shop",
+            MapPointType.Unknown => "question_mark",
+            MapPointType.Elite => "elite",
+            MapPointType.Treasure => "treasure",
+            MapPointType.RestSite => "rest_site",
+            MapPointType.Boss => "boss",
+            MapPointType.Ancient => "ancient",
+            _ => "unassigned",
+        };
 
     public static void ArmHeftyTabletChoice(Player owner)
     {
@@ -16237,6 +16318,30 @@ public static class RunTracker
                 reason.DisplayName,
                 reason.Amount);
         }
+    }
+
+    private static void MergeWingedBootsDestinations(RelicAggregate target, RelicAggregate source)
+    {
+        target.WingedBootsDestinations ??= new List<WingedBootsDestinationAggregate>();
+        if (source.WingedBootsDestinations == null) return;
+
+        foreach (var destination in source.WingedBootsDestinations
+                     .Where(entry => entry != null
+                                     && entry.UseNumber is >= 1 and <= 3
+                                     && !string.IsNullOrWhiteSpace(entry.Destination))
+                     .OrderBy(entry => entry.UseNumber))
+        {
+            if (target.WingedBootsDestinations.Any(entry => entry.UseNumber == destination.UseNumber))
+                continue;
+
+            target.WingedBootsDestinations.Add(new WingedBootsDestinationAggregate
+            {
+                UseNumber = destination.UseNumber,
+                Destination = destination.Destination,
+            });
+        }
+
+        target.WingedBootsDestinations.Sort((left, right) => left.UseNumber.CompareTo(right.UseNumber));
     }
 
     private static void MergeCardsRemovedInto(RelicAggregate target, RelicAggregate source)

@@ -428,6 +428,14 @@ Juzu Bracelet is map-point based, not resolved-room based. Count
 `RoomType.Event` or `EventRoom`: a `?` can resolve into multiple room types, and
 later room transitions can happen after the map site was already entered.
 
+Winged Boots owns the authoritative signal for spending one of its three
+off-path jumps. Its `AfterRoomEntered` callback compares the prior map point's
+children with the current point and increments its saved `TimesUsed` only when
+the move consumed a charge. Compare `TimesUsed` before and after that callback,
+then record the current point's original `MapPointType` under the resulting use
+number. Do not infer activations from general room entry or merely from the
+relic allowing free travel; those also occur for normal connected movement.
+
 Dowsing Rod itself only grants the Dowsing quest card. The card owns the saved
 `RoomsEntered` counter, updates it only for qualifying `?` room entries, and
 transforms into Abundance at five. Observe the `Dowsing.RoomsEntered` setter and

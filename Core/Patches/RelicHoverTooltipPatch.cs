@@ -889,6 +889,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is WingedBoots wingedBoots)
+        {
+            title = "Winged Boots";
+            body = BuildWingedBootsBodyBBCode(agg, wingedBoots.TimesUsed);
+            return true;
+        }
+
         if (relicModel is LeafyPoultice)
         {
             title = "Leafy Poultice";
@@ -2429,6 +2436,39 @@ public static class RelicHoverShowPatch
             "");
         return sb.ToString();
     }
+
+    private static string BuildWingedBootsBodyBBCode(
+        RelicAggregate agg,
+        int liveTimesUsed = 0)
+    {
+        var sb = new StringBuilder();
+        var destinations = agg.WingedBootsDestinations
+            ?? new List<WingedBootsDestinationAggregate>();
+
+        for (var useNumber = 1; useNumber <= 3; useNumber++)
+        {
+            var destination = destinations.FirstOrDefault(
+                entry => entry != null && entry.UseNumber == useNumber);
+            var value = destination != null
+                ? RunTracker.FormatWingedBootsDestination(destination.Destination)
+                : useNumber <= liveTimesUsed
+                    ? "not tracked"
+                    : "not used yet";
+
+            Row3(sb, $"{Ordinal(useNumber)} floor destination", value, "");
+        }
+
+        return sb.ToString();
+    }
+
+    private static string Ordinal(int value)
+        => value switch
+        {
+            1 => "1st",
+            2 => "2nd",
+            3 => "3rd",
+            _ => value.ToString(),
+        };
 
     private static string BuildLeafyPoulticeBodyBBCode(RelicAggregate agg)
     {

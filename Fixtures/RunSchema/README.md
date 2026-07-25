@@ -384,6 +384,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `soul-pile-card-run.json`
   Adds per-source card tracking for generated or transformed Souls that
   actually arrived in the draw pile, hand, or discard pile.
+- `winged-boots-relic-run.json`
+  Adds Winged Boots' three numbered off-path destination categories, keyed to
+  the relic's own saved use counter.
 
 Why these exist:
 
