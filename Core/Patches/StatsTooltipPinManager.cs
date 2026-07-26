@@ -680,13 +680,13 @@ internal static class StatsTooltipPinManager
     private static Control GetLockIconHost(Control target)
     {
         // Card holders are interaction/layout slots whose bounds can be much
-        // larger than the rendered card. Relic holders already coincide with
-        // their visible item, but cards need the badge anchored to the actual
-        // card body so the same top-right placement has the same meaning.
+        // larger than the rendered card. Anchor to the complete NCard control,
+        // not its internal CardContainer: that container's layout origin is
+        // around the card's type banner rather than the card's outer bounds.
         if (target is NCardHolder holder
-            && IsLive(holder.CardNode?.Body))
+            && IsLive(holder.CardNode))
         {
-            return holder.CardNode!.Body;
+            return holder.CardNode!;
         }
 
         if (target is NDeckHistoryEntry historyEntry
