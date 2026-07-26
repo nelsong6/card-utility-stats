@@ -48,6 +48,11 @@ public static class DeckViewInjectRemovedPatch
             // (a separate field on the screen), not the order of _cards.
             __instance._cards = __instance._pile.Cards.ToList();
 
+            // The run-history viewer uses the same native deck screen, but its
+            // pile is an exact reconstruction of that historical final deck.
+            // Never append cards from the current/live RunTracker to it.
+            if (RunHistoryDeckViewer.IsHistoricalDeckViewer(__instance)) return;
+
             if (!ViewStatsInjectorPatch.ShowRemovedCardsEnabled) return;
 
             var supplemental = RunTracker.GetSupplementalDeckViewCards();

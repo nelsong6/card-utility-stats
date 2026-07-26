@@ -129,6 +129,38 @@ public class RunHistoryStatsContextTests
     }
 
     [Fact]
+    public void SelectAggregateKeysForHistoricalDeck_PreservesDuplicateDeckOrder()
+    {
+        var run = new RunData();
+        run.InstanceNumbersByDef["CARD.STRIKE"] = new List<int> { 2, 5 };
+        run.InstanceNumbersByDef["CARD.DEFEND"] = new List<int> { 3 };
+        run.Aggregates["CARD.STRIKE#2"] = new CardAggregate();
+        run.Aggregates["CARD.STRIKE#5"] = new CardAggregate();
+        run.Aggregates["CARD.DEFEND#3"] = new CardAggregate();
+
+        var keys = RunHistoryStatsContext.SelectAggregateKeysForHistoricalDeck(
+            run,
+            new[] { "CARD.STRIKE", "CARD.DEFEND", "CARD.STRIKE" });
+
+        Assert.Equal(
+            new string?[] { "CARD.STRIKE#2", "CARD.DEFEND#3", "CARD.STRIKE#5" },
+            keys);
+    }
+
+    [Fact]
+    public void SelectAggregateKeysForHistoricalDeck_AcceptsPooledHistoryShape()
+    {
+        var run = new RunData();
+        run.Aggregates["CARD.SHIV"] = new CardAggregate();
+
+        var keys = RunHistoryStatsContext.SelectAggregateKeysForHistoricalDeck(
+            run,
+            new[] { "CARD.SHIV", "CARD.SHIV" });
+
+        Assert.Equal(new string?[] { "CARD.SHIV", "CARD.SHIV" }, keys);
+    }
+
+    [Fact]
     public void RelicStatsAggregateId_NormalizesFakeRelics()
     {
         Assert.Equal("RELIC.ANCHOR", RelicHoverShowPatch.GetStatsAggregateId(Uninitialized<FakeAnchor>()));

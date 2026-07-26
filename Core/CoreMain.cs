@@ -140,6 +140,7 @@ public static class CoreMain
         // the user would see the checkbox disappear until they close and
         // reopen the deck view.
         Patches.ViewStatsInjectorPatch.ReinjectIntoActiveDeckView();
+        RunHistoryDeckViewer.ReinjectIntoActiveRunHistory();
         Patches.RelicBarFilterPatch.InitializeHooks();
         Patches.RelicBarFilterPatch.RefreshAll("core initialized");
         Patches.RelicCompendiumFilterUi.ReinjectIntoActiveCollections();
@@ -175,6 +176,9 @@ public static class CoreMain
         // later cleanup. A half-cleaned state is better than a no-cleaned state.
         try { ViewStatsInjectorPatch.TeardownInjectedUI(); }
         catch (Exception e) { Logger.Error($"Shutdown: UI teardown failed: {e}"); }
+
+        try { RunHistoryDeckViewer.Teardown(); }
+        catch (Exception e) { Logger.Error($"Shutdown: run-history deck viewer teardown failed: {e}"); }
 
         try { SpireLensOptionsMenu.Destroy(); }
         catch (Exception e) { Logger.Error($"Shutdown: options menu teardown failed: {e}"); }

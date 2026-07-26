@@ -311,6 +311,7 @@ public static class ViewStatsInjectorPatch
         // we validate semantics per-screen — e.g. Compendium stats would need
         // lifetime aggregation (#2).
         if (__instance is not NDeckViewScreen deckView) return;
+        if (RunHistoryDeckViewer.IsHistoricalDeckViewer(deckView)) return;
 
         // Remember the active deck view so OnStatsToggled can trigger a
         // live re-render (show/hide removed cards instantly on toggle).

@@ -70,6 +70,10 @@ movement is allowed so inline help can be inspected; any other mouse click or
 wheel action, key press, or controller action removes the pin and continues to
 the game normally.
 
+Run history also has a deck icon beside its Cards section. It opens the
+selected player's final deck in the normal deck viewer, with duplicate cards
+kept as separate, inspectable card instances.
+
 The relic compendium's **Edit combat relevance** mode shows each discovered
 relic's classification with the game's enemy-map icon for combat or top-bar
 map icon for non-combat. Inspecting a discovered relic opens explicit **Combat**

@@ -49,6 +49,13 @@ public static class CardHoverShowPatch
         var cardModel = holder.CardModel;
         if (cardModel == null) return false;
 
+        if (RunHistoryStatsContext.TryBuildHistoricalDeckCardHoverTip(
+                cardModel,
+                out statsTip))
+        {
+            return true;
+        }
+
         // Per-instance display: every deck card gets a stable "#N" number
         // assigned at RunStarted for the starting deck and lazily for cards
         // added mid-run.

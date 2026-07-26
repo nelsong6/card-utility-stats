@@ -42,6 +42,12 @@ public static class StatsVisibilityHotkeyPatch
             var inputManager = NInputManager.Instance;
             if (inputManager == null) return;
 
+            if (RunHistoryDeckViewer.HandleInput(evt))
+            {
+                inputManager.GetViewport()?.SetInputAsHandled();
+                return;
+            }
+
             if (SpireLensOptionsMenu.HandleShortcut(evt))
             {
                 inputManager.GetViewport()?.SetInputAsHandled();

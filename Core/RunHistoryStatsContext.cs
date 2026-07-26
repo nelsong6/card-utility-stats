@@ -6,8 +6,10 @@ using Godot;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.HoverTips;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Models.Cards;
 using MegaCrit.Sts2.Core.Models.Relics;
 using MegaCrit.Sts2.Core.Nodes.Relics;
+using MegaCrit.Sts2.Core.Nodes.Screens;
 using MegaCrit.Sts2.Core.Nodes.Screens.RunHistoryScreen;
 using MegaCrit.Sts2.Core.Runs;
 using SpireLens.Core.Patches;
@@ -26,8 +28,63 @@ internal static class RunHistoryStatsContext
     private static LoadedRunFile? _loaded;
     private static long? _gameStartTime;
     private static bool _loadAttempted;
+    private static NDeckViewScreen? _historicalDeckViewer;
+    private static readonly Dictionary<CardModel, string> HistoricalDeckKeys =
+        new(ReferenceEqualityComparer.Instance);
 
     public static bool HasCurrent => EnsureLoaded()?.Data != null;
+
+    public static void SetHistoricalDeckViewer(
+        NDeckViewScreen viewer,
+        IReadOnlyList<CardModel> cards)
+    {
+        _historicalDeckViewer = viewer;
+        HistoricalDeckKeys.Clear();
+
+        var run = EnsureLoaded()?.Data;
+        if (run == null) return;
+
+        var keys = SelectAggregateKeysForHistoricalDeck(
+            run,
+            cards.Select(card => card.Id.ToString()));
+        for (var i = 0; i < cards.Count && i < keys.Count; i++)
+        {
+            if (!string.IsNullOrWhiteSpace(keys[i]))
+                HistoricalDeckKeys[cards[i]] = keys[i]!;
+        }
+    }
+
+    public static void ClearHistoricalDeckViewer()
+    {
+        _historicalDeckViewer = null;
+        HistoricalDeckKeys.Clear();
+    }
+
+    public static bool TryBuildHistoricalDeckCardHoverTip(
+        CardModel card,
+        out HoverTip statsTip)
+    {
+        statsTip = default;
+        if (_historicalDeckViewer == null
+            || !GodotObject.IsInstanceValid(_historicalDeckViewer)
+            || !HistoricalDeckKeys.TryGetValue(card, out var key))
+        {
+            return false;
+        }
+
+        var run = EnsureLoaded()?.Data;
+        if (run == null || !run.Aggregates.TryGetValue(key, out var aggregate))
+            return false;
+
+        var title = BuildCardDisplayName(card, new[] { key }, amount: 1);
+        var body = CardHoverShowPatch.BuildHistoricalBodyBBCode(
+            card,
+            aggregate,
+            run.MetaStats,
+            GetPermanentUpgradeEvents(run, key));
+        statsTip = StatsTooltip.CreateNativeTip(title, body);
+        return true;
+    }
 
     public static bool TryBuildNativeCardHoverTip(
         NDeckHistoryEntry entry,
@@ -108,6 +165,7 @@ internal static class RunHistoryStatsContext
 
     public static void Clear()
     {
+        ClearHistoricalDeckViewer();
         _loaded = null;
         _gameStartTime = null;
         _loadAttempted = false;
@@ -261,6 +319,38 @@ internal static class RunHistoryStatsContext
         }
 
         return candidates.Take(take).ToArray();
+    }
+
+    internal static IReadOnlyList<string?> SelectAggregateKeysForHistoricalDeck(
+        RunData run,
+        IEnumerable<string> definitionIds)
+    {
+        var occurrences = new Dictionary<string, int>(StringComparer.Ordinal);
+        var perDefinitionKeys = new Dictionary<string, IReadOnlyList<string>>(
+            StringComparer.Ordinal);
+        var result = new List<string?>();
+
+        foreach (var definitionId in definitionIds)
+        {
+            occurrences.TryGetValue(definitionId, out var occurrence);
+            occurrences[definitionId] = occurrence + 1;
+
+            if (run.Aggregates.ContainsKey(definitionId))
+            {
+                result.Add(definitionId);
+                continue;
+            }
+
+            if (!perDefinitionKeys.TryGetValue(definitionId, out var keys))
+            {
+                keys = GetPerInstanceKeysForDefinition(run, definitionId);
+                perDefinitionKeys[definitionId] = keys;
+            }
+
+            result.Add(occurrence < keys.Count ? keys[occurrence] : null);
+        }
+
+        return result;
     }
 
     private static List<string> GetPerInstanceKeysForDefinition(RunData run, string definitionId)
@@ -423,9 +513,11 @@ public static class RunHistoryDisplayRunStatsContextPatch
     {
         PatchGuard.Run(nameof(RunHistoryDisplayRunStatsContextPatch), () =>
         {
+            RunHistoryDeckViewer.Close();
             StatsTooltipPinManager.ClearPin();
             RunHistoryStatsContext.SetRun(history);
             StatsTooltipPinManager.AttachRunHistoryTargets(__instance);
+            RunHistoryDeckViewer.InjectButton(__instance);
         });
     }
 }
@@ -438,6 +530,7 @@ public static class RunHistoryHiddenStatsContextPatch
     {
         PatchGuard.Run(nameof(RunHistoryHiddenStatsContextPatch), () =>
         {
+            RunHistoryDeckViewer.Close();
             StatsTooltipPinManager.ClearPin();
             RunHistoryStatsContext.Clear();
         });
