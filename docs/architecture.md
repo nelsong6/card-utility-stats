@@ -102,7 +102,7 @@ When attribution is not naturally one-card-to-one-outcome, the code prefers:
 - [Core/Patches/CardHoverTooltipPatch.cs](../Core/Patches/CardHoverTooltipPatch.cs) builds compact and full tooltip bodies.
 - [Core/Patches/NativeHoverTipAugmentationPatch.cs](../Core/Patches/NativeHoverTipAugmentationPatch.cs) appends owner-specific SpireLens data to the game's `IHoverTip` sequence immediately before `NHoverTipSet` renders it, then applies the SpireLens blue panel tint and brand to only the resulting native stats control.
 - [Core/Patches/StatsTooltipPinManager.cs](../Core/Patches/StatsTooltipPinManager.cs) pins one native card or relic tooltip set under a dedicated surrogate owner, displays the game's top-panel lock icon on its source, and releases the pin on the next non-motion user action.
-- [Core/Patches/CardTooltipPinInputPatch.cs](../Core/Patches/CardTooltipPinInputPatch.cs) intercepts right press on every declared `NCardHolder.OnMousePressed` implementation before the game records an alternate-click action.
+- [Core/Patches/CardTooltipPinInputPatch.cs](../Core/Patches/CardTooltipPinInputPatch.cs) intercepts right press on every declared `NCardHolder.OnMousePressed` implementation before the game records an alternate-click action, but claims it only for holders inside passive card-pile or cards-view screens.
 - [Core/StatsTooltip.cs](../Core/StatsTooltip.cs) creates native `HoverTip` values with the established 20px stats typography and owns no scene-tree nodes or hover lifecycle.
 - [Config/SpireLensConfig.cs](../Config/SpireLensConfig.cs) provides the persistent mod-settings UI for runtime display options.
 

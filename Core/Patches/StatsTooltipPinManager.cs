@@ -5,6 +5,7 @@ using MegaCrit.Sts2.Core.HoverTips;
 using MegaCrit.Sts2.Core.Nodes.Cards.Holders;
 using MegaCrit.Sts2.Core.Nodes.HoverTips;
 using MegaCrit.Sts2.Core.Nodes.Relics;
+using MegaCrit.Sts2.Core.Nodes.Screens;
 using MegaCrit.Sts2.Core.Nodes.Screens.RelicCollection;
 
 namespace SpireLens.Core.Patches;
@@ -223,11 +224,27 @@ internal static class StatsTooltipPinManager
         NCardHolder holder,
         InputEvent inputEvent)
     {
-        if (!IsRightPress(inputEvent))
+        if (!IsRightPress(inputEvent)
+            || !IsPassiveCardPileView(holder))
+        {
             return false;
+        }
 
         AttachTarget(holder, subscribeToGuiInput: false);
         return TryTogglePin(holder, inputEvent);
+    }
+
+    private static bool IsPassiveCardPileView(Node node)
+    {
+        for (var current = node.GetParent();
+             current != null;
+             current = current.GetParent())
+        {
+            if (current is NCardPileScreen or NCardsViewScreen)
+                return true;
+        }
+
+        return false;
     }
 
     private static void OnGuiInput(

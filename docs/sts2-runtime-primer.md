@@ -1032,7 +1032,9 @@ Important surfaces:
   SpireLens prefixes every implementation of that virtual method declared by
   an `NCardHolder` subtype and skips the original when the pin toggle handles
   the press. Patching only the base method is insufficient because
-  `NHandCardHolder` declares an override.
+  `NHandCardHolder` declares an override. The prefix claims right press only
+  when the holder has an `NCardPileScreen` or `NCardsViewScreen` ancestor;
+  combat-hand and active card-selection surfaces retain their normal input.
 - `StatsTooltip` only constructs the native `HoverTip` value and escapes
   dynamic BBCode. It also wraps the stats description in the established 20px
   body size. It must not retain a `Control`, create a scene-root panel, position
