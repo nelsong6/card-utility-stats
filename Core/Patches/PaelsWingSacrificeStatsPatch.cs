@@ -51,7 +51,7 @@ public static class PaelsWingTryModifyCardRewardAlternativesPatch
                 void OnRelicObtained(RelicModel relic)
                 {
                     owner.RelicObtained -= OnRelicObtained;
-                    RunTracker.RecordPaelsWingArtifactGained(relic);
+                    RunTracker.RecordPaelsWingRelicGained(relic);
                 }
 
                 RunTracker.RecordPaelSacrificeMade(cardReward);

@@ -3182,21 +3182,21 @@ public static class RelicHoverShowPatch
         Row3(sb, "common cards consumed", agg.CommonCardsConsumed.ToString(), "");
         Row3(sb, "uncommon cards consumed", agg.UncommonCardsConsumed.ToString(), "");
         Row3(sb, "rare cards consumed", agg.RareCardsConsumed.ToString(), "");
-        var artifacts = agg.RelicsGranted.Values
-            .Where(artifact => artifact.Count > 0)
-            .OrderByDescending(artifact => artifact.Count)
-            .ThenBy(artifact => artifact.DisplayName, StringComparer.OrdinalIgnoreCase)
+        var relics = agg.RelicsGranted.Values
+            .Where(relic => relic.Count > 0)
+            .OrderByDescending(relic => relic.Count)
+            .ThenBy(relic => relic.DisplayName, StringComparer.OrdinalIgnoreCase)
             .ToList();
-        var artifactsGained = artifacts.Sum(artifact => Math.Max(0, artifact.Count));
-        Row3(sb, "Artifacts gained", artifactsGained.ToString(), "");
+        var relicsGained = relics.Sum(relic => Math.Max(0, relic.Count));
+        Row3(sb, "Relics gained", relicsGained.ToString(), "");
 
-        foreach (var artifact in artifacts)
+        foreach (var relic in relics)
         {
-            var displayName = StatsTooltip.EscapeBbcode(string.IsNullOrWhiteSpace(artifact.DisplayName)
-                ? RunTracker.FormatRelicIdForDisplay(artifact.RelicId)
-                : artifact.DisplayName);
-            var value = artifact.Count == 1 ? displayName : $"{displayName} x{artifact.Count}";
-            RowFlow(sb, "Artifact gained", value, "");
+            var displayName = StatsTooltip.EscapeBbcode(string.IsNullOrWhiteSpace(relic.DisplayName)
+                ? RunTracker.FormatRelicIdForDisplay(relic.RelicId)
+                : relic.DisplayName);
+            var value = relic.Count == 1 ? displayName : $"{displayName} x{relic.Count}";
+            RowFlow(sb, "Relic gained", value, "");
         }
 
         Row3(sb, "Sacrifices made", agg.SacrificesMade.ToString(), "");

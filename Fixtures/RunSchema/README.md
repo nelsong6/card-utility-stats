@@ -169,7 +169,7 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `paels-wing-sacrifice-relic-run.json`
   Adds Pael's Wing sacrifice tracking: consumed card reward options split by
   common, uncommon, and rare, sacrifices made and skipped, and the total and
-  specific artifacts gained from its completed sacrifice pairs.
+  specific relics gained from its completed sacrifice pairs.
 - `paels-tooth-relic-run.json`
   Adds Pael's Tooth returned-card history in observed return order, preserving
   duplicate definitions, final display names, and post-return upgrade levels.

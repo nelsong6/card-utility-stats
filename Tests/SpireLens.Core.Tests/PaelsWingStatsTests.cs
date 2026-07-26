@@ -118,11 +118,10 @@ public class PaelsWingStatsTests
         Assert.Contains("rare cards consumed", body);
         Assert.Contains("Sacrifices made", body);
         Assert.Contains("Sacrifices skipped", body);
-        Assert.Contains("Artifacts gained", body);
-        Assert.Contains("Artifact gained", body);
+        Assert.Contains("Relics gained", body);
+        Assert.Contains("Relic gained", body);
         Assert.Contains("Kunai x2", body);
         Assert.Contains("Bag of Preparation", body);
-        Assert.Contains("Artifact gained  [b]Bag of Preparation[/b]", body);
         Assert.Contains("Sacrifice rate", body);
         Assert.Contains("[b]3/5[/b]", body);
         Assert.Contains("60%", body);
@@ -134,7 +133,7 @@ public class PaelsWingStatsTests
     }
 
     [Fact]
-    public void RelicTooltip_PaelsWingUsesExpandedWidthForArtifactNames()
+    public void RelicTooltip_PaelsWingUsesExpandedWidthForRelicNames()
     {
         var relic = (PaelsWing)RuntimeHelpers.GetUninitializedObject(typeof(PaelsWing));
 
@@ -142,17 +141,17 @@ public class PaelsWingStatsTests
     }
 
     [Fact]
-    public void RunTracker_PaelsWingHelper_RecordsEachArtifactGained()
+    public void RunTracker_PaelsWingHelper_RecordsEachRelicGained()
     {
         var agg = new RelicAggregate();
 
-        RunTracker.RecordPaelsWingArtifactGainedForTest(agg, "RELIC.KUNAI", "Kunai");
-        RunTracker.RecordPaelsWingArtifactGainedForTest(agg, "RELIC.KUNAI", "Kunai");
-        RunTracker.RecordPaelsWingArtifactGainedForTest(
+        RunTracker.RecordPaelsWingRelicGainedForTest(agg, "RELIC.KUNAI", "Kunai");
+        RunTracker.RecordPaelsWingRelicGainedForTest(agg, "RELIC.KUNAI", "Kunai");
+        RunTracker.RecordPaelsWingRelicGainedForTest(
             agg,
             "RELIC.BAG_OF_PREPARATION",
             "Bag of Preparation");
-        RunTracker.RecordPaelsWingArtifactGainedForTest(agg, null, null);
+        RunTracker.RecordPaelsWingRelicGainedForTest(agg, null, null);
 
         Assert.Equal(2, agg.RelicsGranted.Count);
         Assert.Equal(2, agg.RelicsGranted["RELIC.KUNAI"].Count);

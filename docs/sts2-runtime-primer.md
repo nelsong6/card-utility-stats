@@ -551,7 +551,7 @@ alternative and `PaelsWing.OnSacrifice` increments the saved sacrifice count.
 `PaelsFlesh` is a separate combat max-energy relic that activates after turn 3.
 Track consumed card reward rarities and skipped sacrifice opportunities from the
 card reward alternative flow, not from PaelsFlesh's energy hooks. Every second
-sacrifice pulls and obtains a normal `RelicModel`. Capture that direct artifact
+sacrifice pulls and obtains a normal `RelicModel`. Capture that direct relic
 from the owner's first `RelicObtained` event during `OnSacrifice`; the event fires
 synchronously when the relic enters inventory, before its async `AfterObtained`
 callback. Store its id, display name, and count in Pael's Wing's `RelicsGranted`

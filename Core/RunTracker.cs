@@ -7697,28 +7697,28 @@ public static class RunTracker
     }
 
     /// <summary>
-    /// Record the direct artifact Pael's Wing adds to its owner's inventory
+    /// Record the direct relic Pael's Wing adds to its owner's inventory
     /// after a completed pair of sacrifices.
     /// </summary>
-    public static void RecordPaelsWingArtifactGained(RelicModel artifactGained)
+    public static void RecordPaelsWingRelicGained(RelicModel relicGained)
     {
-        if (artifactGained == null) return;
+        if (relicGained == null) return;
 
         lock (_lock)
         {
             try
             {
                 var agg = GetOrCreateCurrentRunRelicAggregateLocked(PaelsWingRelicId);
-                RecordPaelsWingArtifactGainedForTest(
+                RecordPaelsWingRelicGainedForTest(
                     agg,
-                    artifactGained.Id.ToString(),
-                    GetRelicDisplayName(artifactGained));
+                    relicGained.Id.ToString(),
+                    GetRelicDisplayName(relicGained));
                 RefreshCurrentRunMetadataLocked();
                 SaveCurrentRun();
             }
             catch (Exception e)
             {
-                CoreMain.LogDebug($"RecordPaelsWingArtifactGained failed: {e.Message}");
+                CoreMain.LogDebug($"RecordPaelsWingRelicGained failed: {e.Message}");
             }
         }
     }
@@ -12008,7 +12008,7 @@ public static class RunTracker
         AddRelicGranted(agg.RelicsGranted, relicId, displayName ?? "", 1);
     }
 
-    internal static void RecordPaelsWingArtifactGainedForTest(
+    internal static void RecordPaelsWingRelicGainedForTest(
         RelicAggregate agg,
         string? relicId,
         string? displayName)
