@@ -534,7 +534,13 @@ helper, while excluding the eggs' separate `TryModifyCardBeingAddedToDeck`
 path for direct non-choosable deck additions. The `CardModel` passed to
 `ModifyCard` is the upgraded clone and retains the offered card's rarity, so
 Common, Uncommon, and Rare breakdowns should be read from that same confirmed
-offer callback rather than reconstructed from later reward state.
+offer callback rather than reconstructed from later reward state. Keep a
+one-use reference marker on that exact modified `CardModel`; card rewards,
+merchant purchases, and other normal choice surfaces then pass the same model
+to `CardPileCmd.Add(CardModel, PileType, ...)`. Consume the marker only after a
+successful permanent-deck add to count the card as taken. This distinguishes
+observed takes from skipped offers and from direct non-choosable grants without
+inferring egg attribution from the card's upgrade level.
 
 Pael's sacrifice reward option is owned by `PaelsWing`, not `PaelsFlesh`.
 `PaelsWing.TryModifyCardRewardAlternatives` adds the `SACRIFICE` card reward

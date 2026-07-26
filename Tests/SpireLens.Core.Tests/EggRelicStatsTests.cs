@@ -38,7 +38,7 @@ public class EggRelicStatsTests
     }
 
     [Fact]
-    public void RelicAggregate_EggOfferFields_JsonRoundtripPreservesRarityCounts()
+    public void RelicAggregate_EggFields_JsonRoundtripPreservesOfferAndTakenRarityCounts()
     {
         var run = new RunData();
         run.RelicAggregates["RELIC.MOLTEN_EGG"] = new RelicAggregate
@@ -47,6 +47,10 @@ public class EggRelicStatsTests
             UpgradedCommonCardsOffered = 4,
             UpgradedUncommonCardsOffered = 2,
             UpgradedRareCardsOffered = 1,
+            UpgradedCardsTaken = 4,
+            UpgradedCommonCardsTaken = 2,
+            UpgradedUncommonCardsTaken = 1,
+            UpgradedRareCardsTaken = 1,
         };
 
         var json = JsonSerializer.Serialize(run, SerializerOptions);
@@ -58,6 +62,10 @@ public class EggRelicStatsTests
         Assert.Equal(4, agg.UpgradedCommonCardsOffered);
         Assert.Equal(2, agg.UpgradedUncommonCardsOffered);
         Assert.Equal(1, agg.UpgradedRareCardsOffered);
+        Assert.Equal(4, agg.UpgradedCardsTaken);
+        Assert.Equal(2, agg.UpgradedCommonCardsTaken);
+        Assert.Equal(1, agg.UpgradedUncommonCardsTaken);
+        Assert.Equal(1, agg.UpgradedRareCardsTaken);
     }
 
     [Fact]
@@ -78,7 +86,24 @@ public class EggRelicStatsTests
     }
 
     [Fact]
-    public void RelicAggregate_EggOfferFields_Merge()
+    public void RunTracker_EggTakenTestHelper_TracksTotalAndRarityBuckets()
+    {
+        var agg = new RelicAggregate();
+
+        RunTracker.RecordEggUpgradedCardTakenForTest(agg, CardRarity.Common, 2);
+        RunTracker.RecordEggUpgradedCardTakenForTest(agg, CardRarity.Uncommon);
+        RunTracker.RecordEggUpgradedCardTakenForTest(agg, CardRarity.Rare);
+        RunTracker.RecordEggUpgradedCardTakenForTest(agg, CardRarity.Basic);
+        RunTracker.RecordEggUpgradedCardTakenForTest(agg, CardRarity.Rare, -1);
+
+        Assert.Equal(5, agg.UpgradedCardsTaken);
+        Assert.Equal(2, agg.UpgradedCommonCardsTaken);
+        Assert.Equal(1, agg.UpgradedUncommonCardsTaken);
+        Assert.Equal(1, agg.UpgradedRareCardsTaken);
+    }
+
+    [Fact]
+    public void RelicAggregate_EggFields_Merge()
     {
         var target = new RelicAggregate
         {
@@ -86,6 +111,9 @@ public class EggRelicStatsTests
             UpgradedCommonCardsOffered = 2,
             UpgradedUncommonCardsOffered = 1,
             UpgradedRareCardsOffered = 1,
+            UpgradedCardsTaken = 2,
+            UpgradedCommonCardsTaken = 1,
+            UpgradedUncommonCardsTaken = 1,
         };
         var source = new RelicAggregate
         {
@@ -93,6 +121,9 @@ public class EggRelicStatsTests
             UpgradedCommonCardsOffered = 1,
             UpgradedUncommonCardsOffered = 1,
             UpgradedRareCardsOffered = 1,
+            UpgradedCardsTaken = 2,
+            UpgradedCommonCardsTaken = 1,
+            UpgradedRareCardsTaken = 1,
         };
 
         RunTracker.MergeRelicAggregateInto(target, source);
@@ -101,6 +132,10 @@ public class EggRelicStatsTests
         Assert.Equal(3, target.UpgradedCommonCardsOffered);
         Assert.Equal(2, target.UpgradedUncommonCardsOffered);
         Assert.Equal(2, target.UpgradedRareCardsOffered);
+        Assert.Equal(4, target.UpgradedCardsTaken);
+        Assert.Equal(2, target.UpgradedCommonCardsTaken);
+        Assert.Equal(1, target.UpgradedUncommonCardsTaken);
+        Assert.Equal(1, target.UpgradedRareCardsTaken);
     }
 
     [Fact]
@@ -134,6 +169,10 @@ public class EggRelicStatsTests
                 UpgradedCommonCardsOffered = 3,
                 UpgradedUncommonCardsOffered = 2,
                 UpgradedRareCardsOffered = 1,
+                UpgradedCardsTaken = 4,
+                UpgradedCommonCardsTaken = 2,
+                UpgradedUncommonCardsTaken = 1,
+                UpgradedRareCardsTaken = 1,
             },
             floorCount: null,
             out var title,
@@ -145,6 +184,10 @@ public class EggRelicStatsTests
         Assert.Contains($"Upgraded common {cardType} offered", body);
         Assert.Contains($"Upgraded uncommon {cardType} offered", body);
         Assert.Contains($"Upgraded rare {cardType} offered", body);
+        Assert.Contains($"Upgraded {cardType} taken", body);
+        Assert.Contains($"Upgraded common {cardType} taken", body);
+        Assert.Contains($"Upgraded uncommon {cardType} taken", body);
+        Assert.Contains($"Upgraded rare {cardType} taken", body);
         Assert.Contains(
             $"res://images/packed/card_library/type_sort_{cardType.TrimEnd('s')}.png",
             body);
@@ -157,5 +200,6 @@ public class EggRelicStatsTests
         Assert.Contains("[b]3[/b]", body);
         Assert.Contains("[b]2[/b]", body);
         Assert.Contains("[b]1[/b]", body);
+        Assert.Contains("[b]4[/b]", body);
     }
 }

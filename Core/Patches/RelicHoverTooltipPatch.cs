@@ -1908,34 +1908,63 @@ public static class RelicHoverShowPatch
     private static string BuildEggBodyBBCode(RelicAggregate agg, string cardType)
     {
         var sb = new StringBuilder();
-        AppendEggOfferRow(
+        AppendEggCardRow(
             sb,
             cardType,
             rarity: null,
-            count: agg.UpgradedCardsOffered);
-        AppendEggOfferRow(
+            count: agg.UpgradedCardsOffered,
+            action: "offered");
+        AppendEggCardRow(
             sb,
             cardType,
             "common",
-            agg.UpgradedCommonCardsOffered);
-        AppendEggOfferRow(
+            agg.UpgradedCommonCardsOffered,
+            "offered");
+        AppendEggCardRow(
             sb,
             cardType,
             "uncommon",
-            agg.UpgradedUncommonCardsOffered);
-        AppendEggOfferRow(
+            agg.UpgradedUncommonCardsOffered,
+            "offered");
+        AppendEggCardRow(
             sb,
             cardType,
             "rare",
-            agg.UpgradedRareCardsOffered);
+            agg.UpgradedRareCardsOffered,
+            "offered");
+        AppendEggCardRow(
+            sb,
+            cardType,
+            rarity: null,
+            count: agg.UpgradedCardsTaken,
+            action: "taken");
+        AppendEggCardRow(
+            sb,
+            cardType,
+            "common",
+            agg.UpgradedCommonCardsTaken,
+            "taken");
+        AppendEggCardRow(
+            sb,
+            cardType,
+            "uncommon",
+            agg.UpgradedUncommonCardsTaken,
+            "taken");
+        AppendEggCardRow(
+            sb,
+            cardType,
+            "rare",
+            agg.UpgradedRareCardsTaken,
+            "taken");
         return sb.ToString();
     }
 
-    private static void AppendEggOfferRow(
+    private static void AppendEggCardRow(
         StringBuilder sb,
         string cardType,
         string? rarity,
-        int count)
+        int count,
+        string action)
     {
         var pluralCardType = $"{cardType}s";
         var rarityText = string.IsNullOrEmpty(rarity)
@@ -1948,9 +1977,9 @@ public static class RelicHoverShowPatch
             sb,
             ["upgraded", typeConceptId],
             [],
-            "offered",
+            action,
             count.ToString(),
-            $"Upgraded {rarityText}{pluralCardType} offered.");
+            $"Upgraded {rarityText}{pluralCardType} {action}.");
     }
 
     private static string BuildSilverCrucibleBodyBBCode(RelicAggregate agg)

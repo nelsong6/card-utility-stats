@@ -2557,19 +2557,31 @@ public class SchemaLoadingTests
             total: 7,
             common: 4,
             uncommon: 2,
-            rare: 1);
+            rare: 1,
+            taken: 4,
+            commonTaken: 2,
+            uncommonTaken: 1,
+            rareTaken: 1);
         AssertEggOfferFixture(
             loaded.Data.RelicAggregates["RELIC.TOXIC_EGG"],
             total: 5,
             common: 2,
             uncommon: 2,
-            rare: 1);
+            rare: 1,
+            taken: 3,
+            commonTaken: 1,
+            uncommonTaken: 1,
+            rareTaken: 1);
         AssertEggOfferFixture(
             loaded.Data.RelicAggregates["RELIC.FROZEN_EGG"],
             total: 3,
             common: 1,
             uncommon: 1,
-            rare: 1);
+            rare: 1,
+            taken: 2,
+            commonTaken: 1,
+            uncommonTaken: 0,
+            rareTaken: 1);
     }
 
     [Fact]
@@ -2583,19 +2595,31 @@ public class SchemaLoadingTests
             total: 7,
             common: 4,
             uncommon: 2,
-            rare: 1);
+            rare: 1,
+            taken: 4,
+            commonTaken: 2,
+            uncommonTaken: 1,
+            rareTaken: 1);
         AssertEggOfferFixture(
             resumed.RelicAggregates["RELIC.TOXIC_EGG"],
             total: 5,
             common: 2,
             uncommon: 2,
-            rare: 1);
+            rare: 1,
+            taken: 3,
+            commonTaken: 1,
+            uncommonTaken: 1,
+            rareTaken: 1);
         AssertEggOfferFixture(
             resumed.RelicAggregates["RELIC.FROZEN_EGG"],
             total: 3,
             common: 1,
             uncommon: 1,
-            rare: 1);
+            rare: 1,
+            taken: 2,
+            commonTaken: 1,
+            uncommonTaken: 0,
+            rareTaken: 1);
     }
 
     private static void AssertEggOfferFixture(
@@ -2603,12 +2627,20 @@ public class SchemaLoadingTests
         int total,
         int common,
         int uncommon,
-        int rare)
+        int rare,
+        int taken,
+        int commonTaken,
+        int uncommonTaken,
+        int rareTaken)
     {
         Assert.Equal(total, agg.UpgradedCardsOffered);
         Assert.Equal(common, agg.UpgradedCommonCardsOffered);
         Assert.Equal(uncommon, agg.UpgradedUncommonCardsOffered);
         Assert.Equal(rare, agg.UpgradedRareCardsOffered);
+        Assert.Equal(taken, agg.UpgradedCardsTaken);
+        Assert.Equal(commonTaken, agg.UpgradedCommonCardsTaken);
+        Assert.Equal(uncommonTaken, agg.UpgradedUncommonCardsTaken);
+        Assert.Equal(rareTaken, agg.UpgradedRareCardsTaken);
     }
 
     [Fact]

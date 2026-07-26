@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Combat.History.Entries;
 using MegaCrit.Sts2.Core.Entities.Cards;
@@ -72,6 +73,8 @@ public static class RunTracker
     private static readonly List<PendingDrawAttempt> _pendingDrawAttempts = new();
     private static CardModel? _pendingEffectSourceCard;
     private static int _pendingEffectSourceHistoryCount;
+    private static readonly ConditionalWeakTable<CardModel, PendingEggOfferAttribution>
+        _pendingEggOfferAttributions = new();
     private static readonly List<PendingPowerChangeAttempt> _pendingPowerChangeAttempts = new();
     private static readonly List<PendingUnsettlingLampDebuff> _pendingUnsettlingLampDebuffs = new();
     private static readonly System.Threading.AsyncLocal<EnemyStatusSourceFrame?> _enemyStatusSourceFrame = new();
@@ -1804,6 +1807,10 @@ public static class RunTracker
         target.UpgradedCommonCardsOffered += source.UpgradedCommonCardsOffered;
         target.UpgradedUncommonCardsOffered += source.UpgradedUncommonCardsOffered;
         target.UpgradedRareCardsOffered += source.UpgradedRareCardsOffered;
+        target.UpgradedCardsTaken += source.UpgradedCardsTaken;
+        target.UpgradedCommonCardsTaken += source.UpgradedCommonCardsTaken;
+        target.UpgradedUncommonCardsTaken += source.UpgradedUncommonCardsTaken;
+        target.UpgradedRareCardsTaken += source.UpgradedRareCardsTaken;
         target.CommonCardsConsumed += source.CommonCardsConsumed;
         target.UncommonCardsConsumed += source.UncommonCardsConsumed;
         target.RareCardsConsumed += source.RareCardsConsumed;
@@ -4271,9 +4278,9 @@ public static class RunTracker
     /// </summary>
     public static void RecordEggUpgradedCardOffered(
         RelicModel eggRelic,
-        CardRarity rarity)
+        CardModel card)
     {
-        if (eggRelic == null) return;
+        if (eggRelic == null || card == null) return;
 
         var relicId = eggRelic switch
         {
@@ -4291,13 +4298,48 @@ public static class RunTracker
                 if (!IsTrackedRelic(eggRelic) || !IsTrackedPlayer(eggRelic.Owner)) return;
 
                 var agg = GetOrCreateCurrentRunRelicAggregateLocked(relicId);
-                RecordEggUpgradedCardOfferedForTest(agg, rarity);
+                RecordEggUpgradedCardOfferedForTest(agg, card.Rarity);
+                _pendingEggOfferAttributions.Remove(card);
+                _pendingEggOfferAttributions.Add(
+                    card,
+                    new PendingEggOfferAttribution(relicId, card.Rarity));
                 RefreshCurrentRunMetadataLocked();
                 SaveCurrentRun();
             }
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordEggUpgradedCardOffered failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Consume an egg-upgraded offer after the game's permanent-deck add
+    /// succeeds. The reference marker makes this a direct continuation of the
+    /// observed offer rather than an inference from upgrade level.
+    /// </summary>
+    public static void RecordEggUpgradedCardTaken(CardModel card)
+    {
+        if (card == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_pendingEggOfferAttributions.TryGetValue(card, out var attribution))
+                    return;
+
+                _pendingEggOfferAttributions.Remove(card);
+                if (!IsTrackedCard(card)) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(attribution.RelicId);
+                RecordEggUpgradedCardTakenForTest(agg, attribution.Rarity);
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordEggUpgradedCardTaken failed: {e.Message}");
             }
         }
     }
@@ -10056,6 +10098,29 @@ public static class RunTracker
                 break;
             case CardRarity.Rare:
                 agg.UpgradedRareCardsOffered += recordedCount;
+                break;
+        }
+    }
+
+    internal static void RecordEggUpgradedCardTakenForTest(
+        RelicAggregate agg,
+        CardRarity rarity,
+        int count = 1)
+    {
+        if (agg == null) return;
+        var recordedCount = Math.Max(0, count);
+        agg.UpgradedCardsTaken += recordedCount;
+
+        switch (rarity)
+        {
+            case CardRarity.Common:
+                agg.UpgradedCommonCardsTaken += recordedCount;
+                break;
+            case CardRarity.Uncommon:
+                agg.UpgradedUncommonCardsTaken += recordedCount;
+                break;
+            case CardRarity.Rare:
+                agg.UpgradedRareCardsTaken += recordedCount;
                 break;
         }
     }
@@ -22065,6 +22130,8 @@ internal sealed class PendingFresnelLensReward
         return result;
     }
 }
+
+internal sealed record PendingEggOfferAttribution(string RelicId, CardRarity Rarity);
 
 internal sealed class PendingSilverCrucibleReward
 {

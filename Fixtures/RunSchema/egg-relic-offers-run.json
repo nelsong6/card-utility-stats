@@ -14,19 +14,31 @@
       "upgraded_cards_offered": 7,
       "upgraded_common_cards_offered": 4,
       "upgraded_uncommon_cards_offered": 2,
-      "upgraded_rare_cards_offered": 1
+      "upgraded_rare_cards_offered": 1,
+      "upgraded_cards_taken": 4,
+      "upgraded_common_cards_taken": 2,
+      "upgraded_uncommon_cards_taken": 1,
+      "upgraded_rare_cards_taken": 1
     },
     "RELIC.TOXIC_EGG": {
       "upgraded_cards_offered": 5,
       "upgraded_common_cards_offered": 2,
       "upgraded_uncommon_cards_offered": 2,
-      "upgraded_rare_cards_offered": 1
+      "upgraded_rare_cards_offered": 1,
+      "upgraded_cards_taken": 3,
+      "upgraded_common_cards_taken": 1,
+      "upgraded_uncommon_cards_taken": 1,
+      "upgraded_rare_cards_taken": 1
     },
     "RELIC.FROZEN_EGG": {
       "upgraded_cards_offered": 3,
       "upgraded_common_cards_offered": 1,
       "upgraded_uncommon_cards_offered": 1,
-      "upgraded_rare_cards_offered": 1
+      "upgraded_rare_cards_offered": 1,
+      "upgraded_cards_taken": 2,
+      "upgraded_common_cards_taken": 1,
+      "upgraded_uncommon_cards_taken": 0,
+      "upgraded_rare_cards_taken": 1
     }
   },
   "meta_stats": {},
