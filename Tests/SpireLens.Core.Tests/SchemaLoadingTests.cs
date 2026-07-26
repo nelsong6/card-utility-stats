@@ -3596,6 +3596,29 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsWhisperingEarringRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("whispering-earring-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertWhisperingEarringFixture(
+            loaded.Data.RelicAggregates["RELIC.WHISPERING_EARRING"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsWhisperingEarringRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("whispering-earring-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertWhisperingEarringFixture(
+            resumed!.RelicAggregates["RELIC.WHISPERING_EARRING"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsRuinedHelmetRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("ruined-helmet-relic-run.json"));
@@ -3808,6 +3831,12 @@ public class SchemaLoadingTests
         Assert.Equal(18m, relicAgg.BeatingRemnantHpLossPrevented);
         Assert.Equal(6, relicAgg.BeatingRemnantTurns);
         Assert.Equal(3, relicAgg.BeatingRemnantCombats);
+    }
+
+    private static void AssertWhisperingEarringFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(21m, relicAgg.WhisperingEarringFirstRoundHpLost);
+        Assert.Equal(3, relicAgg.WhisperingEarringCombats);
     }
 
     private static void AssertRuinedHelmetFixture(RelicAggregate relicAgg)

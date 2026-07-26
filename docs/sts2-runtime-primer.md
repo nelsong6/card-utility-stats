@@ -97,6 +97,11 @@ SpireLens persistence is combat-boundary based.
   boss rooms each receive their own setup/start/end lifecycle; combat-start
   relic attribution must therefore count them as separate activations.
 - During combat, live observations accumulate in `_pendingCombat`.
+- `ICombatState.RoundNumber == 1` spans the entire first round: the player's
+  first side (including extra player turns) and the enemy's first side. It
+  increments before the next player side. On the player side,
+  `PlayerCombatState.Phase == None` is still the pre-turn setup window; reject
+  it when a first-round stat should begin at the player's actual first turn.
 - `CombatManager.Instance.CombatEnded` promotes pending aggregates/events into committed `RunData`, updates run metadata, saves, and clears `_pendingCombat`.
 - The tracked player's final `PlayerCombatState.TurnNumber` remains available
   while pending combat data is promoted. Combat-duration buckets such as

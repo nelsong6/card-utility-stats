@@ -563,6 +563,12 @@ public class RelicAggregate
     public int BeatingRemnantTurns { get; set; }
     public int BeatingRemnantCombats { get; set; }
 
+    // Whispering Earring tracking. Life lost is the sum of observed downward
+    // current-HP deltas from player turn 1 through opponent turn 1. Combats is
+    // a zero-inclusive held denominator.
+    public decimal WhisperingEarringFirstRoundHpLost { get; set; }
+    public int WhisperingEarringCombats { get; set; }
+
     // Total Plating this relic added. Used by Gorget.
     public decimal PlatingAdded { get; set; }
 

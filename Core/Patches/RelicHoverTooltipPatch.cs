@@ -230,6 +230,7 @@ public static class RelicHoverShowPatch
             SturdyClamp => SturdyClampTooltipWidth,
             EmberTea => EmberTeaTooltipWidth,
             RedSkull => EmberTeaTooltipWidth,
+            WhisperingEarring => EmberTeaTooltipWidth,
             _ => null,
         };
 
@@ -762,6 +763,13 @@ public static class RelicHoverShowPatch
         {
             title = "Beating Remnant";
             body = BuildBeatingRemnantBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is WhisperingEarring)
+        {
+            title = "Whispering Earring";
+            body = BuildWhisperingEarringBodyBBCode(agg);
             return true;
         }
 
@@ -2324,6 +2332,26 @@ public static class RelicHoverShowPatch
             sb,
             "Avg HP loss prevented per combat",
             FormatDecimal(preventedPerCombat),
+            "");
+        return sb.ToString();
+    }
+
+    private static string BuildWhisperingEarringBodyBBCode(RelicAggregate agg)
+    {
+        var lifeLostPerCombat = agg.WhisperingEarringCombats <= 0
+            ? 0m
+            : agg.WhisperingEarringFirstRoundHpLost / agg.WhisperingEarringCombats;
+
+        var sb = new StringBuilder();
+        Row3(
+            sb,
+            "Total life lost, player's first turn through opponent's first turn",
+            FormatDecimal(agg.WhisperingEarringFirstRoundHpLost),
+            "");
+        Row3(
+            sb,
+            "Avg life lost, player's first turn through opponent's first turn per combat",
+            FormatDecimal(lifeLostPerCombat),
             "");
         return sb.ToString();
     }

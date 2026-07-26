@@ -401,6 +401,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `sparkling-rouge-relic-run.json`
   Adds Sparkling Rouge's mutually exclusive completed-combat buckets for turn
   1, turn 2, and turn 3 or later.
+- `whispering-earring-relic-run.json`
+  Adds Whispering Earring's observed current-HP loss during the first combat
+  round plus its zero-inclusive held-combat denominator.
 
 Why these exist:
 

@@ -1671,6 +1671,9 @@ public static class RunTracker
         target.BeatingRemnantHpLossPrevented += source.BeatingRemnantHpLossPrevented;
         target.BeatingRemnantTurns += source.BeatingRemnantTurns;
         target.BeatingRemnantCombats += source.BeatingRemnantCombats;
+        target.WhisperingEarringFirstRoundHpLost +=
+            source.WhisperingEarringFirstRoundHpLost;
+        target.WhisperingEarringCombats += source.WhisperingEarringCombats;
         target.PlatingAdded += source.PlatingAdded;
         target.CardsUpgraded += source.CardsUpgraded;
         MergeUpgradedCardsInto(target, source);
@@ -3894,6 +3897,7 @@ public static class RunTracker
     private const string RainbowRingRelicId = "RELIC.RAINBOW_RING";
     private const string SparklingRougeRelicId = "RELIC.SPARKLING_ROUGE";
     private const string BeatingRemnantRelicId = "RELIC.BEATING_REMNANT";
+    private const string WhisperingEarringRelicId = "RELIC.WHISPERING_EARRING";
     private const string GorgetRelicId = "RELIC.GORGET";
     private const string StoneCrackerRelicId = "RELIC.STONE_CRACKER";
     private const string RazorToothRelicId = "RELIC.RAZOR_TOOTH";
@@ -4722,6 +4726,81 @@ public static class RunTracker
     {
         if (agg == null) return;
         agg.BeatingRemnantCombats += Math.Max(0, count);
+    }
+
+    public static void RecordWhisperingEarringHpLost(
+        ICombatState? combatState,
+        Creature? creature,
+        decimal hpLost)
+    {
+        if (combatState == null || creature?.Player == null || hpLost <= 0m)
+            return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var player = creature.Player;
+                if (_pendingCombat == null || !IsTrackedPlayer(player)) return;
+                if (!PlayerHasWhisperingEarring(player)) return;
+
+                var phase = player.PlayerCombatState?.Phase ?? PlayerTurnPhase.None;
+                if (!ShouldTrackWhisperingEarringHpLoss(
+                        combatState.RoundNumber,
+                        combatState.CurrentSide,
+                        phase))
+                {
+                    return;
+                }
+
+                RecordWhisperingEarringCombatForPlayerLocked(player);
+                var agg = GetOrCreatePendingRelicAggregateLocked(
+                    WhisperingEarringRelicId);
+                agg.WhisperingEarringFirstRoundHpLost += hpLost;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordWhisperingEarringHpLost failed: {e.Message}");
+            }
+        }
+    }
+
+    private static bool ShouldTrackWhisperingEarringHpLoss(
+        int roundNumber,
+        CombatSide side,
+        PlayerTurnPhase phase)
+    {
+        if (roundNumber != 1) return false;
+
+        return side switch
+        {
+            CombatSide.Player => phase != PlayerTurnPhase.None,
+            CombatSide.Enemy => true,
+            _ => false
+        };
+    }
+
+    internal static bool ShouldTrackWhisperingEarringHpLossForTest(
+        int roundNumber,
+        CombatSide side,
+        PlayerTurnPhase phase)
+        => ShouldTrackWhisperingEarringHpLoss(roundNumber, side, phase);
+
+    internal static void RecordWhisperingEarringHpLostForTest(
+        RelicAggregate agg,
+        decimal hpLost)
+    {
+        if (agg == null || hpLost <= 0m) return;
+        agg.WhisperingEarringFirstRoundHpLost += hpLost;
+    }
+
+    internal static void RecordWhisperingEarringCombatForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.WhisperingEarringCombats += Math.Max(0, count);
     }
 
     /// <summary>
@@ -15185,6 +15264,18 @@ public static class RunTracker
         }
     }
 
+    private static bool PlayerHasWhisperingEarring(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is WhisperingEarring);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static bool PlayerHasRuinedHelmet(Player player)
     {
         try
@@ -15335,6 +15426,7 @@ public static class RunTracker
             RecordDaughterOfTheWindCombatForPlayerLocked(player);
             RecordSturdyClampCombatForPlayerLocked(player);
             RecordBeatingRemnantCombatForPlayerLocked(player);
+            RecordWhisperingEarringCombatForPlayerLocked(player);
             RecordRuinedHelmetCombatForPlayerLocked(player);
             RecordMummifiedHandCombatForPlayerLocked(player);
             RecordBurningSticksCombatForPlayerLocked(player);
@@ -15653,6 +15745,18 @@ public static class RunTracker
 
         var agg = GetOrCreatePendingRelicAggregateLocked(BeatingRemnantRelicId);
         RecordBeatingRemnantCombatForTest(agg);
+    }
+
+    private static void RecordWhisperingEarringCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasWhisperingEarring(player)) return;
+        if (!_pendingCombat.WhisperingEarringCombatCountedPlayers.Add(player))
+            return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(
+            WhisperingEarringRelicId);
+        RecordWhisperingEarringCombatForTest(agg);
     }
 
     private static void RecordBeatingRemnantTurnForTrackedPlayerLocked()
@@ -20932,6 +21036,8 @@ internal class PendingCombat
     public HashSet<Player> BeatingRemnantCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> BeatingRemnantTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> WhisperingEarringCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> ArtOfWarCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
