@@ -1,0 +1,23 @@
+{
+  "run_id": "rainbow-ring-relic-fixture",
+  "started_at": "2026-07-25T18:00:00Z",
+  "updated_at": "2026-07-25T18:30:00Z",
+  "character": "CHARACTER.IRONCLAD",
+  "ascension": 6,
+  "floor_reached": 24,
+  "outcome": "in_progress",
+  "game_start_time": 1785002400,
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.RAINBOW_RING": {
+      "activations": 5,
+      "rainbow_ring_turns": 12,
+      "rainbow_ring_combats": 4
+    }
+  },
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

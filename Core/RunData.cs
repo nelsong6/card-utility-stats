@@ -545,6 +545,11 @@ public class RelicAggregate
     public int ReptileTrinketTurnsWithExactlyTwoActivations { get; set; }
     public int ReptileTrinketTurnsWithMoreThanTwoActivations { get; set; }
 
+    // Rainbow Ring held-period denominators. Activations use the shared
+    // Activations field; the current-turn card-type state is read live.
+    public int RainbowRingTurns { get; set; }
+    public int RainbowRingCombats { get; set; }
+
     // Beating Remnant tracking. The prevented amount is the positive
     // before/after delta at the relic's own post-Osty HP-loss modifier.
     // Turns and combats are zero-inclusive held denominators.

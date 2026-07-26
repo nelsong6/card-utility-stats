@@ -1122,6 +1122,11 @@ Good hook surfaces already proven useful:
 - `RunManager.EnterMapPointInternal`: original map point entry, before `?`
   points resolve into concrete room types.
 - Specific power/relic methods via `AccessTools.TypeByName`: useful when no public compile-time type is safe or when patching optional/specific models.
+- `RainbowRing.AfterCardPlayed`: its private Attack, Skill, and Power
+  current-turn counters are updated inside this callback. A successful trigger
+  is authoritative only after its returned task completes and
+  `_activationCountThisTurn` advances; that increment follows both of the
+  relic's awaited power applications.
 
 ## Diagnostic Habits
 

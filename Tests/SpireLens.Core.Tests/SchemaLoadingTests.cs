@@ -1459,6 +1459,25 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsRainbowRingRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("rainbow-ring-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertRainbowRingFixture(loaded.Data.RelicAggregates["RELIC.RAINBOW_RING"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsRainbowRingRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("rainbow-ring-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertRainbowRingFixture(resumed!.RelicAggregates["RELIC.RAINBOW_RING"]);
+    }
+
+    [Fact]
     public void ResumableLoad_AcceptsV29GorgetFixture()
     {
         var resumed = RunStorage.LoadResumable(FixturePath("v29-gorget-run.json"));
@@ -3636,6 +3655,13 @@ public class SchemaLoadingTests
         Assert.Equal(3, relicAgg.ReptileTrinketCombats);
         Assert.Equal(2, relicAgg.ReptileTrinketTurnsWithExactlyTwoActivations);
         Assert.Equal(1, relicAgg.ReptileTrinketTurnsWithMoreThanTwoActivations);
+    }
+
+    private static void AssertRainbowRingFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(5, relicAgg.Activations);
+        Assert.Equal(12, relicAgg.RainbowRingTurns);
+        Assert.Equal(4, relicAgg.RainbowRingCombats);
     }
 
     private static void AssertPaelsClawFixture(RelicAggregate relicAgg)

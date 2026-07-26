@@ -45,6 +45,12 @@ public static class RelicHoverShowPatch
         AccessTools.Field(typeof(Vambrace), "_blockGainedThisCombat");
     private static readonly System.Reflection.FieldInfo? PermafrostActivatedThisCombatField =
         AccessTools.Field(typeof(Permafrost), "_activatedThisCombat");
+    private static readonly System.Reflection.FieldInfo? RainbowRingAttacksPlayedThisTurnField =
+        AccessTools.Field(typeof(RainbowRing), "_attacksPlayedThisTurn");
+    private static readonly System.Reflection.FieldInfo? RainbowRingPowersPlayedThisTurnField =
+        AccessTools.Field(typeof(RainbowRing), "_powersPlayedThisTurn");
+    private static readonly System.Reflection.FieldInfo? RainbowRingSkillsPlayedThisTurnField =
+        AccessTools.Field(typeof(RainbowRing), "_skillsPlayedThisTurn");
 
     internal static bool TryBuildNativeHoverTip(
         NRelicInventoryHolder holder,
@@ -715,6 +721,18 @@ public static class RelicHoverShowPatch
         {
             title = "Reptile Trinket";
             body = BuildReptileTrinketBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is RainbowRing rainbowRing)
+        {
+            title = "Rainbow Ring";
+            var turnState = GetRainbowRingTurnState(rainbowRing);
+            body = BuildRainbowRingBodyBBCode(
+                agg,
+                turnState.AttackPlayed,
+                turnState.PowerPlayed,
+                turnState.SkillPlayed);
             return true;
         }
 
@@ -2117,6 +2135,55 @@ public static class RelicHoverShowPatch
             "");
         return sb.ToString();
     }
+
+    private static string BuildRainbowRingBodyBBCode(
+        RelicAggregate agg,
+        bool attackPlayedThisTurn,
+        bool powerPlayedThisTurn,
+        bool skillPlayedThisTurn)
+    {
+        var sb = new StringBuilder();
+        var activationsPerTurn = agg.RainbowRingTurns <= 0
+            ? 0m
+            : (decimal)agg.Activations / agg.RainbowRingTurns;
+        var activationsPerCombat = agg.RainbowRingCombats <= 0
+            ? 0m
+            : (decimal)agg.Activations / agg.RainbowRingCombats;
+
+        RelicActivationRow(sb, agg.Activations.ToString());
+        Row3(sb, "Avg activations per turn", FormatDecimal(activationsPerTurn), "");
+        Row3(sb, "Avg activations per combat", FormatDecimal(activationsPerCombat), "");
+        Row3(sb, "Attack played this turn", FormatBoolean(attackPlayedThisTurn), "");
+        Row3(sb, "Power played this turn", FormatBoolean(powerPlayedThisTurn), "");
+        Row3(sb, "Skill played this turn", FormatBoolean(skillPlayedThisTurn), "");
+        return sb.ToString();
+    }
+
+    private static (
+        bool AttackPlayed,
+        bool PowerPlayed,
+        bool SkillPlayed) GetRainbowRingTurnState(RainbowRing relic)
+    {
+        try
+        {
+            return (
+                ReadPositiveInt(RainbowRingAttacksPlayedThisTurnField, relic),
+                ReadPositiveInt(RainbowRingPowersPlayedThisTurnField, relic),
+                ReadPositiveInt(RainbowRingSkillsPlayedThisTurnField, relic));
+        }
+        catch
+        {
+            return (false, false, false);
+        }
+    }
+
+    private static bool ReadPositiveInt(
+        System.Reflection.FieldInfo? field,
+        object instance)
+        => field?.GetValue(instance) is int value && value > 0;
+
+    private static string FormatBoolean(bool value)
+        => value ? "true" : "false";
 
     private static string BuildGorgetBodyBBCode(RelicAggregate agg)
     {

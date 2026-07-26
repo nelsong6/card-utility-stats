@@ -393,6 +393,10 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `winged-boots-relic-run.json`
   Adds Winged Boots' three numbered off-path destination categories, keyed to
   the relic's own saved use counter.
+- `rainbow-ring-relic-run.json`
+  Adds Rainbow Ring's confirmed activations plus zero-inclusive held turn and
+  combat denominators. Its three current-turn card-type flags remain live
+  relic state and are intentionally not persisted.
 
 Why these exist:
 

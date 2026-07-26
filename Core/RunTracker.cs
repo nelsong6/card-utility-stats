@@ -1563,6 +1563,7 @@ public static class RunTracker
         RecordRedSkullActivePeriodForTrackedPlayerLocked();
         RecordRippleBasinTurnForTrackedPlayerLocked();
         RecordReptileTrinketTurnForTrackedPlayerLocked();
+        RecordRainbowRingTurnForTrackedPlayerLocked();
         RecordBeatingRemnantTurnForTrackedPlayerLocked();
         RecordStoneCrackerTurnForTrackedPlayerLocked();
         RecordPaperPhrogTurnForTrackedPlayerLocked();
@@ -1658,6 +1659,8 @@ public static class RunTracker
             source.ReptileTrinketTurnsWithExactlyTwoActivations;
         target.ReptileTrinketTurnsWithMoreThanTwoActivations +=
             source.ReptileTrinketTurnsWithMoreThanTwoActivations;
+        target.RainbowRingTurns += source.RainbowRingTurns;
+        target.RainbowRingCombats += source.RainbowRingCombats;
         target.BeatingRemnantHpLossPrevented += source.BeatingRemnantHpLossPrevented;
         target.BeatingRemnantTurns += source.BeatingRemnantTurns;
         target.BeatingRemnantCombats += source.BeatingRemnantCombats;
@@ -3876,6 +3879,7 @@ public static class RunTracker
     private const string WingedBootsRelicId = "RELIC.WINGED_BOOTS";
     private const string CloakClaspRelicId = "RELIC.CLOAK_CLASP";
     private const string ReptileTrinketRelicId = "RELIC.REPTILE_TRINKET";
+    private const string RainbowRingRelicId = "RELIC.RAINBOW_RING";
     private const string BeatingRemnantRelicId = "RELIC.BEATING_REMNANT";
     private const string GorgetRelicId = "RELIC.GORGET";
     private const string StoneCrackerRelicId = "RELIC.STONE_CRACKER";
@@ -4529,6 +4533,82 @@ public static class RunTracker
     {
         if (agg == null) return;
         agg.ReptileTrinketCombats += Math.Max(0, count);
+    }
+
+    /// <summary>
+    /// Records the Rainbow Ring only after its owner callback has completed
+    /// and its own activation counter has advanced.
+    /// </summary>
+    public static void RecordRainbowRingActivation(
+        RainbowRing relic,
+        int activations)
+    {
+        var owner = relic?.Owner;
+        if (owner == null || activations <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(owner)) return;
+                if (CombatManager.Instance?.IsInProgress != true) return;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordRainbowRingTurnForPlayerLocked(owner);
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(RainbowRingRelicId);
+                RecordRainbowRingActivationForTest(agg, activations);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordRainbowRingActivation failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordRainbowRingTurnStarted(Player player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                if (CombatManager.Instance?.IsInProgress != true) return;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordRainbowRingTurnForPlayerLocked(player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordRainbowRingTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordRainbowRingActivationForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.Activations += Math.Max(0, count);
+    }
+
+    internal static void RecordRainbowRingTurnForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.RainbowRingTurns += Math.Max(0, count);
+    }
+
+    internal static void RecordRainbowRingCombatForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.RainbowRingCombats += Math.Max(0, count);
     }
 
     /// <summary>
@@ -15083,6 +15163,7 @@ public static class RunTracker
             RecordCloakClaspCombatForPlayerLocked(player);
             RecordRippleBasinCombatForPlayerLocked(player);
             RecordReptileTrinketCombatForPlayerLocked(player);
+            RecordRainbowRingCombatForPlayerLocked(player);
             RecordArtOfWarCombatForPlayerLocked(player);
             RecordHappyFlowerCombatForPlayerLocked(player);
             RecordPendulumCombatForPlayerLocked(player);
@@ -15368,6 +15449,52 @@ public static class RunTracker
 
         var agg = GetOrCreatePendingRelicAggregateLocked(ReptileTrinketRelicId);
         RecordReptileTrinketTurnForTest(agg);
+    }
+
+    private static void RecordRainbowRingCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasRainbowRing(player)) return;
+        if (!_pendingCombat.RainbowRingCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(RainbowRingRelicId);
+        RecordRainbowRingCombatForTest(agg);
+    }
+
+    private static void RecordRainbowRingTurnForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordRainbowRingTurnForPlayerLocked(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordRainbowRingTurnForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordRainbowRingTurnForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasRainbowRing(player)) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.RainbowRingTurnCountedTurns.TryGetValue(
+                player,
+                out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.RainbowRingTurnCountedTurns[player] = turnNumber;
+        RecordRainbowRingCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(RainbowRingRelicId);
+        RecordRainbowRingTurnForTest(agg);
     }
 
     private static void RecordBeatingRemnantCombatForPlayerLocked(Player player)
@@ -16359,6 +16486,18 @@ public static class RunTracker
         try
         {
             return player.Relics.Any(r => r is ReptileTrinket);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool PlayerHasRainbowRing(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is RainbowRing);
         }
         catch
         {
@@ -20603,6 +20742,10 @@ internal class PendingCombat
     public Dictionary<Player, int> ReptileTrinketTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> ReptileTrinketActivationsThisTurn { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> RainbowRingCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> RainbowRingTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> BeatingRemnantCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
