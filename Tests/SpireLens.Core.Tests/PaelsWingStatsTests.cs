@@ -1,7 +1,9 @@
 using System;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using MegaCrit.Sts2.Core.Models.Relics;
 using SpireLens.Core;
 using SpireLens.Core.Patches;
 using Xunit;
@@ -120,6 +122,7 @@ public class PaelsWingStatsTests
         Assert.Contains("Artifact gained", body);
         Assert.Contains("Kunai x2", body);
         Assert.Contains("Bag of Preparation", body);
+        Assert.Contains("Artifact gained  [b]Bag of Preparation[/b]", body);
         Assert.Contains("Sacrifice rate", body);
         Assert.Contains("[b]3/5[/b]", body);
         Assert.Contains("60%", body);
@@ -128,6 +131,14 @@ public class PaelsWingStatsTests
         Assert.Contains("[b]3[/b]", body);
         Assert.Contains("[b]2[/b]", body);
         Assert.Contains("[b]1[/b]", body);
+    }
+
+    [Fact]
+    public void RelicTooltip_PaelsWingUsesExpandedWidthForArtifactNames()
+    {
+        var relic = (PaelsWing)RuntimeHelpers.GetUninitializedObject(typeof(PaelsWing));
+
+        Assert.Equal(500f, RelicHoverShowPatch.GetPreferredStatsTooltipWidth(relic));
     }
 
     [Fact]

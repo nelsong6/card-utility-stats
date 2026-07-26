@@ -42,6 +42,7 @@ public static class RelicHoverShowPatch
     private const double MaxTableLabelWidthUnits = 28d;
     private const float SturdyClampTooltipWidth = 420f;
     private const float EmberTeaTooltipWidth = 500f;
+    private const float PaelsWingTooltipWidth = 500f;
     private static readonly System.Reflection.FieldInfo? VambraceBlockGainedThisCombatField =
         AccessTools.Field(typeof(Vambrace), "_blockGainedThisCombat");
     private static readonly System.Reflection.FieldInfo? PermafrostActivatedThisCombatField =
@@ -232,6 +233,7 @@ public static class RelicHoverShowPatch
             RedSkull => EmberTeaTooltipWidth,
             WhisperingEarring => EmberTeaTooltipWidth,
             TungstenRod => EmberTeaTooltipWidth,
+            PaelsWing => PaelsWingTooltipWidth,
             _ => null,
         };
 
@@ -3160,7 +3162,7 @@ public static class RelicHoverShowPatch
                 ? RunTracker.FormatRelicIdForDisplay(artifact.RelicId)
                 : artifact.DisplayName);
             var value = artifact.Count == 1 ? displayName : $"{displayName} x{artifact.Count}";
-            Row3(sb, "Artifact gained", value, "");
+            RowFlow(sb, "Artifact gained", value, "");
         }
 
         Row3(sb, "Sacrifices made", agg.SacrificesMade.ToString(), "");
