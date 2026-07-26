@@ -98,7 +98,7 @@ public class MealTicketStatsTests
         Assert.Contains("[b]18[/b]", body);
         Assert.Contains("healing lost", body);
         Assert.Contains("[b]12[/b]", body);
-        Assert.Contains("lost to full HP", body);
+        Assert.DoesNotContain("lost to full HP", body);
     }
 
     [Fact]

@@ -101,7 +101,7 @@ public class BurningBloodStatsTests
         Assert.Contains("[hint=\"Healing blocked:", body);
         Assert.Contains("Total Burning Blood healing that did not restore HP.", body);
         Assert.Contains("[b]3[/b]", body);
-        Assert.Contains("blocked by full HP", body);
+        Assert.DoesNotContain("blocked by full HP", body);
     }
 
     [Fact]

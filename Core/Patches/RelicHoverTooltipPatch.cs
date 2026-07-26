@@ -2784,11 +2784,8 @@ public static class RelicHoverShowPatch
 
         if (agg.TotalHealingLost <= 0m) return sb.ToString();
 
-        foreach (var reason in agg.HealingLostReasons.Values
-                     .OrderByDescending(r => r.Amount)
-                     .ThenBy(r => r.DisplayName))
+        foreach (var reason in NonRedundantHealingLostReasons(agg))
         {
-            if (reason.Amount <= 0m) continue;
             var reasonName = string.IsNullOrWhiteSpace(reason.DisplayName)
                 ? "other/prevented causes"
                 : StatsTooltip.EscapeBbcode(reason.DisplayName);
@@ -3782,11 +3779,8 @@ public static class RelicHoverShowPatch
 
         if (agg.TotalHealingLost <= 0m) return;
 
-        foreach (var reason in agg.HealingLostReasons.Values
-                     .OrderByDescending(r => r.Amount)
-                     .ThenBy(r => r.DisplayName))
+        foreach (var reason in NonRedundantHealingLostReasons(agg))
         {
-            if (reason.Amount <= 0m) continue;
             var reasonName = string.IsNullOrWhiteSpace(reason.DisplayName)
                 ? "other/prevented causes"
                 : StatsTooltip.EscapeBbcode(reason.DisplayName);
@@ -3798,6 +3792,21 @@ public static class RelicHoverShowPatch
                 FormatDecimal(reason.Amount),
                 $"Healing from this relic that did not restore HP because of {reasonName}.");
         }
+    }
+
+    private static IReadOnlyList<HealingLostReasonAggregate> NonRedundantHealingLostReasons(
+        RelicAggregate agg)
+    {
+        var reasons = agg.HealingLostReasons.Values
+            .Where(reason => reason.Amount > 0m)
+            .OrderByDescending(reason => reason.Amount)
+            .ThenBy(reason => reason.DisplayName)
+            .ToList();
+
+        if (reasons.Count == 1 && reasons[0].Amount == agg.TotalHealingLost)
+            return Array.Empty<HealingLostReasonAggregate>();
+
+        return reasons;
     }
 
     private static void AppendEnergyGeneratedStats(

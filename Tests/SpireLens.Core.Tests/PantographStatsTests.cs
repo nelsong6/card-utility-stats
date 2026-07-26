@@ -82,7 +82,7 @@ public class PantographStatsTests
     }
 
     [Fact]
-    public void RelicTooltip_PantographFields_ShowWastedReasonRows()
+    public void RelicTooltip_PantographFields_OmitsRedundantWastedReasonRow()
     {
         var agg = new RelicAggregate
         {
@@ -101,7 +101,7 @@ public class PantographStatsTests
 
         Assert.Contains("HP healed", body);
         Assert.Contains("healing wasted", body);
-        Assert.Contains("wasted to full HP", body);
+        Assert.DoesNotContain("wasted to full HP", body);
         Assert.Contains("[b]7[/b]", body);
         Assert.Contains("[b]18[/b]", body);
     }

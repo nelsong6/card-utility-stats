@@ -97,7 +97,7 @@ public class PlanisphereStatsTests
         Assert.Contains("[b]11[/b]", body);
         Assert.Contains("healing lost", body);
         Assert.Contains("[b]4[/b]", body);
-        Assert.Contains("lost to full HP", body);
+        Assert.DoesNotContain("lost to full HP", body);
     }
 
     [Fact]
