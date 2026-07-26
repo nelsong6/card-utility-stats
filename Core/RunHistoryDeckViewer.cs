@@ -248,8 +248,11 @@ internal static class RunHistoryDeckViewer
             {
                 Name = HostName,
                 MouseFilter = Control.MouseFilterEnum.Stop,
-                ZIndex = 500,
             };
+            // Keep the game's native canvas ordering. NGame's global
+            // HoverTipsContainer is drawn after the active scene; raising
+            // this host with a positive ZIndex would put the entire deck
+            // viewer, including its cards, above native hover tips.
             host.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
 
             _source = runHistory;
