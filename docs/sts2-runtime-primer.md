@@ -1088,6 +1088,11 @@ Important surfaces:
   over the pinned source unlocks during that global pass and records the input
   event id, preventing the later holder callback from repinning on the same
   dispatch.
+- Run-history pinning attaches to both the existing card/relic rows and the
+  native card/relic containers. Those containers survive multiplayer player
+  selection while their rows are rebuilt, so their `ChildEnteredTree` signals
+  attach the same right-click behavior to each replacement row without
+  introducing separate lifecycle patches for the two row factories.
 - Card right-click must be claimed on the press, not the release.
   `NCardHolder.OnMousePressed` normally stores right press as
   `_currentPressedAction`; its matching release then emits `AltPressed`.

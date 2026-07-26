@@ -419,11 +419,13 @@ internal static class RunHistoryStatsContext
 public static class RunHistoryDisplayRunStatsContextPatch
 {
     [HarmonyPostfix]
-    public static void Postfix(RunHistory history)
+    public static void Postfix(NRunHistory __instance, RunHistory history)
     {
         PatchGuard.Run(nameof(RunHistoryDisplayRunStatsContextPatch), () =>
         {
+            StatsTooltipPinManager.ClearPin();
             RunHistoryStatsContext.SetRun(history);
+            StatsTooltipPinManager.AttachRunHistoryTargets(__instance);
         });
     }
 }
@@ -434,6 +436,10 @@ public static class RunHistoryHiddenStatsContextPatch
     [HarmonyPostfix]
     public static void Postfix()
     {
-        PatchGuard.Run(nameof(RunHistoryHiddenStatsContextPatch), RunHistoryStatsContext.Clear);
+        PatchGuard.Run(nameof(RunHistoryHiddenStatsContextPatch), () =>
+        {
+            StatsTooltipPinManager.ClearPin();
+            RunHistoryStatsContext.Clear();
+        });
     }
 }

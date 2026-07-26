@@ -61,12 +61,13 @@ the filtered bar throughout the active run. The category includes
 already-resolved max-HP relics, permanent inventory upgrades, card-reward
 upgrades, and other relics whose effects do not need combat-bar attention.
 
-Right-click an owned relic with SpireLens stats to pin its complete native
-tooltip set. The game's compact top-panel lock icon appears on the pinned relic,
-and the tooltip remains visible and mouse-interactive after the pointer leaves
-the relic. Pointer movement is allowed so inline help can be inspected; the
-next mouse click or wheel action, key press, or controller action removes the
-pin and continues to the game normally.
+Right-click an owned relic, a card in a passive pile view, a compendium relic,
+or a card or relic in run history with SpireLens stats to pin its complete
+native tooltip set. The game's compact top-panel lock icon appears on the pinned
+item, and the tooltip remains visible and mouse-interactive after the pointer
+leaves it. Pointer movement is allowed so inline help can be inspected; the next
+mouse click or wheel action, key press, or controller action removes the pin and
+continues to the game normally.
 
 The relic compendium's **Edit combat relevance** mode shows each discovered
 relic's classification with the game's enemy-map icon for combat or top-bar

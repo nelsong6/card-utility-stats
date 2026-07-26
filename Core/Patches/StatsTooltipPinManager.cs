@@ -7,6 +7,7 @@ using MegaCrit.Sts2.Core.Nodes.HoverTips;
 using MegaCrit.Sts2.Core.Nodes.Relics;
 using MegaCrit.Sts2.Core.Nodes.Screens;
 using MegaCrit.Sts2.Core.Nodes.Screens.RelicCollection;
+using MegaCrit.Sts2.Core.Nodes.Screens.RunHistoryScreen;
 
 namespace SpireLens.Core.Patches;
 
@@ -40,7 +41,26 @@ internal static class StatsTooltipPinManager
         public Action TreeExitingHandler { get; }
     }
 
+    private sealed class RunHistoryContainerSubscription
+    {
+        public RunHistoryContainerSubscription(
+            Control container,
+            Node.ChildEnteredTreeEventHandler childEnteredTreeHandler,
+            Action treeExitingHandler)
+        {
+            Container = container;
+            ChildEnteredTreeHandler = childEnteredTreeHandler;
+            TreeExitingHandler = treeExitingHandler;
+        }
+
+        public Control Container { get; }
+        public Node.ChildEnteredTreeEventHandler ChildEnteredTreeHandler { get; }
+        public Action TreeExitingHandler { get; }
+    }
+
     private static readonly Dictionary<ulong, TargetSubscription> Subscriptions = new();
+    private static readonly Dictionary<ulong, RunHistoryContainerSubscription>
+        RunHistoryContainerSubscriptions = new();
 
     private static Control? _pinnedTarget;
     private static Control? _pinOwner;
@@ -64,6 +84,20 @@ internal static class StatsTooltipPinManager
     {
         if (entry != null)
             AttachTarget(entry, subscribeToGuiInput: true);
+    }
+
+    public static void AttachRunHistoryTargets(NRunHistory? runHistory)
+    {
+        if (!IsLive(runHistory)) return;
+
+        AttachRunHistoryDescendants(runHistory!);
+
+        var deckHistory = FindDescendant<NDeckHistory>(runHistory!);
+        var relicHistory = FindDescendant<NRelicHistory>(runHistory!);
+        WatchRunHistoryContainer(
+            deckHistory?.GetNodeOrNull<Control>("%CardContainer"));
+        WatchRunHistoryContainer(
+            relicHistory?.GetNodeOrNull<Control>("%RelicsContainer"));
     }
 
     private static void AttachTarget(
@@ -98,6 +132,8 @@ internal static class StatsTooltipPinManager
             || !_pinnedTarget!.IsVisibleInTree()
             || _pinnedTarget is NCardHolder cardHolder
                 && !ReferenceEquals(_pinnedCardModel, cardHolder.CardModel)
+            || _pinnedTarget is NDeckHistoryEntry historyEntry
+                && !ReferenceEquals(_pinnedCardModel, historyEntry.Card)
             || !IsLive(_pinOwner)
             || !IsLive(_pinnedTipSet)
             || _pinnedTipSet!.IsQueuedForDeletion())
@@ -129,6 +165,18 @@ internal static class StatsTooltipPinManager
         }
 
         Subscriptions.Clear();
+
+        foreach (var subscription in RunHistoryContainerSubscriptions.Values)
+        {
+            if (!IsLive(subscription.Container)) continue;
+
+            subscription.Container.ChildEnteredTree -=
+                subscription.ChildEnteredTreeHandler;
+            subscription.Container.TreeExiting -=
+                subscription.TreeExitingHandler;
+        }
+
+        RunHistoryContainerSubscriptions.Clear();
         _lockTexture = null;
         _lockLoadAttempted = false;
         _dismissedInputEventId = 0;
@@ -192,7 +240,9 @@ internal static class StatsTooltipPinManager
         // NativeStatsHoverTipFactory can append it.
         if (owner is not NRelicInventoryHolder
             && owner is not NRelicCollectionEntry
-            && owner is not NCardHolder)
+            && owner is not NCardHolder
+            && owner is not NDeckHistoryEntry
+            && owner is not NRelicBasicHolder)
         {
             return false;
         }
@@ -319,9 +369,12 @@ internal static class StatsTooltipPinManager
 
         _pinnedTarget = target;
         _pinOwner = pinOwner;
-        _pinnedCardModel = target is NCardHolder cardHolder
-            ? cardHolder.CardModel
-            : null;
+        _pinnedCardModel = target switch
+        {
+            NCardHolder cardHolder => cardHolder.CardModel,
+            NDeckHistoryEntry historyEntry => historyEntry.Card,
+            _ => null,
+        };
 
         try
         {
@@ -394,6 +447,12 @@ internal static class StatsTooltipPinManager
             case NRelicCollectionEntry entry:
                 return CompendiumRelicStatsContext.TryBuildNativeHoverTip(entry, out tip);
 
+            case NDeckHistoryEntry entry:
+                return RunHistoryStatsContext.TryBuildNativeCardHoverTip(entry, out tip);
+
+            case NRelicBasicHolder holder:
+                return RunHistoryStatsContext.TryBuildNativeRelicHoverTip(holder, out tip);
+
             default:
                 tip = default;
                 return false;
@@ -419,6 +478,14 @@ internal static class StatsTooltipPinManager
                 nativeHoverTips = relicModel.HoverTips;
                 return true;
 
+            case NDeckHistoryEntry entry when entry.Card != null:
+                nativeHoverTips = entry.Card.HoverTips;
+                return true;
+
+            case NRelicBasicHolder holder when IsLive(holder.Relic):
+                nativeHoverTips = holder.Relic.Model.HoverTips;
+                return true;
+
             default:
                 nativeHoverTips = null!;
                 return false;
@@ -439,6 +506,14 @@ internal static class StatsTooltipPinManager
 
             case NRelicCollectionEntry entry:
                 tipSet.SetAlignment(entry, HoverTip.GetHoverTipAlignment(entry));
+                break;
+
+            case NDeckHistoryEntry entry:
+                tipSet.SetAlignment(entry, HoverTip.GetHoverTipAlignment(entry));
+                break;
+
+            case NRelicBasicHolder holder:
+                tipSet.SetAlignmentForRelic(holder.Relic);
                 break;
         }
     }
@@ -470,6 +545,15 @@ internal static class StatsTooltipPinManager
                         HoverTip.GetHoverTipAlignment(entry))
                     ?.SetFollowOwner();
                 break;
+
+            // Run-history card rows do not create an ordinary hover-tip set.
+            // Their pinned set is therefore removed without manufacturing a
+            // new transient tooltip when the pin is released.
+
+            case NRelicBasicHolder holder:
+                NHoverTipSet.CreateAndShow(target, nativeHoverTips)
+                    ?.SetAlignmentForRelic(holder.Relic);
+                break;
         }
     }
 
@@ -483,6 +567,10 @@ internal static class StatsTooltipPinManager
             NRelicCollectionEntry entry
                 when CompendiumRelicStatsContext.TryGetRelicModel(entry, out var relicModel)
                 => relicModel.Id.ToString(),
+            NDeckHistoryEntry entry when entry.Card != null
+                => entry.Card.Id.ToString(),
+            NRelicBasicHolder holder when IsLive(holder.Relic)
+                => holder.Relic.Model.Id.ToString(),
             _ => target.Name,
         };
     }
@@ -577,7 +665,85 @@ internal static class StatsTooltipPinManager
             return holder.CardNode!.Body;
         }
 
+        if (target is NDeckHistoryEntry historyEntry
+            && IsLive(historyEntry.GetNodeOrNull<Control>("%Card")))
+        {
+            return historyEntry.GetNode<Control>("%Card");
+        }
+
+        if (target is NRelicBasicHolder basicHolder
+            && IsLive(basicHolder.Relic))
+        {
+            return basicHolder.Relic;
+        }
+
         return target;
+    }
+
+    private static void AttachRunHistoryDescendants(Node node)
+    {
+        switch (node)
+        {
+            case NDeckHistoryEntry entry:
+                AttachTarget(entry, subscribeToGuiInput: true);
+                break;
+
+            case NRelicBasicHolder holder
+                when RunHistoryStatsContext.HasAncestor<NRelicHistory>(holder):
+                AttachTarget(holder, subscribeToGuiInput: true);
+                break;
+        }
+
+        foreach (var child in node.GetChildren())
+            AttachRunHistoryDescendants(child);
+    }
+
+    private static void WatchRunHistoryContainer(Control? container)
+    {
+        if (!IsLive(container)) return;
+
+        var instanceId = container!.GetInstanceId();
+        if (RunHistoryContainerSubscriptions.ContainsKey(instanceId)) return;
+
+        Node.ChildEnteredTreeEventHandler childEnteredTreeHandler =
+            AttachRunHistoryDescendants;
+        Action treeExitingHandler = () =>
+            OnRunHistoryContainerTreeExiting(container, instanceId);
+
+        container.ChildEnteredTree += childEnteredTreeHandler;
+        container.TreeExiting += treeExitingHandler;
+        RunHistoryContainerSubscriptions[instanceId] =
+            new RunHistoryContainerSubscription(
+                container,
+                childEnteredTreeHandler,
+                treeExitingHandler);
+    }
+
+    private static void OnRunHistoryContainerTreeExiting(
+        Control container,
+        ulong instanceId)
+    {
+        if (RunHistoryContainerSubscriptions.Remove(
+                instanceId,
+                out var subscription)
+            && IsLive(container))
+        {
+            container.ChildEnteredTree -= subscription.ChildEnteredTreeHandler;
+            container.TreeExiting -= subscription.TreeExitingHandler;
+        }
+    }
+
+    private static T? FindDescendant<T>(Node node) where T : Node
+    {
+        if (node is T match) return match;
+
+        foreach (var child in node.GetChildren())
+        {
+            var descendant = FindDescendant<T>(child);
+            if (descendant != null) return descendant;
+        }
+
+        return null;
     }
 
     private static void RemoveLockIcon(Control? target)
