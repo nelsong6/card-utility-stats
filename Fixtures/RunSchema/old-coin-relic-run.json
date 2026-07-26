@@ -1,0 +1,27 @@
+{
+  "run_id": "old-coin-relic-fixture",
+  "started_at": "2026-07-27T00:00:00Z",
+  "updated_at": "2026-07-27T00:20:00Z",
+  "outcome": "in_progress",
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.OLD_COIN": {
+      "old_coin_gold_granted": 300,
+      "old_coin_gold_spent": 120
+    }
+  },
+  "gold_attribution_ledger": [
+    {
+      "source_relic_id": "RELIC.OLD_COIN",
+      "amount_remaining": 180
+    },
+    {
+      "amount_remaining": 25
+    }
+  ],
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

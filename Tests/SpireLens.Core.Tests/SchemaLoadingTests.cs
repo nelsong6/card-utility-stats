@@ -2050,6 +2050,30 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsOldCoinRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("old-coin-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.OLD_COIN"];
+        Assert.Equal(300, relicAgg.OldCoinGoldGranted);
+        Assert.Equal(120, relicAgg.OldCoinGoldSpent);
+        Assert.Collection(
+            loaded.Data.GoldAttributionLedger,
+            chunk =>
+            {
+                Assert.Equal("RELIC.OLD_COIN", chunk.SourceRelicId);
+                Assert.Equal(180, chunk.AmountRemaining);
+            },
+            chunk =>
+            {
+                Assert.Null(chunk.SourceRelicId);
+                Assert.Equal(25, chunk.AmountRemaining);
+            });
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsBookOfFiveRingsRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("book-of-five-rings-relic-run.json"));
@@ -2152,6 +2176,18 @@ public class SchemaLoadingTests
         var relicAgg = resumed!.RelicAggregates["RELIC.LUCKY_FYSH"];
         Assert.Equal(45, relicAgg.GoldGained);
         Assert.Equal(3, relicAgg.CardsAddedToDeck);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsOldCoinRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("old-coin-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.OLD_COIN"];
+        Assert.Equal(300, relicAgg.OldCoinGoldGranted);
+        Assert.Equal(120, relicAgg.OldCoinGoldSpent);
+        Assert.Equal(2, resumed.GoldAttributionLedger.Count);
     }
 
     [Fact]

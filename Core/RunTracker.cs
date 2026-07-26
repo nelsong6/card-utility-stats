@@ -7,6 +7,7 @@ using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Combat.History.Entries;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
+using MegaCrit.Sts2.Core.Entities.Gold;
 using MegaCrit.Sts2.Core.Entities.Powers;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Entities.Potions;
@@ -1615,6 +1616,10 @@ public static class RunTracker
             MergeRelicAggregateInto(runRelicAgg, pendingRelicAgg);
         }
 
+        if (pending.GoldAttributionLedger != null)
+            run.GoldAttributionLedger = CloneGoldAttributionLedger(
+                pending.GoldAttributionLedger);
+
         foreach (var (enemyId, pendingEnemyAgg) in pending.EnemyAggregates)
         {
             if (!run.EnemyAggregates.TryGetValue(enemyId, out var runEnemyAgg))
@@ -1732,6 +1737,8 @@ public static class RunTracker
         target.DoomKills += source.DoomKills;
         target.EnergyGenerated += source.EnergyGenerated;
         target.GoldGained += source.GoldGained;
+        target.OldCoinGoldGranted += source.OldCoinGoldGranted;
+        target.OldCoinGoldSpent += source.OldCoinGoldSpent;
         target.CardsAddedToDeck += source.CardsAddedToDeck;
         target.CardRewardsSkipped += source.CardRewardsSkipped;
         target.GoldLost += source.GoldLost;
@@ -4197,6 +4204,7 @@ public static class RunTracker
     private const string DarkstonePeriaptRelicId = "RELIC.DARKSTONE_PERIAPT";
     private const string LuckyFyshRelicId = "RELIC.LUCKY_FYSH";
     private const string AmethystAubergineRelicId = "RELIC.AMETHYST_AUBERGINE";
+    private const string OldCoinRelicId = "RELIC.OLD_COIN";
     private const string LeafyPoulticeRelicId = "RELIC.LEAFY_POULTICE";
     private const string RegalPillowRelicId = "RELIC.REGAL_PILLOW";
     private const string WhiteBeastStatueRelicId = "RELIC.WHITE_BEAST_STATUE";
@@ -8698,6 +8706,268 @@ public static class RunTracker
             }
         }
     }
+
+    /// <summary>
+    /// Starts Old Coin's FIFO attribution from its observed completed pickup
+    /// effect. Gold already held by the owner is placed before the relic's
+    /// grant, so it must be consumed before spending can reach Old Coin gold.
+    /// </summary>
+    public static void RecordOldCoinObtained(
+        OldCoin relic,
+        Player owner,
+        int initialGold,
+        int currentGold)
+    {
+        if (relic == null || owner == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ReferenceEquals(relic.Owner, owner)
+                    || !IsTrackedRelic(relic)
+                    || !IsTrackedPlayer(owner))
+                    return;
+
+                var inCombat = CombatManager.Instance?.IsInProgress == true;
+                var ledger = GetGoldAttributionLedgerForCurrentContextLocked(
+                    createForOldCoinPickup: true,
+                    inCombat);
+                if (ledger == null) return;
+
+                var agg = inCombat
+                    ? GetOrCreatePendingRelicAggregateLocked(OldCoinRelicId)
+                    : GetOrCreateCurrentRunRelicAggregateLocked(OldCoinRelicId);
+                BeginOldCoinGoldAttribution(ledger, agg, initialGold, currentGold);
+
+                if (!inCombat)
+                    SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordOldCoinObtained failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Applies one observed gold-balance reduction to Old Coin's FIFO ledger.
+    /// Every loss consumes provenance, but only the game's Spent transaction
+    /// type increments Old Coin's displayed spent amount.
+    /// </summary>
+    public static void RecordGoldLoss(
+        Player player,
+        int initialGold,
+        int currentGold,
+        GoldLossType goldLossType)
+    {
+        if (player == null || currentGold >= initialGold) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+
+                var inCombat = CombatManager.Instance?.IsInProgress == true;
+                var ledger = GetGoldAttributionLedgerForCurrentContextLocked(
+                    createForOldCoinPickup: false,
+                    inCombat);
+                if (ledger == null) return;
+
+                var spent = ApplyGoldLossToAttribution(
+                    ledger,
+                    initialGold,
+                    currentGold,
+                    goldLossType == GoldLossType.Spent);
+                if (spent > 0)
+                {
+                    var agg = inCombat
+                        ? GetOrCreatePendingRelicAggregateLocked(OldCoinRelicId)
+                        : GetOrCreateCurrentRunRelicAggregateLocked(OldCoinRelicId);
+                    agg.OldCoinGoldSpent += spent;
+                }
+
+                if (!inCombat)
+                    SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordGoldLoss failed: {e.Message}");
+            }
+        }
+    }
+
+    private static List<GoldAttributionChunk>? GetGoldAttributionLedgerForCurrentContextLocked(
+        bool createForOldCoinPickup,
+        bool inCombat)
+    {
+        EnsureLazyCurrentRunLocked();
+        _currentRun.GoldAttributionLedger ??= new List<GoldAttributionChunk>();
+
+        if (!inCombat)
+        {
+            return createForOldCoinPickup
+                || HasAttributedGold(_currentRun.GoldAttributionLedger)
+                    ? _currentRun.GoldAttributionLedger
+                    : null;
+        }
+
+        _pendingCombat ??= new PendingCombat();
+        if (_pendingCombat.GoldAttributionLedger != null)
+        {
+            return createForOldCoinPickup
+                || HasAttributedGold(_pendingCombat.GoldAttributionLedger)
+                    ? _pendingCombat.GoldAttributionLedger
+                    : null;
+        }
+
+        if (!createForOldCoinPickup
+            && !HasAttributedGold(_currentRun.GoldAttributionLedger))
+            return null;
+
+        _pendingCombat.GoldAttributionLedger =
+            CloneGoldAttributionLedger(_currentRun.GoldAttributionLedger);
+        return _pendingCombat.GoldAttributionLedger;
+    }
+
+    private static void BeginOldCoinGoldAttribution(
+        List<GoldAttributionChunk> ledger,
+        RelicAggregate aggregate,
+        int initialGold,
+        int currentGold)
+    {
+        ReconcileGoldAttributionLedger(ledger, Math.Max(0, initialGold));
+
+        var observedGrant = Math.Max(0, currentGold - initialGold);
+        aggregate.OldCoinGoldGranted += observedGrant;
+        if (observedGrant > 0)
+        {
+            ledger.Add(new GoldAttributionChunk
+            {
+                SourceRelicId = OldCoinRelicId,
+                AmountRemaining = observedGrant,
+            });
+        }
+
+        PruneGoldAttributionLedger(ledger);
+    }
+
+    private static int ApplyGoldLossToAttribution(
+        List<GoldAttributionChunk> ledger,
+        int initialGold,
+        int currentGold,
+        bool countsAsSpent)
+    {
+        ReconcileGoldAttributionLedger(ledger, Math.Max(0, initialGold));
+        var actualLoss = Math.Max(0, initialGold - currentGold);
+        var oldCoinGoldSpent = ConsumeGoldAttributionLedger(
+            ledger,
+            actualLoss,
+            countsAsSpent);
+        PruneGoldAttributionLedger(ledger);
+        return oldCoinGoldSpent;
+    }
+
+    private static void ReconcileGoldAttributionLedger(
+        List<GoldAttributionChunk> ledger,
+        int currentBalance)
+    {
+        ledger.RemoveAll(chunk => chunk == null || chunk.AmountRemaining <= 0);
+        var ledgerBalance = ledger.Sum(chunk => (long)chunk.AmountRemaining);
+
+        if (ledgerBalance < currentBalance)
+        {
+            ledger.Add(new GoldAttributionChunk
+            {
+                AmountRemaining = (int)(currentBalance - ledgerBalance),
+            });
+            return;
+        }
+
+        if (ledgerBalance > currentBalance)
+        {
+            ConsumeGoldAttributionLedger(
+                ledger,
+                (int)Math.Min(int.MaxValue, ledgerBalance - currentBalance),
+                countsAsSpent: false);
+        }
+    }
+
+    private static int ConsumeGoldAttributionLedger(
+        List<GoldAttributionChunk> ledger,
+        int amount,
+        bool countsAsSpent)
+    {
+        var remaining = Math.Max(0, amount);
+        var oldCoinGoldSpent = 0;
+
+        for (var index = 0; index < ledger.Count && remaining > 0; index++)
+        {
+            var chunk = ledger[index];
+            if (chunk == null || chunk.AmountRemaining <= 0) continue;
+
+            var consumed = Math.Min(remaining, chunk.AmountRemaining);
+            chunk.AmountRemaining -= consumed;
+            remaining -= consumed;
+
+            if (countsAsSpent
+                && string.Equals(
+                    chunk.SourceRelicId,
+                    OldCoinRelicId,
+                    StringComparison.Ordinal))
+                oldCoinGoldSpent += consumed;
+        }
+
+        ledger.RemoveAll(chunk => chunk == null || chunk.AmountRemaining <= 0);
+        return oldCoinGoldSpent;
+    }
+
+    private static void PruneGoldAttributionLedger(List<GoldAttributionChunk> ledger)
+    {
+        ledger.RemoveAll(chunk => chunk == null || chunk.AmountRemaining <= 0);
+        if (!HasAttributedGold(ledger))
+            ledger.Clear();
+    }
+
+    private static bool HasAttributedGold(IEnumerable<GoldAttributionChunk> ledger)
+        => ledger.Any(chunk =>
+            chunk != null
+            && chunk.AmountRemaining > 0
+            && !string.IsNullOrWhiteSpace(chunk.SourceRelicId));
+
+    private static List<GoldAttributionChunk> CloneGoldAttributionLedger(
+        IEnumerable<GoldAttributionChunk> source)
+        => source
+            .Where(chunk => chunk != null && chunk.AmountRemaining > 0)
+            .Select(chunk => new GoldAttributionChunk
+            {
+                SourceRelicId = chunk.SourceRelicId,
+                AmountRemaining = chunk.AmountRemaining,
+            })
+            .ToList();
+
+    internal static void BeginOldCoinGoldAttributionForTest(
+        List<GoldAttributionChunk> ledger,
+        RelicAggregate aggregate,
+        int initialGold,
+        int currentGold)
+        => BeginOldCoinGoldAttribution(
+            ledger,
+            aggregate,
+            initialGold,
+            currentGold);
+
+    internal static int ApplyGoldLossToAttributionForTest(
+        List<GoldAttributionChunk> ledger,
+        int initialGold,
+        int currentGold,
+        bool countsAsSpent)
+        => ApplyGoldLossToAttribution(
+            ledger,
+            initialGold,
+            currentGold,
+            countsAsSpent);
 
     /// <summary>
     /// Record Book of Five Rings at the successful relic-obtain boundary so
@@ -21501,6 +21771,7 @@ internal class PendingCombat
     public Dictionary<string, RelicAggregate> RelicAggregates { get; } = new();
     public Dictionary<string, EnemyAggregate> EnemyAggregates { get; } = new();
     public List<BlockChunk> PlayerBlockLedger { get; } = new();
+    public List<GoldAttributionChunk>? GoldAttributionLedger { get; set; }
     public Dictionary<AbstractModel, PlayerPowerOwnershipShare> PlayerPowerOwnershipByModifier { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<PowerModel, Dictionary<string, NoxiousFumesContributionShare>> NoxiousFumesContributionsByPower { get; }

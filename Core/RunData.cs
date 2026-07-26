@@ -47,6 +47,15 @@ public class RunData
     /// <summary>Per-relic stat aggregates. Keyed by relic id (e.g. "RELIC.BAG_OF_MARBLES").</summary>
     public Dictionary<string, RelicAggregate> RelicAggregates { get; set; } = new();
 
+    /// <summary>
+    /// Ordered provenance for the portion of the player's gold balance that
+    /// still matters to source attribution. Old Coin seeds the first tracked
+    /// chunk; ordinary balance before and after it is represented by chunks
+    /// without a source relic id. The ledger can be cleared once no attributed
+    /// gold remains.
+    /// </summary>
+    public List<GoldAttributionChunk> GoldAttributionLedger { get; set; } = new();
+
     /// <summary>Per-enemy stat aggregates. Keyed by monster id (e.g. "MONSTER.HAUNTED_SHIP").</summary>
     public Dictionary<string, EnemyAggregate> EnemyAggregates { get; set; } = new();
 
@@ -474,6 +483,12 @@ public class ReplayExtraPlayReasonAggregate
     public int Count { get; set; }
 }
 
+public class GoldAttributionChunk
+{
+    public string? SourceRelicId { get; set; }
+    public int AmountRemaining { get; set; }
+}
+
 /// <summary>
 /// Aggregated stats for a single relic across this run.
 /// Fields are shared across relics; each relic uses only the fields relevant to it.
@@ -703,6 +718,13 @@ public class RelicAggregate
     // completed balance delta after its gold command resolves; Amethyst
     // Aubergine records the concrete extra GoldReward amount it adds.
     public int GoldGained { get; set; }
+
+    // Old Coin's observed pickup grant and the portion of that attributed
+    // grant later consumed by game transactions marked as Spent. A run-level
+    // FIFO gold ledger keeps pre-existing balance ahead of the grant and later
+    // unrelated gains behind it.
+    public int OldCoinGoldGranted { get; set; }
+    public int OldCoinGoldSpent { get; set; }
 
     // Permanent deck additions confirmed by a relic-owned pile-change
     // callback. Used by Lucky Fysh and Book of Five Rings.

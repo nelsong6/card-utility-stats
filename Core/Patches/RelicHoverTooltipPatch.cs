@@ -956,6 +956,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is OldCoin)
+        {
+            title = "Old Coin";
+            body = BuildOldCoinBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is BookOfFiveRings)
         {
             title = "Book of Five Rings";
@@ -2825,6 +2832,18 @@ public static class RelicHoverShowPatch
             agg.GoldGained.ToString(),
             "",
             "Extra gold received — the total amount on Gold rewards added by Amethyst Aubergine.");
+        return sb.ToString();
+    }
+
+    private static string BuildOldCoinBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(
+            sb,
+            "Granted gold spent",
+            $"{agg.OldCoinGoldSpent}/{agg.OldCoinGoldGranted}",
+            "",
+            "Granted gold spent — how much of Old Coin's observed gold grant was later consumed by purchases.");
         return sb.ToString();
     }
 
