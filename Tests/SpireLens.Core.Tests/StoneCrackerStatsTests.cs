@@ -165,9 +165,13 @@ public class StoneCrackerStatsTests
         Assert.Contains("Upgraded commons", body);
         Assert.Contains("Upgraded uncommons", body);
         Assert.Contains("Upgraded rares", body);
-        Assert.Contains("Cards played upgraded by Stone Cracker", body);
-        Assert.Contains("Avg cards played upgraded by Stone Cracker per turn", body);
-        Assert.Contains("Avg cards played upgraded by Stone Cracker per combat", body);
+        Assert.Contains("Cards upgraded by Stone Cracker that were played.", body);
+        Assert.Contains(
+            "Average number of cards upgraded by Stone Cracker that were played per turn.",
+            body);
+        Assert.Contains(
+            "Average number of cards upgraded by Stone Cracker that were played per combat.",
+            body);
         Assert.Contains("[b]9[/b]", body);
         Assert.Contains("[b]1.5[/b]", body);
     }

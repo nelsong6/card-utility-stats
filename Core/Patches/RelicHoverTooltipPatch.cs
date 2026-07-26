@@ -2605,19 +2605,22 @@ public static class RelicHoverShowPatch
         Row3(sb, "Upgraded rares", agg.StoneCrackerUpgradedRares.ToString(), "");
         Row3(
             sb,
-            "Cards played upgraded by Stone Cracker",
+            "Cards played upgraded",
             agg.StoneCrackerUpgradedCardPlays.ToString(),
-            "");
+            "",
+            "Cards upgraded by Stone Cracker that were played.");
         Row3(
             sb,
-            "Avg cards played upgraded by Stone Cracker per turn",
+            "Avg cards played upgraded per turn",
             FormatDecimal(upgradedPlaysPerTurn),
-            "");
+            "",
+            "Average number of cards upgraded by Stone Cracker that were played per turn.");
         Row3(
             sb,
-            "Avg cards played upgraded by Stone Cracker per combat",
+            "Avg cards played upgraded per combat",
             FormatDecimal(upgradedPlaysPerCombat),
-            "");
+            "",
+            "Average number of cards upgraded by Stone Cracker that were played per combat.");
         return sb.ToString();
     }
 
