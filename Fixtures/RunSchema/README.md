@@ -414,6 +414,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `tungsten-rod-relic-run.json`
   Adds Tungsten Rod's exact HP-loss prevention, reliable self/Curse/Status/enemy
   source buckets, and zero-inclusive held turn/combat denominators.
+- `pocketwatch-turn-stats-run.json`
+  Adds Pocketwatch's held turn/combat denominators, turn-end card-count totals,
+  missed-threshold turns, and actual-activation card-count samples.
 
 Why these exist:
 

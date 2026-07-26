@@ -1226,7 +1226,66 @@ public static class RelicHoverShowPatch
     private static string BuildPocketwatchBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "additional cards drawn", agg.AdditionalCardsDrawn.ToString(), "");
+        var averageCountAtTurnEnd = agg.PocketwatchTurns <= 0
+            ? 0m
+            : (decimal)agg.PocketwatchTurnEndCountTotal / agg.PocketwatchTurns;
+        var averageValueWhenActivated = agg.PocketwatchActivationValueSamples <= 0
+            ? 0m
+            : (decimal)agg.PocketwatchActivatedTurnEndCountTotal
+                / agg.PocketwatchActivationValueSamples;
+        var averageValueWhenMissed = agg.PocketwatchTurnsActivationMissed <= 0
+            ? 0m
+            : (decimal)agg.PocketwatchMissedTurnEndCountTotal
+                / agg.PocketwatchTurnsActivationMissed;
+        var averageActivationsPerTurn = agg.PocketwatchTurns <= 0
+            ? 0m
+            : (decimal)agg.Activations / agg.PocketwatchTurns;
+        var averageActivationsPerCombat = agg.PocketwatchCombats <= 0
+            ? 0m
+            : (decimal)agg.Activations / agg.PocketwatchCombats;
+
+        Row3(
+            sb,
+            "Additional cards drawn",
+            agg.AdditionalCardsDrawn.ToString(),
+            "",
+            "Additional cards drawn — cards actually added to hand draws by Pocketwatch.");
+        Row3(
+            sb,
+            "Avg count at turn end",
+            FormatDecimal(averageCountAtTurnEnd),
+            "",
+            "Average count at turn end — cards played by the relic's owner at the end of each turn while Pocketwatch was held.");
+        Row3(
+            sb,
+            "Turns activation missed",
+            agg.PocketwatchTurnsActivationMissed.ToString(),
+            "",
+            "Turns activation missed — turns that ended above Pocketwatch's card threshold and therefore could not activate it.");
+        Row3(
+            sb,
+            "Avg value when activated",
+            FormatDecimal(averageValueWhenActivated),
+            "",
+            "Average value when activated — the prior turn's card count when Pocketwatch actually added cards to the next hand draw.");
+        Row3(
+            sb,
+            "Avg value when missed",
+            FormatDecimal(averageValueWhenMissed),
+            "",
+            "Average value when missed — the card count on turns that ended above Pocketwatch's activation threshold.");
+        Row3(
+            sb,
+            "Avg activations per turn",
+            FormatDecimal(averageActivationsPerTurn),
+            "",
+            "Average activations per turn — actual Pocketwatch activations divided by turns completed while it was held.");
+        Row3(
+            sb,
+            "Avg activations per combat",
+            FormatDecimal(averageActivationsPerCombat),
+            "",
+            "Average activations per combat — actual Pocketwatch activations divided by combats in which it was held.");
         return sb.ToString();
     }
 

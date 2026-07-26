@@ -1560,6 +1560,7 @@ public static class RunTracker
     {
         if (_pendingCombat == null || _currentRun == null) return;
         RecordHeldCombatRelicBaselinesForTrackedPlayerLocked(requireActiveCombat: false, createPendingIfNeeded: false);
+        RecordPocketwatchTurnForTrackedPlayerLocked();
         RecordLetterOpenerTurnForTrackedPlayerLocked();
         RecordTuningForkTurnForTrackedPlayerLocked();
         RecordCloakClaspTurnForTrackedPlayerLocked();
@@ -1649,6 +1650,13 @@ public static class RunTracker
         target.WeakApplied += source.WeakApplied;
         MergeAppliedEffectsInto(target.AppliedEffects, source.AppliedEffects);
         target.AdditionalCardsDrawn += source.AdditionalCardsDrawn;
+        target.PocketwatchTurns += source.PocketwatchTurns;
+        target.PocketwatchCombats += source.PocketwatchCombats;
+        target.PocketwatchTurnEndCountTotal += source.PocketwatchTurnEndCountTotal;
+        target.PocketwatchTurnsActivationMissed += source.PocketwatchTurnsActivationMissed;
+        target.PocketwatchActivatedTurnEndCountTotal += source.PocketwatchActivatedTurnEndCountTotal;
+        target.PocketwatchActivationValueSamples += source.PocketwatchActivationValueSamples;
+        target.PocketwatchMissedTurnEndCountTotal += source.PocketwatchMissedTurnEndCountTotal;
         target.PendulumCombats += source.PendulumCombats;
         target.PendulumCombatsEndedOn0Charges += source.PendulumCombatsEndedOn0Charges;
         target.PendulumCombatsEndedOn1Charge += source.PendulumCombatsEndedOn1Charge;
@@ -2089,6 +2097,7 @@ public static class RunTracker
             // Defensive: if CombatSetUp never fired (unusual), allocate lazily.
             _pendingCombat ??= new PendingCombat();
 
+            RecordPocketwatchCardPlayedLocked(cardPlay.Card);
             RecordStoneCrackerUpgradedCardPlayedLocked(cardPlay.Card);
             RecordRazorToothUpgradedCardPlayedLocked(cardPlay.Card);
             RecordWarHammerUpgradedCardPlayedLocked(cardPlay.Card);
@@ -6054,31 +6063,127 @@ public static class RunTracker
     }
 
     /// <summary>
-    /// Record additional cards drawn by Pocketwatch's turn-start bonus.
-    /// <paramref name="cardsDrawn"/> is the number of extra cards drawn (normally 3).
+    /// Record an actual Pocketwatch activation from the positive hand-draw
+    /// modifier returned by the relic. <paramref name="cardsPlayedLastTurn"/>
+    /// is Pocketwatch's own counter value for the turn that qualified.
     /// Called from <see cref="Patches.PocketwatchModifyHandDrawPatch"/>.
     /// </summary>
-    public static void RecordPocketwatchDraw(int cardsDrawn)
+    public static void RecordPocketwatchDraw(
+        Pocketwatch? relic,
+        Player? player,
+        int cardsDrawn,
+        int cardsPlayedLastTurn)
     {
-        if (cardsDrawn <= 0) return;
+        if (relic?.Owner == null || player == null || cardsDrawn <= 0) return;
 
         lock (_lock)
         {
             try
             {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(player)) return;
+                if (relic.Owner != player) return;
+
                 _pendingCombat ??= new PendingCombat();
-                if (!_pendingCombat.RelicAggregates.TryGetValue(PocketwatchRelicId, out var agg))
+                RecordPocketwatchCombatForPlayerLocked(player);
+
+                var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+                if (turnNumber > 0
+                    && _pendingCombat.PocketwatchActivationCountedTurns.TryGetValue(player, out var recordedTurn)
+                    && recordedTurn == turnNumber)
                 {
-                    agg = new RelicAggregate();
-                    _pendingCombat.RelicAggregates[PocketwatchRelicId] = agg;
+                    return;
                 }
-                agg.AdditionalCardsDrawn += cardsDrawn;
+
+                if (turnNumber > 0)
+                    _pendingCombat.PocketwatchActivationCountedTurns[player] = turnNumber;
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(PocketwatchRelicId);
+                RecordPocketwatchActivationForTest(agg, cardsDrawn, cardsPlayedLastTurn);
             }
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordPocketwatchDraw failed: {e.Message}");
             }
         }
+    }
+
+    /// <summary>
+    /// Snapshot Pocketwatch's card counter at the end of each tracked player
+    /// turn while held.
+    /// </summary>
+    public static void RecordPocketwatchTurnEnded(
+        ICombatState? combatState,
+        IEnumerable<Creature>? participants)
+    {
+        lock (_lock)
+        {
+            try
+            {
+                _pendingCombat ??= new PendingCombat();
+                var recordedParticipant = false;
+
+                if (participants != null)
+                {
+                    foreach (var creature in participants)
+                    {
+                        var player = creature?.Player;
+                        if (player == null || !IsTrackedPlayer(player)) continue;
+
+                        recordedParticipant |= RecordPocketwatchTurnForPlayerLocked(
+                            player,
+                            player.PlayerCombatState?.TurnNumber ?? 0);
+                    }
+                }
+
+                if (recordedParticipant) return;
+
+                var trackedPlayer = GetTrackedRunPlayerLocked();
+                if (trackedPlayer == null) return;
+                RecordPocketwatchTurnForPlayerLocked(
+                    trackedPlayer,
+                    trackedPlayer.PlayerCombatState?.TurnNumber ?? 0);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPocketwatchTurnEnded failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordPocketwatchCombatForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.PocketwatchCombats += Math.Max(0, count);
+    }
+
+    internal static void RecordPocketwatchTurnEndForTest(
+        RelicAggregate agg,
+        int cardCount,
+        int activationThreshold)
+    {
+        if (agg == null || cardCount < 0 || activationThreshold < 0) return;
+
+        agg.PocketwatchTurns += 1;
+        agg.PocketwatchTurnEndCountTotal += cardCount;
+        if (cardCount <= activationThreshold) return;
+
+        agg.PocketwatchTurnsActivationMissed += 1;
+        agg.PocketwatchMissedTurnEndCountTotal += cardCount;
+    }
+
+    internal static void RecordPocketwatchActivationForTest(
+        RelicAggregate agg,
+        int cardsDrawn,
+        int? cardsPlayedLastTurn)
+    {
+        if (agg == null || cardsDrawn <= 0) return;
+
+        agg.Activations += 1;
+        agg.AdditionalCardsDrawn += cardsDrawn;
+        if (cardsPlayedLastTurn is not >= 0) return;
+
+        agg.PocketwatchActivatedTurnEndCountTotal += cardsPlayedLastTurn.Value;
+        agg.PocketwatchActivationValueSamples += 1;
     }
 
     /// <summary>
@@ -16120,6 +16225,7 @@ public static class RunTracker
             if (player == null) return;
 
             RecordPermafrostCombatForPlayerLocked(player);
+            RecordPocketwatchCombatForPlayerLocked(player);
             RecordLetterOpenerCombatForPlayerLocked(player);
             RecordTuningForkCombatForPlayerLocked(player);
             RecordCloakClaspCombatForPlayerLocked(player);
@@ -16190,6 +16296,85 @@ public static class RunTracker
 
         var agg = GetOrCreatePendingRelicAggregateLocked(LetterOpenerRelicId);
         RecordLetterOpenerCombatForTest(agg);
+    }
+
+    private static void RecordPocketwatchCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!TryGetPocketwatch(player, out _)) return;
+        if (!_pendingCombat.PocketwatchCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(PocketwatchRelicId);
+        RecordPocketwatchCombatForTest(agg);
+    }
+
+    private static void RecordPocketwatchCardPlayedLocked(CardModel card)
+    {
+        if (_pendingCombat == null) return;
+
+        var player = card?.Owner;
+        if (player == null || !IsTrackedPlayer(player)) return;
+        if (!TryGetPocketwatch(player, out _)) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+
+        RecordPocketwatchCombatForPlayerLocked(player);
+        if (!_pendingCombat.PocketwatchCardCountTurns.TryGetValue(player, out var countedTurn)
+            || countedTurn != turnNumber)
+        {
+            _pendingCombat.PocketwatchCardCountTurns[player] = turnNumber;
+            _pendingCombat.PocketwatchCardsPlayedThisTurn[player] = 0;
+        }
+
+        _pendingCombat.PocketwatchCardsPlayedThisTurn[player] =
+            _pendingCombat.PocketwatchCardsPlayedThisTurn.GetValueOrDefault(player) + 1;
+    }
+
+    private static void RecordPocketwatchTurnForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordPocketwatchTurnForPlayerLocked(
+                player,
+                player.PlayerCombatState?.TurnNumber ?? 0);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordPocketwatchTurnForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static bool RecordPocketwatchTurnForPlayerLocked(Player player, int turnNumber)
+    {
+        if (_pendingCombat == null) return false;
+        if (!TryGetPocketwatch(player, out var pocketwatch) || pocketwatch == null) return false;
+        if (turnNumber <= 0) return false;
+
+        if (_pendingCombat.PocketwatchTurnCountedTurns.TryGetValue(player, out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return true;
+        }
+
+        _pendingCombat.PocketwatchTurnCountedTurns[player] = turnNumber;
+        RecordPocketwatchCombatForPlayerLocked(player);
+
+        var cardCount = 0;
+        if (_pendingCombat.PocketwatchCardCountTurns.TryGetValue(player, out var countedTurn)
+            && countedTurn == turnNumber)
+        {
+            cardCount = _pendingCombat.PocketwatchCardsPlayedThisTurn.GetValueOrDefault(player);
+        }
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(PocketwatchRelicId);
+        RecordPocketwatchTurnEndForTest(
+            agg,
+            Math.Max(0, cardCount),
+            PocketwatchActivationThreshold(pocketwatch));
+        return true;
     }
 
     private static void RecordTuningForkCombatForPlayerLocked(Player player)
@@ -17774,6 +17959,34 @@ public static class RunTracker
     private static bool PlayerHasLetterOpener(Player player)
     {
         return TryGetLetterOpener(player, out _);
+    }
+
+    private static bool TryGetPocketwatch(Player player, out Pocketwatch? pocketwatch)
+    {
+        pocketwatch = null;
+
+        try
+        {
+            pocketwatch = player?.Relics?.OfType<Pocketwatch>().FirstOrDefault();
+            return pocketwatch != null;
+        }
+        catch
+        {
+            pocketwatch = null;
+            return false;
+        }
+    }
+
+    private static int PocketwatchActivationThreshold(Pocketwatch relic)
+    {
+        try
+        {
+            return Math.Max(0, relic.DynamicVars["CardThreshold"].IntValue);
+        }
+        catch
+        {
+            return 3;
+        }
     }
 
     private static bool TryGetLetterOpener(Player player, out LetterOpener? letterOpener)
@@ -21785,6 +21998,16 @@ internal class PendingCombat
     public Dictionary<Player, PendingBrilliantScarfDiscount> BrilliantScarfDiscountOffers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> PermafrostCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> PocketwatchCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> PocketwatchTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> PocketwatchActivationCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> PocketwatchCardCountTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> PocketwatchCardsPlayedThisTurn { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> LetterOpenerCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

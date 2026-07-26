@@ -522,6 +522,17 @@ public class RelicAggregate
     // combat start).
     public int AdditionalCardsDrawn { get; set; }
 
+    // Pocketwatch held-period observations. A turn is missed when its ending
+    // card count is above Pocketwatch's threshold; an activation is counted
+    // only when the relic actually adds cards to the following hand draw.
+    public int PocketwatchTurns { get; set; }
+    public int PocketwatchCombats { get; set; }
+    public int PocketwatchTurnEndCountTotal { get; set; }
+    public int PocketwatchTurnsActivationMissed { get; set; }
+    public int PocketwatchActivatedTurnEndCountTotal { get; set; }
+    public int PocketwatchActivationValueSamples { get; set; }
+    public int PocketwatchMissedTurnEndCountTotal { get; set; }
+
     // Combats where Pendulum was held, including combats too short for it to
     // activate. Used as the denominator for cards drawn per combat.
     public int PendulumCombats { get; set; }

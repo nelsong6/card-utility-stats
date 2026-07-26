@@ -1,0 +1,25 @@
+{
+  "run_id": "pocketwatch-turn-stats-fixture",
+  "started_at": "2026-07-26T18:00:00Z",
+  "updated_at": "2026-07-26T18:20:00Z",
+  "outcome": "in_progress",
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.POCKETWATCH": {
+      "activations": 3,
+      "additional_cards_drawn": 9,
+      "pocketwatch_turns": 6,
+      "pocketwatch_combats": 2,
+      "pocketwatch_turn_end_count_total": 20,
+      "pocketwatch_turns_activation_missed": 2,
+      "pocketwatch_activated_turn_end_count_total": 5,
+      "pocketwatch_activation_value_samples": 3,
+      "pocketwatch_missed_turn_end_count_total": 10
+    }
+  },
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

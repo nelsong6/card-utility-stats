@@ -777,6 +777,21 @@ the per-combat denominator rather than using activations. Its public
 once during combat promotion, before the pending aggregate is merged into the
 run, for combat-end charge buckets and averages.
 
+Pocketwatch increments its private current-turn counter from owner
+`AfterCardPlayed` callbacks and transfers that value to its private
+previous-turn counter during `BeforeSideTurnStart`. Its hand-draw modifier is
+the authoritative activation signal: count an activation only when
+`ModifyHandDraw` returns a positive bonus, and read that same callback's
+previous-turn counter for the activation-value sample. Count every held player
+turn at `Hook.BeforeSideTurnEnd`, using finished owner card plays as the
+turn-counter observation, then reconcile the still-current turn during combat
+promotion because a combat-ending play can bypass the turn-end hook. A turn
+ending above `CardThreshold` is a missed activation; a qualifying final combat
+turn is neither an activation nor a miss because no later hand draw occurred.
+Keep the new turn/combat denominators and their numerators observation-era:
+historic additional-draw totals cannot reconstruct the earlier card-count
+distribution.
+
 Stone Cracker selects and upgrades combat-card instances from the owner's draw
 pile inside `AfterRoomEntered`; it does not upgrade the permanent deck cards.
 All upgrades occur synchronously before that async callback's first await, so

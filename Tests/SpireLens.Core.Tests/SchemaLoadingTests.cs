@@ -2074,6 +2074,25 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsPocketwatchTurnStatsFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("pocketwatch-turn-stats-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.POCKETWATCH"];
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(9, relicAgg.AdditionalCardsDrawn);
+        Assert.Equal(6, relicAgg.PocketwatchTurns);
+        Assert.Equal(2, relicAgg.PocketwatchCombats);
+        Assert.Equal(20, relicAgg.PocketwatchTurnEndCountTotal);
+        Assert.Equal(2, relicAgg.PocketwatchTurnsActivationMissed);
+        Assert.Equal(5, relicAgg.PocketwatchActivatedTurnEndCountTotal);
+        Assert.Equal(3, relicAgg.PocketwatchActivationValueSamples);
+        Assert.Equal(10, relicAgg.PocketwatchMissedTurnEndCountTotal);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsBookOfFiveRingsRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("book-of-five-rings-relic-run.json"));
@@ -2188,6 +2207,24 @@ public class SchemaLoadingTests
         Assert.Equal(300, relicAgg.OldCoinGoldGranted);
         Assert.Equal(120, relicAgg.OldCoinGoldSpent);
         Assert.Equal(2, resumed.GoldAttributionLedger.Count);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsPocketwatchTurnStatsFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("pocketwatch-turn-stats-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.POCKETWATCH"];
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(9, relicAgg.AdditionalCardsDrawn);
+        Assert.Equal(6, relicAgg.PocketwatchTurns);
+        Assert.Equal(2, relicAgg.PocketwatchCombats);
+        Assert.Equal(20, relicAgg.PocketwatchTurnEndCountTotal);
+        Assert.Equal(2, relicAgg.PocketwatchTurnsActivationMissed);
+        Assert.Equal(5, relicAgg.PocketwatchActivatedTurnEndCountTotal);
+        Assert.Equal(3, relicAgg.PocketwatchActivationValueSamples);
+        Assert.Equal(10, relicAgg.PocketwatchMissedTurnEndCountTotal);
     }
 
     [Fact]
