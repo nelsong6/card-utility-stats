@@ -1134,6 +1134,12 @@ Good hook surfaces already proven useful:
   per-source Soul destination counts; use the still-resolving card play as the
   source and the generated Soul's actual pile as the destination.
 - `PlayerCombatState.GainEnergy`: actual energy delta.
+- `FakeVenerableTeaSet.AfterEnergyReset` and
+  `VenerableTeaSet.AfterEnergyReset`: each checks its saved
+  `GainEnergyInNextCombat` flag, awaits its immediate energy command, and then
+  clears the flag. Capture the armed state and starting energy in a prefix,
+  then record the completed callback's observed energy delta; keep the fake
+  and revealed relic ids separate.
 - `PlayerCombatState.GainStars`: actual star delta.
 - `Hook.AfterForge`: actual forge gain/source.
 - `Hook.BeforePowerAmountChanged`: attempted power application context.

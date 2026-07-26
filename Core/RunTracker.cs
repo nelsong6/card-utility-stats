@@ -3870,6 +3870,8 @@ public static class RunTracker
     private const string VeryHotCocoaRelicId = "RELIC.VERY_HOT_COCOA";
     private const string CandelabraRelicId = "RELIC.CANDELABRA";
     private const string ChandelierRelicId = "RELIC.CHANDELIER";
+    private const string FakeVenerableTeaSetRelicId = "RELIC.FAKE_VENERABLE_TEA_SET";
+    private const string VenerableTeaSetRelicId = "RELIC.VENERABLE_TEA_SET";
     private const string PendulumRelicId = "RELIC.PENDULUM";
     private const string ParryingShieldRelicId = "RELIC.PARRYING_SHIELD";
     private const string FestivePopperRelicId = "RELIC.FESTIVE_POPPER";
@@ -13053,6 +13055,62 @@ public static class RunTracker
         if (countCombat)
             agg.Activations += 1;
     }
+
+    /// <summary>
+    /// Record one completed Venerable Tea Set activation using the actual
+    /// energy-pool delta observed around its owner-specific callback.
+    /// Counterfeit and revealed Tea Sets remain separate relic aggregates.
+    /// </summary>
+    public static void RecordVenerableTeaSetActivation(
+        string? relicId,
+        RelicModel? relic,
+        PlayerCombatState? combatState,
+        int initialEnergy,
+        int finalEnergy)
+    {
+        if (relic == null || combatState == null) return;
+        if (!IsVenerableTeaSetRelicId(relicId)) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var owner = combatState._player;
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(owner)) return;
+                if (relic.Owner != null && !ReferenceEquals(relic.Owner, owner)) return;
+
+                AccumulateVenerableTeaSetActivation(
+                    GetOrCreateRelicAggregateLocked(relicId!),
+                    initialEnergy,
+                    finalEnergy);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordVenerableTeaSetActivation failed: {e.Message}");
+            }
+        }
+    }
+
+    private static bool IsVenerableTeaSetRelicId(string? relicId)
+        => relicId == FakeVenerableTeaSetRelicId
+            || relicId == VenerableTeaSetRelicId;
+
+    private static void AccumulateVenerableTeaSetActivation(
+        RelicAggregate agg,
+        int initialEnergy,
+        int finalEnergy)
+    {
+        if (agg == null) return;
+
+        agg.Activations += 1;
+        agg.EnergyGenerated += Math.Max(0, finalEnergy - initialEnergy);
+    }
+
+    internal static void RecordVenerableTeaSetActivationForTest(
+        RelicAggregate agg,
+        int initialEnergy,
+        int finalEnergy)
+        => AccumulateVenerableTeaSetActivation(agg, initialEnergy, finalEnergy);
 
     /// <summary>
     /// Snapshot the final options when a Fresnel Lens owner's card-reward

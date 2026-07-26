@@ -342,8 +342,22 @@ public static class RelicHoverShowPatch
 
         if (IsAnchorStatsRelicModel(relicModel))
         {
-            title = IsFakeAnchorRelicModel(relicModel) ? "???" : "Anchor";
+            title = IsFakeAnchorRelicModel(relicModel) ? "Anchor???" : "Anchor";
             body = BuildAnchorBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is FakeVenerableTeaSet)
+        {
+            title = "Venerable Tea Set???";
+            body = BuildVenerableTeaSetBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is VenerableTeaSet)
+        {
+            title = "Venerable Tea Set";
+            body = BuildVenerableTeaSetBodyBBCode(agg);
             return true;
         }
 
@@ -1305,6 +1319,14 @@ public static class RelicHoverShowPatch
         var sb = new StringBuilder();
         RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildVenerableTeaSetBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        RelicActivationRow(sb, agg.Activations.ToString());
+        Row3(sb, EnergyLabel("Energy gained"), agg.EnergyGenerated.ToString(), "");
         return sb.ToString();
     }
 
