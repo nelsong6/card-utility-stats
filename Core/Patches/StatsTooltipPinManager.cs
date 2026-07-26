@@ -47,6 +47,7 @@ internal static class StatsTooltipPinManager
     private static NHoverTipSet? _pinnedTipSet;
     private static RichTextLabel? _pinnedStatsDescription;
     private static Control? _hintOwner;
+    private static Control? _lockIconHost;
     private static string? _visibleHintText;
     private static object? _pinnedCardModel;
     private static Texture2D? _lockTexture;
@@ -367,8 +368,7 @@ internal static class StatsTooltipPinManager
             pinOwner.QueueFree();
         }
 
-        if (IsLive(target))
-            RemoveLockIcon(target!);
+        RemoveLockIcon(target);
 
         if (!restoreOrdinaryHover
             || !IsLive(target)
@@ -542,7 +542,8 @@ internal static class StatsTooltipPinManager
     {
         RemoveLockIcon(target);
         var texture = GetLockTexture();
-        if (texture == null) return;
+        var host = GetLockIconHost(target);
+        if (texture == null || !IsLive(host)) return;
 
         var lockIcon = new TextureRect
         {
@@ -560,12 +561,43 @@ internal static class StatsTooltipPinManager
             OffsetTop = 2f,
             OffsetBottom = 30f,
         };
-        target.AddChild(lockIcon);
+        host!.AddChild(lockIcon);
+        _lockIconHost = host;
     }
 
-    private static void RemoveLockIcon(Control target)
+    private static Control GetLockIconHost(Control target)
     {
-        var lockIcon = target.GetNodeOrNull<TextureRect>(LockIconNodeName);
+        // Card holders are interaction/layout slots whose bounds can be much
+        // larger than the rendered card. Relic holders already coincide with
+        // their visible item, but cards need the badge anchored to the actual
+        // card body so the same top-right placement has the same meaning.
+        if (target is NCardHolder holder
+            && IsLive(holder.CardNode?.Body))
+        {
+            return holder.CardNode!.Body;
+        }
+
+        return target;
+    }
+
+    private static void RemoveLockIcon(Control? target)
+    {
+        var recordedHost = _lockIconHost;
+        _lockIconHost = null;
+        RemoveLockIconFromHost(recordedHost);
+
+        if (!IsLive(target)) return;
+
+        var currentHost = GetLockIconHost(target!);
+        if (!ReferenceEquals(currentHost, recordedHost))
+            RemoveLockIconFromHost(currentHost);
+    }
+
+    private static void RemoveLockIconFromHost(Control? host)
+    {
+        if (!IsLive(host)) return;
+
+        var lockIcon = host!.GetNodeOrNull<TextureRect>(LockIconNodeName);
         if (!IsLive(lockIcon)) return;
 
         lockIcon!.GetParent()?.RemoveChild(lockIcon);
