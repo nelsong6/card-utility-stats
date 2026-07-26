@@ -1,0 +1,44 @@
+{
+  "run_id": "entropy-power-fixture",
+  "started_at": "2026-07-26T21:00:00Z",
+  "updated_at": "2026-07-26T21:18:00Z",
+  "character": "REGENT",
+  "ascension": 7,
+  "floor_reached": 43,
+  "outcome": "in_progress",
+  "game_start_time": 1785114000,
+  "aggregates": {
+    "CARD.ENTROPY#1": {
+      "combats_in_deck": 5,
+      "plays": 2,
+      "times_drawn": 4,
+      "floor_added": 12,
+      "initial_upgrade_level": 0
+    }
+  },
+  "events": [],
+  "relic_aggregates": {},
+  "enemy_aggregates": {},
+  "meta_stats": {
+    "power_aggregates": {
+      "POWER.ENTROPY": {
+        "power_id": "POWER.ENTROPY",
+        "display_name": "Entropy",
+        "entropy_chains_of_binding_broken": 2,
+        "entropy_cards_generated": 7,
+        "entropy_common_cards_generated": 3,
+        "entropy_uncommon_cards_generated": 2,
+        "entropy_rare_cards_generated": 2,
+        "combats_active": 2
+      }
+    }
+  },
+  "instance_numbers_by_def": {
+    "CARD.ENTROPY": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.ENTROPY": 1
+  }
+}

@@ -400,6 +400,15 @@ public class PowerAggregate
     public int FreeAttackCommonAttacksDiscounted { get; set; }
     public int FreeAttackUncommonAttacksDiscounted { get; set; }
     public int FreeAttackRareAttacksDiscounted { get; set; }
+
+    // Entropy tracking. Generated cards are confirmed from successful
+    // CardCmd.Transform results. Chains broken counts replacements whose
+    // original card had the Queen's Bound affliction before transformation.
+    public int EntropyChainsOfBindingBroken { get; set; }
+    public int EntropyCardsGenerated { get; set; }
+    public int EntropyCommonCardsGenerated { get; set; }
+    public int EntropyUncommonCardsGenerated { get; set; }
+    public int EntropyRareCardsGenerated { get; set; }
 }
 
 public class EnemyAggregate

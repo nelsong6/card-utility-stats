@@ -1002,6 +1002,15 @@ Examples:
 
 Use pooled summaries when a card does not meaningfully exist as a stable deck resident and per-copy identities would mislead the user.
 
+Entropy's shared power owns its later transformations. Keep a narrow window
+around `EntropyPower.AfterPlayerTurnStart`, then observe the already-established
+`CardCmd.Transform(IEnumerable<CardTransformation>, Rng, CardPreviewStyle)`
+result. The successful result's replacement card is authoritative for rarity.
+Snapshot whether the original card has the Queen's `Bound` affliction before
+the transform removes that original; count a broken Chain of Binding only when
+that same transform succeeds. Count the combat when Entropy becomes active,
+including an active combat that produces no replacement cards.
+
 Enemy status-card pollution uses a source-window plus observed-result pattern:
 
 - Patch the exact enemy-owned move or power trigger that creates the status

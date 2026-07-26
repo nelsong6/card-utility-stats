@@ -576,6 +576,20 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsEntropyPowerFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("entropy-power-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        AssertEntropyPowerFixture(
+            loaded.Data.MetaStats.PowerAggregates["POWER.ENTROPY"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsDanseMacabrePowerFixture()
     {
         var loaded = RunStorage.LoadHistorical(
@@ -1334,6 +1348,17 @@ public class SchemaLoadingTests
         Assert.NotNull(resumed);
         AssertJugglingPowerFixture(
             resumed!.MetaStats.PowerAggregates["POWER.JUGGLING"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsEntropyPowerFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("entropy-power-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertEntropyPowerFixture(
+            resumed!.MetaStats.PowerAggregates["POWER.ENTROPY"]);
     }
 
     [Fact]
@@ -3807,6 +3832,18 @@ public class SchemaLoadingTests
         Assert.Equal(2, powerAgg.UncommonAttacksCopied);
         Assert.Equal(2, powerAgg.RareAttacksCopied);
         Assert.Equal(5, powerAgg.TurnsActive);
+        Assert.Equal(2, powerAgg.CombatsActive);
+    }
+
+    private static void AssertEntropyPowerFixture(PowerAggregate powerAgg)
+    {
+        Assert.Equal("POWER.ENTROPY", powerAgg.PowerId);
+        Assert.Equal("Entropy", powerAgg.DisplayName);
+        Assert.Equal(2, powerAgg.EntropyChainsOfBindingBroken);
+        Assert.Equal(7, powerAgg.EntropyCardsGenerated);
+        Assert.Equal(3, powerAgg.EntropyCommonCardsGenerated);
+        Assert.Equal(2, powerAgg.EntropyUncommonCardsGenerated);
+        Assert.Equal(2, powerAgg.EntropyRareCardsGenerated);
         Assert.Equal(2, powerAgg.CombatsActive);
     }
 

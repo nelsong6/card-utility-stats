@@ -14,6 +14,7 @@ using MegaCrit.Sts2.Core.Entities.Relics;
 using MegaCrit.Sts2.Core.Hooks;
 using MegaCrit.Sts2.Core.Map;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Models.Afflictions;
 using MegaCrit.Sts2.Core.Models.Enchantments;
 using MegaCrit.Sts2.Core.Models.Cards;
 using MegaCrit.Sts2.Core.Models.Powers;
@@ -3387,6 +3388,260 @@ public static class RunTracker
         bool success,
         CardRarity? rarity)
         => AccumulateJugglingCopy(agg, success, rarity);
+
+    /// <summary>
+    /// Count the combat after Entropy's own play callback confirms that its
+    /// shared power is present. Replays and additional Entropy copies in the
+    /// same combat are deduplicated.
+    /// </summary>
+    internal static void RecordEntropyPowerApplied(Player? player)
+    {
+        if (player?.Creature == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+                if (CombatManager.Instance?.IsInProgress != true) return;
+                if (!IsTrackedPlayer(player)) return;
+
+                var power = player.Creature.GetPower<EntropyPower>();
+                if (power == null) return;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordEntropyPowerActiveForPlayerLocked(power, player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordEntropyPowerApplied failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Arm the exact Entropy transform callback. This also supplies a
+    /// combat-count fallback for hot reloads that occurred after the power was
+    /// originally applied.
+    /// </summary>
+    internal static PendingEntropyTransformWindow?
+        ArmEntropyTransformAttribution(
+            EntropyPower? power,
+            Player? player)
+    {
+        if (power?.Owner?.Player == null || player == null) return null;
+        if (!ReferenceEquals(power.Owner.Player, player)) return null;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return null;
+                if (CombatManager.Instance?.IsInProgress != true) return null;
+                if (!IsTrackedPlayer(player)) return null;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordEntropyPowerActiveForPlayerLocked(power, player);
+
+                var window = new PendingEntropyTransformWindow
+                {
+                    PendingCombat = _pendingCombat,
+                    Player = player,
+                    PowerId = power.Id.ToString(),
+                    DisplayName = GetPowerDisplayName(power),
+                };
+                _pendingCombat.PendingEntropyTransformWindows[player] = window;
+                return window;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"ArmEntropyTransformAttribution failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+    internal static void DisarmEntropyTransformAttribution(
+        PendingEntropyTransformWindow? window)
+    {
+        if (window == null) return;
+
+        lock (_lock)
+        {
+            if (_pendingCombat == null) return;
+            if (_pendingCombat.PendingEntropyTransformWindows.TryGetValue(
+                    window.Player,
+                    out var activeWindow)
+                && ReferenceEquals(activeWindow, window))
+            {
+                _pendingCombat.PendingEntropyTransformWindows.Remove(window.Player);
+            }
+        }
+    }
+
+    internal static bool TryCaptureEntropyTransformSources(
+        ref IEnumerable<CardTransformation> transformations,
+        out PendingEntropyTransformBatch? batch)
+    {
+        batch = null;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return false;
+                if (_pendingCombat == null) return false;
+
+                var transformationsArray =
+                    transformations?.ToArray() ?? Array.Empty<CardTransformation>();
+                transformations = transformationsArray;
+                if (transformationsArray.Length == 0) return false;
+
+                var captured = transformationsArray
+                    .Select((transformation, inputIndex) => new
+                    {
+                        Transformation = transformation,
+                        InputIndex = inputIndex,
+                        Owner = transformation.Original?.Owner,
+                        PileType = transformation.Original == null
+                            ? int.MaxValue
+                            : TryGetPileTypeSortValue(transformation.Original),
+                        PileIndex = transformation.Original == null
+                            ? int.MaxValue
+                            : TryGetPileIndex(transformation.Original),
+                    })
+                    .Where(candidate =>
+                        candidate.Owner != null
+                        && _pendingCombat.PendingEntropyTransformWindows.ContainsKey(
+                            candidate.Owner))
+                    .ToList();
+                if (captured.Count == 0
+                    || captured.Count != transformationsArray.Length)
+                    return false;
+
+                var owner = captured[0].Owner!;
+                if (!_pendingCombat.PendingEntropyTransformWindows.TryGetValue(
+                        owner,
+                        out var window))
+                    return false;
+                if (!ReferenceEquals(window.PendingCombat, _pendingCombat)) return false;
+
+                var boundSources = captured
+                    .Where(candidate => ReferenceEquals(candidate.Owner, owner))
+                    .OrderBy(candidate => candidate.PileType)
+                    .ThenBy(candidate => candidate.PileIndex)
+                    .ThenBy(candidate => candidate.InputIndex)
+                    .Select(candidate =>
+                        candidate.Transformation.Original?.Affliction is Bound)
+                    .ToList();
+                if (boundSources.Count == 0) return false;
+
+                batch = new PendingEntropyTransformBatch
+                {
+                    Window = window,
+                    OriginalCardsWereBound = boundSources,
+                };
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"TryCaptureEntropyTransformSources failed: {e.Message}");
+                batch = null;
+                return false;
+            }
+        }
+    }
+
+    internal static void RecordEntropyTransformResults(
+        PendingEntropyTransformBatch? batch,
+        IEnumerable<CardPileAddResult>? results)
+    {
+        if (batch == null || results == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var window = batch.Window;
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+                if (_pendingCombat == null
+                    || !ReferenceEquals(window.PendingCombat, _pendingCombat))
+                    return;
+                if (!_pendingCombat.PendingEntropyTransformWindows.TryGetValue(
+                        window.Player,
+                        out var activeWindow)
+                    || !ReferenceEquals(activeWindow, window))
+                    return;
+
+                var resultList = results.ToList();
+                var count = Math.Min(
+                    batch.OriginalCardsWereBound.Count,
+                    resultList.Count);
+                if (count <= 0) return;
+
+                var agg = GetOrCreatePowerAggregate(
+                    _pendingCombat.MetaStats,
+                    window.PowerId,
+                    window.DisplayName);
+                for (var i = 0; i < count; i++)
+                {
+                    var result = resultList[i];
+                    RecordEntropyGeneratedCardForTest(
+                        agg,
+                        result.success && result.cardAdded != null,
+                        result.cardAdded?.Rarity,
+                        batch.OriginalCardsWereBound[i]);
+                }
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordEntropyTransformResults failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void RecordEntropyPowerActiveForPlayerLocked(
+        EntropyPower power,
+        Player player)
+    {
+        if (_pendingCombat == null) return;
+
+        var agg = GetOrCreatePowerAggregate(
+            _pendingCombat.MetaStats,
+            power.Id.ToString(),
+            GetPowerDisplayName(power));
+        if (_pendingCombat.EntropyPowerCombatCountedPlayers.Add(player))
+            agg.CombatsActive++;
+    }
+
+    internal static void RecordEntropyGeneratedCardForTest(
+        PowerAggregate agg,
+        bool success,
+        CardRarity? rarity,
+        bool originalWasBound)
+    {
+        if (agg == null || !success) return;
+
+        agg.EntropyCardsGenerated++;
+        if (originalWasBound)
+            agg.EntropyChainsOfBindingBroken++;
+
+        switch (rarity)
+        {
+            case CardRarity.Common:
+                agg.EntropyCommonCardsGenerated++;
+                break;
+            case CardRarity.Uncommon:
+                agg.EntropyUncommonCardsGenerated++;
+                break;
+            case CardRarity.Rare:
+                agg.EntropyRareCardsGenerated++;
+                break;
+        }
+    }
 
     /// <summary>
     /// Remember Free Attack's marginal energy-cost reduction for an exact
@@ -20714,6 +20969,15 @@ public static class RunTracker
             targetAgg.FreeAttackCommonAttacksDiscounted += sourceAgg.FreeAttackCommonAttacksDiscounted;
             targetAgg.FreeAttackUncommonAttacksDiscounted += sourceAgg.FreeAttackUncommonAttacksDiscounted;
             targetAgg.FreeAttackRareAttacksDiscounted += sourceAgg.FreeAttackRareAttacksDiscounted;
+            targetAgg.EntropyChainsOfBindingBroken +=
+                sourceAgg.EntropyChainsOfBindingBroken;
+            targetAgg.EntropyCardsGenerated += sourceAgg.EntropyCardsGenerated;
+            targetAgg.EntropyCommonCardsGenerated +=
+                sourceAgg.EntropyCommonCardsGenerated;
+            targetAgg.EntropyUncommonCardsGenerated +=
+                sourceAgg.EntropyUncommonCardsGenerated;
+            targetAgg.EntropyRareCardsGenerated +=
+                sourceAgg.EntropyRareCardsGenerated;
         }
     }
 
@@ -21186,6 +21450,20 @@ internal sealed class PendingJugglingCopyWindow
     public int RemainingAttempts { get; set; }
 }
 
+internal sealed class PendingEntropyTransformWindow
+{
+    public required PendingCombat PendingCombat { get; init; }
+    public required Player Player { get; init; }
+    public string PowerId { get; init; } = "";
+    public string DisplayName { get; init; } = "";
+}
+
+internal sealed class PendingEntropyTransformBatch
+{
+    public required PendingEntropyTransformWindow Window { get; init; }
+    public required IReadOnlyList<bool> OriginalCardsWereBound { get; init; }
+}
+
 internal sealed class PendingBurningSticksDuplicateWindow
 {
     public required Player Player { get; init; }
@@ -21342,6 +21620,10 @@ internal class PendingCombat
     public Dictionary<Player, int> JugglingPowerTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, PendingJugglingCopyWindow> PendingJugglingCopyWindows { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> EntropyPowerCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, PendingEntropyTransformWindow> PendingEntropyTransformWindows { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> DanseMacabrePowerCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

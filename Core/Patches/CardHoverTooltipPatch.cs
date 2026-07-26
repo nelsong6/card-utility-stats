@@ -25,6 +25,7 @@ public static class CardHoverShowPatch
     private const int DebtGoldLossPerTrigger = 5;
     private const string DanseMacabrePowerId = "POWER.DANSE_MACABRE";
     private const string EnergyPotionIconPath = "res://images/atlases/potion_atlas.sprites/energy_potion.tres";
+    private const string EntropyPowerId = "POWER.ENTROPY";
     private const string FreeAttackPowerId = "POWER.FREE_ATTACK_POWER";
     private const string JugglingPowerId = "POWER.JUGGLING";
     private const string StarIconPath = "res://images/packed/sprite_fonts/star_icon.png";
@@ -320,6 +321,7 @@ public static class CardHoverShowPatch
         AppendJackOfAllTradesStats(sb, cardModel, agg, compact: false);
         AppendDiscoveryStats(sb, cardModel, agg, compact: false);
         AppendDrainPowerStats(sb, cardModel, agg, compact: false);
+        AppendEntropyPowerStats(sb, cardModel, metaStats, compact: false);
         AppendJugglingPowerStats(sb, cardModel, metaStats, compact: false);
         AppendDanseMacabrePowerStats(sb, cardModel, metaStats, compact: false);
         AppendUnrelentingFreeAttackStats(sb, cardModel, metaStats, compact: false);
@@ -530,6 +532,7 @@ public static class CardHoverShowPatch
         AppendJackOfAllTradesStats(sb, cardModel, agg, compact: true);
         AppendDiscoveryStats(sb, cardModel, agg, compact: true);
         AppendDrainPowerStats(sb, cardModel, agg, compact: true);
+        AppendEntropyPowerStats(sb, cardModel, metaStats, compact: true);
         AppendJugglingPowerStats(sb, cardModel, metaStats, compact: true);
         AppendDanseMacabrePowerStats(sb, cardModel, metaStats, compact: true);
         AppendUnrelentingFreeAttackStats(sb, cardModel, metaStats, compact: true);
@@ -767,6 +770,64 @@ public static class CardHoverShowPatch
         Row3(sb, "Avg cards upgraded per combat", FormatDecimal(upgradesPerCombat), "");
         Row3(sb, "Avg upgraded-card plays per turn", FormatDecimal(upgradedPlaysPerTurn), "");
         Row3(sb, "Avg upgraded-card plays per combat", FormatDecimal(upgradedPlaysPerCombat), "");
+    }
+
+    private static void AppendEntropyPowerStats(
+        StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel card,
+        RunMetaStats metaStats,
+        bool compact)
+    {
+        if (card is not Entropy && !IsCardId(card, "CARD.ENTROPY")) return;
+
+        metaStats ??= new RunMetaStats();
+        PowerAggregate? powerAgg = null;
+        if (metaStats.PowerAggregates != null)
+        {
+            metaStats.PowerAggregates.TryGetValue(EntropyPowerId, out powerAgg);
+            powerAgg ??= metaStats.PowerAggregates.Values.FirstOrDefault(candidate =>
+                string.Equals(
+                    candidate.PowerId,
+                    EntropyPowerId,
+                    StringComparison.Ordinal)
+                || string.Equals(
+                    candidate.DisplayName,
+                    "Entropy",
+                    StringComparison.OrdinalIgnoreCase));
+        }
+        powerAgg ??= new PowerAggregate();
+
+        Row3(
+            sb,
+            "Times Chains of Binding broken",
+            powerAgg.EntropyChainsOfBindingBroken.ToString(),
+            "");
+        if (compact) return;
+
+        Row3(
+            sb,
+            "Commons generated",
+            powerAgg.EntropyCommonCardsGenerated.ToString(),
+            "");
+        Row3(
+            sb,
+            "Uncommons generated",
+            powerAgg.EntropyUncommonCardsGenerated.ToString(),
+            "");
+        Row3(
+            sb,
+            "Rares generated",
+            powerAgg.EntropyRareCardsGenerated.ToString(),
+            "");
+
+        decimal averagePerCombat = powerAgg.CombatsActive > 0
+            ? (decimal)powerAgg.EntropyCardsGenerated / powerAgg.CombatsActive
+            : 0m;
+        Row3(
+            sb,
+            "Avg cards generated per combat",
+            FormatDecimal(averagePerCombat),
+            "");
     }
 
     private static void AppendJugglingPowerStats(
