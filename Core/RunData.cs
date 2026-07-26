@@ -744,6 +744,10 @@ public class RelicAggregate
     // the relic's own saved HasItemBeenBought state.
     public int MawBankShopsSkipped { get; set; }
 
+    // Actual gold removed by transactions the game classifies as Spent while
+    // Maw Bank was still active and the player's current room was not a shop.
+    public int MawBankGoldSpentOutsideShops { get; set; }
+
     // Old Coin's observed pickup grant and the portion of that attributed
     // grant later consumed by game transactions marked as Spent. A run-level
     // FIFO gold ledger keeps pre-existing balance ahead of the grant and later

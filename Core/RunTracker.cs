@@ -1751,6 +1751,8 @@ public static class RunTracker
         target.EnergyGenerated += source.EnergyGenerated;
         target.GoldGained += source.GoldGained;
         target.MawBankShopsSkipped += source.MawBankShopsSkipped;
+        target.MawBankGoldSpentOutsideShops +=
+            source.MawBankGoldSpentOutsideShops;
         target.OldCoinGoldGranted += source.OldCoinGoldGranted;
         target.OldCoinGoldSpent += source.OldCoinGoldSpent;
         target.CardsAddedToDeck += source.CardsAddedToDeck;
@@ -9135,9 +9137,10 @@ public static class RunTracker
     }
 
     /// <summary>
-    /// Applies one observed gold-balance reduction to Old Coin's FIFO ledger.
-    /// Every loss consumes provenance, but only the game's Spent transaction
-    /// type increments Old Coin's displayed spent amount.
+    /// Applies one observed gold-balance reduction to the gold stats that use
+    /// the game's centralized loss boundary. Every loss consumes Old Coin
+    /// provenance, but only Spent transactions count toward Old Coin's spent
+    /// grant or Maw Bank's spending outside shops.
     /// </summary>
     public static void RecordGoldLoss(
         Player player,
@@ -9154,25 +9157,52 @@ public static class RunTracker
                 if (!IsTrackedPlayer(player)) return;
 
                 var inCombat = CombatManager.Instance?.IsInProgress == true;
+                var countsAsSpent = goldLossType == GoldLossType.Spent;
+                var changed = false;
+
+                var mawBank = player.GetRelic<MawBank>();
+                if (mawBank != null && IsTrackedRelic(mawBank))
+                {
+                    var mawBankSpent = CalculateMawBankGoldSpentOutsideShopsForTest(
+                        initialGold,
+                        currentGold,
+                        countsAsSpent,
+                        player.RunState?.BaseRoom is MerchantRoom,
+                        isActive: !mawBank.HasItemBeenBought);
+                    if (mawBankSpent > 0)
+                    {
+                        var mawBankAggregate = inCombat
+                            ? GetOrCreatePendingRelicAggregateLocked(MawBankRelicId)
+                            : GetOrCreateCurrentRunRelicAggregateLocked(MawBankRelicId);
+                        mawBankAggregate.MawBankGoldSpentOutsideShops += mawBankSpent;
+                        changed = true;
+                    }
+                }
+
                 var ledger = GetGoldAttributionLedgerForCurrentContextLocked(
                     createForOldCoinPickup: false,
                     inCombat);
-                if (ledger == null) return;
-
-                var spent = ApplyGoldLossToAttribution(
-                    ledger,
-                    initialGold,
-                    currentGold,
-                    goldLossType == GoldLossType.Spent);
-                if (spent > 0)
+                if (ledger != null)
                 {
-                    var agg = inCombat
-                        ? GetOrCreatePendingRelicAggregateLocked(OldCoinRelicId)
-                        : GetOrCreateCurrentRunRelicAggregateLocked(OldCoinRelicId);
-                    agg.OldCoinGoldSpent += spent;
+                    var spent = ApplyGoldLossToAttribution(
+                        ledger,
+                        initialGold,
+                        currentGold,
+                        countsAsSpent);
+                    if (spent > 0)
+                    {
+                        var agg = inCombat
+                            ? GetOrCreatePendingRelicAggregateLocked(OldCoinRelicId)
+                            : GetOrCreateCurrentRunRelicAggregateLocked(OldCoinRelicId);
+                        agg.OldCoinGoldSpent += spent;
+                    }
+
+                    // The ledger consumes every observed loss, even when none
+                    // of that loss reaches Old Coin's attributed grant.
+                    changed = true;
                 }
 
-                if (!inCombat)
+                if (!inCombat && changed)
                     SaveCurrentRun();
             }
             catch (Exception e)
@@ -10274,6 +10304,19 @@ public static class RunTracker
 
         aggregate.Activations++;
         aggregate.GoldGained += Math.Max(0, currentGold - initialGold);
+    }
+
+    internal static int CalculateMawBankGoldSpentOutsideShopsForTest(
+        int initialGold,
+        int currentGold,
+        bool countsAsSpent,
+        bool isMerchantRoom,
+        bool isActive)
+    {
+        if (!countsAsSpent || isMerchantRoom || !isActive)
+            return 0;
+
+        return Math.Max(0, initialGold - currentGold);
     }
 
     internal static bool RecordMawBankRoomEntryForTest(

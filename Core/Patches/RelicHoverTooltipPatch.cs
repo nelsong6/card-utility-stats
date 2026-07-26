@@ -2996,6 +2996,12 @@ public static class RelicHoverShowPatch
             agg.MawBankShopsSkipped.ToString(),
             "",
             "Shops skipped — shops entered while Maw Bank was active and left without spending gold.");
+        Row3(
+            sb,
+            "Gold spent outside shops",
+            agg.MawBankGoldSpentOutsideShops.ToString(),
+            "",
+            "Gold spent outside shops — actual gold spent while Maw Bank was active and the current room was not a shop.");
         return sb.ToString();
     }
 

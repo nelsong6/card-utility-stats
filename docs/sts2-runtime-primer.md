@@ -686,7 +686,11 @@ room entry. Count the skip only when `HasItemBeenBought` is still false; a
 positive-gold purchase sets that game-owned flag and therefore resolves the
 visit without a skip. Keeping the pending floor in `RunData` makes duplicate
 same-room callbacks idempotent and preserves an open shop across Continue or
-Core hot reload.
+Core hot reload. For spending outside shops, reuse the established
+`PlayerCmd.LoseGold` before/after balance observation: count only transactions
+classified by the game as `GoldLossType.Spent`, while `HasItemBeenBought` is
+still false and the owner's current `BaseRoom` is not a `MerchantRoom`.
+Ordinary gold loss and shop purchases do not belong in that total.
 
 Book of Five Rings also owns an `AfterCardChangedPiles` callback for every
 same-owner card whose final pile is the permanent Deck. Its saved `CardsAdded`

@@ -9,7 +9,8 @@
     "RELIC.MAW_BANK": {
       "activations": 6,
       "gold_gained": 72,
-      "maw_bank_shops_skipped": 2
+      "maw_bank_shops_skipped": 2,
+      "maw_bank_gold_spent_outside_shops": 34
     }
   },
   "maw_bank_pending_shop_floor": 11,

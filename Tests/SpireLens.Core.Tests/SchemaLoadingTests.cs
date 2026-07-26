@@ -2060,6 +2060,7 @@ public class SchemaLoadingTests
         Assert.Equal(6, relicAgg.Activations);
         Assert.Equal(72, relicAgg.GoldGained);
         Assert.Equal(2, relicAgg.MawBankShopsSkipped);
+        Assert.Equal(34, relicAgg.MawBankGoldSpentOutsideShops);
         Assert.Equal(11, loaded.Data.MawBankPendingShopFloor);
     }
 
@@ -2221,6 +2222,7 @@ public class SchemaLoadingTests
         Assert.Equal(6, relicAgg.Activations);
         Assert.Equal(72, relicAgg.GoldGained);
         Assert.Equal(2, relicAgg.MawBankShopsSkipped);
+        Assert.Equal(34, relicAgg.MawBankGoldSpentOutsideShops);
         Assert.Equal(11, resumed.MawBankPendingShopFloor);
     }
 

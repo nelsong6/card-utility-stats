@@ -89,6 +89,41 @@ public class MawBankStatsTests
     }
 
     [Fact]
+    public void GoldSpentOutsideShops_UsesOnlyActiveNonShopSpentTransactions()
+    {
+        Assert.Equal(27, RunTracker.CalculateMawBankGoldSpentOutsideShopsForTest(
+            initialGold: 100,
+            currentGold: 73,
+            countsAsSpent: true,
+            isMerchantRoom: false,
+            isActive: true));
+        Assert.Equal(0, RunTracker.CalculateMawBankGoldSpentOutsideShopsForTest(
+            initialGold: 100,
+            currentGold: 73,
+            countsAsSpent: false,
+            isMerchantRoom: false,
+            isActive: true));
+        Assert.Equal(0, RunTracker.CalculateMawBankGoldSpentOutsideShopsForTest(
+            initialGold: 100,
+            currentGold: 73,
+            countsAsSpent: true,
+            isMerchantRoom: true,
+            isActive: true));
+        Assert.Equal(0, RunTracker.CalculateMawBankGoldSpentOutsideShopsForTest(
+            initialGold: 100,
+            currentGold: 73,
+            countsAsSpent: true,
+            isMerchantRoom: false,
+            isActive: false));
+        Assert.Equal(0, RunTracker.CalculateMawBankGoldSpentOutsideShopsForTest(
+            initialGold: 73,
+            currentGold: 73,
+            countsAsSpent: true,
+            isMerchantRoom: false,
+            isActive: true));
+    }
+
+    [Fact]
     public void MergeRelicAggregate_MawBankFields_AreAdditive()
     {
         var target = new RelicAggregate
@@ -96,12 +131,14 @@ public class MawBankStatsTests
             Activations = 2,
             GoldGained = 24,
             MawBankShopsSkipped = 1,
+            MawBankGoldSpentOutsideShops = 15,
         };
         var source = new RelicAggregate
         {
             Activations = 4,
             GoldGained = 48,
             MawBankShopsSkipped = 2,
+            MawBankGoldSpentOutsideShops = 20,
         };
 
         RunTracker.MergeRelicAggregateInto(target, source);
@@ -109,6 +146,7 @@ public class MawBankStatsTests
         Assert.Equal(6, target.Activations);
         Assert.Equal(72, target.GoldGained);
         Assert.Equal(3, target.MawBankShopsSkipped);
+        Assert.Equal(35, target.MawBankGoldSpentOutsideShops);
     }
 
     [Fact]
@@ -119,14 +157,17 @@ public class MawBankStatsTests
             Activations = 6,
             GoldGained = 72,
             MawBankShopsSkipped = 2,
+            MawBankGoldSpentOutsideShops = 34,
         });
 
         Assert.Contains("completed room entries where Maw Bank was still active", body);
         Assert.Contains("Gold gained", body);
         Assert.Contains("Shops skipped", body);
+        Assert.Contains("Gold spent outside shops", body);
         Assert.Contains("[b]6[/b]", body);
         Assert.Contains("[b]72[/b]", body);
         Assert.Contains("[b]2[/b]", body);
+        Assert.Contains("[b]34[/b]", body);
     }
 
     [Fact]

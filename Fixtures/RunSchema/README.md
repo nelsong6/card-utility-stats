@@ -231,7 +231,8 @@ New fixtures added going forward do not need a `v*-` prefix.
   those owner-specific callbacks.
 - `maw-bank-relic-run.json`
   Adds Maw Bank room-entry activations, observed gold gained, completed shops
-  skipped without spending, and the persisted in-progress shop floor.
+  skipped without spending, gold spent outside shops while active, and the
+  persisted in-progress shop floor.
 - `old-coin-relic-run.json`
   Adds Old Coin's observed gold grant, the amount of that grant later spent,
   and the persisted FIFO gold-provenance ledger used across floors and reloads.
