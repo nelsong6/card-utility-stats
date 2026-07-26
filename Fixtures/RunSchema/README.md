@@ -404,6 +404,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `whispering-earring-relic-run.json`
   Adds Whispering Earring's observed current-HP loss during the first combat
   round plus its zero-inclusive held-combat denominator.
+- `tungsten-rod-relic-run.json`
+  Adds Tungsten Rod's exact HP-loss prevention, reliable self/Curse/Status/enemy
+  source buckets, and zero-inclusive held turn/combat denominators.
 
 Why these exist:
 

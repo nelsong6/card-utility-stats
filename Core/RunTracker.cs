@@ -74,6 +74,7 @@ public static class RunTracker
     private static readonly List<PendingUnsettlingLampDebuff> _pendingUnsettlingLampDebuffs = new();
     private static readonly System.Threading.AsyncLocal<EnemyStatusSourceFrame?> _enemyStatusSourceFrame = new();
     private static readonly System.Threading.AsyncLocal<PendingToastyMittensActivation?> _toastyMittensActivation = new();
+    private static readonly System.Threading.AsyncLocal<TungstenRodPowerSourceFrame?> _tungstenRodPowerSourceFrame = new();
     private static int _pendingPlayerBlockClearAmount;
     private static bool _pendingPlayerBlockClearArmed;
     private static bool _pendingAkabekoVigorAttribution;
@@ -936,6 +937,7 @@ public static class RunTracker
         _pendingPowerChangeAttempts.Clear();
         _pendingUnsettlingLampDebuffs.Clear();
         _toastyMittensActivation.Value = null;
+        _tungstenRodPowerSourceFrame.Value = null;
         _pendingPlayerBlockClearAmount = 0;
         _pendingPlayerBlockClearArmed = false;
         // Ported windows (Orichalcum, Anchor, Abacus, BoneFlute, CloakClasp,
@@ -1565,6 +1567,7 @@ public static class RunTracker
         RecordReptileTrinketTurnForTrackedPlayerLocked();
         RecordRainbowRingTurnForTrackedPlayerLocked();
         RecordBeatingRemnantTurnForTrackedPlayerLocked();
+        RecordTungstenRodTurnForTrackedPlayerLocked();
         RecordStoneCrackerTurnForTrackedPlayerLocked();
         RecordPaperPhrogTurnForTrackedPlayerLocked();
         RecordRazorToothTurnForTrackedPlayerLocked();
@@ -1674,6 +1677,17 @@ public static class RunTracker
         target.WhisperingEarringFirstRoundHpLost +=
             source.WhisperingEarringFirstRoundHpLost;
         target.WhisperingEarringCombats += source.WhisperingEarringCombats;
+        target.TungstenRodDamagePrevented += source.TungstenRodDamagePrevented;
+        target.TungstenRodSelfDamagePrevented +=
+            source.TungstenRodSelfDamagePrevented;
+        target.TungstenRodCurseDamagePrevented +=
+            source.TungstenRodCurseDamagePrevented;
+        target.TungstenRodStatusDamagePrevented +=
+            source.TungstenRodStatusDamagePrevented;
+        target.TungstenRodEnemyDamagePrevented +=
+            source.TungstenRodEnemyDamagePrevented;
+        target.TungstenRodTurns += source.TungstenRodTurns;
+        target.TungstenRodCombats += source.TungstenRodCombats;
         target.PlatingAdded += source.PlatingAdded;
         target.CardsUpgraded += source.CardsUpgraded;
         MergeUpgradedCardsInto(target, source);
@@ -3898,6 +3912,7 @@ public static class RunTracker
     private const string SparklingRougeRelicId = "RELIC.SPARKLING_ROUGE";
     private const string BeatingRemnantRelicId = "RELIC.BEATING_REMNANT";
     private const string WhisperingEarringRelicId = "RELIC.WHISPERING_EARRING";
+    private const string TungstenRodRelicId = "RELIC.TUNGSTEN_ROD";
     private const string GorgetRelicId = "RELIC.GORGET";
     private const string StoneCrackerRelicId = "RELIC.STONE_CRACKER";
     private const string RazorToothRelicId = "RELIC.RAZOR_TOOTH";
@@ -4801,6 +4816,177 @@ public static class RunTracker
     {
         if (agg == null) return;
         agg.WhisperingEarringCombats += Math.Max(0, count);
+    }
+
+    public static object? PushTungstenRodPowerDamageSource(PowerModel? power)
+    {
+        var previous = _tungstenRodPowerSourceFrame.Value;
+        if (power == null) return previous;
+
+        _tungstenRodPowerSourceFrame.Value = new TungstenRodPowerSourceFrame
+        {
+            Source = power,
+            Previous = previous,
+        };
+        return previous;
+    }
+
+    public static void RestoreTungstenRodPowerDamageSource(object? previous)
+    {
+        _tungstenRodPowerSourceFrame.Value =
+            previous as TungstenRodPowerSourceFrame;
+    }
+
+    public static void RecordTungstenRodDamagePrevented(
+        TungstenRod relic,
+        Creature target,
+        decimal amountBefore,
+        decimal amountAfter,
+        Creature? dealer,
+        CardModel? cardSource)
+    {
+        var owner = relic?.Owner;
+        if (owner?.Creature == null || !ReferenceEquals(target, owner.Creature))
+            return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(owner)) return;
+                if (CombatManager.Instance?.IsInProgress != true) return;
+
+                var prevented = CalculateTungstenRodDamagePreventedForTest(
+                    amountBefore,
+                    amountAfter);
+                if (prevented <= 0m) return;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordTungstenRodCombatForPlayerLocked(owner);
+
+                var powerSource = _tungstenRodPowerSourceFrame.Value?.Source;
+                var source = ClassifyTungstenRodPreventionSourceForTest(
+                    cardSource?.Type,
+                    cardSource != null
+                        && ReferenceEquals(cardSource.Owner, owner),
+                    powerSource?.Type,
+                    powerSource != null
+                        && ReferenceEquals(powerSource.Owner, owner.Creature),
+                    dealer != null
+                        && ReferenceEquals(dealer, owner.Creature),
+                    dealer?.IsEnemy == true);
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(
+                    TungstenRodRelicId);
+                RecordTungstenRodDamagePreventedForTest(
+                    agg,
+                    prevented,
+                    source);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordTungstenRodDamagePrevented failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordTungstenRodTurnStarted(Player player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                if (CombatManager.Instance?.IsInProgress != true) return;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordTungstenRodTurnForPlayerLocked(player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordTungstenRodTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static decimal CalculateTungstenRodDamagePreventedForTest(
+        decimal amountBefore,
+        decimal amountAfter)
+    {
+        if (amountBefore <= 0m) return 0m;
+        var appliedAmount = Math.Clamp(amountAfter, 0m, amountBefore);
+        return amountBefore - appliedAmount;
+    }
+
+    internal static TungstenRodPreventionSource
+        ClassifyTungstenRodPreventionSourceForTest(
+            CardType? cardType,
+            bool cardOwnedByPlayer,
+            PowerType? powerType,
+            bool powerOwnedByPlayer,
+            bool dealerIsPlayer,
+            bool dealerIsEnemy)
+    {
+        if (cardType == CardType.Curse)
+            return TungstenRodPreventionSource.Curse;
+        if (cardType == CardType.Status)
+            return TungstenRodPreventionSource.Status;
+        if (powerOwnedByPlayer && powerType == PowerType.Debuff)
+            return TungstenRodPreventionSource.Enemy;
+        if (cardOwnedByPlayer)
+            return TungstenRodPreventionSource.SelfInflicted;
+        if (powerOwnedByPlayer && powerType == PowerType.Buff)
+            return TungstenRodPreventionSource.SelfInflicted;
+        if (dealerIsEnemy)
+            return TungstenRodPreventionSource.Enemy;
+        if (dealerIsPlayer)
+            return TungstenRodPreventionSource.SelfInflicted;
+        return TungstenRodPreventionSource.Other;
+    }
+
+    internal static void RecordTungstenRodDamagePreventedForTest(
+        RelicAggregate agg,
+        decimal prevented,
+        TungstenRodPreventionSource source)
+    {
+        if (agg == null || prevented <= 0m) return;
+
+        agg.TungstenRodDamagePrevented += prevented;
+        switch (source)
+        {
+            case TungstenRodPreventionSource.SelfInflicted:
+                agg.TungstenRodSelfDamagePrevented += prevented;
+                break;
+            case TungstenRodPreventionSource.Curse:
+                agg.TungstenRodCurseDamagePrevented += prevented;
+                break;
+            case TungstenRodPreventionSource.Status:
+                agg.TungstenRodStatusDamagePrevented += prevented;
+                break;
+            case TungstenRodPreventionSource.Enemy:
+                agg.TungstenRodEnemyDamagePrevented += prevented;
+                break;
+        }
+    }
+
+    internal static void RecordTungstenRodTurnForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.TungstenRodTurns += Math.Max(0, count);
+    }
+
+    internal static void RecordTungstenRodCombatForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.TungstenRodCombats += Math.Max(0, count);
     }
 
     /// <summary>
@@ -15276,6 +15462,18 @@ public static class RunTracker
         }
     }
 
+    private static bool PlayerHasTungstenRod(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is TungstenRod);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static bool PlayerHasRuinedHelmet(Player player)
     {
         try
@@ -15427,6 +15625,7 @@ public static class RunTracker
             RecordSturdyClampCombatForPlayerLocked(player);
             RecordBeatingRemnantCombatForPlayerLocked(player);
             RecordWhisperingEarringCombatForPlayerLocked(player);
+            RecordTungstenRodCombatForPlayerLocked(player);
             RecordRuinedHelmetCombatForPlayerLocked(player);
             RecordMummifiedHandCombatForPlayerLocked(player);
             RecordBurningSticksCombatForPlayerLocked(player);
@@ -15757,6 +15956,53 @@ public static class RunTracker
         var agg = GetOrCreatePendingRelicAggregateLocked(
             WhisperingEarringRelicId);
         RecordWhisperingEarringCombatForTest(agg);
+    }
+
+    private static void RecordTungstenRodCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasTungstenRod(player)) return;
+        if (!_pendingCombat.TungstenRodCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(TungstenRodRelicId);
+        RecordTungstenRodCombatForTest(agg);
+    }
+
+    private static void RecordTungstenRodTurnForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordTungstenRodTurnForPlayerLocked(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug(
+                $"RecordTungstenRodTurnForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordTungstenRodTurnForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasTungstenRod(player)) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.TungstenRodTurnCountedTurns.TryGetValue(
+                player,
+                out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.TungstenRodTurnCountedTurns[player] = turnNumber;
+        RecordTungstenRodCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(TungstenRodRelicId);
+        RecordTungstenRodTurnForTest(agg);
     }
 
     private static void RecordBeatingRemnantTurnForTrackedPlayerLocked()
@@ -21039,6 +21285,10 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> WhisperingEarringCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> TungstenRodCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> TungstenRodTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> ArtOfWarCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> ArtOfWarTurnCountedTurns { get; }
@@ -21201,6 +21451,21 @@ internal sealed class EnemyStatusSourceFrame
 {
     public required Creature Source { get; init; }
     public EnemyStatusSourceFrame? Previous { get; init; }
+}
+
+internal sealed class TungstenRodPowerSourceFrame
+{
+    public required PowerModel Source { get; init; }
+    public TungstenRodPowerSourceFrame? Previous { get; init; }
+}
+
+internal enum TungstenRodPreventionSource
+{
+    Other,
+    SelfInflicted,
+    Curse,
+    Status,
+    Enemy,
 }
 
 internal sealed class PendingToastyMittensActivation

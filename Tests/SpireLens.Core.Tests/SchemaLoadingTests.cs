@@ -3619,6 +3619,29 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsTungstenRodRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("tungsten-rod-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertTungstenRodFixture(
+            loaded.Data.RelicAggregates["RELIC.TUNGSTEN_ROD"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsTungstenRodRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("tungsten-rod-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertTungstenRodFixture(
+            resumed!.RelicAggregates["RELIC.TUNGSTEN_ROD"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsRuinedHelmetRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("ruined-helmet-relic-run.json"));
@@ -3837,6 +3860,17 @@ public class SchemaLoadingTests
     {
         Assert.Equal(21m, relicAgg.WhisperingEarringFirstRoundHpLost);
         Assert.Equal(3, relicAgg.WhisperingEarringCombats);
+    }
+
+    private static void AssertTungstenRodFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(18m, relicAgg.TungstenRodDamagePrevented);
+        Assert.Equal(4m, relicAgg.TungstenRodSelfDamagePrevented);
+        Assert.Equal(3m, relicAgg.TungstenRodCurseDamagePrevented);
+        Assert.Equal(2m, relicAgg.TungstenRodStatusDamagePrevented);
+        Assert.Equal(8m, relicAgg.TungstenRodEnemyDamagePrevented);
+        Assert.Equal(6, relicAgg.TungstenRodTurns);
+        Assert.Equal(3, relicAgg.TungstenRodCombats);
     }
 
     private static void AssertRuinedHelmetFixture(RelicAggregate relicAgg)

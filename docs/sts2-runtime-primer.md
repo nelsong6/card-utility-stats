@@ -869,6 +869,17 @@ the participants include its owner, making that the matching held-turn
 boundary. Count held combats at setup so both averages include zero-prevention
 periods.
 
+Tungsten Rod uses the same owner-specific `ModifyHpLostAfterOsty` observation:
+its positive input/output delta is the exact HP loss prevented by the rod.
+Direct Curse and Status card sources are authoritative. Normal cards owned by
+the target player and target-owned Buff power callbacks are self-inflicted;
+enemy dealers and target-owned Debuff power callbacks are enemy-sourced. The
+game sometimes passes the player or null as dealer for Debuff ticks, so keep a
+narrow async-local source frame around the current player-damaging power
+callbacks rather than classifying those from dealer alone. Unidentified sources
+belong in the total but not a guessed source bucket. Use every held player turn
+and combat as the zero-inclusive average denominators.
+
 Ruined Helmet doubles the first positive Strength amount its owner receives in
 each combat through `TryModifyPowerAmountReceived`. Capture its exact local
 contribution as `modifiedAmount - amount` at that callback, but do not commit it

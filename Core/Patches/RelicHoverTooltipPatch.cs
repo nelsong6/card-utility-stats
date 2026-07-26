@@ -231,6 +231,7 @@ public static class RelicHoverShowPatch
             EmberTea => EmberTeaTooltipWidth,
             RedSkull => EmberTeaTooltipWidth,
             WhisperingEarring => EmberTeaTooltipWidth,
+            TungstenRod => EmberTeaTooltipWidth,
             _ => null,
         };
 
@@ -770,6 +771,13 @@ public static class RelicHoverShowPatch
         {
             title = "Whispering Earring";
             body = BuildWhisperingEarringBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is TungstenRod)
+        {
+            title = "Tungsten Rod";
+            body = BuildTungstenRodBodyBBCode(agg);
             return true;
         }
 
@@ -2355,6 +2363,94 @@ public static class RelicHoverShowPatch
             "");
         return sb.ToString();
     }
+
+    private static string BuildTungstenRodBodyBBCode(RelicAggregate agg)
+    {
+        var turns = agg.TungstenRodTurns;
+        var combats = agg.TungstenRodCombats;
+        var sb = new StringBuilder();
+
+        AddPreventionRows(
+            "Damage prevented",
+            "Lost life prevented",
+            agg.TungstenRodDamagePrevented,
+            turns,
+            combats,
+            "HP loss prevented by Tungsten Rod.",
+            "Average HP loss prevented by Tungsten Rod per player turn while it was held.",
+            "Average HP loss prevented by Tungsten Rod per combat while it was held.");
+        AddPreventionRows(
+            "Self-inflicted lost life prevented",
+            "Self-inflicted lost life prevented",
+            agg.TungstenRodSelfDamagePrevented,
+            turns,
+            combats,
+            "HP loss prevented from the player's own non-Curse, non-Status cards and Buff powers.",
+            "Average self-inflicted HP loss prevented per player turn while Tungsten Rod was held.",
+            "Average self-inflicted HP loss prevented per combat while Tungsten Rod was held.");
+        AddPreventionRows(
+            "Curse-inflicted lost life prevented",
+            "Curse-inflicted lost life prevented",
+            agg.TungstenRodCurseDamagePrevented,
+            turns,
+            combats,
+            "HP loss prevented from direct Curse-card damage.",
+            "Average Curse-inflicted HP loss prevented per player turn while Tungsten Rod was held.",
+            "Average Curse-inflicted HP loss prevented per combat while Tungsten Rod was held.");
+        AddPreventionRows(
+            "Status-inflicted lost life prevented",
+            "Status-inflicted lost life prevented",
+            agg.TungstenRodStatusDamagePrevented,
+            turns,
+            combats,
+            "HP loss prevented from direct Status-card damage.",
+            "Average Status-inflicted HP loss prevented per player turn while Tungsten Rod was held.",
+            "Average Status-inflicted HP loss prevented per combat while Tungsten Rod was held.");
+        AddPreventionRows(
+            "Enemy-source lost life prevented",
+            "Enemy-source lost life prevented",
+            agg.TungstenRodEnemyDamagePrevented,
+            turns,
+            combats,
+            "HP loss prevented from enemy creatures and Debuff powers.",
+            "Average enemy-source HP loss prevented per player turn while Tungsten Rod was held.",
+            "Average enemy-source HP loss prevented per combat while Tungsten Rod was held.");
+
+        return sb.ToString();
+
+        void AddPreventionRows(
+            string totalLabel,
+            string averageLabel,
+            decimal total,
+            int turnCount,
+            int combatCount,
+            string totalDescription,
+            string turnDescription,
+            string combatDescription)
+        {
+            var perTurn = turnCount <= 0 ? 0m : total / turnCount;
+            var perCombat = combatCount <= 0 ? 0m : total / combatCount;
+
+            Row3(sb, totalLabel, FormatDecimal(total), "", totalDescription);
+            Row3(
+                sb,
+                $"Avg {LowercaseFirst(averageLabel)} per turn",
+                FormatDecimal(perTurn),
+                "",
+                turnDescription);
+            Row3(
+                sb,
+                $"Avg {LowercaseFirst(averageLabel)} per combat",
+                FormatDecimal(perCombat),
+                "",
+                combatDescription);
+        }
+    }
+
+    private static string LowercaseFirst(string value)
+        => string.IsNullOrEmpty(value)
+            ? value
+            : char.ToLowerInvariant(value[0]) + value[1..];
 
     private static string BuildStoneCrackerBodyBBCode(RelicAggregate agg)
     {

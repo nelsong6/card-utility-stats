@@ -569,6 +569,17 @@ public class RelicAggregate
     public decimal WhisperingEarringFirstRoundHpLost { get; set; }
     public int WhisperingEarringCombats { get; set; }
 
+    // Tungsten Rod tracking. Each numerator is the exact positive delta at
+    // the rod's own post-Osty HP-loss modifier. Turns and combats are shared,
+    // zero-inclusive held denominators for both the total and source buckets.
+    public decimal TungstenRodDamagePrevented { get; set; }
+    public decimal TungstenRodSelfDamagePrevented { get; set; }
+    public decimal TungstenRodCurseDamagePrevented { get; set; }
+    public decimal TungstenRodStatusDamagePrevented { get; set; }
+    public decimal TungstenRodEnemyDamagePrevented { get; set; }
+    public int TungstenRodTurns { get; set; }
+    public int TungstenRodCombats { get; set; }
+
     // Total Plating this relic added. Used by Gorget.
     public decimal PlatingAdded { get; set; }
 
