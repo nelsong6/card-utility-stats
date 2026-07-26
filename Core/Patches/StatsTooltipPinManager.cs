@@ -23,6 +23,14 @@ internal static class StatsTooltipPinManager
     private const string LockIconPath =
         "res://images/ui/top_panel/reminder_lock.png";
     private const string HintOwnerNodeName = "SpireLensPinnedStatsHintOwner";
+    private const float LockIconWidth = 24f;
+    private const float LockIconHeight = 28f;
+    private const float LockIconRightInset = 3f;
+    private const float LockIconTopInset = 2f;
+    private const float CardLockIconWidth = 48f;
+    private const float CardLockIconHeight = 56f;
+    private const float CardLockIconRightInset = 6f;
+    private const float CardLockIconTopInset = 4f;
 
     private sealed class TargetSubscription
     {
@@ -657,6 +665,16 @@ internal static class StatsTooltipPinManager
         var host = GetLockIconHost(target);
         if (texture == null || !IsLive(host)) return;
 
+        var isFullCard = target is NCardHolder;
+        var width = isFullCard ? CardLockIconWidth : LockIconWidth;
+        var height = isFullCard ? CardLockIconHeight : LockIconHeight;
+        var rightInset = isFullCard
+            ? CardLockIconRightInset
+            : LockIconRightInset;
+        var topInset = isFullCard
+            ? CardLockIconTopInset
+            : LockIconTopInset;
+
         var lockIcon = new TextureRect
         {
             Name = LockIconNodeName,
@@ -668,10 +686,10 @@ internal static class StatsTooltipPinManager
             AnchorRight = 1f,
             AnchorTop = 0f,
             AnchorBottom = 0f,
-            OffsetLeft = -27f,
-            OffsetRight = -3f,
-            OffsetTop = 2f,
-            OffsetBottom = 30f,
+            OffsetLeft = -(rightInset + width),
+            OffsetRight = -rightInset,
+            OffsetTop = topInset,
+            OffsetBottom = topInset + height,
         };
         host!.AddChild(lockIcon);
         _lockIconHost = host;
