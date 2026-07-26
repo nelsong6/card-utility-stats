@@ -979,6 +979,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is WongosMysteryTicket)
+        {
+            title = "Wongo's Mystery Ticket";
+            body = BuildWongosMysteryTicketBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is MawBank)
         {
             title = "Maw Bank";
@@ -3046,6 +3053,55 @@ public static class RelicHoverShowPatch
             agg.GoldGained.ToString(),
             "",
             "Extra gold received — the total amount on Gold rewards added by Amethyst Aubergine.");
+        return sb.ToString();
+    }
+
+    private static string BuildWongosMysteryTicketBodyBBCode(
+        RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var floorsBeforeActivation =
+            agg.FloorAcquired.HasValue && agg.FloorActivated.HasValue
+                ? Math.Max(
+                    0,
+                    agg.FloorActivated.Value - agg.FloorAcquired.Value)
+                    .ToString()
+                : "not yet";
+
+        Row3(
+            sb,
+            "Floors ascended before activating",
+            floorsBeforeActivation,
+            "",
+            "Floors ascended before activating — the distance from receiving Wongo's Mystery Ticket to the combat reward where it activated.");
+
+        var relics = agg.RelicsGranted.Values
+            .Where(relic => relic.Count > 0)
+            .OrderByDescending(relic => relic.Count)
+            .ThenBy(
+                relic => relic.DisplayName,
+                StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var total = relics.Sum(relic => Math.Max(0, relic.Count));
+        Row3(
+            sb,
+            "Relics received",
+            total.ToString(),
+            "",
+            "Relics received — relics successfully claimed from Wongo's Mystery Ticket rewards.");
+
+        foreach (var relic in relics)
+        {
+            var displayName = StatsTooltip.EscapeBbcode(
+                string.IsNullOrWhiteSpace(relic.DisplayName)
+                    ? RunTracker.FormatRelicIdForDisplay(relic.RelicId)
+                    : relic.DisplayName);
+            var value = relic.Count == 1
+                ? displayName
+                : $"{displayName} x{relic.Count}";
+            TextValueRow(sb, "Relic received", value, "");
+        }
+
         return sb.ToString();
     }
 

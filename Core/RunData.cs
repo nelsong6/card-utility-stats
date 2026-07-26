@@ -692,8 +692,9 @@ public class RelicAggregate
     public decimal TotalHealingLost { get; set; }
     public Dictionary<string, HealingLostReasonAggregate> HealingLostReasons { get; set; } = new();
 
-    // Relic lifecycle floor snapshots. Used by Lizard Tail to show where it
-    // was acquired and where its one-shot revive fired.
+    // Relic lifecycle floor snapshots. Used by one-shot relics such as Lizard
+    // Tail and Wongo's Mystery Ticket to show where they were acquired and
+    // where their effect activated.
     public int? FloorAcquired { get; set; }
     public int? FloorActivated { get; set; }
 
@@ -878,7 +879,8 @@ public class RelicAggregate
     public int CampfiresNotDug { get; set; }
 
     // Specific relics granted by relic-owned effects. Used by Large Capsule,
-    // Neow's Bones, and Pael's Wing to show which relics were obtained.
+    // Neow's Bones, Pael's Wing, and Wongo's Mystery Ticket to show which
+    // relics were obtained.
     public Dictionary<string, RelicGrantedAggregate> RelicsGranted { get; set; } = new();
 
     // Total offered cards by rarity for relics that generate card-choice

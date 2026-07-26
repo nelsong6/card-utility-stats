@@ -498,6 +498,17 @@ then record the current point's original `MapPointType` under the resulting use
 number. Do not infer activations from general room entry or merely from the
 relic allowing free travel; those also occur for normal connected movement.
 
+Wongo's Mystery Ticket activates through its owner-specific
+`TryModifyRewards` callback after its saved `CombatsFinished` counter reaches
+five. A successful call appends three concrete `RelicReward` objects to that
+combat's reward list. Mark only those appended references, preserve the weak
+markers in process-stable `AppDomain` data across Core hot reloads, and record
+each reward's `ClaimedRelic` only after its `OnSelect` task succeeds. This keeps
+an ordinary Elite relic reward on the same screen out of the ticket's ledger.
+The activation floor is the current run floor at that successful reward
+modification; subtract the relic's saved `FloorAddedToDeck` to report floors
+ascended before activation.
+
 Dowsing Rod itself only grants the Dowsing quest card. The card owns the saved
 `RoomsEntered` counter, updates it only for qualifying `?` room entries, and
 transforms into Abundance at five. Observe the `Dowsing.RoomsEntered` setter and

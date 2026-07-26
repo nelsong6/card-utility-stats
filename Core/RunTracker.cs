@@ -57,6 +57,8 @@ public static class RunTracker
     private const string SovereignBladeForgedEventType = "sovereign_blade_forged";
     private const string EggOfferAttributionsAppDomainKey =
         "SpireLens.PendingEggOfferAttributions";
+    private const string WongosMysteryTicketRewardAttributionsAppDomainKey =
+        "SpireLens.WongosMysteryTicketRewardAttributions";
 
     private static readonly object _lock = new();
 
@@ -77,6 +79,9 @@ public static class RunTracker
     private static int _pendingEffectSourceHistoryCount;
     private static readonly ConditionalWeakTable<object, Tuple<string, int>>
         _pendingEggOfferAttributions = GetPendingEggOfferAttributions();
+    private static readonly ConditionalWeakTable<object, Tuple<int>>
+        _wongosMysteryTicketRewardAttributions =
+            GetWongosMysteryTicketRewardAttributions();
     private static readonly List<PendingPowerChangeAttempt> _pendingPowerChangeAttempts = new();
     private static readonly List<PendingUnsettlingLampDebuff> _pendingUnsettlingLampDebuffs = new();
     private static readonly System.Threading.AsyncLocal<EnemyStatusSourceFrame?> _enemyStatusSourceFrame = new();
@@ -4233,6 +4238,8 @@ public static class RunTracker
     private const string DarkstonePeriaptRelicId = "RELIC.DARKSTONE_PERIAPT";
     private const string LuckyFyshRelicId = "RELIC.LUCKY_FYSH";
     private const string AmethystAubergineRelicId = "RELIC.AMETHYST_AUBERGINE";
+    private const string WongosMysteryTicketRelicId =
+        "RELIC.WONGOS_MYSTERY_TICKET";
     private const string MawBankRelicId = "RELIC.MAW_BANK";
     private const string OldCoinRelicId = "RELIC.OLD_COIN";
     private const string LeafyPoulticeRelicId = "RELIC.LEAFY_POULTICE";
@@ -4363,6 +4370,23 @@ public static class RunTracker
 
         var created = new ConditionalWeakTable<object, Tuple<string, int>>();
         AppDomain.CurrentDomain.SetData(EggOfferAttributionsAppDomainKey, created);
+        return created;
+    }
+
+    private static ConditionalWeakTable<object, Tuple<int>>
+        GetWongosMysteryTicketRewardAttributions()
+    {
+        if (AppDomain.CurrentDomain.GetData(
+                WongosMysteryTicketRewardAttributionsAppDomainKey)
+            is ConditionalWeakTable<object, Tuple<int>> existing)
+        {
+            return existing;
+        }
+
+        var created = new ConditionalWeakTable<object, Tuple<int>>();
+        AppDomain.CurrentDomain.SetData(
+            WongosMysteryTicketRewardAttributionsAppDomainKey,
+            created);
         return created;
     }
 
@@ -9098,6 +9122,123 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Bind the exact relic rewards appended by Wongo's Mystery Ticket to the
+    /// ticket's one-shot activation. The weak reference markers survive a Core
+    /// hot reload without keeping abandoned reward objects alive.
+    /// </summary>
+    public static void RegisterWongosMysteryTicketRewards(
+        WongosMysteryTicket relic,
+        IReadOnlyList<RelicReward> rewards)
+    {
+        if (relic == null || rewards == null || rewards.Count == 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var owner = relic.Owner;
+                if (owner == null
+                    || !IsTrackedRelic(relic)
+                    || !IsTrackedPlayer(owner))
+                {
+                    return;
+                }
+
+                var ownedRewards = rewards
+                    .Where(reward =>
+                        reward != null
+                        && ReferenceEquals(reward.Player, owner))
+                    .ToList();
+                if (ownedRewards.Count == 0) return;
+
+                var aggregate = GetOrCreateCurrentRunRelicAggregateLocked(
+                    WongosMysteryTicketRelicId);
+                RecordWongosMysteryTicketActivationForTest(
+                    aggregate,
+                    RelicFloorAddedToDeck(relic),
+                    CurrentRunFloorLocked());
+
+                foreach (var reward in ownedRewards)
+                {
+                    _wongosMysteryTicketRewardAttributions.Remove(reward);
+                    _wongosMysteryTicketRewardAttributions.Add(
+                        reward,
+                        Tuple.Create(1));
+                }
+
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RegisterWongosMysteryTicketRewards failed: {e.Message}");
+            }
+        }
+    }
+
+    public static bool IsWongosMysteryTicketReward(RelicReward reward)
+    {
+        if (reward == null) return false;
+
+        lock (_lock)
+        {
+            return _wongosMysteryTicketRewardAttributions.TryGetValue(
+                reward,
+                out _);
+        }
+    }
+
+    /// <summary>
+    /// Record the exact relic successfully claimed from one of the ticket's
+    /// marked rewards. ClaimedRelic is the result of RelicCmd.Obtain rather
+    /// than the reward's pre-selection candidate.
+    /// </summary>
+    public static void RecordWongosMysteryTicketRelicReceived(
+        RelicReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_wongosMysteryTicketRewardAttributions.TryGetValue(
+                        reward,
+                        out _))
+                {
+                    return;
+                }
+
+                var owner = reward.Player;
+                var receivedRelic = reward.ClaimedRelic;
+                if (owner == null
+                    || receivedRelic == null
+                    || !IsTrackedPlayer(owner))
+                {
+                    return;
+                }
+
+                _wongosMysteryTicketRewardAttributions.Remove(reward);
+
+                var aggregate = GetOrCreateCurrentRunRelicAggregateLocked(
+                    WongosMysteryTicketRelicId);
+                RecordWongosMysteryTicketRelicReceivedForTest(
+                    aggregate,
+                    receivedRelic.Id.ToString(),
+                    GetRelicDisplayName(receivedRelic));
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordWongosMysteryTicketRelicReceived failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Starts Old Coin's FIFO attribution from its observed completed pickup
     /// effect. Gold already held by the owner is placed before the relic's
     /// grant, so it must be consumed before spending can reach Old Coin gold.
@@ -10362,6 +10503,31 @@ public static class RunTracker
 
         agg.Activations++;
         agg.GoldGained += Math.Max(0, extraGold);
+    }
+
+    internal static void RecordWongosMysteryTicketActivationForTest(
+        RelicAggregate aggregate,
+        int? pickupFloor,
+        int? activationFloor)
+    {
+        if (aggregate == null) return;
+
+        RecordRelicFloorAcquiredForTest(aggregate, pickupFloor);
+        if (!aggregate.FloorActivated.HasValue)
+            RecordRelicFloorActivatedForTest(aggregate, activationFloor);
+    }
+
+    internal static void RecordWongosMysteryTicketRelicReceivedForTest(
+        RelicAggregate aggregate,
+        string? relicId,
+        string? displayName)
+    {
+        if (aggregate == null || string.IsNullOrWhiteSpace(relicId)) return;
+        AddRelicGranted(
+            aggregate.RelicsGranted,
+            relicId,
+            displayName ?? "",
+            1);
     }
 
     internal static void RecordBookOfFiveRingsCardAddedForTest(
