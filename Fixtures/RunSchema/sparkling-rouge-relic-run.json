@@ -1,0 +1,23 @@
+{
+  "run_id": "sparkling-rouge-relic-fixture",
+  "started_at": "2026-07-25T19:00:00Z",
+  "updated_at": "2026-07-25T19:30:00Z",
+  "character": "CHARACTER.IRONCLAD",
+  "ascension": 6,
+  "floor_reached": 28,
+  "outcome": "in_progress",
+  "game_start_time": 1785006000,
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.SPARKLING_ROUGE": {
+      "sparkling_rouge_combats_ended_on_turn1": 2,
+      "sparkling_rouge_combats_ended_on_turn2": 3,
+      "sparkling_rouge_combats_ended_on_turn3_plus": 4
+    }
+  },
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

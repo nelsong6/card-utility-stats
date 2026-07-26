@@ -1577,6 +1577,7 @@ public static class RunTracker
         RecordPendulumCombatEndChargeForTrackedPlayerLocked();
         RecordNunchakuCombatEndChargeForTrackedPlayerLocked();
         RecordIronClubCombatEndChargeForTrackedPlayerLocked();
+        RecordSparklingRougeCombatEndForTrackedPlayerLocked();
 
         // Surviving player block at combat end never absorbed future
         // damage, so treat any remaining ledger as wasted before
@@ -1661,6 +1662,12 @@ public static class RunTracker
             source.ReptileTrinketTurnsWithMoreThanTwoActivations;
         target.RainbowRingTurns += source.RainbowRingTurns;
         target.RainbowRingCombats += source.RainbowRingCombats;
+        target.SparklingRougeCombatsEndedOnTurn1 +=
+            source.SparklingRougeCombatsEndedOnTurn1;
+        target.SparklingRougeCombatsEndedOnTurn2 +=
+            source.SparklingRougeCombatsEndedOnTurn2;
+        target.SparklingRougeCombatsEndedOnTurn3Plus +=
+            source.SparklingRougeCombatsEndedOnTurn3Plus;
         target.BeatingRemnantHpLossPrevented += source.BeatingRemnantHpLossPrevented;
         target.BeatingRemnantTurns += source.BeatingRemnantTurns;
         target.BeatingRemnantCombats += source.BeatingRemnantCombats;
@@ -3880,6 +3887,7 @@ public static class RunTracker
     private const string CloakClaspRelicId = "RELIC.CLOAK_CLASP";
     private const string ReptileTrinketRelicId = "RELIC.REPTILE_TRINKET";
     private const string RainbowRingRelicId = "RELIC.RAINBOW_RING";
+    private const string SparklingRougeRelicId = "RELIC.SPARKLING_ROUGE";
     private const string BeatingRemnantRelicId = "RELIC.BEATING_REMNANT";
     private const string GorgetRelicId = "RELIC.GORGET";
     private const string StoneCrackerRelicId = "RELIC.STONE_CRACKER";
@@ -12049,6 +12057,20 @@ public static class RunTracker
         }
     }
 
+    internal static void RecordSparklingRougeCombatEndForTest(
+        RelicAggregate agg,
+        int turnNumber)
+    {
+        if (agg == null || turnNumber <= 0) return;
+
+        if (turnNumber == 1)
+            agg.SparklingRougeCombatsEndedOnTurn1 += 1;
+        else if (turnNumber == 2)
+            agg.SparklingRougeCombatsEndedOnTurn2 += 1;
+        else
+            agg.SparklingRougeCombatsEndedOnTurn3Plus += 1;
+    }
+
     /// <summary>
     /// Record Centennial Puzzle's once-per-combat HP-loss activation. The
     /// actual cards drawn are observed from the single-card draw command.
@@ -16016,6 +16038,28 @@ public static class RunTracker
         RecordPendulumCombatEndChargeForTest(agg, pendulum.TurnsSeen);
     }
 
+    private static void RecordSparklingRougeCombatEndForTrackedPlayerLocked()
+    {
+        try
+        {
+            if (_pendingCombat == null) return;
+
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null || !PlayerHasSparklingRouge(player)) return;
+
+            var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+            if (turnNumber <= 0) return;
+
+            var agg = GetOrCreatePendingRelicAggregateLocked(SparklingRougeRelicId);
+            RecordSparklingRougeCombatEndForTest(agg, turnNumber);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug(
+                $"RecordSparklingRougeCombatEndForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
     private static void RecordArtOfWarCombatForPlayerLocked(Player player)
     {
         if (_pendingCombat == null) return;
@@ -16498,6 +16542,18 @@ public static class RunTracker
         try
         {
             return player.Relics.Any(r => r is RainbowRing);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool PlayerHasSparklingRouge(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is SparklingRouge);
         }
         catch
         {

@@ -98,6 +98,10 @@ SpireLens persistence is combat-boundary based.
   relic attribution must therefore count them as separate activations.
 - During combat, live observations accumulate in `_pendingCombat`.
 - `CombatManager.Instance.CombatEnded` promotes pending aggregates/events into committed `RunData`, updates run metadata, saves, and clears `_pendingCombat`.
+- The tracked player's final `PlayerCombatState.TurnNumber` remains available
+  while pending combat data is promoted. Combat-duration buckets such as
+  Sparkling Rouge should be recorded at this shared promotion boundary rather
+  than by patching the relic's unrelated effect callback.
 - `RunTracker.OnRunEnded` also promotes `_pendingCombat` before stamping the outcome — for the `loss` outcome only. Loss ordering (decompiled `CreatureCmd.Kill` → `LoseCombat()` → `RunManager.OnEnded`): `OnRunEnded` runs synchronously from the killing action, and the fatal combat's `CombatEnded` only fires LATER via `ProcessPendingLoss` — after the buffer has been consumed. Without this second promotion site the fatal combat's stats would be discarded. Abandoning mid-combat still discards the buffer (a half-played fight is not a resolved combat — a save-and-quit may even have rolled it back), and wins always get a normal `CombatEnded` first. Promotion is idempotent per buffer (the buffer is nulled after), so the two sites cannot double-promote. `RecordCombatEndingSuppressedDamage` stops capturing once `_currentRun` is null so the post-`OnRunEnded` damage tail can't resurrect the buffer and mint a junk run file at that deferred `CombatEnded`.
 - Between-combat and between-floor reloads are supported.
 - Mid-combat restore is intentionally out of scope.

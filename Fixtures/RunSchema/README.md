@@ -397,6 +397,9 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds Rainbow Ring's confirmed activations plus zero-inclusive held turn and
   combat denominators. Its three current-turn card-type flags remain live
   relic state and are intentionally not persisted.
+- `sparkling-rouge-relic-run.json`
+  Adds Sparkling Rouge's mutually exclusive completed-combat buckets for turn
+  1, turn 2, and turn 3 or later.
 
 Why these exist:
 

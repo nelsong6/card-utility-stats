@@ -1478,6 +1478,27 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsSparklingRougeRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("sparkling-rouge-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertSparklingRougeFixture(
+            loaded.Data.RelicAggregates["RELIC.SPARKLING_ROUGE"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsSparklingRougeRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("sparkling-rouge-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertSparklingRougeFixture(
+            resumed!.RelicAggregates["RELIC.SPARKLING_ROUGE"]);
+    }
+
+    [Fact]
     public void ResumableLoad_AcceptsV29GorgetFixture()
     {
         var resumed = RunStorage.LoadResumable(FixturePath("v29-gorget-run.json"));
@@ -3662,6 +3683,13 @@ public class SchemaLoadingTests
         Assert.Equal(5, relicAgg.Activations);
         Assert.Equal(12, relicAgg.RainbowRingTurns);
         Assert.Equal(4, relicAgg.RainbowRingCombats);
+    }
+
+    private static void AssertSparklingRougeFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(2, relicAgg.SparklingRougeCombatsEndedOnTurn1);
+        Assert.Equal(3, relicAgg.SparklingRougeCombatsEndedOnTurn2);
+        Assert.Equal(4, relicAgg.SparklingRougeCombatsEndedOnTurn3Plus);
     }
 
     private static void AssertPaelsClawFixture(RelicAggregate relicAgg)

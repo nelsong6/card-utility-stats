@@ -550,6 +550,12 @@ public class RelicAggregate
     public int RainbowRingTurns { get; set; }
     public int RainbowRingCombats { get; set; }
 
+    // Final-turn distribution for completed combats where Sparkling Rouge was
+    // held. These buckets are mutually exclusive.
+    public int SparklingRougeCombatsEndedOnTurn1 { get; set; }
+    public int SparklingRougeCombatsEndedOnTurn2 { get; set; }
+    public int SparklingRougeCombatsEndedOnTurn3Plus { get; set; }
+
     // Beating Remnant tracking. The prevented amount is the positive
     // before/after delta at the relic's own post-Osty HP-loss modifier.
     // Turns and combats are zero-inclusive held denominators.

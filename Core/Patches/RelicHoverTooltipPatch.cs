@@ -736,6 +736,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is SparklingRouge)
+        {
+            title = "Sparkling Rouge";
+            body = BuildSparklingRougeBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is BeatingRemnant)
         {
             title = "Beating Remnant";
@@ -2156,6 +2163,27 @@ public static class RelicHoverShowPatch
         Row3(sb, "Attack played this turn", FormatBoolean(attackPlayedThisTurn), "");
         Row3(sb, "Power played this turn", FormatBoolean(powerPlayedThisTurn), "");
         Row3(sb, "Skill played this turn", FormatBoolean(skillPlayedThisTurn), "");
+        return sb.ToString();
+    }
+
+    private static string BuildSparklingRougeBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(
+            sb,
+            "Combats ended on turn 1",
+            agg.SparklingRougeCombatsEndedOnTurn1.ToString(),
+            "");
+        Row3(
+            sb,
+            "Combats ended on turn 2",
+            agg.SparklingRougeCombatsEndedOnTurn2.ToString(),
+            "");
+        Row3(
+            sb,
+            "Combats ended on turn 3+",
+            agg.SparklingRougeCombatsEndedOnTurn3Plus.ToString(),
+            "");
         return sb.ToString();
     }
 
