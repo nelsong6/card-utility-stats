@@ -389,6 +389,16 @@
         "description": "A combat turn or a value measured across turns."
       }
     },
+    "unknown_room": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/atlases/ui_atlas.sprites/map/icons/map_unknown.tres"
+      },
+      "help": {
+        "label": "Unknown room",
+        "description": "A question-mark site on the map."
+      }
+    },
     "upgraded": {
       "display": {
         "type": "game_resource",

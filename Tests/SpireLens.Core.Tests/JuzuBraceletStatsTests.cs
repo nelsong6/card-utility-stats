@@ -67,7 +67,10 @@ public class JuzuBraceletStatsTests
     {
         var emptyBody = (string)(BuildJuzuBraceletBodyMethod.Invoke(null, new object?[] { new RelicAggregate() })
             ?? throw new InvalidOperationException("BuildJuzuBraceletBodyBBCode returned null."));
-        Assert.Contains("? sites entered", emptyBody);
+        Assert.Contains(
+            "res://images/atlases/ui_atlas.sprites/map/icons/map_unknown.tres",
+            emptyBody);
+        Assert.DoesNotContain("? sites entered", emptyBody);
         Assert.Contains("[b]0[/b]", emptyBody);
 
         var agg = new RelicAggregate
@@ -78,7 +81,9 @@ public class JuzuBraceletStatsTests
         var body = (string)(BuildJuzuBraceletBodyMethod.Invoke(null, new object?[] { agg })
             ?? throw new InvalidOperationException("BuildJuzuBraceletBodyBBCode returned null."));
 
-        Assert.Contains("? sites entered", body);
+        Assert.Contains(
+            "res://images/atlases/ui_atlas.sprites/map/icons/map_unknown.tres",
+            body);
         Assert.Contains("[b]4[/b]", body);
     }
 }

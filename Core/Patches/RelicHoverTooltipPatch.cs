@@ -3369,7 +3369,11 @@ public static class RelicHoverShowPatch
     private static string BuildJuzuBraceletBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "? sites entered", agg.QuestionMarkSitesEntered.ToString(), "");
+        ConceptRow(
+            sb,
+            "unknown_room",
+            agg.QuestionMarkSitesEntered.ToString(),
+            "Question-mark map sites entered while Juzu Bracelet was held.");
         return sb.ToString();
     }
 

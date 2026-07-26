@@ -48,6 +48,7 @@ public class StatConceptGlossaryTests
                 "card_uncommon",
                 "power_uncommon",
                 "skill_uncommon",
+                "unknown_room",
                 "upgraded",
                 "vigor",
                 "vulnerable",
@@ -86,6 +87,7 @@ public class StatConceptGlossaryTests
         var power = StatConceptGlossary.RenderHintedGlyph("power");
         var skill = StatConceptGlossary.RenderHintedGlyph("skill");
         var turn = StatConceptGlossary.RenderHintedGlyph("turn");
+        var unknownRoom = StatConceptGlossary.RenderHintedGlyph("unknown_room");
         var upgraded = StatConceptGlossary.RenderHintedGlyph("upgraded");
         var information = StatConceptGlossary.RenderInformationHint(
             "Times this relic has been activated.");
@@ -109,6 +111,7 @@ public class StatConceptGlossaryTests
             power,
             skill,
             turn,
+            unknownRoom,
             upgraded,
         };
         Assert.All(
@@ -182,6 +185,10 @@ public class StatConceptGlossaryTests
         Assert.Contains(
             "user://SpireLens/generated-icons/turn-",
             turn);
+        Assert.Contains("[hint=\"Unknown room:", unknownRoom);
+        Assert.Contains(
+            "res://images/atlases/ui_atlas.sprites/map/icons/map_unknown.tres",
+            unknownRoom);
         Assert.Contains("[hint=\"Upgraded:", upgraded);
         Assert.Contains(
             "res://images/ui/cards/upgrade_preview/upgrade_arrow.png",
