@@ -93,6 +93,66 @@
         "description": "A combat encounter or a value measured across combats."
       }
     },
+    "damage": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/packed/statistics_screen/stats_swords.png"
+      },
+      "help": {
+        "label": "Damage",
+        "description": "Damage attempted, dealt, blocked, prevented, or otherwise measured by a stat."
+      }
+    },
+    "dexterity": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/atlases/power_atlas.sprites/dexterity_power.tres"
+      },
+      "help": {
+        "label": "Dexterity",
+        "description": "Dexterity gained, lost, or otherwise measured by a stat."
+      }
+    },
+    "discard": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/packed/combat_ui/discard_pile.png"
+      },
+      "help": {
+        "label": "Discard",
+        "description": "A card discarded or moved to the discard pile."
+      }
+    },
+    "draw": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/atlases/power_atlas.sprites/draw_cards_next_turn_power.tres"
+      },
+      "help": {
+        "label": "Draw",
+        "description": "A card drawn or a count of cards drawn."
+      }
+    },
+    "energy": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/atlases/potion_atlas.sprites/energy_potion.tres"
+      },
+      "help": {
+        "label": "Energy",
+        "description": "Energy gained, generated, saved, spent, or otherwise measured by a stat."
+      }
+    },
+    "exhaust": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/packed/combat_ui/exhaust_pile.png"
+      },
+      "help": {
+        "label": "Exhaust",
+        "description": "A card exhausted or moved to the exhaust pile."
+      }
+    },
     "floor": {
       "display": {
         "type": "game_resource",
@@ -101,6 +161,16 @@
       "help": {
         "label": "Floor",
         "description": "A run floor or a value measured across floors."
+      }
+    },
+    "gold": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/atlases/ui_atlas.sprites/top_bar/top_bar_gold.tres"
+      },
+      "help": {
+        "label": "Gold",
+        "description": "Gold gained, lost, spent, blocked, or otherwise measured by a stat."
       }
     },
     "healing_blocked": {
@@ -115,8 +185,8 @@
     },
     "healing_gained": {
       "display": {
-        "type": "game_resource",
-        "path": "res://images/atlases/power_atlas.sprites/regen_power.tres"
+        "type": "embedded_image",
+        "resource": "Assets.stat-healing-gained.svg"
       },
       "help": {
         "label": "Healing gained",
@@ -133,6 +203,16 @@
         "description": "Hover this symbol beside a stat to read the row's full description."
       }
     },
+    "max_hp": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/atlases/ui_atlas.sprites/top_bar/top_bar_heart.tres"
+      },
+      "help": {
+        "label": "Max HP",
+        "description": "Maximum HP gained, lost, or otherwise measured by a stat."
+      }
+    },
     "osty_summon_gained": {
       "display": {
         "type": "game_resource",
@@ -141,6 +221,16 @@
       "help": {
         "label": "Osty summon gained",
         "description": "An increase to Osty's summon amount."
+      }
+    },
+    "potion": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/packed/sprite_fonts/potion_icon.png"
+      },
+      "help": {
+        "label": "Potion",
+        "description": "A potion gained, skipped, offered, or otherwise counted by a stat."
       }
     },
     "power": {
@@ -153,6 +243,16 @@
         "description": "A Power card or a count of Power cards."
       }
     },
+    "relic": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/ui/reward_screen/reward_icon_shared_relic.png"
+      },
+      "help": {
+        "label": "Relic",
+        "description": "A relic gained, skipped, offered, or otherwise counted by a stat."
+      }
+    },
     "skill": {
       "display": {
         "type": "game_resource",
@@ -161,6 +261,26 @@
       "help": {
         "label": "Skill",
         "description": "A Skill card or a count of Skill cards."
+      }
+    },
+    "stars": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/packed/sprite_fonts/star_icon.png"
+      },
+      "help": {
+        "label": "Stars",
+        "description": "Regent Stars gained, spent, saved, or otherwise measured by a stat."
+      }
+    },
+    "strength": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/atlases/power_atlas.sprites/strength_power.tres"
+      },
+      "help": {
+        "label": "Strength",
+        "description": "Strength gained, lost, or otherwise measured by a stat."
       }
     },
     "turn": {
@@ -181,6 +301,36 @@
       "help": {
         "label": "Upgraded",
         "description": "A card that received an upgrade, or an upgrade applied to a card."
+      }
+    },
+    "vigor": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/atlases/power_atlas.sprites/vigor_power.tres"
+      },
+      "help": {
+        "label": "Vigor",
+        "description": "Vigor gained, spent, or otherwise measured by a stat."
+      }
+    },
+    "vulnerable": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/atlases/power_atlas.sprites/vulnerable_power.tres"
+      },
+      "help": {
+        "label": "Vulnerable",
+        "description": "Vulnerable applied, received, or otherwise measured by a stat."
+      }
+    },
+    "weak": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/atlases/power_atlas.sprites/weak_power.tres"
+      },
+      "help": {
+        "label": "Weak",
+        "description": "Weak applied, received, or otherwise measured by a stat."
       }
     }
   }

@@ -15,19 +15,34 @@ public class StatConceptGlossaryTests
                 "average",
                 "block",
                 "card",
-                "card_rare",
-                "card_uncommon",
                 "charge",
                 "combat",
+                "damage",
+                "dexterity",
+                "discard",
+                "draw",
+                "energy",
+                "exhaust",
                 "floor",
+                "gold",
                 "healing_blocked",
                 "healing_gained",
                 "information",
+                "max_hp",
                 "osty_summon_gained",
+                "potion",
                 "power",
+                "card_rare",
+                "relic",
                 "skill",
+                "stars",
+                "strength",
                 "turn",
+                "card_uncommon",
                 "upgraded",
+                "vigor",
+                "vulnerable",
+                "weak",
             ],
             StatConceptGlossary.Concepts.Select(concept => concept.Id));
         Assert.Equal(
@@ -37,7 +52,7 @@ public class StatConceptGlossaryTests
             StatConceptDisplayType.EmbeddedImage,
             StatConceptGlossary.Concepts.Single(concept => concept.Id == "healing_blocked").Display.Type);
         Assert.Equal(
-            StatConceptDisplayType.GameResource,
+            StatConceptDisplayType.EmbeddedImage,
             StatConceptGlossary.Concepts.Single(concept => concept.Id == "healing_gained").Display.Type);
         Assert.Equal(20, StatConceptGlossary.IconSlotSize);
     }
@@ -137,7 +152,7 @@ public class StatConceptGlossaryTests
             healingBlocked);
         Assert.Contains("[hint=\"Healing gained:", healingGained);
         Assert.Contains(
-            "res://images/atlases/power_atlas.sprites/regen_power.tres",
+            "user://SpireLens/generated-icons/healing_gained-",
             healingGained);
         Assert.Contains("[hint=\"Information:", informationConcept);
         Assert.Contains(

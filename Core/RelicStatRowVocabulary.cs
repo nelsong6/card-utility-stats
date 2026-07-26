@@ -48,6 +48,7 @@ internal static class RelicStatRowVocabulary
 
     private static readonly IReadOnlyList<ConceptRule> Rules =
     [
+        Rule("max_hp", @"\b(?:max|maximum)\s+hp\b"),
         Rule(
             "healing_blocked",
             @"\b(?:hp\s+)?healing\s+(?:blocked|lost|wasted)\b"),
@@ -63,11 +64,25 @@ internal static class RelicStatRowVocabulary
         Rule("card", @"\bcards?\b|\bcommons?\b"),
         Rule("charge", @"\bcharges?\b"),
         Rule("combat", @"\bcombats?\b", true),
+        Rule("damage", @"\bdamage\b"),
+        Rule("dexterity", @"\bdexterity\b"),
+        Rule("discard", @"\bdiscard(?:ed|ing|s)?\b"),
+        Rule("draw", @"\b(?:draw|drawn|drawing|draws)\b"),
+        Rule("energy", @"\benergy\b"),
+        Rule("exhaust", @"\bexhaust(?:ed|ing|s)?\b"),
         Rule("floor", @"\bfloors?\b", true),
+        Rule("gold", @"\bgold\b"),
+        Rule("potion", @"\bpotions?\b"),
         Rule("power", @"\bpowers?\b"),
+        Rule("relic", @"\brelics?\b"),
         Rule("skill", @"\bskills?\b"),
+        Rule("stars", @"\bstars?\b"),
+        Rule("strength", @"\bstrength\b"),
         Rule("turn", @"\bturns?\b", true),
         Rule("upgraded", @"(?<!non-)\b(?:upgrade|upgraded|upgrades)\b"),
+        Rule("vigor", @"\bvigor\b"),
+        Rule("vulnerable", @"\bvulnerable\b"),
+        Rule("weak", @"\bweak\b"),
     ];
 
     public static RelicStatRowPresentation Create(
@@ -78,7 +93,7 @@ internal static class RelicStatRowVocabulary
         var suffix = rawLabel;
         var preservedImages = new List<string>();
         var imageMeanings = new List<string>();
-        var hadBlockIcon = false;
+        var imageConceptIds = new List<string>();
 
         while (true)
         {
@@ -87,9 +102,10 @@ internal static class RelicStatRowVocabulary
 
             var image = match.Groups["image"].Value;
             suffix = suffix[match.Length..];
-            if (ContainsPath(image, BlockIconPathFragment))
+            if (TryGetImageConceptId(image, out var conceptId))
             {
-                hadBlockIcon = true;
+                imageConceptIds.Add(conceptId);
+                AddImageMeaning(imageMeanings, image);
                 continue;
             }
 
@@ -131,11 +147,16 @@ internal static class RelicStatRowVocabulary
             }
         }
 
-        if (hadBlockIcon
-            && occurrences.All(occurrence =>
-                !string.Equals(occurrence.Id, "block", StringComparison.Ordinal)))
+        foreach (var imageConceptId in imageConceptIds)
         {
-            occurrences.Add(new ConceptOccurrence("block", 0));
+            if (occurrences.All(occurrence =>
+                    !string.Equals(
+                        occurrence.Id,
+                        imageConceptId,
+                        StringComparison.Ordinal)))
+            {
+                occurrences.Add(new ConceptOccurrence(imageConceptId, 0));
+            }
         }
 
         var conceptIds = occurrences
@@ -216,6 +237,22 @@ internal static class RelicStatRowVocabulary
             meanings.Add("Vulnerable");
         else if (ContainsPath(image, WeakIconPathFragment))
             meanings.Add("Weak");
+    }
+
+    private static bool TryGetImageConceptId(string image, out string conceptId)
+    {
+        conceptId = image switch
+        {
+            _ when ContainsPath(image, BlockIconPathFragment) => "block",
+            _ when ContainsPath(image, DrawIconPathFragment) => "draw",
+            _ when ContainsPath(image, EnergyIconPathFragment) => "energy",
+            _ when ContainsPath(image, StarIconPathFragment) => "stars",
+            _ when ContainsPath(image, VigorIconPathFragment) => "vigor",
+            _ when ContainsPath(image, VulnerableIconPathFragment) => "vulnerable",
+            _ when ContainsPath(image, WeakIconPathFragment) => "weak",
+            _ => string.Empty,
+        };
+        return conceptId.Length > 0;
     }
 
     private static string BuildRemainingText(string text, IReadOnlyList<bool> removed)
