@@ -114,6 +114,9 @@ Current UI conventions:
 - card tooltips on every surface are display-only opt-in; disabling them does not disable attribution
 - deck-view tooltips can be fuller and include lineage/context
 - rows should be self-describing
+- relic-row values and percentages use their natural content width while the
+  label receives the remaining space; do not reintroduce character-count
+  wrapping heuristics or fixed narrow value columns
 - loud section headers are discouraged unless they add real clarity
 - inline icons are preferred for keyword-like effects when they improve scanning
 - rows phrased as “per turn/combat/floor/activation” render `/` immediately

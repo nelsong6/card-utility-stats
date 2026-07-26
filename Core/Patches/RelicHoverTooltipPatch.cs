@@ -38,8 +38,6 @@ public static class RelicHoverShowPatch
     private const string StarIconPath = "res://images/packed/sprite_fonts/star_icon.png";
     private const string VigorIconPath = "res://images/atlases/power_atlas.sprites/vigor_power.tres";
     private const int SealOfGoldLossPerTrigger = 5;
-    private const int InlineIconSize = StatConceptGlossary.IconSlotSize;
-    private const double MaxTableLabelWidthUnits = 28d;
     private const float SturdyClampTooltipWidth = 420f;
     private const float EmberTeaTooltipWidth = 500f;
     private const float PaelsWingTooltipWidth = 500f;
@@ -4103,19 +4101,6 @@ public static class RelicHoverShowPatch
         string? fullDescription = null)
     {
         var presentation = RelicStatRowVocabulary.Create(label, fullDescription);
-        if (EstimatedLabelWidthUnits(presentation) > MaxTableLabelWidthUnits)
-        {
-            DescribedIconFlowRow(
-                sb,
-                presentation.ConceptIds,
-                presentation.DenominatorConceptIds,
-                presentation.Label,
-                value,
-                presentation.FullDescription,
-                pct);
-            return;
-        }
-
         DescribedIconRow(
             sb,
             presentation.ConceptIds,
@@ -4175,8 +4160,8 @@ public static class RelicHoverShowPatch
             denominatorConceptIds,
             label);
         sb.Append("[/cell]");
-        sb.Append($"[cell expand=1 padding=0,0,12,0][right][b]{value}[/b][/right][/cell]");
-        sb.Append($"[cell expand=1 padding=0,0,4,0][right][color=#b5b5b5]{pct}[/color][/right][/cell]");
+        sb.Append($"[cell expand=0 padding=0,0,12,0][right][b]{value}[/b][/right][/cell]");
+        sb.Append($"[cell expand=0 padding=0,0,4,0][right][color=#b5b5b5]{pct}[/color][/right][/cell]");
         sb.Append("[/table]\n");
     }
 
@@ -4248,85 +4233,4 @@ public static class RelicHoverShowPatch
         sb.Append($"[color=#e0e0e0]{label}[/color]");
     }
 
-    private static double EstimatedLabelWidthUnits(RelicStatRowPresentation presentation)
-    {
-        var units = (double)VisibleTextLength(presentation.Label);
-        units += CountInlineImages(presentation.Label) * (InlineIconSize / 9d);
-
-        foreach (var conceptId in presentation.ConceptIds)
-        {
-            units += EstimatedConceptWidthUnits(conceptId);
-        }
-
-        if (presentation.ConceptIds.Count > 1)
-            units += (presentation.ConceptIds.Count - 1) * 0.5d;
-        units += presentation.DenominatorConceptIds.Count;
-        if (presentation.ConceptIds.Count > 0
-            && VisibleTextLength(presentation.Label) > 0)
-        {
-            units += 0.5d;
-        }
-
-        return units;
-    }
-
-    private static double EstimatedConceptWidthUnits(string conceptId)
-    {
-        return StatConceptGlossary.IconSlotSize / 9d;
-    }
-
-    private static int CountInlineImages(string bbcode)
-    {
-        var count = 0;
-        var searchStart = 0;
-        while (searchStart < bbcode.Length)
-        {
-            var imageStart = bbcode.IndexOf(
-                "[img",
-                searchStart,
-                StringComparison.OrdinalIgnoreCase);
-            if (imageStart < 0) break;
-
-            count += 1;
-            searchStart = imageStart + 4;
-        }
-
-        return count;
-    }
-
-    private static int VisibleTextLength(string bbcode)
-    {
-        var count = 0;
-        for (var i = 0; i < bbcode.Length;)
-        {
-            if (bbcode[i] == '[')
-            {
-                var close = bbcode.IndexOf(']', i);
-                if (close < 0)
-                {
-                    count += 1;
-                    i += 1;
-                    continue;
-                }
-
-                var tag = bbcode.Substring(i + 1, close - i - 1).Trim();
-                if (tag.StartsWith("img", StringComparison.OrdinalIgnoreCase))
-                {
-                    var imageClose = bbcode.IndexOf("[/img]", close + 1, StringComparison.OrdinalIgnoreCase);
-                    i = imageClose >= 0
-                        ? imageClose + "[/img]".Length
-                        : close + 1;
-                    continue;
-                }
-
-                i = close + 1;
-                continue;
-            }
-
-            count += 1;
-            i += 1;
-        }
-
-        return count;
-    }
 }

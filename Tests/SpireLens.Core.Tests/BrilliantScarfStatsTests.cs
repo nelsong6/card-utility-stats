@@ -245,6 +245,6 @@ public class BrilliantScarfStatsTests
     private static void AssertContainsRow(string body, string label, string value)
     {
         Assert.Contains(label, body);
-        Assert.Contains($"[color=#e0e0e0]{label}[/color][/cell][cell expand=1 padding=0,0,12,0][right][b]{value}[/b][/right]", body);
+        Assert.Contains($"[color=#e0e0e0]{label}[/color][/cell][cell expand=0 padding=0,0,12,0][right][b]{value}[/b][/right]", body);
     }
 }
