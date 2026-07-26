@@ -55,6 +55,8 @@ public static class RunTracker
     private const string SovereignBladeLegacyDefinitionId = "CARD.SOVEREIGN_BLADE";
     private const string ShivGeneratedEventType = "shiv_generated";
     private const string SovereignBladeForgedEventType = "sovereign_blade_forged";
+    private const string EggOfferAttributionsAppDomainKey =
+        "SpireLens.PendingEggOfferAttributions";
 
     private static readonly object _lock = new();
 
@@ -73,8 +75,8 @@ public static class RunTracker
     private static readonly List<PendingDrawAttempt> _pendingDrawAttempts = new();
     private static CardModel? _pendingEffectSourceCard;
     private static int _pendingEffectSourceHistoryCount;
-    private static readonly ConditionalWeakTable<CardModel, PendingEggOfferAttribution>
-        _pendingEggOfferAttributions = new();
+    private static readonly ConditionalWeakTable<object, Tuple<string, int>>
+        _pendingEggOfferAttributions = GetPendingEggOfferAttributions();
     private static readonly List<PendingPowerChangeAttempt> _pendingPowerChangeAttempts = new();
     private static readonly List<PendingUnsettlingLampDebuff> _pendingUnsettlingLampDebuffs = new();
     private static readonly System.Threading.AsyncLocal<EnemyStatusSourceFrame?> _enemyStatusSourceFrame = new();
@@ -4302,7 +4304,7 @@ public static class RunTracker
                 _pendingEggOfferAttributions.Remove(card);
                 _pendingEggOfferAttributions.Add(
                     card,
-                    new PendingEggOfferAttribution(relicId, card.Rarity));
+                    Tuple.Create(relicId, (int)card.Rarity));
                 RefreshCurrentRunMetadataLocked();
                 SaveCurrentRun();
             }
@@ -4332,8 +4334,8 @@ public static class RunTracker
                 _pendingEggOfferAttributions.Remove(card);
                 if (!IsTrackedCard(card)) return;
 
-                var agg = GetOrCreateCurrentRunRelicAggregateLocked(attribution.RelicId);
-                RecordEggUpgradedCardTakenForTest(agg, attribution.Rarity);
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(attribution.Item1);
+                RecordEggUpgradedCardTakenForTest(agg, (CardRarity)attribution.Item2);
                 RefreshCurrentRunMetadataLocked();
                 SaveCurrentRun();
             }
@@ -4342,6 +4344,18 @@ public static class RunTracker
                 CoreMain.LogDebug($"RecordEggUpgradedCardTaken failed: {e.Message}");
             }
         }
+    }
+
+    private static ConditionalWeakTable<object, Tuple<string, int>>
+        GetPendingEggOfferAttributions()
+    {
+        if (AppDomain.CurrentDomain.GetData(EggOfferAttributionsAppDomainKey)
+            is ConditionalWeakTable<object, Tuple<string, int>> existing)
+            return existing;
+
+        var created = new ConditionalWeakTable<object, Tuple<string, int>>();
+        AppDomain.CurrentDomain.SetData(EggOfferAttributionsAppDomainKey, created);
+        return created;
     }
 
     /// <summary>
@@ -22130,8 +22144,6 @@ internal sealed class PendingFresnelLensReward
         return result;
     }
 }
-
-internal sealed record PendingEggOfferAttribution(string RelicId, CardRarity Rarity);
 
 internal sealed class PendingSilverCrucibleReward
 {
