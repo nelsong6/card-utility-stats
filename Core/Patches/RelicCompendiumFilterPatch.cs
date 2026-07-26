@@ -855,18 +855,21 @@ internal static class RelicCompendiumFilterUi
         };
         row.AddChild(glyphSlot);
 
-        var glyph = new RichTextLabel
+        var glyph = new TextureRect
         {
-            BbcodeEnabled = true,
-            Text = $"[center]{StatConceptGlossary.RenderHintedGlyph(concept.Id, 36)}[/center]",
-            FitContent = true,
-            ScrollActive = false,
-            HintUnderlined = false,
             MouseFilter = Control.MouseFilterEnum.Stop,
             CustomMinimumSize = new Vector2(40f, 40f),
             SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter,
             SizeFlagsVertical = Control.SizeFlags.ShrinkCenter,
+            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+            TooltipText = $"{concept.Label}: {concept.Description}",
         };
+        if (StatConceptGlossary.TryGetGlossaryTexture(concept.Id, out var display))
+        {
+            glyph.Texture = display.Texture;
+            glyph.SelfModulate = display.Modulate;
+        }
         glyphSlot.AddChild(glyph);
 
         var text = new VBoxContainer

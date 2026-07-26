@@ -29,6 +29,10 @@ internal sealed record StatConcept(
     string Description,
     StatConceptDisplay Display);
 
+internal sealed record StatConceptTexture(
+    Texture2D Texture,
+    Color Modulate);
+
 /// <summary>
 /// Cached vocabulary for reusable stat concepts. Definitions are loaded once
 /// per hot-reloaded Core assembly and rendered both in stat rows and in the
@@ -59,9 +63,12 @@ internal static class StatConceptGlossary
         LoadConcepts();
     private static readonly Dictionary<string, string> GeneratedImagePaths =
         new(StringComparer.OrdinalIgnoreCase);
-    private static readonly List<ImageTexture> GeneratedImageTextures = [];
-    private static readonly Dictionary<string, string> GameResourceRegions =
+    private static readonly Dictionary<string, ImageTexture> GeneratedImageTextures =
+        new(StringComparer.OrdinalIgnoreCase);
+    private static readonly Dictionary<string, Rect2I> GameResourceRegions =
         new(StringComparer.Ordinal);
+    private static readonly Dictionary<string, Texture2D> GlossaryTextures =
+        new(StringComparer.OrdinalIgnoreCase);
 
     public static IReadOnlyList<StatConcept> Concepts { get; } =
         ConceptsById.Values
@@ -71,6 +78,7 @@ internal static class StatConceptGlossary
 
     public static void Initialize()
     {
+        GlossaryTextures.Clear();
         BuildGeneratedConceptImages();
         BuildGameResourceRegions();
         CoreMain.Logger.Info(
@@ -96,6 +104,34 @@ internal static class StatConceptGlossary
 
         concept = null!;
         return false;
+    }
+
+    public static bool TryGetGlossaryTexture(
+        string conceptId,
+        out StatConceptTexture display)
+    {
+        if (!TryGet(conceptId, out var concept))
+        {
+            display = null!;
+            return false;
+        }
+
+        if (!GlossaryTextures.TryGetValue(concept.Id, out var texture))
+        {
+            texture = BuildGlossaryTexture(concept);
+            if (texture == null)
+            {
+                display = null!;
+                return false;
+            }
+
+            GlossaryTextures.Add(concept.Id, texture);
+        }
+
+        display = new StatConceptTexture(
+            texture,
+            Color.FromHtml(concept.Display.Modulate));
+        return true;
     }
 
     public static string RenderHintedGlyph(string conceptId, int? sizeOverride = null)
@@ -171,10 +207,16 @@ internal static class StatConceptGlossary
     private static string RenderImage(
         string path,
         int size,
-        string region,
+        Rect2I region,
         string modulate)
     {
-        return $"[img width={size} height={size} region={region} "
+        var regionValue = string.Join(
+            ",",
+            region.Position.X,
+            region.Position.Y,
+            region.Size.X,
+            region.Size.Y);
+        return $"[img width={size} height={size} region={regionValue} "
                + $"color={modulate} align=center]{path}[/img]";
     }
 
@@ -425,12 +467,7 @@ internal static class StatConceptGlossary
                     ?? throw new InvalidOperationException(
                         $"ResourceLoader could not load '{path}'.");
                 var region = FindSquareContentRegion(texture);
-                GameResourceRegions[path] = string.Join(
-                    ",",
-                    region.Position.X,
-                    region.Position.Y,
-                    region.Size.X,
-                    region.Size.Y);
+                GameResourceRegions[path] = region;
             }
             catch (Exception e)
             {
@@ -489,12 +526,51 @@ internal static class StatConceptGlossary
         return new Rect2I(left, top, side, side);
     }
 
+    private static Texture2D? BuildGlossaryTexture(StatConcept concept)
+    {
+        if (concept.Display.Type is StatConceptDisplayType.EmbeddedImage
+            or StatConceptDisplayType.GameResourceGroup)
+        {
+            return GeneratedImageTextures.TryGetValue(concept.Id, out var generated)
+                ? generated
+                : null;
+        }
+
+        if (concept.Display.Type != StatConceptDisplayType.GameResource)
+            return null;
+
+        var source = ResourceLoader.Load<Texture2D>(
+            concept.Display.Value,
+            null,
+            ResourceLoader.CacheMode.Reuse);
+        if (source == null)
+        {
+            CoreMain.Logger.Error(
+                $"Could not load glossary texture '{concept.Display.Value}'.");
+            return null;
+        }
+
+        if (!GameResourceRegions.TryGetValue(concept.Display.Value, out var region))
+            return source;
+
+        return new AtlasTexture
+        {
+            Atlas = source,
+            Region = new Rect2(
+                region.Position.X,
+                region.Position.Y,
+                region.Size.X,
+                region.Size.Y),
+            FilterClip = true,
+        };
+    }
+
     private static void SaveGeneratedImage(string conceptId, Image image, string sourceKind)
     {
         var texture = ImageTexture.CreateFromImage(image);
         var path = GetGeneratedImagePath(conceptId);
         texture.TakeOverPath(path);
-        GeneratedImageTextures.Add(texture);
+        GeneratedImageTextures.Add(conceptId, texture);
         GeneratedImagePaths.Add(conceptId, path);
         CoreMain.Logger.Info(
             $"Stat concept generated image loaded: id={conceptId}, "
