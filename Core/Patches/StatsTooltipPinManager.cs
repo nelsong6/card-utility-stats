@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Godot;
 using MegaCrit.Sts2.Core.HoverTips;
+using MegaCrit.Sts2.Core.Nodes.Cards;
 using MegaCrit.Sts2.Core.Nodes.Cards.Holders;
 using MegaCrit.Sts2.Core.Nodes.HoverTips;
 using MegaCrit.Sts2.Core.Nodes.Relics;
@@ -682,15 +683,30 @@ internal static class StatsTooltipPinManager
             MouseFilter = Control.MouseFilterEnum.Ignore,
             ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
-            AnchorLeft = 1f,
-            AnchorRight = 1f,
-            AnchorTop = 0f,
-            AnchorBottom = 0f,
-            OffsetLeft = -(rightInset + width),
-            OffsetRight = -rightInset,
-            OffsetTop = topInset,
-            OffsetBottom = topInset + height,
         };
+        if (isFullCard)
+        {
+            // NCard draws its 300x422 card centered around a zero-sized
+            // Control origin. Anchoring to NCard's Control rect therefore
+            // targets the center of the artwork, not its top-right corner.
+            // Position against the visual bounds reported by the game.
+            lockIcon.Position = new Vector2(
+                (NCard.defaultSize.X / 2f) - rightInset - width,
+                (-NCard.defaultSize.Y / 2f) + topInset);
+            lockIcon.Size = new Vector2(width, height);
+        }
+        else
+        {
+            lockIcon.AnchorLeft = 1f;
+            lockIcon.AnchorRight = 1f;
+            lockIcon.AnchorTop = 0f;
+            lockIcon.AnchorBottom = 0f;
+            lockIcon.OffsetLeft = -(rightInset + width);
+            lockIcon.OffsetRight = -rightInset;
+            lockIcon.OffsetTop = topInset;
+            lockIcon.OffsetBottom = topInset + height;
+        }
+
         host!.AddChild(lockIcon);
         _lockIconHost = host;
     }
@@ -698,9 +714,8 @@ internal static class StatsTooltipPinManager
     private static Control GetLockIconHost(Control target)
     {
         // Card holders are interaction/layout slots whose bounds can be much
-        // larger than the rendered card. Anchor to the complete NCard control,
-        // not its internal CardContainer: that container's layout origin is
-        // around the card's type banner rather than the card's outer bounds.
+        // larger than the rendered card. NCard owns the visual transform; its
+        // centered visual bounds are handled explicitly in AddLockIcon.
         if (target is NCardHolder holder
             && IsLive(holder.CardNode))
         {
