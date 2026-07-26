@@ -27,6 +27,18 @@ public class RelicStatRowVocabularyTests
         "",
         "card,upgraded")]
     [InlineData(
+        "Cards drawn total",
+        "total",
+        "draw")]
+    [InlineData(
+        "Avg cards drawn per combat",
+        "",
+        "average,draw,combat")]
+    [InlineData(
+        "Rare cards drawn",
+        "",
+        "card_rare,draw")]
+    [InlineData(
         "Triggered this combat",
         "",
         "activation,combat")]

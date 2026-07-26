@@ -164,6 +164,13 @@ internal static class RelicStatRowVocabulary
             .Select(occurrence => occurrence.Id)
             .Distinct(StringComparer.Ordinal)
             .ToArray();
+        if (conceptIds.Contains("draw", StringComparer.Ordinal))
+        {
+            conceptIds = conceptIds
+                .Where(id => !string.Equals(id, "card", StringComparison.Ordinal))
+                .ToArray();
+        }
+
         var remainingText = CleanupRemainingText(
             BuildRemainingText(workingText, removed),
             conceptIds);
