@@ -45,7 +45,7 @@ Shift-based chords such as Steam's Shift+Tab and Windows+Shift+S are left
 alone, including chords whose other modifier was pressed before Left Shift.
 
 The modal blocks normal game input while open and contains the master stats
-visibility, card stats, monster stats, and removed-card checkboxes. It does not
+visibility, card stats, monster stats, and not-in-deck card controls. It does not
 take Godot focus from the game screen beneath it, so closing the menu returns
 to the exact selection and highlight that were already active. The D-pad and
 left stick move the menu's independent highlight between rows, and `A` toggles
@@ -115,7 +115,15 @@ hand, combat piles, and run history. It changes presentation only: card
 attribution continues to be recorded while the checkbox is off. Hand hovers
 stay compact unless verbose hand stats are enabled.
 
-A separate **"show removed cards"** checkbox controls the removed-card overlay: cards you've removed this run (Smith, events, curse dispose) appear inline in the deck grid, marked with a red "Card Removed" banner in their tooltip so you can review their stats post-removal. Generated combat-only cards that do not live in the deck permanently can also render as pooled summaries when that is a better representation than pretending each temporary copy is a normal deck instance. Checkbox state persists across hot reloads through the mod configuration.
+**"Show cards not in deck"** switches the native deck screen to a separate
+SpireLens collection: every current deck card leaves the grid, and removed
+physical cards plus pooled meta-cards take their place. Removed cards retain
+their individual run stats and removal marker. Meta-cards such as Shiv, Soul,
+and Sovereign Blade aggregate every observed instance of that generated card
+family into one inspectable card. By default a meta-card enters this view after
+it appears during the run; **"Show all meta-cards in \"not in deck\" view"**
+also renders every supported meta-card with zeroed stats before it is
+encountered. Both choices persist through the mod configuration.
 
 A separate, default-off **"show monster stats"** checkbox in the deck viewer controls combat monster hover popups when general stats are enabled. Keeping it off bypasses enemy aggregate lookup and tooltip construction on creature focus while leaving card and relic stats enabled.
 

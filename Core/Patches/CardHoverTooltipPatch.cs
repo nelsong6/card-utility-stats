@@ -19,6 +19,7 @@ public static class CardHoverShowPatch
 {
     private const int InlineKeywordIconSize = 16;
     private const string ShivMetaNote = "Reflects All Shiv Usage";
+    private const string SoulMetaNote = "Reflects All Soul Usage";
     private const string BlockIconPath = "res://images/ui/combat/block.png";
     private const string DrawCardsNextTurnPowerIconPath = "res://images/atlases/power_atlas.sprites/draw_cards_next_turn_power.tres";
     private const string BlockedDrawIconPath = DrawCardsNextTurnPowerIconPath;
@@ -122,8 +123,10 @@ public static class CardHoverShowPatch
         var run = RunTracker.Current;
         var sb = new StringBuilder();
         bool isShivMetaCard = RunTracker.IsShivDeckViewCard(cardModel);
+        bool isSoulMetaCard = RunTracker.IsSoulDeckViewCard(cardModel);
         bool isSovereignBladeMetaCard = RunTracker.IsSovereignBladeDeckViewCard(cardModel);
-        bool isSupplementalMetaCard = isShivMetaCard || isSovereignBladeMetaCard;
+        bool isSupplementalMetaCard =
+            isShivMetaCard || isSoulMetaCard || isSovereignBladeMetaCard;
 
         // The card identity now lives in the gold title slot for both compact
         // and full views, so repeating it again in the body just adds noise.
@@ -132,6 +135,8 @@ public static class CardHoverShowPatch
         // "not present in deck" note.
         if (isShivMetaCard)
             sb.Append($"[color=#e04c4c][b]{ShivMetaNote}[/b][/color]\n");
+        else if (isSoulMetaCard)
+            sb.Append($"[color=#e04c4c][b]{SoulMetaNote}[/b][/color]\n");
         else if (isSovereignBladeMetaCard)
             sb.Append($"[color=#e04c4c][b]{SovereignBladeMetaNote}[/b][/color]\n");
 

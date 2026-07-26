@@ -1082,16 +1082,25 @@ Not every visible card should become a permanent per-instance deck card.
 Patterns already in use:
 
 - Stable deck cards get normal instance ids.
-- Removed deck cards keep stats and render via removed-card overlay.
+- Removed deck cards keep stats and render in the separate not-in-deck view.
 - Combat-generated cards can get per-observed identities if they are actually played/tracked.
-- Some generated cards are better represented as pooled deck-view summaries.
+- Some generated cards are better represented as pooled meta-card summaries.
 
 Examples:
 
-- Shiv data is pooled under a synthetic deck-view Shiv overlay once a Shiv has been generated.
-- Sovereign Blade gets a supplemental pooled deck-view overlay once forged/generated behavior makes it relevant.
+- Shiv data is pooled under a synthetic Shiv meta-card once a Shiv has been generated.
+- Soul data is pooled under a synthetic Soul meta-card once a Soul has been generated.
+- Sovereign Blade gets a pooled meta-card once forged/generated behavior makes it relevant.
 
-Use pooled summaries when a card does not meaningfully exist as a stable deck resident and per-copy identities would mislead the user.
+The deck screen is either in normal mode or not-in-deck mode. Normal mode
+contains only the permanent deck. Not-in-deck mode contains removed physical
+cards plus the supported meta-card registry and must not retain any current
+deck cards. Normally a registry entry appears only after its generated-card
+event or pooled aggregate proves it appeared this run. The show-all option
+constructs every supported registry card even without data, allowing the
+zero-value tooltip to document what SpireLens can track. Use pooled summaries
+when a card does not meaningfully exist as a stable deck resident and per-copy
+identities would mislead the user.
 
 Entropy's shared power owns its later transformations. Keep a narrow window
 around `EntropyPower.AfterPlayerTurnStart`, then observe the already-established

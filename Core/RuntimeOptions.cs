@@ -9,6 +9,7 @@ public sealed class RuntimeOptions
 {
     public bool ViewStatsToggleEnabled { get; set; }
     public bool ShowRemovedCardsInDeckView { get; set; } = true;
+    public bool ShowAllMetaCardsInNotInDeckView { get; set; }
     public bool ShowEnemyStatsOnHover { get; set; }
     public bool ShowCardStatsDuringCombat { get; set; }
     public bool HideNonCombatRelicStats { get; set; }
@@ -26,6 +27,8 @@ public static class RuntimeOptionsProvider
     private const string GetCurrentOptionsJsonMethodName = "GetCurrentOptionsJson";
     private const string SetViewStatsToggleEnabledMethodName = "SetViewStatsToggleEnabled";
     private const string SetShowRemovedCardsInDeckViewMethodName = "SetShowRemovedCardsInDeckView";
+    private const string SetShowAllMetaCardsInNotInDeckViewMethodName =
+        "SetShowAllMetaCardsInNotInDeckView";
     private const string SetShowEnemyStatsOnHoverMethodName = "SetShowEnemyStatsOnHover";
     private const string SetShowCardStatsDuringCombatMethodName = "SetShowCardStatsDuringCombat";
     private const string SetHideNonCombatRelicStatsMethodName = "SetHideNonCombatRelicStats";
@@ -41,6 +44,7 @@ public static class RuntimeOptionsProvider
     private static MethodInfo? _getCurrentOptionsJsonMethod;
     private static MethodInfo? _setViewStatsToggleEnabledMethod;
     private static MethodInfo? _setShowRemovedCardsInDeckViewMethod;
+    private static MethodInfo? _setShowAllMetaCardsInNotInDeckViewMethod;
     private static MethodInfo? _setShowEnemyStatsOnHoverMethod;
     private static MethodInfo? _setShowCardStatsDuringCombatMethod;
     private static MethodInfo? _setHideNonCombatRelicStatsMethod;
@@ -50,6 +54,7 @@ public static class RuntimeOptionsProvider
     private static bool _loggedRefreshFailure;
     private static bool _loggedToggleFailure;
     private static bool _loggedShowRemovedCardsFailure;
+    private static bool _loggedShowAllMetaCardsFailure;
     private static bool _loggedShowEnemyStatsFailure;
     private static bool _loggedShowCardStatsDuringCombatFailure;
     private static bool _loggedHideNonCombatRelicStatsFailure;
@@ -117,6 +122,36 @@ public static class RuntimeOptionsProvider
             {
                 CoreMain.Logger.Warn($"RuntimeOptionsProvider.SetShowRemovedCardsInDeckView failed: {e.Message}");
                 _loggedShowRemovedCardsFailure = true;
+            }
+        }
+
+        Refresh();
+    }
+
+    public static void SetShowAllMetaCardsInNotInDeckView(bool isEnabled)
+    {
+        try
+        {
+            var method = ResolveSetShowAllMetaCardsInNotInDeckViewMethod();
+            if (method == null)
+            {
+                // The stable Loader cannot gain a new bridge method through a
+                // Core hot reload. Keep the option functional in memory until
+                // the next full game restart loads the updated Loader.
+                Current.ShowAllMetaCardsInNotInDeckView = isEnabled;
+                return;
+            }
+
+            method.Invoke(null, new object?[] { isEnabled });
+            _loggedShowAllMetaCardsFailure = false;
+        }
+        catch (Exception e)
+        {
+            if (!_loggedShowAllMetaCardsFailure)
+            {
+                CoreMain.Logger.Warn(
+                    $"RuntimeOptionsProvider.SetShowAllMetaCardsInNotInDeckView failed: {e.Message}");
+                _loggedShowAllMetaCardsFailure = true;
             }
         }
 
@@ -245,6 +280,14 @@ public static class RuntimeOptionsProvider
             SetShowRemovedCardsInDeckViewMethodName,
             BindingFlags.Public | BindingFlags.Static);
         return _setShowRemovedCardsInDeckViewMethod;
+    }
+
+    private static MethodInfo? ResolveSetShowAllMetaCardsInNotInDeckViewMethod()
+    {
+        _setShowAllMetaCardsInNotInDeckViewMethod ??= ResolveBridgeType()?.GetMethod(
+            SetShowAllMetaCardsInNotInDeckViewMethodName,
+            BindingFlags.Public | BindingFlags.Static);
+        return _setShowAllMetaCardsInNotInDeckViewMethod;
     }
 
     private static MethodInfo? ResolveSetShowEnemyStatsOnHoverMethod()

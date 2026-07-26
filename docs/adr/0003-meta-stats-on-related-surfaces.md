@@ -8,7 +8,7 @@ Status: Accepted
 
 Some stats are useful when shown on a card, but are not facts caused by that
 specific physical card instance. SpireLens already has examples of this pattern:
-supplemental deck-view cards like Shiv and Sovereign Blade summarize all usage
+not-in-deck meta-cards like Shiv, Soul, and Sovereign Blade summarize all usage
 of that generated or synthetic card family rather than one stable deck copy.
 
 Necrobinder's Osty stats need the same distinction. A card that summons Osty can

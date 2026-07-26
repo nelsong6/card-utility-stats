@@ -5,9 +5,9 @@ using MegaCrit.Sts2.Core.Models;
 namespace SpireLens.Core.Patches;
 
 /// <summary>
-/// Marks the synthetic deck-view Shiv overlay as available once the run has
-/// generated its first in-combat Shiv. We patch the generic generated-card
-/// hook so all Shiv sources flow through one place.
+/// Marks supported synthetic meta cards as available once the run has
+/// generated one. We patch the generic generated-card hook so every source
+/// flows through the same availability boundary.
 /// </summary>
 [HarmonyPatch(typeof(Hook), nameof(Hook.AfterCardGeneratedForCombat))]
 public static class HookAfterCardGeneratedForCombatPatch
@@ -18,6 +18,7 @@ public static class HookAfterCardGeneratedForCombatPatch
         try
         {
             RunTracker.RecordShivGenerated(card);
+            RunTracker.RecordSoulGenerated(card);
             RunTracker.RecordSovereignBladeGenerated(card);
         }
         catch (System.Exception e)

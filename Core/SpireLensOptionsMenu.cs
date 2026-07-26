@@ -140,7 +140,7 @@ public static class SpireLensOptionsMenu
 
         var panel = new PanelContainer
         {
-            CustomMinimumSize = new Vector2(780, 710),
+            CustomMinimumSize = new Vector2(780, 790),
             MouseFilter = Control.MouseFilterEnum.Stop,
         };
         center.AddChild(panel);
@@ -168,13 +168,14 @@ public static class SpireLensOptionsMenu
         AddOption(rows, "SpireLens: on/off", 0);
         AddOption(rows, "SpireLens: card stats", 1);
         AddOption(rows, "Show monster stats", 2);
-        AddOption(rows, "Show removed cards", 3);
+        AddOption(rows, "Show cards not in deck", 3);
+        AddOption(rows, "Show all meta-cards in \"not in deck\" view", 4);
 
         var relicFilterHeader = NewLabel("Relic bar filter — choose one", 20);
         relicFilterHeader.Modulate = new Color(0.72f, 0.8f, 0.92f);
         rows.AddChild(relicFilterHeader);
-        AddOption(rows, "Show combat-only relics at the combat screen", 4);
-        AddOption(rows, "Force show only combat relics on all screens", 5);
+        AddOption(rows, "Show combat-only relics at the combat screen", 5);
+        AddOption(rows, "Force show only combat relics on all screens", 6);
 
         var close = new Button
         {
@@ -397,12 +398,17 @@ public static class SpireLensOptionsMenu
                 ViewStatsInjectorPatch.SetEnemyStatsEnabled(enabled, source);
                 break;
             case 3:
-                ViewStatsInjectorPatch.SetShowRemovedCardsEnabled(enabled, source);
+                ViewStatsInjectorPatch.SetShowCardsNotInDeckEnabled(enabled, source);
                 break;
             case 4:
-                ViewStatsInjectorPatch.SetShowCombatOnlyRelicsAtCombatScreen(enabled, source);
+                ViewStatsInjectorPatch.SetShowAllMetaCardsInNotInDeckView(
+                    enabled,
+                    source);
                 break;
             case 5:
+                ViewStatsInjectorPatch.SetShowCombatOnlyRelicsAtCombatScreen(enabled, source);
+                break;
+            case 6:
                 ViewStatsInjectorPatch.SetHideNonCombatRelicStats(enabled, source);
                 break;
         }
@@ -410,13 +416,16 @@ public static class SpireLensOptionsMenu
 
     private static void RefreshCheckboxes()
     {
-        if (Checkboxes.Count != 6) return;
+        if (Checkboxes.Count != 7) return;
         SetCheckboxState(0, ViewStatsInjectorPatch.StatsVisibilityEnabled);
         SetCheckboxState(1, ViewStatsInjectorPatch.CardStatsEnabled);
         SetCheckboxState(2, ViewStatsInjectorPatch.EnemyStatsEnabled);
-        SetCheckboxState(3, ViewStatsInjectorPatch.ShowRemovedCardsEnabled);
-        SetCheckboxState(4, ViewStatsInjectorPatch.ShowCombatOnlyRelicsAtCombatScreen);
-        SetCheckboxState(5, ViewStatsInjectorPatch.HideNonCombatRelicStats);
+        SetCheckboxState(3, ViewStatsInjectorPatch.ShowCardsNotInDeckEnabled);
+        SetCheckboxState(
+            4,
+            ViewStatsInjectorPatch.ShowAllMetaCardsInNotInDeckView);
+        SetCheckboxState(5, ViewStatsInjectorPatch.ShowCombatOnlyRelicsAtCombatScreen);
+        SetCheckboxState(6, ViewStatsInjectorPatch.HideNonCombatRelicStats);
     }
 
     private static void SetCheckboxState(int index, bool enabled)

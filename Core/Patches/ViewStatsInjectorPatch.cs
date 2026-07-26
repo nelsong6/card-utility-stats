@@ -37,7 +37,7 @@ public static class ViewStatsInjectorPatch
     // Track the most recently injected tickbox so phase 2 can read its state.
     public static NTickbox? LastInjectedTickbox { get; private set; }
 
-    public static NTickbox? LastInjectedShowRemovedCardsTickbox { get; private set; }
+    public static NTickbox? LastInjectedShowCardsNotInDeckTickbox { get; private set; }
 
     public static NTickbox? LastInjectedEnemyStatsTickbox { get; private set; }
 
@@ -45,8 +45,8 @@ public static class ViewStatsInjectorPatch
 
     // Track the active deck-view screen so the toggle handler can trigger
     // a live re-render (via DisplayCards) when the user flips the checkbox.
-    // Without this, toggling the checkbox wouldn't show/hide removed cards
-    // until the user closed and reopened the deck view.
+    // Without this, toggling the mode wouldn't switch the active deck screen
+    // between live-deck and not-in-deck contents until it was reopened.
     public static NDeckViewScreen? LastInjectedDeckView { get; private set; }
 
     // Track the cloned containers so Shutdown can QueueFree() them on hot-reload.
@@ -69,6 +69,7 @@ public static class ViewStatsInjectorPatch
     // so changing one control never resets another.
     private static bool _persistedTicked;
     private static bool _persistedShowRemovedCardsTicked = true;
+    private static bool _persistedShowAllMetaCardsInNotInDeckView;
     private static bool _persistedEnemyStatsTicked;
     private static bool _persistedCardStatsTicked;
     private static bool _persistedHideNonCombatRelicStats;
@@ -93,12 +94,21 @@ public static class ViewStatsInjectorPatch
         }
     }
 
-    public static bool ShowRemovedCardsEnabled
+    public static bool ShowCardsNotInDeckEnabled
     {
         get
         {
             EnsurePrefsLoaded();
             return _persistedShowRemovedCardsTicked;
+        }
+    }
+
+    public static bool ShowAllMetaCardsInNotInDeckView
+    {
+        get
+        {
+            EnsurePrefsLoaded();
+            return _persistedShowAllMetaCardsInNotInDeckView;
         }
     }
 
@@ -179,13 +189,25 @@ public static class ViewStatsInjectorPatch
         CoreMain.Logger.Info($"Monster stats set to {isEnabled} ({source})");
     }
 
-    public static void SetShowRemovedCardsEnabled(bool isEnabled, string source)
+    public static void SetShowCardsNotInDeckEnabled(bool isEnabled, string source)
     {
         EnsurePrefsLoaded();
         _persistedShowRemovedCardsTicked = isEnabled;
-        SetTickboxVisualState(LastInjectedShowRemovedCardsTickbox, isEnabled);
+        SetTickboxVisualState(LastInjectedShowCardsNotInDeckTickbox, isEnabled);
         SavePreferences();
-        CoreMain.Logger.Info($"Show removed cards set to {isEnabled} ({source})");
+        CoreMain.Logger.Info($"Show cards not in deck set to {isEnabled} ({source})");
+        RefreshDeckView();
+    }
+
+    public static void SetShowAllMetaCardsInNotInDeckView(
+        bool isEnabled,
+        string source)
+    {
+        EnsurePrefsLoaded();
+        _persistedShowAllMetaCardsInNotInDeckView = isEnabled;
+        SavePreferences();
+        CoreMain.Logger.Info(
+            $"Show all meta-cards in not-in-deck view set to {isEnabled} ({source})");
         RefreshDeckView();
     }
 
@@ -227,6 +249,8 @@ public static class ViewStatsInjectorPatch
             var prefs = PrefsStorage.Load();
             _persistedTicked = prefs.ViewStatsTicked;
             _persistedShowRemovedCardsTicked = prefs.ShowRemovedCardsTicked;
+            _persistedShowAllMetaCardsInNotInDeckView =
+                prefs.ShowAllMetaCardsInNotInDeckView;
             _persistedEnemyStatsTicked = prefs.ShowEnemyStatsTicked;
             // Keep the legacy preference field as the on-disk compatibility
             // key even though the setting now applies to every card surface.
@@ -298,7 +322,7 @@ public static class ViewStatsInjectorPatch
             CoreMain.Logger.Info($"ViewStatsInjector: {_injectedClones.Count} cloned containers queued for removal");
         _injectedClones.Clear();
         LastInjectedTickbox = null;
-        LastInjectedShowRemovedCardsTickbox = null;
+        LastInjectedShowCardsNotInDeckTickbox = null;
         LastInjectedEnemyStatsTickbox = null;
         LastInjectedCardStatsTickbox = null;
     }
@@ -314,7 +338,7 @@ public static class ViewStatsInjectorPatch
         if (RunHistoryDeckViewer.IsHistoricalDeckViewer(deckView)) return;
 
         // Remember the active deck view so OnStatsToggled can trigger a
-        // live re-render (show/hide removed cards instantly on toggle).
+        // live re-render (switch card collections instantly on toggle).
         LastInjectedDeckView = deckView;
 
         try { Inject(__instance); }
@@ -521,9 +545,9 @@ public static class ViewStatsInjectorPatch
         SetEnemyStatsEnabled(tickbox.IsTicked, "deck-view checkbox");
     }
 
-    private static void OnShowRemovedCardsToggled(NTickbox tickbox)
+    private static void OnShowCardsNotInDeckToggled(NTickbox tickbox)
     {
-        SetShowRemovedCardsEnabled(tickbox.IsTicked, "deck-view checkbox");
+        SetShowCardsNotInDeckEnabled(tickbox.IsTicked, "deck-view checkbox");
     }
 
     private static void RefreshDeckView()
@@ -545,6 +569,8 @@ public static class ViewStatsInjectorPatch
         {
             ViewStatsTicked = _persistedTicked,
             ShowRemovedCardsTicked = _persistedShowRemovedCardsTicked,
+            ShowAllMetaCardsInNotInDeckView =
+                _persistedShowAllMetaCardsInNotInDeckView,
             ShowEnemyStatsTicked = _persistedEnemyStatsTicked,
             // Preserve the legacy wire/storage name for existing installs and
             // for compatibility with the stable Loader across Core reloads.

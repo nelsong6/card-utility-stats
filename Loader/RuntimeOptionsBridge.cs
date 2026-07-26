@@ -12,6 +12,7 @@ public sealed class RuntimeOptionsSnapshot
 {
     public bool ViewStatsToggleEnabled { get; set; }
     public bool ShowRemovedCardsInDeckView { get; set; } = true;
+    public bool ShowAllMetaCardsInNotInDeckView { get; set; }
     public bool ShowEnemyStatsOnHover { get; set; }
     public bool ShowCardStatsDuringCombat { get; set; }
     public bool HideNonCombatRelicStats { get; set; }
@@ -54,6 +55,14 @@ public static class RuntimeOptionsBridge
         if (SpireLensConfig.ShowRemovedCardsInDeckView == isEnabled) return;
 
         SpireLensConfig.ShowRemovedCardsInDeckView = isEnabled;
+        ModConfig.SaveDebounced<SpireLensConfig>();
+    }
+
+    public static void SetShowAllMetaCardsInNotInDeckView(bool isEnabled)
+    {
+        if (SpireLensConfig.ShowAllMetaCardsInNotInDeckView == isEnabled) return;
+
+        SpireLensConfig.ShowAllMetaCardsInNotInDeckView = isEnabled;
         ModConfig.SaveDebounced<SpireLensConfig>();
     }
 
@@ -109,6 +118,8 @@ public static class RuntimeOptionsBridge
         {
             ViewStatsToggleEnabled = SpireLensConfig.ViewStatsToggleEnabled,
             ShowRemovedCardsInDeckView = SpireLensConfig.ShowRemovedCardsInDeckView,
+            ShowAllMetaCardsInNotInDeckView =
+                SpireLensConfig.ShowAllMetaCardsInNotInDeckView,
             ShowEnemyStatsOnHover = SpireLensConfig.ShowEnemyStatsOnHover,
             ShowCardStatsDuringCombat = SpireLensConfig.ShowCardStatsDuringCombat,
             HideNonCombatRelicStats = SpireLensConfig.HideNonCombatRelicStats,

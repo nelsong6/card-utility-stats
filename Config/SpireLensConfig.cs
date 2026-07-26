@@ -10,6 +10,8 @@ public sealed class SpireLensConfig : SimpleModConfig
 
     public static bool ShowRemovedCardsInDeckView { get; set; } = true;
 
+    public static bool ShowAllMetaCardsInNotInDeckView { get; set; }
+
     public static bool ShowEnemyStatsOnHover { get; set; }
 
     public static bool ShowCardStatsDuringCombat { get; set; }
@@ -63,6 +65,11 @@ public sealed class SpireLensConfig : SimpleModConfig
         // on disk, but use the current names anywhere the player sees them.
         RelabelGeneratedOption(root, nameof(ViewStatsToggleEnabled), "SpireLens: on/off");
         RelabelGeneratedOption(root, nameof(ShowCardStatsDuringCombat), "SpireLens: card stats");
+        RelabelGeneratedOption(root, nameof(ShowRemovedCardsInDeckView), "Show cards not in deck");
+        RelabelGeneratedOption(
+            root,
+            nameof(ShowAllMetaCardsInNotInDeckView),
+            "Show all meta-cards in \"not in deck\" view");
 
         root.AddChild(CreateSectionHeader("Build Info", false));
         root.AddChild(CreateRawLabelControl($"Build version: {BuildVersion}", 18));

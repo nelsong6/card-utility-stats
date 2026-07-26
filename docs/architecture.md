@@ -100,6 +100,7 @@ When attribution is not naturally one-card-to-one-outcome, the code prefers:
 - [Core/StatConceptGlossary.cs](../Core/StatConceptGlossary.cs) validates and caches the embedded [Core/Config/stat-concepts.json](../Core/Config/stat-concepts.json) vocabulary once per Core load, then renders the same native rich-text hint markup for stat rows and the relic compendium's **Icon glossary** mode.
 - [Core/Patches/StatsVisibilityHotkeyPatch.cs](../Core/Patches/StatsVisibilityHotkeyPatch.cs) maps a standalone Left Shift tap and Right Stick (R3) press to opening/closing that menu while preserving Shift-based chords regardless of whether another modifier was pressed before or after Shift; Left Trigger remains Draw Pile and Left Stick press remains Peek.
 - [Core/Patches/CardHoverTooltipPatch.cs](../Core/Patches/CardHoverTooltipPatch.cs) builds compact and full tooltip bodies.
+- [Core/Patches/DeckViewNotInDeckPatch.cs](../Core/Patches/DeckViewNotInDeckPatch.cs) switches the native deck grid between current deck cards and the separate removed/meta-card collection; those two sets are never mixed.
 - [Core/Patches/NativeHoverTipAugmentationPatch.cs](../Core/Patches/NativeHoverTipAugmentationPatch.cs) appends owner-specific SpireLens data to the game's `IHoverTip` sequence immediately before `NHoverTipSet` renders it, then applies the SpireLens blue panel tint and brand to only the resulting native stats control.
 - [Core/Patches/StatsTooltipPinManager.cs](../Core/Patches/StatsTooltipPinManager.cs) pins one native card or relic tooltip set under a dedicated surrogate owner, including card and relic rows rebuilt inside run history, displays the game's top-panel lock icon on its source, and releases the pin on the next non-motion user action.
 - [Core/RunHistoryDeckViewer.cs](../Core/RunHistoryDeckViewer.cs) adds a deck icon to the run-history Cards section and hosts the game's native deck-view scene over run history. It reconstructs the selected player's final deck from the game's individual `SerializableCard` entries and binds duplicate cards back to their SpireLens per-instance keys by saved deck rank.
@@ -135,7 +136,12 @@ Not every card the player sees should be treated as a stable deck resident.
 
 - stable deck cards use per-instance numbering
 - removed cards remain viewable with their accumulated stats
-- some combat-generated cards are better represented as pooled summaries than as fake permanent instances
+- the not-in-deck view replaces the live deck grid with removed physical cards
+  plus supported pooled meta-cards
+- Shiv, Soul, and Sovereign Blade are the initial pooled meta-card registry;
+  unseen entries can be rendered with zeroed stats through the show-all option
+- some combat-generated cards are better represented as pooled summaries than
+  as fake permanent instances
 
 That distinction matters for both tooltip wording and data integrity.
 

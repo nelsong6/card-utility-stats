@@ -16,6 +16,9 @@ public class Prefs
     [JsonPropertyName("show_removed_cards_ticked")]
     public bool ShowRemovedCardsTicked { get; set; } = true;
 
+    [JsonPropertyName("show_all_meta_cards_in_not_in_deck_view")]
+    public bool ShowAllMetaCardsInNotInDeckView { get; set; }
+
     [JsonPropertyName("show_enemy_stats_ticked")]
     public bool ShowEnemyStatsTicked { get; set; }
 
@@ -40,6 +43,8 @@ public static class PrefsStorage
             {
                 ViewStatsTicked = options.ViewStatsToggleEnabled,
                 ShowRemovedCardsTicked = options.ShowRemovedCardsInDeckView,
+                ShowAllMetaCardsInNotInDeckView =
+                    options.ShowAllMetaCardsInNotInDeckView,
                 ShowEnemyStatsTicked = options.ShowEnemyStatsOnHover,
                 ShowCombatCardStatsTicked = options.ShowCardStatsDuringCombat,
                 HideNonCombatRelicStats = options.HideNonCombatRelicStats,
@@ -63,6 +68,8 @@ public static class PrefsStorage
             RuntimeOptionsProvider.SetShowCardStatsDuringCombat(prefs.ShowCombatCardStatsTicked);
             RuntimeOptionsProvider.SetHideNonCombatRelicStats(prefs.HideNonCombatRelicStats);
             RuntimeOptionsProvider.SetShowCombatOnlyRelicsAtCombatScreen(prefs.ShowCombatOnlyRelicsAtCombatScreen);
+            RuntimeOptionsProvider.SetShowAllMetaCardsInNotInDeckView(
+                prefs.ShowAllMetaCardsInNotInDeckView);
         }
         catch (Exception e)
         {

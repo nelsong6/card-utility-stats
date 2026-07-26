@@ -48,12 +48,28 @@ namespace SpireLens.Core;
 /// </summary>
 public static class RunTracker
 {
+    private enum DeckViewMetaCardKind
+    {
+        Shiv,
+        Soul,
+        SovereignBlade,
+    }
+
+    private static readonly DeckViewMetaCardKind[] DeckViewMetaCardRegistry =
+    [
+        DeckViewMetaCardKind.Shiv,
+        DeckViewMetaCardKind.Soul,
+        DeckViewMetaCardKind.SovereignBlade,
+    ];
+
     private const string EnthralledDefinitionId = "CARD.ENTHRALLED";
     private const string CursedPearlCurseDefinitionId = "CARD.GREED";
     private const string ShivDefinitionId = "CARD.SHIV";
+    private const string SoulDefinitionId = "CARD.SOUL";
     private const string SovereignBladeLegacyDefinitionToken = "SOVEREIGN_BLADE";
     private const string SovereignBladeLegacyDefinitionId = "CARD.SOVEREIGN_BLADE";
     private const string ShivGeneratedEventType = "shiv_generated";
+    private const string SoulGeneratedEventType = "soul_generated";
     private const string SovereignBladeForgedEventType = "sovereign_blade_forged";
     private const string EggOfferAttributionsAppDomainKey =
         "SpireLens.PendingEggOfferAttributions";
@@ -128,6 +144,8 @@ public static class RunTracker
     private static readonly Dictionary<Player, PendingWarHammerActivation> _pendingWarHammerActivations = new(ReferenceEqualityComparer.Instance);
     private static bool _shivAvailableThisRun;
     private static CardModel? _shivDeckViewCard;
+    private static bool _soulAvailableThisRun;
+    private static CardModel? _soulDeckViewCard;
     private const decimal PoisonOwnershipEpsilon = 0.0001m;
     private static bool _sovereignBladeAvailableThisRun;
     private static CardModel? _sovereignBladeDeckViewCard;
@@ -277,6 +295,8 @@ public static class RunTracker
         {
             if (IsShivDeckViewCardLocked(card))
                 return GetShivDeckViewAggregateLocked();
+            if (IsSoulDeckViewCardLocked(card))
+                return GetSoulDeckViewAggregateLocked();
             if (IsSovereignBladeDeckViewCardLocked(card))
                 return GetSovereignBladeDeckViewAggregateLocked();
 
@@ -372,6 +392,23 @@ public static class RunTracker
         return GetPooledEffectiveAggregateByDefinitionLocked(ShivDefinitionId);
     }
 
+    public static bool IsSoulDeckViewCard(CardModel card)
+    {
+        if (card == null) return false;
+        lock (_lock) return IsSoulDeckViewCardLocked(card);
+    }
+
+    private static bool IsSoulDeckViewCardLocked(CardModel card)
+    {
+        return _soulDeckViewCard != null
+            && ReferenceEquals(Canonical(card), _soulDeckViewCard);
+    }
+
+    private static CardAggregate? GetSoulDeckViewAggregateLocked()
+    {
+        return GetPooledEffectiveAggregateByDefinitionLocked(SoulDefinitionId);
+    }
+
     public static CardAggregate GetEnthralledCurseAggregate()
     {
         lock (_lock)
@@ -462,6 +499,25 @@ public static class RunTracker
         return false;
     }
 
+    private static bool HasSoulDataLocked()
+    {
+        if (_currentRun?.Events.Any(e => e.Type == SoulGeneratedEventType) == true)
+            return true;
+
+        if (_pendingCombat?.CombatEvents.Any(e => e.Type == SoulGeneratedEventType) == true)
+            return true;
+
+        if (_currentRun?.Aggregates.Keys.Any(key =>
+                CardAggregatePooler.IsAggregateForDefinition(key, SoulDefinitionId)) == true)
+            return true;
+
+        if (_pendingCombat?.CombatAggregates.Keys.Any(key =>
+                CardAggregatePooler.IsAggregateForDefinition(key, SoulDefinitionId)) == true)
+            return true;
+
+        return false;
+    }
+
     private static bool HasSovereignBladeDataLocked()
     {
         if (_currentRun?.Events.Any(e => e.Type == SovereignBladeForgedEventType) == true)
@@ -495,6 +551,8 @@ public static class RunTracker
     {
         _shivAvailableThisRun = false;
         _shivDeckViewCard = null;
+        _soulAvailableThisRun = false;
+        _soulDeckViewCard = null;
         _sovereignBladeAvailableThisRun = false;
         _sovereignBladeDeckViewCard = null;
         _sovereignBladeDefinitionIdThisRun = null;
@@ -507,6 +565,13 @@ public static class RunTracker
             _shivDeckViewCard = null;
     }
 
+    private static void RefreshSoulAvailabilityLocked()
+    {
+        _soulAvailableThisRun = HasSoulDataLocked();
+        if (!_soulAvailableThisRun)
+            _soulDeckViewCard = null;
+    }
+
     private static void RefreshSovereignBladeAvailabilityLocked()
     {
         _sovereignBladeAvailableThisRun = HasSovereignBladeDataLocked();
@@ -517,9 +582,10 @@ public static class RunTracker
         }
     }
 
-    private static CardModel? GetShivDeckViewCardLocked()
+    private static CardModel? GetShivDeckViewCardLocked(bool includeWhenUnseen = false)
     {
-        if (!_shivAvailableThisRun) return null;
+        if (!ShouldIncludeMetaCard(_shivAvailableThisRun, includeWhenUnseen))
+            return null;
         if (_shivDeckViewCard != null) return _shivDeckViewCard;
 
         try
@@ -535,9 +601,34 @@ public static class RunTracker
         return _shivDeckViewCard;
     }
 
-    private static CardModel? GetSovereignBladeDeckViewCardLocked()
+    private static CardModel? GetSoulDeckViewCardLocked(bool includeWhenUnseen = false)
     {
-        if (!_sovereignBladeAvailableThisRun) return null;
+        if (!ShouldIncludeMetaCard(_soulAvailableThisRun, includeWhenUnseen))
+            return null;
+        if (_soulDeckViewCard != null) return _soulDeckViewCard;
+
+        try
+        {
+            var modelId = ModelId.Deserialize(SoulDefinitionId);
+            _soulDeckViewCard = ModelDb.GetById<CardModel>(modelId).ToMutable();
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"GetSoulDeckViewCardLocked failed: {e.Message}");
+        }
+
+        return _soulDeckViewCard;
+    }
+
+    private static CardModel? GetSovereignBladeDeckViewCardLocked(
+        bool includeWhenUnseen = false)
+    {
+        if (!ShouldIncludeMetaCard(
+                _sovereignBladeAvailableThisRun,
+                includeWhenUnseen))
+        {
+            return null;
+        }
         if (_sovereignBladeDeckViewCard != null) return _sovereignBladeDeckViewCard;
 
         try
@@ -1228,6 +1319,7 @@ public static class RunTracker
             $"pending_rank_restores={_pendingRankRestores.Count} pruned_ghosts={prunedGhosts}");
 
         RefreshShivAvailabilityLocked();
+        RefreshSoulAvailabilityLocked();
         RefreshSovereignBladeAvailabilityLocked();
 
         if (repairedDamageAggregates)
@@ -20055,8 +20147,7 @@ public static class RunTracker
 
     /// <summary>
     /// Return the list of CardModel refs that have been marked Removed
-    /// this run. Used by the deck-view injection to surface removed cards
-    /// alongside current deck cards. Refs remain valid after removal —
+    /// this run. Used by the not-in-deck view. Refs remain valid after removal —
     /// CardModel.RemoveFromState only sets a flag, doesn't free the object.
     /// </summary>
     public static IReadOnlyList<CardModel> GetRemovedCards()
@@ -20085,30 +20176,70 @@ public static class RunTracker
     }
 
     /// <summary>
-    /// Additional cards to surface in the full-deck screen when ViewStats is
-    /// enabled. Today that includes removed cards plus pooled synthetic
-    /// deck-level meta cards for Shiv and Sovereign Blade once the run has
-    /// generated them.
+    /// Cards shown by the separate not-in-deck mode: removed physical cards
+    /// plus one pooled synthetic card for each supported meta-card. Normally a
+    /// meta-card appears after it has been generated in the run; includeAll
+    /// makes the complete registry visible with zeroed stats when unseen.
     /// </summary>
-    public static IReadOnlyList<CardModel> GetSupplementalDeckViewCards()
+    public static IReadOnlyList<CardModel> GetCardsNotInDeckView(
+        bool includeAllMetaCards)
     {
         lock (_lock)
         {
             RefreshShivAvailabilityLocked();
+            RefreshSoulAvailabilityLocked();
             RefreshSovereignBladeAvailabilityLocked();
 
             var result = GetRemovedCardsLocked();
 
-            var shiv = GetShivDeckViewCardLocked();
-            if (shiv != null && !result.Contains(shiv))
-                result.Add(shiv);
-
-            var sovereignBlade = GetSovereignBladeDeckViewCardLocked();
-            if (sovereignBlade != null && !result.Contains(sovereignBlade))
-                result.Add(sovereignBlade);
+            foreach (var kind in DeckViewMetaCardRegistry)
+            {
+                var metaCard = kind switch
+                {
+                    DeckViewMetaCardKind.Shiv =>
+                        GetShivDeckViewCardLocked(includeAllMetaCards),
+                    DeckViewMetaCardKind.Soul =>
+                        GetSoulDeckViewCardLocked(includeAllMetaCards),
+                    DeckViewMetaCardKind.SovereignBlade =>
+                        GetSovereignBladeDeckViewCardLocked(includeAllMetaCards),
+                    _ => null,
+                };
+                AddMetaCardIfPresent(result, metaCard);
+            }
 
             return result;
         }
+    }
+
+    private static bool ShouldIncludeMetaCard(
+        bool appearedThisRun,
+        bool includeAllMetaCards)
+        => appearedThisRun || includeAllMetaCards;
+
+    internal static bool ShouldIncludeMetaCardForTest(
+        bool appearedThisRun,
+        bool includeAllMetaCards)
+        => ShouldIncludeMetaCard(appearedThisRun, includeAllMetaCards);
+
+    internal static IReadOnlyList<string> GetSupportedMetaCardDefinitionIdsForTest()
+        => DeckViewMetaCardRegistry
+            .Select(kind => kind switch
+            {
+                DeckViewMetaCardKind.Shiv => ShivDefinitionId,
+                DeckViewMetaCardKind.Soul => SoulDefinitionId,
+                DeckViewMetaCardKind.SovereignBlade =>
+                    SovereignBladeLegacyDefinitionId,
+                _ => "",
+            })
+            .Where(id => id.Length > 0)
+            .ToArray();
+
+    private static void AddMetaCardIfPresent(
+        ICollection<CardModel> cards,
+        CardModel? metaCard)
+    {
+        if (metaCard != null && !cards.Contains(metaCard))
+            cards.Add(metaCard);
     }
 
     /// <summary>
@@ -20382,6 +20513,34 @@ public static class RunTracker
                 T = Now(),
                 Type = ShivGeneratedEventType,
                 CardId = ShivDefinitionId,
+                Floor = RunManager.Instance.State?.TotalFloor,
+            });
+        }
+    }
+
+    public static void RecordSoulGenerated(CardModel? card)
+    {
+        if (card is not Soul) return;
+
+        lock (_lock)
+        {
+            if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+
+            _soulAvailableThisRun = true;
+
+            EnsureLazyCurrentRunLocked();
+            _pendingCombat ??= new PendingCombat();
+
+            bool alreadyRecorded =
+                _currentRun.Events.Any(e => e.Type == SoulGeneratedEventType) ||
+                _pendingCombat.CombatEvents.Any(e => e.Type == SoulGeneratedEventType);
+            if (alreadyRecorded) return;
+
+            _pendingCombat.CombatEvents.Add(new CardEvent
+            {
+                T = Now(),
+                Type = SoulGeneratedEventType,
+                CardId = SoulDefinitionId,
                 Floor = RunManager.Instance.State?.TotalFloor,
             });
         }

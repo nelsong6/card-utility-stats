@@ -8,6 +8,28 @@ namespace SpireLens.Core.Tests;
 public class RuntimeOptionsTests
 {
     [Fact]
+    public void NotInDeckView_AllMetaCardsDefaultsOffForOlderSettings()
+    {
+        Assert.False(new RuntimeOptions().ShowAllMetaCardsInNotInDeckView);
+        Assert.False(new Prefs().ShowAllMetaCardsInNotInDeckView);
+
+        var options = JsonSerializer.Deserialize<RuntimeOptions>("{}");
+
+        Assert.NotNull(options);
+        Assert.False(options!.ShowAllMetaCardsInNotInDeckView);
+    }
+
+    [Fact]
+    public void NotInDeckView_AllMetaCardsCanBeEnabledByRuntimeSnapshot()
+    {
+        var options = JsonSerializer.Deserialize<RuntimeOptions>(
+            """{"ShowAllMetaCardsInNotInDeckView":true}""");
+
+        Assert.NotNull(options);
+        Assert.True(options!.ShowAllMetaCardsInNotInDeckView);
+    }
+
+    [Fact]
     public void EnemyHoverStats_DefaultOff()
     {
         Assert.False(new RuntimeOptions().ShowEnemyStatsOnHover);
