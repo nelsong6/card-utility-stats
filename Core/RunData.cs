@@ -856,6 +856,15 @@ public class RelicAggregate
     public int EmberTeaActiveTurns { get; set; }
     public int EmberTeaActiveCombats { get; set; }
 
+    // Red Skull tracking uses the relic's live StrengthApplied flag as the
+    // active-state source of truth. Turns and combats count distinct periods
+    // in which that flag was actually active, including periods with no
+    // qualifying attacks or hits.
+    public int RedSkullAttacksPlayedWhileActive { get; set; }
+    public int RedSkullHitsWhileActive { get; set; }
+    public int RedSkullActiveTurns { get; set; }
+    public int RedSkullActiveCombats { get; set; }
+
     // Kunai tracking. Counts owner attack plays, actual Dexterity gained from
     // activation resolution, and player-turn-end charge snapshots.
     public int KunaiAttacksPlayed { get; set; }

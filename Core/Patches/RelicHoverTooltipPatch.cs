@@ -222,6 +222,7 @@ public static class RelicHoverShowPatch
         {
             SturdyClamp => SturdyClampTooltipWidth,
             EmberTea => EmberTeaTooltipWidth,
+            RedSkull => EmberTeaTooltipWidth,
             _ => null,
         };
 
@@ -420,6 +421,13 @@ public static class RelicHoverShowPatch
         {
             title = "Ember Tea";
             body = BuildEmberTeaBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is RedSkull)
+        {
+            title = "Red Skull";
+            body = BuildRedSkullBodyBBCode(agg);
             return true;
         }
 
@@ -2872,6 +2880,31 @@ public static class RelicHoverShowPatch
         Row3(sb, "Hits while active", agg.EmberTeaHitsWhileActive.ToString(), "");
         Row3(sb, "Avg hits per turn while active", FormatDecimal(hitsPerTurn), "");
         Row3(sb, "Avg hits per combat while active", FormatDecimal(hitsPerCombat), "");
+        return sb.ToString();
+    }
+
+    private static string BuildRedSkullBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var attacksPerTurn = agg.RedSkullActiveTurns <= 0
+            ? 0m
+            : (decimal)agg.RedSkullAttacksPlayedWhileActive / agg.RedSkullActiveTurns;
+        var attacksPerCombat = agg.RedSkullActiveCombats <= 0
+            ? 0m
+            : (decimal)agg.RedSkullAttacksPlayedWhileActive / agg.RedSkullActiveCombats;
+        var hitsPerTurn = agg.RedSkullActiveTurns <= 0
+            ? 0m
+            : (decimal)agg.RedSkullHitsWhileActive / agg.RedSkullActiveTurns;
+        var hitsPerCombat = agg.RedSkullActiveCombats <= 0
+            ? 0m
+            : (decimal)agg.RedSkullHitsWhileActive / agg.RedSkullActiveCombats;
+
+        Row3(sb, "Attacks played while active", agg.RedSkullAttacksPlayedWhileActive.ToString(), "");
+        Row3(sb, "Avg attacks played while active per turn", FormatDecimal(attacksPerTurn), "");
+        Row3(sb, "Avg attacks played while active per combat", FormatDecimal(attacksPerCombat), "");
+        Row3(sb, "Hits while active", agg.RedSkullHitsWhileActive.ToString(), "");
+        Row3(sb, "Avg hits while active per turn", FormatDecimal(hitsPerTurn), "");
+        Row3(sb, "Avg hits while active per combat", FormatDecimal(hitsPerCombat), "");
         return sb.ToString();
     }
 

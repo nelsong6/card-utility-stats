@@ -1560,6 +1560,7 @@ public static class RunTracker
         RecordTuningForkTurnForTrackedPlayerLocked();
         RecordCloakClaspTurnForTrackedPlayerLocked();
         RecordEmberTeaActiveTurnForTrackedPlayerLocked();
+        RecordRedSkullActivePeriodForTrackedPlayerLocked();
         RecordRippleBasinTurnForTrackedPlayerLocked();
         RecordReptileTrinketTurnForTrackedPlayerLocked();
         RecordBeatingRemnantTurnForTrackedPlayerLocked();
@@ -1791,6 +1792,10 @@ public static class RunTracker
         target.EmberTeaHitsWhileActive += source.EmberTeaHitsWhileActive;
         target.EmberTeaActiveTurns += source.EmberTeaActiveTurns;
         target.EmberTeaActiveCombats += source.EmberTeaActiveCombats;
+        target.RedSkullAttacksPlayedWhileActive += source.RedSkullAttacksPlayedWhileActive;
+        target.RedSkullHitsWhileActive += source.RedSkullHitsWhileActive;
+        target.RedSkullActiveTurns += source.RedSkullActiveTurns;
+        target.RedSkullActiveCombats += source.RedSkullActiveCombats;
         target.KunaiAttacksPlayed += source.KunaiAttacksPlayed;
         target.KunaiDexterityGained += source.KunaiDexterityGained;
         target.KunaiTurnsEndedAt1Charge += source.KunaiTurnsEndedAt1Charge;
@@ -1948,6 +1953,7 @@ public static class RunTracker
             switch (entry)
             {
                 case CardPlayStartedEntry cps when cps.CardPlay != null:
+                    NoteRedSkullAttackStartedIfActive(cps.CardPlay);
                     if (trackCardStats)
                         NoteCardPlayStarted(cps.CardPlay);
                     break;
@@ -2054,6 +2060,7 @@ public static class RunTracker
             RecordMiniatureCannonUpgradedAttackPlayedIfOwnedLocked(cardPlay.Card);
             RecordVajraAttackPlayedIfOwnedLocked(cardPlay.Card);
             RecordEmberTeaAttackPlayedIfActiveLocked(cardPlay.Card);
+            RecordRedSkullAttackPlayedIfStartedActiveLocked(cardPlay);
             RecordBurningSticksGeneratedCardPlayedLocked(cardPlay.Card);
             RecordBrilliantScarfDiscountTaken(cardPlay);
             RecordPaelsClawGoopyCardPlayedIfOwnedLocked(cardPlay.Card);
@@ -3916,6 +3923,7 @@ public static class RunTracker
     private const string MiniatureCannonRelicId = "RELIC.MINIATURE_CANNON";
     private const string VajraRelicId = "RELIC.VAJRA";
     private const string EmberTeaRelicId = "RELIC.EMBER_TEA";
+    private const string RedSkullRelicId = "RELIC.RED_SKULL";
     private const string ToastyMittensRelicId = "RELIC.TOASTY_MITTENS";
     private const string KunaiRelicId = "RELIC.KUNAI";
     private const string KusarigamaRelicId = "RELIC.KUSARIGAMA";
@@ -9122,6 +9130,30 @@ public static class RunTracker
         agg.EmberTeaActiveCombats += Math.Max(0, count);
     }
 
+    internal static void RecordRedSkullAttackPlayedForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.RedSkullAttacksPlayedWhileActive += Math.Max(0, count);
+    }
+
+    internal static void RecordRedSkullAttackHitForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.RedSkullHitsWhileActive += Math.Max(0, count);
+    }
+
+    internal static void RecordRedSkullActiveTurnForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.RedSkullActiveTurns += Math.Max(0, count);
+    }
+
+    internal static void RecordRedSkullActiveCombatForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.RedSkullActiveCombats += Math.Max(0, count);
+    }
+
     internal static void RecordToastyMittensForTest(
         RelicAggregate agg,
         int cardsExhausted,
@@ -9283,6 +9315,29 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordEmberTeaActiveTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Observe Red Skull after the game's own active-state update or at a
+    /// player-turn boundary. A distinct turn/combat is counted once when the
+    /// relic's authoritative StrengthApplied flag is on.
+    /// </summary>
+    public static void RecordRedSkullActivePeriod(Player player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                RecordRedSkullActivePeriodForPlayerLocked(player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordRedSkullActivePeriod failed: {e.Message}");
             }
         }
     }
@@ -14498,6 +14553,114 @@ public static class RunTracker
         RecordEmberTeaActiveTurnForTest(agg);
     }
 
+    private static void NoteRedSkullAttackStartedIfActive(CardPlay cardPlay)
+    {
+        if (cardPlay?.Card?.Type != CardType.Attack) return;
+
+        lock (_lock)
+        {
+            var owner = cardPlay.Card.Owner;
+            if (owner == null || !IsTrackedPlayer(owner)) return;
+
+            _pendingCombat ??= new PendingCombat();
+            if (!RecordRedSkullActivePeriodForPlayerLocked(owner)) return;
+
+            _pendingCombat.RedSkullAttacksStartedWhileActive.Add(cardPlay);
+        }
+    }
+
+    private static void RecordRedSkullAttackPlayedIfStartedActiveLocked(CardPlay cardPlay)
+    {
+        if (_pendingCombat == null
+            || cardPlay?.Card?.Type != CardType.Attack
+            || !_pendingCombat.RedSkullAttacksStartedWhileActive.Remove(cardPlay))
+        {
+            return;
+        }
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(RedSkullRelicId);
+        RecordRedSkullAttackPlayedForTest(agg);
+    }
+
+    private static void RecordRedSkullAttackHitIfActiveLocked(CardModel card)
+    {
+        if (card?.Type != CardType.Attack) return;
+
+        var owner = card.Owner;
+        if (owner == null
+            || !IsTrackedPlayer(owner)
+            || !RecordRedSkullActivePeriodForPlayerLocked(owner))
+        {
+            return;
+        }
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(RedSkullRelicId);
+        RecordRedSkullAttackHitForTest(agg);
+    }
+
+    private static void RecordRedSkullActivePeriodForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordRedSkullActivePeriodForPlayerLocked(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordRedSkullActivePeriodForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static bool RecordRedSkullActivePeriodForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null
+            || !TryGetActiveRedSkull(player, out _))
+        {
+            return false;
+        }
+
+        RelicAggregate? agg = null;
+        if (_pendingCombat.RedSkullActiveCombatCountedPlayers.Add(player))
+        {
+            agg = GetOrCreatePendingRelicAggregateLocked(RedSkullRelicId);
+            RecordRedSkullActiveCombatForTest(agg);
+        }
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber > 0
+            && (!_pendingCombat.RedSkullActiveTurnCountedTurns.TryGetValue(
+                    player,
+                    out var recordedTurn)
+                || recordedTurn != turnNumber))
+        {
+            _pendingCombat.RedSkullActiveTurnCountedTurns[player] = turnNumber;
+            agg ??= GetOrCreatePendingRelicAggregateLocked(RedSkullRelicId);
+            RecordRedSkullActiveTurnForTest(agg);
+        }
+
+        return true;
+    }
+
+    private static bool TryGetActiveRedSkull(Player player, out RedSkull redSkull)
+    {
+        redSkull = null!;
+        try
+        {
+            var found = player.Relics
+                .OfType<RedSkull>()
+                .FirstOrDefault(IsTrackedRelic);
+            if (found == null || !found.StrengthApplied) return false;
+
+            redSkull = found;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static bool RefreshStrikeDummyDeckCountsIfOwnedLocked()
     {
         if (_currentRun == null) return false;
@@ -19403,6 +19566,7 @@ public static class RunTracker
                 RecordMiniatureCannonUpgradedAttackHitIfOwnedLocked(entry.CardSource!);
                 RecordVajraAttackHitIfOwnedLocked(entry.CardSource!);
                 RecordEmberTeaAttackHitIfActiveLocked(entry.CardSource!);
+                RecordRedSkullAttackHitIfActiveLocked(entry.CardSource!);
             }
 
             if (!ShouldTrackCardStatsDuringCombatLocked()) return;
@@ -20423,6 +20587,12 @@ internal class PendingCombat
     public HashSet<Player> EmberTeaActivePlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> EmberTeaActiveTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> RedSkullActiveCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> RedSkullActiveTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<CardPlay> RedSkullAttacksStartedWhileActive { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> RippleBasinCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

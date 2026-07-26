@@ -723,6 +723,17 @@ Attacks while that marker exists; multi-hit and multi-target Attacks contribute
 one hit per resolved entry. Active turn/combat denominators include marked
 periods with zero attacks or hits.
 
+Red Skull's private mutable `StrengthApplied` flag is its authoritative active
+state; the visible status and HP threshold merely explain why that state
+changes. Observe it after the established async `Hook.AfterCurrentHpChanged`
+dispatch fully completes, and again at each player-turn start, to count every
+distinct active turn/combat including zero-attack periods. Capture whether an
+Attack was active at `CardPlayStartedEntry` and commit that play only when its
+matching finished entry arrives. Count hits from observed enemy damage entries
+only while `StrengthApplied` is currently true, so multi-hit/multi-target
+Attacks count each resolved hit and mid-resolution threshold changes are
+respected.
+
 Brilliant Scarf increments its per-turn card counter from `AfterCardPlayed`,
 after `CardPlayFinished` has already entered combat history. Its actual cost
 discounts happen through `TryModifyEnergyCostInCombatLate` and `TryModifyStarCost`

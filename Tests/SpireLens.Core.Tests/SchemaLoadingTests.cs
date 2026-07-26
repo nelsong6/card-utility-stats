@@ -2947,6 +2947,33 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsRedSkullRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("red-skull-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.RED_SKULL"];
+        Assert.Equal(9, relicAgg.RedSkullAttacksPlayedWhileActive);
+        Assert.Equal(17, relicAgg.RedSkullHitsWhileActive);
+        Assert.Equal(5, relicAgg.RedSkullActiveTurns);
+        Assert.Equal(3, relicAgg.RedSkullActiveCombats);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsRedSkullRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("red-skull-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.RED_SKULL"];
+        Assert.Equal(9, relicAgg.RedSkullAttacksPlayedWhileActive);
+        Assert.Equal(17, relicAgg.RedSkullHitsWhileActive);
+        Assert.Equal(5, relicAgg.RedSkullActiveTurns);
+        Assert.Equal(3, relicAgg.RedSkullActiveCombats);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsToastyMittensRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("toasty-mittens-relic-run.json"));
