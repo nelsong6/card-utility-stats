@@ -65,9 +65,10 @@ Right-click an owned relic, a card in a passive pile view, a compendium relic,
 or a card or relic in run history with SpireLens stats to pin its complete
 native tooltip set. The game's compact top-panel lock icon appears on the pinned
 item, and the tooltip remains visible and mouse-interactive after the pointer
-leaves it. Pointer movement is allowed so inline help can be inspected; the next
-mouse click or wheel action, key press, or controller action removes the pin and
-continues to the game normally.
+leaves it. Right-clicking the locked item again always unlocks it. Pointer
+movement is allowed so inline help can be inspected; any other mouse click or
+wheel action, key press, or controller action removes the pin and continues to
+the game normally.
 
 The relic compendium's **Edit combat relevance** mode shows each discovered
 relic's classification with the game's enemy-map icon for combat or top-bar

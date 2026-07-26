@@ -72,7 +72,7 @@ internal static class StatsTooltipPinManager
     private static object? _pinnedCardModel;
     private static Texture2D? _lockTexture;
     private static bool _lockLoadAttempted;
-    private static ulong _dismissedInputEventId;
+    private static bool _suppressRightPressUntilRelease;
 
     public static void Attach(NRelicInventoryHolder? holder)
     {
@@ -179,7 +179,7 @@ internal static class StatsTooltipPinManager
         RunHistoryContainerSubscriptions.Clear();
         _lockTexture = null;
         _lockLoadAttempted = false;
-        _dismissedInputEventId = 0;
+        _suppressRightPressUntilRelease = false;
     }
 
     /// <summary>
@@ -190,18 +190,37 @@ internal static class StatsTooltipPinManager
     /// </summary>
     internal static void DismissOnGlobalAction(InputEvent inputEvent)
     {
+        // Godot may expose different managed InputEvent wrappers to _Input and
+        // the later _GuiInput/OnMousePressed dispatch for one native click.
+        // Keep the dismissal guard alive for the physical button lifecycle
+        // instead of comparing wrapper instance ids.
+        if (IsRightRelease(inputEvent))
+        {
+            _suppressRightPressUntilRelease = false;
+            return;
+        }
+
+        // If a release was lost while the window changed focus, a later
+        // globally-observed right press is necessarily a new physical press.
+        // Do not let a stale latch consume it.
+        if (_suppressRightPressUntilRelease
+            && IsRightPress(inputEvent)
+            && _pinnedTarget == null)
+        {
+            _suppressRightPressUntilRelease = false;
+        }
+
         if (_pinnedTarget == null || !IsDismissAction(inputEvent))
             return;
 
-        // _Input runs before _GuiInput. Remember the event so a right click
-        // that dismissed a pin cannot reach the same or another target later
-        // in the same dispatch and immediately create a new pin. Perform the
-        // unlock here instead of relying on the target to receive a later
-        // control-specific callback.
-        var restoreOrdinaryHover =
-            IsRightClickInsidePinnedTarget(inputEvent);
-        _dismissedInputEventId = inputEvent.GetInstanceId();
-        ClearPin(restoreOrdinaryHover);
+        if (IsRightPress(inputEvent))
+            _suppressRightPressUntilRelease = true;
+
+        // _Input runs before every lockable surface's control-specific input
+        // handler. Remove the pin once here. If this was a right press, the
+        // latch above makes the later handler consume the same physical press
+        // instead of immediately pinning again.
+        ClearPin(restoreOrdinaryHover: false);
     }
 
     internal static void HandlePinnedHintHover(InputEvent inputEvent)
@@ -309,9 +328,14 @@ internal static class StatsTooltipPinManager
         Control target,
         InputEvent inputEvent)
     {
-        if (_dismissedInputEventId == inputEvent.GetInstanceId())
+        if (_suppressRightPressUntilRelease)
         {
-            _dismissedInputEventId = 0;
+            // Global input has already removed the pin for this physical
+            // press. Restore only the target's ordinary hover set and claim
+            // the press so neither SpireLens nor the game treats it as a new
+            // right-click action.
+            RestoreOrdinaryHover(target);
+            target.GetViewport()?.SetInputAsHandled();
             return true;
         }
 
@@ -814,23 +838,18 @@ internal static class StatsTooltipPinManager
         };
     }
 
-    private static bool IsRightClickInsidePinnedTarget(InputEvent inputEvent)
-    {
-        return inputEvent is InputEventMouseButton
-               {
-                   ButtonIndex: MouseButton.Right,
-                   Pressed: true,
-               } mouseButton
-               && IsLive(_pinnedTarget)
-               && _pinnedTarget!.IsVisibleInTree()
-               && _pinnedTarget.GetGlobalRect().HasPoint(mouseButton.Position);
-    }
-
     private static bool IsRightPress(InputEvent inputEvent)
         => inputEvent is InputEventMouseButton
         {
             ButtonIndex: MouseButton.Right,
             Pressed: true,
+        };
+
+    private static bool IsRightRelease(InputEvent inputEvent)
+        => inputEvent is InputEventMouseButton
+        {
+            ButtonIndex: MouseButton.Right,
+            Pressed: false,
         };
 
     private static bool IsLive(GodotObject? instance)

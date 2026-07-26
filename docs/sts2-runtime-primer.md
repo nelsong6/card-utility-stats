@@ -1085,9 +1085,12 @@ Important surfaces:
   Pointer motion is the only input that preserves a pin: the stable Loader
   input postfix dismisses it before the next mouse, keyboard, or controller
   action continues through the game's normal input path. A second right press
-  over the pinned source unlocks during that global pass and records the input
-  event id, preventing the later holder callback from repinning on the same
-  dispatch.
+  over the pinned source unlocks during that global pass. The manager keeps a
+  right-button press/release latch until the physical button is released, so
+  the later holder callback cannot repin on the same dispatch even when Godot
+  supplies `_Input` and `_GuiInput` with different managed wrappers for that
+  one native event. Do not correlate those phases with
+  `GodotObject.GetInstanceId()`.
 - Run-history pinning attaches to both the existing card/relic rows and the
   native card/relic containers. Those containers survive multiplayer player
   selection while their rows are rebuilt, so their `ChildEnteredTree` signals
