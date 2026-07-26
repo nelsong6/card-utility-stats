@@ -426,6 +426,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is BingBong)
+        {
+            title = "Bing Bong";
+            body = BuildBingBongBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is GoldPlatedCables)
         {
             title = "Gold-Plated Cables";
@@ -3884,6 +3891,42 @@ public static class RelicHoverShowPatch
             agg.BurningSticksRareCardsDuplicated.ToString(),
             "",
             "Rare cards successfully duplicated by Burning Sticks.");
+        return sb.ToString();
+    }
+
+    private static string BuildBingBongBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(
+            sb,
+            "Extra cards added",
+            agg.BingBongExtraCardsAdded.ToString(),
+            "",
+            "Extra cards successfully added to the permanent deck by Bing Bong.");
+        Row3(
+            sb,
+            "Commons added",
+            agg.BingBongCommonCardsAdded.ToString(),
+            "",
+            "Non-Curse Common cards successfully added to the permanent deck by Bing Bong.");
+        Row3(
+            sb,
+            "Uncommons added",
+            agg.BingBongUncommonCardsAdded.ToString(),
+            "",
+            "Non-Curse Uncommon cards successfully added to the permanent deck by Bing Bong.");
+        Row3(
+            sb,
+            "Rares added",
+            agg.BingBongRareCardsAdded.ToString(),
+            "",
+            "Non-Curse Rare cards successfully added to the permanent deck by Bing Bong.");
+        Row3(
+            sb,
+            "Curses added",
+            agg.BingBongCurseCardsAdded.ToString(),
+            "",
+            "Curse cards successfully added to the permanent deck by Bing Bong.");
         return sb.ToString();
     }
 

@@ -326,6 +326,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `symbiotic-virus-relic-run.json`
   Adds lifecycle tracking for the exact Dark orb Symbiotic Virus channels:
   completed evokes, passive triggers, and non-evoke slot-removal fizzles.
+- `bing-bong-relic-run.json`
+  Adds Bing Bong's successful permanent-deck duplicate count, split into
+  non-Curse Common/Uncommon/Rare cards and a mutually exclusive Curse bucket.
 - `gold-plated-cables-relic-run.json`
   Adds Gold-Plated Cables' confirmed activations with an orb, exact activation
   counts by orb type, and player turn ends where no orb was available.

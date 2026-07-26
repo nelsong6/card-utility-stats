@@ -1084,6 +1084,15 @@ public class RelicAggregate
     public int BurningSticksUncommonCardsDuplicated { get; set; }
     public int BurningSticksRareCardsDuplicated { get; set; }
 
+    // Bing Bong tracking. Counts only successful clonedBy:BingBong additions
+    // to the permanent deck. Curse is a mutually exclusive type bucket; the
+    // rarity buckets cover non-Curse Common, Uncommon, and Rare cards.
+    public int BingBongExtraCardsAdded { get; set; }
+    public int BingBongCommonCardsAdded { get; set; }
+    public int BingBongUncommonCardsAdded { get; set; }
+    public int BingBongRareCardsAdded { get; set; }
+    public int BingBongCurseCardsAdded { get; set; }
+
     // Bookmark tracking. Activations is total cost-reduction activations;
     // BookmarkCombats is the denominator for average activations per combat.
     public int BookmarkCombats { get; set; }

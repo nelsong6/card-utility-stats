@@ -3902,6 +3902,29 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsBingBongRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("bing-bong-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertBingBongFixture(
+            loaded.Data.RelicAggregates["RELIC.BING_BONG"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsBingBongRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("bing-bong-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertBingBongFixture(
+            resumed!.RelicAggregates["RELIC.BING_BONG"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsGoldPlatedCablesRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(
@@ -4190,6 +4213,15 @@ public class SchemaLoadingTests
         Assert.Equal(1, relicAgg.BurningSticksCommonCardsDuplicated);
         Assert.Equal(1, relicAgg.BurningSticksUncommonCardsDuplicated);
         Assert.Equal(1, relicAgg.BurningSticksRareCardsDuplicated);
+    }
+
+    private static void AssertBingBongFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(8, relicAgg.BingBongExtraCardsAdded);
+        Assert.Equal(3, relicAgg.BingBongCommonCardsAdded);
+        Assert.Equal(2, relicAgg.BingBongUncommonCardsAdded);
+        Assert.Equal(1, relicAgg.BingBongRareCardsAdded);
+        Assert.Equal(2, relicAgg.BingBongCurseCardsAdded);
     }
 
     private static void AssertGnarledHammerFixture(RelicAggregate relicAgg)

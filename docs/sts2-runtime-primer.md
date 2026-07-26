@@ -556,6 +556,17 @@ reference ledger in process-stable `AppDomain` data rather than a Core-static
 collection so an open offer remains attributable across a Core hot reload;
 weak keys let skipped or replaced offers disappear with the game's card model.
 
+Bing Bong handles every same-owner card entering the permanent Deck by cloning
+that card and calling the five-argument `CardPileCmd.Add` overload with the
+relic itself as `clonedBy`. Observe that established overload and wrap its
+returned task only when `clonedBy is BingBong`; classify the final
+`CardPileAddResult.cardAdded` after a successful add rather than the requested
+clone before the shared add pipeline can replace or reject it. Curse is a card
+type and should take precedence over the card's rarity so Curse and
+Common/Uncommon/Rare remain mutually exclusive display buckets. Basic or Event
+edge cases still belong in the total successful extra-card count without being
+misreported as one of those requested buckets.
+
 Pael's sacrifice reward option is owned by `PaelsWing`, not `PaelsFlesh`.
 `PaelsWing.TryModifyCardRewardAlternatives` adds the `SACRIFICE` card reward
 alternative and `PaelsWing.OnSacrifice` increments the saved sacrifice count.

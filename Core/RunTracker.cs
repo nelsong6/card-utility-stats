@@ -1921,6 +1921,11 @@ public static class RunTracker
         target.BurningSticksCommonCardsDuplicated += source.BurningSticksCommonCardsDuplicated;
         target.BurningSticksUncommonCardsDuplicated += source.BurningSticksUncommonCardsDuplicated;
         target.BurningSticksRareCardsDuplicated += source.BurningSticksRareCardsDuplicated;
+        target.BingBongExtraCardsAdded += source.BingBongExtraCardsAdded;
+        target.BingBongCommonCardsAdded += source.BingBongCommonCardsAdded;
+        target.BingBongUncommonCardsAdded += source.BingBongUncommonCardsAdded;
+        target.BingBongRareCardsAdded += source.BingBongRareCardsAdded;
+        target.BingBongCurseCardsAdded += source.BingBongCurseCardsAdded;
 
         target.BookmarkCombats += source.BookmarkCombats;
         target.BookmarkCommonActivations += source.BookmarkCommonActivations;
@@ -4279,6 +4284,7 @@ public static class RunTracker
     private const string RuinedHelmetRelicId = "RELIC.RUINED_HELMET";
     private const string MummifiedHandRelicId = "RELIC.MUMMIFIED_HAND";
     private const string BurningSticksRelicId = "RELIC.BURNING_STICKS";
+    private const string BingBongRelicId = "RELIC.BING_BONG";
     private const string GnarledHammerRelicId = "RELIC.GNARLED_HAMMER";
     private const string TriBoomerangRelicId = "RELIC.TRI_BOOMERANG";
     private const string BookmarkRelicId = "RELIC.BOOKMARK";
@@ -4362,6 +4368,39 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordEggUpgradedCardTaken failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Records the final card actually added by Bing Bong's clone request.
+    /// The caller observes the completed CardPileCmd.Add result, so failed or
+    /// replaced additions never get inferred from the relic's intent text.
+    /// </summary>
+    public static void RecordBingBongCardAdded(
+        BingBong relic,
+        CardPileAddResult result)
+    {
+        if (relic == null || !result.success || result.cardAdded == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var owner = relic.Owner;
+                var card = result.cardAdded;
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(owner)) return;
+                if (owner == null || !ReferenceEquals(card.Owner, owner)) return;
+                if (card.Pile?.Type != PileType.Deck) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(BingBongRelicId);
+                RecordBingBongCardAddedForTest(agg, card.Type, card.Rarity);
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordBingBongCardAdded failed: {e.Message}");
             }
         }
     }
@@ -10443,6 +10482,35 @@ public static class RunTracker
 
         agg.CardsAddedToDeck++;
         agg.GoldGained += Math.Max(0, currentGold - initialGold);
+    }
+
+    internal static void RecordBingBongCardAddedForTest(
+        RelicAggregate agg,
+        CardType cardType,
+        CardRarity rarity,
+        int count = 1)
+    {
+        if (agg == null || count <= 0) return;
+
+        agg.BingBongExtraCardsAdded += count;
+        if (cardType == CardType.Curse)
+        {
+            agg.BingBongCurseCardsAdded += count;
+            return;
+        }
+
+        switch (rarity)
+        {
+            case CardRarity.Common:
+                agg.BingBongCommonCardsAdded += count;
+                break;
+            case CardRarity.Uncommon:
+                agg.BingBongUncommonCardsAdded += count;
+                break;
+            case CardRarity.Rare:
+                agg.BingBongRareCardsAdded += count;
+                break;
+        }
     }
 
     internal static void RecordMawBankActivationForTest(
