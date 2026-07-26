@@ -272,6 +272,13 @@ public static class RelicHoverShowPatch
         body = "";
         agg ??= new RelicAggregate();
 
+        if (relicModel is BagOfPreparation)
+        {
+            title = "Bag of Preparation";
+            body = BuildBagOfPreparationBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is BagOfMarbles)
         {
             title = "Bag of Marbles";
@@ -1177,6 +1184,22 @@ public static class RelicHoverShowPatch
         }
 
         return false;
+    }
+
+    private static string BuildBagOfPreparationBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        RelicActivationRow(
+            sb,
+            agg.Activations.ToString(),
+            "Activations — first-turn hand draws whose requested card count Bag of Preparation increased.");
+        Row3(
+            sb,
+            "Cards drawn",
+            agg.AdditionalCardsDrawn.ToString(),
+            "",
+            "Cards drawn — first-turn cards that were actually drawn because of Bag of Preparation's added hand-draw count.");
+        return sb.ToString();
     }
 
     private static string BuildBagOfMarblesBodyBBCode(RelicAggregate agg)

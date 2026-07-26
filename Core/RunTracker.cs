@@ -4129,6 +4129,7 @@ public static class RunTracker
 
     // -------- Relic stat recording --------
 
+    private const string BagOfPreparationRelicId = "RELIC.BAG_OF_PREPARATION";
     private const string BagOfMarblesRelicId = "RELIC.BAG_OF_MARBLES";
     private const string RedMaskRelicId = "RELIC.RED_MASK";
     private const string UnsettlingLampRelicId = "RELIC.UNSETTLING_LAMP";
@@ -4296,6 +4297,125 @@ public static class RunTracker
                 CoreMain.LogDebug($"RecordEggUpgradedCardOffered failed: {e.Message}");
             }
         }
+    }
+
+    /// <summary>
+    /// Record Bag of Preparation when its owner-specific hand-draw modifier
+    /// raises the first-turn draw count, then arm attribution for the eventual
+    /// observed hand-draw result.
+    /// </summary>
+    public static void RecordBagOfPreparationActivation(
+        BagOfPreparation? relic,
+        Player? player,
+        int cardsRequested)
+    {
+        if (relic?.Owner == null || player == null || cardsRequested <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(player)) return;
+                if (!ReferenceEquals(relic.Owner, player)) return;
+
+                _pendingCombat ??= new PendingCombat();
+                if (!_pendingCombat.BagOfPreparationActivationCountedPlayers.Add(player)) return;
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(BagOfPreparationRelicId);
+                RecordBagOfPreparationStatsForTest(agg, activations: 1, cardsDrawn: 0);
+                _pendingCombat.PendingBagOfPreparationDraws[player] =
+                    new PendingBagOfPreparationDraw(cardsRequested);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordBagOfPreparationActivation failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Complete Bag of Preparation's modifier-chain snapshot after all normal
+    /// and late hand-draw modifiers have run.
+    /// </summary>
+    public static void FinalizeBagOfPreparationHandDraw(Player? player, decimal finalHandDraw)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null) return;
+                if (!_pendingCombat.PendingBagOfPreparationDraws.TryGetValue(player, out var pending)) return;
+
+                pending.RawHandDrawWithoutBag =
+                    Math.Max(0m, finalHandDraw - pending.CardsRequested);
+                pending.ModifierChainCompleted = true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"FinalizeBagOfPreparationHandDraw failed: {e.Message}");
+            }
+        }
+    }
+
+    public static bool TryConsumeBagOfPreparationDrawAttribution(
+        Player? player,
+        bool fromHandDraw,
+        out decimal rawHandDrawWithoutBag)
+    {
+        rawHandDrawWithoutBag = 0m;
+        if (player == null || !fromHandDraw) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null) return false;
+                if (!_pendingCombat.PendingBagOfPreparationDraws.Remove(player, out var pending))
+                    return false;
+                if (!pending.ModifierChainCompleted) return false;
+
+                rawHandDrawWithoutBag = pending.RawHandDrawWithoutBag;
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"TryConsumeBagOfPreparationDrawAttribution failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    public static void RecordBagOfPreparationCardsDrawn(int cardsDrawn)
+    {
+        if (cardsDrawn <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreatePendingRelicAggregateLocked(BagOfPreparationRelicId);
+                RecordBagOfPreparationStatsForTest(
+                    agg,
+                    activations: 0,
+                    cardsDrawn: cardsDrawn);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordBagOfPreparationCardsDrawn failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordBagOfPreparationStatsForTest(
+        RelicAggregate agg,
+        int activations,
+        int cardsDrawn)
+    {
+        if (agg == null) return;
+        agg.Activations += Math.Max(0, activations);
+        agg.AdditionalCardsDrawn += Math.Max(0, cardsDrawn);
     }
 
     /// <summary>
@@ -21999,6 +22119,8 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> PermafrostCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> BagOfPreparationActivationCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> PocketwatchCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> PocketwatchTurnCountedTurns { get; }
@@ -22008,6 +22130,8 @@ internal class PendingCombat
     public Dictionary<Player, int> PocketwatchCardCountTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> PocketwatchCardsPlayedThisTurn { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, PendingBagOfPreparationDraw> PendingBagOfPreparationDraws { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> LetterOpenerCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
@@ -22208,6 +22332,18 @@ internal class PendingCombat
     /// <summary>Exclusive per-kind attribution windows for this combat. A fresh
     /// PendingCombat (setup/end, run boundary) starts empty, so this IS the reset.</summary>
     public AttributionWindowRegistry Windows { get; } = new();
+}
+
+internal sealed class PendingBagOfPreparationDraw
+{
+    public PendingBagOfPreparationDraw(int cardsRequested)
+    {
+        CardsRequested = Math.Max(0, cardsRequested);
+    }
+
+    public int CardsRequested { get; }
+    public decimal RawHandDrawWithoutBag { get; set; }
+    public bool ModifierChainCompleted { get; set; }
 }
 
 internal sealed class PendingBrilliantScarfDiscount

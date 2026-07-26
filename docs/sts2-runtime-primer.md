@@ -465,6 +465,18 @@ This is intentionally outcome-shaped but still simple. It assumes the relic appl
 
 Relic aggregates live in `RunData.RelicAggregates`, keyed by relic id. Fields are shared across relics; each relic uses only relevant fields.
 
+Bag of Preparation raises its owner's first-turn hand-draw request inside
+`ModifyHandDraw`; the game then finishes the complete normal/late modifier
+chain, raises the first hand to any larger eligible Innate count, clamps it to
+the hand limit, and finally awaits the four-argument `CardPileCmd.Draw`.
+Count the positive owner-specific modifier as the activation, but measure cards
+drawn from that completed draw task. Its observed contribution is the cards
+that arrived beyond the counterfactual request with Bag's delta removed,
+capped by Bag's surviving contribution after Innate and hand-limit clamping.
+This preserves activations when draw prevention yields no cards and avoids
+crediting Bag for a starting hand that Innate cards would already have made
+equally large.
+
 Centennial Puzzle already exposes the exact combat-local state needed for a
 live tooltip through `UsedThisCombat`. The relic sets it before drawing from
 its first qualifying unblocked HP-loss callback and resets it in
