@@ -363,6 +363,9 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds Mummified Hand trigger costs, observed card discounts, energy-spend to
   discounted-cost ratios, held combat/turn denominators, and recipient
   card-type and rarity counts.
+- `burning-sticks-relic-run.json`
+  Adds Burning Sticks confirmed duplicate activations, exact generated-card
+  plays, duplicate rarity splits, and its held-combat denominator.
 - `gnarled-hammer-relic-run.json`
   Adds Gnarled Hammer's observed list of permanent deck cards whose Sharp
   enchantment was applied or increased by its pickup effect.

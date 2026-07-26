@@ -952,6 +952,16 @@ public class RelicAggregate
     public int MummifiedHandDiscountedUncommons { get; set; }
     public int MummifiedHandDiscountedRares { get; set; }
 
+    // Burning Sticks tracking. Activations counts confirmed duplicate cards
+    // added to combat. The generated-card play count follows those exact card
+    // objects, while combats is the held denominator for both requested
+    // averages. Rarity buckets use the successfully added duplicate.
+    public int BurningSticksCombats { get; set; }
+    public int BurningSticksGeneratedCardPlays { get; set; }
+    public int BurningSticksCommonCardsDuplicated { get; set; }
+    public int BurningSticksUncommonCardsDuplicated { get; set; }
+    public int BurningSticksRareCardsDuplicated { get; set; }
+
     // Bookmark tracking. Activations is total cost-reduction activations;
     // BookmarkCombats is the denominator for average activations per combat.
     public int BookmarkCombats { get; set; }

@@ -3366,6 +3366,25 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsBurningSticksRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("burning-sticks-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertBurningSticksFixture(loaded.Data.RelicAggregates["RELIC.BURNING_STICKS"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsBurningSticksRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("burning-sticks-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertBurningSticksFixture(resumed!.RelicAggregates["RELIC.BURNING_STICKS"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsGnarledHammerRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("gnarled-hammer-relic-run.json"));
@@ -3728,6 +3747,16 @@ public class SchemaLoadingTests
         Assert.Equal(1, relicAgg.MummifiedHandDiscountedCommons);
         Assert.Equal(1, relicAgg.MummifiedHandDiscountedUncommons);
         Assert.Equal(1, relicAgg.MummifiedHandDiscountedRares);
+    }
+
+    private static void AssertBurningSticksFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(4, relicAgg.BurningSticksCombats);
+        Assert.Equal(5, relicAgg.BurningSticksGeneratedCardPlays);
+        Assert.Equal(1, relicAgg.BurningSticksCommonCardsDuplicated);
+        Assert.Equal(1, relicAgg.BurningSticksUncommonCardsDuplicated);
+        Assert.Equal(1, relicAgg.BurningSticksRareCardsDuplicated);
     }
 
     private static void AssertGnarledHammerFixture(RelicAggregate relicAgg)

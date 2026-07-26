@@ -1,0 +1,26 @@
+{
+  "run_id": "burning-sticks-relic-fixture",
+  "started_at": "2026-07-25T18:00:00Z",
+  "updated_at": "2026-07-25T18:24:00Z",
+  "character": "CHAR.IRONCLAD",
+  "ascension": 6,
+  "floor_reached": 21,
+  "outcome": "in_progress",
+  "game_start_time": 1785002400,
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.BURNING_STICKS": {
+      "activations": 3,
+      "burning_sticks_combats": 4,
+      "burning_sticks_generated_card_plays": 5,
+      "burning_sticks_common_cards_duplicated": 1,
+      "burning_sticks_uncommon_cards_duplicated": 1,
+      "burning_sticks_rare_cards_duplicated": 1
+    }
+  },
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

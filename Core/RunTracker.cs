@@ -1841,6 +1841,11 @@ public static class RunTracker
         target.MummifiedHandDiscountedCommons += source.MummifiedHandDiscountedCommons;
         target.MummifiedHandDiscountedUncommons += source.MummifiedHandDiscountedUncommons;
         target.MummifiedHandDiscountedRares += source.MummifiedHandDiscountedRares;
+        target.BurningSticksCombats += source.BurningSticksCombats;
+        target.BurningSticksGeneratedCardPlays += source.BurningSticksGeneratedCardPlays;
+        target.BurningSticksCommonCardsDuplicated += source.BurningSticksCommonCardsDuplicated;
+        target.BurningSticksUncommonCardsDuplicated += source.BurningSticksUncommonCardsDuplicated;
+        target.BurningSticksRareCardsDuplicated += source.BurningSticksRareCardsDuplicated;
 
         target.BookmarkCombats += source.BookmarkCombats;
         target.BookmarkCommonActivations += source.BookmarkCommonActivations;
@@ -2049,6 +2054,7 @@ public static class RunTracker
             RecordMiniatureCannonUpgradedAttackPlayedIfOwnedLocked(cardPlay.Card);
             RecordVajraAttackPlayedIfOwnedLocked(cardPlay.Card);
             RecordEmberTeaAttackPlayedIfActiveLocked(cardPlay.Card);
+            RecordBurningSticksGeneratedCardPlayedLocked(cardPlay.Card);
             RecordBrilliantScarfDiscountTaken(cardPlay);
             RecordPaelsClawGoopyCardPlayedIfOwnedLocked(cardPlay.Card);
 
@@ -2699,6 +2705,186 @@ public static class RunTracker
         CardType type,
         int energyCost)
         => AccumulateJackOfAllTradesCardAdded(agg, rarity, type, energyCost);
+
+    /// <summary>
+    /// Arm the single generated-card call made by Burning Sticks after its
+    /// first qualifying owned Skill exhaust in a combat.
+    /// </summary>
+    internal static PendingBurningSticksDuplicateWindow? ArmBurningSticksDuplicateAttribution(
+        BurningSticks? relic,
+        CardModel? exhaustedCard)
+    {
+        if (relic?.Owner == null || exhaustedCard == null) return null;
+
+        lock (_lock)
+        {
+            try
+            {
+                var player = relic.Owner;
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(player)) return null;
+                if (CombatManager.Instance?.IsInProgress != true) return null;
+                if (!ReferenceEquals(exhaustedCard.Owner, player)) return null;
+                if (exhaustedCard.Type != CardType.Skill) return null;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordBurningSticksCombatForPlayerLocked(player);
+
+                var window = new PendingBurningSticksDuplicateWindow
+                {
+                    Player = player,
+                    SourceCardId = exhaustedCard.Id.ToString(),
+                    RemainingAttempts = 1,
+                };
+                _pendingCombat.PendingBurningSticksDuplicateWindows[player] = window;
+                return window;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"ArmBurningSticksDuplicateAttribution failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Match the one generated Skill clone to the active Burning Sticks
+    /// callback. The window survives until the asynchronous pile result.
+    /// </summary>
+    internal static PendingBurningSticksDuplicateWindow? CaptureBurningSticksDuplicateAttempt(
+        CardModel? card,
+        Player? creator)
+    {
+        if (card == null || creator == null) return null;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null) return null;
+                if (!_pendingCombat.PendingBurningSticksDuplicateWindows.TryGetValue(
+                        creator,
+                        out var window))
+                    return null;
+                if (window.RemainingAttempts <= 0) return null;
+                if (card.Type != CardType.Skill) return null;
+                if (!string.Equals(
+                        card.Id.ToString(),
+                        window.SourceCardId,
+                        StringComparison.Ordinal))
+                    return null;
+
+                window.RemainingAttempts--;
+                return window;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"CaptureBurningSticksDuplicateAttempt failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+    internal static void RecordBurningSticksDuplicateResult(
+        PendingBurningSticksDuplicateWindow? window,
+        CardPileAddResult result)
+    {
+        if (window == null || !result.success || result.cardAdded == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null || !IsTrackedPlayer(window.Player)) return;
+                if (!_pendingCombat.PendingBurningSticksDuplicateWindows.TryGetValue(
+                        window.Player,
+                        out var activeWindow)
+                    || !ReferenceEquals(activeWindow, window))
+                    return;
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(BurningSticksRelicId);
+                RecordBurningSticksDuplicateForTest(
+                    agg,
+                    success: true,
+                    result.cardAdded.Rarity);
+                _pendingCombat.BurningSticksGeneratedCards.Add(result.cardAdded);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordBurningSticksDuplicateResult failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void DisarmBurningSticksDuplicateAttribution(
+        PendingBurningSticksDuplicateWindow? window)
+    {
+        if (window == null) return;
+
+        lock (_lock)
+        {
+            if (_pendingCombat == null) return;
+            if (_pendingCombat.PendingBurningSticksDuplicateWindows.TryGetValue(
+                    window.Player,
+                    out var activeWindow)
+                && ReferenceEquals(activeWindow, window))
+            {
+                _pendingCombat.PendingBurningSticksDuplicateWindows.Remove(window.Player);
+            }
+        }
+    }
+
+    private static void RecordBurningSticksGeneratedCardPlayedLocked(CardModel card)
+    {
+        if (_pendingCombat == null) return;
+        if (!_pendingCombat.BurningSticksGeneratedCards.Contains(card)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(BurningSticksRelicId);
+        RecordBurningSticksGeneratedCardPlayedForTest(agg);
+    }
+
+    private static void AccumulateBurningSticksDuplicate(
+        RelicAggregate agg,
+        bool success,
+        CardRarity? rarity)
+    {
+        if (agg == null || !success) return;
+
+        agg.Activations++;
+        switch (rarity)
+        {
+            case CardRarity.Common:
+                agg.BurningSticksCommonCardsDuplicated++;
+                break;
+            case CardRarity.Uncommon:
+                agg.BurningSticksUncommonCardsDuplicated++;
+                break;
+            case CardRarity.Rare:
+                agg.BurningSticksRareCardsDuplicated++;
+                break;
+        }
+    }
+
+    internal static void RecordBurningSticksDuplicateForTest(
+        RelicAggregate agg,
+        bool success,
+        CardRarity? rarity)
+        => AccumulateBurningSticksDuplicate(agg, success, rarity);
+
+    internal static void RecordBurningSticksGeneratedCardPlayedForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null || count <= 0) return;
+        agg.BurningSticksGeneratedCardPlays += count;
+    }
+
+    internal static void RecordBurningSticksCombatForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null || count <= 0) return;
+        agg.BurningSticksCombats += count;
+    }
 
     /// <summary>
     /// Arm the exact generated-card calls made when Juggling's third owner
@@ -3742,6 +3928,7 @@ public static class RunTracker
     private const string SturdyClampRelicId = "RELIC.STURDY_CLAMP";
     private const string RuinedHelmetRelicId = "RELIC.RUINED_HELMET";
     private const string MummifiedHandRelicId = "RELIC.MUMMIFIED_HAND";
+    private const string BurningSticksRelicId = "RELIC.BURNING_STICKS";
     private const string GnarledHammerRelicId = "RELIC.GNARLED_HAMMER";
     private const string TriBoomerangRelicId = "RELIC.TRI_BOOMERANG";
     private const string BookmarkRelicId = "RELIC.BOOKMARK";
@@ -14758,6 +14945,7 @@ public static class RunTracker
             RecordBeatingRemnantCombatForPlayerLocked(player);
             RecordRuinedHelmetCombatForPlayerLocked(player);
             RecordMummifiedHandCombatForPlayerLocked(player);
+            RecordBurningSticksCombatForPlayerLocked(player);
             RecordToastyMittensCombatForPlayerLocked(player);
         }
         catch (Exception e)
@@ -15401,6 +15589,16 @@ public static class RunTracker
         RecordMummifiedHandCombatForTest(agg);
     }
 
+    private static void RecordBurningSticksCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasBurningSticks(player)) return;
+        if (!_pendingCombat.BurningSticksCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(BurningSticksRelicId);
+        RecordBurningSticksCombatForTest(agg);
+    }
+
     private static void RecordToastyMittensCombatForPlayerLocked(Player player)
     {
         if (_pendingCombat == null) return;
@@ -15845,6 +16043,18 @@ public static class RunTracker
         try
         {
             return player.Relics.Any(r => r is MummifiedHand);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool PlayerHasBurningSticks(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is BurningSticks);
         }
         catch
         {
@@ -20141,6 +20351,13 @@ internal sealed class PendingJugglingCopyWindow
     public int RemainingAttempts { get; set; }
 }
 
+internal sealed class PendingBurningSticksDuplicateWindow
+{
+    public required Player Player { get; init; }
+    public string SourceCardId { get; init; } = "";
+    public int RemainingAttempts { get; set; }
+}
+
 internal sealed class PendingFreeAttackUse
 {
     public required FreeAttackPower Power { get; init; }
@@ -20260,6 +20477,12 @@ internal class PendingCombat
     public HashSet<Player> MummifiedHandCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> MummifiedHandTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> BurningSticksCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, PendingBurningSticksDuplicateWindow> PendingBurningSticksDuplicateWindows { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<CardModel> BurningSticksGeneratedCards { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> ToastyMittensCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
