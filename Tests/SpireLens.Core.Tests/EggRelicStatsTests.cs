@@ -145,6 +145,14 @@ public class EggRelicStatsTests
         Assert.Contains($"Upgraded common {cardType} offered", body);
         Assert.Contains($"Upgraded uncommon {cardType} offered", body);
         Assert.Contains($"Upgraded rare {cardType} offered", body);
+        Assert.Contains(
+            $"res://images/packed/card_library/type_sort_{cardType.TrimEnd('s')}.png",
+            body);
+        Assert.Contains("color=#87CEEB", body);
+        Assert.Contains("color=#EFC850", body);
+        Assert.DoesNotContain(
+            "res://images/ui/reward_screen/reward_icon_card.png",
+            body);
         Assert.Contains("[b]6[/b]", body);
         Assert.Contains("[b]3[/b]", body);
         Assert.Contains("[b]2[/b]", body);

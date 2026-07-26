@@ -21,6 +21,38 @@
         "description": "An Attack card or a count of Attack cards."
       }
     },
+    "attack_common": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/packed/card_library/type_sort_attack.png"
+      },
+      "help": {
+        "label": "Common Attack",
+        "description": "A Common Attack card or a count of Common Attack cards."
+      }
+    },
+    "attack_rare": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/packed/card_library/type_sort_attack.png",
+        "modulate": "#EFC850"
+      },
+      "help": {
+        "label": "Rare Attack",
+        "description": "A Rare Attack card or a count of Rare Attack cards."
+      }
+    },
+    "attack_uncommon": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/packed/card_library/type_sort_attack.png",
+        "modulate": "#87CEEB"
+      },
+      "help": {
+        "label": "Uncommon Attack",
+        "description": "An Uncommon Attack card or a count of Uncommon Attack cards."
+      }
+    },
     "average": {
       "display": {
         "type": "embedded_image",
@@ -243,6 +275,38 @@
         "description": "A Power card or a count of Power cards."
       }
     },
+    "power_common": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/packed/card_library/type_sort_power.png"
+      },
+      "help": {
+        "label": "Common Power",
+        "description": "A Common Power card or a count of Common Power cards."
+      }
+    },
+    "power_rare": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/packed/card_library/type_sort_power.png",
+        "modulate": "#EFC850"
+      },
+      "help": {
+        "label": "Rare Power",
+        "description": "A Rare Power card or a count of Rare Power cards."
+      }
+    },
+    "power_uncommon": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/packed/card_library/type_sort_power.png",
+        "modulate": "#87CEEB"
+      },
+      "help": {
+        "label": "Uncommon Power",
+        "description": "An Uncommon Power card or a count of Uncommon Power cards."
+      }
+    },
     "relic": {
       "display": {
         "type": "game_resource",
@@ -261,6 +325,38 @@
       "help": {
         "label": "Skill",
         "description": "A Skill card or a count of Skill cards."
+      }
+    },
+    "skill_common": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/packed/card_library/type_sort_skill.png"
+      },
+      "help": {
+        "label": "Common Skill",
+        "description": "A Common Skill card or a count of Common Skill cards."
+      }
+    },
+    "skill_rare": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/packed/card_library/type_sort_skill.png",
+        "modulate": "#EFC850"
+      },
+      "help": {
+        "label": "Rare Skill",
+        "description": "A Rare Skill card or a count of Rare Skill cards."
+      }
+    },
+    "skill_uncommon": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/packed/card_library/type_sort_skill.png",
+        "modulate": "#87CEEB"
+      },
+      "help": {
+        "label": "Uncommon Skill",
+        "description": "An Uncommon Skill card or a count of Uncommon Skill cards."
       }
     },
     "stars": {

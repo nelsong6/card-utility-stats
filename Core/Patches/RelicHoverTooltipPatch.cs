@@ -622,21 +622,21 @@ public static class RelicHoverShowPatch
         if (relicModel is MoltenEgg)
         {
             title = "Molten Egg";
-            body = BuildEggBodyBBCode(agg, "attacks");
+            body = BuildEggBodyBBCode(agg, "attack");
             return true;
         }
 
         if (relicModel is ToxicEgg)
         {
             title = "Toxic Egg";
-            body = BuildEggBodyBBCode(agg, "skills");
+            body = BuildEggBodyBBCode(agg, "skill");
             return true;
         }
 
         if (relicModel is FrozenEgg)
         {
             title = "Frozen Egg";
-            body = BuildEggBodyBBCode(agg, "powers");
+            body = BuildEggBodyBBCode(agg, "power");
             return true;
         }
 
@@ -1755,23 +1755,48 @@ public static class RelicHoverShowPatch
     private static string BuildEggBodyBBCode(RelicAggregate agg, string cardType)
     {
         var sb = new StringBuilder();
-        Row3(sb, $"Upgraded {cardType} offered", agg.UpgradedCardsOffered.ToString(), "");
-        Row3(
+        AppendEggOfferRow(
             sb,
-            $"Upgraded common {cardType} offered",
-            agg.UpgradedCommonCardsOffered.ToString(),
-            "");
-        Row3(
+            cardType,
+            rarity: null,
+            count: agg.UpgradedCardsOffered);
+        AppendEggOfferRow(
             sb,
-            $"Upgraded uncommon {cardType} offered",
-            agg.UpgradedUncommonCardsOffered.ToString(),
-            "");
-        Row3(
+            cardType,
+            "common",
+            agg.UpgradedCommonCardsOffered);
+        AppendEggOfferRow(
             sb,
-            $"Upgraded rare {cardType} offered",
-            agg.UpgradedRareCardsOffered.ToString(),
-            "");
+            cardType,
+            "uncommon",
+            agg.UpgradedUncommonCardsOffered);
+        AppendEggOfferRow(
+            sb,
+            cardType,
+            "rare",
+            agg.UpgradedRareCardsOffered);
         return sb.ToString();
+    }
+
+    private static void AppendEggOfferRow(
+        StringBuilder sb,
+        string cardType,
+        string? rarity,
+        int count)
+    {
+        var pluralCardType = $"{cardType}s";
+        var rarityText = string.IsNullOrEmpty(rarity)
+            ? string.Empty
+            : $"{rarity} ";
+        var typeConceptId = string.IsNullOrEmpty(rarity)
+            ? cardType
+            : $"{cardType}_{rarity}";
+        DescribedIconRow(
+            sb,
+            ["upgraded", typeConceptId],
+            "offered",
+            count.ToString(),
+            $"Upgraded {rarityText}{pluralCardType} offered.");
     }
 
     private static string BuildSilverCrucibleBodyBBCode(RelicAggregate agg)
