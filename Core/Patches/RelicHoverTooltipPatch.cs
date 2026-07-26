@@ -3054,6 +3054,12 @@ public static class RelicHoverShowPatch
     private static string BuildKusarigamaBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
+        var turnsEndedAt0Charges = Math.Max(
+            0,
+            agg.KusarigamaTurnEndChargeCount
+            - agg.KusarigamaTurnsEndedAt1Charge
+            - agg.KusarigamaTurnsEndedAt2Charges);
+
         Row3(sb, "Attacks played", agg.KusarigamaAttacksPlayed.ToString(), "");
         AppendRelicDamageStats(
             sb,
@@ -3061,6 +3067,7 @@ public static class RelicHoverShowPatch
             triggerDescription: "Activations — the number of times this relic has activated.",
             averageLabel: "Damage per activation",
             averageDenominator: agg.Activations);
+        Row3(sb, "Turns ended at 0 charges", turnsEndedAt0Charges.ToString(), "");
         AppendTurnResetChargeRows(
             sb,
             agg.KusarigamaTurnsEndedAt1Charge,
