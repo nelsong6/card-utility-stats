@@ -1025,7 +1025,10 @@ Important surfaces:
   shutdown so hot reload cannot leave callbacks from an orphaned assembly.
   Pointer motion is the only input that preserves a pin: the stable Loader
   input postfix dismisses it before the next mouse, keyboard, or controller
-  action continues through the game's normal input path.
+  action continues through the game's normal input path. A second right press
+  over the pinned source unlocks during that global pass and records the input
+  event id, preventing the later holder callback from repinning on the same
+  dispatch.
 - Card right-click must be claimed on the press, not the release.
   `NCardHolder.OnMousePressed` normally stores right press as
   `_currentPressedAction`; its matching release then emits `AltPressed`.

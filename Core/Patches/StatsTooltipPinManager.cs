@@ -144,18 +144,15 @@ internal static class StatsTooltipPinManager
         if (_pinnedTarget == null || !IsDismissAction(inputEvent))
             return;
 
-        // A right press inside the pinned target belongs to that target's
-        // toggle. Do not clear it here first: Godot dispatches _Input before
-        // control-specific input, and clearing globally would make the target
-        // see itself as unpinned and pin it again.
-        if (IsRightClickInsidePinnedTarget(inputEvent))
-            return;
-
         // _Input runs before _GuiInput. Remember the event so a right click
-        // that dismissed a pin cannot reach another target later in the same
-        // dispatch and immediately create a new pin.
+        // that dismissed a pin cannot reach the same or another target later
+        // in the same dispatch and immediately create a new pin. Perform the
+        // unlock here instead of relying on the target to receive a later
+        // control-specific callback.
+        var restoreOrdinaryHover =
+            IsRightClickInsidePinnedTarget(inputEvent);
         _dismissedInputEventId = inputEvent.GetInstanceId();
-        ClearPin(restoreOrdinaryHover: false);
+        ClearPin(restoreOrdinaryHover);
     }
 
     internal static void HandlePinnedHintHover(InputEvent inputEvent)
