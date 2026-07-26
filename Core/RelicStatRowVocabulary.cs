@@ -9,7 +9,8 @@ namespace SpireLens.Core;
 internal sealed record RelicStatRowPresentation(
     string Label,
     string FullDescription,
-    IReadOnlyList<string> ConceptIds);
+    IReadOnlyList<string> ConceptIds,
+    IReadOnlyList<string> DenominatorConceptIds);
 
 /// <summary>
 /// Converts the established relic-stat wording into the shared symbol
@@ -28,7 +29,10 @@ internal static class RelicStatRowVocabulary
 
     private sealed record ConceptRule(string Id, Regex Pattern, bool IsDenominator);
 
-    private sealed record ConceptOccurrence(string Id, int Position);
+    private sealed record ConceptOccurrence(
+        string Id,
+        int Position,
+        bool IsDenominator);
 
     private static readonly Regex LeadingImageRegex = new(
         @"^\s*(?<image>\[img[^\]]*\].*?\[/img\])\s*",
@@ -134,16 +138,30 @@ internal static class RelicStatRowVocabulary
                     continue;
 
                 var removalStart = match.Index;
+                var isDenominator = false;
                 if (rule.IsDenominator)
                 {
                     var prefix = workingText[..match.Index];
                     var denominatorPrefix = PrecedingDenominatorRegex.Match(prefix);
                     if (denominatorPrefix.Success)
+                    {
                         removalStart = denominatorPrefix.Index;
+                        var denominatorPrefixText = denominatorPrefix.Value.TrimStart();
+                        isDenominator =
+                            denominatorPrefixText.StartsWith(
+                                "per",
+                                StringComparison.OrdinalIgnoreCase)
+                            || denominatorPrefixText.StartsWith(
+                                "/",
+                                StringComparison.Ordinal);
+                    }
                 }
 
                 MarkRemoved(removed, removalStart, match.Index + match.Length - removalStart);
-                occurrences.Add(new ConceptOccurrence(rule.Id, match.Index));
+                occurrences.Add(new ConceptOccurrence(
+                    rule.Id,
+                    match.Index,
+                    isDenominator));
             }
         }
 
@@ -155,7 +173,10 @@ internal static class RelicStatRowVocabulary
                         imageConceptId,
                         StringComparison.Ordinal)))
             {
-                occurrences.Add(new ConceptOccurrence(imageConceptId, 0));
+                occurrences.Add(new ConceptOccurrence(
+                    imageConceptId,
+                    0,
+                    IsDenominator: false));
             }
         }
 
@@ -170,6 +191,13 @@ internal static class RelicStatRowVocabulary
                 .Where(id => !string.Equals(id, "card", StringComparison.Ordinal))
                 .ToArray();
         }
+        var denominatorConceptIds = occurrences
+            .Where(occurrence => occurrence.IsDenominator)
+            .OrderBy(occurrence => occurrence.Position)
+            .Select(occurrence => occurrence.Id)
+            .Where(id => conceptIds.Contains(id, StringComparer.Ordinal))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
 
         var remainingText = CleanupRemainingText(
             BuildRemainingText(workingText, removed),
@@ -184,7 +212,8 @@ internal static class RelicStatRowVocabulary
         return new RelicStatRowPresentation(
             renderedLabel,
             description,
-            conceptIds);
+            conceptIds,
+            denominatorConceptIds);
     }
 
     private static ConceptRule Rule(

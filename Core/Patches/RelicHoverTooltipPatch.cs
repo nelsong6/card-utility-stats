@@ -1802,6 +1802,7 @@ public static class RelicHoverShowPatch
         DescribedIconRow(
             sb,
             ["upgraded", typeConceptId],
+            [],
             "offered",
             count.ToString(),
             $"Upgraded {rarityText}{pluralCardType} offered.");
@@ -1862,6 +1863,7 @@ public static class RelicHoverShowPatch
         DescribedIconFlowRow(
             sb,
             ["card"],
+            [],
             $"[b]{displayName}[/b]",
             outcome,
             $"This card was offered by Silver Crucible and was {outcome}.");
@@ -2034,24 +2036,28 @@ public static class RelicHoverShowPatch
         DescribedIconRow(
             sb,
             ["average", "block", "turn"],
+            ["turn"],
             "retained",
             FormatDecimal(blockRetainedPerTurn),
             "Average block retained by Sturdy Clamp per turn.");
         DescribedIconRow(
             sb,
             ["average", "block", "combat"],
+            ["combat"],
             "retained",
             FormatDecimal(blockRetainedPerCombat),
             "Average block retained by Sturdy Clamp per combat.");
         DescribedIconRow(
             sb,
             ["average", "block", "turn"],
+            ["turn"],
             "excess over 10",
             FormatDecimal(excessBlockPerTurn),
             "Average block above 10 retained by Sturdy Clamp per turn.");
         DescribedIconRow(
             sb,
             ["average", "block", "combat"],
+            ["combat"],
             "excess over 10",
             FormatDecimal(excessBlockPerCombat),
             "Average block above 10 retained by Sturdy Clamp per combat.");
@@ -2554,6 +2560,7 @@ public static class RelicHoverShowPatch
             DescribedIconRow(
                 sb,
                 ["healing_blocked"],
+                [],
                 $"blocked by {reasonName}",
                 FormatDecimal(reason.Amount),
                 $"Burning Blood healing that did not restore HP because of {reasonName}.");
@@ -3539,6 +3546,7 @@ public static class RelicHoverShowPatch
             DescribedIconRow(
                 sb,
                 ["healing_blocked"],
+                [],
                 $"{reasonPrefix} {reasonName}",
                 FormatDecimal(reason.Amount),
                 $"Healing from this relic that did not restore HP because of {reasonName}.");
@@ -3786,6 +3794,7 @@ public static class RelicHoverShowPatch
             DescribedIconFlowRow(
                 sb,
                 presentation.ConceptIds,
+                presentation.DenominatorConceptIds,
                 presentation.Label,
                 value,
                 presentation.FullDescription,
@@ -3796,6 +3805,7 @@ public static class RelicHoverShowPatch
         DescribedIconRow(
             sb,
             presentation.ConceptIds,
+            presentation.DenominatorConceptIds,
             presentation.Label,
             value,
             presentation.FullDescription,
@@ -3812,6 +3822,7 @@ public static class RelicHoverShowPatch
         DescribedIconRow(
             sb,
             [conceptId],
+            [],
             string.Empty,
             value,
             fullDescription,
@@ -3833,6 +3844,7 @@ public static class RelicHoverShowPatch
     private static void DescribedIconRow(
         StringBuilder sb,
         IReadOnlyList<string> conceptIds,
+        IReadOnlyList<string> denominatorConceptIds,
         string label,
         string value,
         string fullDescription,
@@ -3843,7 +3855,11 @@ public static class RelicHoverShowPatch
         sb.Append(StatConceptGlossary.RenderInformationHint(fullDescription));
         sb.Append("[/cell]");
         sb.Append("[cell expand=4 padding=0,0,12,0]");
-        AppendConceptLabel(sb, conceptIds, label);
+        AppendConceptLabel(
+            sb,
+            conceptIds,
+            denominatorConceptIds,
+            label);
         sb.Append("[/cell]");
         sb.Append($"[cell expand=1 padding=0,0,12,0][right][b]{value}[/b][/right][/cell]");
         sb.Append($"[cell expand=1 padding=0,0,4,0][right][color=#b5b5b5]{pct}[/color][/right][/cell]");
@@ -3856,6 +3872,7 @@ public static class RelicHoverShowPatch
         DescribedIconFlowRow(
             sb,
             presentation.ConceptIds,
+            presentation.DenominatorConceptIds,
             presentation.Label,
             value,
             presentation.FullDescription,
@@ -3865,6 +3882,7 @@ public static class RelicHoverShowPatch
     private static void DescribedIconFlowRow(
         StringBuilder sb,
         IReadOnlyList<string> conceptIds,
+        IReadOnlyList<string> denominatorConceptIds,
         string label,
         string value,
         string fullDescription,
@@ -3875,7 +3893,11 @@ public static class RelicHoverShowPatch
         sb.Append(StatConceptGlossary.RenderInformationHint(fullDescription));
         sb.Append("[/cell]");
         sb.Append("[cell expand=4 padding=0,0,4,0]");
-        AppendConceptLabel(sb, conceptIds, label);
+        AppendConceptLabel(
+            sb,
+            conceptIds,
+            denominatorConceptIds,
+            label);
         if (!string.IsNullOrEmpty(value))
         {
             sb.Append($"  [b]{value}[/b]");
@@ -3891,11 +3913,18 @@ public static class RelicHoverShowPatch
     private static void AppendConceptLabel(
         StringBuilder sb,
         IReadOnlyList<string> conceptIds,
+        IReadOnlyList<string> denominatorConceptIds,
         string label)
     {
         for (var index = 0; index < conceptIds.Count; index++)
         {
             if (index > 0) sb.Append(' ');
+            if (denominatorConceptIds.Contains(
+                    conceptIds[index],
+                    StringComparer.Ordinal))
+            {
+                sb.Append("[color=#b5b5b5]/[/color] ");
+            }
             sb.Append(StatConceptGlossary.RenderHintedGlyph(conceptIds[index]));
         }
 
@@ -3917,6 +3946,7 @@ public static class RelicHoverShowPatch
 
         if (presentation.ConceptIds.Count > 1)
             units += (presentation.ConceptIds.Count - 1) * 0.5d;
+        units += presentation.DenominatorConceptIds.Count;
         if (presentation.ConceptIds.Count > 0
             && VisibleTextLength(presentation.Label) > 0)
         {

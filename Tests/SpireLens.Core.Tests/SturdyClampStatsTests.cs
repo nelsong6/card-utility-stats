@@ -115,6 +115,7 @@ public class SturdyClampStatsTests
         Assert.Contains("[b]8.5[/b]", body);
         Assert.Contains("[b]1[/b]", body);
         Assert.Contains("[b]1.5[/b]", body);
+        Assert.Contains("[color=#b5b5b5]/[/color]", body);
     }
 
     [Fact]
