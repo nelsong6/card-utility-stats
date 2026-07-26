@@ -4151,6 +4151,7 @@ public static class RunTracker
     private const string HealingLostFullHpReasonId = "full_hp";
     private const string HealingLostOtherReasonId = "other";
     private const string HappyFlowerRelicId = "RELIC.HAPPY_FLOWER";
+    private const string FakeHappyFlowerRelicId = "RELIC.FAKE_HAPPY_FLOWER";
     private const string BoomingConchRelicId = "RELIC.BOOMING_CONCH";
     private const string GremlinHornRelicId = "RELIC.GREMLIN_HORN";
     private const string NunchakuRelicId = "RELIC.NUNCHAKU";
@@ -12204,34 +12205,60 @@ public static class RunTracker
     }
 
     /// <summary>
-    /// Arm the one-shot flag that attributes the next player energy gain to
-    /// Happy Flower. Called from
+    /// Arm the owner-keyed one-shot flag that attributes the next player
+    /// energy gain to Happy Flower or Happy Flower???. Called from
     /// <see cref="Patches.HappyFlowerAfterSideTurnStartPatch"/> when Happy
-    /// Flower's <c>AfterSideTurnStart</c> fires on the player's side.
+    /// Flower's <c>AfterSideTurnStart</c> fires on its owner's side.
     /// </summary>
-    public static void ArmHappyFlowerEnergyAttribution()
+    public static void ArmHappyFlowerEnergyAttribution(RelicModel relic)
     {
+        var relicId = GetHappyFlowerStatsRelicId(relic);
+        var owner = relic?.Owner;
+        if (relicId == null || owner == null) return;
+
         lock (_lock)
         {
+            if (!IsTrackedRelic(relic) || !IsTrackedPlayer(owner)) return;
+
             _pendingCombat ??= new PendingCombat();
-            // Bug fix (#250): the energy grant is synchronous within
-            // AfterSideTurnStart, so maxHistoryAdvance=0 keeps it tight and the
-            // window self-expires by history-count rather than depending on the
-            // fragile cross-hook AfterPlayerTurnStart disarm ordering.
-            _pendingCombat.Windows.Arm(HappyFlowerRelicId, AttributionEventKind.PlayerEnergyGain,
-                CurrentHistoryCountLocked(), maxHistoryAdvance: 0);
+            // The owner-specific callback wrapper disarms this after completion
+            // when no energy was granted. maxHistoryAdvance=0 remains a second
+            // guard against claiming an unrelated later energy event.
+            _pendingCombat.Windows.Arm(
+                relicId,
+                AttributionEventKind.PlayerEnergyGain,
+                CurrentHistoryCountLocked(),
+                ownerId: owner,
+                maxHistoryAdvance: 0);
         }
     }
 
+    internal static string? GetHappyFlowerStatsRelicId(RelicModel? relic)
+        => relic switch
+        {
+            HappyFlower => HappyFlowerRelicId,
+            FakeHappyFlower => FakeHappyFlowerRelicId,
+            _ => null,
+        };
+
     /// <summary>
-    /// No-op safety reset kept wired at <c>Hook.AfterSideTurnStart</c>. Happy
-    /// Flower's window is armed with maxHistoryAdvance=0 (see
-    /// <see cref="ArmHappyFlowerEnergyAttribution"/>), so it self-expires by
-    /// history-count and needs no explicit disarm — a Windows.Disarm call
-    /// here would find nothing armed.
+    /// Release the specific flower's owner-keyed energy window after its
+    /// callback completes. This prevents a non-triggering three-turn flower
+    /// from claiming a five-turn flower's gain when both are owned.
     /// </summary>
-    public static void DisarmHappyFlowerEnergyAttribution()
+    public static void DisarmHappyFlowerEnergyAttribution(RelicModel relic)
     {
+        var relicId = GetHappyFlowerStatsRelicId(relic);
+        var owner = relic?.Owner;
+        if (relicId == null || owner == null) return;
+
+        lock (_lock)
+        {
+            _pendingCombat?.Windows.Disarm(
+                relicId,
+                AttributionEventKind.PlayerEnergyGain,
+                ownerId: owner);
+        }
     }
 
     internal static void RecordHappyFlowerEnergyGeneratedForTest(RelicAggregate agg, int amount, int combats)
@@ -17326,11 +17353,32 @@ public static class RunTracker
     private static void RecordHappyFlowerCombatForPlayerLocked(Player player)
     {
         if (_pendingCombat == null) return;
-        if (!PlayerHasHappyFlower(player)) return;
-        if (!_pendingCombat.HappyFlowerCombatCountedPlayers.Add(player)) return;
 
-        var agg = GetOrCreatePendingRelicAggregateLocked(HappyFlowerRelicId);
-        agg.EnergyGeneratedCombats += 1;
+        try
+        {
+            if (!_pendingCombat.HappyFlowerCombatCountedRelicIdsByPlayer.TryGetValue(
+                    player,
+                    out var countedRelicIds))
+            {
+                countedRelicIds = new HashSet<string>(StringComparer.Ordinal);
+                _pendingCombat.HappyFlowerCombatCountedRelicIdsByPlayer[player] =
+                    countedRelicIds;
+            }
+
+            foreach (var relic in player.Relics)
+            {
+                var relicId = GetHappyFlowerStatsRelicId(relic);
+                if (relicId == null || !countedRelicIds.Add(relicId)) continue;
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(relicId);
+                agg.EnergyGeneratedCombats += 1;
+            }
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug(
+                $"RecordHappyFlowerCombatForPlayerLocked failed: {e.Message}");
+        }
     }
 
     private static void RecordPendulumCombatForPlayerLocked(Player player)
@@ -17755,18 +17803,6 @@ public static class RunTracker
         try
         {
             return player.Relics.Any(r => r is Bookmark);
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    private static bool PlayerHasHappyFlower(Player player)
-    {
-        try
-        {
-            return player.Relics.Any(r => r is HappyFlower);
         }
         catch
         {
@@ -22217,7 +22253,8 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<OrbModel> CrackedCoreStartingOrbs { get; }
         = new(ReferenceEqualityComparer.Instance);
-    public HashSet<Player> HappyFlowerCombatCountedPlayers { get; }
+    public Dictionary<Player, HashSet<string>>
+        HappyFlowerCombatCountedRelicIdsByPlayer { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> PendulumCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

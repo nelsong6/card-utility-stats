@@ -1187,6 +1187,14 @@ returned task completes. Keep `RELIC.BLOOD_VIAL` and
 `RELIC.FAKE_BLOOD_VIAL` in separate aggregates even though their tooltip rows
 are identical.
 
+Happy Flower and Happy Flower??? (`FakeHappyFlower`) both grant energy from
+their owner-specific `AfterSideTurnStart` callback, but on three-turn and
+five-turn counters respectively. Patch both callbacks, key the energy window
+to the relic owner, and keep `RELIC.HAPPY_FLOWER` and
+`RELIC.FAKE_HAPPY_FLOWER` in separate aggregates. Their held-combat
+denominators must likewise be keyed by both player and relic id so owning one
+variant cannot suppress the other's combat count.
+
 Meat on the Bone evaluates its healing threshold and heals from the
 owner-specific `AfterCombatVictoryEarly` callback. Mirror the game's integer
 threshold calculation (`current HP <= int(max HP * threshold percent)`), arm

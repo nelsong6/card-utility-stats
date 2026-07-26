@@ -1,7 +1,9 @@
 using System;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using MegaCrit.Sts2.Core.Models.Relics;
 using SpireLens.Core;
 using SpireLens.Core.Patches;
 using Xunit;
@@ -16,6 +18,7 @@ namespace SpireLens.Core.Tests;
 public class HappyFlowerStatsTests
 {
     private const string HappyFlowerRelicId = "RELIC.HAPPY_FLOWER";
+    private const string FakeHappyFlowerRelicId = "RELIC.FAKE_HAPPY_FLOWER";
 
     private static readonly MethodInfo BuildHappyFlowerBodyMethod =
         typeof(RelicHoverShowPatch).GetMethod("BuildHappyFlowerBodyBBCode", BindingFlags.NonPublic | BindingFlags.Static)
@@ -105,6 +108,43 @@ public class HappyFlowerStatsTests
     }
 
     [Fact]
+    public void FakeHappyFlower_UsesSameStatsWithObscuredTitleAndSeparateAggregate()
+    {
+        var happyFlower = Uninitialized<HappyFlower>();
+        var fakeHappyFlower = Uninitialized<FakeHappyFlower>();
+        var aggregate = new RelicAggregate
+        {
+            EnergyGenerated = 2,
+            EnergyGeneratedCombats = 4,
+        };
+
+        var realRecognized = RelicHoverShowPatch.TryBuildBodyBBCode(
+            happyFlower,
+            aggregate,
+            floorCount: null,
+            out var realTitle,
+            out var realBody);
+        var fakeRecognized = RelicHoverShowPatch.TryBuildBodyBBCode(
+            fakeHappyFlower,
+            aggregate,
+            floorCount: null,
+            out var fakeTitle,
+            out var fakeBody);
+
+        Assert.True(realRecognized);
+        Assert.True(fakeRecognized);
+        Assert.Equal("Happy Flower", realTitle);
+        Assert.Equal("Happy Flower???", fakeTitle);
+        Assert.Equal(realBody, fakeBody);
+        Assert.Equal(
+            HappyFlowerRelicId,
+            RunTracker.GetHappyFlowerStatsRelicId(happyFlower));
+        Assert.Equal(
+            FakeHappyFlowerRelicId,
+            RunTracker.GetHappyFlowerStatsRelicId(fakeHappyFlower));
+    }
+
+    [Fact]
     public void RunData_OlderShapeWithoutEnergyGenerated_DeserializesWithZeroDefault()
     {
         const string json = """
@@ -135,4 +175,7 @@ public class HappyFlowerStatsTests
         Assert.Equal(0, agg.EnergyGenerated);
         Assert.Equal(0, agg.EnergyGeneratedCombats);
     }
+
+    private static T Uninitialized<T>() where T : class
+        => (T)RuntimeHelpers.GetUninitializedObject(typeof(T));
 }

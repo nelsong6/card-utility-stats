@@ -421,9 +421,11 @@ public static class RelicHoverShowPatch
             return true;
         }
 
-        if (relicModel is HappyFlower)
+        if (relicModel is HappyFlower or FakeHappyFlower)
         {
-            title = "Happy Flower";
+            title = relicModel is FakeHappyFlower
+                ? "Happy Flower???"
+                : "Happy Flower";
             body = BuildHappyFlowerBodyBBCode(agg);
             return true;
         }

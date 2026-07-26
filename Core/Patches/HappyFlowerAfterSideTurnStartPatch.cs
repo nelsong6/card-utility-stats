@@ -1,62 +1,104 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
+using System.Threading.Tasks;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Combat;
-using MegaCrit.Sts2.Core.Hooks;
+using MegaCrit.Sts2.Core.Entities.Creatures;
+using MegaCrit.Sts2.Core.Models;
 
 namespace SpireLens.Core.Patches;
 
 /// <summary>
-/// Arms the Happy Flower energy attribution window at the start of the player's
-/// turn. Happy Flower grants 1 energy every 3 turns via <c>AfterSideTurnStart</c>;
-/// the energy call itself is captured by <see cref="PlayerGainEnergyPatch"/>.
+/// Arms the energy attribution window for Happy Flower and Happy Flower??? at
+/// the start of the owning player's turn. Their energy calls are captured by
+/// <see cref="PlayerGainEnergyPatch"/> and kept in separate relic aggregates.
 /// </summary>
 [HarmonyPatch]
 public static class HappyFlowerAfterSideTurnStartPatch
 {
-    private static MethodBase? TargetMethod()
+    private static IEnumerable<MethodBase> TargetMethods()
     {
-        var t = AccessTools.TypeByName("MegaCrit.Sts2.Core.Models.Relics.HappyFlower");
-        if (t == null) return null;
-        return AccessTools.Method(t, "AfterSideTurnStart");
+        foreach (var typeName in new[]
+                 {
+                     "MegaCrit.Sts2.Core.Models.Relics.HappyFlower",
+                     "MegaCrit.Sts2.Core.Models.Relics.FakeHappyFlower",
+                 })
+        {
+            var type = AccessTools.TypeByName(typeName);
+            var method = type == null
+                ? null
+                : AccessTools.Method(type, "AfterSideTurnStart");
+            if (method != null)
+                yield return method;
+        }
     }
 
     [HarmonyPrefix]
-    public static void Prefix(CombatSide side)
+    public static void Prefix(
+        RelicModel __instance,
+        CombatSide side,
+        IReadOnlyList<Creature> participants,
+        out bool __state)
     {
+        __state = false;
+
         try
         {
-            if (side != CombatSide.Player) return;
-            RunTracker.ArmHappyFlowerEnergyAttribution();
+            var ownerCreature = __instance.Owner?.Creature;
+            if (side != CombatSide.Player
+                || ownerCreature == null
+                || participants == null
+                || !participants.Contains(ownerCreature))
+            {
+                return;
+            }
+
+            RunTracker.ArmHappyFlowerEnergyAttribution(__instance);
+            __state = true;
         }
         catch (Exception e)
         {
             CoreMain.LogDebug($"HappyFlowerAfterSideTurnStartPatch.Prefix failed: {e.Message}");
         }
     }
-}
 
-/// <summary>
-/// Clears any armed Happy Flower attribution window after all turn-start hooks
-/// have processed for the player's turn. If Happy Flower did not fire its
-/// energy grant this turn (counter not yet at 3), the flag is discarded here
-/// so it does not leak into later energy-gain events during the player's turn.
-/// Mirrors the later-boundary cleanup pattern used by Orichalcum's
-/// <c>Hook.AfterSideTurnEnd</c> patch.
-/// </summary>
-[HarmonyPatch(typeof(Hook), nameof(Hook.AfterPlayerTurnStart))]
-public static class HookAfterPlayerTurnStartHappyFlowerCleanupPatch
-{
-    [HarmonyPrefix]
-    public static void Prefix()
+    [HarmonyPostfix]
+    public static void Postfix(
+        RelicModel __instance,
+        bool __state,
+        ref Task __result)
     {
         try
         {
-            RunTracker.DisarmHappyFlowerEnergyAttribution();
+            if (!__state) return;
+            if (__result == null)
+            {
+                RunTracker.DisarmHappyFlowerEnergyAttribution(__instance);
+                return;
+            }
+
+            __result = DisarmAfterCompletion(__result, __instance);
         }
         catch (Exception e)
         {
-            CoreMain.LogDebug($"HookAfterPlayerTurnStartHappyFlowerCleanupPatch failed: {e.Message}");
+            CoreMain.LogDebug(
+                $"HappyFlowerAfterSideTurnStartPatch.Postfix failed: {e.Message}");
+        }
+    }
+
+    private static async Task DisarmAfterCompletion(
+        Task inner,
+        RelicModel relic)
+    {
+        try
+        {
+            await inner;
+        }
+        finally
+        {
+            RunTracker.DisarmHappyFlowerEnergyAttribution(relic);
         }
     }
 }
