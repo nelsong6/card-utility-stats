@@ -323,6 +323,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `cracked-core-relic-run.json`
   Adds lifecycle tracking for the exact Lightning orb Cracked Core channels:
   completed evokes, passive triggers, and non-evoke slot-removal fizzles.
+- `symbiotic-virus-relic-run.json`
+  Adds lifecycle tracking for the exact Dark orb Symbiotic Virus channels:
+  completed evokes, passive triggers, and non-evoke slot-removal fizzles.
 - `gold-plated-cables-relic-run.json`
   Adds Gold-Plated Cables' confirmed activations with an orb, exact activation
   counts by orb type, and player turn ends where no orb was available.

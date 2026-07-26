@@ -419,6 +419,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is SymbioticVirus)
+        {
+            title = "Symbiotic Virus";
+            body = BuildSymbioticVirusBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is GoldPlatedCables)
         {
             title = "Gold-Plated Cables";
@@ -1597,6 +1604,27 @@ public static class RelicHoverShowPatch
             agg.CrackedCoreOrbPassiveTriggers.ToString(),
             "");
         Row3(sb, "Times orb fizzled", agg.CrackedCoreOrbFizzles.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildSymbioticVirusBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(
+            sb,
+            "Times orb was evoked",
+            agg.SymbioticVirusOrbEvokes.ToString(),
+            "");
+        Row3(
+            sb,
+            "Times orb passive triggered",
+            agg.SymbioticVirusOrbPassiveTriggers.ToString(),
+            "");
+        Row3(
+            sb,
+            "Times orb fizzled",
+            agg.SymbioticVirusOrbFizzles.ToString(),
+            "");
         return sb.ToString();
     }
 

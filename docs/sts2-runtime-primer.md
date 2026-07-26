@@ -981,6 +981,14 @@ non-evoke removal path is `OrbQueue.RemoveCapacity`, currently used by Bulk
 Up, so compare raw queue references around that method for fizzles. Normal
 combat cleanup uses `OrbQueue.Clear` and must not count as a fizzle.
 
+Symbiotic Virus follows the same exact-reference lifecycle with its
+owner-specific `AfterSideTurnStart` callback and the newly queued mutable
+`DarkOrb`. Keep its tracked-orb set and persisted counters separate from
+Cracked Core's: both relics can be owned at once, and neither should claim the
+other relic's orb. Count completed `DarkOrb.Passive` and `DarkOrb.Evoke` calls,
+and route `OrbQueue.RemoveCapacity` removals through both exact-reference sets
+so only the matching relic records a fizzle.
+
 Gold-Plated Cables contributes through the global
 `Hook.ModifyOrbPassiveTriggerCount` chain. That hook's returned
 `modifyingModels` list is the authoritative confirmation that the relic

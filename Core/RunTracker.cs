@@ -1769,6 +1769,10 @@ public static class RunTracker
         target.CrackedCoreOrbEvokes += source.CrackedCoreOrbEvokes;
         target.CrackedCoreOrbPassiveTriggers += source.CrackedCoreOrbPassiveTriggers;
         target.CrackedCoreOrbFizzles += source.CrackedCoreOrbFizzles;
+        target.SymbioticVirusOrbEvokes += source.SymbioticVirusOrbEvokes;
+        target.SymbioticVirusOrbPassiveTriggers +=
+            source.SymbioticVirusOrbPassiveTriggers;
+        target.SymbioticVirusOrbFizzles += source.SymbioticVirusOrbFizzles;
         MergeGoldPlatedCablesOrbActivations(target, source);
         target.GoldPlatedCablesNoOrbTargets +=
             source.GoldPlatedCablesNoOrbTargets;
@@ -4215,6 +4219,7 @@ public static class RunTracker
     private const string FragrantMushroomRelicId = "RELIC.FRAGRANT_MUSHROOM";
     private const string ArtOfWarRelicId = "RELIC.ART_OF_WAR";
     private const string CrackedCoreRelicId = "RELIC.CRACKED_CORE";
+    private const string SymbioticVirusRelicId = "RELIC.SYMBIOTIC_VIRUS";
     private const string GoldPlatedCablesRelicId = "RELIC.GOLD_PLATED_CABLES";
     private const string FishingRodRelicId = "RELIC.FISHING_ROD";
     private const string MoltenEggRelicId = "RELIC.MOLTEN_EGG";
@@ -12900,6 +12905,168 @@ public static class RunTracker
     {
         if (agg == null) return;
         agg.CrackedCoreOrbFizzles += Math.Max(0, count);
+    }
+
+    /// <summary>
+    /// Retain the exact mutable Dark orb instances created during Symbiotic
+    /// Virus's owner callback. Later orb callbacks are attributed only when
+    /// they carry one of these references.
+    /// </summary>
+    public static void TrackSymbioticVirusStartingOrbs(
+        SymbioticVirus relic,
+        IEnumerable<OrbModel> orbs)
+    {
+        var owner = relic?.Owner;
+        var orbQueue = owner?.PlayerCombatState?.OrbQueue;
+        if (owner == null || orbQueue == null || orbs == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(owner)) return;
+                if (CombatManager.Instance?.IsInProgress != true) return;
+
+                _pendingCombat ??= new PendingCombat();
+                foreach (var orb in orbs)
+                {
+                    if (orb == null || !ReferenceEquals(orb.Owner, owner)) continue;
+                    if (!orbQueue.Orbs.Any(
+                            queuedOrb => ReferenceEquals(queuedOrb, orb)))
+                    {
+                        continue;
+                    }
+
+                    _pendingCombat.SymbioticVirusStartingOrbs.Add(orb);
+                }
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"TrackSymbioticVirusStartingOrbs failed: {e.Message}");
+            }
+        }
+    }
+
+    public static bool IsTrackedSymbioticVirusStartingOrb(OrbModel orb)
+    {
+        if (orb == null) return false;
+
+        lock (_lock)
+        {
+            return _pendingCombat?.SymbioticVirusStartingOrbs.Contains(orb)
+                == true;
+        }
+    }
+
+    public static void RecordSymbioticVirusStartingOrbPassive(OrbModel orb)
+    {
+        if (orb == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat?.SymbioticVirusStartingOrbs.Contains(orb)
+                    != true)
+                {
+                    return;
+                }
+
+                var aggregate = GetOrCreatePendingRelicAggregateLocked(
+                    SymbioticVirusRelicId);
+                RecordSymbioticVirusOrbPassiveForTest(aggregate);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordSymbioticVirusStartingOrbPassive failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordSymbioticVirusStartingOrbEvoked(OrbModel orb)
+    {
+        if (orb == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat?.SymbioticVirusStartingOrbs.Contains(orb)
+                    != true)
+                {
+                    return;
+                }
+
+                var aggregate = GetOrCreatePendingRelicAggregateLocked(
+                    SymbioticVirusRelicId);
+                RecordSymbioticVirusOrbEvokedForTest(aggregate);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordSymbioticVirusStartingOrbEvoked failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordSymbioticVirusStartingOrbsFizzled(
+        IEnumerable<OrbModel> removedOrbs)
+    {
+        if (removedOrbs == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null) return;
+
+                var fizzled = 0;
+                foreach (var orb in removedOrbs)
+                {
+                    if (orb != null
+                        && _pendingCombat.SymbioticVirusStartingOrbs.Remove(orb))
+                    {
+                        fizzled++;
+                    }
+                }
+
+                if (fizzled <= 0) return;
+                var aggregate = GetOrCreatePendingRelicAggregateLocked(
+                    SymbioticVirusRelicId);
+                RecordSymbioticVirusOrbFizzledForTest(aggregate, fizzled);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordSymbioticVirusStartingOrbsFizzled failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordSymbioticVirusOrbPassiveForTest(
+        RelicAggregate aggregate,
+        int count = 1)
+    {
+        if (aggregate == null) return;
+        aggregate.SymbioticVirusOrbPassiveTriggers += Math.Max(0, count);
+    }
+
+    internal static void RecordSymbioticVirusOrbEvokedForTest(
+        RelicAggregate aggregate,
+        int count = 1)
+    {
+        if (aggregate == null) return;
+        aggregate.SymbioticVirusOrbEvokes += Math.Max(0, count);
+    }
+
+    internal static void RecordSymbioticVirusOrbFizzledForTest(
+        RelicAggregate aggregate,
+        int count = 1)
+    {
+        if (aggregate == null) return;
+        aggregate.SymbioticVirusOrbFizzles += Math.Max(0, count);
     }
 
     /// <summary>
@@ -22855,6 +23022,8 @@ internal class PendingCombat
     public Dictionary<Player, int> ArtOfWarEnergyAddedThisTurn { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<OrbModel> CrackedCoreStartingOrbs { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<OrbModel> SymbioticVirusStartingOrbs { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, HashSet<string>>
         HappyFlowerCombatCountedRelicIdsByPlayer { get; }

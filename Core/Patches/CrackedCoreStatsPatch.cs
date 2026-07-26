@@ -170,18 +170,20 @@ public static class CrackedCoreStartingOrbEvokeStatsPatch
 }
 
 /// <summary>
-/// Orb-slot loss is the game's non-evoke removal path. Compare raw queue
-/// references around it so ordinary combat cleanup (OrbQueue.Clear) is not
-/// mislabeled as a fizzle.
+/// Orb-slot loss is the game's non-evoke removal path. Compare tracked
+/// starting-relic orb references around it so ordinary combat cleanup
+/// (OrbQueue.Clear) is not mislabeled as a fizzle.
 /// </summary>
 [HarmonyPatch(typeof(OrbQueue), nameof(OrbQueue.RemoveCapacity))]
-public static class CrackedCoreStartingOrbFizzleStatsPatch
+public static class StartingRelicOrbFizzleStatsPatch
 {
     [HarmonyPrefix]
     public static void Prefix(OrbQueue __instance, out IReadOnlyList<OrbModel> __state)
     {
         __state = __instance.Orbs
-            .Where(RunTracker.IsTrackedCrackedCoreStartingOrb)
+            .Where(orb =>
+                RunTracker.IsTrackedCrackedCoreStartingOrb(orb)
+                || RunTracker.IsTrackedSymbioticVirusStartingOrb(orb))
             .ToList();
     }
 
@@ -198,10 +200,12 @@ public static class CrackedCoreStartingOrbFizzleStatsPatch
                         ReferenceEquals(currentOrb, trackedOrb)))
                 .ToList();
             RunTracker.RecordCrackedCoreStartingOrbsFizzled(removedOrbs);
+            RunTracker.RecordSymbioticVirusStartingOrbsFizzled(removedOrbs);
         }
         catch (Exception e)
         {
-            CoreMain.LogDebug($"CrackedCoreStartingOrbFizzleStatsPatch.Postfix failed: {e.Message}");
+            CoreMain.LogDebug(
+                $"StartingRelicOrbFizzleStatsPatch.Postfix failed: {e.Message}");
         }
     }
 }

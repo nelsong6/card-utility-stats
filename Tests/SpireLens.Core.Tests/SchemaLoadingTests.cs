@@ -3879,6 +3879,29 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsSymbioticVirusRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("symbiotic-virus-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertSymbioticVirusFixture(
+            loaded.Data.RelicAggregates["RELIC.SYMBIOTIC_VIRUS"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsSymbioticVirusRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("symbiotic-virus-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertSymbioticVirusFixture(
+            resumed!.RelicAggregates["RELIC.SYMBIOTIC_VIRUS"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsGoldPlatedCablesRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(
@@ -4093,6 +4116,13 @@ public class SchemaLoadingTests
         Assert.Equal(3, relicAgg.CrackedCoreOrbEvokes);
         Assert.Equal(7, relicAgg.CrackedCoreOrbPassiveTriggers);
         Assert.Equal(1, relicAgg.CrackedCoreOrbFizzles);
+    }
+
+    private static void AssertSymbioticVirusFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(3, relicAgg.SymbioticVirusOrbEvokes);
+        Assert.Equal(7, relicAgg.SymbioticVirusOrbPassiveTriggers);
+        Assert.Equal(1, relicAgg.SymbioticVirusOrbFizzles);
     }
 
     private static void AssertGoldPlatedCablesFixture(RelicAggregate relicAgg)

@@ -791,6 +791,12 @@ public class RelicAggregate
     public int CrackedCoreOrbPassiveTriggers { get; set; }
     public int CrackedCoreOrbFizzles { get; set; }
 
+    // Lifecycle outcomes for the exact Dark orb instance created by Symbiotic
+    // Virus at the start of combat.
+    public int SymbioticVirusOrbEvokes { get; set; }
+    public int SymbioticVirusOrbPassiveTriggers { get; set; }
+    public int SymbioticVirusOrbFizzles { get; set; }
+
     // Gold-Plated Cables tracking. Activations is the total number of confirmed
     // extra passive triggers with a first orb available. The per-orb ledger
     // preserves the exact orb type selected by the game's modifier hook.
