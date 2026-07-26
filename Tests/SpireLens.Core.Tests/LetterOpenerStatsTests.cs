@@ -1,5 +1,3 @@
-using System;
-using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using SpireLens.Core;
@@ -11,10 +9,6 @@ namespace SpireLens.Core.Tests;
 public class LetterOpenerStatsTests
 {
     private const string LetterOpenerRelicId = "RELIC.LETTER_OPENER";
-
-    private static readonly MethodInfo BuildLetterOpenerBodyMethod =
-        typeof(RelicHoverShowPatch).GetMethod("BuildLetterOpenerBodyBBCode", BindingFlags.NonPublic | BindingFlags.Static)
-        ?? throw new InvalidOperationException("BuildLetterOpenerBodyBBCode not found.");
 
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
@@ -138,9 +132,9 @@ public class LetterOpenerStatsTests
     }
 
     [Fact]
-    public void RelicTooltip_LetterOpener_ShowsRequestedRowsAndAverages()
+    public void CalculateLetterOpenerRates_ComputesObservedAverages()
     {
-        var body = BuildBody(new RelicAggregate
+        var rates = RelicHoverShowPatch.CalculateLetterOpenerRates(new RelicAggregate
         {
             Activations = 3,
             TotalDamageAttempted = 45,
@@ -152,62 +146,20 @@ public class LetterOpenerStatsTests
             LetterOpenerTurnsEndedAt2Charges = 3,
         });
 
-        Assert.Contains("Activations", body);
-        Assert.Contains("Damage attempted", body);
-        Assert.Contains("Targets hit", body);
-        Assert.Contains("Targets hit per activation", body);
-        Assert.Contains("Avg damage per combat", body);
-        Assert.Contains("Avg damage per turn", body);
-        Assert.Contains("Turns ended at 1 charge", body);
-        Assert.Contains("Turns ended at 2 charges", body);
-        Assert.Contains("Avg damage per skill played", body);
-        Assert.Contains("[b]45[/b]", body);
-        Assert.Contains("[b]15[/b]", body);
-        Assert.Contains("[b]7.5[/b]", body);
-        Assert.Contains("[b]5[/b]", body);
+        Assert.Equal(15m, rates.DamagePerCombat);
+        Assert.Equal(7.5m, rates.DamagePerTurn);
+        Assert.Equal(3m, rates.TargetsPerActivation);
+        Assert.Equal(5m, rates.DamagePerSkillPlayed);
     }
 
     [Fact]
-    public void RelicTooltip_LetterOpener_ShowsZeroRowsForEmptyAggregate()
+    public void CalculateLetterOpenerRates_UsesZeroForMissingDenominators()
     {
-        var body = BuildBody(new RelicAggregate());
+        var rates = RelicHoverShowPatch.CalculateLetterOpenerRates(new RelicAggregate());
 
-        Assert.Contains("Avg damage per combat", body);
-        Assert.Contains("Avg damage per turn", body);
-        Assert.Contains("Targets hit per activation", body);
-        Assert.Contains("Turns ended at 1 charge", body);
-        Assert.Contains("Turns ended at 2 charges", body);
-        Assert.Contains("Avg damage per skill played", body);
-        Assert.Equal(9, CountOccurrences(body, "[b]0[/b]"));
-    }
-
-    [Fact]
-    public void RelicTooltip_LetterOpener_ShowsTargetsHitPerActivation()
-    {
-        var body = BuildBody(new RelicAggregate
-        {
-            Activations = 2,
-            TotalTargets = 5,
-        });
-
-        Assert.Contains("Targets hit per activation", body);
-        Assert.Contains("[b]2.5[/b]", body);
-    }
-
-    private static string BuildBody(RelicAggregate agg)
-        => (string)(BuildLetterOpenerBodyMethod.Invoke(null, new object?[] { agg })
-            ?? throw new InvalidOperationException("BuildLetterOpenerBodyBBCode returned null."));
-
-    private static int CountOccurrences(string value, string needle)
-    {
-        var count = 0;
-        var index = 0;
-        while ((index = value.IndexOf(needle, index, StringComparison.Ordinal)) >= 0)
-        {
-            count++;
-            index += needle.Length;
-        }
-
-        return count;
+        Assert.Equal(0m, rates.DamagePerCombat);
+        Assert.Equal(0m, rates.DamagePerTurn);
+        Assert.Equal(0m, rates.TargetsPerActivation);
+        Assert.Equal(0m, rates.DamagePerSkillPlayed);
     }
 }

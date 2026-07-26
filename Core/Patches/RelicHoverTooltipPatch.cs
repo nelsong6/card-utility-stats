@@ -13,6 +13,12 @@ using MegaCrit.Sts2.Core.Nodes.Relics;
 
 namespace SpireLens.Core.Patches;
 
+internal readonly record struct LetterOpenerRates(
+    decimal DamagePerCombat,
+    decimal DamagePerTurn,
+    decimal TargetsPerActivation,
+    decimal DamagePerSkillPlayed);
+
 /// <summary>
 /// Builds the native SpireLens hover-tip entry for an owned relic.
 /// NHoverTipSet owns the rendered node and its complete lifecycle.
@@ -1264,29 +1270,36 @@ public static class RelicHoverShowPatch
     private static string BuildLetterOpenerBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        var averageDamagePerCombat = agg.LetterOpenerCombats <= 0
-            ? 0m
-            : (decimal)agg.TotalDamageAttempted / agg.LetterOpenerCombats;
-        var averageDamagePerTurn = agg.LetterOpenerTurns <= 0
-            ? 0m
-            : (decimal)agg.TotalDamageAttempted / agg.LetterOpenerTurns;
-        var averageDamagePerSkill = agg.LetterOpenerSkillsPlayed <= 0
-            ? 0m
-            : (decimal)agg.TotalDamageAttempted / agg.LetterOpenerSkillsPlayed;
-        var targetsHitPerActivation = agg.Activations <= 0
-            ? 0m
-            : (decimal)agg.TotalTargets / agg.Activations;
+        var rates = CalculateLetterOpenerRates(agg);
 
         RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, "Damage attempted", agg.TotalDamageAttempted.ToString(), "");
         Row3(sb, "Targets hit", agg.TotalTargets.ToString(), "");
-        Row3(sb, "Targets hit per activation", FormatDecimal(targetsHitPerActivation), "");
-        Row3(sb, "Avg damage per combat", FormatDecimal(averageDamagePerCombat), "");
-        Row3(sb, "Avg damage per turn", FormatDecimal(averageDamagePerTurn), "");
+        Row3(sb, "Targets hit per activation", FormatDecimal(rates.TargetsPerActivation), "");
+        Row3(sb, "Avg damage per combat", FormatDecimal(rates.DamagePerCombat), "");
+        Row3(sb, "Avg damage per turn", FormatDecimal(rates.DamagePerTurn), "");
         Row3(sb, "Turns ended at 1 charge", agg.LetterOpenerTurnsEndedAt1Charge.ToString(), "");
         Row3(sb, "Turns ended at 2 charges", agg.LetterOpenerTurnsEndedAt2Charges.ToString(), "");
-        Row3(sb, "Avg damage per skill played", FormatDecimal(averageDamagePerSkill), "");
+        Row3(sb, "Avg damage per skill played", FormatDecimal(rates.DamagePerSkillPlayed), "");
         return sb.ToString();
+    }
+
+    internal static LetterOpenerRates CalculateLetterOpenerRates(RelicAggregate agg)
+    {
+        agg ??= new RelicAggregate();
+        return new LetterOpenerRates(
+            DamagePerCombat: agg.LetterOpenerCombats <= 0
+                ? 0m
+                : (decimal)agg.TotalDamageAttempted / agg.LetterOpenerCombats,
+            DamagePerTurn: agg.LetterOpenerTurns <= 0
+                ? 0m
+                : (decimal)agg.TotalDamageAttempted / agg.LetterOpenerTurns,
+            TargetsPerActivation: agg.Activations <= 0
+                ? 0m
+                : (decimal)agg.TotalTargets / agg.Activations,
+            DamagePerSkillPlayed: agg.LetterOpenerSkillsPlayed <= 0
+                ? 0m
+                : (decimal)agg.TotalDamageAttempted / agg.LetterOpenerSkillsPlayed);
     }
 
     private static string BuildAkabekoBodyBBCode(RelicAggregate agg)
