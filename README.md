@@ -119,11 +119,12 @@ stay compact unless verbose hand stats are enabled.
 SpireLens collection: every current deck card leaves the grid, and removed
 physical cards plus pooled meta-cards take their place. Removed cards retain
 their individual run stats and removal marker. Meta-cards such as Shiv, Soul,
-and Sovereign Blade aggregate every observed instance of that generated card
-family into one inspectable card. By default a meta-card enters this view after
-it appears during the run; **"Show all meta-cards in \"not in deck\" view"**
-also renders every supported meta-card with zeroed stats before it is
-encountered. Both choices persist through the mod configuration.
+Sovereign Blade, and encountered Status cards aggregate every observed instance
+of that generated card family into one inspectable card. By default a meta-card
+enters this view after it appears during the run; **"Show all meta-cards in
+\"not in deck\" view"** also renders every supported meta-card and every Status
+card in the current game database with zeroed stats before it is encountered.
+Both choices persist through the mod configuration.
 
 A separate, default-off **"show monster stats"** checkbox in the deck viewer controls combat monster hover popups when general stats are enabled. Keeping it off bypasses enemy aggregate lookup and tooltip construction on creature focus while leaving card and relic stats enabled.
 

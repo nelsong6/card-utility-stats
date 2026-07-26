@@ -70,6 +70,7 @@ public static class RunTracker
     private const string SovereignBladeLegacyDefinitionId = "CARD.SOVEREIGN_BLADE";
     private const string ShivGeneratedEventType = "shiv_generated";
     private const string SoulGeneratedEventType = "soul_generated";
+    private const string StatusGeneratedEventType = "status_generated";
     private const string SovereignBladeForgedEventType = "sovereign_blade_forged";
     private const string EggOfferAttributionsAppDomainKey =
         "SpireLens.PendingEggOfferAttributions";
@@ -146,6 +147,10 @@ public static class RunTracker
     private static CardModel? _shivDeckViewCard;
     private static bool _soulAvailableThisRun;
     private static CardModel? _soulDeckViewCard;
+    private static readonly Dictionary<string, CardModel> _statusDeckViewCardsByDefinition =
+        new(StringComparer.Ordinal);
+    private static readonly Dictionary<CardModel, string> _statusDeckViewDefinitionsByCard =
+        new(ReferenceEqualityComparer.Instance);
     private const decimal PoisonOwnershipEpsilon = 0.0001m;
     private static bool _sovereignBladeAvailableThisRun;
     private static CardModel? _sovereignBladeDeckViewCard;
@@ -299,6 +304,8 @@ public static class RunTracker
                 return GetSoulDeckViewAggregateLocked();
             if (IsSovereignBladeDeckViewCardLocked(card))
                 return GetSovereignBladeDeckViewAggregateLocked();
+            if (TryGetStatusDeckViewDefinitionIdLocked(card, out var statusDefinitionId))
+                return GetPooledEffectiveAggregateByDefinitionLocked(statusDefinitionId);
 
             // Non-assigning: if the card isn't tracked (preview/template
             // not yet a real deck member), return null so the tooltip
@@ -407,6 +414,24 @@ public static class RunTracker
     private static CardAggregate? GetSoulDeckViewAggregateLocked()
     {
         return GetPooledEffectiveAggregateByDefinitionLocked(SoulDefinitionId);
+    }
+
+    public static bool IsStatusDeckViewCard(CardModel card)
+    {
+        if (card == null) return false;
+        lock (_lock)
+        {
+            return TryGetStatusDeckViewDefinitionIdLocked(card, out _);
+        }
+    }
+
+    private static bool TryGetStatusDeckViewDefinitionIdLocked(
+        CardModel card,
+        [NotNullWhen(true)] out string? definitionId)
+    {
+        return _statusDeckViewDefinitionsByCard.TryGetValue(
+            Canonical(card),
+            out definitionId);
     }
 
     public static CardAggregate GetEnthralledCurseAggregate()
@@ -553,6 +578,8 @@ public static class RunTracker
         _shivDeckViewCard = null;
         _soulAvailableThisRun = false;
         _soulDeckViewCard = null;
+        _statusDeckViewCardsByDefinition.Clear();
+        _statusDeckViewDefinitionsByCard.Clear();
         _sovereignBladeAvailableThisRun = false;
         _sovereignBladeDeckViewCard = null;
         _sovereignBladeDefinitionIdThisRun = null;
@@ -20207,6 +20234,9 @@ public static class RunTracker
                 AddMetaCardIfPresent(result, metaCard);
             }
 
+            foreach (var statusCard in GetStatusDeckViewCardsLocked(includeAllMetaCards))
+                AddMetaCardIfPresent(result, statusCard);
+
             return result;
         }
     }
@@ -20233,6 +20263,169 @@ public static class RunTracker
             })
             .Where(id => id.Length > 0)
             .ToArray();
+
+    private static IReadOnlyList<CardModel> GetStatusDeckViewCardsLocked(
+        bool includeAllMetaCards)
+    {
+        try
+        {
+            var allStatusCards = ModelDb.AllCards
+                .Where(card => card.Type == CardType.Status)
+                .GroupBy(card => card.Id.ToString(), StringComparer.Ordinal)
+                .Select(group => group.First())
+                .OrderBy(card => card.Id.ToString(), StringComparer.Ordinal)
+                .ToArray();
+
+            var encounteredDefinitionIds = GetEncounteredStatusDefinitionIdsLocked(
+                allStatusCards);
+            var selectedDefinitionIds = SelectStatusMetaCardDefinitionIds(
+                allStatusCards.Select(card => card.Id.ToString()),
+                encounteredDefinitionIds,
+                includeAllMetaCards);
+            var definitionsById = allStatusCards.ToDictionary(
+                card => card.Id.ToString(),
+                StringComparer.Ordinal);
+
+            var result = new List<CardModel>(selectedDefinitionIds.Count);
+            foreach (var definitionId in selectedDefinitionIds)
+            {
+                if (!definitionsById.TryGetValue(definitionId, out var definition))
+                    continue;
+
+                if (!_statusDeckViewCardsByDefinition.TryGetValue(
+                        definitionId,
+                        out var syntheticCard))
+                {
+                    syntheticCard = definition.ToMutable();
+                    _statusDeckViewCardsByDefinition[definitionId] = syntheticCard;
+                    _statusDeckViewDefinitionsByCard[syntheticCard] = definitionId;
+                }
+
+                result.Add(syntheticCard);
+            }
+
+            return result;
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"GetStatusDeckViewCardsLocked failed: {e.Message}");
+            return Array.Empty<CardModel>();
+        }
+    }
+
+    private static HashSet<string> GetEncounteredStatusDefinitionIdsLocked(
+        IReadOnlyCollection<CardModel> allStatusCards)
+    {
+        var encountered = new HashSet<string>(StringComparer.Ordinal);
+
+        if (_currentRun != null)
+        {
+            AddStatusEventDefinitionIds(_currentRun.Events, encountered);
+            AddEnemyStatusDefinitionIds(
+                _currentRun.EnemyAggregates.Values,
+                encountered);
+            AddStatusAggregateDefinitionIds(
+                _currentRun.Aggregates.Keys,
+                allStatusCards,
+                encountered);
+        }
+
+        if (_pendingCombat != null)
+        {
+            AddStatusEventDefinitionIds(_pendingCombat.CombatEvents, encountered);
+            AddEnemyStatusDefinitionIds(
+                _pendingCombat.EnemyAggregates.Values,
+                encountered);
+            AddStatusAggregateDefinitionIds(
+                _pendingCombat.CombatAggregates.Keys,
+                allStatusCards,
+                encountered);
+        }
+
+        return encountered;
+    }
+
+    private static void AddStatusEventDefinitionIds(
+        IEnumerable<CardEvent> events,
+        ISet<string> destination)
+    {
+        foreach (var cardEvent in events)
+        {
+            if (cardEvent.Type != StatusGeneratedEventType
+                || string.IsNullOrWhiteSpace(cardEvent.CardId))
+            {
+                continue;
+            }
+
+            destination.Add(cardEvent.CardId);
+        }
+    }
+
+    private static void AddEnemyStatusDefinitionIds(
+        IEnumerable<EnemyAggregate> enemyAggregates,
+        ISet<string> destination)
+    {
+        foreach (var enemyAggregate in enemyAggregates)
+        {
+            foreach (var (key, statusCard) in enemyAggregate.StatusCardsById)
+            {
+                var definitionId = string.IsNullOrWhiteSpace(statusCard.CardId)
+                    ? key
+                    : statusCard.CardId;
+                if (!string.IsNullOrWhiteSpace(definitionId))
+                    destination.Add(definitionId);
+            }
+        }
+    }
+
+    private static void AddStatusAggregateDefinitionIds(
+        IEnumerable<string> aggregateKeys,
+        IEnumerable<CardModel> allStatusCards,
+        ISet<string> destination)
+    {
+        var keys = aggregateKeys as IReadOnlyCollection<string>
+            ?? aggregateKeys.ToArray();
+        foreach (var statusCard in allStatusCards)
+        {
+            var definitionId = statusCard.Id.ToString();
+            if (keys.Any(key =>
+                    CardAggregatePooler.IsAggregateForDefinition(
+                        key,
+                        definitionId)))
+            {
+                destination.Add(definitionId);
+            }
+        }
+    }
+
+    private static IReadOnlyList<string> SelectStatusMetaCardDefinitionIds(
+        IEnumerable<string> allStatusDefinitionIds,
+        IEnumerable<string> encounteredStatusDefinitionIds,
+        bool includeAllMetaCards)
+    {
+        var all = allStatusDefinitionIds
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct(StringComparer.Ordinal)
+            .ToHashSet(StringComparer.Ordinal);
+        var selected = includeAllMetaCards
+            ? all
+            : encounteredStatusDefinitionIds
+                .Where(all.Contains)
+                .ToHashSet(StringComparer.Ordinal);
+
+        return selected
+            .OrderBy(id => id, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    internal static IReadOnlyList<string> SelectStatusMetaCardDefinitionIdsForTest(
+        IEnumerable<string> allStatusDefinitionIds,
+        IEnumerable<string> encounteredStatusDefinitionIds,
+        bool includeAllMetaCards)
+        => SelectStatusMetaCardDefinitionIds(
+            allStatusDefinitionIds,
+            encounteredStatusDefinitionIds,
+            includeAllMetaCards);
 
     private static void AddMetaCardIfPresent(
         ICollection<CardModel> cards,
@@ -20541,6 +20734,39 @@ public static class RunTracker
                 T = Now(),
                 Type = SoulGeneratedEventType,
                 CardId = SoulDefinitionId,
+                Floor = RunManager.Instance.State?.TotalFloor,
+            });
+        }
+    }
+
+    public static void RecordStatusGenerated(CardModel? card)
+    {
+        if (card?.Type != CardType.Status) return;
+
+        lock (_lock)
+        {
+            if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+
+            var definitionId = Canonical(card).Id.ToString();
+            if (string.IsNullOrWhiteSpace(definitionId)) return;
+
+            EnsureLazyCurrentRunLocked();
+            _pendingCombat ??= new PendingCombat();
+
+            bool alreadyRecorded =
+                _currentRun.Events.Any(e =>
+                    e.Type == StatusGeneratedEventType
+                    && string.Equals(e.CardId, definitionId, StringComparison.Ordinal))
+                || _pendingCombat.CombatEvents.Any(e =>
+                    e.Type == StatusGeneratedEventType
+                    && string.Equals(e.CardId, definitionId, StringComparison.Ordinal));
+            if (alreadyRecorded) return;
+
+            _pendingCombat.CombatEvents.Add(new CardEvent
+            {
+                T = Now(),
+                Type = StatusGeneratedEventType,
+                CardId = definitionId,
                 Floor = RunManager.Instance.State?.TotalFloor,
             });
         }

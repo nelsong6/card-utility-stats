@@ -138,8 +138,9 @@ Not every card the player sees should be treated as a stable deck resident.
 - removed cards remain viewable with their accumulated stats
 - the not-in-deck view replaces the live deck grid with removed physical cards
   plus supported pooled meta-cards
-- Shiv, Soul, and Sovereign Blade are the initial pooled meta-card registry;
-  unseen entries can be rendered with zeroed stats through the show-all option
+- Shiv, Soul, Sovereign Blade, and each encountered Status definition render as
+  pooled meta-cards; the show-all option also enumerates every Status card in
+  the current game database and renders unseen entries with zeroed stats
 - some combat-generated cards are better represented as pooled summaries than
   as fake permanent instances
 

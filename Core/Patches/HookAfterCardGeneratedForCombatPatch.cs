@@ -19,6 +19,7 @@ public static class HookAfterCardGeneratedForCombatPatch
         {
             RunTracker.RecordShivGenerated(card);
             RunTracker.RecordSoulGenerated(card);
+            RunTracker.RecordStatusGenerated(card);
             RunTracker.RecordSovereignBladeGenerated(card);
         }
         catch (System.Exception e)

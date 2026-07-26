@@ -63,4 +63,44 @@ public class NotInDeckViewTests
             ids);
         Assert.Equal(ids.Count, ids.Distinct().Count());
     }
+
+    [Fact]
+    public void StatusMetaCards_DefaultViewUsesOnlyEncounteredDefinitions()
+    {
+        var ids = RunTracker.SelectStatusMetaCardDefinitionIdsForTest(
+            allStatusDefinitionIds:
+            [
+                "CARD.WOUND",
+                "CARD.BURN",
+                "CARD.SLIMED",
+                "CARD.BURN",
+            ],
+            encounteredStatusDefinitionIds:
+            [
+                "CARD.SLIMED",
+                "CARD.UNKNOWN_STATUS",
+            ],
+            includeAllMetaCards: false);
+
+        Assert.Equal(["CARD.SLIMED"], ids);
+    }
+
+    [Fact]
+    public void StatusMetaCards_ShowAllUsesEveryKnownStatusDefinition()
+    {
+        var ids = RunTracker.SelectStatusMetaCardDefinitionIdsForTest(
+            allStatusDefinitionIds:
+            [
+                "CARD.WOUND",
+                "CARD.BURN",
+                "CARD.SLIMED",
+                "CARD.BURN",
+            ],
+            encounteredStatusDefinitionIds: [],
+            includeAllMetaCards: true);
+
+        Assert.Equal(
+            ["CARD.BURN", "CARD.SLIMED", "CARD.WOUND"],
+            ids);
+    }
 }

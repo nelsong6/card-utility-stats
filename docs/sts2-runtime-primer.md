@@ -1091,6 +1091,8 @@ Examples:
 - Shiv data is pooled under a synthetic Shiv meta-card once a Shiv has been generated.
 - Soul data is pooled under a synthetic Soul meta-card once a Soul has been generated.
 - Sovereign Blade gets a pooled meta-card once forged/generated behavior makes it relevant.
+- Each Status definition that reaches a combat pile gets one pooled meta-card
+  whose tooltip merges every observed instance of that Status.
 
 The deck screen is either in normal mode or not-in-deck mode. Normal mode
 contains only the permanent deck. Not-in-deck mode contains removed physical
@@ -1101,6 +1103,13 @@ constructs every supported registry card even without data, allowing the
 zero-value tooltip to document what SpireLens can track. Use pooled summaries
 when a card does not meaningfully exist as a stable deck resident and per-copy
 identities would mislead the user.
+
+Status encounter availability is recorded at the established
+`Hook.AfterCardGeneratedForCombat` boundary, after the generated card has
+reached its final combat pile. The default not-in-deck view therefore includes
+only Status definitions actually encountered during the run. Its show-all
+option enumerates `ModelDb.AllCards` for every `CardType.Status`, while the
+tooltip pools normal per-instance aggregates by card definition.
 
 Entropy's shared power owns its later transformations. Keep a narrow window
 around `EntropyPower.AfterPlayerTurnStart`, then observe the already-established

@@ -124,9 +124,13 @@ public static class CardHoverShowPatch
         var sb = new StringBuilder();
         bool isShivMetaCard = RunTracker.IsShivDeckViewCard(cardModel);
         bool isSoulMetaCard = RunTracker.IsSoulDeckViewCard(cardModel);
+        bool isStatusMetaCard = RunTracker.IsStatusDeckViewCard(cardModel);
         bool isSovereignBladeMetaCard = RunTracker.IsSovereignBladeDeckViewCard(cardModel);
         bool isSupplementalMetaCard =
-            isShivMetaCard || isSoulMetaCard || isSovereignBladeMetaCard;
+            isShivMetaCard
+            || isSoulMetaCard
+            || isStatusMetaCard
+            || isSovereignBladeMetaCard;
 
         // The card identity now lives in the gold title slot for both compact
         // and full views, so repeating it again in the body just adds noise.
@@ -137,6 +141,9 @@ public static class CardHoverShowPatch
             sb.Append($"[color=#e04c4c][b]{ShivMetaNote}[/b][/color]\n");
         else if (isSoulMetaCard)
             sb.Append($"[color=#e04c4c][b]{SoulMetaNote}[/b][/color]\n");
+        else if (isStatusMetaCard)
+            sb.Append(
+                $"[color=#e04c4c][b]Reflects All {StatsTooltip.EscapeBbcode(cardModel.Title)} Usage[/b][/color]\n");
         else if (isSovereignBladeMetaCard)
             sb.Append($"[color=#e04c4c][b]{SovereignBladeMetaNote}[/b][/color]\n");
 
