@@ -23,11 +23,12 @@ public static class EggRelicCardOfferStatsPatch
     }
 
     [HarmonyPostfix]
-    public static void Postfix(RelicModel modifyingRelic)
+    public static void Postfix(CardModel card, RelicModel modifyingRelic)
     {
         try
         {
-            RunTracker.RecordEggUpgradedCardOffered(modifyingRelic);
+            if (card == null) return;
+            RunTracker.RecordEggUpgradedCardOffered(modifyingRelic, card.Rarity);
         }
         catch (Exception e)
         {

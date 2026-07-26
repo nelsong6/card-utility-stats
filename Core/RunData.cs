@@ -805,6 +805,9 @@ public class RelicAggregate
     // Total choosable card options actually upgraded by Molten Egg, Toxic Egg,
     // or Frozen Egg. Direct card grants are intentionally excluded.
     public int UpgradedCardsOffered { get; set; }
+    public int UpgradedCommonCardsOffered { get; set; }
+    public int UpgradedUncommonCardsOffered { get; set; }
+    public int UpgradedRareCardsOffered { get; set; }
 
     // Total card reward options consumed when Pael's Wing's Sacrifice option
     // is selected. The game model that owns the sacrifice option is

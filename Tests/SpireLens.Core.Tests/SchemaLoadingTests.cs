@@ -2454,9 +2454,24 @@ public class SchemaLoadingTests
 
         Assert.NotNull(loaded);
         Assert.True(loaded!.SupportsResume);
-        Assert.Equal(7, loaded.Data.RelicAggregates["RELIC.MOLTEN_EGG"].UpgradedCardsOffered);
-        Assert.Equal(5, loaded.Data.RelicAggregates["RELIC.TOXIC_EGG"].UpgradedCardsOffered);
-        Assert.Equal(3, loaded.Data.RelicAggregates["RELIC.FROZEN_EGG"].UpgradedCardsOffered);
+        AssertEggOfferFixture(
+            loaded.Data.RelicAggregates["RELIC.MOLTEN_EGG"],
+            total: 7,
+            common: 4,
+            uncommon: 2,
+            rare: 1);
+        AssertEggOfferFixture(
+            loaded.Data.RelicAggregates["RELIC.TOXIC_EGG"],
+            total: 5,
+            common: 2,
+            uncommon: 2,
+            rare: 1);
+        AssertEggOfferFixture(
+            loaded.Data.RelicAggregates["RELIC.FROZEN_EGG"],
+            total: 3,
+            common: 1,
+            uncommon: 1,
+            rare: 1);
     }
 
     [Fact]
@@ -2465,9 +2480,37 @@ public class SchemaLoadingTests
         var resumed = RunStorage.LoadResumable(FixturePath("egg-relic-offers-run.json"));
 
         Assert.NotNull(resumed);
-        Assert.Equal(7, resumed!.RelicAggregates["RELIC.MOLTEN_EGG"].UpgradedCardsOffered);
-        Assert.Equal(5, resumed.RelicAggregates["RELIC.TOXIC_EGG"].UpgradedCardsOffered);
-        Assert.Equal(3, resumed.RelicAggregates["RELIC.FROZEN_EGG"].UpgradedCardsOffered);
+        AssertEggOfferFixture(
+            resumed!.RelicAggregates["RELIC.MOLTEN_EGG"],
+            total: 7,
+            common: 4,
+            uncommon: 2,
+            rare: 1);
+        AssertEggOfferFixture(
+            resumed.RelicAggregates["RELIC.TOXIC_EGG"],
+            total: 5,
+            common: 2,
+            uncommon: 2,
+            rare: 1);
+        AssertEggOfferFixture(
+            resumed.RelicAggregates["RELIC.FROZEN_EGG"],
+            total: 3,
+            common: 1,
+            uncommon: 1,
+            rare: 1);
+    }
+
+    private static void AssertEggOfferFixture(
+        RelicAggregate agg,
+        int total,
+        int common,
+        int uncommon,
+        int rare)
+    {
+        Assert.Equal(total, agg.UpgradedCardsOffered);
+        Assert.Equal(common, agg.UpgradedCommonCardsOffered);
+        Assert.Equal(uncommon, agg.UpgradedUncommonCardsOffered);
+        Assert.Equal(rare, agg.UpgradedRareCardsOffered);
     }
 
     [Fact]

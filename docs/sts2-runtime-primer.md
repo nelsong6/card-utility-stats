@@ -507,7 +507,10 @@ For each matching upgradable option, that helper calls the two-argument
 the modifying relic. Observe that exact call to count upgraded cards offered:
 it covers rewards, shops, and other choosable-card surfaces that use the shared
 helper, while excluding the eggs' separate `TryModifyCardBeingAddedToDeck`
-path for direct non-choosable deck additions.
+path for direct non-choosable deck additions. The `CardModel` passed to
+`ModifyCard` is the upgraded clone and retains the offered card's rarity, so
+Common, Uncommon, and Rare breakdowns should be read from that same confirmed
+offer callback rather than reconstructed from later reward state.
 
 Pael's sacrifice reward option is owned by `PaelsWing`, not `PaelsFlesh`.
 `PaelsWing.TryModifyCardRewardAlternatives` adds the `SACRIFICE` card reward

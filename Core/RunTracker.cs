@@ -1768,6 +1768,9 @@ public static class RunTracker
         target.UncommonCardsTaken += source.UncommonCardsTaken;
         target.RareCardsTaken += source.RareCardsTaken;
         target.UpgradedCardsOffered += source.UpgradedCardsOffered;
+        target.UpgradedCommonCardsOffered += source.UpgradedCommonCardsOffered;
+        target.UpgradedUncommonCardsOffered += source.UpgradedUncommonCardsOffered;
+        target.UpgradedRareCardsOffered += source.UpgradedRareCardsOffered;
         target.CommonCardsConsumed += source.CommonCardsConsumed;
         target.UncommonCardsConsumed += source.UncommonCardsConsumed;
         target.RareCardsConsumed += source.RareCardsConsumed;
@@ -3968,7 +3971,9 @@ public static class RunTracker
     /// Card rewards, merchant cards, and any future offer surface using the
     /// game's shared egg helper all pass through this observation point.
     /// </summary>
-    public static void RecordEggUpgradedCardOffered(RelicModel eggRelic)
+    public static void RecordEggUpgradedCardOffered(
+        RelicModel eggRelic,
+        CardRarity rarity)
     {
         if (eggRelic == null) return;
 
@@ -3988,7 +3993,7 @@ public static class RunTracker
                 if (!IsTrackedRelic(eggRelic) || !IsTrackedPlayer(eggRelic.Owner)) return;
 
                 var agg = GetOrCreateCurrentRunRelicAggregateLocked(relicId);
-                RecordEggUpgradedCardOfferedForTest(agg);
+                RecordEggUpgradedCardOfferedForTest(agg, rarity);
                 RefreshCurrentRunMetadataLocked();
                 SaveCurrentRun();
             }
@@ -8954,10 +8959,27 @@ public static class RunTracker
         agg.WarHammerUpgradedCardPlays += Math.Max(0, count);
     }
 
-    internal static void RecordEggUpgradedCardOfferedForTest(RelicAggregate agg, int count = 1)
+    internal static void RecordEggUpgradedCardOfferedForTest(
+        RelicAggregate agg,
+        CardRarity rarity,
+        int count = 1)
     {
         if (agg == null) return;
-        agg.UpgradedCardsOffered += Math.Max(0, count);
+        var recordedCount = Math.Max(0, count);
+        agg.UpgradedCardsOffered += recordedCount;
+
+        switch (rarity)
+        {
+            case CardRarity.Common:
+                agg.UpgradedCommonCardsOffered += recordedCount;
+                break;
+            case CardRarity.Uncommon:
+                agg.UpgradedUncommonCardsOffered += recordedCount;
+                break;
+            case CardRarity.Rare:
+                agg.UpgradedRareCardsOffered += recordedCount;
+                break;
+        }
     }
 
     private static void RecordRelicUpgradedCards(

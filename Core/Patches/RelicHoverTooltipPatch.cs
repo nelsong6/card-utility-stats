@@ -1756,6 +1756,21 @@ public static class RelicHoverShowPatch
     {
         var sb = new StringBuilder();
         Row3(sb, $"Upgraded {cardType} offered", agg.UpgradedCardsOffered.ToString(), "");
+        Row3(
+            sb,
+            $"Upgraded common {cardType} offered",
+            agg.UpgradedCommonCardsOffered.ToString(),
+            "");
+        Row3(
+            sb,
+            $"Upgraded uncommon {cardType} offered",
+            agg.UpgradedUncommonCardsOffered.ToString(),
+            "");
+        Row3(
+            sb,
+            $"Upgraded rare {cardType} offered",
+            agg.UpgradedRareCardsOffered.ToString(),
+            "");
         return sb.ToString();
     }
 

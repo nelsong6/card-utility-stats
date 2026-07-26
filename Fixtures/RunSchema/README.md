@@ -331,7 +331,8 @@ New fixtures added going forward do not need a `v*-` prefix.
   held turn/combat denominators.
 - `egg-relic-offers-run.json`
   Adds Molten, Toxic, and Frozen Egg tracking: every matching choosable card
-  option the egg actually upgraded across rewards, shops, and other offers.
+  option the egg actually upgraded across rewards, shops, and other offers,
+  including Common, Uncommon, and Rare breakdowns.
 - `hefty-tablet-relic-run.json`
   Adds Hefty Tablet rare-card choice tracking: cards granted by id/name and
   skipped pickup choices.
