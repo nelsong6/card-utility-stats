@@ -11,9 +11,12 @@ public class StatConceptGlossaryTests
         Assert.Equal(
             [
                 "activation",
+                "attack",
                 "average",
                 "block",
                 "card",
+                "card_rare",
+                "card_uncommon",
                 "charge",
                 "combat",
                 "floor",
@@ -21,6 +24,8 @@ public class StatConceptGlossaryTests
                 "healing_gained",
                 "information",
                 "osty_summon_gained",
+                "power",
+                "skill",
                 "turn",
                 "upgraded",
             ],
@@ -41,9 +46,12 @@ public class StatConceptGlossaryTests
     public void Glossary_RenderersIncludeNativeHintsAndConfiguredGlyphs()
     {
         var activation = StatConceptGlossary.RenderHintedGlyph("activation");
+        var attack = StatConceptGlossary.RenderHintedGlyph("attack");
         var average = StatConceptGlossary.RenderHintedGlyph("average");
         var block = StatConceptGlossary.RenderHintedGlyph("block");
         var card = StatConceptGlossary.RenderHintedGlyph("card");
+        var rareCard = StatConceptGlossary.RenderHintedGlyph("card_rare");
+        var uncommonCard = StatConceptGlossary.RenderHintedGlyph("card_uncommon");
         var charge = StatConceptGlossary.RenderHintedGlyph("charge");
         var combat = StatConceptGlossary.RenderHintedGlyph("combat");
         var floor = StatConceptGlossary.RenderHintedGlyph("floor");
@@ -51,6 +59,8 @@ public class StatConceptGlossaryTests
         var healingGained = StatConceptGlossary.RenderHintedGlyph("healing_gained");
         var informationConcept = StatConceptGlossary.RenderHintedGlyph("information");
         var summon = StatConceptGlossary.RenderHintedGlyph("osty_summon_gained");
+        var power = StatConceptGlossary.RenderHintedGlyph("power");
+        var skill = StatConceptGlossary.RenderHintedGlyph("skill");
         var turn = StatConceptGlossary.RenderHintedGlyph("turn");
         var upgraded = StatConceptGlossary.RenderHintedGlyph("upgraded");
         var information = StatConceptGlossary.RenderInformationHint(
@@ -59,9 +69,12 @@ public class StatConceptGlossaryTests
         var defaultGlyphs = new[]
         {
             activation,
+            attack,
             average,
             block,
             card,
+            rareCard,
+            uncommonCard,
             charge,
             combat,
             floor,
@@ -69,6 +82,8 @@ public class StatConceptGlossaryTests
             healingGained,
             informationConcept,
             summon,
+            power,
+            skill,
             turn,
             upgraded,
         };
@@ -83,6 +98,10 @@ public class StatConceptGlossaryTests
         Assert.Contains(
             "user://SpireLens/generated-icons/activation-",
             activation);
+        Assert.Contains("[hint=\"Attack:", attack);
+        Assert.Contains(
+            "res://images/packed/card_library/type_sort_attack.png",
+            attack);
         Assert.Contains("[hint=\"Average:", average);
         Assert.Contains(
             "user://SpireLens/generated-icons/average-",
@@ -91,6 +110,10 @@ public class StatConceptGlossaryTests
         Assert.Contains("res://images/ui/combat/block.png", block);
         Assert.Contains("[hint=\"Card:", card);
         Assert.Contains("res://images/ui/reward_screen/reward_icon_card.png", card);
+        Assert.Contains("[hint=\"Rare card:", rareCard);
+        Assert.Contains("color=#EFC850", rareCard);
+        Assert.Contains("[hint=\"Uncommon card:", uncommonCard);
+        Assert.Contains("color=#87CEEB", uncommonCard);
         Assert.Contains("[hint=\"Charge:", charge);
         Assert.Contains(
             "user://SpireLens/generated-icons/charge-",
@@ -123,6 +146,14 @@ public class StatConceptGlossaryTests
         Assert.Contains(
             "res://images/atlases/relic_atlas.sprites/bound_phylactery.tres",
             summon);
+        Assert.Contains("[hint=\"Power:", power);
+        Assert.Contains(
+            "res://images/packed/card_library/type_sort_power.png",
+            power);
+        Assert.Contains("[hint=\"Skill:", skill);
+        Assert.Contains(
+            "res://images/packed/card_library/type_sort_skill.png",
+            skill);
         Assert.Contains("[hint=\"Turn:", turn);
         Assert.Contains(
             "user://SpireLens/generated-icons/turn-",

@@ -846,6 +846,15 @@ internal static class RelicCompendiumFilterUi
         row.AddThemeConstantOverride("separation", 18);
         panel.AddChild(row);
 
+        var glyphSlot = new CenterContainer
+        {
+            CustomMinimumSize = new Vector2(68f, 54f),
+            MouseFilter = Control.MouseFilterEnum.Pass,
+            SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter,
+            SizeFlagsVertical = Control.SizeFlags.Fill,
+        };
+        row.AddChild(glyphSlot);
+
         var glyph = new RichTextLabel
         {
             BbcodeEnabled = true,
@@ -854,10 +863,11 @@ internal static class RelicCompendiumFilterUi
             ScrollActive = false,
             HintUnderlined = false,
             MouseFilter = Control.MouseFilterEnum.Stop,
-            CustomMinimumSize = new Vector2(68f, 54f),
+            CustomMinimumSize = new Vector2(40f, 40f),
+            SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter,
             SizeFlagsVertical = Control.SizeFlags.ShrinkCenter,
         };
-        row.AddChild(glyph);
+        glyphSlot.AddChild(glyph);
 
         var text = new VBoxContainer
         {

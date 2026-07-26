@@ -11,6 +11,16 @@
         "description": "An activation occurs when an effect successfully triggers."
       }
     },
+    "attack": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/packed/card_library/type_sort_attack.png"
+      },
+      "help": {
+        "label": "Attack",
+        "description": "An Attack card or a count of Attack cards."
+      }
+    },
     "average": {
       "display": {
         "type": "embedded_image",
@@ -39,6 +49,28 @@
       "help": {
         "label": "Card",
         "description": "A card or a count of cards."
+      }
+    },
+    "card_rare": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/ui/reward_screen/reward_icon_card.png",
+        "modulate": "#EFC850"
+      },
+      "help": {
+        "label": "Rare card",
+        "description": "A Rare card or a count of Rare cards."
+      }
+    },
+    "card_uncommon": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/ui/reward_screen/reward_icon_card.png",
+        "modulate": "#87CEEB"
+      },
+      "help": {
+        "label": "Uncommon card",
+        "description": "An Uncommon card or a count of Uncommon cards."
       }
     },
     "charge": {
@@ -109,6 +141,26 @@
       "help": {
         "label": "Osty summon gained",
         "description": "An increase to Osty's summon amount."
+      }
+    },
+    "power": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/packed/card_library/type_sort_power.png"
+      },
+      "help": {
+        "label": "Power",
+        "description": "A Power card or a count of Power cards."
+      }
+    },
+    "skill": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/packed/card_library/type_sort_skill.png"
+      },
+      "help": {
+        "label": "Skill",
+        "description": "A Skill card or a count of Skill cards."
       }
     },
     "turn": {

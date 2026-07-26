@@ -44,8 +44,32 @@ public class RelicStatRowVocabularyTests
         "")]
     [InlineData(
         "Non-upgraded attacks in combat",
-        "Non-upgraded attacks",
-        "combat")]
+        "Non-upgraded",
+        "attack,combat")]
+    [InlineData(
+        "Commons picked",
+        "picked",
+        "card")]
+    [InlineData(
+        "Uncommons picked",
+        "picked",
+        "card_uncommon")]
+    [InlineData(
+        "Rares picked",
+        "picked",
+        "card_rare")]
+    [InlineData(
+        "Attacks copied",
+        "copied",
+        "attack")]
+    [InlineData(
+        "Powers copied",
+        "copied",
+        "power")]
+    [InlineData(
+        "Skills copied",
+        "copied",
+        "skill")]
     public void Create_ReplacesKnownRelicConceptWords(
         string label,
         string expectedLabel,

@@ -20,6 +20,7 @@ internal sealed record StatConceptResource(
 internal sealed record StatConceptDisplay(
     StatConceptDisplayType Type,
     string Value,
+    string Modulate,
     IReadOnlyList<StatConceptResource> Resources);
 
 internal sealed record StatConcept(
@@ -142,7 +143,10 @@ internal static class StatConceptGlossary
 
     private static string RenderGameResource(StatConcept concept, int size)
     {
-        return RenderImage(concept.Display.Value, size);
+        return RenderImage(
+            concept.Display.Value,
+            size,
+            concept.Display.Modulate);
     }
 
     private static string RenderGeneratedConceptImage(StatConcept concept, int size)
@@ -154,14 +158,25 @@ internal static class StatConceptGlossary
     }
 
     internal static string RenderImage(string path, int size)
+        => RenderImage(path, size, "#FFFFFF");
+
+    private static string RenderImage(string path, int size, string modulate)
     {
         return GameResourceRegions.TryGetValue(path, out var region)
-            ? RenderImage(path, size, region)
-            : $"[img width={size} height={size} align=center]{path}[/img]";
+            ? RenderImage(path, size, region, modulate)
+            : $"[img width={size} height={size} color={modulate} align=center]"
+              + $"{path}[/img]";
     }
 
-    private static string RenderImage(string path, int size, string region)
-        => $"[img width={size} height={size} region={region} align=center]{path}[/img]";
+    private static string RenderImage(
+        string path,
+        int size,
+        string region,
+        string modulate)
+    {
+        return $"[img width={size} height={size} region={region} "
+               + $"color={modulate} align=center]{path}[/img]";
+    }
 
     internal static string RenderInlineImage(string path)
         => RenderImage(path, IconSlotSize);
@@ -430,18 +445,11 @@ internal static class StatConceptGlossary
         Rect2I content;
         if (texture is AtlasTexture atlas)
         {
-            content = atlas.Margin.Size.X > 0f
-                      && atlas.Margin.Size.Y > 0f
-                ? new Rect2I(
-                    (int)Math.Round(atlas.Margin.Position.X),
-                    (int)Math.Round(atlas.Margin.Position.Y),
-                    Math.Max(1, (int)Math.Round(atlas.Margin.Size.X)),
-                    Math.Max(1, (int)Math.Round(atlas.Margin.Size.Y)))
-                : new Rect2I(
-                    0,
-                    0,
-                    texture.GetWidth(),
-                    texture.GetHeight());
+            content = new Rect2I(
+                (int)Math.Round(atlas.Margin.Position.X),
+                (int)Math.Round(atlas.Margin.Position.Y),
+                Math.Max(1, (int)Math.Round(atlas.Region.Size.X)),
+                Math.Max(1, (int)Math.Round(atlas.Region.Size.Y)));
         }
         else
         {
@@ -592,7 +600,8 @@ internal static class StatConceptGlossary
                 element,
                 $"{id}.display",
                 "type",
-                "path");
+                "path",
+                "modulate");
             var path = RequireString(element, "path", $"{id}.display");
             if (!path.StartsWith("res://", StringComparison.Ordinal))
             {
@@ -603,6 +612,7 @@ internal static class StatConceptGlossary
             return new StatConceptDisplay(
                 StatConceptDisplayType.GameResource,
                 path,
+                ReadOptionalColor(element, "modulate", "#FFFFFF", $"{id}.display"),
                 Array.Empty<StatConceptResource>());
         }
 
@@ -632,6 +642,7 @@ internal static class StatConceptGlossary
             return new StatConceptDisplay(
                 StatConceptDisplayType.GameResourceGroup,
                 string.Empty,
+                "#FFFFFF",
                 resources);
         }
 
@@ -647,6 +658,7 @@ internal static class StatConceptGlossary
             return new StatConceptDisplay(
                 StatConceptDisplayType.EmbeddedImage,
                 resource,
+                "#FFFFFF",
                 Array.Empty<StatConceptResource>());
         }
 
@@ -731,6 +743,40 @@ internal static class StatConceptGlossary
         }
 
         return value;
+    }
+
+    private static string ReadOptionalColor(
+        JsonElement element,
+        string propertyName,
+        string defaultValue,
+        string context)
+    {
+        if (!element.TryGetProperty(propertyName, out var property))
+            return defaultValue;
+        if (property.ValueKind != JsonValueKind.String
+            || string.IsNullOrWhiteSpace(property.GetString()))
+        {
+            throw new InvalidOperationException(
+                $"Stat concept glossary '{context}.{propertyName}' "
+                + "must be a nonblank color.");
+        }
+
+        var color = property.GetString()!.Trim();
+        if (!IsHexColor(color))
+        {
+            throw new InvalidOperationException(
+                $"Stat concept glossary '{context}.{propertyName}' "
+                + $"must be #RRGGBB or #RRGGBBAA, got '{color}'.");
+        }
+
+        return color;
+    }
+
+    private static bool IsHexColor(string value)
+    {
+        return value.Length is 7 or 9
+               && value[0] == '#'
+               && value.Skip(1).All(Uri.IsHexDigit);
     }
 
     private static void RequireOnlyProperties(
