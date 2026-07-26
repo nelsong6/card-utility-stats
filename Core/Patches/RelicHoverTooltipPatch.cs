@@ -419,6 +419,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is GoldPlatedCables)
+        {
+            title = "Gold-Plated Cables";
+            body = BuildGoldPlatedCablesBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is HappyFlower or FakeHappyFlower)
         {
             title = relicModel is FakeHappyFlower
@@ -1583,6 +1590,71 @@ public static class RelicHoverShowPatch
             agg.CrackedCoreOrbPassiveTriggers.ToString(),
             "");
         Row3(sb, "Times orb fizzled", agg.CrackedCoreOrbFizzles.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildGoldPlatedCablesBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(
+            sb,
+            "Activations with orb",
+            agg.Activations.ToString(),
+            "",
+            "Activations with orb — times Gold-Plated Cables increased the passive trigger count of the owner's first orb.");
+
+        var activationsByOrb = agg.GoldPlatedCablesActivationsByOrbType
+            ?? new Dictionary<string, RelicOrbActivationAggregate>();
+        var standardOrbs = new[]
+        {
+            ("ORB.LIGHTNING", "Lightning"),
+            ("ORB.FROST", "Frost"),
+            ("ORB.DARK", "Dark"),
+            ("ORB.PLASMA", "Plasma"),
+            ("ORB.GLASS", "Glass"),
+        };
+
+        foreach (var (orbId, fallbackName) in standardOrbs)
+        {
+            activationsByOrb.TryGetValue(orbId, out var bucket);
+            var displayName = string.IsNullOrWhiteSpace(bucket?.DisplayName)
+                ? fallbackName
+                : bucket.DisplayName;
+            Row3(
+                sb,
+                $"{displayName} activations",
+                Math.Max(0, bucket?.Activations ?? 0).ToString(),
+                "",
+                $"{displayName} activations — confirmed Gold-Plated Cables activations that targeted a {displayName} orb.");
+        }
+
+        foreach (var bucket in activationsByOrb
+                     .Where(kvp => standardOrbs.All(standard =>
+                         !string.Equals(
+                             standard.Item1,
+                             kvp.Key,
+                             StringComparison.Ordinal)))
+                     .Select(kvp => kvp.Value)
+                     .Where(bucket => bucket != null && bucket.Activations > 0)
+                     .OrderBy(bucket => bucket.DisplayName, StringComparer.Ordinal))
+        {
+            var displayName = string.IsNullOrWhiteSpace(bucket.DisplayName)
+                ? RunTracker.FormatOrbIdForDisplay(bucket.OrbId)
+                : bucket.DisplayName;
+            Row3(
+                sb,
+                $"{displayName} activations",
+                bucket.Activations.ToString(),
+                "",
+                $"{displayName} activations — confirmed Gold-Plated Cables activations that targeted a {displayName} orb.");
+        }
+
+        Row3(
+            sb,
+            "Turns with no orb to target",
+            agg.GoldPlatedCablesNoOrbTargets.ToString(),
+            "",
+            "Turns with no orb to target — player turns that ended while Gold-Plated Cables had no first orb available.");
         return sb.ToString();
     }
 

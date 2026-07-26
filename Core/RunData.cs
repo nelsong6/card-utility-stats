@@ -790,6 +790,14 @@ public class RelicAggregate
     public int CrackedCoreOrbPassiveTriggers { get; set; }
     public int CrackedCoreOrbFizzles { get; set; }
 
+    // Gold-Plated Cables tracking. Activations is the total number of confirmed
+    // extra passive triggers with a first orb available. The per-orb ledger
+    // preserves the exact orb type selected by the game's modifier hook.
+    // Empty opportunities are sampled at each owner end-turn orb-queue pass.
+    public Dictionary<string, RelicOrbActivationAggregate>
+        GoldPlatedCablesActivationsByOrbType { get; set; } = new();
+    public int GoldPlatedCablesNoOrbTargets { get; set; }
+
     // Total relevant player turns that ended with unspent energy while the
     // matching turn-energy relic was held.
     public int FirstTurnsEndedWithExcessEnergy { get; set; }
@@ -1197,6 +1205,13 @@ public class RelicCardAggregate
     public string CardId { get; set; } = "";
     public string DisplayName { get; set; } = "";
     public int Count { get; set; }
+}
+
+public class RelicOrbActivationAggregate
+{
+    public string OrbId { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public int Activations { get; set; }
 }
 
 public class RelicEnchantedCardAggregate

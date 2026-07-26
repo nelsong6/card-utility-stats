@@ -323,6 +323,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `cracked-core-relic-run.json`
   Adds lifecycle tracking for the exact Lightning orb Cracked Core channels:
   completed evokes, passive triggers, and non-evoke slot-removal fizzles.
+- `gold-plated-cables-relic-run.json`
+  Adds Gold-Plated Cables' confirmed activations with an orb, exact activation
+  counts by orb type, and player turn ends where no orb was available.
 - `reptile-trinket-rates-run.json`
   Adds Reptile Trinket's held turn/combat denominators plus mutually exclusive
   turn buckets for exactly two and more than two activations.

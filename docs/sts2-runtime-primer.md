@@ -970,6 +970,16 @@ non-evoke removal path is `OrbQueue.RemoveCapacity`, currently used by Bulk
 Up, so compare raw queue references around that method for fizzles. Normal
 combat cleanup uses `OrbQueue.Clear` and must not count as a fizzle.
 
+Gold-Plated Cables contributes through the global
+`Hook.ModifyOrbPassiveTriggerCount` chain. That hook's returned
+`modifyingModels` list is the authoritative confirmation that the relic
+actually increased the trigger count. Observe that list when it is passed to
+`Hook.AfterModifyingOrbPassiveTriggerCount`; its `OrbModel` argument is the
+exact first orb that received the additional passive trigger. When the queue
+is empty, neither the relic modifier nor its follow-up callback runs; count
+that missed opportunity separately at the tracked owner's exact
+`OrbQueue.BeforeTurnEnd` pass, not from generic orb traffic.
+
 Shovel adds `DigRestSiteOption` from `TryModifyRestSiteOptions`; the relic
 itself does not receive the obtained relic payload. Patch
 `DigRestSiteOption.OnSelect`, snapshot the owner's relic inventory before the

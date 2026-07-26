@@ -1764,6 +1764,9 @@ public static class RunTracker
         target.CrackedCoreOrbEvokes += source.CrackedCoreOrbEvokes;
         target.CrackedCoreOrbPassiveTriggers += source.CrackedCoreOrbPassiveTriggers;
         target.CrackedCoreOrbFizzles += source.CrackedCoreOrbFizzles;
+        MergeGoldPlatedCablesOrbActivations(target, source);
+        target.GoldPlatedCablesNoOrbTargets +=
+            source.GoldPlatedCablesNoOrbTargets;
         target.FirstTurnsEndedWithExcessEnergy += source.FirstTurnsEndedWithExcessEnergy;
         target.SecondTurnsEndedWithExcessEnergy += source.SecondTurnsEndedWithExcessEnergy;
         target.ThirdTurnsEndedWithExcessEnergy += source.ThirdTurnsEndedWithExcessEnergy;
@@ -4207,6 +4210,7 @@ public static class RunTracker
     private const string FragrantMushroomRelicId = "RELIC.FRAGRANT_MUSHROOM";
     private const string ArtOfWarRelicId = "RELIC.ART_OF_WAR";
     private const string CrackedCoreRelicId = "RELIC.CRACKED_CORE";
+    private const string GoldPlatedCablesRelicId = "RELIC.GOLD_PLATED_CABLES";
     private const string FishingRodRelicId = "RELIC.FISHING_ROD";
     private const string MoltenEggRelicId = "RELIC.MOLTEN_EGG";
     private const string ToxicEggRelicId = "RELIC.TOXIC_EGG";
@@ -12733,6 +12737,103 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Record a confirmed Gold-Plated Cables trigger-count increase for the
+    /// exact first orb passed through the game's modifier chain.
+    /// </summary>
+    public static void RecordGoldPlatedCablesActivation(
+        GoldPlatedCables relic,
+        OrbModel orb)
+    {
+        if (relic?.Owner == null || orb == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(relic.Owner)) return;
+                if (!ReferenceEquals(orb.Owner, relic.Owner)) return;
+                if (CombatManager.Instance?.IsInProgress != true) return;
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(
+                    GoldPlatedCablesRelicId);
+                RecordGoldPlatedCablesActivationForTest(
+                    agg,
+                    orb.Id.ToString(),
+                    GetOrbDisplayName(orb));
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordGoldPlatedCablesActivation failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gold-Plated Cables has no owner callback when the queue is empty. Count
+    /// that missed opportunity at the owner's exact end-turn orb-queue pass.
+    /// </summary>
+    public static void RecordGoldPlatedCablesNoOrbTurnEnd(Player? player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (CombatManager.Instance?.IsInProgress != true) return;
+                if (!IsTrackedPlayer(player)) return;
+                if (!PlayerHasRelic(
+                        player,
+                        GoldPlatedCablesRelicId,
+                        relic => relic is GoldPlatedCables))
+                {
+                    return;
+                }
+
+                if (player.PlayerCombatState?.OrbQueue?.Orbs.Count != 0) return;
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(
+                    GoldPlatedCablesRelicId);
+                RecordGoldPlatedCablesNoOrbTargetForTest(agg);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordGoldPlatedCablesNoOrbTurnEnd failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordGoldPlatedCablesActivationForTest(
+        RelicAggregate agg,
+        string? orbId,
+        string? displayName,
+        int count = 1)
+    {
+        if (agg == null || string.IsNullOrWhiteSpace(orbId)) return;
+        var normalizedCount = Math.Max(0, count);
+        if (normalizedCount <= 0) return;
+
+        agg.GoldPlatedCablesActivationsByOrbType ??=
+            new Dictionary<string, RelicOrbActivationAggregate>();
+        agg.Activations += normalizedCount;
+        AddGoldPlatedCablesOrbActivation(
+            agg.GoldPlatedCablesActivationsByOrbType,
+            orbId,
+            displayName ?? "",
+            normalizedCount);
+    }
+
+    internal static void RecordGoldPlatedCablesNoOrbTargetForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.GoldPlatedCablesNoOrbTargets += Math.Max(0, count);
+    }
+
+    /// <summary>
     /// Record a Nunchaku-owned attack play and arm energy attribution if the
     /// relic's live counter is one attack away from its energy trigger.
     /// </summary>
@@ -18868,6 +18969,33 @@ public static class RunTracker
         }
     }
 
+    private static void MergeGoldPlatedCablesOrbActivations(
+        RelicAggregate target,
+        RelicAggregate source)
+    {
+        target.GoldPlatedCablesActivationsByOrbType ??=
+            new Dictionary<string, RelicOrbActivationAggregate>();
+        if (source.GoldPlatedCablesActivationsByOrbType == null
+            || source.GoldPlatedCablesActivationsByOrbType.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var kvp in source.GoldPlatedCablesActivationsByOrbType)
+        {
+            var orb = kvp.Value;
+            if (orb == null || orb.Activations <= 0) continue;
+            var orbId = string.IsNullOrWhiteSpace(orb.OrbId)
+                ? kvp.Key
+                : orb.OrbId;
+            AddGoldPlatedCablesOrbActivation(
+                target.GoldPlatedCablesActivationsByOrbType,
+                orbId,
+                orb.DisplayName,
+                orb.Activations);
+        }
+    }
+
     private static void MergeRelicCardTransformations(RelicAggregate target, RelicAggregate source)
     {
         if (source.CardTransformations == null || source.CardTransformations.Count == 0) return;
@@ -18960,6 +19088,38 @@ public static class RunTracker
         agg.Count += count;
     }
 
+    private static void AddGoldPlatedCablesOrbActivation(
+        Dictionary<string, RelicOrbActivationAggregate> orbs,
+        string orbId,
+        string displayName,
+        int count)
+    {
+        if (count <= 0 || string.IsNullOrWhiteSpace(orbId)) return;
+
+        if (!orbs.TryGetValue(orbId, out var agg))
+        {
+            agg = new RelicOrbActivationAggregate
+            {
+                OrbId = orbId,
+                DisplayName = string.IsNullOrWhiteSpace(displayName)
+                    ? FormatOrbIdForDisplay(orbId)
+                    : displayName,
+            };
+            orbs[orbId] = agg;
+        }
+
+        if (string.IsNullOrWhiteSpace(agg.OrbId))
+            agg.OrbId = orbId;
+        if (string.IsNullOrWhiteSpace(agg.DisplayName))
+        {
+            agg.DisplayName = string.IsNullOrWhiteSpace(displayName)
+                ? FormatOrbIdForDisplay(orbId)
+                : displayName;
+        }
+
+        agg.Activations += count;
+    }
+
     private static string GetCardDisplayName(CardModel card)
     {
         try
@@ -18997,6 +19157,41 @@ public static class RunTracker
         }
 
         return FormatRelicIdForDisplay(relic.Id.ToString());
+    }
+
+    private static string GetOrbDisplayName(OrbModel orb)
+    {
+        try
+        {
+            var title = orb.Title.GetFormattedText();
+            if (!string.IsNullOrWhiteSpace(title))
+                return title;
+        }
+        catch
+        {
+        }
+
+        try
+        {
+            var title = orb.Title.GetRawText();
+            if (!string.IsNullOrWhiteSpace(title))
+                return title;
+        }
+        catch
+        {
+        }
+
+        return FormatOrbIdForDisplay(orb.Id.ToString());
+    }
+
+    internal static string FormatOrbIdForDisplay(string orbId)
+    {
+        var value = orbId;
+        const string prefix = "ORB.";
+        if (value.StartsWith(prefix, StringComparison.Ordinal))
+            value = value[prefix.Length..];
+
+        return ToDisplayName(value);
     }
 
     private static string ToDisplayName(string key)

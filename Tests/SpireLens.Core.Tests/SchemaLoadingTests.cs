@@ -3879,6 +3879,29 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsGoldPlatedCablesRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("gold-plated-cables-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertGoldPlatedCablesFixture(
+            loaded.Data.RelicAggregates["RELIC.GOLD_PLATED_CABLES"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsGoldPlatedCablesRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("gold-plated-cables-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertGoldPlatedCablesFixture(
+            resumed!.RelicAggregates["RELIC.GOLD_PLATED_CABLES"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsPaelsClawRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("paels-claw-relic-run.json"));
@@ -4070,6 +4093,28 @@ public class SchemaLoadingTests
         Assert.Equal(3, relicAgg.CrackedCoreOrbEvokes);
         Assert.Equal(7, relicAgg.CrackedCoreOrbPassiveTriggers);
         Assert.Equal(1, relicAgg.CrackedCoreOrbFizzles);
+    }
+
+    private static void AssertGoldPlatedCablesFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(7, relicAgg.Activations);
+        Assert.Equal(
+            4,
+            relicAgg.GoldPlatedCablesActivationsByOrbType["ORB.LIGHTNING"]
+                .Activations);
+        Assert.Equal(
+            "Lightning",
+            relicAgg.GoldPlatedCablesActivationsByOrbType["ORB.LIGHTNING"]
+                .DisplayName);
+        Assert.Equal(
+            2,
+            relicAgg.GoldPlatedCablesActivationsByOrbType["ORB.FROST"]
+                .Activations);
+        Assert.Equal(
+            1,
+            relicAgg.GoldPlatedCablesActivationsByOrbType["ORB.PLASMA"]
+                .Activations);
+        Assert.Equal(3, relicAgg.GoldPlatedCablesNoOrbTargets);
     }
 
     private static void AssertStoneHumidifierFixture(RelicAggregate relicAgg)
