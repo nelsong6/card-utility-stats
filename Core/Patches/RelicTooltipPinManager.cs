@@ -4,13 +4,14 @@ using Godot;
 using MegaCrit.Sts2.Core.HoverTips;
 using MegaCrit.Sts2.Core.Nodes.HoverTips;
 using MegaCrit.Sts2.Core.Nodes.Relics;
+using MegaCrit.Sts2.Core.Nodes.Screens.RelicCollection;
 
 namespace SpireLens.Core.Patches;
 
 /// <summary>
-/// Pins one owned-relic tooltip set at a time. The pinned set uses a dedicated
-/// native owner so the relic's ordinary OnUnfocus/Remove lifecycle can run
-/// unchanged without dismissing it.
+/// Pins one relic tooltip set at a time. The pinned set uses a dedicated native
+/// owner so the relic's ordinary OnUnfocus/Remove lifecycle can run unchanged
+/// without dismissing it.
 /// </summary>
 internal static class RelicTooltipPinManager
 {
@@ -20,26 +21,26 @@ internal static class RelicTooltipPinManager
         "res://images/ui/top_panel/reminder_lock.png";
     private const string HintOwnerNodeName = "SpireLensPinnedRelicHintOwner";
 
-    private sealed class HolderSubscription
+    private sealed class TargetSubscription
     {
-        public HolderSubscription(
-            NRelicInventoryHolder holder,
+        public TargetSubscription(
+            Control target,
             Control.GuiInputEventHandler guiInputHandler,
             Action treeExitingHandler)
         {
-            Holder = holder;
+            Target = target;
             GuiInputHandler = guiInputHandler;
             TreeExitingHandler = treeExitingHandler;
         }
 
-        public NRelicInventoryHolder Holder { get; }
+        public Control Target { get; }
         public Control.GuiInputEventHandler GuiInputHandler { get; }
         public Action TreeExitingHandler { get; }
     }
 
-    private static readonly Dictionary<ulong, HolderSubscription> Subscriptions = new();
+    private static readonly Dictionary<ulong, TargetSubscription> Subscriptions = new();
 
-    private static NRelicInventoryHolder? _pinnedHolder;
+    private static Control? _pinnedTarget;
     private static Control? _pinOwner;
     private static NHoverTipSet? _pinnedTipSet;
     private static RichTextLabel? _pinnedStatsDescription;
@@ -51,30 +52,42 @@ internal static class RelicTooltipPinManager
 
     public static void Attach(NRelicInventoryHolder? holder)
     {
-        if (!IsLive(holder)) return;
+        if (holder != null)
+            AttachTarget(holder);
+    }
 
-        var instanceId = holder!.GetInstanceId();
+    public static void Attach(NRelicCollectionEntry? entry)
+    {
+        if (entry != null)
+            AttachTarget(entry);
+    }
+
+    private static void AttachTarget(Control target)
+    {
+        if (!IsLive(target)) return;
+
+        var instanceId = target.GetInstanceId();
         if (Subscriptions.ContainsKey(instanceId)) return;
 
         Control.GuiInputEventHandler guiInputHandler = inputEvent =>
-            OnGuiInput(holder, inputEvent);
+            OnGuiInput(target, inputEvent);
         Action treeExitingHandler = () =>
-            OnHolderTreeExiting(holder, instanceId);
+            OnTargetTreeExiting(target, instanceId);
 
-        holder.GuiInput += guiInputHandler;
-        holder.TreeExiting += treeExitingHandler;
-        Subscriptions[instanceId] = new HolderSubscription(
-            holder,
+        target.GuiInput += guiInputHandler;
+        target.TreeExiting += treeExitingHandler;
+        Subscriptions[instanceId] = new TargetSubscription(
+            target,
             guiInputHandler,
             treeExitingHandler);
     }
 
     public static void ReconcilePinnedState()
     {
-        if (_pinnedHolder == null) return;
+        if (_pinnedTarget == null) return;
 
-        if (!IsLive(_pinnedHolder)
-            || !_pinnedHolder!.IsVisibleInTree()
+        if (!IsLive(_pinnedTarget)
+            || !_pinnedTarget!.IsVisibleInTree()
             || !IsLive(_pinOwner)
             || !IsLive(_pinnedTipSet)
             || _pinnedTipSet!.IsQueuedForDeletion())
@@ -88,7 +101,7 @@ internal static class RelicTooltipPinManager
 
     public static void UnpinIfHolder(NRelicInventoryHolder holder)
     {
-        if (ReferenceEquals(_pinnedHolder, holder))
+        if (ReferenceEquals(_pinnedTarget, holder))
             ClearPin(restoreOrdinaryHover: false);
     }
 
@@ -98,10 +111,10 @@ internal static class RelicTooltipPinManager
 
         foreach (var subscription in Subscriptions.Values)
         {
-            if (!IsLive(subscription.Holder)) continue;
+            if (!IsLive(subscription.Target)) continue;
 
-            subscription.Holder.GuiInput -= subscription.GuiInputHandler;
-            subscription.Holder.TreeExiting -= subscription.TreeExitingHandler;
+            subscription.Target.GuiInput -= subscription.GuiInputHandler;
+            subscription.Target.TreeExiting -= subscription.TreeExitingHandler;
         }
 
         Subscriptions.Clear();
@@ -118,18 +131,18 @@ internal static class RelicTooltipPinManager
     /// </summary>
     internal static void DismissOnGlobalAction(InputEvent inputEvent)
     {
-        if (_pinnedHolder == null || !IsDismissAction(inputEvent))
+        if (_pinnedTarget == null || !IsDismissAction(inputEvent))
             return;
 
-        // A right press inside the pinned relic belongs to that holder's
+        // A right press inside the pinned relic belongs to that target's
         // _GuiInput toggle. Do not clear it here first: Godot dispatches
         // _Input before _GuiInput, and clearing globally would make the
-        // holder see an unpinned relic and pin it again.
-        if (IsRightClickInsidePinnedHolder(inputEvent))
+        // target see an unpinned relic and pin it again.
+        if (IsRightClickInsidePinnedTarget(inputEvent))
             return;
 
         // _Input runs before _GuiInput. Remember the event so a right click
-        // that dismissed a pin cannot reach a relic holder later in the same
+        // that dismissed a pin cannot reach another relic later in the same
         // dispatch and immediately create a new pin.
         _dismissedInputEventId = inputEvent.GetInstanceId();
         ClearPin(restoreOrdinaryHover: false);
@@ -169,27 +182,29 @@ internal static class RelicTooltipPinManager
         // call returns, so reconciling the surrogate here would mistake the
         // in-progress pin for a dead one and remove the SpireLens page before
         // NativeStatsHoverTipFactory can append it.
-        if (owner is not NRelicInventoryHolder holder)
+        if (owner is not NRelicInventoryHolder
+            && owner is not NRelicCollectionEntry)
+        {
             return false;
+        }
 
         ReconcilePinnedState();
-        return ReferenceEquals(_pinnedHolder, holder);
+        return ReferenceEquals(_pinnedTarget, owner);
     }
 
-    internal static bool TryGetPinnedHolder(
+    internal static bool TryBuildPinnedStatsTip(
         Control owner,
-        out NRelicInventoryHolder holder)
+        out HoverTip tip)
     {
-        holder = null!;
-        if (!ReferenceEquals(owner, _pinOwner) || !IsLive(_pinnedHolder))
+        tip = default;
+        if (!ReferenceEquals(owner, _pinOwner) || !IsLive(_pinnedTarget))
             return false;
 
-        holder = _pinnedHolder!;
-        return true;
+        return TryBuildStatsTip(_pinnedTarget!, out tip);
     }
 
     private static void OnGuiInput(
-        NRelicInventoryHolder holder,
+        Control target,
         InputEvent inputEvent)
     {
         if (inputEvent is not InputEventMouseButton
@@ -204,7 +219,7 @@ internal static class RelicTooltipPinManager
         if (_dismissedInputEventId == inputEvent.GetInstanceId())
         {
             _dismissedInputEventId = 0;
-            holder.GetViewport()?.SetInputAsHandled();
+            target.GetViewport()?.SetInputAsHandled();
             return;
         }
 
@@ -212,17 +227,17 @@ internal static class RelicTooltipPinManager
         {
             ReconcilePinnedState();
 
-            if (ReferenceEquals(_pinnedHolder, holder))
+            if (ReferenceEquals(_pinnedTarget, target))
             {
                 ClearPin(restoreOrdinaryHover: true);
             }
             else
             {
-                if (!CanPin(holder)) return;
-                Pin(holder);
+                if (!CanPin(target)) return;
+                Pin(target);
             }
 
-            holder.GetViewport()?.SetInputAsHandled();
+            target.GetViewport()?.SetInputAsHandled();
         }
         catch (Exception e)
         {
@@ -230,20 +245,25 @@ internal static class RelicTooltipPinManager
         }
     }
 
-    private static bool CanPin(NRelicInventoryHolder holder)
+    private static bool CanPin(Control target)
     {
-        return IsLive(holder)
-               && holder.IsVisibleInTree()
+        return IsLive(target)
+               && target.IsVisibleInTree()
                && ViewStatsInjectorPatch.StatsVisibilityEnabled
-               && RelicHoverShowPatch.TryBuildNativeHoverTip(holder, out _);
+               && TryBuildStatsTip(target, out _)
+               && TryGetNativeHoverTips(target, out _);
     }
 
-    private static void Pin(NRelicInventoryHolder holder)
+    private static void Pin(Control target)
     {
         ClearPin(restoreOrdinaryHover: false);
-        if (!CanPin(holder)) return;
+        if (!CanPin(target)
+            || !TryGetNativeHoverTips(target, out var nativeHoverTips))
+        {
+            return;
+        }
 
-        NHoverTipSet.Remove(holder);
+        NHoverTipSet.Remove(target);
 
         var pinOwner = new Control
         {
@@ -251,16 +271,16 @@ internal static class RelicTooltipPinManager
             MouseFilter = Control.MouseFilterEnum.Ignore,
             FocusMode = Control.FocusModeEnum.None,
         };
-        holder.AddChild(pinOwner);
+        target.AddChild(pinOwner);
 
-        _pinnedHolder = holder;
+        _pinnedTarget = target;
         _pinOwner = pinOwner;
 
         try
         {
             var tipSet = NHoverTipSet.CreateAndShow(
                 pinOwner,
-                holder.Relic.Model.HoverTips);
+                nativeHoverTips);
             if (tipSet == null)
             {
                 ClearPin(restoreOrdinaryHover: false);
@@ -268,12 +288,12 @@ internal static class RelicTooltipPinManager
             }
 
             _pinnedTipSet = tipSet;
-            tipSet.SetAlignmentForRelic(holder.Relic);
+            AlignPinnedTipSet(target, tipSet);
             _pinnedStatsDescription =
                 NativeStatsHoverTipStyler.GetLastStatsDescription(tipSet);
-            AddLockIcon(holder);
+            AddLockIcon(target);
             CoreMain.LogDebug(
-                $"Pinned relic tooltip: {holder.Relic.Model.Id}");
+                $"Pinned relic tooltip: {GetRelicDebugId(target)}");
         }
         catch
         {
@@ -284,10 +304,10 @@ internal static class RelicTooltipPinManager
 
     private static void ClearPin(bool restoreOrdinaryHover)
     {
-        var holder = _pinnedHolder;
+        var target = _pinnedTarget;
         var pinOwner = _pinOwner;
 
-        _pinnedHolder = null;
+        _pinnedTarget = null;
         _pinOwner = null;
         _pinnedTipSet = null;
         _pinnedStatsDescription = null;
@@ -300,21 +320,106 @@ internal static class RelicTooltipPinManager
             pinOwner.QueueFree();
         }
 
-        if (IsLive(holder))
-            RemoveLockIcon(holder!);
+        if (IsLive(target))
+            RemoveLockIcon(target!);
 
         if (!restoreOrdinaryHover
-            || !IsLive(holder)
-            || !holder!.IsVisibleInTree()
+            || !IsLive(target)
+            || !target!.IsVisibleInTree()
             || !ViewStatsInjectorPatch.StatsVisibilityEnabled)
         {
             return;
         }
 
-        var ordinaryTipSet = NHoverTipSet.CreateAndShow(
-            holder,
-            holder.Relic.Model.HoverTips);
-        ordinaryTipSet?.SetAlignmentForRelic(holder.Relic);
+        RestoreOrdinaryHover(target);
+    }
+
+    private static bool TryBuildStatsTip(Control target, out HoverTip tip)
+    {
+        switch (target)
+        {
+            case NRelicInventoryHolder holder:
+                return RelicHoverShowPatch.TryBuildNativeHoverTip(holder, out tip);
+
+            case NRelicCollectionEntry entry:
+                return CompendiumRelicStatsContext.TryBuildNativeHoverTip(entry, out tip);
+
+            default:
+                tip = default;
+                return false;
+        }
+    }
+
+    private static bool TryGetNativeHoverTips(
+        Control target,
+        out IEnumerable<IHoverTip> nativeHoverTips)
+    {
+        switch (target)
+        {
+            case NRelicInventoryHolder holder:
+                nativeHoverTips = holder.Relic.Model.HoverTips;
+                return true;
+
+            case NRelicCollectionEntry entry
+                when CompendiumRelicStatsContext.TryGetRelicModel(entry, out var relicModel):
+                nativeHoverTips = relicModel.HoverTips;
+                return true;
+
+            default:
+                nativeHoverTips = null!;
+                return false;
+        }
+    }
+
+    private static void AlignPinnedTipSet(Control target, NHoverTipSet tipSet)
+    {
+        switch (target)
+        {
+            case NRelicInventoryHolder holder:
+                tipSet.SetAlignmentForRelic(holder.Relic);
+                break;
+
+            case NRelicCollectionEntry entry:
+                tipSet.SetAlignment(entry, HoverTip.GetHoverTipAlignment(entry));
+                break;
+        }
+    }
+
+    private static void RestoreOrdinaryHover(Control target)
+    {
+        if (!CanPin(target)
+            || !TryGetNativeHoverTips(target, out var nativeHoverTips))
+        {
+            return;
+        }
+
+        switch (target)
+        {
+            case NRelicInventoryHolder holder:
+                NHoverTipSet.CreateAndShow(target, nativeHoverTips)
+                    ?.SetAlignmentForRelic(holder.Relic);
+                break;
+
+            case NRelicCollectionEntry entry:
+                NHoverTipSet.CreateAndShow(
+                        target,
+                        nativeHoverTips,
+                        HoverTip.GetHoverTipAlignment(entry))
+                    ?.SetFollowOwner();
+                break;
+        }
+    }
+
+    private static string GetRelicDebugId(Control target)
+    {
+        return target switch
+        {
+            NRelicInventoryHolder holder => holder.Relic.Model.Id.ToString(),
+            NRelicCollectionEntry entry
+                when CompendiumRelicStatsContext.TryGetRelicModel(entry, out var relicModel)
+                => relicModel.Id.ToString(),
+            _ => target.Name,
+        };
     }
 
     private static void ShowHintPopup(string tooltip, Vector2 pointerPosition)
@@ -368,9 +473,9 @@ internal static class RelicTooltipPinManager
         hintOwner.QueueFree();
     }
 
-    private static void AddLockIcon(NRelicInventoryHolder holder)
+    private static void AddLockIcon(Control target)
     {
-        RemoveLockIcon(holder);
+        RemoveLockIcon(target);
         var texture = GetLockTexture();
         if (texture == null) return;
 
@@ -390,12 +495,12 @@ internal static class RelicTooltipPinManager
             OffsetTop = 2f,
             OffsetBottom = 30f,
         };
-        holder.AddChild(lockIcon);
+        target.AddChild(lockIcon);
     }
 
-    private static void RemoveLockIcon(NRelicInventoryHolder holder)
+    private static void RemoveLockIcon(Control target)
     {
-        var lockIcon = holder.GetNodeOrNull<TextureRect>(LockIconNodeName);
+        var lockIcon = target.GetNodeOrNull<TextureRect>(LockIconNodeName);
         if (!IsLive(lockIcon)) return;
 
         lockIcon!.GetParent()?.RemoveChild(lockIcon);
@@ -420,11 +525,11 @@ internal static class RelicTooltipPinManager
         return _lockTexture;
     }
 
-    private static void OnHolderTreeExiting(
-        NRelicInventoryHolder holder,
+    private static void OnTargetTreeExiting(
+        Control target,
         ulong instanceId)
     {
-        if (ReferenceEquals(_pinnedHolder, holder))
+        if (ReferenceEquals(_pinnedTarget, target))
             ClearPin(restoreOrdinaryHover: false);
 
         Subscriptions.Remove(instanceId);
@@ -446,16 +551,16 @@ internal static class RelicTooltipPinManager
         };
     }
 
-    private static bool IsRightClickInsidePinnedHolder(InputEvent inputEvent)
+    private static bool IsRightClickInsidePinnedTarget(InputEvent inputEvent)
     {
         return inputEvent is InputEventMouseButton
                {
                    ButtonIndex: MouseButton.Right,
                    Pressed: true,
                } mouseButton
-               && IsLive(_pinnedHolder)
-               && _pinnedHolder!.IsVisibleInTree()
-               && _pinnedHolder.GetGlobalRect().HasPoint(mouseButton.Position);
+               && IsLive(_pinnedTarget)
+               && _pinnedTarget!.IsVisibleInTree()
+               && _pinnedTarget.GetGlobalRect().HasPoint(mouseButton.Position);
     }
 
     private static bool IsLive(GodotObject? instance)

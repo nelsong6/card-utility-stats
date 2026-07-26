@@ -210,8 +210,7 @@ internal static class NativeStatsHoverTipFactory
             return false;
 
         HoverTip tip;
-        if (RelicTooltipPinManager.TryGetPinnedHolder(owner, out var pinnedHolder)
-            && RelicHoverShowPatch.TryBuildNativeHoverTip(pinnedHolder, out tip))
+        if (RelicTooltipPinManager.TryBuildPinnedStatsTip(owner, out tip))
         {
             statsTip = tip;
             return true;

@@ -227,6 +227,7 @@ internal static class RelicCompendiumFilterUi
     public static void ApplyToEntry(NRelicCollectionEntry? entry)
     {
         if (entry == null || !GodotObject.IsInstanceValid(entry)) return;
+        RelicTooltipPinManager.Attach(entry);
         RememberOriginal(entry);
 
         var isVisibleRelic = entry.ModelVisibility == ModelVisibility.Visible;
