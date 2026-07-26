@@ -37,7 +37,7 @@ internal static class NativeHoverTipCreateStatsPatch
         out bool __state)
     {
         __state = false;
-        if (RelicTooltipPinManager.ShouldSuppressOrdinaryHoverTip(owner))
+        if (StatsTooltipPinManager.ShouldSuppressOrdinaryHoverTip(owner))
         {
             __result = null;
             return false;
@@ -210,7 +210,7 @@ internal static class NativeStatsHoverTipFactory
             return false;
 
         HoverTip tip;
-        if (RelicTooltipPinManager.TryBuildPinnedStatsTip(owner, out tip))
+        if (StatsTooltipPinManager.TryBuildPinnedStatsTip(owner, out tip))
         {
             statsTip = tip;
             return true;

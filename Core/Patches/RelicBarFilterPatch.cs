@@ -31,7 +31,7 @@ public static class RelicBarFilterPatch
     {
         try
         {
-            RelicTooltipPinManager.Attach(__instance);
+            StatsTooltipPinManager.Attach(__instance);
             ApplyToHolder(__instance);
         }
         catch (Exception e) { CoreMain.Logger.Error($"RelicBarFilterPatch failed: {e.Message}"); }
@@ -77,7 +77,7 @@ public static class RelicBarFilterPatch
                 ref holders,
                 ref classified,
                 ref hidden);
-            RelicTooltipPinManager.ReconcilePinnedState();
+            StatsTooltipPinManager.ReconcilePinnedState();
             RefreshVisibleNavigation(focusedRelic);
 
             var capstone = NCapstoneContainer.Instance?.CurrentCapstoneScreen?.GetType().Name ?? "none";
@@ -217,7 +217,7 @@ public static class RelicBarFilterPatch
         holder.Visible = !shouldFilter
                          || IsCombatRelevantNow(relicModel, GetCurrentPlayerTurnNumber());
         if (!holder.Visible)
-            RelicTooltipPinManager.UnpinIfHolder(holder);
+            StatsTooltipPinManager.UnpinIfHolder(holder);
     }
 
     private static void SetPotionDownNeighbors(Node? node, NodePath downPath)
@@ -283,7 +283,7 @@ public static class RelicBarFilterPatch
     {
         if (node is NRelicInventoryHolder holder)
         {
-            RelicTooltipPinManager.Attach(holder);
+            StatsTooltipPinManager.Attach(holder);
             holders++;
             var relicModel = holder.Relic?.Model;
             if (relicModel != null)
@@ -293,7 +293,7 @@ public static class RelicBarFilterPatch
                 var shouldHide = shouldFilter && !isRelevant;
                 holder.Visible = !shouldHide;
                 if (shouldHide)
-                    RelicTooltipPinManager.UnpinIfHolder(holder);
+                    StatsTooltipPinManager.UnpinIfHolder(holder);
                 if (shouldHide) hidden++;
             }
         }

@@ -1016,16 +1016,23 @@ Important surfaces:
   relics. Its postfix styles only the final native text control created for
   that appended tip: the SpireLens blue background tint and top-right brand
   return without creating a parallel panel or retaining the control.
-- Owned-relic pinning does not override `NRelicInventoryHolder.OnUnfocus` or
-  `NHoverTipSet.Remove`. A right-clicked relic receives a dedicated surrogate
-  `Control` owner for a second native tooltip set; ordinary relic unfocus
-  removes only the transient holder-owned set. While pinned, attempts to create
-  another transient set for that same holder are suppressed. The surrogate,
-  its mouse-input signal, and the lock badge are all removed during Core
+- Card/relic pinning does not override ordinary unfocus or
+  `NHoverTipSet.Remove`. A right-clicked card or relic receives a dedicated
+  surrogate `Control` owner for a second native tooltip set; ordinary unfocus
+  removes only the transient source-owned set. While pinned, attempts to create
+  another transient set for that same source are suppressed. The surrogate,
+  any mouse-input signal, and the lock badge are all removed during Core
   shutdown so hot reload cannot leave callbacks from an orphaned assembly.
   Pointer motion is the only input that preserves a pin: the stable Loader
   input postfix dismisses it before the next mouse, keyboard, or controller
   action continues through the game's normal input path.
+- Card right-click must be claimed on the press, not the release.
+  `NCardHolder.OnMousePressed` normally stores right press as
+  `_currentPressedAction`; its matching release then emits `AltPressed`.
+  SpireLens prefixes every implementation of that virtual method declared by
+  an `NCardHolder` subtype and skips the original when the pin toggle handles
+  the press. Patching only the base method is insufficient because
+  `NHandCardHolder` declares an override.
 - `StatsTooltip` only constructs the native `HoverTip` value and escapes
   dynamic BBCode. It also wraps the stats description in the established 20px
   body size. It must not retain a `Control`, create a scene-root panel, position

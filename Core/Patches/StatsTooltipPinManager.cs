@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Godot;
 using MegaCrit.Sts2.Core.HoverTips;
+using MegaCrit.Sts2.Core.Nodes.Cards.Holders;
 using MegaCrit.Sts2.Core.Nodes.HoverTips;
 using MegaCrit.Sts2.Core.Nodes.Relics;
 using MegaCrit.Sts2.Core.Nodes.Screens.RelicCollection;
@@ -9,23 +10,23 @@ using MegaCrit.Sts2.Core.Nodes.Screens.RelicCollection;
 namespace SpireLens.Core.Patches;
 
 /// <summary>
-/// Pins one relic tooltip set at a time. The pinned set uses a dedicated native
-/// owner so the relic's ordinary OnUnfocus/Remove lifecycle can run unchanged
-/// without dismissing it.
+/// Pins one card or relic tooltip set at a time. The pinned set uses a
+/// dedicated native owner so the game's ordinary OnUnfocus/Remove lifecycle
+/// can run unchanged without dismissing it.
 /// </summary>
-internal static class RelicTooltipPinManager
+internal static class StatsTooltipPinManager
 {
-    private const string PinOwnerNodeName = "SpireLensPinnedRelicTooltipOwner";
-    private const string LockIconNodeName = "SpireLensRelicTooltipLock";
+    private const string PinOwnerNodeName = "SpireLensPinnedStatsTooltipOwner";
+    private const string LockIconNodeName = "SpireLensStatsTooltipLock";
     private const string LockIconPath =
         "res://images/ui/top_panel/reminder_lock.png";
-    private const string HintOwnerNodeName = "SpireLensPinnedRelicHintOwner";
+    private const string HintOwnerNodeName = "SpireLensPinnedStatsHintOwner";
 
     private sealed class TargetSubscription
     {
         public TargetSubscription(
             Control target,
-            Control.GuiInputEventHandler guiInputHandler,
+            Control.GuiInputEventHandler? guiInputHandler,
             Action treeExitingHandler)
         {
             Target = target;
@@ -34,7 +35,7 @@ internal static class RelicTooltipPinManager
         }
 
         public Control Target { get; }
-        public Control.GuiInputEventHandler GuiInputHandler { get; }
+        public Control.GuiInputEventHandler? GuiInputHandler { get; }
         public Action TreeExitingHandler { get; }
     }
 
@@ -46,6 +47,7 @@ internal static class RelicTooltipPinManager
     private static RichTextLabel? _pinnedStatsDescription;
     private static Control? _hintOwner;
     private static string? _visibleHintText;
+    private static object? _pinnedCardModel;
     private static Texture2D? _lockTexture;
     private static bool _lockLoadAttempted;
     private static ulong _dismissedInputEventId;
@@ -53,28 +55,32 @@ internal static class RelicTooltipPinManager
     public static void Attach(NRelicInventoryHolder? holder)
     {
         if (holder != null)
-            AttachTarget(holder);
+            AttachTarget(holder, subscribeToGuiInput: true);
     }
 
     public static void Attach(NRelicCollectionEntry? entry)
     {
         if (entry != null)
-            AttachTarget(entry);
+            AttachTarget(entry, subscribeToGuiInput: true);
     }
 
-    private static void AttachTarget(Control target)
+    private static void AttachTarget(
+        Control target,
+        bool subscribeToGuiInput)
     {
         if (!IsLive(target)) return;
 
         var instanceId = target.GetInstanceId();
         if (Subscriptions.ContainsKey(instanceId)) return;
 
-        Control.GuiInputEventHandler guiInputHandler = inputEvent =>
-            OnGuiInput(target, inputEvent);
+        Control.GuiInputEventHandler? guiInputHandler = subscribeToGuiInput
+            ? inputEvent => OnGuiInput(target, inputEvent)
+            : null;
         Action treeExitingHandler = () =>
             OnTargetTreeExiting(target, instanceId);
 
-        target.GuiInput += guiInputHandler;
+        if (guiInputHandler != null)
+            target.GuiInput += guiInputHandler;
         target.TreeExiting += treeExitingHandler;
         Subscriptions[instanceId] = new TargetSubscription(
             target,
@@ -88,6 +94,8 @@ internal static class RelicTooltipPinManager
 
         if (!IsLive(_pinnedTarget)
             || !_pinnedTarget!.IsVisibleInTree()
+            || _pinnedTarget is NCardHolder cardHolder
+                && !ReferenceEquals(_pinnedCardModel, cardHolder.CardModel)
             || !IsLive(_pinOwner)
             || !IsLive(_pinnedTipSet)
             || _pinnedTipSet!.IsQueuedForDeletion())
@@ -113,7 +121,8 @@ internal static class RelicTooltipPinManager
         {
             if (!IsLive(subscription.Target)) continue;
 
-            subscription.Target.GuiInput -= subscription.GuiInputHandler;
+            if (subscription.GuiInputHandler != null)
+                subscription.Target.GuiInput -= subscription.GuiInputHandler;
             subscription.Target.TreeExiting -= subscription.TreeExitingHandler;
         }
 
@@ -124,7 +133,7 @@ internal static class RelicTooltipPinManager
     }
 
     /// <summary>
-    /// A pin exists only to let the pointer travel from the relic into its
+    /// A pin exists only to let the pointer travel from the card/relic into its
     /// stats page. Pointer motion is therefore allowed, but the next actual
     /// mouse, keyboard, or controller action dismisses the pin without
     /// consuming the action that the game is about to handle.
@@ -134,15 +143,15 @@ internal static class RelicTooltipPinManager
         if (_pinnedTarget == null || !IsDismissAction(inputEvent))
             return;
 
-        // A right press inside the pinned relic belongs to that target's
-        // _GuiInput toggle. Do not clear it here first: Godot dispatches
-        // _Input before _GuiInput, and clearing globally would make the
-        // target see an unpinned relic and pin it again.
+        // A right press inside the pinned target belongs to that target's
+        // toggle. Do not clear it here first: Godot dispatches _Input before
+        // control-specific input, and clearing globally would make the target
+        // see itself as unpinned and pin it again.
         if (IsRightClickInsidePinnedTarget(inputEvent))
             return;
 
         // _Input runs before _GuiInput. Remember the event so a right click
-        // that dismissed a pin cannot reach another relic later in the same
+        // that dismissed a pin cannot reach another target later in the same
         // dispatch and immediately create a new pin.
         _dismissedInputEventId = inputEvent.GetInstanceId();
         ClearPin(restoreOrdinaryHover: false);
@@ -183,7 +192,8 @@ internal static class RelicTooltipPinManager
         // in-progress pin for a dead one and remove the SpireLens page before
         // NativeStatsHoverTipFactory can append it.
         if (owner is not NRelicInventoryHolder
-            && owner is not NRelicCollectionEntry)
+            && owner is not NRelicCollectionEntry
+            && owner is not NCardHolder)
         {
             return false;
         }
@@ -203,24 +213,41 @@ internal static class RelicTooltipPinManager
         return TryBuildStatsTip(_pinnedTarget!, out tip);
     }
 
+    /// <summary>
+    /// Handles a card right press before NCardHolder records it as the
+    /// pending alternate-click action. Returning true tells the Harmony
+    /// prefix to skip the game's handler, which also prevents its matching
+    /// release from emitting AltPressed.
+    /// </summary>
+    internal static bool TryHandleCardRightClick(
+        NCardHolder holder,
+        InputEvent inputEvent)
+    {
+        if (!IsRightPress(inputEvent))
+            return false;
+
+        AttachTarget(holder, subscribeToGuiInput: false);
+        return TryTogglePin(holder, inputEvent);
+    }
+
     private static void OnGuiInput(
         Control target,
         InputEvent inputEvent)
     {
-        if (inputEvent is not InputEventMouseButton
-            {
-                ButtonIndex: MouseButton.Right,
-                Pressed: true,
-            })
-        {
-            return;
-        }
+        if (!IsRightPress(inputEvent)) return;
 
+        if (TryTogglePin(target, inputEvent))
+            target.GetViewport()?.SetInputAsHandled();
+    }
+
+    private static bool TryTogglePin(
+        Control target,
+        InputEvent inputEvent)
+    {
         if (_dismissedInputEventId == inputEvent.GetInstanceId())
         {
             _dismissedInputEventId = 0;
-            target.GetViewport()?.SetInputAsHandled();
-            return;
+            return true;
         }
 
         try
@@ -233,15 +260,17 @@ internal static class RelicTooltipPinManager
             }
             else
             {
-                if (!CanPin(target)) return;
+                if (!CanPin(target)) return false;
                 Pin(target);
             }
 
             target.GetViewport()?.SetInputAsHandled();
+            return true;
         }
         catch (Exception e)
         {
-            CoreMain.Logger.Error($"Relic tooltip pin toggle failed: {e}");
+            CoreMain.Logger.Error($"Stats tooltip pin toggle failed: {e}");
+            return false;
         }
     }
 
@@ -275,6 +304,9 @@ internal static class RelicTooltipPinManager
 
         _pinnedTarget = target;
         _pinOwner = pinOwner;
+        _pinnedCardModel = target is NCardHolder cardHolder
+            ? cardHolder.CardModel
+            : null;
 
         try
         {
@@ -293,7 +325,7 @@ internal static class RelicTooltipPinManager
                 NativeStatsHoverTipStyler.GetLastStatsDescription(tipSet);
             AddLockIcon(target);
             CoreMain.LogDebug(
-                $"Pinned relic tooltip: {GetRelicDebugId(target)}");
+                $"Pinned stats tooltip: {GetTargetDebugId(target)}");
         }
         catch
         {
@@ -311,6 +343,7 @@ internal static class RelicTooltipPinManager
         _pinOwner = null;
         _pinnedTipSet = null;
         _pinnedStatsDescription = null;
+        _pinnedCardModel = null;
         ClearHintPopup();
 
         if (IsLive(pinOwner))
@@ -338,6 +371,9 @@ internal static class RelicTooltipPinManager
     {
         switch (target)
         {
+            case NCardHolder holder:
+                return CardHoverShowPatch.TryBuildNativeHoverTip(holder, out tip);
+
             case NRelicInventoryHolder holder:
                 return RelicHoverShowPatch.TryBuildNativeHoverTip(holder, out tip);
 
@@ -356,6 +392,10 @@ internal static class RelicTooltipPinManager
     {
         switch (target)
         {
+            case NCardHolder holder when holder.CardModel != null:
+                nativeHoverTips = holder.CardModel.HoverTips;
+                return true;
+
             case NRelicInventoryHolder holder:
                 nativeHoverTips = holder.Relic.Model.HoverTips;
                 return true;
@@ -375,6 +415,10 @@ internal static class RelicTooltipPinManager
     {
         switch (target)
         {
+            case NCardHolder holder:
+                tipSet.SetAlignmentForCardHolder(holder);
+                break;
+
             case NRelicInventoryHolder holder:
                 tipSet.SetAlignmentForRelic(holder.Relic);
                 break;
@@ -395,6 +439,11 @@ internal static class RelicTooltipPinManager
 
         switch (target)
         {
+            case NCardHolder holder:
+                NHoverTipSet.CreateAndShow(target, nativeHoverTips)
+                    ?.SetAlignmentForCardHolder(holder);
+                break;
+
             case NRelicInventoryHolder holder:
                 NHoverTipSet.CreateAndShow(target, nativeHoverTips)
                     ?.SetAlignmentForRelic(holder.Relic);
@@ -410,10 +459,12 @@ internal static class RelicTooltipPinManager
         }
     }
 
-    private static string GetRelicDebugId(Control target)
+    private static string GetTargetDebugId(Control target)
     {
         return target switch
         {
+            NCardHolder holder when holder.CardModel != null
+                => holder.CardModel.Id.ToString(),
             NRelicInventoryHolder holder => holder.Relic.Model.Id.ToString(),
             NRelicCollectionEntry entry
                 when CompendiumRelicStatsContext.TryGetRelicModel(entry, out var relicModel)
@@ -519,7 +570,7 @@ internal static class RelicTooltipPinManager
         if (_lockTexture == null)
         {
             CoreMain.Logger.Error(
-                $"Could not load relic tooltip lock icon: {LockIconPath}");
+                $"Could not load stats tooltip lock icon: {LockIconPath}");
         }
 
         return _lockTexture;
@@ -562,6 +613,13 @@ internal static class RelicTooltipPinManager
                && _pinnedTarget!.IsVisibleInTree()
                && _pinnedTarget.GetGlobalRect().HasPoint(mouseButton.Position);
     }
+
+    private static bool IsRightPress(InputEvent inputEvent)
+        => inputEvent is InputEventMouseButton
+        {
+            ButtonIndex: MouseButton.Right,
+            Pressed: true,
+        };
 
     private static bool IsLive(GodotObject? instance)
         => instance != null && GodotObject.IsInstanceValid(instance);

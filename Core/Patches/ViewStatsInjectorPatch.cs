@@ -150,7 +150,7 @@ public static class ViewStatsInjectorPatch
 
         if (!isEnabled)
         {
-            RelicTooltipPinManager.ClearPin();
+            StatsTooltipPinManager.ClearPin();
             NHoverTipSet.Clear();
         }
 
