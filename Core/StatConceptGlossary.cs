@@ -55,6 +55,7 @@ internal static class StatConceptGlossary
         "res://images/atlases/power_atlas.sprites/vigor_power.tres",
         "res://images/atlases/power_atlas.sprites/vulnerable_power.tres",
         "res://images/atlases/power_atlas.sprites/weak_power.tres",
+        "res://images/atlases/relic_atlas.sprites/paels_wing.tres",
         "res://images/packed/sprite_fonts/star_icon.png",
         "res://images/ui/combat/block.png",
     ];

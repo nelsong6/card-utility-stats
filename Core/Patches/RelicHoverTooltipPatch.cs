@@ -34,6 +34,7 @@ public static class RelicHoverShowPatch
     private const string BlockIconPath = "res://images/ui/combat/block.png";
     private const string DrawIconPath = "res://images/atlases/power_atlas.sprites/draw_cards_next_turn_power.tres";
     private const string EnergyIconPath = "res://images/atlases/potion_atlas.sprites/energy_potion.tres";
+    private const string PaelsWingIconPath = "res://images/atlases/relic_atlas.sprites/paels_wing.tres";
     private const string StarIconPath = "res://images/packed/sprite_fonts/star_icon.png";
     private const string VigorIconPath = "res://images/atlases/power_atlas.sprites/vigor_power.tres";
     private const int SealOfGoldLossPerTrigger = 5;
@@ -1889,7 +1890,10 @@ public static class RelicHoverShowPatch
                     reward.AlternativeId,
                     PaelsWing.sacrificeAlternativeKey,
                     StringComparison.OrdinalIgnoreCase))
-                return "sacrificed to Pael";
+            {
+                return StatConceptGlossary.RenderInlineImage(
+                    PaelsWingIconPath);
+            }
 
             var alternative = string.IsNullOrWhiteSpace(reward.AlternativeId)
                 ? "alternative"

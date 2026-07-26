@@ -124,7 +124,10 @@ public class OrreryStatsTests
         Assert.Contains("Reward 2", body);
         Assert.Contains("obtained Pommel Strike", body);
         Assert.Contains("Reward 3", body);
-        Assert.Contains("sacrificed to Pael", body);
+        Assert.Contains(
+            "res://images/atlases/relic_atlas.sprites/paels_wing.tres",
+            body);
+        Assert.DoesNotContain("sacrificed to Pael", body);
         Assert.Contains("Reward 4", body);
         Assert.Contains("pending", body);
         Assert.Contains("Reward 5", body);
