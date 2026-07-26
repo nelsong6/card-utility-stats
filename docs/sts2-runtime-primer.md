@@ -1174,6 +1174,14 @@ Healing has its own attribution rule: track attempted, actually restored, and
 lost healing separately, with lost-healing reason buckets such as `full_hp` and
 specific blocker ids as they are discovered. See [ADR 0002](adr/0002-healing-attribution.md).
 
+Blood Vial and Blood Vial??? (`FakeBloodVial`) both heal from their
+owner-specific `AfterPlayerTurnStartLate` callback on the first turn. Arm the
+shared relic-healing ledger from that exact callback, use the model's current
+`DynamicVars.Heal` value as the attempted amount, and finalize after the
+returned task completes. Keep `RELIC.BLOOD_VIAL` and
+`RELIC.FAKE_BLOOD_VIAL` in separate aggregates even though their tooltip rows
+are identical.
+
 Good hook surfaces already proven useful:
 
 - `CombatHistory.Add`: broad real-entry observation point. Caveat: does NOT see damage from combat-ending killing blows (see the Damage Attribution known trap).

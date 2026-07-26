@@ -1022,6 +1022,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is FakeBloodVial)
+        {
+            title = "Blood Vial???";
+            body = BuildBloodVialBodyBBCode(agg);
+            return true;
+        }
+
         if (IsRelicModel(relicModel, "MegaCrit.Sts2.Core.Models.Relics.Toolbox"))
         {
             title = "Toolbox";

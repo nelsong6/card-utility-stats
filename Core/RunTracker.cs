@@ -4201,6 +4201,7 @@ public static class RunTracker
     private const string MealTicketRelicId = "RELIC.MEAL_TICKET";
     private const string BurningBloodRelicId = "RELIC.BURNING_BLOOD";
     private const string BloodVialRelicId = "RELIC.BLOOD_VIAL";
+    private const string FakeBloodVialRelicId = "RELIC.FAKE_BLOOD_VIAL";
     private const string PantographRelicId = "RELIC.PANTOGRAPH";
     private const string PlanisphereRelicId = "RELIC.PLANISPHERE";
     private const string LizardTailRelicId = "RELIC.LIZARD_TAIL";
@@ -8032,6 +8033,15 @@ public static class RunTracker
     public static void RecordBloodVialTrigger(Creature healedCreature, decimal attemptedHealing)
     {
         RecordRelicHealingTrigger(BloodVialRelicId, healedCreature, attemptedHealing, nameof(RecordBloodVialTrigger));
+    }
+
+    /// <summary>
+    /// Record Blood Vial???'s combat-start trigger and arm its own observed
+    /// healing window.
+    /// </summary>
+    public static void RecordFakeBloodVialTrigger(Creature healedCreature, decimal attemptedHealing)
+    {
+        RecordRelicHealingTrigger(FakeBloodVialRelicId, healedCreature, attemptedHealing, nameof(RecordFakeBloodVialTrigger));
     }
 
     /// <summary>
