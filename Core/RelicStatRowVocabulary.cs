@@ -27,7 +27,10 @@ internal static class RelicStatRowVocabulary
     private const string VulnerableIconPathFragment = "vulnerable_power.tres";
     private const string WeakIconPathFragment = "weak_power.tres";
 
-    private sealed record ConceptRule(string Id, Regex Pattern, bool IsDenominator);
+    private sealed record ConceptRule(
+        string Id,
+        Regex Pattern,
+        bool SupportsScopePrefix);
 
     private sealed record ConceptOccurrence(
         string Id,
@@ -46,7 +49,7 @@ internal static class RelicStatRowVocabulary
         @"\[[^\]]+\]",
         RegexOptions.CultureInvariant);
 
-    private static readonly Regex PrecedingDenominatorRegex = new(
+    private static readonly Regex PrecedingConceptPrefixRegex = new(
         @"(?:\b(?:per|in|this)\s*|/\s*)$",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
@@ -139,21 +142,30 @@ internal static class RelicStatRowVocabulary
 
                 var removalStart = match.Index;
                 var isDenominator = false;
-                if (rule.IsDenominator)
+                var prefix = workingText[..match.Index];
+                var conceptPrefix = PrecedingConceptPrefixRegex.Match(prefix);
+                if (conceptPrefix.Success)
                 {
-                    var prefix = workingText[..match.Index];
-                    var denominatorPrefix = PrecedingDenominatorRegex.Match(prefix);
-                    if (denominatorPrefix.Success)
-                    {
-                        removalStart = denominatorPrefix.Index;
-                        var denominatorPrefixText = denominatorPrefix.Value.TrimStart();
-                        isDenominator =
-                            denominatorPrefixText.StartsWith(
-                                "per",
+                    var conceptPrefixText = conceptPrefix.Value.TrimStart();
+                    var hasDenominatorPrefix =
+                        conceptPrefixText.StartsWith(
+                            "per",
+                            StringComparison.OrdinalIgnoreCase)
+                        || conceptPrefixText.StartsWith(
+                            "/",
+                            StringComparison.Ordinal);
+                    var hasSupportedScopePrefix =
+                        rule.SupportsScopePrefix
+                        && (conceptPrefixText.StartsWith(
+                                "in",
                                 StringComparison.OrdinalIgnoreCase)
-                            || denominatorPrefixText.StartsWith(
-                                "/",
-                                StringComparison.Ordinal);
+                            || conceptPrefixText.StartsWith(
+                                "this",
+                                StringComparison.OrdinalIgnoreCase));
+                    if (hasDenominatorPrefix || hasSupportedScopePrefix)
+                    {
+                        removalStart = conceptPrefix.Index;
+                        isDenominator = hasDenominatorPrefix;
                     }
                 }
 
@@ -219,7 +231,7 @@ internal static class RelicStatRowVocabulary
     private static ConceptRule Rule(
         string id,
         string pattern,
-        bool isDenominator = false)
+        bool supportsScopePrefix = false)
     {
         return new ConceptRule(
             id,
@@ -228,7 +240,7 @@ internal static class RelicStatRowVocabulary
                 RegexOptions.IgnoreCase
                 | RegexOptions.CultureInvariant
                 | RegexOptions.Compiled),
-            isDenominator);
+            supportsScopePrefix);
     }
 
     private static string BuildDescriptionText(

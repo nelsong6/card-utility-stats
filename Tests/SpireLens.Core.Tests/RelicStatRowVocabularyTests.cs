@@ -117,6 +117,11 @@ public class RelicStatRowVocabularyTests
         "strength,activation",
         "activation")]
     [InlineData(
+        "Avg damage per skill played",
+        "played",
+        "average,damage,skill",
+        "skill")]
+    [InlineData(
         "Cards exhausted per combat",
         "",
         "card,exhaust,combat",

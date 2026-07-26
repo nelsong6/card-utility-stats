@@ -120,9 +120,9 @@ Current UI conventions:
   a narrow numeric column; do not use character-count wrapping heuristics
 - loud section headers are discouraged unless they add real clarity
 - inline icons are preferred for keyword-like effects when they improve scanning
-- rows phrased as “per turn/combat/floor/activation” render `/` immediately
-  before the denominator icon; “in” and “this” indicate scope and do not
-  receive a slash
+- rows phrased as “per <recognized concept>” render `/` immediately before
+  the denominator icon; “in” and “this” indicate scope and do not receive a
+  slash
 - every icon-driven stat row can pair a left-side information hint for the full row meaning with a separate semantic concept hint; the central compendium glossary describes those same concept symbols
 - when the game already exposes a recognizable asset, prefer the in-game block/draw/energy/star iconography over generic text-only rows
 - native lifecycle does not erase visual ownership: SpireLens stats tips retain
