@@ -56,10 +56,10 @@ window's Close button also closes it.
 The optional, mutually exclusive relic-bar filters hide already-resolved relics
 while leaving them owned, functional, and visible on every other relic surface.
 The contextual mode filters during combat and combat pile overlays but restores
-the full bar in the deck/library view; the forced mode keeps the filtered bar
-throughout the active run. The category includes already-resolved max-HP
-relics, permanent inventory upgrades, card-reward upgrades, and other relics
-whose effects do not need combat-bar attention.
+the full bar in the deck/library view and on the act map; the forced mode keeps
+the filtered bar throughout the active run. The category includes
+already-resolved max-HP relics, permanent inventory upgrades, card-reward
+upgrades, and other relics whose effects do not need combat-bar attention.
 
 Right-click an owned relic with SpireLens stats to pin its complete native
 tooltip set. The game's compact top-panel lock icon appears on the pinned relic,

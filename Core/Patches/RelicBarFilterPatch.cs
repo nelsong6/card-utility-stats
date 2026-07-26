@@ -12,6 +12,7 @@ using MegaCrit.Sts2.Core.Nodes.Potions;
 using MegaCrit.Sts2.Core.Nodes.Relics;
 using MegaCrit.Sts2.Core.Nodes.Screens;
 using MegaCrit.Sts2.Core.Nodes.Screens.Capstones;
+using MegaCrit.Sts2.Core.Nodes.Screens.Map;
 using MegaCrit.Sts2.Core.Rooms;
 using MegaCrit.Sts2.Core.Runs;
 
@@ -25,6 +26,7 @@ namespace SpireLens.Core.Patches;
 public static class RelicBarFilterPatch
 {
     private static bool _hooksInitialized;
+    private static NMapScreen? _hookedMapScreen;
 
     [HarmonyPostfix]
     public static void Postfix(NRelicInventoryHolder __instance)
@@ -39,16 +41,22 @@ public static class RelicBarFilterPatch
 
     public static void InitializeHooks()
     {
-        if (_hooksInitialized) return;
+        if (_hooksInitialized)
+        {
+            AttachMapScreenHooks();
+            return;
+        }
 
         CombatManager.Instance.CombatBegan += OnCombatBegan;
         CombatManager.Instance.CombatEnded += OnCombatEnded;
         _hooksInitialized = true;
-        CoreMain.Logger.Info("Relic bar filter hooks wired (CombatBegan, CombatEnded).");
+        AttachMapScreenHooks();
+        CoreMain.Logger.Info("Relic bar filter hooks wired (CombatBegan, CombatEnded, map Opened/Closed).");
     }
 
     public static void TeardownHooks()
     {
+        DetachMapScreenHooks();
         if (!_hooksInitialized) return;
 
         CombatManager.Instance.CombatBegan -= OnCombatBegan;
@@ -61,6 +69,7 @@ public static class RelicBarFilterPatch
     {
         try
         {
+            AttachMapScreenHooks();
             var tree = Engine.GetMainLoop() as SceneTree;
             if (tree == null) return;
             var shouldFilter = ShouldFilterNow();
@@ -107,6 +116,18 @@ public static class RelicBarFilterPatch
         => !hiddenStartingTurn.HasValue
            || currentTurn <= 0
            || currentTurn < hiddenStartingTurn.Value;
+
+    internal static bool ShouldFilterForContext(
+        bool forceCombatRelicsOnly,
+        bool showCombatOnlyAtCombatScreen,
+        bool isCombatInProgress,
+        bool isActMapOpen,
+        bool isDeckViewOpen)
+    {
+        if (forceCombatRelicsOnly) return true;
+        if (!showCombatOnlyAtCombatScreen || !isCombatInProgress) return false;
+        return !isActMapOpen && !isDeckViewOpen;
+    }
 
     internal static int FindNearestVisibleIndex(
         IReadOnlyList<bool> visible,
@@ -267,10 +288,39 @@ public static class RelicBarFilterPatch
 
     private static bool ShouldFilterNow()
     {
-        if (ViewStatsInjectorPatch.HideNonCombatRelicStats) return true;
-        if (!ViewStatsInjectorPatch.ShowCombatOnlyRelicsAtCombatScreen) return false;
-        if (CombatManager.Instance?.IsInProgress != true) return false;
-        return NCapstoneContainer.Instance?.CurrentCapstoneScreen is not NDeckViewScreen;
+        return ShouldFilterForContext(
+            ViewStatsInjectorPatch.HideNonCombatRelicStats,
+            ViewStatsInjectorPatch.ShowCombatOnlyRelicsAtCombatScreen,
+            CombatManager.Instance?.IsInProgress == true,
+            NMapScreen.Instance?.IsOpen == true,
+            NCapstoneContainer.Instance?.CurrentCapstoneScreen is NDeckViewScreen);
+    }
+
+    private static void AttachMapScreenHooks()
+    {
+        var currentMapScreen = NMapScreen.Instance;
+        if (ReferenceEquals(_hookedMapScreen, currentMapScreen)
+            && (currentMapScreen == null || GodotObject.IsInstanceValid(currentMapScreen)))
+        {
+            return;
+        }
+
+        DetachMapScreenHooks();
+        if (currentMapScreen == null || !GodotObject.IsInstanceValid(currentMapScreen)) return;
+
+        currentMapScreen.Opened += OnMapOpened;
+        currentMapScreen.Closed += OnMapClosed;
+        _hookedMapScreen = currentMapScreen;
+    }
+
+    private static void DetachMapScreenHooks()
+    {
+        var mapScreen = _hookedMapScreen;
+        _hookedMapScreen = null;
+        if (mapScreen == null || !GodotObject.IsInstanceValid(mapScreen)) return;
+
+        mapScreen.Opened -= OnMapOpened;
+        mapScreen.Closed -= OnMapClosed;
     }
 
     private static void RefreshRecursive(
@@ -322,6 +372,10 @@ public static class RelicBarFilterPatch
     private static void OnCombatBegan(CombatState _) => RefreshAll("combat began");
 
     private static void OnCombatEnded(CombatRoom _) => RefreshAll("combat ended");
+
+    private static void OnMapOpened() => RefreshAll("act map opened");
+
+    private static void OnMapClosed() => RefreshAll("act map closed");
 }
 
 [HarmonyPatch(typeof(Hook), nameof(Hook.AfterPlayerTurnStart))]

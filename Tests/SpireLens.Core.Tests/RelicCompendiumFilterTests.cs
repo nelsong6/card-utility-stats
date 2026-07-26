@@ -23,6 +23,36 @@ public class RelicCompendiumFilterTests
     }
 
     [Theory]
+    [InlineData(false, false, true)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    public void ContextualRelicFilter_RestoresFullBarForDeckAndActMap(
+        bool isActMapOpen,
+        bool isDeckViewOpen,
+        bool expectedFilter)
+    {
+        Assert.Equal(
+            expectedFilter,
+            RelicBarFilterPatch.ShouldFilterForContext(
+                forceCombatRelicsOnly: false,
+                showCombatOnlyAtCombatScreen: true,
+                isCombatInProgress: true,
+                isActMapOpen,
+                isDeckViewOpen));
+    }
+
+    [Fact]
+    public void ForcedRelicFilter_RemainsActiveOnActMap()
+    {
+        Assert.True(RelicBarFilterPatch.ShouldFilterForContext(
+            forceCombatRelicsOnly: true,
+            showCombatOnlyAtCombatScreen: false,
+            isCombatInProgress: true,
+            isActMapOpen: true,
+            isDeckViewOpen: false));
+    }
+
+    [Theory]
     [InlineData(0, 1)]
     [InlineData(1, 2)]
     [InlineData(2, 0)]
