@@ -865,6 +865,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is MeatOnTheBone)
+        {
+            title = "Meat on the Bone";
+            body = BuildMeatOnTheBoneBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is Planisphere)
         {
             title = "Planisphere";
@@ -2734,6 +2741,14 @@ public static class RelicHoverShowPatch
     }
 
     private static string BuildMealTicketBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        RelicActivationRow(sb, agg.Activations.ToString());
+        AppendHealingStats(sb, agg);
+        return sb.ToString();
+    }
+
+    private static string BuildMeatOnTheBoneBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
         RelicActivationRow(sb, agg.Activations.ToString());

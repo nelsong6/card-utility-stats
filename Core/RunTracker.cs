@@ -4202,6 +4202,7 @@ public static class RunTracker
     private const string BurningBloodRelicId = "RELIC.BURNING_BLOOD";
     private const string BloodVialRelicId = "RELIC.BLOOD_VIAL";
     private const string FakeBloodVialRelicId = "RELIC.FAKE_BLOOD_VIAL";
+    private const string MeatOnTheBoneRelicId = "RELIC.MEAT_ON_THE_BONE";
     private const string PantographRelicId = "RELIC.PANTOGRAPH";
     private const string PlanisphereRelicId = "RELIC.PLANISPHERE";
     private const string LizardTailRelicId = "RELIC.LIZARD_TAIL";
@@ -8042,6 +8043,19 @@ public static class RunTracker
     public static void RecordFakeBloodVialTrigger(Creature healedCreature, decimal attemptedHealing)
     {
         RecordRelicHealingTrigger(FakeBloodVialRelicId, healedCreature, attemptedHealing, nameof(RecordFakeBloodVialTrigger));
+    }
+
+    /// <summary>
+    /// Record Meat on the Bone's qualifying post-combat trigger and arm its
+    /// observed healing window.
+    /// </summary>
+    public static void RecordMeatOnTheBoneTrigger(Creature healedCreature, decimal attemptedHealing)
+    {
+        RecordRelicHealingTrigger(
+            MeatOnTheBoneRelicId,
+            healedCreature,
+            attemptedHealing,
+            nameof(RecordMeatOnTheBoneTrigger));
     }
 
     /// <summary>

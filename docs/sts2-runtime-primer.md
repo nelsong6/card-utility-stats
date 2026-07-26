@@ -1182,6 +1182,12 @@ returned task completes. Keep `RELIC.BLOOD_VIAL` and
 `RELIC.FAKE_BLOOD_VIAL` in separate aggregates even though their tooltip rows
 are identical.
 
+Meat on the Bone evaluates its healing threshold and heals from the
+owner-specific `AfterCombatVictoryEarly` callback. Mirror the game's integer
+threshold calculation (`current HP <= int(max HP * threshold percent)`), arm
+the shared relic-healing ledger only when that condition is true, and finalize
+after the callback's returned task completes.
+
 Good hook surfaces already proven useful:
 
 - `CombatHistory.Add`: broad real-entry observation point. Caveat: does NOT see damage from combat-ending killing blows (see the Damage Attribution known trap).
