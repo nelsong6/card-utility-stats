@@ -163,6 +163,10 @@ public class LeafyPoulticeStatsTests
         Assert.Contains("[b]Bash[/b]", body);
         Assert.Contains("[b]Defend[/b]", body);
         Assert.Contains("[b]Shrug It Off[/b]", body);
+        Assert.Contains(
+            "[color=#e0e0e0]Transform 2 result[/color]  [b]Shrug It Off[/b]",
+            body);
+        Assert.DoesNotContain("[right][b]Shrug It Off[/b]", body);
     }
 
     [Fact]

@@ -114,9 +114,10 @@ Current UI conventions:
 - card tooltips on every surface are display-only opt-in; disabling them does not disable attribution
 - deck-view tooltips can be fuller and include lineage/context
 - rows should be self-describing
-- relic-row values and percentages use their natural content width while the
-  label receives the remaining space; do not reintroduce character-count
-  wrapping heuristics or fixed narrow value columns
+- numeric relic-row values and percentages use the right-aligned value
+  columns; card names, relic names, destinations, and other textual outcomes
+  render inline in the expanding label cell so Godot cannot squeeze them into
+  a narrow numeric column; do not use character-count wrapping heuristics
 - loud section headers are discouraged unless they add real clarity
 - inline icons are preferred for keyword-like effects when they improve scanning
 - rows phrased as “per turn/combat/floor/activation” render `/` immediately

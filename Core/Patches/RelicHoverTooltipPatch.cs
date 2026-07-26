@@ -1998,14 +1998,14 @@ public static class RelicHoverShowPatch
                 candidate != null && candidate.ScreenNumber == screenNumber);
             if (screen == null)
             {
-                Row3(sb, $"Card reward {screenNumber}", "not seen yet", "");
+                TextValueRow(sb, $"Card reward {screenNumber}", "not seen yet", "");
                 continue;
             }
 
             var cards = screen.Cards ?? new List<RelicCardRewardOptionAggregate>();
             if (cards.Count == 0)
             {
-                Row3(sb, $"Card reward {screenNumber}", "no cards offered", "");
+                TextValueRow(sb, $"Card reward {screenNumber}", "no cards offered", "");
                 continue;
             }
 
@@ -2057,7 +2057,7 @@ public static class RelicHoverShowPatch
         {
             var reward = rewards.LastOrDefault(candidate =>
                 candidate != null && candidate.RewardNumber == rewardNumber);
-            Row3(
+            TextValueRow(
                 sb,
                 $"Reward {rewardNumber}",
                 reward == null ? "not seen yet" : FormatOrreryRewardOutcome(reward),
@@ -2274,7 +2274,7 @@ public static class RelicHoverShowPatch
                 ? RunTracker.FormatRelicIdForDisplay(relic.RelicId)
                 : relic.DisplayName);
             var value = relic.Count == 1 ? displayName : $"{displayName} x{relic.Count}";
-            Row3(sb, "Neow relic", value, "");
+            TextValueRow(sb, "Neow relic", value, "");
         }
 
         var curses = agg.CardsGranted.Values
@@ -2297,7 +2297,7 @@ public static class RelicHoverShowPatch
                 ? RunTracker.FormatCardIdForDisplay(curse.CardId)
                 : curse.DisplayName);
             var value = curse.Count == 1 ? displayName : $"{displayName} x{curse.Count}";
-            Row3(sb, "Curse added", value, "");
+            TextValueRow(sb, "Curse added", value, "");
 
             CardAggregate? curseAgg = null;
             curseAggregates?.TryGetValue(curse.CardId, out curseAgg);
@@ -2682,7 +2682,7 @@ public static class RelicHoverShowPatch
         foreach (var card in (agg.UpgradedCards ?? new List<string>())
                      .Where(card => !string.IsNullOrWhiteSpace(card)))
         {
-            RowFlow(sb, "Upgraded card", StatsTooltip.EscapeBbcode(card), "");
+            TextValueRow(sb, "Upgraded card", StatsTooltip.EscapeBbcode(card), "");
         }
         Row3(sb, "Upgraded-card plays", agg.WarHammerUpgradedCardPlays.ToString(), "");
         Row3(sb, "Avg upgraded plays/turn", FormatDecimal(upgradedPlaysPerTurn), "");
@@ -2713,7 +2713,7 @@ public static class RelicHoverShowPatch
 
         Row3(sb, "Cards enchanted with Sharp", cards.Count.ToString(), "");
         foreach (var card in cards)
-            RowFlow(sb, "Sharp-enchanted card", StatsTooltip.EscapeBbcode(card), "");
+            TextValueRow(sb, "Sharp-enchanted card", StatsTooltip.EscapeBbcode(card), "");
         return sb.ToString();
     }
 
@@ -2737,7 +2737,7 @@ public static class RelicHoverShowPatch
             var displayName = string.IsNullOrWhiteSpace(card.DisplayName)
                 ? card.CardInstanceId
                 : card.DisplayName;
-            RowFlow(
+            TextValueRow(
                 sb,
                 "Instinct-enchanted card",
                 StatsTooltip.EscapeBbcode(displayName),
@@ -2778,7 +2778,7 @@ public static class RelicHoverShowPatch
 
         Row3(sb, "Cards upgraded", agg.CardsUpgraded.ToString(), "");
         foreach (var card in upgradedCards)
-            RowFlow(sb, "Upgraded card", StatsTooltip.EscapeBbcode(card), "");
+            TextValueRow(sb, "Upgraded card", StatsTooltip.EscapeBbcode(card), "");
     }
 
     private static string BuildMealTicketBodyBBCode(RelicAggregate agg)
@@ -3064,7 +3064,7 @@ public static class RelicHoverShowPatch
                     ? "not tracked"
                     : "not used yet";
 
-            Row3(sb, $"{Ordinal(useNumber)} floor destination", value, "");
+            TextValueRow(sb, $"{Ordinal(useNumber)} floor destination", value, "");
         }
 
         return sb.ToString();
@@ -3105,7 +3105,7 @@ public static class RelicHoverShowPatch
 
         Row3(sb, "Cards removed", cardsRemoved.Count.ToString(), "");
         foreach (var card in cardsRemoved)
-            Row3(sb, "Removed card", StatsTooltip.EscapeBbcode(card), "");
+            TextValueRow(sb, "Removed card", StatsTooltip.EscapeBbcode(card), "");
 
         AppendMaxHpChangeRows(sb, agg, "Max HP lost", MaxHpLost(agg));
         return sb.ToString();
@@ -3146,7 +3146,7 @@ public static class RelicHoverShowPatch
                 ? RunTracker.FormatCardIdForDisplay(card.CardId)
                 : card.DisplayName);
             var value = card.Count == 1 ? displayName : $"{displayName} x{card.Count}";
-            Row3(sb, "Granted", value, "");
+            TextValueRow(sb, "Granted", value, "");
         }
 
         return sb.ToString();
@@ -3173,7 +3173,7 @@ public static class RelicHoverShowPatch
                 ? RunTracker.FormatCardIdForDisplay(card.CardId)
                 : card.DisplayName);
             var value = card.Count == 1 ? displayName : $"{displayName} x{card.Count}";
-            Row3(sb, "Rare received", value, "");
+            TextValueRow(sb, "Rare received", value, "");
         }
 
         return sb.ToString();
@@ -3197,7 +3197,7 @@ public static class RelicHoverShowPatch
                 ? RunTracker.FormatRelicIdForDisplay(relic.RelicId)
                 : relic.DisplayName);
             var value = relic.Count == 1 ? displayName : $"{displayName} x{relic.Count}";
-            Row3(sb, "Obtained", value, "");
+            TextValueRow(sb, "Obtained", value, "");
         }
 
         return sb.ToString();
@@ -3223,7 +3223,7 @@ public static class RelicHoverShowPatch
                 ? RunTracker.FormatRelicIdForDisplay(relic.RelicId)
                 : relic.DisplayName);
             var value = relic.Count == 1 ? displayName : $"{displayName} x{relic.Count}";
-            RowFlow(sb, "Relic gained", value, "");
+            TextValueRow(sb, "Relic gained", value, "");
         }
 
         Row3(sb, "Sacrifices made", agg.SacrificesMade.ToString(), "");
@@ -3263,7 +3263,7 @@ public static class RelicHoverShowPatch
                     displayName += new string('+', card.UpgradeLevel);
             }
 
-            Row3(sb, "Returned card", StatsTooltip.EscapeBbcode(displayName), "");
+            TextValueRow(sb, "Returned card", StatsTooltip.EscapeBbcode(displayName), "");
         }
 
         return sb.ToString();
@@ -3947,10 +3947,10 @@ public static class RelicHoverShowPatch
         for (var i = 0; i < expectedCount; i++)
         {
             var transformation = i < transformations.Count ? transformations[i] : null;
-            Row3(sb, $"Transform {i + 1} source", CardTransformationDisplay(
+            TextValueRow(sb, $"Transform {i + 1} source", CardTransformationDisplay(
                 transformation?.SourceDisplayName,
                 transformation?.SourceCardId), "");
-            Row3(sb, $"Transform {i + 1} result", CardTransformationDisplay(
+            TextValueRow(sb, $"Transform {i + 1} result", CardTransformationDisplay(
                 transformation?.ResultDisplayName,
                 transformation?.ResultCardId), "");
         }
@@ -4194,7 +4194,7 @@ public static class RelicHoverShowPatch
         sb.Append("[/table]\n");
     }
 
-    private static void RowFlow(StringBuilder sb, string label, string value, string pct)
+    private static void TextValueRow(StringBuilder sb, string label, string value, string pct)
     {
         var presentation = RelicStatRowVocabulary.Create(label);
         DescribedIconFlowRow(
