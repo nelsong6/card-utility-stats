@@ -56,6 +56,14 @@ public class RunData
     /// </summary>
     public List<GoldAttributionChunk> GoldAttributionLedger { get; set; } = new();
 
+    /// <summary>
+    /// The floor of an active Maw Bank shop visit that has not yet been
+    /// resolved by entering the next room. Persisting the floor makes the
+    /// visit idempotent across Continue and Core hot reload while the shop is
+    /// still open.
+    /// </summary>
+    public int? MawBankPendingShopFloor { get; set; }
+
     /// <summary>Per-enemy stat aggregates. Keyed by monster id (e.g. "MONSTER.HAUNTED_SHIP").</summary>
     public Dictionary<string, EnemyAggregate> EnemyAggregates { get; set; } = new();
 
@@ -727,8 +735,14 @@ public class RelicAggregate
 
     // Gold attributed to a relic effect. Lucky Fysh measures the owner's
     // completed balance delta after its gold command resolves; Amethyst
-    // Aubergine records the concrete extra GoldReward amount it adds.
+    // Aubergine records the concrete extra GoldReward amount it adds; Maw Bank
+    // measures the completed balance delta from its room-entry callback.
     public int GoldGained { get; set; }
+
+    // Shops entered while Maw Bank was active and then left without spending
+    // gold. A pending visit is resolved at the next distinct room entry using
+    // the relic's own saved HasItemBeenBought state.
+    public int MawBankShopsSkipped { get; set; }
 
     // Old Coin's observed pickup grant and the portion of that attributed
     // grant later consumed by game transactions marked as Spent. A run-level

@@ -2050,6 +2050,20 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsMawBankRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("maw-bank-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.MAW_BANK"];
+        Assert.Equal(6, relicAgg.Activations);
+        Assert.Equal(72, relicAgg.GoldGained);
+        Assert.Equal(2, relicAgg.MawBankShopsSkipped);
+        Assert.Equal(11, loaded.Data.MawBankPendingShopFloor);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsOldCoinRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("old-coin-relic-run.json"));
@@ -2195,6 +2209,19 @@ public class SchemaLoadingTests
         var relicAgg = resumed!.RelicAggregates["RELIC.LUCKY_FYSH"];
         Assert.Equal(45, relicAgg.GoldGained);
         Assert.Equal(3, relicAgg.CardsAddedToDeck);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsMawBankRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("maw-bank-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.MAW_BANK"];
+        Assert.Equal(6, relicAgg.Activations);
+        Assert.Equal(72, relicAgg.GoldGained);
+        Assert.Equal(2, relicAgg.MawBankShopsSkipped);
+        Assert.Equal(11, resumed.MawBankPendingShopFloor);
     }
 
     [Fact]

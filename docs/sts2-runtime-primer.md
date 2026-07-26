@@ -677,6 +677,17 @@ task, count the confirmed deck addition only after successful completion, and
 measure the owner's completed gold-balance delta so gold modifiers or
 prevention are reflected instead of assuming its base 15 gold.
 
+Maw Bank gains gold from its owner-specific `AfterRoomEntered` callback while
+its saved `HasItemBeenBought` flag is false. Mirror the callback's BaseRoom
+gate, then record the owner's completed gold-balance delta rather than its
+listed 12-gold value. A shop skip is not known at shop entry: persist that
+MerchantRoom's floor as an open visit, then resolve it at the next distinct
+room entry. Count the skip only when `HasItemBeenBought` is still false; a
+positive-gold purchase sets that game-owned flag and therefore resolves the
+visit without a skip. Keeping the pending floor in `RunData` makes duplicate
+same-room callbacks idempotent and preserves an open shop across Continue or
+Core hot reload.
+
 Book of Five Rings also owns an `AfterCardChangedPiles` callback for every
 same-owner card whose final pile is the permanent Deck. Its saved `CardsAdded`
 counter advances on each callback and triggers healing whenever the post-add

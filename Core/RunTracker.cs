@@ -1750,6 +1750,7 @@ public static class RunTracker
         target.DoomKills += source.DoomKills;
         target.EnergyGenerated += source.EnergyGenerated;
         target.GoldGained += source.GoldGained;
+        target.MawBankShopsSkipped += source.MawBankShopsSkipped;
         target.OldCoinGoldGranted += source.OldCoinGoldGranted;
         target.OldCoinGoldSpent += source.OldCoinGoldSpent;
         target.CardsAddedToDeck += source.CardsAddedToDeck;
@@ -4226,6 +4227,7 @@ public static class RunTracker
     private const string DarkstonePeriaptRelicId = "RELIC.DARKSTONE_PERIAPT";
     private const string LuckyFyshRelicId = "RELIC.LUCKY_FYSH";
     private const string AmethystAubergineRelicId = "RELIC.AMETHYST_AUBERGINE";
+    private const string MawBankRelicId = "RELIC.MAW_BANK";
     private const string OldCoinRelicId = "RELIC.OLD_COIN";
     private const string LeafyPoulticeRelicId = "RELIC.LEAFY_POULTICE";
     private const string RegalPillowRelicId = "RELIC.REGAL_PILLOW";
@@ -8979,6 +8981,82 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Resolve any prior Maw Bank shop visit and arm the current shop, if
+    /// applicable. The relic's saved HasItemBeenBought flag is authoritative:
+    /// it changes only after a positive-gold merchant purchase.
+    /// </summary>
+    public static void RecordMawBankRoomEntered(MawBank relic, AbstractRoom room)
+    {
+        if (relic == null || room == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var owner = relic.Owner;
+                if (owner == null
+                    || !IsTrackedRelic(relic)
+                    || !IsTrackedPlayer(owner)
+                    || !ReferenceEquals(owner.RunState?.BaseRoom, room))
+                    return;
+
+                EnsureLazyCurrentRunLocked();
+                var aggregate = GetOrCreateCurrentRunRelicAggregateLocked(MawBankRelicId);
+                var pendingShopFloor = _currentRun.MawBankPendingShopFloor;
+                var changed = RecordMawBankRoomEntryForTest(
+                    aggregate,
+                    ref pendingShopFloor,
+                    owner.RunState.TotalFloor,
+                    room is MerchantRoom,
+                    relic.HasItemBeenBought);
+                if (!changed) return;
+
+                _currentRun.MawBankPendingShopFloor = pendingShopFloor;
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordMawBankRoomEntered failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record one completed active Maw Bank room-entry callback and the actual
+    /// amount added to its owner's gold balance.
+    /// </summary>
+    public static void RecordMawBankActivation(
+        MawBank relic,
+        Player owner,
+        int initialGold,
+        int currentGold)
+    {
+        if (relic == null || owner == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ReferenceEquals(relic.Owner, owner)
+                    || !IsTrackedRelic(relic)
+                    || !IsTrackedPlayer(owner))
+                    return;
+
+                var persistDirectlyToRun = _pendingCombat == null;
+                var aggregate = GetOrCreateRelicAggregateForCurrentContextLocked(
+                    MawBankRelicId);
+                RecordMawBankActivationForTest(aggregate, initialGold, currentGold);
+                if (persistDirectlyToRun)
+                    SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordMawBankActivation failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Record one successful Amethyst Aubergine reward modification and the
     /// amount on the concrete extra GoldReward appended by that callback.
     /// </summary>
@@ -10185,6 +10263,48 @@ public static class RunTracker
 
         agg.CardsAddedToDeck++;
         agg.GoldGained += Math.Max(0, currentGold - initialGold);
+    }
+
+    internal static void RecordMawBankActivationForTest(
+        RelicAggregate aggregate,
+        int initialGold,
+        int currentGold)
+    {
+        if (aggregate == null) return;
+
+        aggregate.Activations++;
+        aggregate.GoldGained += Math.Max(0, currentGold - initialGold);
+    }
+
+    internal static bool RecordMawBankRoomEntryForTest(
+        RelicAggregate aggregate,
+        ref int? pendingShopFloor,
+        int currentFloor,
+        bool enteredShop,
+        bool hasItemBeenBought)
+    {
+        if (aggregate == null) return false;
+
+        var changed = false;
+        if (pendingShopFloor.HasValue
+            && pendingShopFloor.Value != currentFloor)
+        {
+            if (!hasItemBeenBought)
+                aggregate.MawBankShopsSkipped++;
+
+            pendingShopFloor = null;
+            changed = true;
+        }
+
+        if (enteredShop
+            && !hasItemBeenBought
+            && pendingShopFloor != currentFloor)
+        {
+            pendingShopFloor = currentFloor;
+            changed = true;
+        }
+
+        return changed;
     }
 
     internal static void RecordAmethystAubergineTriggerForTest(

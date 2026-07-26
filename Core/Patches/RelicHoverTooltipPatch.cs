@@ -972,6 +972,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is MawBank)
+        {
+            title = "Maw Bank";
+            body = BuildMawBankBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is OldCoin)
         {
             title = "Old Coin";
@@ -2967,6 +2974,28 @@ public static class RelicHoverShowPatch
             agg.GoldGained.ToString(),
             "",
             "Extra gold received — the total amount on Gold rewards added by Amethyst Aubergine.");
+        return sb.ToString();
+    }
+
+    private static string BuildMawBankBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        RelicActivationRow(
+            sb,
+            agg.Activations.ToString(),
+            "Activations — completed room entries where Maw Bank was still active.");
+        Row3(
+            sb,
+            "Gold gained",
+            agg.GoldGained.ToString(),
+            "",
+            "Gold gained — the actual gold added by Maw Bank across its completed activations.");
+        Row3(
+            sb,
+            "Shops skipped",
+            agg.MawBankShopsSkipped.ToString(),
+            "",
+            "Shops skipped — shops entered while Maw Bank was active and left without spending gold.");
         return sb.ToString();
     }
 
