@@ -360,6 +360,12 @@ public class OpenBranchRelicStatsTests
         Assert.Contains("block gained", hornCleatBody);
         Assert.Contains("[b]2[/b]", hornCleatBody);
         Assert.Contains("[b]24[/b]", hornCleatBody);
+
+        var captainsWheelBody = InvokeTooltipBuilder(
+            "BuildCaptainsWheelBodyBBCode",
+            new RelicAggregate { Activations = 3, AdditionalBlockGained = 54 });
+        Assert.Contains("[b]3[/b]", captainsWheelBody);
+        Assert.Contains("[b]54[/b]", captainsWheelBody);
     }
 
     private static string InvokeTooltipBuilder(string methodName, RelicAggregate agg)

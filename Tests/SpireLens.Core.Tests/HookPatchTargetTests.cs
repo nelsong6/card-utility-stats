@@ -43,6 +43,26 @@ public class HookPatchTargetTests
 
     [Fact]
     [Trait("Category", "RequiresLiveGame")]
+    public void CaptainsWheelPatch_ResolvesAfterBlockCleared()
+    {
+        var target = AccessTools.Method(
+            typeof(CaptainsWheel),
+            nameof(CaptainsWheel.AfterBlockCleared));
+
+        Assert.NotNull(target);
+        Assert.Equal(
+            "MegaCrit.Sts2.Core.Models.Relics.CaptainsWheel",
+            target!.DeclaringType?.FullName);
+        Assert.Equal("AfterBlockCleared", target.Name);
+        Assert.Equal(
+            ["creature"],
+            target.GetParameters()
+                .Select(parameter => parameter.Name ?? string.Empty)
+                .ToArray());
+    }
+
+    [Fact]
+    [Trait("Category", "RequiresLiveGame")]
     public void GamblingChipPatch_ResolvesAfterPlayerTurnStart()
     {
         var target = InvokeTargetMethod(typeof(GamblingChipAfterPlayerTurnStartPatch));

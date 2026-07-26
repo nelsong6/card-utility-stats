@@ -564,6 +564,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is CaptainsWheel)
+        {
+            title = "Captain's Wheel";
+            body = BuildCaptainsWheelBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is PrismaticGem)
         {
             title = "Prismatic Gem";
@@ -1623,6 +1630,14 @@ public static class RelicHoverShowPatch
     }
 
     private static string BuildHornCleatBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        RelicActivationRow(sb, agg.Activations.ToString());
+        Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildCaptainsWheelBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
         RelicActivationRow(sb, agg.Activations.ToString());

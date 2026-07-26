@@ -91,6 +91,7 @@ public static class RunTracker
     private static readonly Dictionary<PowerModel, int> _bronzeScalesThornsContributions = new(ReferenceEqualityComparer.Instance);
     private static readonly List<PendingBronzeScalesDamageAttribution> _pendingBronzeScalesDamageAttributions = new();
     private static readonly List<Creature> _pendingHornCleatBlockAttributions = new();
+    private static readonly List<Creature> _pendingCaptainsWheelBlockAttributions = new();
     private static readonly Dictionary<string, int> _lastEnergyResetRoundByRelicAndPlayer = new();
     private static int _pendingWhiteBeastPotionRewards;
     private static int _pendingToolboxOfferScreens;
@@ -955,6 +956,7 @@ public static class RunTracker
         _bronzeScalesThornsContributions.Clear();
         _pendingBronzeScalesDamageAttributions.Clear();
         _pendingHornCleatBlockAttributions.Clear();
+        _pendingCaptainsWheelBlockAttributions.Clear();
         _lastEnergyResetRoundByRelicAndPlayer.Clear();
         _pendingWarHammerActivations.Clear();
         _pendingToolboxOfferScreens = 0;
@@ -3669,6 +3671,7 @@ public static class RunTracker
     private const string MrStrugglesRelicId = "RELIC.MR_STRUGGLES";
     private const string BronzeScalesRelicId = "RELIC.BRONZE_SCALES";
     private const string HornCleatRelicId = "RELIC.HORN_CLEAT";
+    private const string CaptainsWheelRelicId = "RELIC.CAPTAINS_WHEEL";
     private const string PrismaticGemRelicId = "RELIC.PRISMATIC_GEM";
     private const string SealOfGoldRelicId = "RELIC.SEAL_OF_GOLD";
     private const string FresnelLensRelicId = "RELIC.FRESNEL_LENS";
@@ -12390,6 +12393,68 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordHornCleatBlockGained failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record Captain's Wheel's owner-specific third-turn block-clear trigger.
+    /// The actual block gained is observed from the gain-block command result.
+    /// </summary>
+    public static void ArmCaptainsWheelAttribution(Creature creature)
+    {
+        if (creature == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(CaptainsWheelRelicId);
+                agg.Activations += 1;
+                _pendingCaptainsWheelBlockAttributions.Add(creature);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"ArmCaptainsWheelAttribution failed: {e.Message}");
+            }
+        }
+    }
+
+    public static bool TryConsumeCaptainsWheelBlockAttribution(Creature creature)
+    {
+        if (creature == null) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                return ConsumePendingCreatureAttribution(
+                    _pendingCaptainsWheelBlockAttributions,
+                    creature);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"TryConsumeCaptainsWheelBlockAttribution failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    public static void RecordCaptainsWheelBlockGained(decimal amount)
+    {
+        if (amount <= 0m) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(CaptainsWheelRelicId);
+                agg.AdditionalBlockGained += (int)amount;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordCaptainsWheelBlockGained failed: {e.Message}");
             }
         }
     }

@@ -511,8 +511,8 @@ public class RelicAggregate
 
     // Total block gained from this relic across all combats.
     // Used by Orichalcum, Permafrost, The Abacus, Bone Flute, Cloak Clasp,
-    // Anchor, Horn Cleat, Tuning Fork, Ornamental Fan, Regalite, and Vambrace's
-    // extra block from its multiplier.
+    // Anchor, Horn Cleat, Captain's Wheel, Tuning Fork, Ornamental Fan,
+    // Regalite, and Vambrace's extra block from its multiplier.
     public int AdditionalBlockGained { get; set; }
 
     // Cloak Clasp held-period denominators. Turns include every player turn
