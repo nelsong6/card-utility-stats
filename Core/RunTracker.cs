@@ -3920,6 +3920,7 @@ public static class RunTracker
     private const string ChosenCheeseRelicId = "RELIC.CHOSEN_CHEESE";
     private const string DarkstonePeriaptRelicId = "RELIC.DARKSTONE_PERIAPT";
     private const string LuckyFyshRelicId = "RELIC.LUCKY_FYSH";
+    private const string AmethystAubergineRelicId = "RELIC.AMETHYST_AUBERGINE";
     private const string LeafyPoulticeRelicId = "RELIC.LEAFY_POULTICE";
     private const string RegalPillowRelicId = "RELIC.REGAL_PILLOW";
     private const string WhiteBeastStatueRelicId = "RELIC.WHITE_BEAST_STATUE";
@@ -8142,6 +8143,41 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Record one successful Amethyst Aubergine reward modification and the
+    /// amount on the concrete extra GoldReward appended by that callback.
+    /// </summary>
+    public static void RecordAmethystAubergineTrigger(
+        AmethystAubergine relic,
+        Player owner,
+        int extraGold)
+    {
+        if (relic == null || owner == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ReferenceEquals(relic.Owner, owner)
+                    || !IsTrackedRelic(relic)
+                    || !IsTrackedPlayer(owner)
+                    || _currentRun == null && _pendingCombat == null)
+                    return;
+
+                var persistDirectlyToRun = _pendingCombat == null;
+                var agg = GetOrCreateRelicAggregateForCurrentContextLocked(
+                    AmethystAubergineRelicId);
+                RecordAmethystAubergineTriggerForTest(agg, extraGold);
+                if (persistDirectlyToRun)
+                    SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordAmethystAubergineTrigger failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Record Book of Five Rings at the successful relic-obtain boundary so
     /// its cards-per-floor denominator exists even before the first card is
     /// added to the deck.
@@ -9028,6 +9064,16 @@ public static class RunTracker
 
         agg.CardsAddedToDeck++;
         agg.GoldGained += Math.Max(0, currentGold - initialGold);
+    }
+
+    internal static void RecordAmethystAubergineTriggerForTest(
+        RelicAggregate agg,
+        int extraGold)
+    {
+        if (agg == null) return;
+
+        agg.Activations++;
+        agg.GoldGained += Math.Max(0, extraGold);
     }
 
     internal static void RecordBookOfFiveRingsCardAddedForTest(

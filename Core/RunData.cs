@@ -673,8 +673,9 @@ public class RelicAggregate
     // observed PlayerCombatState.GainEnergy delta.
     public int EnergyGenerated { get; set; }
 
-    // Gold actually gained by a relic effect. Lucky Fysh measures the owner's
-    // completed balance delta after its gold command resolves.
+    // Gold attributed to a relic effect. Lucky Fysh measures the owner's
+    // completed balance delta after its gold command resolves; Amethyst
+    // Aubergine records the concrete extra GoldReward amount it adds.
     public int GoldGained { get; set; }
 
     // Permanent deck additions confirmed by a relic-owned pile-change

@@ -271,6 +271,13 @@ task, and observe both resource deltas on completion. Count held combats
 separately from activations so its boss-relic energy-per-combat average includes
 combats where the owner ran out of gold and the relic produced no energy.
 
+Amethyst Aubergine uses its owner-specific
+`TryModifyRewards(Player, List<Reward>, AbstractRoom)` callback. A `true`
+return confirms a trigger, and the `GoldReward` appended during that exact call
+contains the observed extra-gold amount. Snapshot the reward-list count before
+the callback and inspect only the appended tail afterward; do not copy the
+relic's current 15-gold text value into tracking.
+
 ## Damage Attribution
 
 For direct card damage, `DamageReceivedEntry` is the important observed outcome.

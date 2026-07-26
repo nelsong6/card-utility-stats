@@ -919,6 +919,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is AmethystAubergine)
+        {
+            title = "Amethyst Aubergine";
+            body = BuildAmethystAubergineBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is BookOfFiveRings)
         {
             title = "Book of Five Rings";
@@ -2649,6 +2656,22 @@ public static class RelicHoverShowPatch
         var sb = new StringBuilder();
         Row3(sb, "Gold gained", agg.GoldGained.ToString(), "");
         Row3(sb, "Cards added to deck", agg.CardsAddedToDeck.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildAmethystAubergineBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        RelicActivationRow(
+            sb,
+            agg.Activations.ToString(),
+            "Times triggered — successful Amethyst Aubergine reward additions.");
+        Row3(
+            sb,
+            "Extra gold received",
+            agg.GoldGained.ToString(),
+            "",
+            "Extra gold received — the total amount on Gold rewards added by Amethyst Aubergine.");
         return sb.ToString();
     }
 
