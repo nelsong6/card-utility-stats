@@ -2971,7 +2971,7 @@ public static class RelicHoverShowPatch
     private static string BuildPlanisphereBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "? floors gained", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         AppendHealingStats(sb, agg);
         return sb.ToString();
     }

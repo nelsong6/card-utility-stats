@@ -74,7 +74,7 @@ public class PlanisphereStatsTests
     }
 
     [Fact]
-    public void RelicTooltip_PlanisphereFields_ShowQuestionFloorsAndHealing()
+    public void RelicTooltip_PlanisphereFields_ShowActivationsAndHealing()
     {
         var agg = new RelicAggregate
         {
@@ -91,7 +91,8 @@ public class PlanisphereStatsTests
 
         var body = BuildBody(agg);
 
-        Assert.Contains("? floors gained", body);
+        Assert.Contains("Activations", body);
+        Assert.DoesNotContain("? floors gained", body);
         Assert.Contains("[b]3[/b]", body);
         Assert.Contains("HP healed", body);
         Assert.Contains("[b]11[/b]", body);
@@ -105,7 +106,8 @@ public class PlanisphereStatsTests
     {
         var body = BuildBody(new RelicAggregate());
 
-        Assert.Contains("? floors gained", body);
+        Assert.Contains("Activations", body);
+        Assert.DoesNotContain("? floors gained", body);
         Assert.Contains("HP healed", body);
         Assert.Contains("healing lost", body);
         Assert.Contains("[b]0[/b]", body);
