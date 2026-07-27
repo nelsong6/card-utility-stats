@@ -64,6 +64,7 @@ public static class RunTracker
 
     private const string EnthralledDefinitionId = "CARD.ENTHRALLED";
     private const string CursedPearlCurseDefinitionId = "CARD.GREED";
+    private const string NormalityDefinitionId = "CARD.NORMALITY";
     private const string ShivDefinitionId = "CARD.SHIV";
     private const string SoulDefinitionId = "CARD.SOUL";
     private const string SovereignBladeLegacyDefinitionToken = "SOVEREIGN_BLADE";
@@ -13646,6 +13647,88 @@ public static class RunTracker
         }
     }
 
+    /// <summary>
+    /// Record each physical Normality still in the tracked player's hand at
+    /// the before-turn-end boundary. Energy is sampled at that same boundary,
+    /// before the game clears the player's remaining pool.
+    /// </summary>
+    public static void RecordNormalityTurnEndedInHand(
+        IEnumerable<Creature>? participants)
+    {
+        if (participants == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+
+                foreach (var creature in participants)
+                {
+                    var player = creature?.Player;
+                    if (player == null || !IsTrackedPlayer(player)) continue;
+
+                    var combatState = player.PlayerCombatState;
+                    if (combatState == null) continue;
+
+                    foreach (var card in combatState.Hand.Cards)
+                    {
+                        if (!IsNormalityCard(card)) continue;
+
+                        var canonical = Canonical(card);
+                        if (_pendingCombat != null
+                            && _pendingCombat.NormalityTurnEndRecordedTurns.TryGetValue(
+                                canonical,
+                                out var recordedTurn)
+                            && recordedTurn == combatState.TurnNumber)
+                        {
+                            continue;
+                        }
+
+                        _pendingCombat ??= new PendingCombat();
+                        _pendingCombat.NormalityTurnEndRecordedTurns[canonical] =
+                            combatState.TurnNumber;
+
+                        var instanceId = GetOrAssignInstanceId(card);
+                        var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
+                        RecordNormalityTurnEndForTest(agg, combatState.Energy);
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordNormalityTurnEndedInHand failed: {e.Message}");
+            }
+        }
+    }
+
+    private static bool IsNormalityCard(CardModel? card)
+    {
+        if (card == null) return false;
+        if (card is Normality) return true;
+
+        try
+        {
+            return string.Equals(
+                card.Id.ToString(),
+                NormalityDefinitionId,
+                StringComparison.Ordinal);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    internal static void RecordNormalityTurnEndForTest(
+        CardAggregate agg,
+        int excessEnergy)
+    {
+        if (agg == null) return;
+        agg.NormalityTurnsEndedInHand += 1;
+        agg.NormalityExcessEnergyAtTurnEndTotal += Math.Max(0, excessEnergy);
+    }
+
     private static void RecordTurnEnergyRelicExcessEnergyForPlayerLocked(string relicId, Player player)
     {
         _pendingCombat ??= new PendingCombat();
@@ -22773,6 +22856,9 @@ public static class RunTracker
         target.DebtTriggers += source.DebtTriggers;
         target.DebtGoldLost += source.DebtGoldLost;
         target.DebtGoldLossBlocked += source.DebtGoldLossBlocked;
+        target.NormalityTurnsEndedInHand += source.NormalityTurnsEndedInHand;
+        target.NormalityExcessEnergyAtTurnEndTotal +=
+            source.NormalityExcessEnergyAtTurnEndTotal;
         target.TotalBlockGained += source.TotalBlockGained;
         target.TotalBlockEffective += source.TotalBlockEffective;
         target.TotalBlockWasted += source.TotalBlockWasted;
@@ -23413,6 +23499,8 @@ internal class PendingCombat
     public Dictionary<Player, int> PocketwatchCardCountTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> PocketwatchCardsPlayedThisTurn { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<CardModel, int> NormalityTurnEndRecordedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, PendingBagOfPreparationDraw> PendingBagOfPreparationDraws { get; }
         = new(ReferenceEqualityComparer.Instance);

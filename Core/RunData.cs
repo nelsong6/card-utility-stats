@@ -209,6 +209,13 @@ public class CardAggregate
     public int DebtGoldLost { get; set; }
     public int DebtGoldLossBlocked { get; set; }
 
+    // Normality turn-end exposure. A qualifying turn is observed before hand
+    // cleanup while this exact physical Normality is still in Hand. The
+    // energy total includes zero-energy turns so the display-side average is
+    // over every qualifying turn, not only turns with leftover energy.
+    public int NormalityTurnsEndedInHand { get; set; }
+    public int NormalityExcessEnergyAtTurnEndTotal { get; set; }
+
     // M2a: Block gained (how much block this card contributed over the run,
     // summed across plays). M2b extends this with absorbed/wasted splits
     // using an ordered provenance ledger for the player's block pool.

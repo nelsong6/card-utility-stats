@@ -633,6 +633,21 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsNormalityCardFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("normality-card-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        var cardAgg = loaded.Data.Aggregates["CARD.NORMALITY#1"];
+        Assert.Equal(4, cardAgg.NormalityTurnsEndedInHand);
+        Assert.Equal(7, cardAgg.NormalityExcessEnergyAtTurnEndTotal);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsSealOfGoldRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("seal-of-gold-relic-run.json"));

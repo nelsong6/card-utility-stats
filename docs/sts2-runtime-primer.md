@@ -267,6 +267,13 @@ before and after the completed callback: that delta is actual gold lost, and
 generic gold-loss command would lose Debt's unclamped intent and risk
 attributing unrelated gold changes.
 
+Normality has no owner-specific turn-end callback; its behavior is a passive
+`ShouldPlay` veto while the card remains in Hand. Observe the established
+`Hook.BeforeSideTurnEnd` prefix instead, where both Hand contents and the
+player's unspent energy are still intact. Record each exact physical Normality
+in Hand once for that player turn, and include zero-energy qualifying turns in
+the denominator for average excess energy.
+
 Seal of Gold uses its owner-specific
 `AfterSideTurnStart(CombatSide, IReadOnlyList<Creature>, ICombatState)`
 callback. It activates only when the owner is in the callback's participant

@@ -345,6 +345,7 @@ public static class CardHoverShowPatch
         AppendDanseMacabrePowerStats(sb, cardModel, metaStats, compact: false);
         AppendUnrelentingFreeAttackStats(sb, cardModel, metaStats, compact: false);
         AppendDebtStats(sb, cardModel, agg);
+        AppendNormalityStats(sb, cardModel, agg);
         AppendReplayStats(sb, agg);
 
         bool hasDedicatedPoison = AppendDedicatedPoisonStats(sb, agg, compact: false);
@@ -556,6 +557,7 @@ public static class CardHoverShowPatch
         AppendDanseMacabrePowerStats(sb, cardModel, metaStats, compact: true);
         AppendUnrelentingFreeAttackStats(sb, cardModel, metaStats, compact: true);
         AppendDebtStats(sb, cardModel, agg);
+        AppendNormalityStats(sb, cardModel, agg);
         AppendReplayStats(sb, agg);
 
         bool showDamage = isAttack || agg.TotalIntended > 0;
@@ -1045,6 +1047,29 @@ public static class CardHoverShowPatch
         Row3(sb, "Gold loss attempted", (agg.DebtTriggers * DebtGoldLossPerTrigger).ToString(), "");
         Row3(sb, "Gold lost", agg.DebtGoldLost.ToString(), "");
         Row3(sb, "Gold loss blocked", agg.DebtGoldLossBlocked.ToString(), "");
+    }
+
+    private static void AppendNormalityStats(
+        StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel card,
+        CardAggregate agg)
+    {
+        if (card is not Normality && !IsCardId(card, "CARD.NORMALITY")) return;
+
+        var averageExcessEnergy = agg.NormalityTurnsEndedInHand <= 0
+            ? 0m
+            : (decimal)agg.NormalityExcessEnergyAtTurnEndTotal
+                / agg.NormalityTurnsEndedInHand;
+        Row3(
+            sb,
+            "Turns ended in hand",
+            agg.NormalityTurnsEndedInHand.ToString(),
+            "");
+        Row3(
+            sb,
+            GetEnergyStatLabel("avg excess at turn end"),
+            FormatDecimal(averageExcessEnergy),
+            "");
     }
 
     private static bool IsCardId(MegaCrit.Sts2.Core.Models.CardModel? card, string id)
