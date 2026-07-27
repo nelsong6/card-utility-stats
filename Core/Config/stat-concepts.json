@@ -73,6 +73,17 @@
         "description": "Block gained, retained, spent, or otherwise measured by a stat."
       }
     },
+    "block_gained": {
+      "display": {
+        "type": "game_resource_badge",
+        "path": "res://images/ui/combat/block.png",
+        "badge": "plus"
+      },
+      "help": {
+        "label": "Block gained",
+        "description": "Block added by a card, relic, or other effect."
+      }
+    },
     "block_wasted": {
       "display": {
         "type": "embedded_image",
@@ -196,6 +207,17 @@
         "description": "Energy gained, generated, saved, spent, or otherwise measured by a stat."
       }
     },
+    "energy_gained": {
+      "display": {
+        "type": "game_resource_badge",
+        "path": "res://images/packed/sprite_fonts/ironclad_energy_icon.png",
+        "badge": "plus"
+      },
+      "help": {
+        "label": "Energy gained",
+        "description": "Energy added by a card, relic, or other effect."
+      }
+    },
     "energy_wasted": {
       "display": {
         "type": "embedded_image",
@@ -234,6 +256,17 @@
       "help": {
         "label": "Gold",
         "description": "Gold gained, lost, spent, blocked, or otherwise measured by a stat."
+      }
+    },
+    "gold_gained": {
+      "display": {
+        "type": "game_resource_badge",
+        "path": "res://images/atlases/ui_atlas.sprites/top_bar/top_bar_gold.tres",
+        "badge": "plus"
+      },
+      "help": {
+        "label": "Gold gained",
+        "description": "Gold added by a card, relic, or other effect."
       }
     },
     "healing_blocked": {
@@ -286,6 +319,17 @@
         "description": "Maximum HP gained, lost, or otherwise measured by a stat."
       }
     },
+    "max_hp_gained": {
+      "display": {
+        "type": "game_resource_badge",
+        "path": "res://images/atlases/ui_atlas.sprites/top_bar/top_bar_heart.tres",
+        "badge": "plus"
+      },
+      "help": {
+        "label": "Maximum HP gained",
+        "description": "Maximum HP added by a relic or other effect."
+      }
+    },
     "nimble": {
       "display": {
         "type": "game_resource",
@@ -314,6 +358,17 @@
       "help": {
         "label": "Potion",
         "description": "A potion gained, skipped, offered, or otherwise counted by a stat."
+      }
+    },
+    "potion_gained": {
+      "display": {
+        "type": "game_resource_badge",
+        "path": "res://images/packed/sprite_fonts/potion_icon.png",
+        "badge": "plus"
+      },
+      "help": {
+        "label": "Potion gained",
+        "description": "A potion successfully added to the potion belt."
       }
     },
     "power": {
@@ -366,6 +421,17 @@
       "help": {
         "label": "Relic",
         "description": "A relic gained, skipped, offered, or otherwise counted by a stat."
+      }
+    },
+    "relic_gained": {
+      "display": {
+        "type": "game_resource_badge",
+        "path": "res://images/ui/reward_screen/reward_icon_shared_relic.png",
+        "badge": "plus"
+      },
+      "help": {
+        "label": "Relic gained",
+        "description": "A relic successfully added to the player's relic inventory."
       }
     },
     "skill": {
@@ -479,6 +545,17 @@
       "help": {
         "label": "Vigor",
         "description": "Vigor gained, spent, or otherwise measured by a stat."
+      }
+    },
+    "vigor_gained": {
+      "display": {
+        "type": "game_resource_badge",
+        "path": "res://images/atlases/power_atlas.sprites/vigor_power.tres",
+        "badge": "plus"
+      },
+      "help": {
+        "label": "Vigor gained",
+        "description": "Vigor added by a card, relic, or other effect."
       }
     },
     "vulnerable": {

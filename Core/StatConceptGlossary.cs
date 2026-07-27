@@ -44,6 +44,7 @@ internal static class StatConceptGlossary
 {
     private const string EmbeddedFileSuffix = "Config.stat-concepts.json";
     private const string EnergyConceptId = "energy";
+    private const string EnergyGainedConceptId = "energy_gained";
     private const int SupportedSchemaVersion = 1;
     internal const int IconSlotSize = 20;
     private const int IconArtworkSize = 16;
@@ -68,10 +69,16 @@ internal static class StatConceptGlossary
         new(StringComparer.OrdinalIgnoreCase);
     private static readonly Dictionary<string, ImageTexture> GeneratedImageTextures =
         new(StringComparer.OrdinalIgnoreCase);
+    private static readonly Dictionary<string, ContextualGeneratedIcon> ContextualEnergyGainedIcons =
+        new(StringComparer.OrdinalIgnoreCase);
     private static readonly Dictionary<string, Rect2I> GameResourceRegions =
         new(StringComparer.Ordinal);
     private static readonly Dictionary<string, Texture2D> GlossaryTextures =
         new(StringComparer.OrdinalIgnoreCase);
+
+    private sealed record ContextualGeneratedIcon(
+        string GeneratedPath,
+        ImageTexture Texture);
 
     public static IReadOnlyList<StatConcept> Concepts { get; } =
         ConceptsById.Values
@@ -82,6 +89,7 @@ internal static class StatConceptGlossary
     public static void Initialize()
     {
         GlossaryTextures.Clear();
+        ContextualEnergyGainedIcons.Clear();
         BuildGeneratedConceptImages();
         BuildGameResourceRegions();
         CoreMain.Logger.Info(
@@ -119,10 +127,7 @@ internal static class StatConceptGlossary
             return false;
         }
 
-        var isContextualEnergy = string.Equals(
-            concept.Id,
-            EnergyConceptId,
-            StringComparison.Ordinal);
+        var isContextualEnergy = IsContextualEnergyConcept(concept.Id);
         if (isContextualEnergy
             || !GlossaryTextures.TryGetValue(concept.Id, out var texture))
         {
@@ -174,6 +179,14 @@ internal static class StatConceptGlossary
 
     private static string RenderGlyph(StatConcept concept, int size)
     {
+        if (string.Equals(
+                concept.Id,
+                EnergyGainedConceptId,
+                StringComparison.Ordinal))
+        {
+            return RenderContextualEnergyGained(concept, size);
+        }
+
         return concept.Display.Type switch
         {
             StatConceptDisplayType.GameResource =>
@@ -265,10 +278,7 @@ internal static class StatConceptGlossary
 
         var generatedConcepts = Concepts
             .Where(concept =>
-                !string.Equals(
-                    concept.Id,
-                    EnergyConceptId,
-                    StringComparison.Ordinal)
+                !IsContextualEnergyConcept(concept.Id)
                 && concept.Display.Type is (
                     StatConceptDisplayType.GameResource
                     or StatConceptDisplayType.EmbeddedImage
@@ -461,6 +471,52 @@ internal static class StatConceptGlossary
         combined.FillRect(new Rect2I(46, 34, 7, 26), fill);
         combined.FillRect(new Rect2I(36, 44, 25, 7), fill);
         return combined;
+    }
+
+    private static string RenderContextualEnergyGained(
+        StatConcept concept,
+        int size)
+    {
+        var generated = GetOrBuildContextualEnergyGainedIcon(concept);
+        return RenderImage(generated.GeneratedPath, size);
+    }
+
+    private static ContextualGeneratedIcon GetOrBuildContextualEnergyGainedIcon(
+        StatConcept concept)
+    {
+        var energyPath = StatEnergyIcon.GetCurrentPath();
+        if (ContextualEnergyGainedIcons.TryGetValue(energyPath, out var cached))
+            return cached;
+
+        System.IO.Directory.CreateDirectory(
+            ProjectSettings.GlobalizePath(GeneratedIconDirectory));
+
+        var contextualConcept = concept with
+        {
+            Display = concept.Display with
+            {
+                Value = energyPath,
+            },
+        };
+        using var sourceImage = BuildBadgedGameResourceImage(contextualConcept);
+        using var normalizedImage = NormalizeToIconSlot(sourceImage);
+        var texture = ImageTexture.CreateFromImage(normalizedImage);
+        var energyName = System.IO.Path.GetFileNameWithoutExtension(energyPath)
+            .Replace("_energy_icon", string.Empty, StringComparison.OrdinalIgnoreCase);
+        var safeEnergyName = new string(energyName
+            .Select(character => char.IsLetterOrDigit(character) ? character : '_')
+            .ToArray());
+        var generatedPath =
+            $"{GeneratedIconDirectory}/{EnergyGainedConceptId}-{safeEnergyName}-"
+            + $"{GeneratedIconGeneration}.tres";
+        texture.TakeOverPath(generatedPath);
+
+        var generated = new ContextualGeneratedIcon(generatedPath, texture);
+        ContextualEnergyGainedIcons.Add(energyPath, generated);
+        CoreMain.Logger.Info(
+            $"Stat concept contextual image loaded: id={EnergyGainedConceptId}, "
+            + $"energy={energyName}, size={texture.GetWidth()}x{texture.GetHeight()}");
+        return generated;
     }
 
     private static Image LoadGameResourceImage(string path)
@@ -687,6 +743,14 @@ internal static class StatConceptGlossary
                 ResourceLoader.CacheMode.Reuse);
         }
 
+        if (string.Equals(
+                concept.Id,
+                EnergyGainedConceptId,
+                StringComparison.Ordinal))
+        {
+            return GetOrBuildContextualEnergyGainedIcon(concept).Texture;
+        }
+
         if (GeneratedImageTextures.TryGetValue(
                 concept.Id,
                 out var normalized))
@@ -728,6 +792,18 @@ internal static class StatConceptGlossary
                 region.Size.Y),
             FilterClip = true,
         };
+    }
+
+    private static bool IsContextualEnergyConcept(string conceptId)
+    {
+        return string.Equals(
+                   conceptId,
+                   EnergyConceptId,
+                   StringComparison.Ordinal)
+               || string.Equals(
+                   conceptId,
+                   EnergyGainedConceptId,
+                   StringComparison.Ordinal);
     }
 
     private static void SaveGeneratedImage(string conceptId, Image image, string sourceKind)

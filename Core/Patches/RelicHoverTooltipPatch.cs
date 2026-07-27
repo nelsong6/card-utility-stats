@@ -1868,7 +1868,7 @@ public static class RelicHoverShowPatch
         AppendEnergyGeneratedStats(sb, agg);
         Row3(sb, excessEnergyLabel, turnsEndedWithExcessEnergy.ToString(), "");
         if (includeCombatsWithEnergyNotGained)
-            Row3(sb, "Combats with energy not gained", agg.CombatsWithoutActivation.ToString(), "");
+            Row3(sb, "Combats without energy", agg.CombatsWithoutActivation.ToString(), "");
         return sb.ToString();
     }
 
@@ -2374,7 +2374,11 @@ public static class RelicHoverShowPatch
         var sb = new StringBuilder();
         Row3(sb, "Brightest Flame played", brightestFlameAgg.Plays.ToString(), "");
         Row3(sb, DrawLabel("Brightest Flame drawn"), brightestFlameAgg.TimesDrawn.ToString(), "");
-        Row3(sb, EnergyLabel("gained by Flame"), brightestFlameAgg.TotalEnergyGenerated.ToString(), "");
+        Row3(
+            sb,
+            EnergyLabel("Energy gained by Flame"),
+            brightestFlameAgg.TotalEnergyGenerated.ToString(),
+            "");
         Row3(sb, DrawLabel("Cards drawn by Flame"), brightestFlameAgg.TimesCardsDrawn.ToString(), "");
         Row3(sb, "Max HP lost to Flame", brightestFlameAgg.TotalMaxHpLost.ToString(), "");
         return sb.ToString();

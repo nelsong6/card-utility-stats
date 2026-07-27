@@ -14,6 +14,7 @@ public class StatConceptGlossaryTests
                 "attack",
                 "average",
                 "block",
+                "block_gained",
                 "block_wasted",
                 "card",
                 "charge",
@@ -27,24 +28,29 @@ public class StatConceptGlossaryTests
                 "discard",
                 "draw",
                 "energy",
+                "energy_gained",
                 "energy_wasted",
                 "exhaust",
                 "floor",
                 "gold",
+                "gold_gained",
                 "healing_blocked",
                 "healing_gained",
                 "healing_wasted",
                 "information",
                 "max_hp",
+                "max_hp_gained",
                 "nimble",
                 "osty_summon_gained",
                 "potion",
+                "potion_gained",
                 "power",
                 "attack_rare",
                 "card_rare",
                 "power_rare",
                 "skill_rare",
                 "relic",
+                "relic_gained",
                 "skill",
                 "stars",
                 "strength",
@@ -57,6 +63,7 @@ public class StatConceptGlossaryTests
                 "unknown_room",
                 "upgraded",
                 "vigor",
+                "vigor_gained",
                 "vulnerable",
                 "wasted",
                 "weak",
@@ -77,6 +84,21 @@ public class StatConceptGlossaryTests
         Assert.Equal(
             StatConceptDisplayType.GameResourceBadge,
             StatConceptGlossary.Concepts.Single(concept => concept.Id == "strength_gained").Display.Type);
+        Assert.All(
+            [
+                "block_gained",
+                "energy_gained",
+                "gold_gained",
+                "max_hp_gained",
+                "potion_gained",
+                "relic_gained",
+                "vigor_gained",
+            ],
+            conceptId => Assert.Equal(
+                StatConceptDisplayType.GameResourceBadge,
+                StatConceptGlossary.Concepts
+                    .Single(concept => concept.Id == conceptId)
+                    .Display.Type));
         Assert.Equal(20, StatConceptGlossary.IconSlotSize);
     }
 

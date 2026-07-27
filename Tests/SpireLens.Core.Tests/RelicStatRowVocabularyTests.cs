@@ -88,8 +88,8 @@ public class RelicStatRowVocabularyTests
         "turn")]
     [InlineData(
         "Max HP gained",
-        "gained",
-        "max_hp",
+        "",
+        "max_hp_gained",
         "")]
     [InlineData(
         "Non-upgraded attacks in combat",
@@ -163,8 +163,33 @@ public class RelicStatRowVocabularyTests
         "combat")]
     [InlineData(
         "Potions gained",
-        "gained",
-        "potion",
+        "",
+        "potion_gained",
+        "")]
+    [InlineData(
+        "Total block gained",
+        "Total",
+        "block_gained",
+        "")]
+    [InlineData(
+        "Avg energy gained per combat",
+        "",
+        "average,energy_gained,combat",
+        "combat")]
+    [InlineData(
+        "Gold gained",
+        "",
+        "gold_gained",
+        "")]
+    [InlineData(
+        "Relic gained",
+        "",
+        "relic_gained",
+        "")]
+    [InlineData(
+        "Vigor gained",
+        "",
+        "vigor_gained",
         "")]
     public void Create_ReplacesKnownRelicConceptWords(
         string label,
@@ -193,9 +218,9 @@ public class RelicStatRowVocabularyTests
 
         var presentation = RelicStatRowVocabulary.Create(label);
 
-        Assert.Equal("gained", presentation.Label);
+        Assert.Equal("", presentation.Label);
         Assert.Equal(
-            ["average", "block", "combat"],
+            ["average", "block_gained", "combat"],
             presentation.ConceptIds);
         Assert.Equal(["combat"], presentation.DenominatorConceptIds);
         Assert.DoesNotContain("block.png", presentation.Label);
@@ -211,9 +236,9 @@ public class RelicStatRowVocabularyTests
             $"{energyIcon} Avg energy gained per combat");
 
         Assert.DoesNotContain(energyIcon, presentation.Label);
-        Assert.Equal("gained", presentation.Label);
+        Assert.Equal("", presentation.Label);
         Assert.Equal(
-            ["average", "energy", "combat"],
+            ["average", "energy_gained", "combat"],
             presentation.ConceptIds);
         Assert.Equal(["combat"], presentation.DenominatorConceptIds);
         Assert.Contains("energy", presentation.FullDescription);

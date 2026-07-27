@@ -121,6 +121,9 @@ public class PaelsWingStatsTests
         Assert.Contains("Relics gained", body);
         Assert.Contains("Relic gained", body);
         Assert.Contains(
+            "user://SpireLens/generated-icons/relic_gained-",
+            body);
+        Assert.Contains(
             "res://images/atlases/relic_atlas.sprites/kunai.tres",
             body);
         Assert.Contains(

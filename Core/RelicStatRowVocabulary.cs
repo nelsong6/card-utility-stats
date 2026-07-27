@@ -53,6 +53,18 @@ internal static class RelicStatRowVocabulary
         @"(?:\b(?:per|in|this)\s*|/\s*)$",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
+    private static readonly IReadOnlyDictionary<string, string> GainedConceptBaseIds =
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["block_gained"] = "block",
+            ["energy_gained"] = "energy",
+            ["gold_gained"] = "gold",
+            ["max_hp_gained"] = "max_hp",
+            ["potion_gained"] = "potion",
+            ["relic_gained"] = "relic",
+            ["vigor_gained"] = "vigor",
+        };
+
     private static readonly IReadOnlyList<ConceptRule> Rules =
     [
         Rule(
@@ -64,6 +76,7 @@ internal static class RelicStatRowVocabulary
         Rule(
             "healing_wasted",
             @"\b(?:(?:hp\s+)?healing\s+wasted|wasted\s+(?:hp\s+)?healing)\b"),
+        Rule("max_hp_gained", @"\b(?:max|maximum)\s+hp\s+gained\b"),
         Rule("max_hp", @"\b(?:max|maximum)\s+hp\b"),
         Rule(
             "healing_blocked",
@@ -74,6 +87,7 @@ internal static class RelicStatRowVocabulary
         Rule("average", @"\b(?:avg|average)\b"),
         Rule("activation", @"\b(?:activations?|activated|triggers?|triggered)\b", true),
         Rule("attack", @"\battacks?\b"),
+        Rule("block_gained", @"\bblock\s+gained\b"),
         Rule("block", @"\bblock\b"),
         Rule("card_rare", @"\brare(?:s|\s+cards?)?\b"),
         Rule("card_uncommon", @"\buncommon(?:s|\s+cards?)?\b"),
@@ -85,12 +99,16 @@ internal static class RelicStatRowVocabulary
         Rule("dexterity", @"\bdexterity\b"),
         Rule("discard", @"\bdiscard(?:ed|ing|s)?\b"),
         Rule("draw", @"\b(?:draw|drawn|drawing|draws)\b"),
+        Rule("energy_gained", @"\benergy\s+gained\b"),
         Rule("energy", @"\benergy\b"),
         Rule("exhaust", @"\bexhaust(?:ed|ing|s)?\b"),
         Rule("floor", @"\bfloors?\b", true),
+        Rule("gold_gained", @"\bgold\s+gained\b"),
         Rule("gold", @"\bgold\b"),
+        Rule("potion_gained", @"\bpotions?\s+gained\b"),
         Rule("potion", @"\bpotions?\b"),
         Rule("power", @"\bpowers?\b"),
+        Rule("relic_gained", @"\brelics?\s+gained\b"),
         Rule("relic", @"\brelics?\b"),
         Rule("skill", @"\bskills?\b"),
         Rule("stars", @"\bstars?\b"),
@@ -98,6 +116,7 @@ internal static class RelicStatRowVocabulary
         Rule("strength", @"\bstrength\b"),
         Rule("turn", @"\bturns?\b", true),
         Rule("upgraded", @"(?<!non-)\b(?:upgrade|upgraded|upgrades)\b"),
+        Rule("vigor_gained", @"\bvigor\s+gained\b"),
         Rule("vigor", @"\bvigor\b"),
         Rule("vulnerable", @"\bvulnerable\b"),
         Rule("wasted", @"\bwast(?:e|ed|ing)\b"),
@@ -213,6 +232,15 @@ internal static class RelicStatRowVocabulary
         {
             conceptIds = conceptIds
                 .Where(id => !string.Equals(id, "card", StringComparison.Ordinal))
+                .ToArray();
+        }
+        foreach (var (gainedConceptId, baseConceptId) in GainedConceptBaseIds)
+        {
+            if (!conceptIds.Contains(gainedConceptId, StringComparer.Ordinal))
+                continue;
+
+            conceptIds = conceptIds
+                .Where(id => !string.Equals(id, baseConceptId, StringComparison.Ordinal))
                 .ToArray();
         }
         var denominatorConceptIds = occurrences
