@@ -32,6 +32,7 @@ public class StatConceptGlossaryTests
                 "healing_gained",
                 "information",
                 "max_hp",
+                "nimble",
                 "osty_summon_gained",
                 "potion",
                 "power",
@@ -83,6 +84,7 @@ public class StatConceptGlossaryTests
         var healingBlocked = StatConceptGlossary.RenderHintedGlyph("healing_blocked");
         var healingGained = StatConceptGlossary.RenderHintedGlyph("healing_gained");
         var informationConcept = StatConceptGlossary.RenderHintedGlyph("information");
+        var nimble = StatConceptGlossary.RenderHintedGlyph("nimble");
         var summon = StatConceptGlossary.RenderHintedGlyph("osty_summon_gained");
         var power = StatConceptGlossary.RenderHintedGlyph("power");
         var skill = StatConceptGlossary.RenderHintedGlyph("skill");
@@ -107,6 +109,7 @@ public class StatConceptGlossaryTests
             healingBlocked,
             healingGained,
             informationConcept,
+            nimble,
             summon,
             power,
             skill,
@@ -170,6 +173,8 @@ public class StatConceptGlossaryTests
         Assert.Contains(
             "user://SpireLens/generated-icons/information-",
             informationConcept);
+        Assert.Contains("[hint=\"Nimble:", nimble);
+        Assert.Contains("res://images/enchantments/nimble.png", nimble);
         Assert.Contains(
             "res://images/atlases/relic_atlas.sprites/bound_phylactery.tres",
             summon);

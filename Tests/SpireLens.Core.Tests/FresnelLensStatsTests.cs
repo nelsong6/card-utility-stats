@@ -131,12 +131,12 @@ public class FresnelLensStatsTests
         Assert.Contains("Original max HP", body);
         Assert.Contains("New max HP", body);
         Assert.Contains("Max HP lost to Drowning Beacon", body);
-        Assert.Contains("Nimble cards taken", body);
-        Assert.Contains("Reward screens with Nimble cards", body);
-        Assert.Contains("Reward screens with 2 Nimble cards", body);
-        Assert.Contains("Reward screens with 3+ Nimble cards", body);
-        Assert.Contains("Reward screens with no Nimble cards", body);
-        Assert.Contains("Nimble offered, none taken", body);
+        Assert.Contains("res://images/enchantments/nimble.png", body);
+        Assert.Contains("cards taken", body);
+        Assert.Contains("reward screens with 2", body);
+        Assert.Contains("reward screens with 3+", body);
+        Assert.Contains("reward screens with none", body);
+        Assert.Contains("offered, none taken", body);
         Assert.Contains("[b]70[/b]", body);
         Assert.Contains("[b]57[/b]", body);
         Assert.Contains("[b]13[/b]", body);
@@ -170,7 +170,8 @@ public class FresnelLensStatsTests
 
         Assert.True(recognized);
         Assert.Equal("Fresnel Lens", title);
-        Assert.Contains("Nimble cards taken", body);
+        Assert.Contains("res://images/enchantments/nimble.png", body);
+        Assert.Equal(500f, RelicHoverShowPatch.GetPreferredStatsTooltipWidth(relic));
     }
 
     [Fact]

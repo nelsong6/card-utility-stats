@@ -245,6 +245,16 @@
         "description": "Maximum HP gained, lost, or otherwise measured by a stat."
       }
     },
+    "nimble": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/enchantments/nimble.png"
+      },
+      "help": {
+        "label": "Nimble",
+        "description": "A card enchanted with Nimble or a reward containing a Nimble card."
+      }
+    },
     "osty_summon_gained": {
       "display": {
         "type": "game_resource",

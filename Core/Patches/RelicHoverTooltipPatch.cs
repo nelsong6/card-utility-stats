@@ -41,6 +41,7 @@ public static class RelicHoverShowPatch
     private const float SturdyClampTooltipWidth = 420f;
     private const float EmberTeaTooltipWidth = 500f;
     private const float PaelsWingTooltipWidth = 500f;
+    private const float FresnelLensTooltipWidth = 500f;
     private static readonly System.Reflection.FieldInfo? VambraceBlockGainedThisCombatField =
         AccessTools.Field(typeof(Vambrace), "_blockGainedThisCombat");
     private static readonly System.Reflection.FieldInfo? PermafrostActivatedThisCombatField =
@@ -232,6 +233,7 @@ public static class RelicHoverShowPatch
             WhisperingEarring => EmberTeaTooltipWidth,
             TungstenRod => EmberTeaTooltipWidth,
             PaelsWing => PaelsWingTooltipWidth,
+            FresnelLens => FresnelLensTooltipWidth,
             _ => null,
         };
 
@@ -2008,13 +2010,52 @@ public static class RelicHoverShowPatch
     {
         var sb = new StringBuilder();
         AppendMaxHpChangeRows(sb, agg, "Max HP lost to Drowning Beacon", MaxHpLost(agg));
-        Row3(sb, "Nimble cards taken", agg.NimbleCardsTaken.ToString(), "");
-        Row3(sb, "Reward screens with Nimble cards", agg.RewardScreensWithNimbleCards.ToString(), "");
-        Row3(sb, "Reward screens with 2 Nimble cards", agg.RewardScreensWithTwoNimbleCards.ToString(), "");
-        Row3(sb, "Reward screens with 3+ Nimble cards", agg.RewardScreensWithThreeOrMoreNimbleCards.ToString(), "");
-        Row3(sb, "Reward screens with no Nimble cards", agg.RewardScreensWithoutNimbleCards.ToString(), "");
-        Row3(sb, "Nimble offered, none taken", agg.RewardScreensWithNimbleCardsButNoneTaken.ToString(), "");
+        NimbleRow(
+            sb,
+            "cards taken",
+            agg.NimbleCardsTaken,
+            "Nimble cards taken from rewards affected by Fresnel Lens.");
+        NimbleRow(
+            sb,
+            "reward screens",
+            agg.RewardScreensWithNimbleCards,
+            "Reward screens that offered at least one Nimble card.");
+        NimbleRow(
+            sb,
+            "reward screens with 2",
+            agg.RewardScreensWithTwoNimbleCards,
+            "Reward screens that offered exactly two Nimble cards.");
+        NimbleRow(
+            sb,
+            "reward screens with 3+",
+            agg.RewardScreensWithThreeOrMoreNimbleCards,
+            "Reward screens that offered three or more Nimble cards.");
+        NimbleRow(
+            sb,
+            "reward screens with none",
+            agg.RewardScreensWithoutNimbleCards,
+            "Reward screens that offered no Nimble cards.");
+        NimbleRow(
+            sb,
+            "offered, none taken",
+            agg.RewardScreensWithNimbleCardsButNoneTaken,
+            "Reward screens that offered Nimble cards but from which none were taken.");
         return sb.ToString();
+    }
+
+    private static void NimbleRow(
+        StringBuilder sb,
+        string label,
+        int value,
+        string fullDescription)
+    {
+        DescribedIconRow(
+            sb,
+            ["nimble"],
+            [],
+            label,
+            value.ToString(),
+            fullDescription);
     }
 
     private static string BuildFishingRodBodyBBCode(RelicAggregate agg)
