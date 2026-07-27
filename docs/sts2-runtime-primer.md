@@ -679,6 +679,13 @@ across the full pickup callback when that is what the player experiences. Lee's
 Waffle records current-HP gained across `AfterObtained`, covering both its
 max-HP grant and the follow-up heal-to-full.
 
+Lee's Waffle??? (`FakeLeesWaffle`) is mechanically different: its
+`AfterObtained` callback attempts to heal ten percent of the owner's current
+maximum HP and does not change maximum HP. Calculate that exact decimal attempt
+before the callback, then finalize the shared relic-healing ledger after the
+returned task completes so restored HP, full-HP overfill, and other prevention
+remain distinct from normal Lee's Waffle's aggregate.
+
 For simple max-HP pickup relics such as Strawberry, Pear, Mango, Mango???
 (`FakeMango`), and Nutritious Oyster, snapshot the owner's max HP in an
 `AfterObtained` prefix and observe it only after the returned task completes

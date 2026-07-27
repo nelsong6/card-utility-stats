@@ -974,6 +974,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is FakeLeesWaffle)
+        {
+            title = "Lee's Waffle???";
+            body = BuildFakeLeesWaffleBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is Strawberry)
         {
             title = "Strawberry";
@@ -3108,6 +3115,14 @@ public static class RelicHoverShowPatch
         var sb = new StringBuilder();
         AppendMaxHpChangeRows(sb, agg, "Max HP gained", MaxHpGained(agg));
         Row3(sb, "HP gained", FormatDecimal(agg.TotalHealingRestored), "");
+        return sb.ToString();
+    }
+
+    private static string BuildFakeLeesWaffleBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        RelicActivationRow(sb, agg.Activations.ToString());
+        AppendHealingStats(sb, agg);
         return sb.ToString();
     }
 

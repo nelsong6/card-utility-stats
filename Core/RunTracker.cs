@@ -4376,6 +4376,7 @@ public static class RunTracker
     private const string PlanisphereRelicId = "RELIC.PLANISPHERE";
     private const string LizardTailRelicId = "RELIC.LIZARD_TAIL";
     private const string LeesWaffleRelicId = "RELIC.LEES_WAFFLE";
+    private const string FakeLeesWaffleRelicId = "RELIC.FAKE_LEES_WAFFLE";
     private const string StrawberryRelicId = "RELIC.STRAWBERRY";
     private const string PearRelicId = "RELIC.PEAR";
     private const string MangoRelicId = "RELIC.MANGO";
@@ -8911,6 +8912,23 @@ public static class RunTracker
                 CoreMain.LogDebug($"RecordLeesWafflePickupHpGained failed: {e.Message}");
             }
         }
+    }
+
+    /// <summary>
+    /// Record Lee's Waffle???'s pickup heal and arm its observed healing
+    /// window. Unlike Lee's Waffle, the obscured relic heals a percentage of
+    /// max HP without changing max HP.
+    /// </summary>
+    public static void RecordFakeLeesWaffleTrigger(
+        Creature healedCreature,
+        decimal attemptedHealing)
+    {
+        RecordRelicHealingTrigger(
+            FakeLeesWaffleRelicId,
+            healedCreature,
+            attemptedHealing,
+            nameof(RecordFakeLeesWaffleTrigger),
+            forceDirectRunPersistence: true);
     }
 
     /// <summary>
