@@ -66,7 +66,7 @@ public class WarPaintStatsTests
     }
 
     [Fact]
-    public void RelicTooltip_WarPaint_ShowsCardsUpgradedAndCardList()
+    public void RelicTooltip_WarPaint_UsesSkillConceptForCountAndList()
     {
         var body = BuildBody(new RelicAggregate
         {
@@ -74,8 +74,11 @@ public class WarPaintStatsTests
             UpgradedCards = { "Defend+", "Battle Trance+" },
         });
 
-        Assert.Contains("Cards upgraded", body);
-        Assert.Contains("Upgraded card", body);
+        Assert.Contains("Skills upgraded", body);
+        Assert.Contains("Upgraded skill", body);
+        Assert.DoesNotContain("Cards upgraded", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("skill"), body);
+        Assert.DoesNotContain(StatConceptGlossary.RenderHintedGlyph("card"), body);
         Assert.Contains("Defend+", body);
         Assert.Contains("Battle Trance+", body);
         Assert.Contains("[b]2[/b]", body);
@@ -86,7 +89,9 @@ public class WarPaintStatsTests
     {
         var body = BuildBody(new RelicAggregate());
 
-        Assert.Contains("Cards upgraded", body);
+        Assert.Contains("Skills upgraded", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("skill"), body);
+        Assert.DoesNotContain(StatConceptGlossary.RenderHintedGlyph("card"), body);
         Assert.Contains("[b]0[/b]", body);
     }
 

@@ -32,6 +32,16 @@ public class RelicStatRowVocabularyTests
         "card,upgraded",
         "")]
     [InlineData(
+        "Attacks upgraded",
+        "",
+        "attack,upgraded",
+        "")]
+    [InlineData(
+        "Skills upgraded",
+        "",
+        "skill,upgraded",
+        "")]
+    [InlineData(
         "Cards drawn total",
         "total",
         "draw",

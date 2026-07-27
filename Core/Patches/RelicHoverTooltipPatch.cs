@@ -2919,7 +2919,11 @@ public static class RelicHoverShowPatch
     private static string BuildWhetstoneBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        AppendUpgradedCardStats(sb, agg);
+        AppendUpgradedCardStats(
+            sb,
+            agg,
+            totalLabel: "Attacks upgraded",
+            itemLabel: "Upgraded attack");
         return sb.ToString();
     }
 
@@ -2978,7 +2982,11 @@ public static class RelicHoverShowPatch
     private static string BuildWarPaintBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        AppendUpgradedCardStats(sb, agg);
+        AppendUpgradedCardStats(
+            sb,
+            agg,
+            totalLabel: "Skills upgraded",
+            itemLabel: "Upgraded skill");
         return sb.ToString();
     }
 
@@ -2989,15 +2997,19 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
-    private static void AppendUpgradedCardStats(StringBuilder sb, RelicAggregate agg)
+    private static void AppendUpgradedCardStats(
+        StringBuilder sb,
+        RelicAggregate agg,
+        string totalLabel = "Cards upgraded",
+        string itemLabel = "Upgraded card")
     {
         var upgradedCards = (agg.UpgradedCards ?? new System.Collections.Generic.List<string>())
             .Where(card => !string.IsNullOrWhiteSpace(card))
             .ToList();
 
-        Row3(sb, "Cards upgraded", agg.CardsUpgraded.ToString(), "");
+        Row3(sb, totalLabel, agg.CardsUpgraded.ToString(), "");
         foreach (var card in upgradedCards)
-            TextValueRow(sb, "Upgraded card", StatsTooltip.EscapeBbcode(card), "");
+            TextValueRow(sb, itemLabel, StatsTooltip.EscapeBbcode(card), "");
     }
 
     private static string BuildMealTicketBodyBBCode(RelicAggregate agg)
