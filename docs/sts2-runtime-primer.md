@@ -679,11 +679,12 @@ across the full pickup callback when that is what the player experiences. Lee's
 Waffle records current-HP gained across `AfterObtained`, covering both its
 max-HP grant and the follow-up heal-to-full.
 
-For simple max-HP pickup relics such as Strawberry, Pear, Mango, and Nutritious
-Oyster, snapshot the owner's max HP in an `AfterObtained` prefix and observe it
-only after the returned task completes successfully. This captures the actual
-gain, including caps or other runtime changes, without counting relic
-restoration.
+For simple max-HP pickup relics such as Strawberry, Pear, Mango, Mango???
+(`FakeMango`), and Nutritious Oyster, snapshot the owner's max HP in an
+`AfterObtained` prefix and observe it only after the returned task completes
+successfully. This captures the actual gain, including caps or other runtime
+changes, without counting relic restoration. Mango and Mango??? use separate
+relic aggregates even though they share the same presentation.
 
 Gnarled Hammer's `AfterObtained` awaits a deck selection, then synchronously
 calls `CardCmd.Enchant` with Sharp on each returned physical deck card. Snapshot

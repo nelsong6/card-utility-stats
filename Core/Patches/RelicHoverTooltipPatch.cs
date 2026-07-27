@@ -1002,6 +1002,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is FakeMango)
+        {
+            title = "Mango???";
+            body = BuildMangoBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is StoneHumidifier)
         {
             title = "Stone Humidifier";

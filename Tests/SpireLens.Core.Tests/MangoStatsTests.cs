@@ -11,6 +11,7 @@ namespace SpireLens.Core.Tests;
 public class MangoStatsTests
 {
     private const string MangoRelicId = "RELIC.MANGO";
+    private const string FakeMangoRelicId = "RELIC.FAKE_MANGO";
 
     private static readonly MethodInfo BuildMangoBodyMethod =
         typeof(RelicHoverShowPatch).GetMethod(
@@ -22,6 +23,15 @@ public class MangoStatsTests
     public void Patch_TargetsMangoAfterObtained()
     {
         var target = typeof(Mango).GetMethod(nameof(Mango.AfterObtained));
+
+        Assert.NotNull(target);
+        Assert.Empty(target!.GetParameters());
+    }
+
+    [Fact]
+    public void Patch_TargetsFakeMangoAfterObtained()
+    {
+        var target = typeof(FakeMango).GetMethod(nameof(FakeMango.AfterObtained));
 
         Assert.NotNull(target);
         Assert.Empty(target!.GetParameters());
@@ -71,6 +81,19 @@ public class MangoStatsTests
     }
 
     [Fact]
+    public void RunTracker_FakeMangoHelper_UsesUsualMaxHpGainFields()
+    {
+        var agg = new RelicAggregate();
+
+        RunTracker.RecordFakeMangoMaxHpGainedForTest(agg, 3m, 70m, 73m);
+
+        Assert.Equal(1, agg.Activations);
+        Assert.Equal(3m, agg.MaxHpGained);
+        Assert.Equal(70m, agg.OriginalMaxHp);
+        Assert.Equal(73m, agg.NewMaxHp);
+    }
+
+    [Fact]
     public void RelicTooltip_Mango_ShowsUsualMaxHpGainRows()
     {
         var body = BuildBody(PopulatedAggregate());
@@ -113,6 +136,52 @@ public class MangoStatsTests
         Assert.True(recognized);
         Assert.Equal("Mango", title);
         Assert.Contains("Max HP gained", body);
+    }
+
+    [Fact]
+    public void RelicTooltip_FakeMango_DispatchesWithObscuredTitle()
+    {
+        var relic = (FakeMango)RuntimeHelpers.GetUninitializedObject(typeof(FakeMango));
+        var aggregate = new RelicAggregate
+        {
+            Activations = 1,
+            MaxHpGained = 3m,
+            OriginalMaxHp = 70m,
+            NewMaxHp = 73m,
+        };
+
+        var recognized = RelicHoverShowPatch.TryBuildBodyBBCode(
+            relic,
+            aggregate,
+            floorCount: null,
+            out var title,
+            out var body);
+
+        Assert.True(recognized);
+        Assert.Equal("Mango???", title);
+        Assert.Contains("Max HP gained", body);
+        Assert.Contains("[b]3[/b]", body);
+    }
+
+    [Fact]
+    public void RelicAggregate_FakeMangoPersistsSeparatelyFromMango()
+    {
+        var run = new RunData();
+        run.RelicAggregates[MangoRelicId] = PopulatedAggregate();
+        run.RelicAggregates[FakeMangoRelicId] = new RelicAggregate
+        {
+            Activations = 1,
+            MaxHpGained = 3m,
+            OriginalMaxHp = 84m,
+            NewMaxHp = 87m,
+        };
+
+        var json = JsonSerializer.Serialize(run, RunStorage.Options);
+        var restored = JsonSerializer.Deserialize<RunData>(json, RunStorage.Options);
+
+        Assert.NotNull(restored);
+        Assert.Equal(14m, restored!.RelicAggregates[MangoRelicId].MaxHpGained);
+        Assert.Equal(3m, restored.RelicAggregates[FakeMangoRelicId].MaxHpGained);
     }
 
     private static RelicAggregate PopulatedAggregate()
