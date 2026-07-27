@@ -1,10 +1,12 @@
 using System;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Powers;
+using MegaCrit.Sts2.Core.Models.Relics;
 using SpireLens.Core;
 using SpireLens.Core.Patches;
 using Xunit;
@@ -171,6 +173,8 @@ public class CentennialPuzzleStatsTests
     [Fact]
     public void RelicTooltip_CentennialPuzzle_ShowsActivationTotalAndAverageRows()
     {
+        var relic = (CentennialPuzzle)RuntimeHelpers.GetUninitializedObject(
+            typeof(CentennialPuzzle));
         var body = BuildBody(new RelicAggregate
         {
             Activations = 4,
@@ -202,6 +206,7 @@ public class CentennialPuzzleStatsTests
         Assert.Contains("[b]3[/b]", body);
         Assert.Contains("[b]1[/b]", body);
         Assert.Contains("[b]2[/b]", body);
+        Assert.True(RelicHoverShowPatch.ShouldStretchStatsTooltip(relic, body));
     }
 
     [Fact]

@@ -122,7 +122,9 @@ internal static class RunHistoryStatsContext
             title,
             body,
             stretchHorizontally:
-                RelicHoverShowPatch.GetPreferredStatsTooltipWidth(holder.Relic?.Model).HasValue);
+                RelicHoverShowPatch.ShouldStretchStatsTooltip(
+                    holder.Relic?.Model,
+                    body));
         return true;
     }
 

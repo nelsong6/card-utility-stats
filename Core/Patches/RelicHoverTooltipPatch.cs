@@ -70,7 +70,7 @@ public static class RelicHoverShowPatch
         statsTip = StatsTooltip.CreateNativeTip(
             title,
             body,
-            stretchHorizontally: GetPreferredStatsTooltipWidth(relicModel).HasValue);
+            stretchHorizontally: ShouldStretchStatsTooltip(relicModel, body));
         return true;
     }
 
@@ -254,6 +254,23 @@ public static class RelicHoverShowPatch
             FresnelLens => FresnelLensTooltipWidth,
             _ => null,
         };
+
+    internal static bool ShouldStretchStatsTooltip(
+        RelicModel? relicModel,
+        string? bodyBBCode)
+    {
+        if (relicModel == null) return false;
+
+        // A shared scalar table deliberately sizes its label column from the
+        // longest row. The game's default 360px wrapped hover tip does not
+        // shrink table columns, so allow the native control to grow to that
+        // calculated width instead of clipping the aligned value columns.
+        return GetPreferredStatsTooltipWidth(relicModel).HasValue
+               || (!string.IsNullOrEmpty(bodyBBCode)
+                   && bodyBBCode.Contains(
+                       ScalarStatsTableOpen,
+                       StringComparison.Ordinal));
+    }
 
     internal static bool TryBuildBodyBBCode(
         RelicModel relicModel,

@@ -83,7 +83,7 @@ internal static class CompendiumRelicStatsContext
             title,
             body,
             stretchHorizontally:
-                RelicHoverShowPatch.GetPreferredStatsTooltipWidth(relicModel).HasValue);
+                RelicHoverShowPatch.ShouldStretchStatsTooltip(relicModel, body));
         return true;
     }
 
