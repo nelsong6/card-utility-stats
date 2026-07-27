@@ -120,8 +120,15 @@ public class PaelsWingStatsTests
         Assert.Contains("Sacrifices skipped", body);
         Assert.Contains("Relics gained", body);
         Assert.Contains("Relic gained", body);
-        Assert.Contains("Kunai x2", body);
-        Assert.Contains("Bag of Preparation", body);
+        Assert.Contains(
+            "res://images/atlases/relic_atlas.sprites/kunai.tres",
+            body);
+        Assert.Contains(
+            "res://images/atlases/relic_atlas.sprites/bag_of_preparation.tres",
+            body);
+        Assert.Contains("[hint=\"Kunai\"]", body);
+        Assert.Contains("[hint=\"Bag of Preparation\"]", body);
+        Assert.Contains("×2", body);
         Assert.Contains("Sacrifice rate", body);
         Assert.Contains("[b]3/5[/b]", body);
         Assert.Contains("60%", body);
@@ -132,8 +139,27 @@ public class PaelsWingStatsTests
         Assert.Contains("[b]1[/b]", body);
     }
 
+    [Theory]
+    [InlineData(
+        "RELIC.KUNAI",
+        "res://images/atlases/relic_atlas.sprites/kunai.tres")]
+    [InlineData(
+        "RELIC.BAG_OF_PREPARATION",
+        "res://images/atlases/relic_atlas.sprites/bag_of_preparation.tres")]
+    [InlineData(
+        "invalid",
+        "res://images/ui/reward_screen/reward_icon_shared_relic.png")]
+    public void RelicTooltip_PaelsWingResolvesGrantedRelicArtwork(
+        string relicId,
+        string expectedPath)
+    {
+        Assert.Equal(
+            expectedPath,
+            RelicHoverShowPatch.ResolveGrantedRelicIconPath(relicId));
+    }
+
     [Fact]
-    public void RelicTooltip_PaelsWingUsesExpandedWidthForRelicNames()
+    public void RelicTooltip_PaelsWingRetainsExpandedStatsWidth()
     {
         var relic = (PaelsWing)RuntimeHelpers.GetUninitializedObject(typeof(PaelsWing));
 

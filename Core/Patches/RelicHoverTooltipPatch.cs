@@ -36,6 +36,7 @@ public static class RelicHoverShowPatch
     private const string BlockIconPath = "res://images/ui/combat/block.png";
     private const string DrawIconPath = "res://images/atlases/power_atlas.sprites/draw_cards_next_turn_power.tres";
     private const string PaelsWingIconPath = "res://images/atlases/relic_atlas.sprites/paels_wing.tres";
+    private const string GenericRelicIconPath = "res://images/ui/reward_screen/reward_icon_shared_relic.png";
     private const string StarIconPath = "res://images/packed/sprite_fonts/star_icon.png";
     private const string VigorIconPath = "res://images/atlases/power_atlas.sprites/vigor_power.tres";
     private const int SealOfGoldLossPerTrigger = 5;
@@ -3505,10 +3506,7 @@ public static class RelicHoverShowPatch
 
         foreach (var relic in relics)
         {
-            var displayName = StatsTooltip.EscapeBbcode(string.IsNullOrWhiteSpace(relic.DisplayName)
-                ? RunTracker.FormatRelicIdForDisplay(relic.RelicId)
-                : relic.DisplayName);
-            var value = relic.Count == 1 ? displayName : $"{displayName} x{relic.Count}";
+            var value = RenderGrantedRelic(relic);
             TextValueRow(sb, "Relic gained", value, "");
         }
 
@@ -3527,6 +3525,45 @@ public static class RelicHoverShowPatch
         }
 
         return sb.ToString();
+    }
+
+    private static string RenderGrantedRelic(RelicGrantedAggregate relic)
+    {
+        var displayName = string.IsNullOrWhiteSpace(relic.DisplayName)
+            ? RunTracker.FormatRelicIdForDisplay(relic.RelicId)
+            : relic.DisplayName;
+        var icon = StatConceptGlossary.RenderHintedInlineImage(
+            ResolveGrantedRelicIconPath(relic.RelicId),
+            displayName);
+        return relic.Count > 1 ? $"{icon} ×{relic.Count}" : icon;
+    }
+
+    internal static string ResolveGrantedRelicIconPath(string? relicId)
+    {
+        if (string.IsNullOrWhiteSpace(relicId))
+            return GenericRelicIconPath;
+
+        try
+        {
+            var modelId = ModelId.Deserialize(relicId);
+            var relicModel = ModelDb.GetByIdOrNull<RelicModel>(modelId);
+            if (!string.IsNullOrWhiteSpace(relicModel?.IconPath))
+                return relicModel.IconPath;
+
+            if (string.Equals(modelId.Category, "RELIC", StringComparison.Ordinal)
+                && !string.IsNullOrWhiteSpace(modelId.Entry))
+            {
+                return $"res://images/atlases/relic_atlas.sprites/"
+                       + $"{modelId.Entry.ToLowerInvariant()}.tres";
+            }
+        }
+        catch
+        {
+            // Historical data can outlive a removed model. Use the generic
+            // relic artwork instead of restoring the old text-only value.
+        }
+
+        return GenericRelicIconPath;
     }
 
     private static string BuildPaelsToothBodyBBCode(RelicAggregate agg)

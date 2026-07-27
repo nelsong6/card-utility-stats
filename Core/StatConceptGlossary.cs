@@ -255,6 +255,9 @@ internal static class StatConceptGlossary
     internal static string RenderInlineImage(string path)
         => RenderImage(path, IconSlotSize);
 
+    internal static string RenderHintedInlineImage(string path, string hint)
+        => $"[hint=\"{EscapeHint(hint)}\"]{RenderInlineImage(path)}[/hint]";
+
     private static void BuildGeneratedConceptImages()
     {
         GeneratedImagePaths.Clear();
