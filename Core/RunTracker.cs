@@ -119,6 +119,7 @@ public static class RunTracker
     private static readonly List<PendingDanseMacabreBlockAttribution> _pendingDanseMacabreBlockAttributions = new();
     private static readonly List<Creature> _pendingMercuryHourglassDamageAttributions = new();
     private static readonly List<Creature> _pendingMrStrugglesDamageAttributions = new();
+    private static readonly List<Creature> _pendingLostWispDamageAttributions = new();
     private static readonly Dictionary<PowerModel, int> _bronzeScalesThornsContributions = new(ReferenceEqualityComparer.Instance);
     private static readonly List<PendingBronzeScalesDamageAttribution> _pendingBronzeScalesDamageAttributions = new();
     private static readonly List<Creature> _pendingHornCleatBlockAttributions = new();
@@ -1086,6 +1087,7 @@ public static class RunTracker
         _pendingDanseMacabreBlockAttributions.Clear();
         _pendingMercuryHourglassDamageAttributions.Clear();
         _pendingMrStrugglesDamageAttributions.Clear();
+        _pendingLostWispDamageAttributions.Clear();
         _bronzeScalesThornsContributions.Clear();
         _pendingBronzeScalesDamageAttributions.Clear();
         _pendingHornCleatBlockAttributions.Clear();
@@ -4330,6 +4332,7 @@ public static class RunTracker
     private const string FestivePopperRelicId = "RELIC.FESTIVE_POPPER";
     private const string MercuryHourglassRelicId = "RELIC.MERCURY_HOURGLASS";
     private const string MrStrugglesRelicId = "RELIC.MR_STRUGGLES";
+    private const string LostWispRelicId = "RELIC.LOST_WISP";
     private const string BronzeScalesRelicId = "RELIC.BRONZE_SCALES";
     private const string HornCleatRelicId = "RELIC.HORN_CLEAT";
     private const string CaptainsWheelRelicId = "RELIC.CAPTAINS_WHEEL";
@@ -14518,6 +14521,47 @@ public static class RunTracker
         }
     }
 
+    /// <summary>
+    /// Record a Lost Wisp activation from an owner Power play, then arm the
+    /// immediately emitted damage command for observed-result attribution.
+    /// </summary>
+    public static void ArmLostWispAttribution(Creature dealer)
+    {
+        if (dealer == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(LostWispRelicId);
+                agg.Activations += 1;
+                _pendingLostWispDamageAttributions.Add(dealer);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"ArmLostWispAttribution failed: {e.Message}");
+            }
+        }
+    }
+
+    public static bool TryConsumeLostWispDamageAttribution(Creature dealer)
+    {
+        if (dealer == null) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                return ConsumePendingCreatureAttribution(_pendingLostWispDamageAttributions, dealer);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"TryConsumeLostWispDamageAttribution failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
     public static void RecordFestivePopperDamage(IEnumerable<DamageResult>? results)
     {
         if (results == null) return;
@@ -14532,6 +14576,24 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordFestivePopperDamage failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordLostWispDamage(IEnumerable<DamageResult>? results)
+    {
+        if (results == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(LostWispRelicId);
+                AddRelicDamageResultsLocked(agg, results);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordLostWispDamage failed: {e.Message}");
             }
         }
     }
@@ -14711,6 +14773,21 @@ public static class RunTracker
     }
 
     internal static void RecordMrStrugglesDamageForTest(
+        RelicAggregate agg,
+        IEnumerable<(int BlockedDamage, int UnblockedDamage, int OverkillDamage, bool WasTargetKilled)> results)
+    {
+        foreach (var result in results)
+        {
+            AddRelicDamageResultPartsLocked(
+                agg,
+                result.BlockedDamage,
+                result.UnblockedDamage,
+                result.OverkillDamage,
+                result.WasTargetKilled);
+        }
+    }
+
+    internal static void RecordLostWispDamageForTest(
         RelicAggregate agg,
         IEnumerable<(int BlockedDamage, int UnblockedDamage, int OverkillDamage, bool WasTargetKilled)> results)
     {

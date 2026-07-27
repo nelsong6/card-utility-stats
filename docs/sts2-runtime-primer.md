@@ -649,6 +649,13 @@ Macabre card rather than assigning later power behavior to one physical copy.
 
 For relics that emit damage commands, prefer the relic-owned callback plus the resolved `CreatureCmd.Damage` result. Mercury Hourglass arms from `MercuryHourglass.AfterPlayerTurnStart`, records the actual multi-target damage split from the command result on each turn, and counts the combat once so damage per combat is not confused with damage per turn-start trigger.
 
+Lost Wisp uses the same observed-result pattern from
+`LostWisp.AfterCardPlayed`. Arm only when the callback receives an owner Power
+while combat is in progress, count that qualifying Power as the activation,
+then consume the window at the immediately emitted decimal-plus-`ValueProp`
+multi-target `CreatureCmd.Damage` overload. The resolved results are
+authoritative for blocked damage, overkill, kills, and targets hit.
+
 Gremlin Horn's `AfterDeath` callback still runs for the combat-ending enemy and
 flashes the relic, but `PlayerCmd.GainEnergy` and `CardPileCmd.Draw` suppress
 their outcomes once combat is over or ending. Exclude that callback before

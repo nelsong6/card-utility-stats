@@ -632,6 +632,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is LostWisp)
+        {
+            title = "Lost Wisp";
+            body = BuildLostWispBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is ParryingShield)
         {
             title = "Parrying Shield";
@@ -1920,6 +1927,29 @@ public static class RelicHoverShowPatch
             triggerDescription: "Activations — the number of times this relic has activated.",
             averageLabel: "Damage per activation",
             averageDenominator: agg.Activations);
+        return sb.ToString();
+    }
+
+    private static string BuildLostWispBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var damagePerPower = agg.Activations <= 0
+            ? 0m
+            : (decimal)agg.TotalDamageDealt / agg.Activations;
+
+        Row3(
+            sb,
+            "Powers played",
+            agg.Activations.ToString(),
+            "",
+            "Power cards played by this relic's owner while Lost Wisp could activate.");
+        Row3(sb, "Damage attempted", agg.TotalDamageAttempted.ToString(), "");
+        Row3(sb, "Damage dealt", agg.TotalDamageDealt.ToString(), "");
+        Row3(sb, "Damage blocked", agg.TotalDamageBlocked.ToString(), "");
+        Row3(sb, "Overkill", agg.TotalDamageOverkill.ToString(), "");
+        Row3(sb, "Kills", agg.Kills.ToString(), "");
+        Row3(sb, "Targets hit", agg.TotalTargets.ToString(), "");
+        Row3(sb, "Avg damage per Power", FormatDecimal(damagePerPower), "");
         return sb.ToString();
     }
 
