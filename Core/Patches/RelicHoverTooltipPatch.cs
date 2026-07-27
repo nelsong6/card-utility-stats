@@ -4013,10 +4013,50 @@ public static class RelicHoverShowPatch
         var averageDrawn = agg.Activations <= 0
             ? 0m
             : (decimal)agg.AdditionalCardsDrawn / agg.Activations;
+        var averageActivationTurn = agg.CentennialPuzzleActivationTurnSamples <= 0
+            ? 0m
+            : (decimal)agg.CentennialPuzzleActivationTurnTotal
+                / agg.CentennialPuzzleActivationTurnSamples;
         RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, "Triggered this combat", triggeredThisCombat ? "true" : "false", "");
         Row3(sb, "Cards drawn total", agg.AdditionalCardsDrawn.ToString(), "");
         Row3(sb, "Avg cards drawn per combat", FormatDecimal(averageDrawn), "");
+        Row3(
+            sb,
+            "Avg activation turn",
+            FormatDecimal(averageActivationTurn),
+            "",
+            "The average player turn number when Centennial Puzzle activated.");
+        Row3(
+            sb,
+            "Activated during your turn",
+            agg.CentennialPuzzlePlayerTurnActivations.ToString(),
+            "",
+            "Times Centennial Puzzle activated during your turn.");
+        Row3(
+            sb,
+            "Activated during opponent's turn",
+            agg.CentennialPuzzleOpponentTurnActivations.ToString(),
+            "",
+            "Times Centennial Puzzle activated during the opponent's turn.");
+        Row3(
+            sb,
+            "Activated by Status",
+            agg.CentennialPuzzleStatusActivations.ToString(),
+            "",
+            "Times a Status card caused the HP loss that activated Centennial Puzzle.");
+        Row3(
+            sb,
+            "Activated by Curse",
+            agg.CentennialPuzzleCurseActivations.ToString(),
+            "",
+            "Times a Curse card caused the HP loss that activated Centennial Puzzle.");
+        Row3(
+            sb,
+            "Activated by enemy source",
+            agg.CentennialPuzzleEnemySourceActivations.ToString(),
+            "",
+            "Times an enemy attack or enemy-applied debuff caused the HP loss that activated Centennial Puzzle.");
         return sb.ToString();
     }
 

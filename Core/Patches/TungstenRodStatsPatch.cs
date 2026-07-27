@@ -69,14 +69,14 @@ public static class TungstenRodAfterPlayerTurnStartStatsPatch
 }
 
 /// <summary>
-/// The HP-loss modifier receives no PowerModel source. These are the current
-/// player-targeting damage callbacks owned by Buff or Debuff powers. An
+/// HP-loss callbacks receive no PowerModel source. These are the current
+/// player-targeting damage callbacks owned by Buff or Debuff powers. A shared
 /// async-local frame preserves the exact power through awaited damage calls,
-/// allowing Buff damage to count as self-inflicted and Debuff damage to count
-/// as enemy-sourced even when the game passes the player or null as dealer.
+/// allowing relic trackers to distinguish Buff and Debuff HP-loss sources even
+/// when the game passes the player or null as dealer.
 /// </summary>
 [HarmonyPatch]
-public static class TungstenRodPowerDamageSourcePatch
+public static class HpLossPowerDamageSourcePatch
 {
     private static readonly (string TypeName, string MethodName)[] Targets =
     [
@@ -109,12 +109,12 @@ public static class TungstenRodPowerDamageSourcePatch
         __state = null;
         try
         {
-            __state = RunTracker.PushTungstenRodPowerDamageSource(__instance);
+            __state = RunTracker.PushHpLossPowerDamageSource(__instance);
         }
         catch (Exception e)
         {
             CoreMain.LogDebug(
-                $"TungstenRodPowerDamageSourcePatch.Prefix failed: {e.Message}");
+                $"HpLossPowerDamageSourcePatch.Prefix failed: {e.Message}");
         }
     }
 
@@ -123,12 +123,12 @@ public static class TungstenRodPowerDamageSourcePatch
     {
         try
         {
-            RunTracker.RestoreTungstenRodPowerDamageSource(__state);
+            RunTracker.RestoreHpLossPowerDamageSource(__state);
         }
         catch (Exception e)
         {
             CoreMain.LogDebug(
-                $"TungstenRodPowerDamageSourcePatch.Postfix failed: {e.Message}");
+                $"HpLossPowerDamageSourcePatch.Postfix failed: {e.Message}");
         }
     }
 }

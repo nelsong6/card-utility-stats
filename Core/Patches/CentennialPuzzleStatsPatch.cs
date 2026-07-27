@@ -34,7 +34,12 @@ public static class CentennialPuzzleAfterDamageReceivedPatch
     }
 
     [HarmonyPrefix]
-    public static void Prefix(CentennialPuzzle __instance, Creature target, DamageResult result)
+    public static void Prefix(
+        CentennialPuzzle __instance,
+        Creature target,
+        DamageResult result,
+        Creature? dealer,
+        CardModel? cardSource)
     {
         try
         {
@@ -46,7 +51,9 @@ public static class CentennialPuzzleAfterDamageReceivedPatch
 
             RunTracker.ArmCentennialPuzzleAttribution(
                 __instance.Owner,
-                GetExpectedCardsToDraw(__instance));
+                GetExpectedCardsToDraw(__instance),
+                dealer,
+                cardSource);
         }
         catch (Exception e)
         {

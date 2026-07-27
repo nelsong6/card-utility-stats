@@ -537,6 +537,18 @@ public class RelicAggregate
     // combat start).
     public int AdditionalCardsDrawn { get; set; }
 
+    // Centennial Puzzle's once-per-combat activation context. The turn total
+    // is summed at the exact HP-loss callback and uses the owning player's
+    // turn number. Turn-side and HP-loss-source buckets are mutually
+    // exclusive within their respective groups.
+    public int CentennialPuzzleActivationTurnTotal { get; set; }
+    public int CentennialPuzzleActivationTurnSamples { get; set; }
+    public int CentennialPuzzlePlayerTurnActivations { get; set; }
+    public int CentennialPuzzleOpponentTurnActivations { get; set; }
+    public int CentennialPuzzleStatusActivations { get; set; }
+    public int CentennialPuzzleCurseActivations { get; set; }
+    public int CentennialPuzzleEnemySourceActivations { get; set; }
+
     // Pocketwatch held-period observations. A turn is missed when its ending
     // card count is above Pocketwatch's threshold; an activation is counted
     // only when the relic actually adds cards to the following hand draw.

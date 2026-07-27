@@ -104,7 +104,7 @@ public static class RunTracker
     private static readonly List<PendingUnsettlingLampDebuff> _pendingUnsettlingLampDebuffs = new();
     private static readonly System.Threading.AsyncLocal<EnemyStatusSourceFrame?> _enemyStatusSourceFrame = new();
     private static readonly System.Threading.AsyncLocal<PendingToastyMittensActivation?> _toastyMittensActivation = new();
-    private static readonly System.Threading.AsyncLocal<TungstenRodPowerSourceFrame?> _tungstenRodPowerSourceFrame = new();
+    private static readonly System.Threading.AsyncLocal<HpLossPowerSourceFrame?> _hpLossPowerSourceFrame = new();
     private static int _pendingPlayerBlockClearAmount;
     private static bool _pendingPlayerBlockClearArmed;
     private static bool _pendingAkabekoVigorAttribution;
@@ -1068,7 +1068,7 @@ public static class RunTracker
         _pendingPowerChangeAttempts.Clear();
         _pendingUnsettlingLampDebuffs.Clear();
         _toastyMittensActivation.Value = null;
-        _tungstenRodPowerSourceFrame.Value = null;
+        _hpLossPowerSourceFrame.Value = null;
         _pendingPlayerBlockClearAmount = 0;
         _pendingPlayerBlockClearArmed = false;
         // Ported windows (Orichalcum, Anchor, Abacus, BoneFlute, CloakClasp,
@@ -1780,6 +1780,20 @@ public static class RunTracker
         target.WeakApplied += source.WeakApplied;
         MergeAppliedEffectsInto(target.AppliedEffects, source.AppliedEffects);
         target.AdditionalCardsDrawn += source.AdditionalCardsDrawn;
+        target.CentennialPuzzleActivationTurnTotal +=
+            source.CentennialPuzzleActivationTurnTotal;
+        target.CentennialPuzzleActivationTurnSamples +=
+            source.CentennialPuzzleActivationTurnSamples;
+        target.CentennialPuzzlePlayerTurnActivations +=
+            source.CentennialPuzzlePlayerTurnActivations;
+        target.CentennialPuzzleOpponentTurnActivations +=
+            source.CentennialPuzzleOpponentTurnActivations;
+        target.CentennialPuzzleStatusActivations +=
+            source.CentennialPuzzleStatusActivations;
+        target.CentennialPuzzleCurseActivations +=
+            source.CentennialPuzzleCurseActivations;
+        target.CentennialPuzzleEnemySourceActivations +=
+            source.CentennialPuzzleEnemySourceActivations;
         target.PocketwatchTurns += source.PocketwatchTurns;
         target.PocketwatchCombats += source.PocketwatchCombats;
         target.PocketwatchTurnEndCountTotal += source.PocketwatchTurnEndCountTotal;
@@ -5465,12 +5479,12 @@ public static class RunTracker
         agg.WhisperingEarringCombats += Math.Max(0, count);
     }
 
-    public static object? PushTungstenRodPowerDamageSource(PowerModel? power)
+    public static object? PushHpLossPowerDamageSource(PowerModel? power)
     {
-        var previous = _tungstenRodPowerSourceFrame.Value;
+        var previous = _hpLossPowerSourceFrame.Value;
         if (power == null) return previous;
 
-        _tungstenRodPowerSourceFrame.Value = new TungstenRodPowerSourceFrame
+        _hpLossPowerSourceFrame.Value = new HpLossPowerSourceFrame
         {
             Source = power,
             Previous = previous,
@@ -5478,10 +5492,10 @@ public static class RunTracker
         return previous;
     }
 
-    public static void RestoreTungstenRodPowerDamageSource(object? previous)
+    public static void RestoreHpLossPowerDamageSource(object? previous)
     {
-        _tungstenRodPowerSourceFrame.Value =
-            previous as TungstenRodPowerSourceFrame;
+        _hpLossPowerSourceFrame.Value =
+            previous as HpLossPowerSourceFrame;
     }
 
     public static void RecordTungstenRodDamagePrevented(
@@ -5511,7 +5525,7 @@ public static class RunTracker
                 _pendingCombat ??= new PendingCombat();
                 RecordTungstenRodCombatForPlayerLocked(owner);
 
-                var powerSource = _tungstenRodPowerSourceFrame.Value?.Source;
+                var powerSource = _hpLossPowerSourceFrame.Value?.Source;
                 var source = ClassifyTungstenRodPreventionSourceForTest(
                     cardSource?.Type,
                     cardSource != null
@@ -14157,7 +14171,11 @@ public static class RunTracker
     /// Record Centennial Puzzle's once-per-combat HP-loss activation. The
     /// actual cards drawn are observed from the single-card draw command.
     /// </summary>
-    public static void ArmCentennialPuzzleAttribution(Player owner, int expectedDraws)
+    public static void ArmCentennialPuzzleAttribution(
+        Player owner,
+        int expectedDraws,
+        Creature? dealer,
+        CardModel? cardSource)
     {
         if (owner == null) return;
 
@@ -14169,7 +14187,18 @@ public static class RunTracker
 
                 _pendingCombat ??= new PendingCombat();
                 var agg = GetOrCreateRelicAggregateLocked(CentennialPuzzleRelicId);
-                agg.Activations += 1;
+                var powerSource = _hpLossPowerSourceFrame.Value?.Source;
+                var source = ClassifyCentennialPuzzleActivationSourceForTest(
+                    cardSource?.Type,
+                    powerSource?.Type,
+                    powerSource != null
+                        && ReferenceEquals(powerSource.Owner, owner.Creature),
+                    dealer?.IsEnemy == true);
+                RecordCentennialPuzzleActivationForTest(
+                    agg,
+                    owner.PlayerCombatState?.TurnNumber ?? 0,
+                    owner.Creature?.CombatState?.CurrentSide,
+                    source);
 
                 if (expectedDraws <= 0) return;
                 _pendingCombat.CentennialPuzzleDrawsRemaining[owner] =
@@ -14249,14 +14278,55 @@ public static class RunTracker
         }
     }
 
-    internal static void RecordCentennialPuzzleStatsForTest(
+    internal static CentennialPuzzleActivationSource
+        ClassifyCentennialPuzzleActivationSourceForTest(
+            CardType? cardType,
+            PowerType? powerType,
+            bool powerOwnedByPlayer,
+            bool dealerIsEnemy)
+    {
+        if (cardType == CardType.Status)
+            return CentennialPuzzleActivationSource.Status;
+        if (cardType == CardType.Curse)
+            return CentennialPuzzleActivationSource.Curse;
+        if (powerOwnedByPlayer && powerType == PowerType.Debuff)
+            return CentennialPuzzleActivationSource.Enemy;
+        if (dealerIsEnemy)
+            return CentennialPuzzleActivationSource.Enemy;
+        return CentennialPuzzleActivationSource.Other;
+    }
+
+    internal static void RecordCentennialPuzzleActivationForTest(
         RelicAggregate agg,
-        int activations,
-        int cardsDrawn)
+        int turnNumber,
+        CombatSide? side,
+        CentennialPuzzleActivationSource source)
     {
         if (agg == null) return;
-        agg.Activations += Math.Max(0, activations);
-        agg.AdditionalCardsDrawn += Math.Max(0, cardsDrawn);
+        agg.Activations += 1;
+        if (turnNumber > 0)
+        {
+            agg.CentennialPuzzleActivationTurnTotal += turnNumber;
+            agg.CentennialPuzzleActivationTurnSamples += 1;
+        }
+
+        if (side == CombatSide.Player)
+            agg.CentennialPuzzlePlayerTurnActivations += 1;
+        else if (side == CombatSide.Enemy)
+            agg.CentennialPuzzleOpponentTurnActivations += 1;
+
+        switch (source)
+        {
+            case CentennialPuzzleActivationSource.Status:
+                agg.CentennialPuzzleStatusActivations += 1;
+                break;
+            case CentennialPuzzleActivationSource.Curse:
+                agg.CentennialPuzzleCurseActivations += 1;
+                break;
+            case CentennialPuzzleActivationSource.Enemy:
+                agg.CentennialPuzzleEnemySourceActivations += 1;
+                break;
+        }
     }
 
     /// <summary>
@@ -23739,10 +23809,18 @@ internal sealed class EnemyStatusSourceFrame
     public EnemyStatusSourceFrame? Previous { get; init; }
 }
 
-internal sealed class TungstenRodPowerSourceFrame
+internal sealed class HpLossPowerSourceFrame
 {
     public required PowerModel Source { get; init; }
-    public TungstenRodPowerSourceFrame? Previous { get; init; }
+    public HpLossPowerSourceFrame? Previous { get; init; }
+}
+
+internal enum CentennialPuzzleActivationSource
+{
+    Other,
+    Status,
+    Curse,
+    Enemy,
 }
 
 internal enum TungstenRodPreventionSource

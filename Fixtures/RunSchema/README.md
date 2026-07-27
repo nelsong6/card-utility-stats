@@ -263,8 +263,9 @@ New fixtures added going forward do not need a `v*-` prefix.
   cards actually discarded so the tooltip can show total and average discarded
   per combat.
 - `centennial-puzzle-relic-run.json`
-  Adds Centennial Puzzle activation tracking plus actual cards drawn so the
-  tooltip can show total and average cards drawn per combat.
+  Adds Centennial Puzzle activation tracking, actual cards drawn, average
+  activation turn, active-side buckets, and mutually exclusive Status, Curse,
+  and enemy-source activation buckets.
 - `regal-pillow-relic-run.json`
   Adds Regal Pillow rest-site bonus healing tracking: activations, effective
   bonus HP healed, and bonus healing lost to full HP.

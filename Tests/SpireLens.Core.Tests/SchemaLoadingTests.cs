@@ -2407,6 +2407,7 @@ public class SchemaLoadingTests
         var relicAgg = loaded.Data.RelicAggregates["RELIC.CENTENNIAL_PUZZLE"];
         Assert.Equal(4, relicAgg.Activations);
         Assert.Equal(11, relicAgg.AdditionalCardsDrawn);
+        AssertCentennialPuzzleActivationContext(relicAgg);
     }
 
     [Fact]
@@ -2418,6 +2419,18 @@ public class SchemaLoadingTests
         var relicAgg = resumed!.RelicAggregates["RELIC.CENTENNIAL_PUZZLE"];
         Assert.Equal(4, relicAgg.Activations);
         Assert.Equal(11, relicAgg.AdditionalCardsDrawn);
+        AssertCentennialPuzzleActivationContext(relicAgg);
+    }
+
+    private static void AssertCentennialPuzzleActivationContext(RelicAggregate relicAgg)
+    {
+        Assert.Equal(9, relicAgg.CentennialPuzzleActivationTurnTotal);
+        Assert.Equal(4, relicAgg.CentennialPuzzleActivationTurnSamples);
+        Assert.Equal(3, relicAgg.CentennialPuzzlePlayerTurnActivations);
+        Assert.Equal(1, relicAgg.CentennialPuzzleOpponentTurnActivations);
+        Assert.Equal(1, relicAgg.CentennialPuzzleStatusActivations);
+        Assert.Equal(1, relicAgg.CentennialPuzzleCurseActivations);
+        Assert.Equal(2, relicAgg.CentennialPuzzleEnemySourceActivations);
     }
 
     [Fact]
