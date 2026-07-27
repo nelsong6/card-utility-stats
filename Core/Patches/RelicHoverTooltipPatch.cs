@@ -9,6 +9,7 @@ using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Cards;
 using MegaCrit.Sts2.Core.Models.Relics;
 using MegaCrit.Sts2.Core.Nodes.Relics;
+using MegaCrit.Sts2.Core.Nodes.Screens.GameOverScreen;
 
 
 namespace SpireLens.Core.Patches;
@@ -28,7 +29,6 @@ public static class RelicHoverShowPatch
     private const string EnthralledDefinitionId = "CARD.ENTHRALLED";
     private const string CursedPearlCurseDefinitionId = "CARD.GREED";
     private const string BrightestFlameDefinitionId = "CARD.BRIGHTEST_FLAME";
-    private const string GameOverScreenNamespace = "MegaCrit.Sts2.Core.Nodes.Screens.GameOverScreen";
     private const string VulnerableIconPath = "res://images/atlases/power_atlas.sprites/vulnerable_power.tres";
     private const string WeakIconPath = "res://images/atlases/power_atlas.sprites/weak_power.tres";
     private const string BlockIconPath = "res://images/ui/combat/block.png";
@@ -203,12 +203,28 @@ public static class RelicHoverShowPatch
     {
         for (var current = node; current != null; current = current.GetParent())
         {
-            for (var type = current.GetType(); type != null; type = type.BaseType)
-            {
-                if (string.Equals(type.Namespace, GameOverScreenNamespace, StringComparison.Ordinal)
-                    && type.Name.StartsWith("NGameOverScreen", StringComparison.Ordinal))
-                    return true;
-            }
+            if (current is NGameOverScreen)
+                return true;
+        }
+
+        // The in-run relic inventory is persistent global UI. On the game-over
+        // screen its holders remain under the global top bar rather than being
+        // reparented beneath NGameOverScreen, so ancestor-only detection can
+        // never identify the death-screen context. Resolve the actual active
+        // screen in the shared scene tree instead.
+        var tree = node?.GetTree() ?? Engine.GetMainLoop() as SceneTree;
+        return tree?.Root != null && ContainsVisibleGameOverScreen(tree.Root);
+    }
+
+    private static bool ContainsVisibleGameOverScreen(Node node)
+    {
+        if (node is NGameOverScreen screen && screen.IsVisibleInTree())
+            return true;
+
+        for (var i = 0; i < node.GetChildCount(); i++)
+        {
+            if (ContainsVisibleGameOverScreen(node.GetChild(i)))
+                return true;
         }
 
         return false;
