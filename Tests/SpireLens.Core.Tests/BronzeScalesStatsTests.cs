@@ -114,9 +114,24 @@ public class BronzeScalesStatsTests
         Assert.Contains("Targets hit", body);
         Assert.Contains("Damage per trigger", body);
         Assert.Contains("[b]0[/b]", body);
+        Assert.Equal(1, CountOccurrences(body, "[table=4]"));
+        Assert.DoesNotContain("[table=2]", body);
     }
 
     private static string BuildBody(RelicAggregate agg)
         => (string)(BuildBronzeScalesBodyMethod.Invoke(null, new object?[] { agg })
             ?? throw new InvalidOperationException("BuildBronzeScalesBodyBBCode returned null."));
+
+    private static int CountOccurrences(string value, string needle)
+    {
+        var count = 0;
+        var index = 0;
+        while ((index = value.IndexOf(needle, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += needle.Length;
+        }
+
+        return count;
+    }
 }

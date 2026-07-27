@@ -26,6 +26,8 @@ internal readonly record struct LetterOpenerRates(
 /// </summary>
 public static class RelicHoverShowPatch
 {
+    private const string ScalarStatsTableOpen = "[table=4]";
+    private const string StatsTableClose = "[/table]\n";
     private const string EnthralledDefinitionId = "CARD.ENTHRALLED";
     private const string CursedPearlCurseDefinitionId = "CARD.GREED";
     private const string BrightestFlameDefinitionId = "CARD.BRIGHTEST_FLAME";
@@ -4480,7 +4482,7 @@ public static class RelicHoverShowPatch
         string fullDescription,
         string pct = "")
     {
-        sb.Append("[table=4]");
+        BeginOrContinueScalarTable(sb);
         sb.Append("[cell expand=0 padding=0,0,10,0]");
         sb.Append(StatConceptGlossary.RenderInformationHint(fullDescription));
         sb.Append("[/cell]");
@@ -4493,7 +4495,64 @@ public static class RelicHoverShowPatch
         sb.Append("[/cell]");
         sb.Append($"[cell expand=0 padding=0,0,12,0][right][b]{value}[/b][/right][/cell]");
         sb.Append($"[cell expand=0 padding=0,0,4,0][right][color=#b5b5b5]{pct}[/color][/right][/cell]");
-        sb.Append("[/table]\n");
+        sb.Append(StatsTableClose);
+    }
+
+    private static void BeginOrContinueScalarTable(StringBuilder sb)
+    {
+        if (TryReopenTrailingScalarTable(sb))
+            return;
+
+        sb.Append(ScalarStatsTableOpen);
+    }
+
+    private static bool TryReopenTrailingScalarTable(StringBuilder sb)
+    {
+        if (!EndsWith(sb, StatsTableClose))
+            return false;
+
+        var lastTableStart = LastIndexOf(sb, "[table=");
+        if (lastTableStart < 0
+            || !MatchesAt(sb, lastTableStart, ScalarStatsTableOpen))
+        {
+            return false;
+        }
+
+        sb.Length -= StatsTableClose.Length;
+        return true;
+    }
+
+    private static bool EndsWith(StringBuilder sb, string suffix)
+    {
+        if (sb.Length < suffix.Length)
+            return false;
+
+        return MatchesAt(sb, sb.Length - suffix.Length, suffix);
+    }
+
+    private static int LastIndexOf(StringBuilder sb, string value)
+    {
+        for (var start = sb.Length - value.Length; start >= 0; start--)
+        {
+            if (MatchesAt(sb, start, value))
+                return start;
+        }
+
+        return -1;
+    }
+
+    private static bool MatchesAt(StringBuilder sb, int start, string value)
+    {
+        if (start < 0 || start + value.Length > sb.Length)
+            return false;
+
+        for (var index = 0; index < value.Length; index++)
+        {
+            if (sb[start + index] != value[index])
+                return false;
+        }
+
+        return true;
     }
 
     private static void TextValueRow(StringBuilder sb, string label, string value, string pct)
@@ -4537,7 +4596,7 @@ public static class RelicHoverShowPatch
             sb.Append($"  [color=#b5b5b5]{pct}[/color]");
         }
         sb.Append("[/cell]");
-        sb.Append("[/table]\n");
+        sb.Append(StatsTableClose);
     }
 
     private static void AppendConceptLabel(
