@@ -25,7 +25,6 @@ public static class CardHoverShowPatch
     private const string BlockedDrawIconPath = DrawCardsNextTurnPowerIconPath;
     private const int DebtGoldLossPerTrigger = 5;
     private const string DanseMacabrePowerId = "POWER.DANSE_MACABRE";
-    private const string EnergyPotionIconPath = "res://images/atlases/potion_atlas.sprites/energy_potion.tres";
     private const string EntropyPowerId = "POWER.ENTROPY";
     private const string FreeAttackPowerId = "POWER.FREE_ATTACK_POWER";
     private const string JugglingPowerId = "POWER.JUGGLING";
@@ -1006,7 +1005,7 @@ public static class CardHoverShowPatch
             : powerAgg.FreeAttackEnergySaved / powerAgg.FreeAttackChargesUsed;
         Row3(
             sb,
-            "Charges used with 0 energy saved",
+            GetEnergyStatLabel("charges used with 0 saved"),
             powerAgg.FreeAttackZeroEnergySavingsUses.ToString(),
             "");
         Row3(
@@ -1270,7 +1269,7 @@ public static class CardHoverShowPatch
 
     private static string GetEnergyStatLabel(string suffix)
     {
-        return GetInlineIconStatLabel(EnergyPotionIconPath, suffix);
+        return $"{StatEnergyIcon.RenderInline(InlineKeywordIconSize)} {suffix}";
     }
 
     private static string GetStarStatLabel(string suffix)
@@ -1459,10 +1458,10 @@ public static class CardHoverShowPatch
         // a display name containing '[' would otherwise be parsed as markup.
         var label = StatsTooltip.EscapeBbcode(
             string.IsNullOrWhiteSpace(effect.DisplayName) ? effect.EffectId : effect.DisplayName);
-        if (!string.IsNullOrWhiteSpace(effect.IconPath))
-            return GetInlineIconStatLabel(effect.IconPath, label);
         if (IsEnergyEffect(effect))
             return GetEnergyEffectLabel(label);
+        if (!string.IsNullOrWhiteSpace(effect.IconPath))
+            return GetInlineIconStatLabel(effect.IconPath, label);
         if (IsStarEffect(effect))
             return GetStarEffectLabel(label);
         if (IsNoxiousFumesEffect(effect))
@@ -1539,10 +1538,10 @@ public static class CardHoverShowPatch
         {
             var suffix = label.Substring(energyPrefix.Length).Trim();
             if (!string.IsNullOrWhiteSpace(suffix))
-                return GetInlineIconStatLabel(EnergyPotionIconPath, suffix);
+                return GetEnergyStatLabel(suffix);
         }
 
-        return GetInlineIconStatLabel(EnergyPotionIconPath, label);
+        return GetEnergyStatLabel(label);
     }
 
     private static bool IsStarEffect(AppliedEffectAggregate effect)

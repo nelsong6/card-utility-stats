@@ -149,7 +149,9 @@ public class UnrelentingStatsTests
         Assert.Contains("[b]8/10[/b]", body);
         Assert.Contains("[b]80%[/b]", body);
         Assert.Contains("total saved", body);
-        Assert.Contains("Charges used with 0 energy saved", body);
+        Assert.Contains(
+            "[img=16x16]res://images/packed/sprite_fonts/ironclad_energy_icon.png[/img] charges used with 0 saved",
+            body);
         Assert.Contains("avg saved per charge used", body);
         Assert.Contains("[b]1.63[/b]", body);
         Assert.Contains("Basic Attacks discounted", body);
@@ -167,7 +169,7 @@ public class UnrelentingStatsTests
 
         Assert.Contains("Free Attack charges used/granted", body);
         Assert.Contains("total saved", body);
-        Assert.DoesNotContain("Charges used with 0 energy saved", body);
+        Assert.DoesNotContain("charges used with 0 saved", body);
         Assert.DoesNotContain("avg saved per charge used", body);
         Assert.DoesNotContain("Attacks discounted", body);
     }

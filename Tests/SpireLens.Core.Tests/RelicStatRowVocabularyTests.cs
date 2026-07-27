@@ -195,7 +195,7 @@ public class RelicStatRowVocabularyTests
     public void Create_PromotesNativeIconsIntoHintedConcepts()
     {
         const string energyIcon =
-            "[img=16x16]res://images/atlases/potion_atlas.sprites/energy_potion.tres[/img]";
+            "[img=16x16]res://images/packed/sprite_fonts/ironclad_energy_icon.png[/img]";
 
         var presentation = RelicStatRowVocabulary.Create(
             $"{energyIcon} Avg energy gained per combat");

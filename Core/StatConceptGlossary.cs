@@ -43,6 +43,7 @@ internal sealed record StatConceptTexture(
 internal static class StatConceptGlossary
 {
     private const string EmbeddedFileSuffix = "Config.stat-concepts.json";
+    private const string EnergyConceptId = "energy";
     private const int SupportedSchemaVersion = 1;
     internal const int IconSlotSize = 20;
     private const int IconArtworkSize = 16;
@@ -52,7 +53,6 @@ internal static class StatConceptGlossary
         Guid.NewGuid().ToString("N");
     private static readonly string[] RelicInlineGameResources =
     [
-        "res://images/atlases/potion_atlas.sprites/energy_potion.tres",
         "res://images/atlases/power_atlas.sprites/draw_cards_next_turn_power.tres",
         "res://images/atlases/power_atlas.sprites/vigor_power.tres",
         "res://images/atlases/power_atlas.sprites/vulnerable_power.tres",
@@ -119,7 +119,12 @@ internal static class StatConceptGlossary
             return false;
         }
 
-        if (!GlossaryTextures.TryGetValue(concept.Id, out var texture))
+        var isContextualEnergy = string.Equals(
+            concept.Id,
+            EnergyConceptId,
+            StringComparison.Ordinal);
+        if (isContextualEnergy
+            || !GlossaryTextures.TryGetValue(concept.Id, out var texture))
         {
             texture = BuildGlossaryTexture(concept);
             if (texture == null)
@@ -128,7 +133,8 @@ internal static class StatConceptGlossary
                 return false;
             }
 
-            GlossaryTextures.Add(concept.Id, texture);
+            if (!isContextualEnergy)
+                GlossaryTextures.Add(concept.Id, texture);
         }
 
         display = new StatConceptTexture(
@@ -184,6 +190,17 @@ internal static class StatConceptGlossary
 
     private static string RenderGameResource(StatConcept concept, int size)
     {
+        if (string.Equals(
+                concept.Id,
+                EnergyConceptId,
+                StringComparison.Ordinal))
+        {
+            return RenderImage(
+                StatEnergyIcon.GetCurrentPath(),
+                size,
+                concept.Display.Modulate);
+        }
+
         if (GeneratedImagePaths.TryGetValue(
                 concept.Id,
                 out var normalizedPath))
@@ -245,10 +262,15 @@ internal static class StatConceptGlossary
 
         var generatedConcepts = Concepts
             .Where(concept =>
-                concept.Display.Type is StatConceptDisplayType.GameResource
+                !string.Equals(
+                    concept.Id,
+                    EnergyConceptId,
+                    StringComparison.Ordinal)
+                && concept.Display.Type is (
+                    StatConceptDisplayType.GameResource
                     or StatConceptDisplayType.EmbeddedImage
                     or StatConceptDisplayType.GameResourceBadge
-                    or StatConceptDisplayType.GameResourceGroup)
+                    or StatConceptDisplayType.GameResourceGroup))
             .ToArray();
         if (generatedConcepts.Length == 0) return;
 
@@ -651,6 +673,17 @@ internal static class StatConceptGlossary
 
     private static Texture2D? BuildGlossaryTexture(StatConcept concept)
     {
+        if (string.Equals(
+                concept.Id,
+                EnergyConceptId,
+                StringComparison.Ordinal))
+        {
+            return ResourceLoader.Load<Texture2D>(
+                StatEnergyIcon.GetCurrentPath(),
+                null,
+                ResourceLoader.CacheMode.Reuse);
+        }
+
         if (GeneratedImageTextures.TryGetValue(
                 concept.Id,
                 out var normalized))

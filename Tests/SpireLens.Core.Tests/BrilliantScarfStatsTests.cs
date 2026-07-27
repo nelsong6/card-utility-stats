@@ -12,8 +12,8 @@ public class BrilliantScarfStatsTests
 {
     private const string BrilliantScarfRelicId = "RELIC.BRILLIANT_SCARF";
     private const string EnergyIcon =
-        "[img width=16 height=16 align=center]"
-        + "res://images/atlases/potion_atlas.sprites/energy_potion.tres[/img]";
+        "[img=16x16]"
+        + "res://images/packed/sprite_fonts/ironclad_energy_icon.png[/img]";
     private const string StarIcon =
         "[img width=16 height=16 align=center]"
         + "res://images/packed/sprite_fonts/star_icon.png[/img]";

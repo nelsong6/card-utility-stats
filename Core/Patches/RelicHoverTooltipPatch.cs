@@ -35,7 +35,6 @@ public static class RelicHoverShowPatch
     private const string WeakIconPath = "res://images/atlases/power_atlas.sprites/weak_power.tres";
     private const string BlockIconPath = "res://images/ui/combat/block.png";
     private const string DrawIconPath = "res://images/atlases/power_atlas.sprites/draw_cards_next_turn_power.tres";
-    private const string EnergyIconPath = "res://images/atlases/potion_atlas.sprites/energy_potion.tres";
     private const string PaelsWingIconPath = "res://images/atlases/relic_atlas.sprites/paels_wing.tres";
     private const string StarIconPath = "res://images/packed/sprite_fonts/star_icon.png";
     private const string VigorIconPath = "res://images/atlases/power_atlas.sprites/vigor_power.tres";
@@ -4302,8 +4301,7 @@ public static class RelicHoverShowPatch
 
     private static string EnergyLabel(string suffix)
     {
-        var path = NormalizeResourcePath(EnergyIconPath);
-        return $"{StatConceptGlossary.RenderInlineImage(path)} {suffix}";
+        return $"{StatEnergyIcon.RenderInline(StatConceptGlossary.IconSlotSize)} {suffix}";
     }
 
     private static string DrawLabel(string suffix)
@@ -4314,7 +4312,7 @@ public static class RelicHoverShowPatch
 
     private static string BrilliantScarfCostLabel(int energyCost, int starCost)
     {
-        var energyIcon = InlineIcon(EnergyIconPath);
+        var energyIcon = StatEnergyIcon.RenderInline(16);
         if (starCost > 0)
         {
             var starIcon = InlineIcon(StarIconPath);

@@ -21,7 +21,7 @@ internal static class RelicStatRowVocabulary
 {
     private const string BlockIconPathFragment = "images/ui/combat/block.png";
     private const string DrawIconPathFragment = "draw_cards_next_turn_power.tres";
-    private const string EnergyIconPathFragment = "energy_potion.tres";
+    private const string EnergyIconPathFragment = "_energy_icon.png";
     private const string StarIconPathFragment = "star_icon.png";
     private const string VigorIconPathFragment = "vigor_power.tres";
     private const string VulnerableIconPathFragment = "vulnerable_power.tres";
