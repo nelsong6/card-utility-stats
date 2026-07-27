@@ -128,9 +128,19 @@ public class RelicStatRowVocabularyTests
         "")]
     [InlineData(
         "Strength gained per activation",
-        "gained",
-        "strength,activation",
+        "",
+        "strength_gained,activation",
         "activation")]
+    [InlineData(
+        "Strength added",
+        "",
+        "strength_gained",
+        "")]
+    [InlineData(
+        "Dexterity gained",
+        "",
+        "dexterity_gained",
+        "")]
     [InlineData(
         "Avg damage per skill played",
         "played",

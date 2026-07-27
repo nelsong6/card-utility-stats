@@ -23,6 +23,7 @@ public class StatConceptGlossaryTests
                 "skill_common",
                 "damage",
                 "dexterity",
+                "dexterity_gained",
                 "discard",
                 "draw",
                 "energy",
@@ -47,6 +48,7 @@ public class StatConceptGlossaryTests
                 "skill",
                 "stars",
                 "strength",
+                "strength_gained",
                 "turn",
                 "attack_uncommon",
                 "card_uncommon",
@@ -69,6 +71,12 @@ public class StatConceptGlossaryTests
         Assert.Equal(
             StatConceptDisplayType.EmbeddedImage,
             StatConceptGlossary.Concepts.Single(concept => concept.Id == "healing_gained").Display.Type);
+        Assert.Equal(
+            StatConceptDisplayType.GameResourceBadge,
+            StatConceptGlossary.Concepts.Single(concept => concept.Id == "dexterity_gained").Display.Type);
+        Assert.Equal(
+            StatConceptDisplayType.GameResourceBadge,
+            StatConceptGlossary.Concepts.Single(concept => concept.Id == "strength_gained").Display.Type);
         Assert.Equal(20, StatConceptGlossary.IconSlotSize);
     }
 
@@ -85,6 +93,7 @@ public class StatConceptGlossaryTests
         var uncommonCard = StatConceptGlossary.RenderHintedGlyph("card_uncommon");
         var charge = StatConceptGlossary.RenderHintedGlyph("charge");
         var combat = StatConceptGlossary.RenderHintedGlyph("combat");
+        var dexterityGained = StatConceptGlossary.RenderHintedGlyph("dexterity_gained");
         var floor = StatConceptGlossary.RenderHintedGlyph("floor");
         var healingBlocked = StatConceptGlossary.RenderHintedGlyph("healing_blocked");
         var healingGained = StatConceptGlossary.RenderHintedGlyph("healing_gained");
@@ -94,6 +103,7 @@ public class StatConceptGlossaryTests
         var summon = StatConceptGlossary.RenderHintedGlyph("osty_summon_gained");
         var power = StatConceptGlossary.RenderHintedGlyph("power");
         var skill = StatConceptGlossary.RenderHintedGlyph("skill");
+        var strengthGained = StatConceptGlossary.RenderHintedGlyph("strength_gained");
         var turn = StatConceptGlossary.RenderHintedGlyph("turn");
         var unknownRoom = StatConceptGlossary.RenderHintedGlyph("unknown_room");
         var upgraded = StatConceptGlossary.RenderHintedGlyph("upgraded");
@@ -114,6 +124,7 @@ public class StatConceptGlossaryTests
             uncommonCard,
             charge,
             combat,
+            dexterityGained,
             floor,
             healingBlocked,
             healingGained,
@@ -123,6 +134,7 @@ public class StatConceptGlossaryTests
             summon,
             power,
             skill,
+            strengthGained,
             turn,
             unknownRoom,
             upgraded,
@@ -168,6 +180,10 @@ public class StatConceptGlossaryTests
         Assert.Contains(
             "res://images/atlases/ui_atlas.sprites/map/icons/map_monster.tres",
             combat);
+        Assert.Contains("[hint=\"Dexterity gained:", dexterityGained);
+        Assert.Contains(
+            "user://SpireLens/generated-icons/dexterity_gained-",
+            dexterityGained);
         Assert.Contains("[hint=\"Floor:", floor);
         Assert.Contains(
             "res://images/atlases/ui_atlas.sprites/top_bar/top_bar_floor.tres",
@@ -206,6 +222,10 @@ public class StatConceptGlossaryTests
         Assert.Contains(
             "res://images/packed/card_library/type_sort_skill.png",
             skill);
+        Assert.Contains("[hint=\"Strength gained:", strengthGained);
+        Assert.Contains(
+            "user://SpireLens/generated-icons/strength_gained-",
+            strengthGained);
         Assert.Contains("[hint=\"Turn:", turn);
         Assert.Contains(
             "user://SpireLens/generated-icons/turn-",

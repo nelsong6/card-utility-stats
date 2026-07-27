@@ -155,6 +155,17 @@
         "description": "Dexterity gained, lost, or otherwise measured by a stat."
       }
     },
+    "dexterity_gained": {
+      "display": {
+        "type": "game_resource_badge",
+        "path": "res://images/atlases/power_atlas.sprites/dexterity_power.tres",
+        "badge": "plus"
+      },
+      "help": {
+        "label": "Dexterity gained",
+        "description": "Dexterity added by a card, relic, or other effect."
+      }
+    },
     "discard": {
       "display": {
         "type": "game_resource",
@@ -417,6 +428,17 @@
       "help": {
         "label": "Strength",
         "description": "Strength gained, lost, or otherwise measured by a stat."
+      }
+    },
+    "strength_gained": {
+      "display": {
+        "type": "game_resource_badge",
+        "path": "res://images/atlases/power_atlas.sprites/strength_power.tres",
+        "badge": "plus"
+      },
+      "help": {
+        "label": "Strength gained",
+        "description": "Strength added by a card, relic, or other effect."
       }
     },
     "turn": {

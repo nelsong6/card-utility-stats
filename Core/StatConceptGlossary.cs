@@ -9,6 +9,7 @@ namespace SpireLens.Core;
 internal enum StatConceptDisplayType
 {
     GameResource,
+    GameResourceBadge,
     GameResourceGroup,
     EmbeddedImage,
 }
@@ -21,6 +22,7 @@ internal sealed record StatConceptDisplay(
     StatConceptDisplayType Type,
     string Value,
     string Modulate,
+    string Badge,
     IReadOnlyList<StatConceptResource> Resources);
 
 internal sealed record StatConcept(
@@ -170,6 +172,8 @@ internal static class StatConceptGlossary
         {
             StatConceptDisplayType.GameResource =>
                 RenderGameResource(concept, size),
+            StatConceptDisplayType.GameResourceBadge =>
+                RenderGeneratedConceptImage(concept, size),
             StatConceptDisplayType.GameResourceGroup =>
                 RenderGeneratedConceptImage(concept, size),
             StatConceptDisplayType.EmbeddedImage =>
@@ -232,6 +236,7 @@ internal static class StatConceptGlossary
         var generatedConcepts = Concepts
             .Where(concept =>
                 concept.Display.Type is StatConceptDisplayType.EmbeddedImage
+                    or StatConceptDisplayType.GameResourceBadge
                     or StatConceptDisplayType.GameResourceGroup)
             .ToArray();
         if (generatedConcepts.Length == 0) return;
@@ -249,6 +254,8 @@ internal static class StatConceptGlossary
                 {
                     StatConceptDisplayType.EmbeddedImage =>
                         LoadEmbeddedImage(concept, assembly, manifestNames),
+                    StatConceptDisplayType.GameResourceBadge =>
+                        BuildBadgedGameResourceImage(concept),
                     StatConceptDisplayType.GameResourceGroup =>
                         BuildGroupedSourceImage(concept),
                     _ => throw new InvalidOperationException(
@@ -300,14 +307,7 @@ internal static class StatConceptGlossary
         {
             foreach (var resource in concept.Display.Resources)
             {
-                var texture = ResourceLoader.Load<Texture2D>(
-                    resource.Path,
-                    null,
-                    ResourceLoader.CacheMode.Reuse)
-                    ?? throw new InvalidOperationException(
-                        $"ResourceLoader could not load '{resource.Path}'.");
-                var image = texture.GetImage();
-                EnsureImageReadable(image);
+                var image = LoadGameResourceImage(resource.Path);
                 loaded.Add((image, resource.Scale));
             }
 
@@ -359,6 +359,111 @@ internal static class StatConceptGlossary
             foreach (var entry in loaded)
                 entry.Image.Dispose();
         }
+    }
+
+    private static Image BuildBadgedGameResourceImage(StatConcept concept)
+    {
+        using var source = LoadGameResourceImage(concept.Display.Value);
+        var usedRect = FindVisiblePixelBounds(source, 0.02f);
+        if (usedRect.Size.X <= 0 || usedRect.Size.Y <= 0)
+        {
+            throw new InvalidOperationException(
+                $"Game resource '{concept.Display.Value}' does not contain visible pixels.");
+        }
+
+        using var cropped = Image.CreateEmpty(
+            usedRect.Size.X,
+            usedRect.Size.Y,
+            false,
+            Image.Format.Rgba8);
+        cropped.Fill(new Color(0f, 0f, 0f, 0f));
+        cropped.BlitRect(source, usedRect, Vector2I.Zero);
+
+        const int canvasSize = 64;
+        const int baseArtworkSize = 50;
+        var baseScale = Math.Min(
+            baseArtworkSize / (double)cropped.GetWidth(),
+            baseArtworkSize / (double)cropped.GetHeight());
+        var baseWidth = Math.Max(
+            1,
+            (int)Math.Round(
+                cropped.GetWidth() * baseScale,
+                MidpointRounding.AwayFromZero));
+        var baseHeight = Math.Max(
+            1,
+            (int)Math.Round(
+                cropped.GetHeight() * baseScale,
+                MidpointRounding.AwayFromZero));
+        cropped.Resize(baseWidth, baseHeight, Image.Interpolation.Lanczos);
+
+        var combined = Image.CreateEmpty(
+            canvasSize,
+            canvasSize,
+            false,
+            Image.Format.Rgba8);
+        combined.Fill(new Color(0f, 0f, 0f, 0f));
+        combined.BlitRect(
+            cropped,
+            new Rect2I(0, 0, baseWidth, baseHeight),
+            new Vector2I(
+                (baseArtworkSize - baseWidth) / 2,
+                (baseArtworkSize - baseHeight) / 2));
+
+        if (!string.Equals(concept.Display.Badge, "plus", StringComparison.Ordinal))
+        {
+            combined.Dispose();
+            throw new InvalidOperationException(
+                $"Stat concept '{concept.Id}' has unsupported badge '{concept.Display.Badge}'.");
+        }
+
+        var outline = Color.FromHtml("#294F23");
+        var fill = Color.FromHtml("#8FE34F");
+        combined.FillRect(new Rect2I(43, 31, 13, 32), outline);
+        combined.FillRect(new Rect2I(33, 41, 31, 13), outline);
+        combined.FillRect(new Rect2I(46, 34, 7, 26), fill);
+        combined.FillRect(new Rect2I(36, 44, 25, 7), fill);
+        return combined;
+    }
+
+    private static Image LoadGameResourceImage(string path)
+    {
+        var texture = ResourceLoader.Load<Texture2D>(
+            path,
+            null,
+            ResourceLoader.CacheMode.Reuse)
+            ?? throw new InvalidOperationException(
+                $"ResourceLoader could not load '{path}'.");
+        if (texture is not AtlasTexture atlas || atlas.Atlas == null)
+        {
+            var resourceImage = texture.GetImage();
+            EnsureImageReadable(resourceImage);
+            return resourceImage;
+        }
+
+        using var atlasImage = atlas.Atlas.GetImage();
+        EnsureImageReadable(atlasImage);
+        var region = new Rect2I(
+            Math.Max(0, (int)Math.Round(atlas.Region.Position.X)),
+            Math.Max(0, (int)Math.Round(atlas.Region.Position.Y)),
+            Math.Max(1, (int)Math.Round(atlas.Region.Size.X)),
+            Math.Max(1, (int)Math.Round(atlas.Region.Size.Y)));
+        region.Size = new Vector2I(
+            Math.Min(region.Size.X, atlasImage.GetWidth() - region.Position.X),
+            Math.Min(region.Size.Y, atlasImage.GetHeight() - region.Position.Y));
+        if (region.Size.X <= 0 || region.Size.Y <= 0)
+        {
+            throw new InvalidOperationException(
+                $"Atlas region for '{path}' lies outside its source texture.");
+        }
+
+        var croppedImage = Image.CreateEmpty(
+            region.Size.X,
+            region.Size.Y,
+            false,
+            Image.Format.Rgba8);
+        croppedImage.Fill(new Color(0f, 0f, 0f, 0f));
+        croppedImage.BlitRect(atlasImage, region, Vector2I.Zero);
+        return croppedImage;
     }
 
     private static Image NormalizeToIconSlot(Image source)
@@ -454,6 +559,10 @@ internal static class StatConceptGlossary
                     concept.Display.Type == StatConceptDisplayType.GameResourceGroup)
                 .SelectMany(concept =>
                     concept.Display.Resources.Select(resource => resource.Path)))
+            .Concat(Concepts
+                .Where(concept =>
+                    concept.Display.Type == StatConceptDisplayType.GameResourceBadge)
+                .Select(concept => concept.Display.Value))
             .Concat(RelicInlineGameResources)
             .Distinct(StringComparer.Ordinal);
 
@@ -530,6 +639,7 @@ internal static class StatConceptGlossary
     private static Texture2D? BuildGlossaryTexture(StatConcept concept)
     {
         if (concept.Display.Type is StatConceptDisplayType.EmbeddedImage
+            or StatConceptDisplayType.GameResourceBadge
             or StatConceptDisplayType.GameResourceGroup)
         {
             return GeneratedImageTextures.TryGetValue(concept.Id, out var generated)
@@ -690,6 +800,37 @@ internal static class StatConceptGlossary
                 StatConceptDisplayType.GameResource,
                 path,
                 ReadOptionalColor(element, "modulate", "#FFFFFF", $"{id}.display"),
+                string.Empty,
+                Array.Empty<StatConceptResource>());
+        }
+
+        if (string.Equals(type, "game_resource_badge", StringComparison.Ordinal))
+        {
+            RequireOnlyProperties(
+                element,
+                $"{id}.display",
+                "type",
+                "path",
+                "badge");
+            var path = RequireString(element, "path", $"{id}.display");
+            if (!path.StartsWith("res://", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"Stat concept '{id}' game resource must use a res:// path.");
+            }
+
+            var badge = RequireString(element, "badge", $"{id}.display");
+            if (!string.Equals(badge, "plus", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"Stat concept '{id}' has unsupported badge '{badge}'.");
+            }
+
+            return new StatConceptDisplay(
+                StatConceptDisplayType.GameResourceBadge,
+                path,
+                "#FFFFFF",
+                badge,
                 Array.Empty<StatConceptResource>());
         }
 
@@ -720,6 +861,7 @@ internal static class StatConceptGlossary
                 StatConceptDisplayType.GameResourceGroup,
                 string.Empty,
                 "#FFFFFF",
+                string.Empty,
                 resources);
         }
 
@@ -736,6 +878,7 @@ internal static class StatConceptGlossary
                 StatConceptDisplayType.EmbeddedImage,
                 resource,
                 "#FFFFFF",
+                string.Empty,
                 Array.Empty<StatConceptResource>());
         }
 
