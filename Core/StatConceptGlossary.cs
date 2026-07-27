@@ -184,6 +184,16 @@ internal static class StatConceptGlossary
 
     private static string RenderGameResource(StatConcept concept, int size)
     {
+        if (GeneratedImagePaths.TryGetValue(
+                concept.Id,
+                out var normalizedPath))
+        {
+            return RenderImage(
+                normalizedPath,
+                size,
+                concept.Display.Modulate);
+        }
+
         return RenderImage(
             concept.Display.Value,
             size,
@@ -235,7 +245,8 @@ internal static class StatConceptGlossary
 
         var generatedConcepts = Concepts
             .Where(concept =>
-                concept.Display.Type is StatConceptDisplayType.EmbeddedImage
+                concept.Display.Type is StatConceptDisplayType.GameResource
+                    or StatConceptDisplayType.EmbeddedImage
                     or StatConceptDisplayType.GameResourceBadge
                     or StatConceptDisplayType.GameResourceGroup)
             .ToArray();
@@ -252,6 +263,8 @@ internal static class StatConceptGlossary
             {
                 using var sourceImage = concept.Display.Type switch
                 {
+                    StatConceptDisplayType.GameResource =>
+                        LoadGameResourceImage(concept.Display.Value),
                     StatConceptDisplayType.EmbeddedImage =>
                         LoadEmbeddedImage(concept, assembly, manifestNames),
                     StatConceptDisplayType.GameResourceBadge =>
@@ -638,13 +651,18 @@ internal static class StatConceptGlossary
 
     private static Texture2D? BuildGlossaryTexture(StatConcept concept)
     {
+        if (GeneratedImageTextures.TryGetValue(
+                concept.Id,
+                out var normalized))
+        {
+            return normalized;
+        }
+
         if (concept.Display.Type is StatConceptDisplayType.EmbeddedImage
             or StatConceptDisplayType.GameResourceBadge
             or StatConceptDisplayType.GameResourceGroup)
         {
-            return GeneratedImageTextures.TryGetValue(concept.Id, out var generated)
-                ? generated
-                : null;
+            return null;
         }
 
         if (concept.Display.Type != StatConceptDisplayType.GameResource)
