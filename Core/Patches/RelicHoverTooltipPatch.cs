@@ -2383,18 +2383,18 @@ public static class RelicHoverShowPatch
             "Average block retained by Sturdy Clamp per combat.");
         DescribedIconRow(
             sb,
-            ["average", "block", "turn"],
+            ["average", "block_wasted", "turn"],
             ["turn"],
             "excess over 10",
             FormatDecimal(excessBlockPerTurn),
-            "Average block above 10 retained by Sturdy Clamp per turn.");
+            "Average block discarded above Sturdy Clamp's 10-block retention cap per turn.");
         DescribedIconRow(
             sb,
-            ["average", "block", "combat"],
+            ["average", "block_wasted", "combat"],
             ["combat"],
             "excess over 10",
             FormatDecimal(excessBlockPerCombat),
-            "Average block above 10 retained by Sturdy Clamp per combat.");
+            "Average block discarded above Sturdy Clamp's 10-block retention cap per combat.");
         return sb.ToString();
     }
 

@@ -55,10 +55,19 @@ internal static class RelicStatRowVocabulary
 
     private static readonly IReadOnlyList<ConceptRule> Rules =
     [
+        Rule(
+            "block_wasted",
+            @"\b(?:block\s+(?:wasted|expired|unused)|(?:wasted|expired|unused)\s+block|excess\s+block)\b"),
+        Rule(
+            "energy_wasted",
+            @"\b(?:energy\s+(?:wasted|unused)|(?:wasted|unused)\s+energy|excess\s+energy)\b"),
+        Rule(
+            "healing_wasted",
+            @"\b(?:(?:hp\s+)?healing\s+wasted|wasted\s+(?:hp\s+)?healing)\b"),
         Rule("max_hp", @"\b(?:max|maximum)\s+hp\b"),
         Rule(
             "healing_blocked",
-            @"\b(?:hp\s+)?healing\s+(?:blocked|lost|wasted)\b"),
+            @"\b(?:hp\s+)?healing\s+(?:blocked|lost)\b"),
         Rule(
             "healing_gained",
             @"(?<!max\s)\bhp\s+(?:healed|gained|restored)\b|\bhealing\s+(?:gained|restored)\b"),
@@ -89,6 +98,7 @@ internal static class RelicStatRowVocabulary
         Rule("upgraded", @"(?<!non-)\b(?:upgrade|upgraded|upgrades)\b"),
         Rule("vigor", @"\bvigor\b"),
         Rule("vulnerable", @"\bvulnerable\b"),
+        Rule("wasted", @"\bwast(?:e|ed|ing)\b"),
         Rule("weak", @"\bweak\b"),
     ];
 

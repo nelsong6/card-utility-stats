@@ -14,6 +14,7 @@ public class StatConceptGlossaryTests
                 "attack",
                 "average",
                 "block",
+                "block_wasted",
                 "card",
                 "charge",
                 "combat",
@@ -25,11 +26,13 @@ public class StatConceptGlossaryTests
                 "discard",
                 "draw",
                 "energy",
+                "energy_wasted",
                 "exhaust",
                 "floor",
                 "gold",
                 "healing_blocked",
                 "healing_gained",
+                "healing_wasted",
                 "information",
                 "max_hp",
                 "nimble",
@@ -53,6 +56,7 @@ public class StatConceptGlossaryTests
                 "upgraded",
                 "vigor",
                 "vulnerable",
+                "wasted",
                 "weak",
             ],
             StatConceptGlossary.Concepts.Select(concept => concept.Id));
@@ -75,6 +79,7 @@ public class StatConceptGlossaryTests
         var attack = StatConceptGlossary.RenderHintedGlyph("attack");
         var average = StatConceptGlossary.RenderHintedGlyph("average");
         var block = StatConceptGlossary.RenderHintedGlyph("block");
+        var blockWasted = StatConceptGlossary.RenderHintedGlyph("block_wasted");
         var card = StatConceptGlossary.RenderHintedGlyph("card");
         var rareCard = StatConceptGlossary.RenderHintedGlyph("card_rare");
         var uncommonCard = StatConceptGlossary.RenderHintedGlyph("card_uncommon");
@@ -83,6 +88,7 @@ public class StatConceptGlossaryTests
         var floor = StatConceptGlossary.RenderHintedGlyph("floor");
         var healingBlocked = StatConceptGlossary.RenderHintedGlyph("healing_blocked");
         var healingGained = StatConceptGlossary.RenderHintedGlyph("healing_gained");
+        var healingWasted = StatConceptGlossary.RenderHintedGlyph("healing_wasted");
         var informationConcept = StatConceptGlossary.RenderHintedGlyph("information");
         var nimble = StatConceptGlossary.RenderHintedGlyph("nimble");
         var summon = StatConceptGlossary.RenderHintedGlyph("osty_summon_gained");
@@ -91,6 +97,8 @@ public class StatConceptGlossaryTests
         var turn = StatConceptGlossary.RenderHintedGlyph("turn");
         var unknownRoom = StatConceptGlossary.RenderHintedGlyph("unknown_room");
         var upgraded = StatConceptGlossary.RenderHintedGlyph("upgraded");
+        var energyWasted = StatConceptGlossary.RenderHintedGlyph("energy_wasted");
+        var wasted = StatConceptGlossary.RenderHintedGlyph("wasted");
         var information = StatConceptGlossary.RenderInformationHint(
             "Times this relic has been activated.");
 
@@ -100,6 +108,7 @@ public class StatConceptGlossaryTests
             attack,
             average,
             block,
+            blockWasted,
             card,
             rareCard,
             uncommonCard,
@@ -108,6 +117,7 @@ public class StatConceptGlossaryTests
             floor,
             healingBlocked,
             healingGained,
+            healingWasted,
             informationConcept,
             nimble,
             summon,
@@ -116,6 +126,8 @@ public class StatConceptGlossaryTests
             turn,
             unknownRoom,
             upgraded,
+            energyWasted,
+            wasted,
         };
         Assert.All(
             defaultGlyphs,
@@ -138,6 +150,10 @@ public class StatConceptGlossaryTests
             average);
         Assert.Contains("[hint=\"Block:", block);
         Assert.Contains("res://images/ui/combat/block.png", block);
+        Assert.Contains("[hint=\"Block wasted:", blockWasted);
+        Assert.Contains(
+            "user://SpireLens/generated-icons/block_wasted-",
+            blockWasted);
         Assert.Contains("[hint=\"Card:", card);
         Assert.Contains("res://images/ui/reward_screen/reward_icon_card.png", card);
         Assert.Contains("[hint=\"Rare card:", rareCard);
@@ -169,6 +185,10 @@ public class StatConceptGlossaryTests
         Assert.Contains(
             "user://SpireLens/generated-icons/healing_gained-",
             healingGained);
+        Assert.Contains("[hint=\"Healing wasted:", healingWasted);
+        Assert.Contains(
+            "user://SpireLens/generated-icons/healing_wasted-",
+            healingWasted);
         Assert.Contains("[hint=\"Information:", informationConcept);
         Assert.Contains(
             "user://SpireLens/generated-icons/information-",
@@ -198,6 +218,14 @@ public class StatConceptGlossaryTests
         Assert.Contains(
             "res://images/ui/cards/upgrade_preview/upgrade_arrow.png",
             upgraded);
+        Assert.Contains("[hint=\"Energy wasted:", energyWasted);
+        Assert.Contains(
+            "user://SpireLens/generated-icons/energy_wasted-",
+            energyWasted);
+        Assert.Contains("[hint=\"Wasted:", wasted);
+        Assert.Contains(
+            "user://SpireLens/generated-icons/wasted-",
+            wasted);
         Assert.Contains("[img width=20 height=20", information);
         Assert.Contains(
             "user://SpireLens/generated-icons/information-",

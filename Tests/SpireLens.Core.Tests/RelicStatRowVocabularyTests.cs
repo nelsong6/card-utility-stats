@@ -62,6 +62,21 @@ public class RelicStatRowVocabularyTests
         "healing_blocked",
         "")]
     [InlineData(
+        "healing wasted",
+        "",
+        "healing_wasted",
+        "")]
+    [InlineData(
+        "1st turns ended with excess energy",
+        "1st ended with",
+        "turn,energy_wasted",
+        "")]
+    [InlineData(
+        "avg excess block over 10 per turn",
+        "over 10",
+        "average,block_wasted,turn",
+        "turn")]
+    [InlineData(
         "Max HP gained",
         "gained",
         "max_hp",

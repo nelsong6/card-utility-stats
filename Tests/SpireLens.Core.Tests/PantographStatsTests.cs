@@ -77,7 +77,9 @@ public class PantographStatsTests
 
         Assert.Contains("Activations", body);
         Assert.Contains("HP healed", body);
-        Assert.Contains("healing wasted", body);
+        Assert.Contains(
+            "user://SpireLens/generated-icons/healing_wasted-",
+            body);
         Assert.Contains("[b]0[/b]", body);
     }
 
@@ -100,7 +102,9 @@ public class PantographStatsTests
         var body = BuildBody(agg);
 
         Assert.Contains("HP healed", body);
-        Assert.Contains("healing wasted", body);
+        Assert.Contains(
+            "user://SpireLens/generated-icons/healing_wasted-",
+            body);
         Assert.DoesNotContain("wasted to full HP", body);
         Assert.Contains("[b]7[/b]", body);
         Assert.Contains("[b]18[/b]", body);

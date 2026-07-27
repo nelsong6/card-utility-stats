@@ -73,6 +73,16 @@
         "description": "Block gained, retained, spent, or otherwise measured by a stat."
       }
     },
+    "block_wasted": {
+      "display": {
+        "type": "embedded_image",
+        "resource": "Assets.stat-block-wasted.svg"
+      },
+      "help": {
+        "label": "Block wasted",
+        "description": "Block that expired or exceeded a retention limit without preventing damage."
+      }
+    },
     "card": {
       "display": {
         "type": "game_resource",
@@ -175,6 +185,16 @@
         "description": "Energy gained, generated, saved, spent, or otherwise measured by a stat."
       }
     },
+    "energy_wasted": {
+      "display": {
+        "type": "embedded_image",
+        "resource": "Assets.stat-energy-wasted.svg"
+      },
+      "help": {
+        "label": "Energy wasted",
+        "description": "Energy that remained unused or prevented an energy-granting effect from benefiting the player."
+      }
+    },
     "exhaust": {
       "display": {
         "type": "game_resource",
@@ -223,6 +243,16 @@
       "help": {
         "label": "Healing gained",
         "description": "HP successfully restored by a healing effect."
+      }
+    },
+    "healing_wasted": {
+      "display": {
+        "type": "embedded_image",
+        "resource": "Assets.stat-healing-wasted.svg"
+      },
+      "help": {
+        "label": "Healing wasted",
+        "description": "Healing that could not restore HP, such as healing offered while already at full HP."
       }
     },
     "information": {
@@ -437,6 +467,16 @@
       "help": {
         "label": "Vulnerable",
         "description": "Vulnerable applied, received, or otherwise measured by a stat."
+      }
+    },
+    "wasted": {
+      "display": {
+        "type": "embedded_image",
+        "resource": "Assets.stat-wasted.svg"
+      },
+      "help": {
+        "label": "Wasted",
+        "description": "A resource that was available or generated but produced no benefit."
       }
     },
     "weak": {
