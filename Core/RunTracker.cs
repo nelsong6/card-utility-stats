@@ -77,6 +77,8 @@ public static class RunTracker
         "SpireLens.PendingEggOfferAttributions";
     private const string WongosMysteryTicketRewardAttributionsAppDomainKey =
         "SpireLens.WongosMysteryTicketRewardAttributions";
+    private const string WhiteStarRewardAttributionsAppDomainKey =
+        "SpireLens.WhiteStarRewardAttributions";
 
     private static readonly object _lock = new();
 
@@ -100,6 +102,9 @@ public static class RunTracker
     private static readonly ConditionalWeakTable<object, Tuple<int>>
         _wongosMysteryTicketRewardAttributions =
             GetWongosMysteryTicketRewardAttributions();
+    private static readonly ConditionalWeakTable<object, Tuple<int>>
+        _whiteStarRewardAttributions =
+            GetWhiteStarRewardAttributions();
     private static readonly List<PendingPowerChangeAttempt> _pendingPowerChangeAttempts = new();
     private static readonly List<PendingUnsettlingLampDebuff> _pendingUnsettlingLampDebuffs = new();
     private static readonly System.Threading.AsyncLocal<EnemyStatusSourceFrame?> _enemyStatusSourceFrame = new();
@@ -133,6 +138,8 @@ public static class RunTracker
     private static readonly Dictionary<CardReward, PendingFresnelLensReward> _fresnelLensRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, PendingSilverCrucibleReward> _silverCrucibleRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, PendingOrreryReward> _orreryRewards = new(ReferenceEqualityComparer.Instance);
+    private static readonly Dictionary<CardReward, int> _whiteStarRewardRareCardsBeforeSelection =
+        new(ReferenceEqualityComparer.Instance);
     private static Orrery? _orreryRewardRegistrationRelic;
     private static readonly List<int> _silverCrucibleRestoreBatchScreenNumbers = new();
     private static int _silverCrucibleRestoreBatchDepth;
@@ -1118,6 +1125,7 @@ public static class RunTracker
         _fresnelLensRewards.Clear();
         _silverCrucibleRewards.Clear();
         _orreryRewards.Clear();
+        _whiteStarRewardRareCardsBeforeSelection.Clear();
         _orreryRewardRegistrationRelic = null;
         _silverCrucibleRestoreBatchScreenNumbers.Clear();
         _silverCrucibleRestoreBatchDepth = 0;
@@ -1964,6 +1972,10 @@ public static class RunTracker
         target.RareCardsOffered += source.RareCardsOffered;
         target.UncommonCardsTaken += source.UncommonCardsTaken;
         target.RareCardsTaken += source.RareCardsTaken;
+        target.RareAttackCardsOffered += source.RareAttackCardsOffered;
+        target.RareSkillCardsOffered += source.RareSkillCardsOffered;
+        target.RarePowerCardsOffered += source.RarePowerCardsOffered;
+        target.RareCardRewardScreensDeclined += source.RareCardRewardScreensDeclined;
         target.UpgradedCardsOffered += source.UpgradedCardsOffered;
         target.UpgradedCommonCardsOffered += source.UpgradedCommonCardsOffered;
         target.UpgradedUncommonCardsOffered += source.UpgradedUncommonCardsOffered;
@@ -4409,6 +4421,7 @@ public static class RunTracker
     private const string BoundPhylacteryRelicId = "RELIC.BOUND_PHYLACTERY";
     private const string PhylacteryUnboundRelicId = "RELIC.PHYLACTERY_UNBOUND";
     private const string ToolboxRelicId = "RELIC.TOOLBOX";
+    private const string WhiteStarRelicId = "RELIC.WHITE_STAR";
     private const string PaelsWingRelicId = "RELIC.PAELS_WING";
     private const string PaelsToothRelicId = "RELIC.PAELS_TOOTH";
     private const string PaelsClawRelicId = "RELIC.PAELS_CLAW";
@@ -4578,6 +4591,23 @@ public static class RunTracker
         var created = new ConditionalWeakTable<object, Tuple<int>>();
         AppDomain.CurrentDomain.SetData(
             WongosMysteryTicketRewardAttributionsAppDomainKey,
+            created);
+        return created;
+    }
+
+    private static ConditionalWeakTable<object, Tuple<int>>
+        GetWhiteStarRewardAttributions()
+    {
+        if (AppDomain.CurrentDomain.GetData(
+                WhiteStarRewardAttributionsAppDomainKey)
+            is ConditionalWeakTable<object, Tuple<int>> existing)
+        {
+            return existing;
+        }
+
+        var created = new ConditionalWeakTable<object, Tuple<int>>();
+        AppDomain.CurrentDomain.SetData(
+            WhiteStarRewardAttributionsAppDomainKey,
             created);
         return created;
     }
@@ -7165,6 +7195,211 @@ public static class RunTracker
             }
         }
     }
+
+    /// <summary>
+    /// Binds the exact CardReward appended by White Star's Elite-reward hook.
+    /// The weak marker is AppDomain-owned so a Core hot reload while the
+    /// rewards page is open does not turn an ordinary card reward into a
+    /// false White Star match.
+    /// </summary>
+    public static void RegisterWhiteStarReward(
+        WhiteStar? relic,
+        Player? player,
+        CardReward? reward)
+    {
+        if (relic?.Owner == null || player == null || reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(player)) return;
+                if (!ReferenceEquals(relic.Owner, player)
+                    || !ReferenceEquals(reward.Player, player))
+                {
+                    return;
+                }
+                if (_whiteStarRewardAttributions.TryGetValue(reward, out _)) return;
+
+                _whiteStarRewardAttributions.Add(reward, Tuple.Create(1));
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(WhiteStarRelicId);
+                RecordWhiteStarActivationForTest(agg);
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RegisterWhiteStarReward failed: {e.Message}");
+            }
+        }
+    }
+
+    public static bool IsTrackedWhiteStarReward(CardReward? reward)
+    {
+        if (reward == null) return false;
+
+        lock (_lock)
+            return _whiteStarRewardAttributions.TryGetValue(reward, out _);
+    }
+
+    public static void RecordWhiteStarOffers(CardReward? reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_whiteStarRewardAttributions.TryGetValue(reward, out _)) return;
+                if (!IsTrackedPlayer(reward.Player)) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(WhiteStarRelicId);
+                RecordWhiteStarOffersForTest(
+                    agg,
+                    reward.Cards
+                        .Where(card => card != null)
+                        .Select(card => (card.Rarity, card.Type)));
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordWhiteStarOffers failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void NoteWhiteStarRewardOpened(CardReward? reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_whiteStarRewardAttributions.TryGetValue(reward, out _)) return;
+                _whiteStarRewardRareCardsBeforeSelection[reward] =
+                    CountRareCards(reward);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"NoteWhiteStarRewardOpened failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RefreshWhiteStarRewardAfterReroll(CardReward? reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            if (!_whiteStarRewardRareCardsBeforeSelection.ContainsKey(reward)) return;
+            _whiteStarRewardRareCardsBeforeSelection[reward] =
+                CountRareCards(reward);
+        }
+    }
+
+    public static void RecordWhiteStarRewardResolved(
+        CardReward? reward,
+        bool completed)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_whiteStarRewardRareCardsBeforeSelection.Remove(
+                        reward,
+                        out var rareCardsBeforeSelection))
+                {
+                    return;
+                }
+                if (!completed) return;
+                if (!_whiteStarRewardAttributions.Remove(reward)) return;
+                if (!IsTrackedPlayer(reward.Player)) return;
+
+                var remainingRareCards = CountRareCards(reward);
+                if (remainingRareCards < rareCardsBeforeSelection) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(WhiteStarRelicId);
+                RecordWhiteStarRewardDeclinedForTest(agg);
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordWhiteStarRewardResolved failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordWhiteStarRewardSkipped(CardReward? reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                _whiteStarRewardRareCardsBeforeSelection.Remove(reward);
+                if (!_whiteStarRewardAttributions.Remove(reward)) return;
+                if (!IsTrackedPlayer(reward.Player)) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(WhiteStarRelicId);
+                RecordWhiteStarRewardDeclinedForTest(agg);
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordWhiteStarRewardSkipped failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordWhiteStarActivationForTest(RelicAggregate agg)
+    {
+        if (agg == null) return;
+        agg.Activations += 1;
+    }
+
+    internal static void RecordWhiteStarOffersForTest(
+        RelicAggregate agg,
+        IEnumerable<(CardRarity Rarity, CardType Type)>? cards)
+    {
+        if (agg == null || cards == null) return;
+
+        foreach (var (rarity, type) in cards)
+        {
+            if (rarity != CardRarity.Rare) continue;
+
+            agg.RareCardsOffered += 1;
+            switch (type)
+            {
+                case CardType.Attack:
+                    agg.RareAttackCardsOffered += 1;
+                    break;
+                case CardType.Skill:
+                    agg.RareSkillCardsOffered += 1;
+                    break;
+                case CardType.Power:
+                    agg.RarePowerCardsOffered += 1;
+                    break;
+            }
+        }
+    }
+
+    internal static void RecordWhiteStarRewardDeclinedForTest(
+        RelicAggregate agg)
+    {
+        if (agg == null) return;
+        agg.RareCardRewardScreensDeclined += 1;
+    }
+
+    private static int CountRareCards(CardReward reward)
+        => reward.Cards.Count(card => card?.Rarity == CardRarity.Rare);
 
     /// <summary>
     /// Record that Brilliant Scarf has reached its "next card discounted"

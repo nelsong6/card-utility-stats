@@ -2445,6 +2445,29 @@ public class SchemaLoadingTests
             resumed!.RelicAggregates["RELIC.POLLINOUS_CORE"]);
     }
 
+    [Fact]
+    public void HistoricalLoad_AcceptsWhiteStarRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("white-star-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertWhiteStarFixture(
+            loaded.Data.RelicAggregates["RELIC.WHITE_STAR"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsWhiteStarRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("white-star-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertWhiteStarFixture(
+            resumed!.RelicAggregates["RELIC.WHITE_STAR"]);
+    }
+
     private static void AssertCentennialPuzzleActivationContext(RelicAggregate relicAgg)
     {
         Assert.Equal(9, relicAgg.CentennialPuzzleActivationTurnTotal);
@@ -2467,6 +2490,16 @@ public class SchemaLoadingTests
         Assert.Equal(3, relicAgg.PollinousCoreTurnsEndedOn1Counter);
         Assert.Equal(3, relicAgg.PollinousCoreTurnsEndedOn2Counters);
         Assert.Equal(2, relicAgg.PollinousCoreTurnsEndedOn3Counters);
+    }
+
+    private static void AssertWhiteStarFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(8, relicAgg.RareCardsOffered);
+        Assert.Equal(4, relicAgg.RareAttackCardsOffered);
+        Assert.Equal(2, relicAgg.RareSkillCardsOffered);
+        Assert.Equal(2, relicAgg.RarePowerCardsOffered);
+        Assert.Equal(2, relicAgg.RareCardRewardScreensDeclined);
     }
 
     [Fact]

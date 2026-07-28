@@ -926,6 +926,10 @@ public class RelicAggregate
     public int RareCardsOffered { get; set; }
     public int UncommonCardsTaken { get; set; }
     public int RareCardsTaken { get; set; }
+    public int RareAttackCardsOffered { get; set; }
+    public int RareSkillCardsOffered { get; set; }
+    public int RarePowerCardsOffered { get; set; }
+    public int RareCardRewardScreensDeclined { get; set; }
 
     // Total choosable card options actually upgraded by Molten Egg, Toxic Egg,
     // or Frozen Egg, plus which of those offers successfully entered the
