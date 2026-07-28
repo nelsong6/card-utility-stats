@@ -2495,6 +2495,29 @@ public class SchemaLoadingTests
                 .OddlySmoothStoneBlockCardsPlayed);
     }
 
+    [Fact]
+    public void HistoricalLoad_AcceptsPrayerWheelRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("prayer-wheel-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertPrayerWheelFixture(
+            loaded.Data.RelicAggregates["RELIC.PRAYER_WHEEL"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsPrayerWheelRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("prayer-wheel-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertPrayerWheelFixture(
+            resumed!.RelicAggregates["RELIC.PRAYER_WHEEL"]);
+    }
+
     private static void AssertCentennialPuzzleActivationContext(RelicAggregate relicAgg)
     {
         Assert.Equal(9, relicAgg.CentennialPuzzleActivationTurnTotal);
@@ -2527,6 +2550,15 @@ public class SchemaLoadingTests
         Assert.Equal(2, relicAgg.RareSkillCardsOffered);
         Assert.Equal(2, relicAgg.RarePowerCardsOffered);
         Assert.Equal(2, relicAgg.RareCardRewardScreensDeclined);
+    }
+
+    private static void AssertPrayerWheelFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(4, relicAgg.PrayerWheelExtraRewardScreens);
+        Assert.Equal(1, relicAgg.PrayerWheelExtraRewardScreensRejected);
+        Assert.Equal(7, relicAgg.CommonCardsOffered);
+        Assert.Equal(4, relicAgg.UncommonCardsOffered);
+        Assert.Equal(1, relicAgg.RareCardsOffered);
     }
 
     [Fact]

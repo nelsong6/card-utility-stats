@@ -79,6 +79,8 @@ public static class RunTracker
         "SpireLens.WongosMysteryTicketRewardAttributions";
     private const string WhiteStarRewardAttributionsAppDomainKey =
         "SpireLens.WhiteStarRewardAttributions";
+    private const string PrayerWheelRewardAttributionsAppDomainKey =
+        "SpireLens.PrayerWheelRewardAttributions";
 
     private static readonly object _lock = new();
 
@@ -105,6 +107,9 @@ public static class RunTracker
     private static readonly ConditionalWeakTable<object, Tuple<int>>
         _whiteStarRewardAttributions =
             GetWhiteStarRewardAttributions();
+    private static readonly ConditionalWeakTable<object, Tuple<int>>
+        _prayerWheelRewardAttributions =
+            GetPrayerWheelRewardAttributions();
     private static readonly List<PendingPowerChangeAttempt> _pendingPowerChangeAttempts = new();
     private static readonly List<PendingUnsettlingLampDebuff> _pendingUnsettlingLampDebuffs = new();
     private static readonly System.Threading.AsyncLocal<EnemyStatusSourceFrame?> _enemyStatusSourceFrame = new();
@@ -139,6 +144,8 @@ public static class RunTracker
     private static readonly Dictionary<CardReward, PendingSilverCrucibleReward> _silverCrucibleRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, PendingOrreryReward> _orreryRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, int> _whiteStarRewardRareCardsBeforeSelection =
+        new(ReferenceEqualityComparer.Instance);
+    private static readonly Dictionary<CardReward, int> _prayerWheelRewardCardsBeforeSelection =
         new(ReferenceEqualityComparer.Instance);
     private static Orrery? _orreryRewardRegistrationRelic;
     private static readonly List<int> _silverCrucibleRestoreBatchScreenNumbers = new();
@@ -1126,6 +1133,7 @@ public static class RunTracker
         _silverCrucibleRewards.Clear();
         _orreryRewards.Clear();
         _whiteStarRewardRareCardsBeforeSelection.Clear();
+        _prayerWheelRewardCardsBeforeSelection.Clear();
         _orreryRewardRegistrationRelic = null;
         _silverCrucibleRestoreBatchScreenNumbers.Clear();
         _silverCrucibleRestoreBatchDepth = 0;
@@ -1968,6 +1976,7 @@ public static class RunTracker
         target.RareRelicsAcquired += source.RareRelicsAcquired;
         target.CampfiresNotDug += source.CampfiresNotDug;
         MergeRelicsGranted(target.RelicsGranted, source.RelicsGranted);
+        target.CommonCardsOffered += source.CommonCardsOffered;
         target.UncommonCardsOffered += source.UncommonCardsOffered;
         target.RareCardsOffered += source.RareCardsOffered;
         target.UncommonCardsTaken += source.UncommonCardsTaken;
@@ -1976,6 +1985,8 @@ public static class RunTracker
         target.RareSkillCardsOffered += source.RareSkillCardsOffered;
         target.RarePowerCardsOffered += source.RarePowerCardsOffered;
         target.RareCardRewardScreensDeclined += source.RareCardRewardScreensDeclined;
+        target.PrayerWheelExtraRewardScreens += source.PrayerWheelExtraRewardScreens;
+        target.PrayerWheelExtraRewardScreensRejected += source.PrayerWheelExtraRewardScreensRejected;
         target.UpgradedCardsOffered += source.UpgradedCardsOffered;
         target.UpgradedCommonCardsOffered += source.UpgradedCommonCardsOffered;
         target.UpgradedUncommonCardsOffered += source.UpgradedUncommonCardsOffered;
@@ -4424,6 +4435,7 @@ public static class RunTracker
     private const string PhylacteryUnboundRelicId = "RELIC.PHYLACTERY_UNBOUND";
     private const string ToolboxRelicId = "RELIC.TOOLBOX";
     private const string WhiteStarRelicId = "RELIC.WHITE_STAR";
+    private const string PrayerWheelRelicId = "RELIC.PRAYER_WHEEL";
     private const string PaelsWingRelicId = "RELIC.PAELS_WING";
     private const string PaelsToothRelicId = "RELIC.PAELS_TOOTH";
     private const string PaelsClawRelicId = "RELIC.PAELS_CLAW";
@@ -4611,6 +4623,23 @@ public static class RunTracker
         var created = new ConditionalWeakTable<object, Tuple<int>>();
         AppDomain.CurrentDomain.SetData(
             WhiteStarRewardAttributionsAppDomainKey,
+            created);
+        return created;
+    }
+
+    private static ConditionalWeakTable<object, Tuple<int>>
+        GetPrayerWheelRewardAttributions()
+    {
+        if (AppDomain.CurrentDomain.GetData(
+                PrayerWheelRewardAttributionsAppDomainKey)
+            is ConditionalWeakTable<object, Tuple<int>> existing)
+        {
+            return existing;
+        }
+
+        var created = new ConditionalWeakTable<object, Tuple<int>>();
+        AppDomain.CurrentDomain.SetData(
+            PrayerWheelRewardAttributionsAppDomainKey,
             created);
         return created;
     }
@@ -7403,6 +7432,228 @@ public static class RunTracker
 
     private static int CountRareCards(CardReward reward)
         => reward.Cards.Count(card => card?.Rarity == CardRarity.Rare);
+
+    /// <summary>
+    /// Binds the exact CardReward appended by Prayer Wheel's normal-monster
+    /// reward hook, excluding the ordinary card reward on the same page.
+    /// </summary>
+    public static void RegisterPrayerWheelReward(
+        PrayerWheel? relic,
+        Player? player,
+        CardReward? reward)
+    {
+        if (relic?.Owner == null || player == null || reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(player)) return;
+                if (!ReferenceEquals(relic.Owner, player)
+                    || !ReferenceEquals(reward.Player, player))
+                {
+                    return;
+                }
+                if (_prayerWheelRewardAttributions.TryGetValue(reward, out _))
+                    return;
+
+                _prayerWheelRewardAttributions.Add(reward, Tuple.Create(1));
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(
+                    PrayerWheelRelicId);
+                RecordPrayerWheelExtraRewardScreenForTest(agg);
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RegisterPrayerWheelReward failed: {e.Message}");
+            }
+        }
+    }
+
+    public static bool IsTrackedPrayerWheelReward(CardReward? reward)
+    {
+        if (reward == null) return false;
+
+        lock (_lock)
+            return _prayerWheelRewardAttributions.TryGetValue(reward, out _);
+    }
+
+    public static void RecordPrayerWheelOffers(CardReward? reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_prayerWheelRewardAttributions.TryGetValue(
+                        reward,
+                        out _))
+                {
+                    return;
+                }
+                if (!IsTrackedPlayer(reward.Player)) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(
+                    PrayerWheelRelicId);
+                RecordPrayerWheelOffersForTest(
+                    agg,
+                    reward.Cards
+                        .Where(card => card != null)
+                        .Select(card => card.Rarity));
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordPrayerWheelOffers failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void NotePrayerWheelRewardOpened(CardReward? reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_prayerWheelRewardAttributions.TryGetValue(
+                        reward,
+                        out _))
+                {
+                    return;
+                }
+
+                _prayerWheelRewardCardsBeforeSelection[reward] =
+                    CountRewardCards(reward);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"NotePrayerWheelRewardOpened failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RefreshPrayerWheelRewardAfterReroll(CardReward? reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            if (!_prayerWheelRewardCardsBeforeSelection.ContainsKey(reward))
+                return;
+            _prayerWheelRewardCardsBeforeSelection[reward] =
+                CountRewardCards(reward);
+        }
+    }
+
+    public static void RecordPrayerWheelRewardResolved(
+        CardReward? reward,
+        bool completed)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_prayerWheelRewardCardsBeforeSelection.Remove(
+                        reward,
+                        out var cardsBeforeSelection))
+                {
+                    return;
+                }
+                if (!completed) return;
+                if (!_prayerWheelRewardAttributions.Remove(reward)) return;
+                if (!IsTrackedPlayer(reward.Player)) return;
+
+                if (CountRewardCards(reward) < cardsBeforeSelection) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(
+                    PrayerWheelRelicId);
+                RecordPrayerWheelRewardRejectedForTest(agg);
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordPrayerWheelRewardResolved failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordPrayerWheelRewardSkipped(CardReward? reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                _prayerWheelRewardCardsBeforeSelection.Remove(reward);
+                if (!_prayerWheelRewardAttributions.Remove(reward)) return;
+                if (!IsTrackedPlayer(reward.Player)) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(
+                    PrayerWheelRelicId);
+                RecordPrayerWheelRewardRejectedForTest(agg);
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordPrayerWheelRewardSkipped failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordPrayerWheelExtraRewardScreenForTest(
+        RelicAggregate agg)
+    {
+        if (agg == null) return;
+        agg.PrayerWheelExtraRewardScreens += 1;
+    }
+
+    internal static void RecordPrayerWheelOffersForTest(
+        RelicAggregate agg,
+        IEnumerable<CardRarity>? rarities)
+    {
+        if (agg == null || rarities == null) return;
+
+        foreach (var rarity in rarities)
+        {
+            switch (rarity)
+            {
+                case CardRarity.Common:
+                    agg.CommonCardsOffered += 1;
+                    break;
+                case CardRarity.Uncommon:
+                    agg.UncommonCardsOffered += 1;
+                    break;
+                case CardRarity.Rare:
+                    agg.RareCardsOffered += 1;
+                    break;
+            }
+        }
+    }
+
+    internal static void RecordPrayerWheelRewardRejectedForTest(
+        RelicAggregate agg)
+    {
+        if (agg == null) return;
+        agg.PrayerWheelExtraRewardScreensRejected += 1;
+    }
+
+    private static int CountRewardCards(CardReward reward)
+        => reward.Cards.Count(card => card != null);
 
     /// <summary>
     /// Record that Brilliant Scarf has reached its "next card discounted"

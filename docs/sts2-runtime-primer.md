@@ -1105,6 +1105,15 @@ Pael's Wing uses the `SACRIFICE` alternative. Inner card-screen Skip and
 Driftwood reroll do not consume the reward and must preserve its original
 Orrery number.
 
+Prayer Wheel appends one dedicated `CardReward` from its owner-specific
+`TryModifyRewards` callback after a normal monster combat. Bind only the
+appended reward reference so the ordinary card reward on the same page never
+enters Prayer Wheel's totals. Count every populated option set, including
+Driftwood rerolls, by the final cards' observed rarities. A completed selection
+that removes no card and an outer `CardReward.OnSkipped` are terminal
+rejections; the inner card-screen Skip is not terminal and must preserve the
+same pending reward.
+
 ## Generated And Supplemental Cards
 
 Not every visible card should become a permanent per-instance deck card.

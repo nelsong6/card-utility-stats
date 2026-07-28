@@ -921,7 +921,8 @@ public class RelicAggregate
     public Dictionary<string, RelicGrantedAggregate> RelicsGranted { get; set; } = new();
 
     // Total offered cards by rarity for relics that generate card-choice
-    // screens. Used by Toolbox.
+    // screens. Used by Toolbox, White Star, and Prayer Wheel.
+    public int CommonCardsOffered { get; set; }
     public int UncommonCardsOffered { get; set; }
     public int RareCardsOffered { get; set; }
     public int UncommonCardsTaken { get; set; }
@@ -930,6 +931,8 @@ public class RelicAggregate
     public int RareSkillCardsOffered { get; set; }
     public int RarePowerCardsOffered { get; set; }
     public int RareCardRewardScreensDeclined { get; set; }
+    public int PrayerWheelExtraRewardScreens { get; set; }
+    public int PrayerWheelExtraRewardScreensRejected { get; set; }
 
     // Total choosable card options actually upgraded by Molten Egg, Toxic Egg,
     // or Frozen Egg, plus which of those offers successfully entered the

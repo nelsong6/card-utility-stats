@@ -444,6 +444,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `oddly-smooth-stone-relic-run.json`
   Adds Oddly Smooth Stone's completed plays of cards the game classifies as
   immediately gaining Dexterity-scaled Block.
+- `prayer-wheel-relic-run.json`
+  Adds Prayer Wheel's extra reward-screen count, terminal rejections, and
+  generated Common/Uncommon/Rare card offers.
 
 Why these exist:
 
