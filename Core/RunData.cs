@@ -974,6 +974,10 @@ public class RelicAggregate
     public int StrikeDummyBaseStrikesInDeck { get; set; }
     public int StrikeDummyNonBaseStrikeCardsInDeck { get; set; }
 
+    // Oddly Smooth Stone tracking. Uses CardModel.GainsBlock, the game's own
+    // classification for cards that immediately gain Dexterity-scaled Block.
+    public int OddlySmoothStoneBlockCardsPlayed { get; set; }
+
     // Nutritious Soup tracking. Counts finished plays of basic Strike-tagged
     // cards carrying the Tezcataras Ember enchantment while the relic is held.
     public int NutritiousSoupEnchantedStrikesPlayed { get; set; }

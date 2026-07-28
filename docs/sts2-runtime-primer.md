@@ -764,6 +764,14 @@ to confirm the eligibility rule. Base Strikes are `IsBasicStrikeOrDefend` cards
 that also carry the Strike tag, while non-base Strike cards are every other
 permanent deck card with that tag.
 
+Oddly Smooth Stone's tracked input is a completed play of a card whose
+`CardModel.GainsBlock` property is true while the relic is owned. That is the
+game's explicit classification for cards that immediately gain Block through
+their Dexterity-sensitive block value; it intentionally excludes delayed block
+engines such as Shadowmeld. Count the finished play even if the resulting Block
+is later modified or prevented, because this stat measures qualifying cards
+played rather than Block actually gained.
+
 Kunai, Kusarigama, Ornamental Fan, and Shuriken share the same repeatable
 three-Attack counter shape: their owner-specific `AfterCardPlayed` callback
 increments a turn-local counter and activates at every threshold multiple.

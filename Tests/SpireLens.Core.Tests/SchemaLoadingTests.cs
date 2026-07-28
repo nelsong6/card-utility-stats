@@ -2468,6 +2468,33 @@ public class SchemaLoadingTests
             resumed!.RelicAggregates["RELIC.WHITE_STAR"]);
     }
 
+    [Fact]
+    public void HistoricalLoad_AcceptsOddlySmoothStoneRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("oddly-smooth-stone-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.Equal(
+            7,
+            loaded.Data.RelicAggregates["RELIC.ODDLY_SMOOTH_STONE"]
+                .OddlySmoothStoneBlockCardsPlayed);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsOddlySmoothStoneRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("oddly-smooth-stone-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        Assert.Equal(
+            7,
+            resumed!.RelicAggregates["RELIC.ODDLY_SMOOTH_STONE"]
+                .OddlySmoothStoneBlockCardsPlayed);
+    }
+
     private static void AssertCentennialPuzzleActivationContext(RelicAggregate relicAgg)
     {
         Assert.Equal(9, relicAgg.CentennialPuzzleActivationTurnTotal);

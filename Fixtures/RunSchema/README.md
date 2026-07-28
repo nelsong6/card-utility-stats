@@ -441,6 +441,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `white-star-relic-run.json`
   Adds White Star activations, generated Rare card offers split by
   Attack/Skill/Power, and terminally declined rare-card reward screens.
+- `oddly-smooth-stone-relic-run.json`
+  Adds Oddly Smooth Stone's completed plays of cards the game classifies as
+  immediately gaining Dexterity-scaled Block.
 
 Why these exist:
 

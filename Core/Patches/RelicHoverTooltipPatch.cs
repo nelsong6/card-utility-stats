@@ -514,6 +514,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is OddlySmoothStone)
+        {
+            title = "Oddly Smooth Stone";
+            body = BuildOddlySmoothStoneBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is EmberTea)
         {
             title = "Ember Tea";
@@ -3837,6 +3844,19 @@ public static class RelicHoverShowPatch
         var sb = new StringBuilder();
         Row3(sb, "Attacks played", agg.VajraAttacksPlayed.ToString(), "");
         Row3(sb, "Attack hits", agg.VajraAttackHits.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildOddlySmoothStoneBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        DescribedIconRow(
+            sb,
+            ["block"],
+            [],
+            "cards played",
+            agg.OddlySmoothStoneBlockCardsPlayed.ToString(),
+            "Block cards played — cards classified by the game as immediately gaining Dexterity-scaled Block.");
         return sb.ToString();
     }
 

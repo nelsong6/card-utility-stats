@@ -2004,6 +2004,7 @@ public static class RunTracker
         if (source.StrikeDummyNonBaseStrikeCardsInDeck != 0 || target.StrikeDummyNonBaseStrikeCardsInDeck == 0)
             target.StrikeDummyNonBaseStrikeCardsInDeck = source.StrikeDummyNonBaseStrikeCardsInDeck;
 
+        target.OddlySmoothStoneBlockCardsPlayed += source.OddlySmoothStoneBlockCardsPlayed;
         target.NutritiousSoupEnchantedStrikesPlayed += source.NutritiousSoupEnchantedStrikesPlayed;
 
         if (source.MiniatureCannonUpgradedAttacksInDeck != 0 || target.MiniatureCannonUpgradedAttacksInDeck == 0)
@@ -2288,6 +2289,7 @@ public static class RunTracker
             RecordWarHammerUpgradedCardPlayedLocked(cardPlay.Card);
             RecordTriBoomerangInstinctCardPlayedLocked(cardPlay.Card);
             RecordStrikeDummyStrikePlayedIfOwnedLocked(cardPlay.Card);
+            RecordOddlySmoothStoneBlockCardPlayedIfOwnedLocked(cardPlay.Card);
             RecordNutritiousSoupEnchantedStrikePlayedIfOwnedLocked(cardPlay.Card);
             RecordMiniatureCannonUpgradedAttackPlayedIfOwnedLocked(cardPlay.Card);
             RecordVajraAttackPlayedIfOwnedLocked(cardPlay.Card);
@@ -4427,6 +4429,7 @@ public static class RunTracker
     private const string PaelsClawRelicId = "RELIC.PAELS_CLAW";
     private const string PaelsEyeRelicId = "RELIC.PAELS_EYE";
     private const string StrikeDummyRelicId = "RELIC.STRIKE_DUMMY";
+    private const string OddlySmoothStoneRelicId = "RELIC.ODDLY_SMOOTH_STONE";
     private const string NutritiousSoupRelicId = "RELIC.NUTRITIOUS_SOUP";
     private const string MiniatureCannonRelicId = "RELIC.MINIATURE_CANNON";
     private const string VajraRelicId = "RELIC.VAJRA";
@@ -11333,6 +11336,14 @@ public static class RunTracker
         agg.StrikeDummyStrikesPlayed += 1;
     }
 
+    internal static void RecordOddlySmoothStoneBlockCardPlayedForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.OddlySmoothStoneBlockCardsPlayed += Math.Max(0, count);
+    }
+
     internal static void RecordNutritiousSoupEnchantedStrikePlayedForTest(RelicAggregate agg, int count = 1)
     {
         if (agg == null || count <= 0) return;
@@ -17259,6 +17270,24 @@ public static class RunTracker
         agg.StrikeDummyStrikesPlayed += 1;
     }
 
+    private static void RecordOddlySmoothStoneBlockCardPlayedIfOwnedLocked(
+        CardModel card)
+    {
+        if (!IsOddlySmoothStoneBlockCard(card)) return;
+
+        var owner = card.Owner;
+        if (owner == null
+            || !IsTrackedPlayer(owner)
+            || !PlayerHasOddlySmoothStone(owner))
+        {
+            return;
+        }
+
+        var agg = GetOrCreateRelicAggregateForCurrentContextLocked(
+            OddlySmoothStoneRelicId);
+        RecordOddlySmoothStoneBlockCardPlayedForTest(agg);
+    }
+
     private static void RecordNutritiousSoupEnchantedStrikePlayedIfOwnedLocked(CardModel card)
     {
         if (!IsNutritiousSoupEnchantedStrikeCard(card)) return;
@@ -17654,6 +17683,18 @@ public static class RunTracker
         try
         {
             return player.Relics.Any(IsStrikeDummyStatsRelic);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool PlayerHasOddlySmoothStone(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(relic => relic is OddlySmoothStone);
         }
         catch
         {
@@ -19945,6 +19986,18 @@ public static class RunTracker
         try
         {
             return card?.Tags?.Contains(CardTag.Strike) == true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    internal static bool IsOddlySmoothStoneBlockCard(CardModel? card)
+    {
+        try
+        {
+            return card?.GainsBlock == true;
         }
         catch
         {
