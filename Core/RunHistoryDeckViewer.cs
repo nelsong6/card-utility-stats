@@ -69,7 +69,11 @@ internal static class RunHistoryDeckViewer
             FocusMode = Control.FocusModeEnum.All,
             MouseDefaultCursorShape = Control.CursorShape.PointingHand,
             TooltipText = "View every card in this run's final deck",
-            ZIndex = 5,
+            // Stay at the run-history surface's normal canvas depth. The
+            // native deck viewer is attached later and must draw its cards
+            // above this launcher without raising the entire viewer above
+            // the game's global hover-tip layer.
+            ZIndex = 0,
             AnchorLeft = 1f,
             AnchorRight = 1f,
             OffsetLeft = -54f,
