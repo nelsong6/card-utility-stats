@@ -344,6 +344,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is PollinousCore)
+        {
+            title = "Pollinous Core";
+            body = BuildPollinousCoreBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is Orichalcum)
         {
             title = "Orichalcum";
@@ -1418,6 +1425,82 @@ public static class RelicHoverShowPatch
             FormatDecimal(averageActivationsPerCombat),
             "",
             "Average activations per combat — actual Pocketwatch activations divided by combats in which it was held.");
+        return sb.ToString();
+    }
+
+    private static string BuildPollinousCoreBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var averageActivationsPerCombat = agg.PollinousCoreCombats <= 0
+            ? 0m
+            : (decimal)agg.Activations / agg.PollinousCoreCombats;
+        var averageTurnsPerCombat = agg.PollinousCoreCombats <= 0
+            ? 0m
+            : (decimal)agg.PollinousCoreTurns / agg.PollinousCoreCombats;
+        var averageCardsDrawnPerCombat = agg.PollinousCoreCombats <= 0
+            ? 0m
+            : (decimal)agg.AdditionalCardsDrawn / agg.PollinousCoreCombats;
+
+        Row3(
+            sb,
+            "Activations",
+            agg.Activations.ToString(),
+            "",
+            "Times Pollinous Core reached four counters and added cards to the upcoming hand draw.");
+        Row3(
+            sb,
+            "Turns ended on 0 counters",
+            agg.PollinousCoreTurnsEndedOn0Counters.ToString(),
+            "",
+            "Player turns that ended after Pollinous Core activated and reset its counter to zero.");
+        Row3(
+            sb,
+            "Turns ended on 1 counter",
+            agg.PollinousCoreTurnsEndedOn1Counter.ToString(),
+            "",
+            "Player turns that ended with Pollinous Core showing one counter.");
+        Row3(
+            sb,
+            "Turns ended on 2 counters",
+            agg.PollinousCoreTurnsEndedOn2Counters.ToString(),
+            "",
+            "Player turns that ended with Pollinous Core showing two counters.");
+        Row3(
+            sb,
+            "Turns ended on 3 counters",
+            agg.PollinousCoreTurnsEndedOn3Counters.ToString(),
+            "",
+            "Player turns that ended with Pollinous Core showing three counters.");
+        Row3(
+            sb,
+            "Avg activations/combat",
+            FormatDecimal(averageActivationsPerCombat),
+            "",
+            "Average activations per combat — activations divided by combats where Pollinous Core was held.");
+        Row3(
+            sb,
+            "Avg turns/combat",
+            FormatDecimal(averageTurnsPerCombat),
+            "",
+            "Average turns per combat — completed player turns divided by combats where Pollinous Core was held.");
+        Row3(
+            sb,
+            "Cards drawn",
+            agg.AdditionalCardsDrawn.ToString(),
+            "",
+            "Cards drawn — Pollinous Core cards that actually reached the hand.");
+        Row3(
+            sb,
+            "Card draws blocked",
+            agg.AdditionalCardDrawsBlocked.ToString(),
+            "",
+            "Card draws blocked — Pollinous Core cards requested but prevented by draw limits or draw-prevention effects.");
+        Row3(
+            sb,
+            "Avg cards drawn/combat",
+            FormatDecimal(averageCardsDrawnPerCombat),
+            "",
+            "Average cards drawn per combat — observed Pollinous Core cards drawn divided by combats where it was held.");
         return sb.ToString();
     }
 

@@ -560,6 +560,18 @@ public class RelicAggregate
     public int PocketwatchActivationValueSamples { get; set; }
     public int PocketwatchMissedTurnEndCountTotal { get; set; }
 
+    // Pollinous Core held-period observations. The relic increments its saved
+    // counter before each hand draw, adds two cards on the fourth turn, then
+    // resets to zero before that turn ends. AdditionalCardsDrawn stores the
+    // observed marginal cards that actually reached the hand.
+    public int AdditionalCardDrawsBlocked { get; set; }
+    public int PollinousCoreTurns { get; set; }
+    public int PollinousCoreCombats { get; set; }
+    public int PollinousCoreTurnsEndedOn0Counters { get; set; }
+    public int PollinousCoreTurnsEndedOn1Counter { get; set; }
+    public int PollinousCoreTurnsEndedOn2Counters { get; set; }
+    public int PollinousCoreTurnsEndedOn3Counters { get; set; }
+
     // Combats where Pendulum was held, including combats too short for it to
     // activate. Used as the denominator for cards drawn per combat.
     public int PendulumCombats { get; set; }

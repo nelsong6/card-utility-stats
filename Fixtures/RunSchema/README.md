@@ -435,6 +435,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `pocketwatch-turn-stats-run.json`
   Adds Pocketwatch's held turn/combat denominators, turn-end card-count totals,
   missed-threshold turns, and actual-activation card-count samples.
+- `pollinous-core-relic-run.json`
+  Adds Pollinous Core activations, observed and blocked bonus card draws,
+  held turn/combat denominators, and turn-end 0/1/2/3 counter buckets.
 
 Why these exist:
 

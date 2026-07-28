@@ -1693,6 +1693,7 @@ public static class RunTracker
         if (_pendingCombat == null || _currentRun == null) return;
         RecordHeldCombatRelicBaselinesForTrackedPlayerLocked(requireActiveCombat: false, createPendingIfNeeded: false);
         RecordPocketwatchTurnForTrackedPlayerLocked();
+        RecordPollinousCoreTurnForTrackedPlayerLocked();
         RecordLetterOpenerTurnForTrackedPlayerLocked();
         RecordTuningForkTurnForTrackedPlayerLocked();
         RecordCloakClaspTurnForTrackedPlayerLocked();
@@ -1803,6 +1804,13 @@ public static class RunTracker
         target.PocketwatchActivatedTurnEndCountTotal += source.PocketwatchActivatedTurnEndCountTotal;
         target.PocketwatchActivationValueSamples += source.PocketwatchActivationValueSamples;
         target.PocketwatchMissedTurnEndCountTotal += source.PocketwatchMissedTurnEndCountTotal;
+        target.AdditionalCardDrawsBlocked += source.AdditionalCardDrawsBlocked;
+        target.PollinousCoreTurns += source.PollinousCoreTurns;
+        target.PollinousCoreCombats += source.PollinousCoreCombats;
+        target.PollinousCoreTurnsEndedOn0Counters += source.PollinousCoreTurnsEndedOn0Counters;
+        target.PollinousCoreTurnsEndedOn1Counter += source.PollinousCoreTurnsEndedOn1Counter;
+        target.PollinousCoreTurnsEndedOn2Counters += source.PollinousCoreTurnsEndedOn2Counters;
+        target.PollinousCoreTurnsEndedOn3Counters += source.PollinousCoreTurnsEndedOn3Counters;
         target.PendulumCombats += source.PendulumCombats;
         target.PendulumCombatsEndedOn0Charges += source.PendulumCombatsEndedOn0Charges;
         target.PendulumCombatsEndedOn1Charge += source.PendulumCombatsEndedOn1Charge;
@@ -4299,6 +4307,7 @@ public static class RunTracker
     private const string RedMaskRelicId = "RELIC.RED_MASK";
     private const string UnsettlingLampRelicId = "RELIC.UNSETTLING_LAMP";
     private const string PocketwatchRelicId = "RELIC.POCKETWATCH";
+    private const string PollinousCoreRelicId = "RELIC.POLLINOUS_CORE";
     private const string OrichalcumRelicId = "RELIC.ORICHALCUM";
     private const string PermafrostRelicId = "RELIC.PERMAFROST";
     private const string TuningForkRelicId = "RELIC.TUNING_FORK";
@@ -4690,6 +4699,195 @@ public static class RunTracker
         if (agg == null) return;
         agg.Activations += Math.Max(0, activations);
         agg.AdditionalCardsDrawn += Math.Max(0, cardsDrawn);
+    }
+
+    /// <summary>
+    /// Records Pollinous Core's confirmed fourth-turn hand-draw modifier and
+    /// arms attribution for the completed hand draw.
+    /// </summary>
+    public static void RecordPollinousCoreActivation(
+        PollinousCore? relic,
+        Player? player,
+        int cardsRequested)
+    {
+        if (relic?.Owner == null || player == null || cardsRequested <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(player)) return;
+                if (!ReferenceEquals(relic.Owner, player)) return;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordPollinousCoreCombatForPlayerLocked(player);
+
+                var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+                if (turnNumber > 0
+                    && _pendingCombat.PollinousCoreActivationCountedTurns.TryGetValue(
+                        player,
+                        out var recordedTurn)
+                    && recordedTurn == turnNumber)
+                {
+                    return;
+                }
+
+                if (turnNumber > 0)
+                    _pendingCombat.PollinousCoreActivationCountedTurns[player] = turnNumber;
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(PollinousCoreRelicId);
+                RecordPollinousCoreActivationForTest(agg);
+                _pendingCombat.PendingPollinousCoreDraws[player] =
+                    new PendingPollinousCoreDraw(cardsRequested);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPollinousCoreActivation failed: {e.Message}");
+            }
+        }
+    }
+
+    public static bool TryConsumePollinousCoreDrawAttribution(
+        Player? player,
+        bool fromHandDraw,
+        decimal finalHandDraw,
+        out decimal handDrawWithoutPollinousCore,
+        out int maximumContribution)
+    {
+        handDrawWithoutPollinousCore = 0m;
+        maximumContribution = 0;
+        if (player == null || !fromHandDraw) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null) return false;
+                if (!_pendingCombat.PendingPollinousCoreDraws.Remove(player, out var pending))
+                    return false;
+
+                maximumContribution = pending.CardsRequested;
+                handDrawWithoutPollinousCore =
+                    Math.Max(0m, finalHandDraw - pending.CardsRequested);
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"TryConsumePollinousCoreDrawAttribution failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    public static void RecordPollinousCoreDrawResult(
+        int cardsRequested,
+        int cardsDrawn)
+    {
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreatePendingRelicAggregateLocked(PollinousCoreRelicId);
+                RecordPollinousCoreDrawResultForTest(agg, cardsRequested, cardsDrawn);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPollinousCoreDrawResult failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Snapshots Pollinous Core's post-reset counter at player-turn end.
+    /// </summary>
+    public static void RecordPollinousCoreTurnEnded(
+        IEnumerable<Creature>? participants)
+    {
+        lock (_lock)
+        {
+            try
+            {
+                _pendingCombat ??= new PendingCombat();
+                var recordedParticipant = false;
+
+                if (participants != null)
+                {
+                    foreach (var creature in participants)
+                    {
+                        var player = creature?.Player;
+                        if (player == null || !IsTrackedPlayer(player)) continue;
+
+                        recordedParticipant |= RecordPollinousCoreTurnForPlayerLocked(
+                            player,
+                            player.PlayerCombatState?.TurnNumber ?? 0);
+                    }
+                }
+
+                if (recordedParticipant) return;
+
+                var trackedPlayer = GetTrackedRunPlayerLocked();
+                if (trackedPlayer == null) return;
+                RecordPollinousCoreTurnForPlayerLocked(
+                    trackedPlayer,
+                    trackedPlayer.PlayerCombatState?.TurnNumber ?? 0);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPollinousCoreTurnEnded failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordPollinousCoreCombatForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.PollinousCoreCombats += Math.Max(0, count);
+    }
+
+    internal static void RecordPollinousCoreTurnEndForTest(
+        RelicAggregate agg,
+        int counter)
+    {
+        if (agg == null || counter is < 0 or > 3) return;
+
+        agg.PollinousCoreTurns += 1;
+        switch (counter)
+        {
+            case 0:
+                agg.PollinousCoreTurnsEndedOn0Counters += 1;
+                break;
+            case 1:
+                agg.PollinousCoreTurnsEndedOn1Counter += 1;
+                break;
+            case 2:
+                agg.PollinousCoreTurnsEndedOn2Counters += 1;
+                break;
+            case 3:
+                agg.PollinousCoreTurnsEndedOn3Counters += 1;
+                break;
+        }
+    }
+
+    internal static void RecordPollinousCoreActivationForTest(RelicAggregate agg)
+    {
+        if (agg == null) return;
+        agg.Activations += 1;
+    }
+
+    internal static void RecordPollinousCoreDrawResultForTest(
+        RelicAggregate agg,
+        int cardsRequested,
+        int cardsDrawn)
+    {
+        if (agg == null) return;
+
+        var attempted = Math.Max(0, cardsRequested);
+        var observed = Math.Min(attempted, Math.Max(0, cardsDrawn));
+        agg.AdditionalCardsDrawn += observed;
+        agg.AdditionalCardDrawsBlocked += attempted - observed;
     }
 
     /// <summary>
@@ -17554,6 +17752,7 @@ public static class RunTracker
 
             RecordPermafrostCombatForPlayerLocked(player);
             RecordPocketwatchCombatForPlayerLocked(player);
+            RecordPollinousCoreCombatForPlayerLocked(player);
             RecordLetterOpenerCombatForPlayerLocked(player);
             RecordTuningForkCombatForPlayerLocked(player);
             RecordCloakClaspCombatForPlayerLocked(player);
@@ -17636,6 +17835,16 @@ public static class RunTracker
         RecordPocketwatchCombatForTest(agg);
     }
 
+    private static void RecordPollinousCoreCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!TryGetPollinousCore(player, out _)) return;
+        if (!_pendingCombat.PollinousCoreCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(PollinousCoreRelicId);
+        RecordPollinousCoreCombatForTest(agg);
+    }
+
     private static void RecordPocketwatchCardPlayedLocked(CardModel card)
     {
         if (_pendingCombat == null) return;
@@ -17702,6 +17911,53 @@ public static class RunTracker
             agg,
             Math.Max(0, cardCount),
             PocketwatchActivationThreshold(pocketwatch));
+        return true;
+    }
+
+    private static void RecordPollinousCoreTurnForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordPollinousCoreTurnForPlayerLocked(
+                player,
+                player.PlayerCombatState?.TurnNumber ?? 0);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug(
+                $"RecordPollinousCoreTurnForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static bool RecordPollinousCoreTurnForPlayerLocked(
+        Player player,
+        int turnNumber)
+    {
+        if (_pendingCombat == null) return false;
+        if (!TryGetPollinousCore(player, out var pollinousCore)
+            || pollinousCore == null)
+        {
+            return false;
+        }
+        if (turnNumber <= 0) return false;
+
+        if (_pendingCombat.PollinousCoreTurnCountedTurns.TryGetValue(
+                player,
+                out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return true;
+        }
+
+        _pendingCombat.PollinousCoreTurnCountedTurns[player] = turnNumber;
+        RecordPollinousCoreCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(PollinousCoreRelicId);
+        RecordPollinousCoreTurnEndForTest(
+            agg,
+            Math.Clamp(pollinousCore.TurnsSeen, 0, 3));
         return true;
     }
 
@@ -19310,6 +19566,22 @@ public static class RunTracker
         catch
         {
             pocketwatch = null;
+            return false;
+        }
+    }
+
+    private static bool TryGetPollinousCore(
+        Player player,
+        out PollinousCore? pollinousCore)
+    {
+        pollinousCore = null;
+        try
+        {
+            pollinousCore = player?.Relics?.OfType<PollinousCore>().FirstOrDefault();
+            return pollinousCore != null;
+        }
+        catch
+        {
             return false;
         }
     }
@@ -23707,6 +23979,14 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> PocketwatchActivationCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> PollinousCoreCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> PollinousCoreTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> PollinousCoreActivationCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, PendingPollinousCoreDraw> PendingPollinousCoreDraws { get; }
+        = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> PocketwatchCardCountTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> PocketwatchCardsPlayedThisTurn { get; }
@@ -23929,6 +24209,16 @@ internal sealed class PendingBagOfPreparationDraw
     public int CardsRequested { get; }
     public decimal RawHandDrawWithoutBag { get; set; }
     public bool ModifierChainCompleted { get; set; }
+}
+
+internal sealed class PendingPollinousCoreDraw
+{
+    public PendingPollinousCoreDraw(int cardsRequested)
+    {
+        CardsRequested = Math.Max(0, cardsRequested);
+    }
+
+    public int CardsRequested { get; }
 }
 
 internal sealed class PendingBrilliantScarfDiscount

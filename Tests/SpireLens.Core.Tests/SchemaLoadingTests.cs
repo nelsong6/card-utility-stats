@@ -2422,6 +2422,29 @@ public class SchemaLoadingTests
         AssertCentennialPuzzleActivationContext(relicAgg);
     }
 
+    [Fact]
+    public void HistoricalLoad_AcceptsPollinousCoreRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("pollinous-core-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertPollinousCoreFixture(
+            loaded.Data.RelicAggregates["RELIC.POLLINOUS_CORE"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsPollinousCoreRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("pollinous-core-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertPollinousCoreFixture(
+            resumed!.RelicAggregates["RELIC.POLLINOUS_CORE"]);
+    }
+
     private static void AssertCentennialPuzzleActivationContext(RelicAggregate relicAgg)
     {
         Assert.Equal(9, relicAgg.CentennialPuzzleActivationTurnTotal);
@@ -2431,6 +2454,19 @@ public class SchemaLoadingTests
         Assert.Equal(1, relicAgg.CentennialPuzzleStatusActivations);
         Assert.Equal(1, relicAgg.CentennialPuzzleCurseActivations);
         Assert.Equal(2, relicAgg.CentennialPuzzleEnemySourceActivations);
+    }
+
+    private static void AssertPollinousCoreFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(5, relicAgg.AdditionalCardsDrawn);
+        Assert.Equal(1, relicAgg.AdditionalCardDrawsBlocked);
+        Assert.Equal(10, relicAgg.PollinousCoreTurns);
+        Assert.Equal(2, relicAgg.PollinousCoreCombats);
+        Assert.Equal(2, relicAgg.PollinousCoreTurnsEndedOn0Counters);
+        Assert.Equal(3, relicAgg.PollinousCoreTurnsEndedOn1Counter);
+        Assert.Equal(3, relicAgg.PollinousCoreTurnsEndedOn2Counters);
+        Assert.Equal(2, relicAgg.PollinousCoreTurnsEndedOn3Counters);
     }
 
     [Fact]
