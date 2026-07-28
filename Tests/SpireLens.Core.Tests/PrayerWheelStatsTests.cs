@@ -37,12 +37,25 @@ public class PrayerWheelStatsTests
                 CardRarity.Basic,
             ]);
         RunTracker.RecordPrayerWheelRewardRejectedForTest(agg);
+        RunTracker.RecordPrayerWheelTakenForTest(
+            agg,
+            CardRarity.Common,
+            2);
+        RunTracker.RecordPrayerWheelTakenForTest(
+            agg,
+            CardRarity.Uncommon);
+        RunTracker.RecordPrayerWheelTakenForTest(
+            agg,
+            CardRarity.Rare);
 
         Assert.Equal(1, agg.PrayerWheelExtraRewardScreens);
         Assert.Equal(1, agg.PrayerWheelExtraRewardScreensRejected);
         Assert.Equal(2, agg.CommonCardsOffered);
         Assert.Equal(1, agg.UncommonCardsOffered);
         Assert.Equal(1, agg.RareCardsOffered);
+        Assert.Equal(2, agg.CommonCardsTaken);
+        Assert.Equal(1, agg.UncommonCardsTaken);
+        Assert.Equal(1, agg.RareCardsTaken);
     }
 
     [Fact]
@@ -61,6 +74,7 @@ public class PrayerWheelStatsTests
             "\"prayer_wheel_extra_reward_screens_rejected\":1",
             json);
         Assert.Contains("\"common_cards_offered\":7", json);
+        Assert.Contains("\"common_cards_taken\":3", json);
         Assert.NotNull(restored);
         AssertPopulated(restored!.RelicAggregates[RelicId]);
     }
@@ -77,6 +91,9 @@ public class PrayerWheelStatsTests
         Assert.Equal(14, target.CommonCardsOffered);
         Assert.Equal(8, target.UncommonCardsOffered);
         Assert.Equal(2, target.RareCardsOffered);
+        Assert.Equal(6, target.CommonCardsTaken);
+        Assert.Equal(2, target.UncommonCardsTaken);
+        Assert.Equal(2, target.RareCardsTaken);
     }
 
     [Fact]
@@ -89,6 +106,9 @@ public class PrayerWheelStatsTests
         Assert.Contains("Commons offered", body);
         Assert.Contains("Uncommons offered", body);
         Assert.Contains("Rares offered", body);
+        Assert.Contains("Commons taken", body);
+        Assert.Contains("Uncommons taken", body);
+        Assert.Contains("Rares taken", body);
         Assert.Contains("color=#87CEEB", body);
         Assert.Contains("color=#EFC850", body);
     }
@@ -123,6 +143,7 @@ public class PrayerWheelStatsTests
         Assert.Equal(0, agg!.PrayerWheelExtraRewardScreens);
         Assert.Equal(0, agg.PrayerWheelExtraRewardScreensRejected);
         Assert.Equal(0, agg.CommonCardsOffered);
+        Assert.Equal(0, agg.CommonCardsTaken);
     }
 
     private static RelicAggregate PopulatedAggregate()
@@ -133,6 +154,9 @@ public class PrayerWheelStatsTests
             CommonCardsOffered = 7,
             UncommonCardsOffered = 4,
             RareCardsOffered = 1,
+            CommonCardsTaken = 3,
+            UncommonCardsTaken = 1,
+            RareCardsTaken = 1,
         };
 
     private static void AssertPopulated(RelicAggregate agg)
@@ -142,6 +166,9 @@ public class PrayerWheelStatsTests
         Assert.Equal(7, agg.CommonCardsOffered);
         Assert.Equal(4, agg.UncommonCardsOffered);
         Assert.Equal(1, agg.RareCardsOffered);
+        Assert.Equal(3, agg.CommonCardsTaken);
+        Assert.Equal(1, agg.UncommonCardsTaken);
+        Assert.Equal(1, agg.RareCardsTaken);
     }
 
     private static string BuildBody(RelicAggregate agg)

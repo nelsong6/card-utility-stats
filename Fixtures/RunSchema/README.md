@@ -446,7 +446,7 @@ New fixtures added going forward do not need a `v*-` prefix.
   immediately gaining Dexterity-scaled Block.
 - `prayer-wheel-relic-run.json`
   Adds Prayer Wheel's extra reward-screen count, terminal rejections, and
-  generated Common/Uncommon/Rare card offers.
+  generated and taken Common/Uncommon/Rare cards.
 
 Why these exist:
 

@@ -11,7 +11,10 @@
       "prayer_wheel_extra_reward_screens_rejected": 1,
       "common_cards_offered": 7,
       "uncommon_cards_offered": 4,
-      "rare_cards_offered": 1
+      "rare_cards_offered": 1,
+      "common_cards_taken": 3,
+      "uncommon_cards_taken": 1,
+      "rare_cards_taken": 1
     }
   },
   "enemy_aggregates": {},

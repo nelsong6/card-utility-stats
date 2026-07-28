@@ -2559,6 +2559,9 @@ public class SchemaLoadingTests
         Assert.Equal(7, relicAgg.CommonCardsOffered);
         Assert.Equal(4, relicAgg.UncommonCardsOffered);
         Assert.Equal(1, relicAgg.RareCardsOffered);
+        Assert.Equal(3, relicAgg.CommonCardsTaken);
+        Assert.Equal(1, relicAgg.UncommonCardsTaken);
+        Assert.Equal(1, relicAgg.RareCardsTaken);
     }
 
     [Fact]

@@ -145,7 +145,7 @@ public static class RunTracker
     private static readonly Dictionary<CardReward, PendingOrreryReward> _orreryRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, int> _whiteStarRewardRareCardsBeforeSelection =
         new(ReferenceEqualityComparer.Instance);
-    private static readonly Dictionary<CardReward, int> _prayerWheelRewardCardsBeforeSelection =
+    private static readonly Dictionary<CardReward, PendingPrayerWheelReward> _prayerWheelRewardCardsBeforeSelection =
         new(ReferenceEqualityComparer.Instance);
     private static Orrery? _orreryRewardRegistrationRelic;
     private static readonly List<int> _silverCrucibleRestoreBatchScreenNumbers = new();
@@ -1979,6 +1979,7 @@ public static class RunTracker
         target.CommonCardsOffered += source.CommonCardsOffered;
         target.UncommonCardsOffered += source.UncommonCardsOffered;
         target.RareCardsOffered += source.RareCardsOffered;
+        target.CommonCardsTaken += source.CommonCardsTaken;
         target.UncommonCardsTaken += source.UncommonCardsTaken;
         target.RareCardsTaken += source.RareCardsTaken;
         target.RareAttackCardsOffered += source.RareAttackCardsOffered;
@@ -7530,7 +7531,7 @@ public static class RunTracker
                 }
 
                 _prayerWheelRewardCardsBeforeSelection[reward] =
-                    CountRewardCards(reward);
+                    PendingPrayerWheelReward.FromReward(reward);
             }
             catch (Exception e)
             {
@@ -7549,7 +7550,7 @@ public static class RunTracker
             if (!_prayerWheelRewardCardsBeforeSelection.ContainsKey(reward))
                 return;
             _prayerWheelRewardCardsBeforeSelection[reward] =
-                CountRewardCards(reward);
+                PendingPrayerWheelReward.FromReward(reward);
         }
     }
 
@@ -7565,7 +7566,7 @@ public static class RunTracker
             {
                 if (!_prayerWheelRewardCardsBeforeSelection.Remove(
                         reward,
-                        out var cardsBeforeSelection))
+                        out var beforeSelection))
                 {
                     return;
                 }
@@ -7573,11 +7574,29 @@ public static class RunTracker
                 if (!_prayerWheelRewardAttributions.Remove(reward)) return;
                 if (!IsTrackedPlayer(reward.Player)) return;
 
-                if (CountRewardCards(reward) < cardsBeforeSelection) return;
-
+                var afterSelection =
+                    PendingPrayerWheelReward.FromReward(reward);
                 var agg = GetOrCreateCurrentRunRelicAggregateLocked(
                     PrayerWheelRelicId);
-                RecordPrayerWheelRewardRejectedForTest(agg);
+                if (afterSelection.TotalCards >= beforeSelection.TotalCards)
+                {
+                    RecordPrayerWheelRewardRejectedForTest(agg);
+                }
+                else
+                {
+                    RecordPrayerWheelTakenForTest(
+                        agg,
+                        CardRarity.Common,
+                        beforeSelection.CommonCards - afterSelection.CommonCards);
+                    RecordPrayerWheelTakenForTest(
+                        agg,
+                        CardRarity.Uncommon,
+                        beforeSelection.UncommonCards - afterSelection.UncommonCards);
+                    RecordPrayerWheelTakenForTest(
+                        agg,
+                        CardRarity.Rare,
+                        beforeSelection.RareCards - afterSelection.RareCards);
+                }
                 RefreshCurrentRunMetadataLocked();
                 SaveCurrentRun();
             }
@@ -7652,8 +7671,26 @@ public static class RunTracker
         agg.PrayerWheelExtraRewardScreensRejected += 1;
     }
 
-    private static int CountRewardCards(CardReward reward)
-        => reward.Cards.Count(card => card != null);
+    internal static void RecordPrayerWheelTakenForTest(
+        RelicAggregate agg,
+        CardRarity rarity,
+        int count = 1)
+    {
+        if (agg == null || count <= 0) return;
+
+        switch (rarity)
+        {
+            case CardRarity.Common:
+                agg.CommonCardsTaken += count;
+                break;
+            case CardRarity.Uncommon:
+                agg.UncommonCardsTaken += count;
+                break;
+            case CardRarity.Rare:
+                agg.RareCardsTaken += count;
+                break;
+        }
+    }
 
     /// <summary>
     /// Record that Brilliant Scarf has reached its "next card discounted"
@@ -24353,6 +24390,40 @@ internal sealed class PendingPaelSacrificeReward
         foreach (var card in cards)
         {
             if (card == null) continue;
+            switch (card.Rarity)
+            {
+                case CardRarity.Common:
+                    result.CommonCards += 1;
+                    break;
+                case CardRarity.Uncommon:
+                    result.UncommonCards += 1;
+                    break;
+                case CardRarity.Rare:
+                    result.RareCards += 1;
+                    break;
+            }
+        }
+
+        return result;
+    }
+}
+
+internal sealed class PendingPrayerWheelReward
+{
+    public int CommonCards { get; private set; }
+    public int UncommonCards { get; private set; }
+    public int RareCards { get; private set; }
+    public int TotalCards { get; private set; }
+
+    public static PendingPrayerWheelReward FromReward(CardReward? reward)
+    {
+        var result = new PendingPrayerWheelReward();
+        if (reward == null) return result;
+
+        foreach (var card in reward.Cards)
+        {
+            if (card == null) continue;
+            result.TotalCards += 1;
             switch (card.Rarity)
             {
                 case CardRarity.Common:

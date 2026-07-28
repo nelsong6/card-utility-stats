@@ -925,6 +925,7 @@ public class RelicAggregate
     public int CommonCardsOffered { get; set; }
     public int UncommonCardsOffered { get; set; }
     public int RareCardsOffered { get; set; }
+    public int CommonCardsTaken { get; set; }
     public int UncommonCardsTaken { get; set; }
     public int RareCardsTaken { get; set; }
     public int RareAttackCardsOffered { get; set; }

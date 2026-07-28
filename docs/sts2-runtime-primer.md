@@ -1110,7 +1110,9 @@ Prayer Wheel appends one dedicated `CardReward` from its owner-specific
 appended reward reference so the ordinary card reward on the same page never
 enters Prayer Wheel's totals. Count every populated option set, including
 Driftwood rerolls, by the final cards' observed rarities. A completed selection
-that removes no card and an outer `CardReward.OnSkipped` are terminal
+removes its obtained card from the reward, so compare before/after rarity
+counts to classify the actual Common, Uncommon, or Rare card taken. A completed
+selection that removes no card and an outer `CardReward.OnSkipped` are terminal
 rejections; the inner card-screen Skip is not terminal and must preserve the
 same pending reward.
 
