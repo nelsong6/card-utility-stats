@@ -39,6 +39,12 @@ public static class RelicHoverShowPatch
     private const string GenericRelicIconPath = "res://images/ui/reward_screen/reward_icon_shared_relic.png";
     private const string StarIconPath = "res://images/packed/sprite_fonts/star_icon.png";
     private const string VigorIconPath = "res://images/atlases/power_atlas.sprites/vigor_power.tres";
+    private const string MapCombatIconPath = "res://images/atlases/ui_atlas.sprites/map/icons/map_monster.tres";
+    private const string MapShopIconPath = "res://images/atlases/ui_atlas.sprites/map/icons/map_shop.tres";
+    private const string MapUnknownIconPath = "res://images/atlases/ui_atlas.sprites/map/icons/map_unknown.tres";
+    private const string MapEliteIconPath = "res://images/atlases/ui_atlas.sprites/map/icons/map_elite.tres";
+    private const string MapTreasureIconPath = "res://images/atlases/ui_atlas.sprites/map/icons/map_chest.tres";
+    private const string MapRestSiteIconPath = "res://images/atlases/ui_atlas.sprites/map/icons/map_rest.tres";
     private const int SealOfGoldLossPerTrigger = 5;
     private const float SturdyClampTooltipWidth = 420f;
     private const float EmberTeaTooltipWidth = 500f;
@@ -3476,7 +3482,7 @@ public static class RelicHoverShowPatch
             var destination = destinations.FirstOrDefault(
                 entry => entry != null && entry.UseNumber == useNumber);
             var value = destination != null
-                ? RunTracker.FormatWingedBootsDestination(destination.Destination)
+                ? FormatWingedBootsDestinationIcon(destination.Destination)
                 : useNumber <= liveTimesUsed
                     ? "not tracked"
                     : "not used yet";
@@ -3485,6 +3491,27 @@ public static class RelicHoverShowPatch
         }
 
         return sb.ToString();
+    }
+
+    private static string FormatWingedBootsDestinationIcon(string? destination)
+    {
+        var iconPath = destination switch
+        {
+            "combat" => MapCombatIconPath,
+            "shop" => MapShopIconPath,
+            "question_mark" => MapUnknownIconPath,
+            "elite" => MapEliteIconPath,
+            "treasure" => MapTreasureIconPath,
+            "rest_site" => MapRestSiteIconPath,
+            _ => null,
+        };
+
+        var displayName = RunTracker.FormatWingedBootsDestination(destination);
+        return iconPath == null
+            ? StatsTooltip.EscapeBbcode(displayName)
+            : StatConceptGlossary.RenderHintedInlineImage(
+                iconPath,
+                $"{displayName} destination");
     }
 
     private static string Ordinal(int value)

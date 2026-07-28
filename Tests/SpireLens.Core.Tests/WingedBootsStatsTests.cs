@@ -91,7 +91,10 @@ public class WingedBootsStatsTests
         Assert.Contains("1st floor destination", body);
         Assert.Contains("[b]not tracked[/b]", body);
         Assert.Contains("2nd floor destination", body);
-        Assert.Contains("[b]shop[/b]", body);
+        Assert.Contains(
+            "res://images/atlases/ui_atlas.sprites/map/icons/map_shop.tres",
+            body);
+        Assert.DoesNotContain("[b]shop[/b]", body);
         Assert.Contains("3rd floor destination", body);
         Assert.Contains("[b]not used yet[/b]", body);
     }
