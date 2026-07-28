@@ -125,6 +125,43 @@ internal static class RunHistoryDeckViewer
         }
     }
 
+    public static void RefreshAllArrowHotkeys()
+    {
+        try
+        {
+            var tree = Engine.GetMainLoop() as SceneTree;
+            if (tree != null)
+                RefreshArrowHotkeysRecursive(tree.Root);
+        }
+        catch (Exception e)
+        {
+            CoreMain.Logger.Error(
+                $"RunHistoryDeckViewer arrow-hotkey refresh failed: {e}");
+        }
+    }
+
+    public static void DisableArrowHotkeys(NRunHistory? runHistory)
+    {
+        if (!IsLive(runHistory)) return;
+
+        foreach (var arrow in FindArrowButtons(runHistory!))
+            arrow.Disable();
+    }
+
+    public static void RestoreVisibleArrowHotkeys(NRunHistory? runHistory)
+    {
+        if (!IsLive(runHistory)) return;
+
+        var shouldEnable = runHistory!.IsVisibleInTree() && !IsOpen;
+        foreach (var arrow in FindArrowButtons(runHistory))
+        {
+            if (shouldEnable && arrow.Visible)
+                arrow.Enable();
+            else
+                arrow.Disable();
+        }
+    }
+
     public static bool HandleInput(InputEvent inputEvent)
     {
         if (!IsOpen) return false;
@@ -153,6 +190,7 @@ internal static class RunHistoryDeckViewer
             return;
         }
 
+        var sourceToRestore = _source;
         try
         {
             StatsTooltipPinManager.ClearPin();
@@ -197,6 +235,7 @@ internal static class RunHistoryDeckViewer
         {
             RestoreSourceButton();
             ClearViewerReferences();
+            RestoreVisibleArrowHotkeys(sourceToRestore);
         }
     }
 
@@ -272,6 +311,7 @@ internal static class RunHistoryDeckViewer
                 individualCards);
 
             runHistory.SetProcessInput(false);
+            DisableArrowHotkeys(runHistory);
             runHistory.AddChild(host);
             host.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
             host.AddChild(viewer);
@@ -364,6 +404,27 @@ internal static class RunHistoryDeckViewer
         }
 
         return null;
+    }
+
+    private static void RefreshArrowHotkeysRecursive(Node node)
+    {
+        if (node is NRunHistory runHistory)
+            RestoreVisibleArrowHotkeys(runHistory);
+
+        for (var i = 0; i < node.GetChildCount(); i++)
+            RefreshArrowHotkeysRecursive(node.GetChild(i));
+    }
+
+    private static IEnumerable<NRunHistoryArrowButton> FindArrowButtons(
+        NRunHistory runHistory)
+    {
+        var left = runHistory.GetNodeOrNull<NRunHistoryArrowButton>("LeftArrow");
+        if (left != null)
+            yield return left;
+
+        var right = runHistory.GetNodeOrNull<NRunHistoryArrowButton>("RightArrow");
+        if (right != null)
+            yield return right;
     }
 
     private static bool IsLive(GodotObject? value)

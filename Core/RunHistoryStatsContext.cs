@@ -520,6 +520,7 @@ public static class RunHistoryDisplayRunStatsContextPatch
             RunHistoryStatsContext.SetRun(history);
             StatsTooltipPinManager.AttachRunHistoryTargets(__instance);
             RunHistoryDeckViewer.InjectButton(__instance);
+            RunHistoryDeckViewer.RestoreVisibleArrowHotkeys(__instance);
         });
     }
 }
@@ -528,11 +529,12 @@ public static class RunHistoryDisplayRunStatsContextPatch
 public static class RunHistoryHiddenStatsContextPatch
 {
     [HarmonyPostfix]
-    public static void Postfix()
+    public static void Postfix(NRunHistory __instance)
     {
         PatchGuard.Run(nameof(RunHistoryHiddenStatsContextPatch), () =>
         {
             RunHistoryDeckViewer.Close();
+            RunHistoryDeckViewer.DisableArrowHotkeys(__instance);
             StatsTooltipPinManager.ClearPin();
             RunHistoryStatsContext.Clear();
         });
