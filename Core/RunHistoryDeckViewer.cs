@@ -34,6 +34,7 @@ internal static class RunHistoryDeckViewer
     private static readonly List<Button> InjectedButtons = new();
 
     private static NRunHistory? _source;
+    private static Button? _sourceButton;
     private static Control? _host;
     private static NDeckViewScreen? _viewer;
     private static Control? _previousFocus;
@@ -94,7 +95,7 @@ internal static class RunHistoryDeckViewer
         };
         icon.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         button.AddChild(icon);
-        button.Pressed += () => Open(runHistory);
+        button.Pressed += () => Open(runHistory, button);
         header.AddChild(button);
         PositionButtonAfterHeaderText(header, button);
         Callable.From(() => PositionButtonAfterHeaderText(header, button))
@@ -147,6 +148,7 @@ internal static class RunHistoryDeckViewer
     {
         if (!IsLive(_host) && !IsLive(_viewer))
         {
+            RestoreSourceButton();
             ClearViewerReferences();
             return;
         }
@@ -193,6 +195,7 @@ internal static class RunHistoryDeckViewer
         }
         finally
         {
+            RestoreSourceButton();
             ClearViewerReferences();
         }
     }
@@ -209,7 +212,7 @@ internal static class RunHistoryDeckViewer
         InjectedButtons.Clear();
     }
 
-    private static void Open(NRunHistory runHistory)
+    private static void Open(NRunHistory runHistory, Button sourceButton)
     {
         try
         {
@@ -265,6 +268,8 @@ internal static class RunHistoryDeckViewer
             host.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
 
             _source = runHistory;
+            _sourceButton = sourceButton;
+            _sourceButton.Visible = false;
             _sourceWasProcessingInput = runHistory.IsProcessingInput();
             _previousFocus = runHistory.GetViewport()?.GuiGetFocusOwner();
             _host = host;
@@ -359,9 +364,16 @@ internal static class RunHistoryDeckViewer
     private static bool IsLive(GodotObject? value)
         => value != null && GodotObject.IsInstanceValid(value);
 
+    private static void RestoreSourceButton()
+    {
+        if (IsLive(_sourceButton))
+            _sourceButton!.Visible = true;
+    }
+
     private static void ClearViewerReferences()
     {
         _source = null;
+        _sourceButton = null;
         _host = null;
         _viewer = null;
         _previousFocus = null;
