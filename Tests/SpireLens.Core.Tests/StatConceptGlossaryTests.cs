@@ -27,6 +27,7 @@ public class StatConceptGlossaryTests
                 "dexterity_gained",
                 "discard",
                 "draw",
+                "elite",
                 "energy",
                 "energy_gained",
                 "energy_wasted",
@@ -84,6 +85,9 @@ public class StatConceptGlossaryTests
         Assert.Equal(
             StatConceptDisplayType.GameResourceBadge,
             StatConceptGlossary.Concepts.Single(concept => concept.Id == "strength_gained").Display.Type);
+        Assert.Equal(
+            StatConceptDisplayType.GameResourceOverlay,
+            StatConceptGlossary.Concepts.Single(concept => concept.Id == "elite").Display.Type);
         Assert.All(
             [
                 "block_gained",
@@ -116,6 +120,7 @@ public class StatConceptGlossaryTests
         var charge = StatConceptGlossary.RenderHintedGlyph("charge");
         var combat = StatConceptGlossary.RenderHintedGlyph("combat");
         var dexterityGained = StatConceptGlossary.RenderHintedGlyph("dexterity_gained");
+        var elite = StatConceptGlossary.RenderHintedGlyph("elite");
         var floor = StatConceptGlossary.RenderHintedGlyph("floor");
         var healingBlocked = StatConceptGlossary.RenderHintedGlyph("healing_blocked");
         var healingGained = StatConceptGlossary.RenderHintedGlyph("healing_gained");
@@ -148,6 +153,7 @@ public class StatConceptGlossaryTests
             charge,
             combat,
             dexterityGained,
+            elite,
             floor,
             healingBlocked,
             healingGained,
@@ -208,6 +214,10 @@ public class StatConceptGlossaryTests
         Assert.Contains(
             "user://SpireLens/generated-icons/dexterity_gained-",
             dexterityGained);
+        Assert.Contains("[hint=\"Elite:", elite);
+        Assert.Contains(
+            "user://SpireLens/generated-icons/elite-",
+            elite);
         Assert.Contains("[hint=\"Floor:", floor);
         Assert.Contains(
             "res://images/atlases/ui_atlas.sprites/top_bar/top_bar_floor.tres",

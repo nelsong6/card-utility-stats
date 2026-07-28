@@ -42,7 +42,6 @@ public static class RelicHoverShowPatch
     private const string MapCombatIconPath = "res://images/atlases/ui_atlas.sprites/map/icons/map_monster.tres";
     private const string MapShopIconPath = "res://images/atlases/ui_atlas.sprites/map/icons/map_shop.tres";
     private const string MapUnknownIconPath = "res://images/atlases/ui_atlas.sprites/map/icons/map_unknown.tres";
-    private const string MapEliteIconPath = "res://images/atlases/ui_atlas.sprites/map/icons/map_elite.tres";
     private const string MapTreasureIconPath = "res://images/atlases/ui_atlas.sprites/map/icons/map_chest.tres";
     private const string MapRestSiteIconPath = "res://images/atlases/ui_atlas.sprites/map/icons/map_rest.tres";
     private const int SealOfGoldLossPerTrigger = 5;
@@ -3501,12 +3500,14 @@ public static class RelicHoverShowPatch
 
     private static string FormatWingedBootsDestinationIcon(string? destination)
     {
+        if (string.Equals(destination, "elite", StringComparison.Ordinal))
+            return StatConceptGlossary.RenderHintedGlyph("elite");
+
         var iconPath = destination switch
         {
             "combat" => MapCombatIconPath,
             "shop" => MapShopIconPath,
             "question_mark" => MapUnknownIconPath,
-            "elite" => MapEliteIconPath,
             "treasure" => MapTreasureIconPath,
             "rest_site" => MapRestSiteIconPath,
             _ => null,

@@ -123,6 +123,29 @@ public class WingedBootsStatsTests
             body);
     }
 
+    [Fact]
+    public void Tooltip_UsesNormalizedOutlinedEliteDestinationIcon()
+    {
+        var agg = new RelicAggregate
+        {
+            WingedBootsDestinations =
+            [
+                new WingedBootsDestinationAggregate
+                {
+                    UseNumber = 1,
+                    Destination = "elite",
+                },
+            ],
+        };
+
+        var body = BuildBody(agg, liveTimesUsed: 1);
+
+        Assert.Contains(
+            "user://SpireLens/generated-icons/elite-",
+            body);
+        Assert.DoesNotContain("[b]elite[/b]", body);
+    }
+
     private static string BuildBody(RelicAggregate agg, int liveTimesUsed)
         => (string)(BuildWingedBootsBodyMethod.Invoke(null, new object?[] { agg, liveTimesUsed })
             ?? throw new InvalidOperationException("BuildWingedBootsBodyBBCode returned null."));

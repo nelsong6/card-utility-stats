@@ -11,6 +11,7 @@ internal enum StatConceptDisplayType
     GameResource,
     GameResourceBadge,
     GameResourceGroup,
+    GameResourceOverlay,
     EmbeddedImage,
 }
 
@@ -195,6 +196,8 @@ internal static class StatConceptGlossary
                 RenderGeneratedConceptImage(concept, size),
             StatConceptDisplayType.GameResourceGroup =>
                 RenderGeneratedConceptImage(concept, size),
+            StatConceptDisplayType.GameResourceOverlay =>
+                RenderGeneratedConceptImage(concept, size),
             StatConceptDisplayType.EmbeddedImage =>
                 RenderGeneratedConceptImage(concept, size),
             _ => StatsTooltip.EscapeBbcode(concept.Label),
@@ -283,7 +286,8 @@ internal static class StatConceptGlossary
                     StatConceptDisplayType.GameResource
                     or StatConceptDisplayType.EmbeddedImage
                     or StatConceptDisplayType.GameResourceBadge
-                    or StatConceptDisplayType.GameResourceGroup))
+                    or StatConceptDisplayType.GameResourceGroup
+                    or StatConceptDisplayType.GameResourceOverlay))
             .ToArray();
         if (generatedConcepts.Length == 0) return;
 
@@ -306,6 +310,8 @@ internal static class StatConceptGlossary
                         BuildBadgedGameResourceImage(concept),
                     StatConceptDisplayType.GameResourceGroup =>
                         BuildGroupedSourceImage(concept),
+                    StatConceptDisplayType.GameResourceOverlay =>
+                        BuildOverlaidSourceImage(concept),
                     _ => throw new InvalidOperationException(
                         $"Concept '{concept.Id}' does not require a generated image."),
                 };
@@ -398,6 +404,63 @@ internal static class StatConceptGlossary
                     new Rect2I(0, 0, targetWidth, targetImageHeight),
                     new Vector2I(x, (targetHeight - targetImageHeight) / 2));
                 x += targetWidth;
+            }
+
+            return combined;
+        }
+        finally
+        {
+            foreach (var entry in loaded)
+                entry.Image.Dispose();
+        }
+    }
+
+    private static Image BuildOverlaidSourceImage(StatConcept concept)
+    {
+        var loaded = new List<(Image Image, decimal Scale)>();
+        try
+        {
+            foreach (var resource in concept.Display.Resources)
+            {
+                var image = LoadGameResourceImage(resource.Path);
+                loaded.Add((image, resource.Scale));
+            }
+
+            var widths = loaded.Select(entry =>
+                Math.Max(
+                    1,
+                    (int)Math.Round(
+                        entry.Image.GetWidth() * (double)entry.Scale,
+                        MidpointRounding.AwayFromZero)))
+                .ToArray();
+            var heights = loaded.Select(entry =>
+                Math.Max(
+                    1,
+                    (int)Math.Round(
+                        entry.Image.GetHeight() * (double)entry.Scale,
+                        MidpointRounding.AwayFromZero)))
+                .ToArray();
+            var targetWidth = widths.Max();
+            var targetHeight = heights.Max();
+            var combined = Image.CreateEmpty(
+                targetWidth,
+                targetHeight,
+                false,
+                Image.Format.Rgba8);
+            combined.Fill(new Color(0f, 0f, 0f, 0f));
+
+            for (var index = 0; index < loaded.Count; index++)
+            {
+                var image = loaded[index].Image;
+                var width = widths[index];
+                var height = heights[index];
+                image.Resize(width, height, Image.Interpolation.Lanczos);
+                combined.BlendRect(
+                    image,
+                    new Rect2I(0, 0, width, height),
+                    new Vector2I(
+                        (targetWidth - width) / 2,
+                        (targetHeight - height) / 2));
             }
 
             return combined;
@@ -655,6 +718,11 @@ internal static class StatConceptGlossary
                     concept.Display.Resources.Select(resource => resource.Path)))
             .Concat(Concepts
                 .Where(concept =>
+                    concept.Display.Type == StatConceptDisplayType.GameResourceOverlay)
+                .SelectMany(concept =>
+                    concept.Display.Resources.Select(resource => resource.Path)))
+            .Concat(Concepts
+                .Where(concept =>
                     concept.Display.Type == StatConceptDisplayType.GameResourceBadge)
                 .Select(concept => concept.Display.Value))
             .Concat(RelicInlineGameResources)
@@ -760,7 +828,8 @@ internal static class StatConceptGlossary
 
         if (concept.Display.Type is StatConceptDisplayType.EmbeddedImage
             or StatConceptDisplayType.GameResourceBadge
-            or StatConceptDisplayType.GameResourceGroup)
+            or StatConceptDisplayType.GameResourceGroup
+            or StatConceptDisplayType.GameResourceOverlay)
         {
             return null;
         }
@@ -989,6 +1058,37 @@ internal static class StatConceptGlossary
 
             return new StatConceptDisplay(
                 StatConceptDisplayType.GameResourceGroup,
+                string.Empty,
+                "#FFFFFF",
+                string.Empty,
+                resources);
+        }
+
+        if (string.Equals(type, "game_resource_overlay", StringComparison.Ordinal))
+        {
+            RequireOnlyProperties(
+                element,
+                $"{id}.display",
+                "type",
+                "resources");
+            var resourcesElement = RequireProperty(element, "resources", $"{id}.display");
+            if (resourcesElement.ValueKind != JsonValueKind.Array)
+            {
+                throw new InvalidOperationException(
+                    $"Stat concept '{id}' display 'resources' must be an array.");
+            }
+
+            var resources = resourcesElement.EnumerateArray()
+                .Select((resource, index) => ParseResource(id, resource, index))
+                .ToArray();
+            if (resources.Length < 2)
+            {
+                throw new InvalidOperationException(
+                    $"Stat concept '{id}' game resource overlay must contain at least two resources.");
+            }
+
+            return new StatConceptDisplay(
+                StatConceptDisplayType.GameResourceOverlay,
                 string.Empty,
                 "#FFFFFF",
                 string.Empty,
