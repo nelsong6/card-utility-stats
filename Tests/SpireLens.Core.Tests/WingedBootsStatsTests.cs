@@ -72,7 +72,7 @@ public class WingedBootsStatsTests
     }
 
     [Fact]
-    public void Tooltip_ShowsThreeNumberedDestinationsAndMarksUnobservedPriorUse()
+    public void Tooltip_ShowsThreeFloorIconsAndMarksUnobservedPriorUse()
     {
         var agg = new RelicAggregate
         {
@@ -88,14 +88,19 @@ public class WingedBootsStatsTests
 
         var body = BuildBody(agg, liveTimesUsed: 2);
 
-        Assert.Contains("1st floor destination", body);
+        Assert.Equal(
+            3,
+            body.Split(
+                "res://images/atlases/ui_atlas.sprites/top_bar/top_bar_floor.tres",
+                StringSplitOptions.None).Length - 1);
+        Assert.DoesNotContain("1st floor destination", body);
+        Assert.DoesNotContain("2nd floor destination", body);
+        Assert.DoesNotContain("3rd floor destination", body);
         Assert.Contains("[b]not tracked[/b]", body);
-        Assert.Contains("2nd floor destination", body);
         Assert.Contains(
             "res://images/atlases/ui_atlas.sprites/map/icons/map_shop.tres",
             body);
         Assert.DoesNotContain("[b]shop[/b]", body);
-        Assert.Contains("3rd floor destination", body);
         Assert.Contains("[b]not used yet[/b]", body);
     }
 
@@ -113,7 +118,9 @@ public class WingedBootsStatsTests
 
         Assert.True(recognized);
         Assert.Equal("Winged Boots", title);
-        Assert.Contains("1st floor destination", body);
+        Assert.Contains(
+            "res://images/atlases/ui_atlas.sprites/top_bar/top_bar_floor.tres",
+            body);
     }
 
     private static string BuildBody(RelicAggregate agg, int liveTimesUsed)

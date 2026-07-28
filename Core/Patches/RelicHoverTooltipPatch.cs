@@ -3487,7 +3487,13 @@ public static class RelicHoverShowPatch
                     ? "not tracked"
                     : "not used yet";
 
-            TextValueRow(sb, $"{Ordinal(useNumber)} floor destination", value, "");
+            DescribedIconFlowRow(
+                sb,
+                ["floor"],
+                [],
+                string.Empty,
+                value,
+                WingedBootsDestinationDescription(useNumber));
         }
 
         return sb.ToString();
@@ -3514,13 +3520,13 @@ public static class RelicHoverShowPatch
                 $"{displayName} destination");
     }
 
-    private static string Ordinal(int value)
-        => value switch
+    private static string WingedBootsDestinationDescription(int useNumber)
+        => useNumber switch
         {
-            1 => "1st",
-            2 => "2nd",
-            3 => "3rd",
-            _ => value.ToString(),
+            1 => "The destination reached by the first use of Winged Boots.",
+            2 => "The destination reached by the second use of Winged Boots.",
+            3 => "The destination reached by the third use of Winged Boots.",
+            _ => "A destination reached by using Winged Boots.",
         };
 
     private static string BuildLeafyPoulticeBodyBBCode(RelicAggregate agg)
