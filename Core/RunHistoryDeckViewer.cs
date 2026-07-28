@@ -28,6 +28,8 @@ internal static class RunHistoryDeckViewer
     private const string HostName = "SpireLensRunHistoryDeckViewHost";
     private const string DeckIconPath =
         "res://images/atlases/ui_atlas.sprites/top_bar/top_bar_deck.tres";
+    private const float ButtonGapAfterHeaderText = 8f;
+    private const float ButtonSize = 50f;
 
     private static readonly List<Button> InjectedButtons = new();
 
@@ -54,7 +56,7 @@ internal static class RunHistoryDeckViewer
 
         RemoveButton(runHistory);
 
-        var header = runHistory._deckHistory.GetNodeOrNull<Control>("Header");
+        var header = runHistory._deckHistory.GetNodeOrNull<RichTextLabel>("Header");
         if (header == null)
         {
             CoreMain.Logger.Warn(
@@ -74,10 +76,10 @@ internal static class RunHistoryDeckViewer
             // above this launcher without raising the entire viewer above
             // the game's global hover-tip layer.
             ZIndex = 0,
-            AnchorLeft = 1f,
-            AnchorRight = 1f,
-            OffsetLeft = -54f,
-            OffsetRight = -4f,
+            AnchorLeft = 0f,
+            AnchorRight = 0f,
+            OffsetLeft = 0f,
+            OffsetRight = ButtonSize,
             OffsetTop = -6f,
             OffsetBottom = 44f,
         };
@@ -94,6 +96,9 @@ internal static class RunHistoryDeckViewer
         button.AddChild(icon);
         button.Pressed += () => Open(runHistory);
         header.AddChild(button);
+        PositionButtonAfterHeaderText(header, button);
+        Callable.From(() => PositionButtonAfterHeaderText(header, button))
+            .CallDeferred();
         InjectedButtons.Add(button);
     }
 
@@ -322,6 +327,19 @@ internal static class RunHistoryDeckViewer
             InjectedButtons.Remove(existing);
             existing.QueueFree();
         }
+    }
+
+    private static void PositionButtonAfterHeaderText(
+        RichTextLabel header,
+        Button button)
+    {
+        if (!IsLive(header) || !IsLive(button))
+            return;
+
+        var left = Math.Max(0f, header.GetContentWidth())
+                   + ButtonGapAfterHeaderText;
+        button.OffsetLeft = left;
+        button.OffsetRight = left + ButtonSize;
     }
 
     private static NRunHistory? FindRunHistory(Node node)
