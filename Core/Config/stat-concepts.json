@@ -197,6 +197,25 @@
         "description": "A card drawn or a count of cards drawn."
       }
     },
+    "elite": {
+      "display": {
+        "type": "game_resource_overlay",
+        "resources": [
+          {
+            "path": "res://images/atlases/compressed.sprites/map/map_elite_outline.tres",
+            "scale": 1
+          },
+          {
+            "path": "res://images/atlases/ui_atlas.sprites/map/icons/map_elite.tres",
+            "scale": 1
+          }
+        ]
+      },
+      "help": {
+        "label": "Elite",
+        "description": "An Elite combat destination on the act map."
+      }
+    },
     "energy": {
       "display": {
         "type": "game_resource",
@@ -226,25 +245,6 @@
       "help": {
         "label": "Energy wasted",
         "description": "Energy that remained unused or prevented an energy-granting effect from benefiting the player."
-      }
-    },
-    "elite": {
-      "display": {
-        "type": "game_resource_overlay",
-        "resources": [
-          {
-            "path": "res://images/atlases/compressed.sprites/map/map_elite_outline.tres",
-            "scale": 1
-          },
-          {
-            "path": "res://images/atlases/ui_atlas.sprites/map/icons/map_elite.tres",
-            "scale": 1
-          }
-        ]
-      },
-      "help": {
-        "label": "Elite",
-        "description": "An Elite combat destination on the act map."
       }
     },
     "exhaust": {
