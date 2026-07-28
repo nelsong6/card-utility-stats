@@ -276,6 +276,19 @@ internal static class RunHistoryDeckViewer
             host.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
             host.AddChild(viewer);
             viewer.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+
+            var borderGradient =
+                viewer.GetNodeOrNull<CanvasItem>("CardGrid/BorderGradient");
+            if (borderGradient is not null)
+            {
+                borderGradient.Visible = false;
+            }
+            else
+            {
+                CoreMain.Logger.Warn(
+                    "RunHistoryDeckViewer: native card-grid border gradient was not found.");
+            }
+
             viewer.AfterCapstoneOpened();
 
             var originalReturn =
