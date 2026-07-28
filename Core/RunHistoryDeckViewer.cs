@@ -226,14 +226,6 @@ internal static class RunHistoryDeckViewer
                 return;
             }
 
-            var mainMenu = NGame.Instance?.MainMenu;
-            if (mainMenu == null)
-            {
-                CoreMain.Logger.Warn(
-                    "RunHistoryDeckViewer: main-menu host was not available.");
-                return;
-            }
-
             var unlockState = SaveManager.Instance.GenerateUnlockStateFromProgress();
             var player = Player.CreateForNewRun(
                 SaveUtil.CharacterOrDeprecated(historyPlayer.Character),
@@ -261,10 +253,10 @@ internal static class RunHistoryDeckViewer
                 Name = HostName,
                 MouseFilter = Control.MouseFilterEnum.Stop,
             };
-            // Keep the game's native canvas ordering. NGame's global
-            // HoverTipsContainer is drawn after the active scene; raising
-            // this host with a positive ZIndex would put the entire deck
-            // viewer, including its cards, above native hover tips.
+            // NRunHistory is a full-viewport Control in both the main-menu
+            // and active-run submenu contexts. Hosting the viewer as its last
+            // child keeps the deck above run history while preserving the
+            // game's later global hover-tip layer.
             host.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
 
             _source = runHistory;
@@ -280,7 +272,7 @@ internal static class RunHistoryDeckViewer
                 individualCards);
 
             runHistory.SetProcessInput(false);
-            mainMenu.AddChild(host);
+            runHistory.AddChild(host);
             host.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
             host.AddChild(viewer);
             viewer.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
