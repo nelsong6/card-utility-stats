@@ -22,6 +22,7 @@ public class StatConceptGlossaryTests
                 "combat",
                 "attack_common",
                 "power_common",
+                "relic_common",
                 "skill_common",
                 "damage",
                 "dexterity",
@@ -51,6 +52,7 @@ public class StatConceptGlossaryTests
                 "attack_rare",
                 "card_rare",
                 "power_rare",
+                "relic_rare",
                 "skill_rare",
                 "relic",
                 "relic_gained",
@@ -63,6 +65,7 @@ public class StatConceptGlossaryTests
                 "attack_uncommon",
                 "card_uncommon",
                 "power_uncommon",
+                "relic_uncommon",
                 "skill_uncommon",
                 "unknown_room",
                 "upgraded",
@@ -134,6 +137,9 @@ public class StatConceptGlossaryTests
         var nimble = StatConceptGlossary.RenderHintedGlyph("nimble");
         var summon = StatConceptGlossary.RenderHintedGlyph("osty_summon_gained");
         var power = StatConceptGlossary.RenderHintedGlyph("power");
+        var commonRelic = StatConceptGlossary.RenderHintedGlyph("relic_common");
+        var rareRelic = StatConceptGlossary.RenderHintedGlyph("relic_rare");
+        var uncommonRelic = StatConceptGlossary.RenderHintedGlyph("relic_uncommon");
         var skill = StatConceptGlossary.RenderHintedGlyph("skill");
         var strengthGained = StatConceptGlossary.RenderHintedGlyph("strength_gained");
         var swift = StatConceptGlossary.RenderHintedGlyph("swift");
@@ -170,6 +176,9 @@ public class StatConceptGlossaryTests
             nimble,
             summon,
             power,
+            commonRelic,
+            rareRelic,
+            uncommonRelic,
             skill,
             strengthGained,
             swift,
@@ -267,6 +276,12 @@ public class StatConceptGlossaryTests
         Assert.Contains(
             "res://images/packed/card_library/type_sort_power.png",
             power);
+        Assert.Contains("[hint=\"Common relic:", commonRelic);
+        Assert.Contains("color=#B5B5B5", commonRelic);
+        Assert.Contains("[hint=\"Rare relic:", rareRelic);
+        Assert.Contains("color=#EFC850", rareRelic);
+        Assert.Contains("[hint=\"Uncommon relic:", uncommonRelic);
+        Assert.Contains("color=#87CEEB", uncommonRelic);
         Assert.Contains("[hint=\"Skill:", skill);
         Assert.Contains(
             "res://images/packed/card_library/type_sort_skill.png",

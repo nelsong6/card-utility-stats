@@ -114,9 +114,9 @@ public class ShovelStatsTests
             ?? throw new InvalidOperationException("BuildShovelBodyBBCode returned null."));
 
         Assert.Contains(StatConceptGlossary.RenderHintedGlyph("relic_gained"), body);
-        Assert.Contains("common relics", body);
-        Assert.Contains("uncommon relics", body);
-        Assert.Contains("rare relics", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("relic_common"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("relic_uncommon"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("relic_rare"), body);
         Assert.Contains(StatConceptGlossary.RenderHintedGlyph("campfire"), body);
         Assert.Contains("not dug", body);
         Assert.Contains("[b]4[/b]", body);
@@ -131,9 +131,9 @@ public class ShovelStatsTests
             ?? throw new InvalidOperationException("BuildShovelBodyBBCode returned null."));
 
         Assert.Contains(StatConceptGlossary.RenderHintedGlyph("relic_gained"), body);
-        Assert.Contains("common relics", body);
-        Assert.Contains("uncommon relics", body);
-        Assert.Contains("rare relics", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("relic_common"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("relic_uncommon"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("relic_rare"), body);
         Assert.Contains(StatConceptGlossary.RenderHintedGlyph("campfire"), body);
         Assert.Contains("not dug", body);
         Assert.Equal(5, CountOccurrences(body, "[b]0[/b]"));

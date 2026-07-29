@@ -462,6 +462,17 @@
         "description": "A relic gained, skipped, offered, or otherwise counted by a stat."
       }
     },
+    "relic_common": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/ui/reward_screen/reward_icon_shared_relic.png",
+        "modulate": "#B5B5B5"
+      },
+      "help": {
+        "label": "Common relic",
+        "description": "A Common relic or a count of Common relics."
+      }
+    },
     "relic_gained": {
       "display": {
         "type": "game_resource_badge",
@@ -471,6 +482,28 @@
       "help": {
         "label": "Relic gained",
         "description": "A relic successfully added to the player's relic inventory."
+      }
+    },
+    "relic_rare": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/ui/reward_screen/reward_icon_shared_relic.png",
+        "modulate": "#EFC850"
+      },
+      "help": {
+        "label": "Rare relic",
+        "description": "A Rare relic or a count of Rare relics."
+      }
+    },
+    "relic_uncommon": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/ui/reward_screen/reward_icon_shared_relic.png",
+        "modulate": "#87CEEB"
+      },
+      "help": {
+        "label": "Uncommon relic",
+        "description": "An Uncommon relic or a count of Uncommon relics."
       }
     },
     "skill": {

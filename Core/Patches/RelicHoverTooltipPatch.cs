@@ -4592,9 +4592,21 @@ public static class RelicHoverShowPatch
             "relic_gained",
             agg.RelicsAcquired.ToString(),
             "Relics acquired by digging with Shovel.");
-        Row3(sb, "common relics", agg.CommonRelicsAcquired.ToString(), "");
-        Row3(sb, "uncommon relics", agg.UncommonRelicsAcquired.ToString(), "");
-        Row3(sb, "rare relics", agg.RareRelicsAcquired.ToString(), "");
+        ConceptRow(
+            sb,
+            "relic_common",
+            agg.CommonRelicsAcquired.ToString(),
+            "Common relics acquired by digging with Shovel.");
+        ConceptRow(
+            sb,
+            "relic_uncommon",
+            agg.UncommonRelicsAcquired.ToString(),
+            "Uncommon relics acquired by digging with Shovel.");
+        ConceptRow(
+            sb,
+            "relic_rare",
+            agg.RareRelicsAcquired.ToString(),
+            "Rare relics acquired by digging with Shovel.");
         DescribedIconRow(
             sb,
             ["campfire"],
