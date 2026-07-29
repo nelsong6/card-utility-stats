@@ -115,9 +115,9 @@ public class HeftyTabletStatsTests
 
         var body = BuildBody(agg);
 
-        Assert.Contains("Cards granted", body);
+        Assert.Contains("color=#EFC850", body);
+        Assert.Contains("[b]+[/b]", body);
         Assert.Contains("Skipped", body);
-        Assert.Contains("Granted", body);
         Assert.Contains("Adrenaline x2", body);
         Assert.Contains("[b]2[/b]", body);
         Assert.Contains("[b]1[/b]", body);
@@ -128,7 +128,8 @@ public class HeftyTabletStatsTests
     {
         var body = BuildBody(new RelicAggregate());
 
-        Assert.Contains("Cards granted", body);
+        Assert.Contains("color=#EFC850", body);
+        Assert.Contains("[b]+[/b]", body);
         Assert.Contains("Skipped", body);
         Assert.Contains("[b]0[/b]", body);
     }

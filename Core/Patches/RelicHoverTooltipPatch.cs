@@ -3911,7 +3911,13 @@ public static class RelicHoverShowPatch
     {
         var sb = new StringBuilder();
         var cardsGranted = agg.CardsGranted.Values.Sum(card => Math.Max(0, card.Count));
-        Row3(sb, "Cards granted", cardsGranted.ToString(), "");
+        DescribedIconRow(
+            sb,
+            ["card_rare"],
+            [],
+            "[b]+[/b]",
+            cardsGranted.ToString(),
+            "Rare cards granted by Hefty Tablet.");
         Row3(sb, "Skipped", agg.CardChoicesSkipped.ToString(), "");
 
         foreach (var card in agg.CardsGranted.Values
@@ -3923,7 +3929,13 @@ public static class RelicHoverShowPatch
                 ? RunTracker.FormatCardIdForDisplay(card.CardId)
                 : card.DisplayName);
             var value = card.Count == 1 ? displayName : $"{displayName} x{card.Count}";
-            TextValueRow(sb, "Granted", value, "");
+            DescribedIconFlowRow(
+                sb,
+                ["card_rare"],
+                [],
+                "[b]+[/b]",
+                value,
+                $"The Rare card granted by Hefty Tablet: {displayName}.");
         }
 
         return sb.ToString();
