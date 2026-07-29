@@ -94,6 +94,16 @@
         "description": "Block that expired or exceeded a retention limit without preventing damage."
       }
     },
+    "campfire": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/atlases/ui_atlas.sprites/map/icons/map_rest.tres"
+      },
+      "help": {
+        "label": "Campfire",
+        "description": "A campfire or rest site on the act map."
+      }
+    },
     "card": {
       "display": {
         "type": "game_resource",

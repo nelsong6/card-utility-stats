@@ -4587,11 +4587,21 @@ public static class RelicHoverShowPatch
     private static string BuildShovelBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Relics acquired", agg.RelicsAcquired.ToString(), "");
+        ConceptRow(
+            sb,
+            "relic_gained",
+            agg.RelicsAcquired.ToString(),
+            "Relics acquired by digging with Shovel.");
         Row3(sb, "common relics", agg.CommonRelicsAcquired.ToString(), "");
         Row3(sb, "uncommon relics", agg.UncommonRelicsAcquired.ToString(), "");
         Row3(sb, "rare relics", agg.RareRelicsAcquired.ToString(), "");
-        Row3(sb, "Campfires not dug", agg.CampfiresNotDug.ToString(), "");
+        DescribedIconRow(
+            sb,
+            ["campfire"],
+            [],
+            "not dug",
+            agg.CampfiresNotDug.ToString(),
+            "Campfires where Shovel was available but Dig was not chosen.");
         return sb.ToString();
     }
 

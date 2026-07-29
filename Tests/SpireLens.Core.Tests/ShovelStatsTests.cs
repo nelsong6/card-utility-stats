@@ -113,11 +113,12 @@ public class ShovelStatsTests
         var body = (string)(BuildShovelBodyMethod.Invoke(null, new object?[] { agg })
             ?? throw new InvalidOperationException("BuildShovelBodyBBCode returned null."));
 
-        Assert.Contains("Relics acquired", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("relic_gained"), body);
         Assert.Contains("common relics", body);
         Assert.Contains("uncommon relics", body);
         Assert.Contains("rare relics", body);
-        Assert.Contains("Campfires not dug", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("campfire"), body);
+        Assert.Contains("not dug", body);
         Assert.Contains("[b]4[/b]", body);
         Assert.Contains("[b]3[/b]", body);
         Assert.Contains("[b]2[/b]", body);
@@ -129,11 +130,12 @@ public class ShovelStatsTests
         var body = (string)(BuildShovelBodyMethod.Invoke(null, new object?[] { new RelicAggregate() })
             ?? throw new InvalidOperationException("BuildShovelBodyBBCode returned null."));
 
-        Assert.Contains("Relics acquired", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("relic_gained"), body);
         Assert.Contains("common relics", body);
         Assert.Contains("uncommon relics", body);
         Assert.Contains("rare relics", body);
-        Assert.Contains("Campfires not dug", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("campfire"), body);
+        Assert.Contains("not dug", body);
         Assert.Equal(5, CountOccurrences(body, "[b]0[/b]"));
     }
 

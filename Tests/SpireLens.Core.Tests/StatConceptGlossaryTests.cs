@@ -16,6 +16,7 @@ public class StatConceptGlossaryTests
                 "block",
                 "block_gained",
                 "block_wasted",
+                "campfire",
                 "card",
                 "charge",
                 "combat",
@@ -116,6 +117,7 @@ public class StatConceptGlossaryTests
         var average = StatConceptGlossary.RenderHintedGlyph("average");
         var block = StatConceptGlossary.RenderHintedGlyph("block");
         var blockWasted = StatConceptGlossary.RenderHintedGlyph("block_wasted");
+        var campfire = StatConceptGlossary.RenderHintedGlyph("campfire");
         var card = StatConceptGlossary.RenderHintedGlyph("card");
         var rareCard = StatConceptGlossary.RenderHintedGlyph("card_rare");
         var uncommonCard = StatConceptGlossary.RenderHintedGlyph("card_uncommon");
@@ -151,6 +153,7 @@ public class StatConceptGlossaryTests
             average,
             block,
             blockWasted,
+            campfire,
             card,
             rareCard,
             uncommonCard,
@@ -202,6 +205,10 @@ public class StatConceptGlossaryTests
         Assert.Contains(
             "user://SpireLens/generated-icons/block_wasted-",
             blockWasted);
+        Assert.Contains("[hint=\"Campfire:", campfire);
+        Assert.Contains(
+            "res://images/atlases/ui_atlas.sprites/map/icons/map_rest.tres",
+            campfire);
         Assert.Contains("[hint=\"Card:", card);
         Assert.Contains("res://images/ui/reward_screen/reward_icon_card.png", card);
         Assert.Contains("[hint=\"Rare card:", rareCard);
