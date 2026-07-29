@@ -909,6 +909,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is SilkenTress)
+        {
+            title = "Silken Tress";
+            body = BuildSilkenTressBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is TriBoomerang)
         {
             title = "Tri-Boomerang";
@@ -3079,6 +3086,31 @@ public static class RelicHoverShowPatch
         Row3(sb, "Cards enchanted with Sharp", cards.Count.ToString(), "");
         foreach (var card in cards)
             TextValueRow(sb, "Sharp-enchanted card", StatsTooltip.EscapeBbcode(card), "");
+        return sb.ToString();
+    }
+
+    private static string BuildSilkenTressBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var cards = (agg.SilkenTressGlamCards ?? new List<string>())
+            .Where(card => !string.IsNullOrWhiteSpace(card))
+            .ToList();
+
+        if (cards.Count == 0)
+        {
+            TextValueRow(sb, "Card enchanted with Glam", "none", "");
+            return sb.ToString();
+        }
+
+        foreach (var card in cards)
+        {
+            TextValueRow(
+                sb,
+                "Card enchanted with Glam",
+                StatsTooltip.EscapeBbcode(card),
+                "");
+        }
+
         return sb.ToString();
     }
 

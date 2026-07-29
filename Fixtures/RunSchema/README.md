@@ -398,6 +398,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `gnarled-hammer-relic-run.json`
   Adds Gnarled Hammer's observed list of permanent deck cards whose Sharp
   enchantment was applied or increased by its pickup effect.
+- `silken-tress-relic-run.json`
+  Adds the card successfully taken from a reward after Silken Tress applied
+  Glam, using the reward option's native modifying-relic provenance.
 - `tri-boomerang-relic-run.json`
   Adds Tri-Boomerang's observed Instinct-enchanted permanent-card ledger,
   later plays of those same card instances, and held-combat denominator.

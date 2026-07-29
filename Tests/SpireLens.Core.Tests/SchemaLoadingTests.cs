@@ -3832,6 +3832,29 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsSilkenTressRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("silken-tress-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertSilkenTressFixture(
+            loaded.Data.RelicAggregates["RELIC.SILKEN_TRESS"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsSilkenTressRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("silken-tress-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertSilkenTressFixture(
+            resumed!.RelicAggregates["RELIC.SILKEN_TRESS"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsTriBoomerangRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(
@@ -4388,6 +4411,13 @@ public class SchemaLoadingTests
         Assert.Equal(
             new[] { "Pommel Strike", "Uppercut+", "Pommel Strike" },
             relicAgg.SharpEnchantedCards);
+    }
+
+    private static void AssertSilkenTressFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(
+            new[] { "Pommel Strike" },
+            relicAgg.SilkenTressGlamCards);
     }
 
     private static void AssertTriBoomerangFixture(RelicAggregate relicAgg)

@@ -141,6 +141,7 @@ public static class RunTracker
     private static readonly HashSet<PotionReward> _whiteBeastPotionRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, PendingPaelSacrificeReward> _paelSacrificeRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, PendingFresnelLensReward> _fresnelLensRewards = new(ReferenceEqualityComparer.Instance);
+    private static readonly Dictionary<CardReward, PendingSilkenTressReward> _silkenTressRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, PendingSilverCrucibleReward> _silverCrucibleRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, PendingOrreryReward> _orreryRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, int> _whiteStarRewardRareCardsBeforeSelection =
@@ -1131,6 +1132,7 @@ public static class RunTracker
         _pendingHeftyTabletChoicePlayers.Clear();
         _paelSacrificeRewards.Clear();
         _fresnelLensRewards.Clear();
+        _silkenTressRewards.Clear();
         _silverCrucibleRewards.Clear();
         _orreryRewards.Clear();
         _whiteStarRewardRareCardsBeforeSelection.Clear();
@@ -1888,6 +1890,7 @@ public static class RunTracker
         target.WarHammerCombats += source.WarHammerCombats;
         target.WarHammerTurns += source.WarHammerTurns;
         MergeSharpEnchantedCardsInto(target, source);
+        MergeSilkenTressGlamCardsInto(target, source);
         MergeTriBoomerangInstinctCardsInto(target, source);
         target.TriBoomerangInstinctCardPlays += source.TriBoomerangInstinctCardPlays;
         target.TriBoomerangCombats += source.TriBoomerangCombats;
@@ -4466,6 +4469,7 @@ public static class RunTracker
     private const string BurningSticksRelicId = "RELIC.BURNING_STICKS";
     private const string BingBongRelicId = "RELIC.BING_BONG";
     private const string GnarledHammerRelicId = "RELIC.GNARLED_HAMMER";
+    private const string SilkenTressRelicId = "RELIC.SILKEN_TRESS";
     private const string TriBoomerangRelicId = "RELIC.TRI_BOOMERANG";
     private const string BookmarkRelicId = "RELIC.BOOKMARK";
     private const string BrilliantScarfRelicId = "RELIC.BRILLIANT_SCARF";
@@ -13297,6 +13301,121 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Snapshot the Glam options explicitly attributed to Silken Tress by the
+    /// game's CardCreationResult provenance. CardReward removes an option only
+    /// after that card successfully enters the deck, so resolution can name
+    /// the card actually taken without treating every enchanted preview as an
+    /// acquisition.
+    /// </summary>
+    public static void NoteSilkenTressRewardOpened(CardReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!TryCreatePendingSilkenTressRewardLocked(reward, out var pending))
+                {
+                    _silkenTressRewards.Remove(reward);
+                    return;
+                }
+
+                _silkenTressRewards[reward] = pending;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"NoteSilkenTressRewardOpened failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RefreshSilkenTressRewardAfterReroll(CardReward reward)
+        => NoteSilkenTressRewardOpened(reward);
+
+    public static void RecordSilkenTressRewardResolved(CardReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_silkenTressRewards.Remove(reward, out var pending)) return;
+                if (!IsTrackedPlayer(reward.Player)) return;
+
+                var remaining = new HashSet<CardCreationResult>(
+                    reward._cards,
+                    ReferenceEqualityComparer.Instance);
+                var takenCardNames = pending.Options
+                    .Where(option => !remaining.Contains(option.Result))
+                    .Select(option => option.DisplayName)
+                    .Where(cardName => !string.IsNullOrWhiteSpace(cardName))
+                    .ToList();
+                if (takenCardNames.Count == 0) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(
+                    SilkenTressRelicId);
+                RecordSilkenTressGlamCardsForTest(agg, takenCardNames);
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordSilkenTressRewardResolved failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void CancelSilkenTressReward(CardReward reward)
+    {
+        if (reward == null) return;
+        lock (_lock)
+            _silkenTressRewards.Remove(reward);
+    }
+
+    internal static void RecordSilkenTressGlamCardsForTest(
+        RelicAggregate agg,
+        IEnumerable<string>? cards)
+    {
+        if (agg == null || cards == null) return;
+
+        agg.SilkenTressGlamCards ??= new List<string>();
+        agg.SilkenTressGlamCards.AddRange(
+            cards.Where(card => !string.IsNullOrWhiteSpace(card)));
+    }
+
+    private static bool TryCreatePendingSilkenTressRewardLocked(
+        CardReward reward,
+        [NotNullWhen(true)] out PendingSilkenTressReward? pending)
+    {
+        pending = null;
+        if (!IsTrackedPlayer(reward.Player)) return false;
+
+        var options = new List<PendingSilkenTressOption>();
+        foreach (var result in reward._cards)
+        {
+            var card = result?.Card;
+            if (result == null || card?.Enchantment is not Glam) continue;
+
+            var modifiedByTrackedSilkenTress = result.ModifyingRelics
+                .OfType<SilkenTress>()
+                .Any(relic =>
+                    IsTrackedRelic(relic)
+                    && ReferenceEquals(relic.Owner, reward.Player));
+            if (!modifiedByTrackedSilkenTress) continue;
+
+            options.Add(new PendingSilkenTressOption(
+                result,
+                GetRewardCardDisplayNameForStats(card)));
+        }
+
+        if (options.Count == 0) return false;
+        pending = new PendingSilkenTressReward(options);
+        return true;
+    }
+
+    /// <summary>
     /// Persist the exact permanent-deck cards whose Instinct amount changed
     /// across Tri-Boomerang's completed pickup callback.
     /// </summary>
@@ -20542,6 +20661,20 @@ public static class RunTracker
             source.SharpEnchantedCards.Where(card => !string.IsNullOrWhiteSpace(card)));
     }
 
+    private static void MergeSilkenTressGlamCardsInto(
+        RelicAggregate target,
+        RelicAggregate source)
+    {
+        if (source.SilkenTressGlamCards == null
+            || source.SilkenTressGlamCards.Count == 0)
+            return;
+
+        target.SilkenTressGlamCards ??= new List<string>();
+        target.SilkenTressGlamCards.AddRange(
+            source.SilkenTressGlamCards.Where(card =>
+                !string.IsNullOrWhiteSpace(card)));
+    }
+
     private static void MergeTriBoomerangInstinctCardsInto(
         RelicAggregate target,
         RelicAggregate source)
@@ -24543,6 +24676,21 @@ internal sealed class PendingFresnelLensReward
 
         return result;
     }
+}
+
+internal sealed record PendingSilkenTressOption(
+    CardCreationResult Result,
+    string DisplayName);
+
+internal sealed class PendingSilkenTressReward
+{
+    public PendingSilkenTressReward(
+        IReadOnlyList<PendingSilkenTressOption> options)
+    {
+        Options = options;
+    }
+
+    public IReadOnlyList<PendingSilkenTressOption> Options { get; }
 }
 
 internal sealed class PendingSilverCrucibleReward

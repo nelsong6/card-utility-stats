@@ -122,6 +122,7 @@ public static class CardRewardAttributedRelicOnSelectStatsPatch
         {
             RunTracker.NoteWhiteStarRewardOpened(__instance);
             RunTracker.NotePrayerWheelRewardOpened(__instance);
+            RunTracker.NoteSilkenTressRewardOpened(__instance);
         }
         catch (Exception e)
         {
@@ -146,11 +147,13 @@ public static class CardRewardAttributedRelicOnSelectStatsPatch
             var completed = await selectionTask;
             RunTracker.RecordWhiteStarRewardResolved(reward, completed);
             RunTracker.RecordPrayerWheelRewardResolved(reward, completed);
+            RunTracker.RecordSilkenTressRewardResolved(reward);
         }
         catch (Exception e)
         {
             RunTracker.RecordWhiteStarRewardResolved(reward, completed: false);
             RunTracker.RecordPrayerWheelRewardResolved(reward, completed: false);
+            RunTracker.CancelSilkenTressReward(reward);
             CoreMain.LogDebug(
                 $"CardRewardAttributedRelicOnSelectStatsPatch failed: {e.Message}");
         }
@@ -171,6 +174,7 @@ public static class CardRewardAttributedRelicOnSkippedStatsPatch
         {
             RunTracker.RecordWhiteStarRewardSkipped(__instance);
             RunTracker.RecordPrayerWheelRewardSkipped(__instance);
+            RunTracker.CancelSilkenTressReward(__instance);
         }
         catch (Exception e)
         {
@@ -194,6 +198,7 @@ public static class CardRewardAttributedRelicRerollStatsPatch
         {
             RunTracker.RefreshWhiteStarRewardAfterReroll(__instance);
             RunTracker.RefreshPrayerWheelRewardAfterReroll(__instance);
+            RunTracker.RefreshSilkenTressRewardAfterReroll(__instance);
         }
         catch (Exception e)
         {

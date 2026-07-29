@@ -686,6 +686,10 @@ public class RelicAggregate
     // by Gnarled Hammer's pickup effect.
     public List<string> SharpEnchantedCards { get; set; } = new();
 
+    // Reward cards whose Glam enchantment came from Silken Tress and were
+    // successfully taken into the permanent deck.
+    public List<string> SilkenTressGlamCards { get; set; } = new();
+
     // Permanent deck cards whose Instinct enchantment was applied or increased
     // by Tri-Boomerang. Stable instance ids let later combat-copy plays remain
     // attributable across combats, saves, and hot reloads.
