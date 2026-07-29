@@ -155,6 +155,7 @@ public static class RunTracker
     private static readonly HashSet<Player> _pendingLeafyPoulticePickups = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<Player, PendingSandCastlePickup> _pendingSandCastlePickups = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<Player, PendingWhetstonePickup> _pendingWhetstonePickups = new(ReferenceEqualityComparer.Instance);
+    private static readonly Dictionary<Player, PendingYummyCookiePickup> _pendingYummyCookiePickups = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<Player, PendingWarPaintPickup> _pendingWarPaintPickups = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<Player, PendingFragrantMushroomPickup> _pendingFragrantMushroomPickups = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<Player, PendingFishingRodUpgrade> _pendingFishingRodUpgrades = new(ReferenceEqualityComparer.Instance);
@@ -1142,6 +1143,7 @@ public static class RunTracker
         _pendingLeafyPoulticePickups.Clear();
         _pendingSandCastlePickups.Clear();
         _pendingWhetstonePickups.Clear();
+        _pendingYummyCookiePickups.Clear();
         _pendingWarPaintPickups.Clear();
         _pendingFragrantMushroomPickups.Clear();
         _pendingFishingRodUpgrades.Clear();
@@ -4392,6 +4394,7 @@ public static class RunTracker
     private const string RazorToothRelicId = "RELIC.RAZOR_TOOTH";
     private const string WarHammerRelicId = "RELIC.WAR_HAMMER";
     private const string WhetstoneRelicId = "RELIC.WHETSTONE";
+    private const string YummyCookieRelicId = "RELIC.YUMMY_COOKIE";
     private const string WarPaintRelicId = "RELIC.WAR_PAINT";
     private const string FragrantMushroomRelicId = "RELIC.FRAGRANT_MUSHROOM";
     private const string ArtOfWarRelicId = "RELIC.ART_OF_WAR";
@@ -9375,6 +9378,57 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Arm Yummy Cookie pickup attribution. Actual upgraded cards are observed
+    /// from <see cref="RecordUpgrade"/> while the pickup task resolves.
+    /// </summary>
+    public static bool BeginYummyCookiePickup(RelicModel relic, out Player? player)
+    {
+        player = null;
+        if (relic?.Owner == null) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic)) return false;
+                if (!IsTrackedPlayer(relic.Owner)) return false;
+
+                player = relic.Owner;
+                _pendingYummyCookiePickups[player] = new PendingYummyCookiePickup();
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"BeginYummyCookiePickup failed: {e.Message}");
+                player = null;
+                return false;
+            }
+        }
+    }
+
+    public static void CompleteYummyCookiePickup(Player? player, bool succeeded)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_pendingYummyCookiePickups.Remove(player, out var pending)) return;
+                if (!succeeded) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(YummyCookieRelicId);
+                RecordYummyCookieUpgradesForTest(agg, pending.UpgradedCards);
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"CompleteYummyCookiePickup failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Arm War Paint pickup attribution. Actual upgraded cards are observed
     /// from <see cref="RecordUpgrade"/> while the pickup task resolves.
     /// </summary>
@@ -11264,6 +11318,11 @@ public static class RunTracker
     }
 
     internal static void RecordWhetstoneUpgradesForTest(
+        RelicAggregate agg,
+        IEnumerable<string>? upgradedCards)
+        => RecordRelicUpgradedCards(agg, upgradedCards);
+
+    internal static void RecordYummyCookieUpgradesForTest(
         RelicAggregate agg,
         IEnumerable<string>? upgradedCards)
         => RecordRelicUpgradedCards(agg, upgradedCards);
@@ -21131,6 +21190,7 @@ public static class RunTracker
             // mechanics, including temporary combat-copy upgrades.
             RecordSandCastleCardUpgradedLocked(card);
             RecordWhetstoneCardUpgradedLocked(card);
+            RecordYummyCookieCardUpgradedLocked(card);
             RecordWarPaintCardUpgradedLocked(card);
             RecordFragrantMushroomCardUpgradedLocked(card);
             RecordFishingRodCardUpgradedLocked(card);
@@ -21243,6 +21303,23 @@ public static class RunTracker
         catch (Exception e)
         {
             CoreMain.LogDebug($"RecordWhetstoneCardUpgradedLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordYummyCookieCardUpgradedLocked(CardModel card)
+    {
+        try
+        {
+            if (card == null) return;
+            var owner = card.Owner;
+            if (owner == null) return;
+            if (!_pendingYummyCookiePickups.TryGetValue(owner, out var pending)) return;
+
+            pending.UpgradedCards.Add(GetCardDisplayNameForStats(card));
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordYummyCookieCardUpgradedLocked failed: {e.Message}");
         }
     }
 
@@ -24966,6 +25043,11 @@ internal sealed class PendingSandCastlePickup
 }
 
 internal sealed class PendingWhetstonePickup
+{
+    public List<string> UpgradedCards { get; } = new();
+}
+
+internal sealed class PendingYummyCookiePickup
 {
     public List<string> UpgradedCards { get; } = new();
 }

@@ -658,8 +658,8 @@ public class RelicAggregate
     public decimal PlatingAdded { get; set; }
 
     // Total cards this relic upgraded. Used by Stone Cracker, Razor Tooth,
-    // Sand Castle, Whetstone, War Paint, Fishing Rod, War Hammer, and other
-    // upgrade-granting relics.
+    // Sand Castle, Whetstone, Yummy Cookie, War Paint, Fishing Rod, War
+    // Hammer, and other upgrade-granting relics.
     public int CardsUpgraded { get; set; }
     public List<string> UpgradedCards { get; set; } = new();
 

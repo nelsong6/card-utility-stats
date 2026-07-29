@@ -923,6 +923,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is YummyCookie)
+        {
+            title = "Yummy Cookie";
+            body = BuildYummyCookieBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is WarPaint)
         {
             title = "War Paint";
@@ -3052,6 +3059,13 @@ public static class RelicHoverShowPatch
             agg,
             totalLabel: "Attacks upgraded",
             itemLabel: "Upgraded attack");
+        return sb.ToString();
+    }
+
+    private static string BuildYummyCookieBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        AppendUpgradedCardStats(sb, agg);
         return sb.ToString();
     }
 
