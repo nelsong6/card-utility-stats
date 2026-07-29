@@ -33,6 +33,7 @@ public class StatConceptGlossaryTests
                 "energy_wasted",
                 "exhaust",
                 "floor",
+                "glam",
                 "gold",
                 "gold_gained",
                 "healing_blocked",
@@ -122,6 +123,7 @@ public class StatConceptGlossaryTests
         var dexterityGained = StatConceptGlossary.RenderHintedGlyph("dexterity_gained");
         var elite = StatConceptGlossary.RenderHintedGlyph("elite");
         var floor = StatConceptGlossary.RenderHintedGlyph("floor");
+        var glam = StatConceptGlossary.RenderHintedGlyph("glam");
         var healingBlocked = StatConceptGlossary.RenderHintedGlyph("healing_blocked");
         var healingGained = StatConceptGlossary.RenderHintedGlyph("healing_gained");
         var healingWasted = StatConceptGlossary.RenderHintedGlyph("healing_wasted");
@@ -155,6 +157,7 @@ public class StatConceptGlossaryTests
             dexterityGained,
             elite,
             floor,
+            glam,
             healingBlocked,
             healingGained,
             healingWasted,
@@ -222,6 +225,8 @@ public class StatConceptGlossaryTests
         Assert.Contains(
             "res://images/atlases/ui_atlas.sprites/top_bar/top_bar_floor.tres",
             floor);
+        Assert.Contains("[hint=\"Glam:", glam);
+        Assert.Contains("res://images/enchantments/glam.png", glam);
         Assert.Contains("[hint=\"Osty summon gained:", summon);
         Assert.Contains("[hint=\"Healing blocked:", healingBlocked);
         var healingBlockedDisplay = StatConceptGlossary.Concepts

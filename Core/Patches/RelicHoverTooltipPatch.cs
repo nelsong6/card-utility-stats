@@ -3098,20 +3098,29 @@ public static class RelicHoverShowPatch
 
         if (cards.Count == 0)
         {
-            TextValueRow(sb, "Card enchanted with Glam", "none", "");
+            SilkenTressGlamCardRow(sb, "none");
             return sb.ToString();
         }
 
         foreach (var card in cards)
-        {
-            TextValueRow(
-                sb,
-                "Card enchanted with Glam",
-                StatsTooltip.EscapeBbcode(card),
-                "");
-        }
+            SilkenTressGlamCardRow(sb, StatsTooltip.EscapeBbcode(card));
 
         return sb.ToString();
+    }
+
+    private static void SilkenTressGlamCardRow(
+        StringBuilder sb,
+        string value)
+    {
+        var iconExpression =
+            $"[b]+[/b] {StatConceptGlossary.RenderHintedGlyph("glam")}";
+        DescribedIconFlowRow(
+            sb,
+            new[] { "card" },
+            Array.Empty<string>(),
+            iconExpression,
+            value,
+            "The card successfully taken after Silken Tress applied Glam.");
     }
 
     private static string BuildTriBoomerangBodyBBCode(RelicAggregate agg)

@@ -73,7 +73,10 @@ public class SilkenTressStatsTests
     {
         var body = BuildBody(PopulatedAggregate());
 
-        Assert.Contains("Card enchanted with Glam", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("card"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("glam"), body);
+        Assert.Contains("[b]+[/b]", body);
+        Assert.DoesNotContain("Card enchanted with Glam", body);
         Assert.Contains("Pommel Strike", body);
     }
 
@@ -82,7 +85,10 @@ public class SilkenTressStatsTests
     {
         var body = BuildBody(new RelicAggregate());
 
-        Assert.Contains("Card enchanted with Glam", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("card"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("glam"), body);
+        Assert.Contains("[b]+[/b]", body);
+        Assert.DoesNotContain("Card enchanted with Glam", body);
         Assert.Contains("none", body);
     }
 

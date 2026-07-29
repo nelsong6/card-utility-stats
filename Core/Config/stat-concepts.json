@@ -267,6 +267,16 @@
         "description": "A run floor or a value measured across floors."
       }
     },
+    "glam": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/enchantments/glam.png"
+      },
+      "help": {
+        "label": "Glam",
+        "description": "A card enchanted with Glam."
+      }
+    },
     "gold": {
       "display": {
         "type": "game_resource",
