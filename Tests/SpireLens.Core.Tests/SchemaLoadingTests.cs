@@ -2446,6 +2446,29 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsJossPaperRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("joss-paper-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertJossPaperFixture(
+            loaded.Data.RelicAggregates["RELIC.JOSS_PAPER"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsJossPaperRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("joss-paper-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertJossPaperFixture(
+            resumed!.RelicAggregates["RELIC.JOSS_PAPER"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsWhiteStarRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(
@@ -2540,6 +2563,21 @@ public class SchemaLoadingTests
         Assert.Equal(3, relicAgg.PollinousCoreTurnsEndedOn1Counter);
         Assert.Equal(3, relicAgg.PollinousCoreTurnsEndedOn2Counters);
         Assert.Equal(2, relicAgg.PollinousCoreTurnsEndedOn3Counters);
+    }
+
+    private static void AssertJossPaperFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(5, relicAgg.AdditionalCardsDrawn);
+        Assert.Equal(1, relicAgg.AdditionalCardDrawsBlocked);
+        Assert.Equal(11, relicAgg.JossPaperCardsExhausted);
+        Assert.Equal(10, relicAgg.JossPaperTurns);
+        Assert.Equal(2, relicAgg.JossPaperCombats);
+        Assert.Equal(2, relicAgg.JossPaperTurnsEndedOn0Counters);
+        Assert.Equal(3, relicAgg.JossPaperTurnsEndedOn1Counter);
+        Assert.Equal(3, relicAgg.JossPaperTurnsEndedOn2Counters);
+        Assert.Equal(2, relicAgg.JossPaperTurnsEndedOn3Counters);
+        Assert.Equal(0, relicAgg.JossPaperTurnsEndedOn4Counters);
     }
 
     private static void AssertWhiteStarFixture(RelicAggregate relicAgg)

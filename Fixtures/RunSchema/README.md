@@ -444,6 +444,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `pollinous-core-relic-run.json`
   Adds Pollinous Core activations, observed and blocked bonus card draws,
   held turn/combat denominators, and turn-end 0/1/2/3 counter buckets.
+- `joss-paper-relic-run.json`
+  Adds Joss Paper's observed exhaust count, threshold activations, observed and
+  blocked card draws, held turn/combat denominators, and turn-end 0-4 counters.
 - `white-star-relic-run.json`
   Adds White Star activations, generated Rare card offers split by
   Attack/Skill/Power, and terminally declined rare-card reward screens.

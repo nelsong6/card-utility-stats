@@ -1716,6 +1716,7 @@ public static class RunTracker
         RecordHeldCombatRelicBaselinesForTrackedPlayerLocked(requireActiveCombat: false, createPendingIfNeeded: false);
         RecordPocketwatchTurnForTrackedPlayerLocked();
         RecordPollinousCoreTurnForTrackedPlayerLocked();
+        RecordJossPaperTurnForTrackedPlayerLocked();
         RecordLetterOpenerTurnForTrackedPlayerLocked();
         RecordTuningForkTurnForTrackedPlayerLocked();
         RecordCloakClaspTurnForTrackedPlayerLocked();
@@ -1833,6 +1834,14 @@ public static class RunTracker
         target.PollinousCoreTurnsEndedOn1Counter += source.PollinousCoreTurnsEndedOn1Counter;
         target.PollinousCoreTurnsEndedOn2Counters += source.PollinousCoreTurnsEndedOn2Counters;
         target.PollinousCoreTurnsEndedOn3Counters += source.PollinousCoreTurnsEndedOn3Counters;
+        target.JossPaperCardsExhausted += source.JossPaperCardsExhausted;
+        target.JossPaperTurns += source.JossPaperTurns;
+        target.JossPaperCombats += source.JossPaperCombats;
+        target.JossPaperTurnsEndedOn0Counters += source.JossPaperTurnsEndedOn0Counters;
+        target.JossPaperTurnsEndedOn1Counter += source.JossPaperTurnsEndedOn1Counter;
+        target.JossPaperTurnsEndedOn2Counters += source.JossPaperTurnsEndedOn2Counters;
+        target.JossPaperTurnsEndedOn3Counters += source.JossPaperTurnsEndedOn3Counters;
+        target.JossPaperTurnsEndedOn4Counters += source.JossPaperTurnsEndedOn4Counters;
         target.PendulumCombats += source.PendulumCombats;
         target.PendulumCombatsEndedOn0Charges += source.PendulumCombatsEndedOn0Charges;
         target.PendulumCombatsEndedOn1Charge += source.PendulumCombatsEndedOn1Charge;
@@ -4346,6 +4355,7 @@ public static class RunTracker
     private const string UnsettlingLampRelicId = "RELIC.UNSETTLING_LAMP";
     private const string PocketwatchRelicId = "RELIC.POCKETWATCH";
     private const string PollinousCoreRelicId = "RELIC.POLLINOUS_CORE";
+    private const string JossPaperRelicId = "RELIC.JOSS_PAPER";
     private const string OrichalcumRelicId = "RELIC.ORICHALCUM";
     private const string PermafrostRelicId = "RELIC.PERMAFROST";
     private const string TuningForkRelicId = "RELIC.TUNING_FORK";
@@ -4966,6 +4976,246 @@ public static class RunTracker
         var observed = Math.Min(attempted, Math.Max(0, cardsDrawn));
         agg.AdditionalCardsDrawn += observed;
         agg.AdditionalCardDrawsBlocked += attempted - observed;
+    }
+
+    /// <summary>
+    /// Records one card that Joss Paper itself observed exhausting. This is
+    /// independent of the Card Stats preference and includes Ethereal cards,
+    /// whose threshold resolution is deliberately deferred by the game until
+    /// the player side finishes flushing the hand.
+    /// </summary>
+    public static void RecordJossPaperCardExhausted(
+        JossPaper? relic,
+        CardModel? card)
+    {
+        if (relic?.Owner == null || card?.Owner == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(relic.Owner)) return;
+                if (!ReferenceEquals(card.Owner, relic.Owner)) return;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordJossPaperCombatForPlayerLocked(relic.Owner);
+                var agg = GetOrCreatePendingRelicAggregateLocked(JossPaperRelicId);
+                RecordJossPaperCardsExhaustedForTest(agg);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordJossPaperCardExhausted failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Records each completed five-card threshold as an activation and arms
+    /// the immediately following Joss Paper draw for observed-result tracking.
+    /// One deferred Ethereal batch can cross more than one threshold.
+    /// </summary>
+    public static PendingJossPaperDraw? ArmJossPaperDrawAttribution(
+        JossPaper? relic,
+        int cardsRequested)
+    {
+        if (relic?.Owner == null || cardsRequested <= 0) return null;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(relic.Owner)) return null;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordJossPaperCombatForPlayerLocked(relic.Owner);
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(JossPaperRelicId);
+                RecordJossPaperActivationForTest(agg, cardsRequested);
+
+                var pending = new PendingJossPaperDraw(
+                    relic.Owner,
+                    cardsRequested);
+                _pendingCombat.PendingJossPaperDraws[relic.Owner] = pending;
+                return pending;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"ArmJossPaperDrawAttribution failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+    public static bool TryConsumeJossPaperDrawAttribution(
+        Player? player,
+        bool fromHandDraw,
+        decimal count,
+        out PendingJossPaperDraw? pending)
+    {
+        pending = null;
+        if (player == null || fromHandDraw) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null
+                    || !_pendingCombat.PendingJossPaperDraws.Remove(
+                        player,
+                        out var candidate))
+                {
+                    return false;
+                }
+
+                var requested = count > 0m
+                    ? (int)Math.Ceiling(count)
+                    : 0;
+                if (requested != candidate.CardsRequested) return false;
+
+                pending = candidate;
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"TryConsumeJossPaperDrawAttribution failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    public static void RecordJossPaperDrawResult(
+        PendingJossPaperDraw? pending,
+        int cardsDrawn)
+    {
+        if (pending == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(pending.Owner)) return;
+                var agg = GetOrCreatePendingRelicAggregateLocked(JossPaperRelicId);
+                RecordJossPaperDrawResultForTest(
+                    agg,
+                    pending.CardsRequested,
+                    cardsDrawn);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordJossPaperDrawResult failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void DisarmJossPaperDrawAttribution(
+        PendingJossPaperDraw? pending)
+    {
+        if (pending == null) return;
+
+        lock (_lock)
+        {
+            if (_pendingCombat == null) return;
+            if (_pendingCombat.PendingJossPaperDraws.TryGetValue(
+                    pending.Owner,
+                    out var current)
+                && ReferenceEquals(current, pending))
+            {
+                _pendingCombat.PendingJossPaperDraws.Remove(pending.Owner);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Snapshots Joss Paper after its owner-side turn-end callback completes,
+    /// so deferred Ethereal exhausts and any resulting reset are included.
+    /// </summary>
+    public static void RecordJossPaperTurnEnded(JossPaper? relic)
+    {
+        if (relic?.Owner == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(relic.Owner)) return;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordJossPaperTurnForPlayerLocked(
+                    relic.Owner,
+                    relic.Owner.PlayerCombatState?.TurnNumber ?? 0);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordJossPaperTurnEnded failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordJossPaperCardsExhaustedForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.JossPaperCardsExhausted += Math.Max(0, count);
+    }
+
+    internal static void RecordJossPaperActivationForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.Activations += Math.Max(0, count);
+    }
+
+    internal static void RecordJossPaperDrawResultForTest(
+        RelicAggregate agg,
+        int cardsRequested,
+        int cardsDrawn)
+    {
+        if (agg == null) return;
+
+        var attempted = Math.Max(0, cardsRequested);
+        var observed = Math.Min(attempted, Math.Max(0, cardsDrawn));
+        agg.AdditionalCardsDrawn += observed;
+        agg.AdditionalCardDrawsBlocked += attempted - observed;
+    }
+
+    internal static void RecordJossPaperCombatForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.JossPaperCombats += Math.Max(0, count);
+    }
+
+    internal static void RecordJossPaperTurnEndForTest(
+        RelicAggregate agg,
+        int counter)
+    {
+        if (agg == null || counter is < 0 or > 4) return;
+
+        agg.JossPaperTurns += 1;
+        switch (counter)
+        {
+            case 0:
+                agg.JossPaperTurnsEndedOn0Counters += 1;
+                break;
+            case 1:
+                agg.JossPaperTurnsEndedOn1Counter += 1;
+                break;
+            case 2:
+                agg.JossPaperTurnsEndedOn2Counters += 1;
+                break;
+            case 3:
+                agg.JossPaperTurnsEndedOn3Counters += 1;
+                break;
+            case 4:
+                agg.JossPaperTurnsEndedOn4Counters += 1;
+                break;
+        }
     }
 
     /// <summary>
@@ -18604,6 +18854,7 @@ public static class RunTracker
             RecordPermafrostCombatForPlayerLocked(player);
             RecordPocketwatchCombatForPlayerLocked(player);
             RecordPollinousCoreCombatForPlayerLocked(player);
+            RecordJossPaperCombatForPlayerLocked(player);
             RecordLetterOpenerCombatForPlayerLocked(player);
             RecordTuningForkCombatForPlayerLocked(player);
             RecordCloakClaspCombatForPlayerLocked(player);
@@ -18694,6 +18945,16 @@ public static class RunTracker
 
         var agg = GetOrCreatePendingRelicAggregateLocked(PollinousCoreRelicId);
         RecordPollinousCoreCombatForTest(agg);
+    }
+
+    private static void RecordJossPaperCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!TryGetJossPaper(player, out _)) return;
+        if (!_pendingCombat.JossPaperCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(JossPaperRelicId);
+        RecordJossPaperCombatForTest(agg);
     }
 
     private static void RecordPocketwatchCardPlayedLocked(CardModel card)
@@ -19841,6 +20102,49 @@ public static class RunTracker
         RecordIronClubCombatEndChargeForTest(agg, IronClubCharge(ironClub));
     }
 
+    private static void RecordJossPaperTurnForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordJossPaperTurnForPlayerLocked(
+                player,
+                player.PlayerCombatState?.TurnNumber ?? 0);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug(
+                $"RecordJossPaperTurnForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static bool RecordJossPaperTurnForPlayerLocked(
+        Player player,
+        int turnNumber)
+    {
+        if (_pendingCombat == null) return false;
+        if (!TryGetJossPaper(player, out var jossPaper) || jossPaper == null)
+            return false;
+        if (turnNumber <= 0) return false;
+
+        if (_pendingCombat.JossPaperTurnCountedTurns.TryGetValue(
+                player,
+                out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return true;
+        }
+
+        _pendingCombat.JossPaperTurnCountedTurns[player] = turnNumber;
+        RecordJossPaperCombatForPlayerLocked(player);
+        var agg = GetOrCreatePendingRelicAggregateLocked(JossPaperRelicId);
+        RecordJossPaperTurnEndForTest(
+            agg,
+            JossPaperCounter(jossPaper));
+        return true;
+    }
+
     private static void RecordBookmarkCombatForTrackedPlayerLocked()
     {
         try
@@ -20434,6 +20738,37 @@ public static class RunTracker
         catch
         {
             return false;
+        }
+    }
+
+    private static bool TryGetJossPaper(
+        Player player,
+        out JossPaper? jossPaper)
+    {
+        jossPaper = null;
+        try
+        {
+            jossPaper = player?.Relics?.OfType<JossPaper>().FirstOrDefault();
+            return jossPaper != null;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static int JossPaperCounter(JossPaper relic)
+    {
+        try
+        {
+            var threshold = Math.Max(
+                1,
+                relic.DynamicVars["ExhaustAmount"].IntValue);
+            return Math.Max(0, relic.CardsExhausted) % threshold;
+        }
+        catch
+        {
+            return Math.Max(0, relic.CardsExhausted) % 5;
         }
     }
 
@@ -24969,6 +25304,12 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, PendingPollinousCoreDraw> PendingPollinousCoreDraws { get; }
         = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> JossPaperCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> JossPaperTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, PendingJossPaperDraw> PendingJossPaperDraws { get; }
+        = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> PocketwatchCardCountTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> PocketwatchCardsPlayedThisTurn { get; }
@@ -25200,6 +25541,18 @@ internal sealed class PendingPollinousCoreDraw
         CardsRequested = Math.Max(0, cardsRequested);
     }
 
+    public int CardsRequested { get; }
+}
+
+public sealed class PendingJossPaperDraw
+{
+    public PendingJossPaperDraw(Player owner, int cardsRequested)
+    {
+        Owner = owner;
+        CardsRequested = Math.Max(0, cardsRequested);
+    }
+
+    public Player Owner { get; }
     public int CardsRequested { get; }
 }
 

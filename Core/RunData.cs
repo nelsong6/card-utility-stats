@@ -572,6 +572,20 @@ public class RelicAggregate
     public int PollinousCoreTurnsEndedOn2Counters { get; set; }
     public int PollinousCoreTurnsEndedOn3Counters { get; set; }
 
+    // Joss Paper observes every owned card exhausted while held. Each full
+    // five-card threshold is one activation and one requested card draw.
+    // AdditionalCardsDrawn / AdditionalCardDrawsBlocked store the observed
+    // draw result. End-of-turn snapshots retain its 0-4 remainder
+    // distribution, including the deferred Ethereal exhaust batch.
+    public int JossPaperCardsExhausted { get; set; }
+    public int JossPaperTurns { get; set; }
+    public int JossPaperCombats { get; set; }
+    public int JossPaperTurnsEndedOn0Counters { get; set; }
+    public int JossPaperTurnsEndedOn1Counter { get; set; }
+    public int JossPaperTurnsEndedOn2Counters { get; set; }
+    public int JossPaperTurnsEndedOn3Counters { get; set; }
+    public int JossPaperTurnsEndedOn4Counters { get; set; }
+
     // Combats where Pendulum was held, including combats too short for it to
     // activate. Used as the denominator for cards drawn per combat.
     public int PendulumCombats { get; set; }

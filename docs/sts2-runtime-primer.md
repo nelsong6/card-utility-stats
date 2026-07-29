@@ -484,6 +484,16 @@ This preserves activations when draw prevention yields no cards and avoids
 crediting Bag for a starting hand that Innate cards would already have made
 equally large.
 
+Joss Paper is a mixed immediate/deferred exhaust counter. Its owner-specific
+`AfterCardExhausted` callback is the authoritative successful-exhaust count,
+but Ethereal cards are only folded into `CardsExhausted` at
+`AfterSideTurnEnd`. Patch the private `DrawIfThresholdMet` method to count every
+completed five-card threshold (one deferred batch can cross multiple
+thresholds), then observe the returned cards from the exact four-argument
+`CardPileCmd.Draw` call instead of assuming every requested draw reached the
+hand. Sample the 0-4 remainder only after Joss Paper's awaited turn-end callback
+finishes, so the snapshot includes Ethereal cards and any resulting reset.
+
 Centennial Puzzle already exposes the exact combat-local state needed for a
 live tooltip through `UsedThisCombat`. The relic sets it before drawing from
 its first qualifying unblocked HP-loss callback and resets it in

@@ -356,6 +356,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is JossPaper)
+        {
+            title = "Joss Paper";
+            body = BuildJossPaperBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is Orichalcum)
         {
             title = "Orichalcum";
@@ -1548,6 +1555,102 @@ public static class RelicHoverShowPatch
             FormatDecimal(averageCardsDrawnPerCombat),
             "",
             "Average cards drawn per combat — observed Pollinous Core cards drawn divided by combats where it was held.");
+        return sb.ToString();
+    }
+
+    private static string BuildJossPaperBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var combats = agg.JossPaperCombats;
+        var averageActivationsPerCombat = combats <= 0
+            ? 0m
+            : (decimal)agg.Activations / combats;
+        var averageExhaustsPerCombat = combats <= 0
+            ? 0m
+            : (decimal)agg.JossPaperCardsExhausted / combats;
+        var averageTurnsPerCombat = combats <= 0
+            ? 0m
+            : (decimal)agg.JossPaperTurns / combats;
+        var averageCardsDrawnPerCombat = combats <= 0
+            ? 0m
+            : (decimal)agg.AdditionalCardsDrawn / combats;
+
+        RelicActivationRow(
+            sb,
+            agg.Activations.ToString(),
+            "Activations — five-card exhaust thresholds reached by Joss Paper.");
+        ConceptRow(
+            sb,
+            "exhaust",
+            agg.JossPaperCardsExhausted.ToString(),
+            "Cards exhausted while Joss Paper was held.");
+        Row3(
+            sb,
+            "Turns ended on 0 counters",
+            agg.JossPaperTurnsEndedOn0Counters.ToString(),
+            "",
+            "Player turns that ended after Joss Paper activated and reset its counter to zero.");
+        Row3(
+            sb,
+            "Turns ended on 1 counter",
+            agg.JossPaperTurnsEndedOn1Counter.ToString(),
+            "",
+            "Player turns that ended with Joss Paper showing one counter.");
+        Row3(
+            sb,
+            "Turns ended on 2 counters",
+            agg.JossPaperTurnsEndedOn2Counters.ToString(),
+            "",
+            "Player turns that ended with Joss Paper showing two counters.");
+        Row3(
+            sb,
+            "Turns ended on 3 counters",
+            agg.JossPaperTurnsEndedOn3Counters.ToString(),
+            "",
+            "Player turns that ended with Joss Paper showing three counters.");
+        Row3(
+            sb,
+            "Turns ended on 4 counters",
+            agg.JossPaperTurnsEndedOn4Counters.ToString(),
+            "",
+            "Player turns that ended with Joss Paper showing four counters.");
+        Row3(
+            sb,
+            "Avg activations/combat",
+            FormatDecimal(averageActivationsPerCombat),
+            "",
+            "Average activations per combat — thresholds reached divided by combats where Joss Paper was held.");
+        DescribedIconRow(
+            sb,
+            ["average", "exhaust", "combat"],
+            ["combat"],
+            string.Empty,
+            FormatDecimal(averageExhaustsPerCombat),
+            "Average cards exhausted per combat while Joss Paper was held.");
+        Row3(
+            sb,
+            "Avg turns/combat",
+            FormatDecimal(averageTurnsPerCombat),
+            "",
+            "Average turns per combat — completed player turns divided by combats where Joss Paper was held.");
+        Row3(
+            sb,
+            "Cards drawn",
+            agg.AdditionalCardsDrawn.ToString(),
+            "",
+            "Cards drawn — Joss Paper cards that actually reached the hand.");
+        Row3(
+            sb,
+            "Card draws blocked",
+            agg.AdditionalCardDrawsBlocked.ToString(),
+            "",
+            "Card draws blocked — Joss Paper draws prevented by draw limits, a full hand, or draw-prevention effects.");
+        Row3(
+            sb,
+            "Avg cards drawn/combat",
+            FormatDecimal(averageCardsDrawnPerCombat),
+            "",
+            "Average cards drawn per combat — observed Joss Paper draws divided by combats where it was held.");
         return sb.ToString();
     }
 
