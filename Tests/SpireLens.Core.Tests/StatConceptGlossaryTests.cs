@@ -57,6 +57,7 @@ public class StatConceptGlossaryTests
                 "stars",
                 "strength",
                 "strength_gained",
+                "swift",
                 "turn",
                 "attack_uncommon",
                 "card_uncommon",
@@ -133,6 +134,7 @@ public class StatConceptGlossaryTests
         var power = StatConceptGlossary.RenderHintedGlyph("power");
         var skill = StatConceptGlossary.RenderHintedGlyph("skill");
         var strengthGained = StatConceptGlossary.RenderHintedGlyph("strength_gained");
+        var swift = StatConceptGlossary.RenderHintedGlyph("swift");
         var turn = StatConceptGlossary.RenderHintedGlyph("turn");
         var unknownRoom = StatConceptGlossary.RenderHintedGlyph("unknown_room");
         var upgraded = StatConceptGlossary.RenderHintedGlyph("upgraded");
@@ -167,6 +169,7 @@ public class StatConceptGlossaryTests
             power,
             skill,
             strengthGained,
+            swift,
             turn,
             unknownRoom,
             upgraded,
@@ -265,6 +268,8 @@ public class StatConceptGlossaryTests
         Assert.Contains(
             "user://SpireLens/generated-icons/strength_gained-",
             strengthGained);
+        Assert.Contains("[hint=\"Swift:", swift);
+        Assert.Contains("res://images/enchantments/swift.png", swift);
         Assert.Contains("[hint=\"Turn:", turn);
         Assert.Contains(
             "user://SpireLens/generated-icons/turn-",

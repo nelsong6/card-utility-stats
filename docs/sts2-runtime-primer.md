@@ -1064,6 +1064,15 @@ Drowning Beacon applies its max-HP loss before obtaining Fresnel Lens; wrap the
 full async `DrowningBeacon.ClimbOption` to preserve the observed before/after
 max HP because a relic pickup hook begins too late to recover the baseline.
 
+Wing Charm uses the same native card-reward provenance: its
+`TryModifyCardRewardOptionsLate` callback applies Swift to one eligible
+`CardCreationResult` and records Wing Charm in `ModifyingRelics`. Snapshot that
+exact result object and its final rarity when the selection opens. A result
+removed from `CardReward._cards` was successfully taken; a terminal selection
+or outer skip with the result remaining is not taken. A reroll visibly offered
+the old Swift option, so resolve that option before `_cards` is cleared, then
+register the newly generated Swift option after repopulation.
+
 Silver Crucible's first, second, and third reward numbers are generation order,
 not click order. `CardReward.Populate` runs before the outer rewards page is
 shown, and `SilverCrucible.AfterModifyingCardRewardOptions` synchronously

@@ -123,6 +123,7 @@ public static class CardRewardAttributedRelicOnSelectStatsPatch
             RunTracker.NoteWhiteStarRewardOpened(__instance);
             RunTracker.NotePrayerWheelRewardOpened(__instance);
             RunTracker.NoteSilkenTressRewardOpened(__instance);
+            RunTracker.NoteWingCharmRewardOpened(__instance);
         }
         catch (Exception e)
         {
@@ -148,12 +149,15 @@ public static class CardRewardAttributedRelicOnSelectStatsPatch
             RunTracker.RecordWhiteStarRewardResolved(reward, completed);
             RunTracker.RecordPrayerWheelRewardResolved(reward, completed);
             RunTracker.RecordSilkenTressRewardResolved(reward);
+            if (completed)
+                RunTracker.RecordWingCharmRewardResolved(reward);
         }
         catch (Exception e)
         {
             RunTracker.RecordWhiteStarRewardResolved(reward, completed: false);
             RunTracker.RecordPrayerWheelRewardResolved(reward, completed: false);
             RunTracker.CancelSilkenTressReward(reward);
+            RunTracker.CancelWingCharmReward(reward);
             CoreMain.LogDebug(
                 $"CardRewardAttributedRelicOnSelectStatsPatch failed: {e.Message}");
         }
@@ -175,6 +179,7 @@ public static class CardRewardAttributedRelicOnSkippedStatsPatch
             RunTracker.RecordWhiteStarRewardSkipped(__instance);
             RunTracker.RecordPrayerWheelRewardSkipped(__instance);
             RunTracker.CancelSilkenTressReward(__instance);
+            RunTracker.RecordWingCharmRewardResolved(__instance);
         }
         catch (Exception e)
         {
@@ -191,6 +196,20 @@ public static class CardRewardAttributedRelicOnSkippedStatsPatch
 [HarmonyPatch(typeof(CardReward), nameof(CardReward.Reroll))]
 public static class CardRewardAttributedRelicRerollStatsPatch
 {
+    [HarmonyPrefix]
+    public static void Prefix(CardReward __instance)
+    {
+        try
+        {
+            RunTracker.RecordWingCharmRewardResolved(__instance);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug(
+                $"CardRewardAttributedRelicRerollStatsPatch.Prefix failed: {e.Message}");
+        }
+    }
+
     [HarmonyPostfix]
     public static void Postfix(CardReward __instance)
     {
@@ -199,6 +218,7 @@ public static class CardRewardAttributedRelicRerollStatsPatch
             RunTracker.RefreshWhiteStarRewardAfterReroll(__instance);
             RunTracker.RefreshPrayerWheelRewardAfterReroll(__instance);
             RunTracker.RefreshSilkenTressRewardAfterReroll(__instance);
+            RunTracker.NoteWingCharmRewardOpened(__instance);
         }
         catch (Exception e)
         {

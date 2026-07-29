@@ -3653,6 +3653,29 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsWingCharmRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("wing-charm-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertWingCharmFixture(
+            loaded.Data.RelicAggregates["RELIC.WING_CHARM"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsWingCharmRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("wing-charm-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertWingCharmFixture(
+            resumed!.RelicAggregates["RELIC.WING_CHARM"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsSilverCrucibleRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("silver-crucible-relic-run.json"));
@@ -4474,6 +4497,15 @@ public class SchemaLoadingTests
         Assert.Equal(2, relicAgg.RewardScreensWithThreeOrMoreNimbleCards);
         Assert.Equal(5, relicAgg.RewardScreensWithoutNimbleCards);
         Assert.Equal(4, relicAgg.RewardScreensWithNimbleCardsButNoneTaken);
+    }
+
+    private static void AssertWingCharmFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(3, relicAgg.WingCharmSwiftCardsTaken);
+        Assert.Equal(4, relicAgg.WingCharmSwiftCardsNotTaken);
+        Assert.Equal(4, relicAgg.WingCharmCommonSwiftCardsOffered);
+        Assert.Equal(2, relicAgg.WingCharmUncommonSwiftCardsOffered);
+        Assert.Equal(1, relicAgg.WingCharmRareSwiftCardsOffered);
     }
 
     private static void AssertPaelsToothFixture(RelicAggregate relicAgg)

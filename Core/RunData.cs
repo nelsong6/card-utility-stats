@@ -1223,6 +1223,14 @@ public class RelicAggregate
     public int RewardScreensWithoutNimbleCards { get; set; }
     public int RewardScreensWithNimbleCardsButNoneTaken { get; set; }
 
+    // Wing Charm card-reward tracking. Each offered rarity is sourced from
+    // the exact CardCreationResult modified by Wing Charm with Swift.
+    public int WingCharmSwiftCardsTaken { get; set; }
+    public int WingCharmSwiftCardsNotTaken { get; set; }
+    public int WingCharmCommonSwiftCardsOffered { get; set; }
+    public int WingCharmUncommonSwiftCardsOffered { get; set; }
+    public int WingCharmRareSwiftCardsOffered { get; set; }
+
     // Ordered card-reward offers modified by Silver Crucible. Each screen is
     // keyed by the relic's own one-based use number (1-3), while Cards keeps
     // the visible left-to-right option order and, once resolved, explicit

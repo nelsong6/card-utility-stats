@@ -722,6 +722,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is WingCharm)
+        {
+            title = "Wing Charm";
+            body = BuildWingCharmBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is FishingRod)
         {
             title = "Fishing Rod";
@@ -2256,6 +2263,60 @@ public static class RelicHoverShowPatch
             ["nimble"],
             [],
             label,
+            value.ToString(),
+            fullDescription);
+    }
+
+    private static string BuildWingCharmBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        WingCharmSwiftRow(
+            sb,
+            "card",
+            "taken",
+            agg.WingCharmSwiftCardsTaken,
+            "Swift cards successfully taken from Wing Charm-modified rewards.");
+        WingCharmSwiftRow(
+            sb,
+            "card",
+            "not taken",
+            agg.WingCharmSwiftCardsNotTaken,
+            "Swift cards offered by Wing Charm but not taken.");
+        WingCharmSwiftRow(
+            sb,
+            "card",
+            "offered",
+            agg.WingCharmCommonSwiftCardsOffered,
+            "Common Swift cards offered by Wing Charm.");
+        WingCharmSwiftRow(
+            sb,
+            "card_uncommon",
+            "offered",
+            agg.WingCharmUncommonSwiftCardsOffered,
+            "Uncommon Swift cards offered by Wing Charm.");
+        WingCharmSwiftRow(
+            sb,
+            "card_rare",
+            "offered",
+            agg.WingCharmRareSwiftCardsOffered,
+            "Rare Swift cards offered by Wing Charm.");
+        return sb.ToString();
+    }
+
+    private static void WingCharmSwiftRow(
+        StringBuilder sb,
+        string cardConceptId,
+        string action,
+        int value,
+        string fullDescription)
+    {
+        var iconExpression =
+            $"[b]+[/b] {StatConceptGlossary.RenderHintedGlyph("swift")} {action}";
+        DescribedIconFlowRow(
+            sb,
+            new[] { cardConceptId },
+            Array.Empty<string>(),
+            iconExpression,
             value.ToString(),
             fullDescription);
     }

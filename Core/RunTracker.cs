@@ -142,6 +142,7 @@ public static class RunTracker
     private static readonly Dictionary<CardReward, PendingPaelSacrificeReward> _paelSacrificeRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, PendingFresnelLensReward> _fresnelLensRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, PendingSilkenTressReward> _silkenTressRewards = new(ReferenceEqualityComparer.Instance);
+    private static readonly Dictionary<CardReward, PendingWingCharmReward> _wingCharmRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, PendingSilverCrucibleReward> _silverCrucibleRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, PendingOrreryReward> _orreryRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, int> _whiteStarRewardRareCardsBeforeSelection =
@@ -1133,6 +1134,7 @@ public static class RunTracker
         _paelSacrificeRewards.Clear();
         _fresnelLensRewards.Clear();
         _silkenTressRewards.Clear();
+        _wingCharmRewards.Clear();
         _silverCrucibleRewards.Clear();
         _orreryRewards.Clear();
         _whiteStarRewardRareCardsBeforeSelection.Clear();
@@ -2145,6 +2147,11 @@ public static class RunTracker
         target.RewardScreensWithThreeOrMoreNimbleCards += source.RewardScreensWithThreeOrMoreNimbleCards;
         target.RewardScreensWithoutNimbleCards += source.RewardScreensWithoutNimbleCards;
         target.RewardScreensWithNimbleCardsButNoneTaken += source.RewardScreensWithNimbleCardsButNoneTaken;
+        target.WingCharmSwiftCardsTaken += source.WingCharmSwiftCardsTaken;
+        target.WingCharmSwiftCardsNotTaken += source.WingCharmSwiftCardsNotTaken;
+        target.WingCharmCommonSwiftCardsOffered += source.WingCharmCommonSwiftCardsOffered;
+        target.WingCharmUncommonSwiftCardsOffered += source.WingCharmUncommonSwiftCardsOffered;
+        target.WingCharmRareSwiftCardsOffered += source.WingCharmRareSwiftCardsOffered;
         MergeCardRewardScreens(target, source);
         MergeOrreryRewards(target, source);
         MergeCardRewardCategories(target.CardRewardCategories, source.CardRewardCategories);
@@ -4379,6 +4386,7 @@ public static class RunTracker
     private const string PrismaticGemRelicId = "RELIC.PRISMATIC_GEM";
     private const string SealOfGoldRelicId = "RELIC.SEAL_OF_GOLD";
     private const string FresnelLensRelicId = "RELIC.FRESNEL_LENS";
+    private const string WingCharmRelicId = "RELIC.WING_CHARM";
     private const string SilverCrucibleRelicId = "RELIC.SILVER_CRUCIBLE";
     private const string OrreryRelicId = "RELIC.ORRERY";
     private const string BloodSoakedRoseRelicId = "RELIC.BLOOD_SOAKED_ROSE";
@@ -16333,6 +16341,107 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Snapshot the exact reward option Wing Charm modified with Swift. The
+    /// same reward may be reopened, so an existing snapshot is preserved
+    /// until a terminal selection, outer skip, or reroll resolves it.
+    /// </summary>
+    public static void NoteWingCharmRewardOpened(CardReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(reward.Player)) return;
+                if (_wingCharmRewards.ContainsKey(reward)) return;
+
+                var pending = PendingWingCharmReward.FromReward(reward);
+                if (pending.Options.Count > 0)
+                    _wingCharmRewards[reward] = pending;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"NoteWingCharmRewardOpened failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Resolve the visible Swift options against CardReward's remaining result
+    /// objects. A result disappears only after its card successfully enters
+    /// the deck, making taken versus not-taken an observed outcome.
+    /// </summary>
+    public static void RecordWingCharmRewardResolved(CardReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_wingCharmRewards.Remove(reward, out var pending)) return;
+                if (!IsTrackedPlayer(reward.Player)) return;
+
+                var remaining = new HashSet<CardCreationResult>(
+                    reward._cards,
+                    ReferenceEqualityComparer.Instance);
+                var taken = pending.Options.Count(option =>
+                    !remaining.Contains(option.Result));
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(
+                    WingCharmRelicId);
+                RecordWingCharmRewardForTest(
+                    agg,
+                    pending.Options.Select(option => option.Rarity),
+                    taken);
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordWingCharmRewardResolved failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void CancelWingCharmReward(CardReward reward)
+    {
+        if (reward == null) return;
+        lock (_lock)
+            _wingCharmRewards.Remove(reward);
+    }
+
+    internal static void RecordWingCharmRewardForTest(
+        RelicAggregate agg,
+        IEnumerable<CardRarity>? offeredRarities,
+        int takenCount)
+    {
+        if (agg == null || offeredRarities == null) return;
+
+        var rarities = offeredRarities.ToList();
+        var taken = Math.Clamp(takenCount, 0, rarities.Count);
+        agg.WingCharmSwiftCardsTaken += taken;
+        agg.WingCharmSwiftCardsNotTaken += rarities.Count - taken;
+
+        foreach (var rarity in rarities)
+        {
+            switch (rarity)
+            {
+                case CardRarity.Common:
+                    agg.WingCharmCommonSwiftCardsOffered += 1;
+                    break;
+                case CardRarity.Uncommon:
+                    agg.WingCharmUncommonSwiftCardsOffered += 1;
+                    break;
+                case CardRarity.Rare:
+                    agg.WingCharmRareSwiftCardsOffered += 1;
+                    break;
+            }
+        }
+    }
+
+    /// <summary>
     /// Record Drowning Beacon's observed max-HP cost across the full climb
     /// option. The event loses max HP before obtaining Fresnel Lens, so the
     /// relic's own pickup callbacks cannot recover the original value.
@@ -24675,6 +24784,44 @@ internal sealed class PendingFresnelLensReward
         }
 
         return result;
+    }
+}
+
+internal sealed record PendingWingCharmOption(
+    CardCreationResult Result,
+    CardRarity Rarity);
+
+internal sealed class PendingWingCharmReward
+{
+    public List<PendingWingCharmOption> Options { get; } = new();
+
+    public static PendingWingCharmReward FromReward(CardReward? reward)
+    {
+        var pending = new PendingWingCharmReward();
+        if (reward == null) return pending;
+
+        foreach (var option in reward._cards)
+        {
+            try
+            {
+                var card = option?.Card;
+                if (option == null
+                    || card?.Enchantment is not Swift
+                    || !option.ModifyingRelics.Any(relic =>
+                        relic is WingCharm
+                        && ReferenceEquals(relic.Owner, reward.Player)))
+                    continue;
+
+                pending.Options.Add(new PendingWingCharmOption(
+                    option,
+                    card.Rarity));
+            }
+            catch
+            {
+            }
+        }
+
+        return pending;
     }
 }
 

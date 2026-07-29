@@ -536,6 +536,16 @@
         "description": "Strength added by a card, relic, or other effect."
       }
     },
+    "swift": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/enchantments/swift.png"
+      },
+      "help": {
+        "label": "Swift",
+        "description": "A card enchanted with Swift."
+      }
+    },
     "turn": {
       "display": {
         "type": "embedded_image",
