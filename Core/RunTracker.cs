@@ -66,6 +66,7 @@ public static class RunTracker
     private const string EnthralledDefinitionId = "CARD.ENTHRALLED";
     private const string CursedPearlCurseDefinitionId = "CARD.GREED";
     private const string NormalityDefinitionId = "CARD.NORMALITY";
+    private const string DarkEmbracePowerId = "POWER.DARK_EMBRACE";
     private const string ShivDefinitionId = "CARD.SHIV";
     private const string SoulDefinitionId = "CARD.SOUL";
     private const string SovereignBladeLegacyDefinitionToken = "SOVEREIGN_BLADE";
@@ -1755,6 +1756,7 @@ public static class RunTracker
         RecordNunchakuCombatEndChargeForTrackedPlayerLocked();
         RecordIronClubCombatEndChargeForTrackedPlayerLocked();
         RecordSparklingRougeCombatEndForTrackedPlayerLocked();
+        RecordDarkEmbraceCombatTurnsForTrackedPlayerLocked();
 
         // Surviving player block at combat end never absorbed future
         // damage, so treat any remaining ledger as wasted before
@@ -3954,6 +3956,253 @@ public static class RunTracker
     {
         if (agg == null || cardsDrawn <= 0) return;
         agg.ViciousCardsDrawn += cardsDrawn;
+    }
+
+    internal static PendingDarkEmbraceDraw?
+        ArmDarkEmbraceImmediateDrawAttribution(
+            DarkEmbracePower? power,
+            CardModel? exhaustedCard,
+            bool causedByEthereal)
+    {
+        if (power?.Owner?.Player is not Player player) return null;
+        if (!DarkEmbraceImmediateDrawQualifiesForTest(
+                exhaustedCard?.Owner?.Creature == power.Owner,
+                causedByEthereal))
+        {
+            return null;
+        }
+
+        return ArmDarkEmbraceDrawAttribution(power, player);
+    }
+
+    internal static PendingDarkEmbraceDraw?
+        ArmDarkEmbraceDeferredDrawAttribution(
+            DarkEmbracePower? power,
+            IEnumerable<Creature>? participants)
+    {
+        if (power?.Owner?.Player is not Player player) return null;
+        if (participants == null || !participants.Contains(power.Owner))
+            return null;
+
+        return ArmDarkEmbraceDrawAttribution(power, player);
+    }
+
+    private static PendingDarkEmbraceDraw? ArmDarkEmbraceDrawAttribution(
+        DarkEmbracePower power,
+        Player player)
+    {
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return null;
+                if (CombatManager.Instance?.IsInProgress != true) return null;
+                if (!IsTrackedPlayer(player)) return null;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordDarkEmbracePowerActiveForPlayerLocked(power, player);
+
+                var pending = new PendingDarkEmbraceDraw
+                {
+                    PendingCombat = _pendingCombat,
+                    Owner = player,
+                    PowerId = power.Id.ToString(),
+                    DisplayName = GetPowerDisplayName(power),
+                };
+                _pendingCombat.PendingDarkEmbraceDraws[player] = pending;
+                return pending;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"ArmDarkEmbraceDrawAttribution failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+    internal static bool TryConsumeDarkEmbraceDrawAttribution(
+        Player? player,
+        bool fromHandDraw,
+        out PendingDarkEmbraceDraw? pending)
+    {
+        pending = null;
+        if (player == null || fromHandDraw) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null) return false;
+                if (!_pendingCombat.PendingDarkEmbraceDraws.Remove(
+                        player,
+                        out pending))
+                {
+                    return false;
+                }
+
+                if (ReferenceEquals(pending.PendingCombat, _pendingCombat))
+                    return true;
+                pending = null;
+                return false;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"TryConsumeDarkEmbraceDrawAttribution failed: {e.Message}");
+                pending = null;
+                return false;
+            }
+        }
+    }
+
+    internal static void RecordDarkEmbraceCardsDrawn(
+        PendingDarkEmbraceDraw? pending,
+        int cardsDrawn)
+    {
+        if (pending == null || cardsDrawn <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ReferenceEquals(pending.PendingCombat, _pendingCombat))
+                    return;
+                var agg = GetOrCreatePowerAggregate(
+                    _pendingCombat!.MetaStats,
+                    pending.PowerId,
+                    pending.DisplayName);
+                RecordDarkEmbraceCardsDrawnForTest(agg, cardsDrawn);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordDarkEmbraceCardsDrawn failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void DisarmDarkEmbraceDrawAttribution(
+        PendingDarkEmbraceDraw? pending)
+    {
+        if (pending == null) return;
+
+        lock (_lock)
+        {
+            if (_pendingCombat == null) return;
+            if (_pendingCombat.PendingDarkEmbraceDraws.TryGetValue(
+                    pending.Owner,
+                    out var active)
+                && ReferenceEquals(active, pending))
+            {
+                _pendingCombat.PendingDarkEmbraceDraws.Remove(pending.Owner);
+            }
+        }
+    }
+
+    public static void RecordDarkEmbracePowerTurnStarted(Player? player)
+    {
+        if (player?.Creature == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+                if (!IsTrackedPlayer(player)) return;
+                var power = player.Creature.GetPower<DarkEmbracePower>();
+                if (power == null) return;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordDarkEmbracePowerActiveForPlayerLocked(power, player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordDarkEmbracePowerTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void RecordDarkEmbracePowerActiveForPlayerLocked(
+        DarkEmbracePower power,
+        Player player)
+    {
+        if (_pendingCombat == null) return;
+
+        var agg = GetOrCreatePowerAggregate(
+            _pendingCombat.MetaStats,
+            power.Id.ToString(),
+            GetPowerDisplayName(power));
+
+        if (_pendingCombat.DarkEmbracePowerCombatCountedPlayers.Add(player))
+            agg.CombatsActive++;
+
+        int turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.DarkEmbracePowerTurnCountedTurns.TryGetValue(
+                player,
+                out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.DarkEmbracePowerTurnCountedTurns[player] = turnNumber;
+        agg.TurnsActive++;
+    }
+
+    private static void RecordDarkEmbraceCombatTurnsForTrackedPlayerLocked()
+    {
+        try
+        {
+            if (_pendingCombat == null) return;
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            if (!_pendingCombat.DarkEmbracePowerCombatCountedPlayers.Contains(
+                    player))
+            {
+                return;
+            }
+            if (!_pendingCombat.DarkEmbracePowerCombatTurnsRecordedPlayers.Add(
+                    player))
+            {
+                return;
+            }
+
+            int combatTurns = player.PlayerCombatState?.TurnNumber ?? 0;
+            var agg = GetOrCreatePowerAggregate(
+                _pendingCombat.MetaStats,
+                DarkEmbracePowerId,
+                "Dark Embrace");
+            RecordDarkEmbraceCombatTurnsForTest(agg, combatTurns);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug(
+                $"RecordDarkEmbraceCombatTurnsForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    internal static bool DarkEmbraceImmediateDrawQualifiesForTest(
+        bool exhaustedCardBelongsToOwner,
+        bool causedByEthereal)
+        => exhaustedCardBelongsToOwner && !causedByEthereal;
+
+    internal static void RecordDarkEmbraceCardsDrawnForTest(
+        PowerAggregate agg,
+        int cardsDrawn)
+    {
+        if (agg == null || cardsDrawn <= 0) return;
+        agg.DarkEmbraceCardsDrawn += cardsDrawn;
+    }
+
+    internal static void RecordDarkEmbraceCombatTurnsForTest(
+        PowerAggregate agg,
+        int combatTurns)
+    {
+        if (agg == null || combatTurns <= 0) return;
+        agg.DarkEmbraceCombatTurns += combatTurns;
     }
 
     internal static PendingStampedeCallback? ArmStampedeCallback(
@@ -25083,6 +25332,16 @@ public static class RunTracker
                         rupture.Owner.Player);
                 }
 
+                if (entry.Amount > 0m
+                    && entry.Power is DarkEmbracePower darkEmbrace
+                    && darkEmbrace.Owner?.Player != null
+                    && IsTrackedPlayer(darkEmbrace.Owner.Player))
+                {
+                    RecordDarkEmbracePowerActiveForPlayerLocked(
+                        darkEmbrace,
+                        darkEmbrace.Owner.Player);
+                }
+
                 var causingPlay = FindCurrentlyResolvingCardPlay();
                 if (causingPlay?.Card == null)
                 {
@@ -26087,6 +26346,10 @@ public static class RunTracker
             targetAgg.EntropyRareCardsGenerated +=
                 sourceAgg.EntropyRareCardsGenerated;
             targetAgg.ViciousCardsDrawn += sourceAgg.ViciousCardsDrawn;
+            targetAgg.DarkEmbraceCardsDrawn +=
+                sourceAgg.DarkEmbraceCardsDrawn;
+            targetAgg.DarkEmbraceCombatTurns +=
+                sourceAgg.DarkEmbraceCombatTurns;
             targetAgg.StampedeAttacksPlayed += sourceAgg.StampedeAttacksPlayed;
             targetAgg.StampedeCommonAttacksPlayed +=
                 sourceAgg.StampedeCommonAttacksPlayed;
@@ -26706,6 +26969,14 @@ internal sealed class PendingFeelNoPainBlockAttribution
     public required string DisplayName { get; init; }
 }
 
+internal sealed class PendingDarkEmbraceDraw
+{
+    public required PendingCombat PendingCombat { get; init; }
+    public required Player Owner { get; init; }
+    public required string PowerId { get; init; }
+    public required string DisplayName { get; init; }
+}
+
 /// <summary>
 /// Holds per-combat stats and events while a combat is in progress.
 /// Discarded if the combat doesn't finish cleanly; promoted into the run on CombatEnded.
@@ -26879,6 +27150,14 @@ internal class PendingCombat
     public Dictionary<Player, PendingEntropyTransformWindow> PendingEntropyTransformWindows { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, PendingViciousDraw> PendingViciousDraws { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, PendingDarkEmbraceDraw> PendingDarkEmbraceDraws { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> DarkEmbracePowerCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> DarkEmbracePowerTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> DarkEmbracePowerCombatTurnsRecordedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, PendingStampedeCallback> PendingStampedeCallbacks { get; }
         = new(ReferenceEqualityComparer.Instance);

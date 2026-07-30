@@ -718,6 +718,18 @@ including turns with no exhausts. Persist the numerator as `BlockGained` and
 the denominator as `TurnsActive` under `POWER.FEEL_NO_PAIN`, then project the
 shared quotient on every Feel No Pain card.
 
+`DarkEmbracePower` has two draw paths. Non-Ethereal owner cards draw
+immediately from `AfterCardExhausted`; Ethereal cards increment an internal
+counter and produce one deferred batch from `AfterSideTurnEnd`. Arm each native
+callback independently, consume the window at its direct `CardPileCmd.Draw`,
+and count only the cards returned by that command so blocked or capacity-limited
+draws stay observed outcomes. Count the application turn and later turns that
+start while the power is active for the active-turn denominator. Also count
+every player turn in a combat where Dark Embrace became active, including turns
+before it was played, by finalizing that combat-wide denominator at promotion.
+Persist both turn denominators, the active-combat count, and cards drawn under
+`POWER.DARK_EMBRACE`, then project all four rows on every Dark Embrace card.
+
 `DanseMacabrePower.BeforeCardPlayed` owns both the exact trigger condition and
 the block command: an owner card whose resolved energy cost is at least the
 power's Energy dynamic variable causes one flash and one awaited

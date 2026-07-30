@@ -26,6 +26,7 @@ public static class CardHoverShowPatch
     private const int DebtGoldLossPerTrigger = 5;
     private const string AggressionPowerId = "POWER.AGGRESSION";
     private const string DanseMacabrePowerId = "POWER.DANSE_MACABRE";
+    private const string DarkEmbracePowerId = "POWER.DARK_EMBRACE";
     private const string EntropyPowerId = "POWER.ENTROPY";
     private const string FeelNoPainPowerId = "POWER.FEEL_NO_PAIN";
     private const string FreeAttackPowerId = "POWER.FREE_ATTACK_POWER";
@@ -348,6 +349,7 @@ public static class CardHoverShowPatch
         AppendEntropyPowerStats(sb, cardModel, metaStats, compact: false);
         AppendJugglingPowerStats(sb, cardModel, metaStats, compact: false);
         AppendDanseMacabrePowerStats(sb, cardModel, metaStats, compact: false);
+        AppendDarkEmbracePowerStats(sb, cardModel, metaStats);
         AppendViciousPowerStats(sb, cardModel, metaStats);
         AppendStampedePowerStats(sb, cardModel, metaStats, compact: false);
         AppendAggressionPowerStats(sb, cardModel, metaStats);
@@ -572,6 +574,7 @@ public static class CardHoverShowPatch
         AppendEntropyPowerStats(sb, cardModel, metaStats, compact: true);
         AppendJugglingPowerStats(sb, cardModel, metaStats, compact: true);
         AppendDanseMacabrePowerStats(sb, cardModel, metaStats, compact: true);
+        AppendDarkEmbracePowerStats(sb, cardModel, metaStats);
         AppendViciousPowerStats(sb, cardModel, metaStats);
         AppendStampedePowerStats(sb, cardModel, metaStats, compact: true);
         AppendAggressionPowerStats(sb, cardModel, metaStats);
@@ -1102,6 +1105,69 @@ public static class CardHoverShowPatch
             sb,
             GetDrawStatLabel("cards drawn"),
             powerAgg.ViciousCardsDrawn.ToString(),
+            "");
+    }
+
+    private static void AppendDarkEmbracePowerStats(
+        StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel card,
+        RunMetaStats metaStats)
+    {
+        if (card is not DarkEmbrace
+            && !IsCardId(card, "CARD.DARK_EMBRACE"))
+        {
+            return;
+        }
+
+        metaStats ??= new RunMetaStats();
+        PowerAggregate? powerAgg = null;
+        if (metaStats.PowerAggregates != null)
+        {
+            metaStats.PowerAggregates.TryGetValue(
+                DarkEmbracePowerId,
+                out powerAgg);
+            powerAgg ??= metaStats.PowerAggregates.Values.FirstOrDefault(candidate =>
+                string.Equals(
+                    candidate.PowerId,
+                    DarkEmbracePowerId,
+                    StringComparison.Ordinal)
+                || string.Equals(
+                    candidate.DisplayName,
+                    "Dark Embrace",
+                    StringComparison.OrdinalIgnoreCase));
+        }
+        powerAgg ??= new PowerAggregate();
+
+        decimal cardsPerActiveTurn = powerAgg.TurnsActive > 0
+            ? (decimal)powerAgg.DarkEmbraceCardsDrawn / powerAgg.TurnsActive
+            : 0m;
+        decimal cardsPerTurn = powerAgg.DarkEmbraceCombatTurns > 0
+            ? (decimal)powerAgg.DarkEmbraceCardsDrawn
+                / powerAgg.DarkEmbraceCombatTurns
+            : 0m;
+        decimal cardsPerCombat = powerAgg.CombatsActive > 0
+            ? (decimal)powerAgg.DarkEmbraceCardsDrawn / powerAgg.CombatsActive
+            : 0m;
+
+        Row3(
+            sb,
+            GetDrawStatLabel("cards drawn"),
+            powerAgg.DarkEmbraceCardsDrawn.ToString(),
+            "");
+        Row3(
+            sb,
+            GetDrawStatLabel("avg / active turn"),
+            FormatDecimal(cardsPerActiveTurn),
+            "");
+        Row3(
+            sb,
+            GetDrawStatLabel("avg / turn"),
+            FormatDecimal(cardsPerTurn),
+            "");
+        Row3(
+            sb,
+            GetDrawStatLabel("avg / combat"),
+            FormatDecimal(cardsPerCombat),
             "");
     }
 

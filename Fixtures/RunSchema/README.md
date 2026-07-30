@@ -425,6 +425,9 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds Mummified Hand trigger costs, observed card discounts, energy-spend to
   discounted-cost ratios, held combat/turn denominators, and recipient
   card-type and rarity counts.
+- `dark-embrace-power-run.json`
+  Adds Dark Embrace's observed immediate and deferred cards drawn, its active
+  turn and active-combat denominators, and all turns in combats where active.
 - `burning-sticks-relic-run.json`
   Adds Burning Sticks confirmed duplicate activations, exact generated-card
   plays, duplicate rarity splits, and its held-combat denominator.

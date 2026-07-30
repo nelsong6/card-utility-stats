@@ -590,6 +590,20 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsDarkEmbracePowerFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("dark-embrace-power-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        AssertDarkEmbracePowerFixture(
+            loaded.Data.MetaStats.PowerAggregates["POWER.DARK_EMBRACE"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsStampedePowerFixture()
     {
         var loaded = RunStorage.LoadHistorical(
@@ -1446,6 +1460,17 @@ public class SchemaLoadingTests
         Assert.NotNull(resumed);
         AssertViciousPowerFixture(
             resumed!.MetaStats.PowerAggregates["POWER.VICIOUS"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsDarkEmbracePowerFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("dark-embrace-power-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertDarkEmbracePowerFixture(
+            resumed!.MetaStats.PowerAggregates["POWER.DARK_EMBRACE"]);
     }
 
     [Fact]
@@ -4413,6 +4438,16 @@ public class SchemaLoadingTests
         Assert.Equal("POWER.VICIOUS", powerAgg.PowerId);
         Assert.Equal("Vicious", powerAgg.DisplayName);
         Assert.Equal(11, powerAgg.ViciousCardsDrawn);
+    }
+
+    private static void AssertDarkEmbracePowerFixture(PowerAggregate powerAgg)
+    {
+        Assert.Equal("POWER.DARK_EMBRACE", powerAgg.PowerId);
+        Assert.Equal("Dark Embrace", powerAgg.DisplayName);
+        Assert.Equal(18, powerAgg.DarkEmbraceCardsDrawn);
+        Assert.Equal(6, powerAgg.TurnsActive);
+        Assert.Equal(9, powerAgg.DarkEmbraceCombatTurns);
+        Assert.Equal(3, powerAgg.CombatsActive);
     }
 
     private static void AssertStampedePowerFixture(PowerAggregate powerAgg)

@@ -451,6 +451,13 @@ public class PowerAggregate
     // Vulnerable. Failed/blocked draws contribute zero.
     public int ViciousCardsDrawn { get; set; }
 
+    // Dark Embrace tracking. Drawn cards are the observed results of both its
+    // immediate Exhaust draw and deferred Ethereal batch. TurnsActive counts
+    // only turns while the power is active; DarkEmbraceCombatTurns counts all
+    // player turns in combats where it became active.
+    public int DarkEmbraceCardsDrawn { get; set; }
+    public int DarkEmbraceCombatTurns { get; set; }
+
     // Stampede tracking. An Attack counts only after the exact autoplay
     // selected by Stampede reaches a finished primary play. Energy saved is
     // that play's resolved EnergyValue; autoplay itself spends zero.
