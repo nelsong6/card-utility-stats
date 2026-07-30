@@ -604,6 +604,20 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsFeelNoPainPowerFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("feel-no-pain-power-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        AssertFeelNoPainPowerFixture(
+            loaded.Data.MetaStats.PowerAggregates["POWER.FEEL_NO_PAIN"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsEntropyPowerFixture()
     {
         var loaded = RunStorage.LoadHistorical(
@@ -1415,6 +1429,17 @@ public class SchemaLoadingTests
         Assert.NotNull(resumed);
         AssertStampedePowerFixture(
             resumed!.MetaStats.PowerAggregates["POWER.STAMPEDE"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsFeelNoPainPowerFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("feel-no-pain-power-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertFeelNoPainPowerFixture(
+            resumed!.MetaStats.PowerAggregates["POWER.FEEL_NO_PAIN"]);
     }
 
     [Fact]
@@ -4349,6 +4374,14 @@ public class SchemaLoadingTests
         Assert.Equal(3, powerAgg.StampedeUncommonAttacksPlayed);
         Assert.Equal(2, powerAgg.StampedeRareAttacksPlayed);
         Assert.Equal(14, powerAgg.StampedeEnergySaved);
+    }
+
+    private static void AssertFeelNoPainPowerFixture(PowerAggregate powerAgg)
+    {
+        Assert.Equal("POWER.FEEL_NO_PAIN", powerAgg.PowerId);
+        Assert.Equal("Feel No Pain", powerAgg.DisplayName);
+        Assert.Equal(36m, powerAgg.BlockGained);
+        Assert.Equal(6, powerAgg.TurnsActive);
     }
 
     private static void AssertEntropyPowerFixture(PowerAggregate powerAgg)

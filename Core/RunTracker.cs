@@ -138,6 +138,7 @@ public static class RunTracker
     private static readonly List<Creature> _pendingIntimidatingHelmetBlockAttributions = new();
     private static readonly List<Creature> _pendingDaughterOfTheWindBlockAttributions = new();
     private static readonly List<PendingDanseMacabreBlockAttribution> _pendingDanseMacabreBlockAttributions = new();
+    private static readonly List<PendingFeelNoPainBlockAttribution> _pendingFeelNoPainBlockAttributions = new();
     private static readonly List<Creature> _pendingMercuryHourglassDamageAttributions = new();
     private static readonly List<Creature> _pendingMrStrugglesDamageAttributions = new();
     private static readonly List<Creature> _pendingLostWispDamageAttributions = new();
@@ -1114,6 +1115,7 @@ public static class RunTracker
         _pendingIntimidatingHelmetBlockAttributions.Clear();
         _pendingDaughterOfTheWindBlockAttributions.Clear();
         _pendingDanseMacabreBlockAttributions.Clear();
+        _pendingFeelNoPainBlockAttributions.Clear();
         _pendingMercuryHourglassDamageAttributions.Clear();
         _pendingMrStrugglesDamageAttributions.Clear();
         _pendingLostWispDamageAttributions.Clear();
@@ -3667,6 +3669,160 @@ public static class RunTracker
     }
 
     internal static void RecordDanseMacabreBlockGainedForTest(
+        PowerAggregate agg,
+        decimal amount)
+    {
+        if (agg == null || amount <= 0m) return;
+        agg.BlockGained += amount;
+    }
+
+    internal static PendingFeelNoPainBlockAttribution?
+        ArmFeelNoPainBlockAttribution(
+            FeelNoPainPower? power,
+            CardModel? exhaustedCard)
+    {
+        if (power?.Owner?.Player is not Player player
+            || exhaustedCard?.Owner?.Creature == null)
+        {
+            return null;
+        }
+        if (exhaustedCard.Owner.Creature != power.Owner) return null;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return null;
+                if (CombatManager.Instance?.IsInProgress != true) return null;
+                if (!IsTrackedPlayer(player)) return null;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordFeelNoPainPowerActiveForPlayerLocked(power, player);
+
+                var attribution = new PendingFeelNoPainBlockAttribution
+                {
+                    PendingCombat = _pendingCombat,
+                    Owner = power.Owner,
+                    PowerId = power.Id.ToString(),
+                    DisplayName = GetPowerDisplayName(power),
+                };
+                _pendingFeelNoPainBlockAttributions.Add(attribution);
+                return attribution;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"ArmFeelNoPainBlockAttribution failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+    internal static PendingFeelNoPainBlockAttribution?
+        TryConsumeFeelNoPainBlockAttribution(Creature? creature)
+    {
+        if (creature == null) return null;
+
+        lock (_lock)
+        {
+            for (int i = 0; i < _pendingFeelNoPainBlockAttributions.Count; i++)
+            {
+                var attribution = _pendingFeelNoPainBlockAttributions[i];
+                if (!ReferenceEquals(attribution.Owner, creature)) continue;
+                if (!ReferenceEquals(attribution.PendingCombat, _pendingCombat)) continue;
+
+                _pendingFeelNoPainBlockAttributions.RemoveAt(i);
+                return attribution;
+            }
+
+            return null;
+        }
+    }
+
+    internal static void DisarmFeelNoPainBlockAttribution(
+        PendingFeelNoPainBlockAttribution? attribution)
+    {
+        if (attribution == null) return;
+        lock (_lock)
+            _pendingFeelNoPainBlockAttributions.Remove(attribution);
+    }
+
+    internal static void RecordFeelNoPainBlockGained(
+        PendingFeelNoPainBlockAttribution? attribution,
+        decimal amount)
+    {
+        if (attribution == null || amount <= 0m) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+                if (!ReferenceEquals(attribution.PendingCombat, _pendingCombat)) return;
+
+                var agg = GetOrCreatePowerAggregate(
+                    _pendingCombat!.MetaStats,
+                    attribution.PowerId,
+                    attribution.DisplayName);
+                RecordFeelNoPainBlockGainedForTest(agg, amount);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordFeelNoPainBlockGained failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordFeelNoPainPowerTurnStarted(Player? player)
+    {
+        if (player?.Creature == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+                if (!IsTrackedPlayer(player)) return;
+                var power = player.Creature.GetPower<FeelNoPainPower>();
+                if (power == null) return;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordFeelNoPainPowerActiveForPlayerLocked(power, player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordFeelNoPainPowerTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void RecordFeelNoPainPowerActiveForPlayerLocked(
+        FeelNoPainPower power,
+        Player player)
+    {
+        if (_pendingCombat == null) return;
+
+        var agg = GetOrCreatePowerAggregate(
+            _pendingCombat.MetaStats,
+            power.Id.ToString(),
+            GetPowerDisplayName(power));
+
+        int turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.FeelNoPainPowerTurnCountedTurns.TryGetValue(
+                player,
+                out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.FeelNoPainPowerTurnCountedTurns[player] = turnNumber;
+        agg.TurnsActive++;
+    }
+
+    internal static void RecordFeelNoPainBlockGainedForTest(
         PowerAggregate agg,
         decimal amount)
     {
@@ -24581,6 +24737,16 @@ public static class RunTracker
                         danseMacabre.Owner.Player);
                 }
 
+                if (entry.Amount > 0m
+                    && entry.Power is FeelNoPainPower feelNoPain
+                    && feelNoPain.Owner?.Player != null
+                    && IsTrackedPlayer(feelNoPain.Owner.Player))
+                {
+                    RecordFeelNoPainPowerActiveForPlayerLocked(
+                        feelNoPain,
+                        feelNoPain.Owner.Player);
+                }
+
                 var causingPlay = FindCurrentlyResolvingCardPlay();
                 if (causingPlay?.Card == null)
                 {
@@ -26191,6 +26357,14 @@ internal sealed class PendingDanseMacabreBlockAttribution
     public required string DisplayName { get; init; }
 }
 
+internal sealed class PendingFeelNoPainBlockAttribution
+{
+    public required PendingCombat PendingCombat { get; init; }
+    public required Creature Owner { get; init; }
+    public required string PowerId { get; init; }
+    public required string DisplayName { get; init; }
+}
+
 /// <summary>
 /// Holds per-combat stats and events while a combat is in progress.
 /// Discarded if the combat doesn't finish cleanly; promoted into the run on CombatEnded.
@@ -26372,6 +26546,8 @@ internal class PendingCombat
     public HashSet<Player> DanseMacabrePowerCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> DanseMacabrePowerTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> FeelNoPainPowerTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<CardModel, decimal> FreeAttackEnergySavingsByCard { get; }
         = new(ReferenceEqualityComparer.Instance);

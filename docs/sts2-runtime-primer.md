@@ -688,6 +688,16 @@ resolved amount a normal play would spend while autoplay spends zero. Persist
 the totals and rarity splits under `POWER.STAMPEDE` and project them on every
 Stampede card.
 
+`FeelNoPainPower.AfterCardExhausted` owns an exact owner-card check and then
+awaits the decimal/`ValueProp` `CreatureCmd.GainBlock` overload. Arm from that
+callback and replace the command's returned task with an observer so the
+post-modifier block amount is recorded before the power listener completes.
+For the per-active-turn denominator, count the positive application turn from
+`PowerReceivedEntry` and every later player turn that starts with the power,
+including turns with no exhausts. Persist the numerator as `BlockGained` and
+the denominator as `TurnsActive` under `POWER.FEEL_NO_PAIN`, then project the
+shared quotient on every Feel No Pain card.
+
 `DanseMacabrePower.BeforeCardPlayed` owns both the exact trigger condition and
 the block command: an owner card whose resolved energy cost is at least the
 power's Energy dynamic variable causes one flash and one awaited

@@ -26,6 +26,7 @@ public static class CardHoverShowPatch
     private const int DebtGoldLossPerTrigger = 5;
     private const string DanseMacabrePowerId = "POWER.DANSE_MACABRE";
     private const string EntropyPowerId = "POWER.ENTROPY";
+    private const string FeelNoPainPowerId = "POWER.FEEL_NO_PAIN";
     private const string FreeAttackPowerId = "POWER.FREE_ATTACK_POWER";
     private const string JugglingPowerId = "POWER.JUGGLING";
     private const string StampedePowerId = "POWER.STAMPEDE";
@@ -347,6 +348,7 @@ public static class CardHoverShowPatch
         AppendDanseMacabrePowerStats(sb, cardModel, metaStats, compact: false);
         AppendViciousPowerStats(sb, cardModel, metaStats);
         AppendStampedePowerStats(sb, cardModel, metaStats, compact: false);
+        AppendFeelNoPainPowerStats(sb, cardModel, metaStats);
         AppendUnrelentingFreeAttackStats(sb, cardModel, metaStats, compact: false);
         AppendDebtStats(sb, cardModel, agg);
         AppendNormalityStats(sb, cardModel, agg);
@@ -568,6 +570,7 @@ public static class CardHoverShowPatch
         AppendDanseMacabrePowerStats(sb, cardModel, metaStats, compact: true);
         AppendViciousPowerStats(sb, cardModel, metaStats);
         AppendStampedePowerStats(sb, cardModel, metaStats, compact: true);
+        AppendFeelNoPainPowerStats(sb, cardModel, metaStats);
         AppendUnrelentingFreeAttackStats(sb, cardModel, metaStats, compact: true);
         AppendDebtStats(sb, cardModel, agg);
         AppendNormalityStats(sb, cardModel, agg);
@@ -1148,6 +1151,46 @@ public static class CardHoverShowPatch
             sb,
             GetEnergyStatLabel("saved"),
             powerAgg.StampedeEnergySaved.ToString(),
+            "");
+    }
+
+    private static void AppendFeelNoPainPowerStats(
+        StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel card,
+        RunMetaStats metaStats)
+    {
+        if (card is not FeelNoPain
+            && !IsCardId(card, "CARD.FEEL_NO_PAIN"))
+        {
+            return;
+        }
+
+        metaStats ??= new RunMetaStats();
+        PowerAggregate? powerAgg = null;
+        if (metaStats.PowerAggregates != null)
+        {
+            metaStats.PowerAggregates.TryGetValue(
+                FeelNoPainPowerId,
+                out powerAgg);
+            powerAgg ??= metaStats.PowerAggregates.Values.FirstOrDefault(candidate =>
+                string.Equals(
+                    candidate.PowerId,
+                    FeelNoPainPowerId,
+                    StringComparison.Ordinal)
+                || string.Equals(
+                    candidate.DisplayName,
+                    "Feel No Pain",
+                    StringComparison.OrdinalIgnoreCase));
+        }
+        powerAgg ??= new PowerAggregate();
+
+        decimal blockPerActiveTurn = powerAgg.TurnsActive > 0
+            ? powerAgg.BlockGained / powerAgg.TurnsActive
+            : 0m;
+        Row3(
+            sb,
+            GetBlockStatLabel("added / active turn"),
+            FormatDecimal(blockPerActiveTurn),
             "");
     }
 

@@ -115,6 +115,10 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds a power-ID-keyed Stampede aggregate with confirmed direct Attack
   autoplays, rarity splits, and the resolved energy those free plays saved.
   Every Stampede card projects this shared power total.
+- `feel-no-pain-power-run.json`
+  Adds a power-ID-keyed Feel No Pain aggregate with observed post-modifier
+  block and active-turn denominator data. Every Feel No Pain card projects
+  the shared block-per-active-turn value.
 - `entropy-power-run.json`
   Adds a power-ID-keyed Entropy aggregate with confirmed replacement-card
   rarities, Bound cards transformed, and a zero-inclusive active-combat
