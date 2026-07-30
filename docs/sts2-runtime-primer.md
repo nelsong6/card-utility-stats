@@ -731,6 +731,19 @@ task, count the confirmed deck addition only after successful completion, and
 measure the owner's completed gold-balance delta so gold modifiers or
 prevention are reflected instead of assuming its base 15 gold.
 
+Bowler Hat applies its 25% multiplier through the central
+`PlayerCmd.GainGold` → `Hook.ModifyGoldGained` path without filtering the
+source. It therefore affects normal Gold rewards (including stolen gold being
+returned), events, cards, potions, relic grants, and any other positive grant
+that uses `PlayerCmd.GainGold`; direct balance restoration/loading is outside
+that hook. Snapshot the owner's balance and the command's unmodified amount,
+then wait for the complete command. The observed bonus is the completed
+integer balance gain minus the integer unmodified grant, clamped at zero. This
+captures truncation and correctly records zero when Ectoplasm later prevents
+the gain. For SpireLens, count an activation only when at least one bonus gold
+actually reaches the balance; zero-benefit modifier calls stay out of both the
+activation and average.
+
 Maw Bank gains gold from its owner-specific `AfterRoomEntered` callback while
 its saved `HasItemBeenBought` flag is false. Mirror the callback's BaseRoom
 gate, then record the owner's completed gold-balance delta rather than its

@@ -784,9 +784,10 @@ public class RelicAggregate
     public int EnergyGenerated { get; set; }
 
     // Gold attributed to a relic effect. Lucky Fysh measures the owner's
-    // completed balance delta after its gold command resolves; Amethyst
-    // Aubergine records the concrete extra GoldReward amount it adds; Maw Bank
-    // measures the completed balance delta from its room-entry callback.
+    // completed balance delta after its gold command resolves; Bowler Hat
+    // stores only the observed bonus beyond the unmodified integer grant;
+    // Amethyst Aubergine records the concrete extra GoldReward amount it adds;
+    // Maw Bank measures the completed balance delta from its room-entry callback.
     public int GoldGained { get; set; }
 
     // Shops entered while Maw Bank was active and then left without spending

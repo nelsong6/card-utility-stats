@@ -4445,6 +4445,7 @@ public static class RunTracker
     private const string ChosenCheeseRelicId = "RELIC.CHOSEN_CHEESE";
     private const string DarkstonePeriaptRelicId = "RELIC.DARKSTONE_PERIAPT";
     private const string LuckyFyshRelicId = "RELIC.LUCKY_FYSH";
+    private const string BowlerHatRelicId = "RELIC.BOWLER_HAT";
     private const string AmethystAubergineRelicId = "RELIC.AMETHYST_AUBERGINE";
     private const string WongosMysteryTicketRelicId =
         "RELIC.WONGOS_MYSTERY_TICKET";
@@ -10280,6 +10281,75 @@ public static class RunTracker
                 CoreMain.LogDebug($"RecordLuckyFyshCardAdded failed: {e.Message}");
             }
         }
+    }
+
+    /// <summary>
+    /// Records the integer gold that actually reached the owner because of
+    /// Bowler Hat. The unmodified command amount supplies the counterfactual;
+    /// the completed balance delta includes the game's truncation and any
+    /// later gold-prevention modifier.
+    /// </summary>
+    public static void RecordBowlerHatGoldGain(
+        BowlerHat relic,
+        Player owner,
+        int initialGold,
+        int currentGold,
+        decimal unmodifiedAmount)
+    {
+        if (relic == null || owner == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ReferenceEquals(relic.Owner, owner)
+                    || !IsTrackedRelic(relic)
+                    || !IsTrackedPlayer(owner))
+                {
+                    return;
+                }
+
+                var extraGold = CalculateBowlerHatExtraGoldForTest(
+                    initialGold,
+                    currentGold,
+                    unmodifiedAmount);
+                if (extraGold <= 0) return;
+
+                var persistDirectlyToRun = _pendingCombat == null;
+                var agg = GetOrCreateRelicAggregateForCurrentContextLocked(
+                    BowlerHatRelicId);
+                RecordBowlerHatGoldGainForTest(agg, extraGold);
+                if (persistDirectlyToRun)
+                    SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordBowlerHatGoldGain failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static int CalculateBowlerHatExtraGoldForTest(
+        int initialGold,
+        int currentGold,
+        decimal unmodifiedAmount)
+    {
+        var observedGain = Math.Max(0, currentGold - initialGold);
+        var counterfactualGain = unmodifiedAmount > 0m
+            ? Math.Max(0, (int)unmodifiedAmount)
+            : 0;
+        return Math.Max(0, observedGain - counterfactualGain);
+    }
+
+    internal static void RecordBowlerHatGoldGainForTest(
+        RelicAggregate agg,
+        int extraGold)
+    {
+        if (agg == null || extraGold <= 0) return;
+
+        agg.Activations++;
+        agg.GoldGained += extraGold;
     }
 
     /// <summary>

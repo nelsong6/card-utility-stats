@@ -1091,6 +1091,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is BowlerHat)
+        {
+            title = "Bowler Hat";
+            body = BuildBowlerHatBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is AmethystAubergine)
         {
             title = "Amethyst Aubergine";
@@ -3544,6 +3551,32 @@ public static class RelicHoverShowPatch
         var sb = new StringBuilder();
         Row3(sb, "Gold gained", agg.GoldGained.ToString(), "");
         Row3(sb, "Cards added to deck", agg.CardsAddedToDeck.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildBowlerHatBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var averageExtraGold = agg.Activations <= 0
+            ? 0m
+            : (decimal)agg.GoldGained / agg.Activations;
+
+        RelicActivationRow(
+            sb,
+            agg.Activations.ToString(),
+            "Activations — positive gold grants where Bowler Hat's 25% increase added at least one gold after integer truncation.");
+        Row3(
+            sb,
+            "Extra gold gained",
+            agg.GoldGained.ToString(),
+            "",
+            "Extra gold gained — gold that actually reached the player beyond each grant's unmodified integer amount.");
+        Row3(
+            sb,
+            "Avg extra gold/activation",
+            FormatDecimal(averageExtraGold),
+            "",
+            "Average extra gold per activation — observed Bowler Hat bonus gold divided by successful positive-integer bonuses.");
         return sb.ToString();
     }
 
