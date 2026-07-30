@@ -2279,7 +2279,11 @@ public static class RelicHoverShowPatch
         var averageEndCharge = agg.PenNibTurnEndChargeCount <= 0
             ? 0m
             : (decimal)agg.PenNibTurnEndChargeTotal / agg.PenNibTurnEndChargeCount;
+        var activations = Math.Max(
+            agg.Activations,
+            agg.PenNibAttacksPlayed / 10);
 
+        RelicActivationRow(sb, activations.ToString());
         Row3(sb, "Base damage added", agg.TotalDamageAttempted.ToString(), "");
         Row3(sb, "Avg base damage added per attack", FormatDecimal(averageBaseDamage), "");
         Row3(sb, "Attacks played", agg.PenNibAttacksPlayed.ToString(), "");

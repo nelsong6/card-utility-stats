@@ -83,6 +83,7 @@ public class OpenBranchRelicStatsTests
         };
         run.RelicAggregates["RELIC.PEN_NIB"] = new RelicAggregate
         {
+            Activations = 1,
             TotalDamageAttempted = 27,
             PenNibAttacksPlayed = 9,
             PenNibTurnsEndedOn8Charges = 2,
@@ -138,6 +139,7 @@ public class OpenBranchRelicStatsTests
         Assert.Equal(2, restored.RelicAggregates["RELIC.PARRYING_SHIELD"].TotalDamageOverkill);
         Assert.Equal(1, restored.RelicAggregates["RELIC.PARRYING_SHIELD"].Kills);
         Assert.Equal(2, restored.RelicAggregates["RELIC.PARRYING_SHIELD"].TotalTargets);
+        Assert.Equal(1, restored.RelicAggregates["RELIC.PEN_NIB"].Activations);
         Assert.Equal(27, restored.RelicAggregates["RELIC.PEN_NIB"].TotalDamageAttempted);
         Assert.Equal(9, restored.RelicAggregates["RELIC.PEN_NIB"].PenNibAttacksPlayed);
         Assert.Equal(2, restored.RelicAggregates["RELIC.PEN_NIB"].PenNibTurnsEndedOn8Charges);
@@ -188,14 +190,19 @@ public class OpenBranchRelicStatsTests
     {
         var agg = new RelicAggregate();
 
-        RunTracker.RecordPenNibAttackPlayedForTest(agg, 3);
+        RunTracker.RecordPenNibAttackPlayedForTest(agg, 9);
+        RunTracker.RecordPenNibAttackPlayedForTest(
+            agg,
+            willActivate: true);
+        RunTracker.RecordPenNibAttackPlayedForTest(agg, 10);
         RunTracker.RecordPenNibAttackPlayedForTest(agg, -2);
         RunTracker.RecordPenNibTurnEndChargeForTest(agg, 8);
         RunTracker.RecordPenNibTurnEndChargeForTest(agg, 9);
         RunTracker.RecordPenNibTurnEndChargeForTest(agg, 12);
         RunTracker.RecordPenNibTurnEndChargeForTest(agg, -1);
 
-        Assert.Equal(3, agg.PenNibAttacksPlayed);
+        Assert.Equal(20, agg.PenNibAttacksPlayed);
+        Assert.Equal(2, agg.Activations);
         Assert.Equal(1, agg.PenNibTurnsEndedOn8Charges);
         Assert.Equal(1, agg.PenNibTurnsEndedOn9Charges);
         Assert.Equal(19, agg.PenNibTurnEndChargeTotal);
@@ -336,6 +343,7 @@ public class OpenBranchRelicStatsTests
             "BuildPenNibBodyBBCode",
             new RelicAggregate
             {
+                Activations = 1,
                 TotalDamageAttempted = 27,
                 PenNibAttacksPlayed = 9,
                 PenNibTurnsEndedOn8Charges = 2,
@@ -343,6 +351,9 @@ public class OpenBranchRelicStatsTests
                 PenNibTurnEndChargeTotal = 34,
                 PenNibTurnEndChargeCount = 5,
             });
+        Assert.Contains(
+            StatConceptGlossary.RenderHintedGlyph("activation"),
+            penNibBody);
         Assert.Contains("Base damage added", penNibBody);
         Assert.Contains("Avg base damage added per attack", penNibBody);
         Assert.Contains("Attacks played", penNibBody);

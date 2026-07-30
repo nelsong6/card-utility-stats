@@ -6903,7 +6903,22 @@ public static class RunTracker
                 if (!IsTrackedPlayer(relic.Owner)) return;
 
                 var agg = GetOrCreateRelicAggregateLocked(PenNibRelicId);
-                RecordPenNibAttackPlayedForTest(agg);
+                var committedAttacks = 0;
+                var committedActivations = 0;
+                if (_currentRun?.RelicAggregates.TryGetValue(
+                        PenNibRelicId,
+                        out var committed) == true)
+                {
+                    committedAttacks = committed.PenNibAttacksPlayed;
+                    committedActivations = committed.Activations;
+                }
+
+                AccumulatePenNibAttackPlayed(
+                    agg,
+                    count: 1,
+                    willActivate: relic.AttacksPlayed == 9,
+                    committedAttacks: committedAttacks,
+                    committedActivations: committedActivations);
             }
             catch (Exception e)
             {
@@ -6954,10 +6969,47 @@ public static class RunTracker
     internal static void RecordPenNibBaseDamageAddedForTest(RelicAggregate agg, decimal baseDamageAdded)
         => AddPenNibBaseDamageAdded(agg, baseDamageAdded);
 
-    internal static void RecordPenNibAttackPlayedForTest(RelicAggregate agg, int count = 1)
+    internal static void RecordPenNibAttackPlayedForTest(
+        RelicAggregate agg,
+        int count = 1,
+        bool willActivate = false)
+        => AccumulatePenNibAttackPlayed(
+            agg,
+            count,
+            willActivate,
+            committedAttacks: 0,
+            committedActivations: 0);
+
+    private static void AccumulatePenNibAttackPlayed(
+        RelicAggregate agg,
+        int count,
+        bool willActivate,
+        int committedAttacks,
+        int committedActivations)
     {
         if (agg == null) return;
-        agg.PenNibAttacksPlayed += Math.Max(0, count);
+
+        var added = Math.Max(0, count);
+        if (added <= 0) return;
+
+        agg.PenNibAttacksPlayed += added;
+
+        // Activations were not persisted by older builds. The number of
+        // complete ten-Attack cycles is a safe lower bound that immediately
+        // backfills those runs, while the live pre-increment charge check
+        // above preserves exact activations when tracking begins mid-cycle.
+        var observedActivations =
+            Math.Max(0, committedActivations)
+            + agg.Activations
+            + (willActivate ? 1 : 0);
+        var inferredActivations =
+            (Math.Max(0, committedAttacks) + agg.PenNibAttacksPlayed) / 10;
+        var combinedActivations = Math.Max(
+            observedActivations,
+            inferredActivations);
+        agg.Activations = Math.Max(
+            0,
+            combinedActivations - Math.Max(0, committedActivations));
     }
 
     internal static void RecordPenNibTurnEndChargeForTest(RelicAggregate agg, int charge)

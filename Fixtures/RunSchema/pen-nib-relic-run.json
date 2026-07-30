@@ -7,6 +7,7 @@
   "events": [],
   "relic_aggregates": {
     "RELIC.PEN_NIB": {
+      "activations": 1,
       "total_damage_attempted": 27,
       "pen_nib_attacks_played": 9,
       "pen_nib_turns_ended_on8_charges": 2,

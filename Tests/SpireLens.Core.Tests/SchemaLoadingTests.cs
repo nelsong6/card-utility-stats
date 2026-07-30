@@ -1000,6 +1000,7 @@ public class SchemaLoadingTests
         Assert.NotNull(loaded);
         Assert.True(loaded!.SupportsResume);
         var relicAgg = loaded.Data.RelicAggregates["RELIC.PEN_NIB"];
+        Assert.Equal(1, relicAgg.Activations);
         Assert.Equal(27, relicAgg.TotalDamageAttempted);
         Assert.Equal(9, relicAgg.PenNibAttacksPlayed);
         Assert.Equal(2, relicAgg.PenNibTurnsEndedOn8Charges);
@@ -1015,6 +1016,7 @@ public class SchemaLoadingTests
 
         Assert.NotNull(resumed);
         var relicAgg = resumed!.RelicAggregates["RELIC.PEN_NIB"];
+        Assert.Equal(1, relicAgg.Activations);
         Assert.Equal(27, relicAgg.TotalDamageAttempted);
         Assert.Equal(9, relicAgg.PenNibAttacksPlayed);
         Assert.Equal(2, relicAgg.PenNibTurnsEndedOn8Charges);
