@@ -75,7 +75,7 @@ public class BoneFluteStatsTests
 
         Assert.Contains("Times triggered", body);
         Assert.Contains("[b]2[/b]", body);
-        Assert.Contains("[hint=\"Block:", body);
+        Assert.Contains("[hint=\"Block gained:", body);
         Assert.Contains("block gained", body);
         Assert.Contains("[b]14[/b]", body);
     }

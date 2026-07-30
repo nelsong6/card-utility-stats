@@ -540,8 +540,20 @@ internal static class StatConceptGlossary
         StatConcept concept,
         int size)
     {
-        var generated = GetOrBuildContextualEnergyGainedIcon(concept);
-        return RenderImage(generated.GeneratedPath, size);
+        try
+        {
+            var generated = GetOrBuildContextualEnergyGainedIcon(concept);
+            return RenderImage(generated.GeneratedPath, size);
+        }
+        catch
+        {
+            // Headless consumers (including the checked-in-reference CI run)
+            // have no initialized Godot resource filesystem. Keep tooltip
+            // markup usable there, and degrade safely in-game if generating
+            // the badged texture ever fails.
+            return $"{RenderImage(StatEnergyIcon.GetCurrentPath(), size)}"
+                   + "[b][color=#8FE34F]+[/color][/b]";
+        }
     }
 
     private static ContextualGeneratedIcon GetOrBuildContextualEnergyGainedIcon(

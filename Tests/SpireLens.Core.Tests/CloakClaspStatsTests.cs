@@ -134,7 +134,7 @@ public class CloakClaspStatsTests
         var body = (string)(BuildCloakClaspBodyMethod.Invoke(null, new object?[] { agg })
             ?? throw new InvalidOperationException("BuildCloakClaspBodyBBCode returned null."));
 
-        Assert.Contains("[hint=\"Block:", body);
+        Assert.Contains("[hint=\"Block gained:", body);
         Assert.Contains("Block gained", body);
         Assert.Contains("[b]21[/b]", body);
         Assert.Contains("[hint=\"Average:", body);

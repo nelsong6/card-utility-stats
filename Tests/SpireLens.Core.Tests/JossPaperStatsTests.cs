@@ -96,18 +96,18 @@ public class JossPaperStatsTests
             ?? throw new InvalidOperationException(
                 "BuildJossPaperBodyBBCode returned null."));
 
-        Assert.Contains("Turns ended on 0 counters", body);
-        Assert.Contains("Turns ended on 1 counter", body);
-        Assert.Contains("Turns ended on 2 counters", body);
-        Assert.Contains("Turns ended on 3 counters", body);
-        Assert.Contains("Turns ended on 4 counters", body);
-        Assert.Contains("Avg activations/combat", body);
+        Assert.Contains("ended after Joss Paper activated and reset its counter to zero", body);
+        Assert.Contains("ended with Joss Paper showing one", body);
+        Assert.Contains("ended with Joss Paper showing two", body);
+        Assert.Contains("ended with Joss Paper showing three", body);
+        Assert.Contains("ended with Joss Paper showing four", body);
+        Assert.Contains("Average activations per combat", body);
         Assert.Contains("[b]1.5[/b]", body);
-        Assert.Contains("Avg turns/combat", body);
+        Assert.Contains("Average turns per combat", body);
         Assert.Contains("[b]5[/b]", body);
-        Assert.Contains("Cards drawn", body);
-        Assert.Contains("Card draws blocked", body);
-        Assert.Contains("Avg cards drawn/combat", body);
+        Assert.Contains("Cards drawn — Joss Paper cards that actually reached the hand.", body);
+        Assert.Contains("Joss Paper draws prevented by draw limits", body);
+        Assert.Contains("Average cards drawn per combat", body);
         Assert.Contains("[b]2.5[/b]", body);
         Assert.Contains("exhaust_pile.png", body);
     }

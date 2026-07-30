@@ -20,6 +20,7 @@ public class VenerableTeaSetStatsTests
         ?? throw new InvalidOperationException("BuildVenerableTeaSetBodyBBCode not found.");
 
     [Fact]
+    [Trait("Category", "RequiresLiveGame")]
     public void Patch_TargetsBothTeaSetEnergyResetCallbacks()
     {
         var targetMethods = typeof(VenerableTeaSetStatsPatch).GetMethod(

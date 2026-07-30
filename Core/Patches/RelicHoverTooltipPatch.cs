@@ -1320,10 +1320,9 @@ public static class RelicHoverShowPatch
             return true;
         }
 
-        if (string.Equals(
-                relicModel.Id.ToString(),
-                DowsingRodRelicId,
-                StringComparison.Ordinal))
+        if (IsRelicModel(
+                relicModel,
+                "MegaCrit.Sts2.Core.Models.Relics.DowsingRod"))
         {
             title = "Dowsing Rod";
             body = BuildDowsingRodBodyBBCode(agg);
@@ -4115,6 +4114,16 @@ public static class RelicHoverShowPatch
         if (string.IsNullOrWhiteSpace(relicId))
             return GenericRelicIconPath;
 
+        string? conventionalRelicPath = null;
+        const string relicPrefix = "RELIC.";
+        if (relicId.StartsWith(relicPrefix, StringComparison.OrdinalIgnoreCase)
+            && relicId.Length > relicPrefix.Length)
+        {
+            conventionalRelicPath =
+                "res://images/atlases/relic_atlas.sprites/"
+                + $"{relicId[relicPrefix.Length..].ToLowerInvariant()}.tres";
+        }
+
         try
         {
             var modelId = ModelId.Deserialize(relicId);
@@ -4122,12 +4131,8 @@ public static class RelicHoverShowPatch
             if (!string.IsNullOrWhiteSpace(relicModel?.IconPath))
                 return relicModel.IconPath;
 
-            if (string.Equals(modelId.Category, "RELIC", StringComparison.Ordinal)
-                && !string.IsNullOrWhiteSpace(modelId.Entry))
-            {
-                return $"res://images/atlases/relic_atlas.sprites/"
-                       + $"{modelId.Entry.ToLowerInvariant()}.tres";
-            }
+            if (conventionalRelicPath != null)
+                return conventionalRelicPath;
         }
         catch
         {
@@ -4135,7 +4140,7 @@ public static class RelicHoverShowPatch
             // relic artwork instead of restoring the old text-only value.
         }
 
-        return GenericRelicIconPath;
+        return conventionalRelicPath ?? GenericRelicIconPath;
     }
 
     private static string BuildPaelsToothBodyBBCode(RelicAggregate agg)

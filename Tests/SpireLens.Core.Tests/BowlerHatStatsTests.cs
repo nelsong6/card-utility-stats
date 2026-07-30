@@ -72,8 +72,8 @@ public class BowlerHatStatsTests
         });
 
         Assert.Contains("integer truncation", body);
-        Assert.Contains("Extra gold gained", body);
-        Assert.Contains("Avg extra gold/activation", body);
+        Assert.Contains("Extra gold gained — gold that actually reached", body);
+        Assert.Contains("Average extra gold per activation", body);
         Assert.Contains("[b]3[/b]", body);
         Assert.Contains("[b]7[/b]", body);
         Assert.Contains("[b]2.33[/b]", body);

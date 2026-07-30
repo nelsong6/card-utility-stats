@@ -1,5 +1,6 @@
 using System;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using MegaCrit.Sts2.Core.Models.Relics;
 using SpireLens.Core;
 using SpireLens.Core.Patches;
@@ -127,18 +128,18 @@ public class PollinousCoreStatsTests
             ?? throw new InvalidOperationException(
                 "BuildPollinousCoreBodyBBCode returned null."));
 
-        Assert.Contains("Activations", body);
-        Assert.Contains("Turns ended on 0 counters", body);
-        Assert.Contains("Turns ended on 1 counter", body);
-        Assert.Contains("Turns ended on 2 counters", body);
-        Assert.Contains("Turns ended on 3 counters", body);
-        Assert.Contains("Avg activations/combat", body);
+        Assert.Contains("Times Pollinous Core reached four counters", body);
+        Assert.Contains("ended after Pollinous Core activated and reset its counter to zero", body);
+        Assert.Contains("ended with Pollinous Core showing one counter", body);
+        Assert.Contains("ended with Pollinous Core showing two counters", body);
+        Assert.Contains("ended with Pollinous Core showing three counters", body);
+        Assert.Contains("Average activations per combat", body);
         Assert.Contains("[b]1.5[/b]", body);
-        Assert.Contains("Avg turns/combat", body);
+        Assert.Contains("Average turns per combat", body);
         Assert.Contains("[b]5[/b]", body);
-        Assert.Contains("Cards drawn", body);
-        Assert.Contains("Card draws blocked", body);
-        Assert.Contains("Avg cards drawn/combat", body);
+        Assert.Contains("Cards drawn — Pollinous Core cards that actually reached the hand", body);
+        Assert.Contains("Cards requested but prevented", body, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Average cards drawn per combat", body);
         Assert.Contains("[b]2.5[/b]", body);
     }
 
@@ -146,7 +147,8 @@ public class PollinousCoreStatsTests
     public void TooltipDispatch_RecognizesPollinousCore()
     {
         var recognized = RelicHoverShowPatch.TryBuildBodyBBCode(
-            new PollinousCore(),
+            (PollinousCore)RuntimeHelpers.GetUninitializedObject(
+                typeof(PollinousCore)),
             new RelicAggregate
             {
                 Activations = 1,

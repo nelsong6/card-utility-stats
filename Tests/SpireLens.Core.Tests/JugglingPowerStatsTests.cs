@@ -105,7 +105,7 @@ public class JugglingPowerStatsTests
             AttacksCopied = 5,
             CommonAttacksCopied = 2,
             UncommonAttacksCopied = 2,
-            RareAttacksCopied = 1,
+            RareAttacksCopied = 2,
             TurnsActive = 3,
             CombatsActive = 1,
         };

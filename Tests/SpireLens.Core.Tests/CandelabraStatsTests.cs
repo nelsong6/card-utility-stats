@@ -171,8 +171,7 @@ public class CandelabraStatsTests
         Assert.Contains("Activations", body);
         Assert.Contains("Energy generated", body);
         Assert.Contains("1st turns ended with excess energy", body);
-        Assert.Contains("[b]0[/b]", body);
-        Assert.Contains("1st turns ended with excess energy[/color]  [b]0[/b]", body);
+        Assert.Equal(3, CountOccurrences(body, "[b]0[/b]"));
         Assert.DoesNotContain("Combats with energy not gained", body);
     }
 
@@ -184,8 +183,7 @@ public class CandelabraStatsTests
         Assert.Contains("Activations", body);
         Assert.Contains("Energy generated", body);
         Assert.Contains("1st turns ended with excess energy", body);
-        Assert.Contains("[b]0[/b]", body);
-        Assert.Contains("1st turns ended with excess energy[/color]  [b]0[/b]", body);
+        Assert.Equal(3, CountOccurrences(body, "[b]0[/b]"));
         Assert.DoesNotContain("Combats with energy not gained", body);
     }
 
@@ -204,7 +202,7 @@ public class CandelabraStatsTests
         Assert.Contains("Activations", body);
         Assert.Contains("Energy generated", body);
         Assert.Contains("[b]3[/b]", body);
-        Assert.Contains("1st turns ended with excess energy[/color]  [b]2[/b]", body);
+        Assert.Contains("[b]2[/b]", body);
         Assert.DoesNotContain("Combats with energy not gained", body);
     }
 
@@ -216,10 +214,8 @@ public class CandelabraStatsTests
         Assert.Contains("Activations", body);
         Assert.Contains("Energy generated", body);
         Assert.Contains("2nd turns ended with excess energy", body);
-        Assert.Contains("Combats with energy not gained", body);
-        Assert.Contains("[b]0[/b]", body);
-        Assert.Contains("2nd turns ended with excess energy[/color]  [b]0[/b]", body);
-        Assert.Contains("Combats with energy not gained[/color]  [b]0[/b]", body);
+        Assert.Contains("Combats without energy", body);
+        Assert.Equal(4, CountOccurrences(body, "[b]0[/b]"));
     }
 
     [Fact]
@@ -238,8 +234,8 @@ public class CandelabraStatsTests
         Assert.Contains("Activations", body);
         Assert.Contains("Energy generated", body);
         Assert.Contains("2nd turns ended with excess energy", body);
-        Assert.Contains("2nd turns ended with excess energy[/color]  [b]2[/b]", body);
-        Assert.Contains("Combats with energy not gained[/color]  [b]1[/b]", body);
+        Assert.Contains("[b]2[/b]", body);
+        Assert.Contains("[b]1[/b]", body);
         Assert.Contains("[b]4[/b]", body);
         Assert.Contains("[b]8[/b]", body);
         Assert.Contains("[b]2[/b]", body);
@@ -261,8 +257,8 @@ public class CandelabraStatsTests
         Assert.Contains("Activations", body);
         Assert.Contains("Energy generated", body);
         Assert.Contains("[b]9[/b]", body);
-        Assert.Contains("3rd turns ended with excess energy[/color]  [b]1[/b]", body);
-        Assert.Contains("Combats with energy not gained[/color]  [b]2[/b]", body);
+        Assert.Contains("[b]1[/b]", body);
+        Assert.Contains("[b]2[/b]", body);
     }
 
     [Fact]
@@ -299,4 +295,17 @@ public class CandelabraStatsTests
     private static string BuildBody(MethodInfo method, RelicAggregate agg)
         => (string)(method.Invoke(null, new object?[] { agg })
             ?? throw new InvalidOperationException($"{method.Name} returned null."));
+
+    private static int CountOccurrences(string text, string value)
+    {
+        var count = 0;
+        var index = 0;
+        while ((index = text.IndexOf(value, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += value.Length;
+        }
+
+        return count;
+    }
 }

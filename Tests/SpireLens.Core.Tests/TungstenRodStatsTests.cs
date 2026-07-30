@@ -155,13 +155,13 @@ public class TungstenRodStatsTests
 
         Assert.True(supported);
         Assert.Equal("Tungsten Rod", title);
-        Assert.Contains("Damage prevented", body);
-        Assert.Contains("Avg lost life prevented per turn", body);
-        Assert.Contains("Avg lost life prevented per combat", body);
-        Assert.Contains("Self-inflicted lost life prevented", body);
-        Assert.Contains("Curse-inflicted lost life prevented", body);
-        Assert.Contains("Status-inflicted lost life prevented", body);
-        Assert.Contains("Enemy-source lost life prevented", body);
+        Assert.Contains("HP loss prevented by Tungsten Rod.", body);
+        Assert.Contains("Average HP loss prevented by Tungsten Rod per player turn", body);
+        Assert.Contains("Average HP loss prevented by Tungsten Rod per combat", body);
+        Assert.Contains("Average self-inflicted HP loss prevented", body);
+        Assert.Contains("Average Curse-inflicted HP loss prevented", body);
+        Assert.Contains("Average Status-inflicted HP loss prevented", body);
+        Assert.Contains("Average enemy-source HP loss prevented", body);
     }
 
     private static RelicAggregate FixtureAggregate()

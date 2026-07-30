@@ -25,6 +25,7 @@ public class DowsingRodStatsTests
     };
 
     [Fact]
+    [Trait("Category", "RequiresLiveGame")]
     public void DowsingPatch_TargetsRoomsEnteredSetter()
     {
         var targetMethod = typeof(DowsingRoomsEnteredStatsPatch).GetMethod(

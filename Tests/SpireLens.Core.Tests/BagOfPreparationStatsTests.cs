@@ -1,5 +1,6 @@
 using System;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using MegaCrit.Sts2.Core.Models.Relics;
 using SpireLens.Core;
 using SpireLens.Core.Patches;
@@ -70,7 +71,8 @@ public class BagOfPreparationStatsTests
     public void TooltipDispatch_RecognizesBagOfPreparation()
     {
         var recognized = RelicHoverShowPatch.TryBuildBodyBBCode(
-            new BagOfPreparation(),
+            (BagOfPreparation)RuntimeHelpers.GetUninitializedObject(
+                typeof(BagOfPreparation)),
             new RelicAggregate { Activations = 1, AdditionalCardsDrawn = 2 },
             floorCount: null,
             bloodSoakedRoseCurseAgg: null,

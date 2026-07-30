@@ -1,4 +1,7 @@
+using System;
+using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Text;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Models.Cards;
 using SpireLens.Core;
@@ -9,6 +12,12 @@ namespace SpireLens.Core.Tests;
 
 public class SoulPileStatsTests
 {
+    private static readonly MethodInfo AppendSoulPileStatsMethod =
+        typeof(CardHoverShowPatch).GetMethod(
+            "AppendSoulPileStats",
+            BindingFlags.NonPublic | BindingFlags.Static)
+        ?? throw new InvalidOperationException("AppendSoulPileStats not found.");
+
     [Fact]
     public void CardAggregate_SoulPileFields_DefaultToZero()
     {
@@ -59,8 +68,6 @@ public class SoulPileStatsTests
     [Fact]
     public void CardTooltip_ShowsObservedSoulDestinations()
     {
-        var card = (GraveWarden)RuntimeHelpers.GetUninitializedObject(
-            typeof(GraveWarden));
         var agg = new CardAggregate
         {
             SoulsAddedToDrawPile = 4,
@@ -68,10 +75,9 @@ public class SoulPileStatsTests
             SoulsAddedToDiscardPile = 3,
         };
 
-        var body = CardHoverShowPatch.BuildHistoricalBodyBBCode(
-            card,
-            agg,
-            new RunMetaStats());
+        var sb = new StringBuilder();
+        AppendSoulPileStatsMethod.Invoke(null, new object?[] { sb, agg });
+        var body = sb.ToString();
 
         Assert.Contains("Souls added to draw pile", body);
         Assert.Contains("Souls added to hand", body);

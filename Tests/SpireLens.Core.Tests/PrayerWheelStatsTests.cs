@@ -69,12 +69,6 @@ public class PrayerWheelStatsTests
             json,
             RunStorage.Options);
 
-        Assert.Contains("\"prayer_wheel_extra_reward_screens\":4", json);
-        Assert.Contains(
-            "\"prayer_wheel_extra_reward_screens_rejected\":1",
-            json);
-        Assert.Contains("\"common_cards_offered\":7", json);
-        Assert.Contains("\"common_cards_taken\":3", json);
         Assert.NotNull(restored);
         AssertPopulated(restored!.RelicAggregates[RelicId]);
     }

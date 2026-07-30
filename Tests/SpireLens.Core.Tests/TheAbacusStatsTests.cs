@@ -79,7 +79,7 @@ public class TheAbacusStatsTests
         var body = (string)(BuildTheAbacusBodyMethod.Invoke(null, new object?[] { agg })
             ?? throw new InvalidOperationException("BuildTheAbacusBodyBBCode returned null."));
 
-        Assert.Contains("[hint=\"Block:", body);
+        Assert.Contains("[hint=\"Block gained:", body);
         Assert.Contains("block gained", body);
         Assert.Contains("[b]12[/b]", body);
     }

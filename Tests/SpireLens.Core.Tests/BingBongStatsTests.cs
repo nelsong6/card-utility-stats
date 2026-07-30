@@ -123,12 +123,11 @@ public class BingBongStatsTests
     {
         var body = BuildBody(PopulatedAggregate());
 
-        Assert.Contains("Extra cards added", body);
-        Assert.Contains("Commons added", body);
-        Assert.Contains("Uncommons added", body);
-        Assert.Contains("Rares added", body);
-        Assert.Contains("Curses added", body);
         Assert.Contains("Extra cards successfully added to the permanent deck", body);
+        Assert.Contains("Non-Curse Common cards successfully added", body);
+        Assert.Contains("Non-Curse Uncommon cards successfully added", body);
+        Assert.Contains("Non-Curse Rare cards successfully added", body);
+        Assert.Contains("Curse cards successfully added", body);
     }
 
     [Fact]
