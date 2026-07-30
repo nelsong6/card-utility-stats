@@ -450,6 +450,15 @@ public class PowerAggregate
     // draw command issued when the shared power reacts to its owner applying
     // Vulnerable. Failed/blocked draws contribute zero.
     public int ViciousCardsDrawn { get; set; }
+
+    // Stampede tracking. An Attack counts only after the exact autoplay
+    // selected by Stampede reaches a finished primary play. Energy saved is
+    // that play's resolved EnergyValue; autoplay itself spends zero.
+    public int StampedeAttacksPlayed { get; set; }
+    public int StampedeCommonAttacksPlayed { get; set; }
+    public int StampedeUncommonAttacksPlayed { get; set; }
+    public int StampedeRareAttacksPlayed { get; set; }
+    public int StampedeEnergySaved { get; set; }
 }
 
 public class EnemyAggregate

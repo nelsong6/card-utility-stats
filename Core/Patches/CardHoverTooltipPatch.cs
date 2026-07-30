@@ -28,6 +28,7 @@ public static class CardHoverShowPatch
     private const string EntropyPowerId = "POWER.ENTROPY";
     private const string FreeAttackPowerId = "POWER.FREE_ATTACK_POWER";
     private const string JugglingPowerId = "POWER.JUGGLING";
+    private const string StampedePowerId = "POWER.STAMPEDE";
     private const string ViciousPowerId = "POWER.VICIOUS";
     private const string StarIconPath = "res://images/packed/sprite_fonts/star_icon.png";
     private const string SovereignBladeMetaNote = "Reflects All Sovereign Blade Usage";
@@ -345,6 +346,7 @@ public static class CardHoverShowPatch
         AppendJugglingPowerStats(sb, cardModel, metaStats, compact: false);
         AppendDanseMacabrePowerStats(sb, cardModel, metaStats, compact: false);
         AppendViciousPowerStats(sb, cardModel, metaStats);
+        AppendStampedePowerStats(sb, cardModel, metaStats, compact: false);
         AppendUnrelentingFreeAttackStats(sb, cardModel, metaStats, compact: false);
         AppendDebtStats(sb, cardModel, agg);
         AppendNormalityStats(sb, cardModel, agg);
@@ -565,6 +567,7 @@ public static class CardHoverShowPatch
         AppendJugglingPowerStats(sb, cardModel, metaStats, compact: true);
         AppendDanseMacabrePowerStats(sb, cardModel, metaStats, compact: true);
         AppendViciousPowerStats(sb, cardModel, metaStats);
+        AppendStampedePowerStats(sb, cardModel, metaStats, compact: true);
         AppendUnrelentingFreeAttackStats(sb, cardModel, metaStats, compact: true);
         AppendDebtStats(sb, cardModel, agg);
         AppendNormalityStats(sb, cardModel, agg);
@@ -1090,6 +1093,61 @@ public static class CardHoverShowPatch
             sb,
             GetDrawStatLabel("cards drawn"),
             powerAgg.ViciousCardsDrawn.ToString(),
+            "");
+    }
+
+    private static void AppendStampedePowerStats(
+        StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel card,
+        RunMetaStats metaStats,
+        bool compact)
+    {
+        if (card is not Stampede && !IsCardId(card, "CARD.STAMPEDE")) return;
+
+        metaStats ??= new RunMetaStats();
+        PowerAggregate? powerAgg = null;
+        if (metaStats.PowerAggregates != null)
+        {
+            metaStats.PowerAggregates.TryGetValue(StampedePowerId, out powerAgg);
+            powerAgg ??= metaStats.PowerAggregates.Values.FirstOrDefault(candidate =>
+                string.Equals(
+                    candidate.PowerId,
+                    StampedePowerId,
+                    StringComparison.Ordinal)
+                || string.Equals(
+                    candidate.DisplayName,
+                    "Stampede",
+                    StringComparison.OrdinalIgnoreCase));
+        }
+        powerAgg ??= new PowerAggregate();
+
+        Row3(
+            sb,
+            "Attacks stampeded",
+            powerAgg.StampedeAttacksPlayed.ToString(),
+            "");
+        if (!compact)
+        {
+            Row3(
+                sb,
+                "Common attacks",
+                powerAgg.StampedeCommonAttacksPlayed.ToString(),
+                "");
+            Row3(
+                sb,
+                "Uncommon attacks",
+                powerAgg.StampedeUncommonAttacksPlayed.ToString(),
+                "");
+            Row3(
+                sb,
+                "Rare attacks",
+                powerAgg.StampedeRareAttacksPlayed.ToString(),
+                "");
+        }
+        Row3(
+            sb,
+            GetEnergyStatLabel("saved"),
+            powerAgg.StampedeEnergySaved.ToString(),
             "");
     }
 

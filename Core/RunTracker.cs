@@ -2358,6 +2358,7 @@ public static class RunTracker
             RecordBrilliantScarfDiscountTaken(cardPlay);
             RecordPaelsClawGoopyCardPlayedIfOwnedLocked(cardPlay.Card);
             RecordThrowingAxeExtraPlayLocked(cardPlay);
+            RecordStampedeAutoPlayedAttackLocked(cardPlay);
 
             if (!ShouldTrackCardStatsDuringCombatLocked()) return;
             RecordDrainPowerUpgradedCardPlayedLocked(cardPlay.Card);
@@ -3797,6 +3798,185 @@ public static class RunTracker
     {
         if (agg == null || cardsDrawn <= 0) return;
         agg.ViciousCardsDrawn += cardsDrawn;
+    }
+
+    internal static PendingStampedeCallback? ArmStampedeCallback(
+        StampedePower? stampede,
+        Player? callbackPlayer)
+    {
+        if (stampede?.Owner?.Player is not Player owner) return null;
+        if (callbackPlayer != owner) return null;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return null;
+                if (!IsTrackedPlayer(owner)) return null;
+
+                _pendingCombat ??= new PendingCombat();
+                var pending = new PendingStampedeCallback
+                {
+                    PendingCombat = _pendingCombat,
+                    Owner = owner,
+                    PowerId = stampede.Id.ToString(),
+                    DisplayName = GetPowerDisplayName(stampede),
+                };
+                _pendingCombat.PendingStampedeCallbacks[owner] = pending;
+                return pending;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"ArmStampedeCallback failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+    internal static PendingStampedeAutoPlay? TryBeginStampedeAutoPlay(
+        CardModel? card)
+    {
+        if (card?.Owner is not Player owner) return null;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null) return null;
+                if (!_pendingCombat.PendingStampedeCallbacks.TryGetValue(
+                        owner,
+                        out var callback))
+                {
+                    return null;
+                }
+                if (!ReferenceEquals(callback.PendingCombat, _pendingCombat)
+                    || callback.AutoPlayInProgress)
+                {
+                    return null;
+                }
+
+                callback.AutoPlayInProgress = true;
+                var pending = new PendingStampedeAutoPlay
+                {
+                    Callback = callback,
+                    Card = card,
+                };
+                _pendingCombat.PendingStampedeAutoPlays[owner] = pending;
+                return pending;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"TryBeginStampedeAutoPlay failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+    internal static void CompleteStampedeAutoPlay(
+        PendingStampedeAutoPlay? pending)
+    {
+        if (pending == null) return;
+
+        lock (_lock)
+        {
+            if (_pendingCombat == null) return;
+            var callback = pending.Callback;
+            if (!ReferenceEquals(callback.PendingCombat, _pendingCombat)) return;
+
+            if (_pendingCombat.PendingStampedeAutoPlays.TryGetValue(
+                    callback.Owner,
+                    out var active)
+                && ReferenceEquals(active, pending))
+            {
+                _pendingCombat.PendingStampedeAutoPlays.Remove(callback.Owner);
+            }
+
+            if (_pendingCombat.PendingStampedeCallbacks.TryGetValue(
+                    callback.Owner,
+                    out var activeCallback)
+                && ReferenceEquals(activeCallback, callback))
+            {
+                callback.AutoPlayInProgress = false;
+            }
+        }
+    }
+
+    internal static void DisarmStampedeCallback(
+        PendingStampedeCallback? pending)
+    {
+        if (pending == null) return;
+
+        lock (_lock)
+        {
+            if (_pendingCombat == null) return;
+            if (_pendingCombat.PendingStampedeCallbacks.TryGetValue(
+                    pending.Owner,
+                    out var active)
+                && ReferenceEquals(active, pending))
+            {
+                _pendingCombat.PendingStampedeCallbacks.Remove(pending.Owner);
+            }
+
+            if (_pendingCombat.PendingStampedeAutoPlays.TryGetValue(
+                    pending.Owner,
+                    out var activeAutoPlay)
+                && ReferenceEquals(activeAutoPlay.Callback, pending))
+            {
+                _pendingCombat.PendingStampedeAutoPlays.Remove(pending.Owner);
+            }
+        }
+    }
+
+    private static void RecordStampedeAutoPlayedAttackLocked(CardPlay cardPlay)
+    {
+        if (!cardPlay.IsAutoPlay || cardPlay.PlayIndex != 0) return;
+        if (cardPlay.Card?.Owner is not Player owner) return;
+        if (_pendingCombat == null) return;
+        if (!_pendingCombat.PendingStampedeAutoPlays.TryGetValue(
+                owner,
+                out var pending))
+        {
+            return;
+        }
+        if (pending.Recorded
+            || !ReferenceEquals(pending.Card, cardPlay.Card)
+            || cardPlay.Card.Type != CardType.Attack)
+        {
+            return;
+        }
+
+        pending.Recorded = true;
+        var agg = GetOrCreatePowerAggregate(
+            _pendingCombat.MetaStats,
+            pending.Callback.PowerId,
+            pending.Callback.DisplayName);
+        RecordStampedeAttackForTest(
+            agg,
+            cardPlay.Card.Rarity,
+            cardPlay.Resources.EnergyValue);
+    }
+
+    internal static void RecordStampedeAttackForTest(
+        PowerAggregate agg,
+        CardRarity rarity,
+        int energySaved)
+    {
+        if (agg == null) return;
+
+        agg.StampedeAttacksPlayed++;
+        agg.StampedeEnergySaved += Math.Max(0, energySaved);
+        switch (rarity)
+        {
+            case CardRarity.Common:
+                agg.StampedeCommonAttacksPlayed++;
+                break;
+            case CardRarity.Uncommon:
+                agg.StampedeUncommonAttacksPlayed++;
+                break;
+            case CardRarity.Rare:
+                agg.StampedeRareAttacksPlayed++;
+                break;
+        }
     }
 
     private static PowerAggregate GetOrCreatePowerAggregate(
@@ -25405,6 +25585,14 @@ public static class RunTracker
             targetAgg.EntropyRareCardsGenerated +=
                 sourceAgg.EntropyRareCardsGenerated;
             targetAgg.ViciousCardsDrawn += sourceAgg.ViciousCardsDrawn;
+            targetAgg.StampedeAttacksPlayed += sourceAgg.StampedeAttacksPlayed;
+            targetAgg.StampedeCommonAttacksPlayed +=
+                sourceAgg.StampedeCommonAttacksPlayed;
+            targetAgg.StampedeUncommonAttacksPlayed +=
+                sourceAgg.StampedeUncommonAttacksPlayed;
+            targetAgg.StampedeRareAttacksPlayed +=
+                sourceAgg.StampedeRareAttacksPlayed;
+            targetAgg.StampedeEnergySaved += sourceAgg.StampedeEnergySaved;
         }
     }
 
@@ -26177,6 +26365,10 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, PendingViciousDraw> PendingViciousDraws { get; }
         = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, PendingStampedeCallback> PendingStampedeCallbacks { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, PendingStampedeAutoPlay> PendingStampedeAutoPlays { get; }
+        = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> DanseMacabrePowerCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> DanseMacabrePowerTurnCountedTurns { get; }
@@ -26296,6 +26488,22 @@ internal sealed class PendingViciousDraw
     public required Player Owner { get; init; }
     public required string PowerId { get; init; }
     public required string DisplayName { get; init; }
+}
+
+internal sealed class PendingStampedeCallback
+{
+    public required PendingCombat PendingCombat { get; init; }
+    public required Player Owner { get; init; }
+    public required string PowerId { get; init; }
+    public required string DisplayName { get; init; }
+    public bool AutoPlayInProgress { get; set; }
+}
+
+internal sealed class PendingStampedeAutoPlay
+{
+    public required PendingStampedeCallback Callback { get; init; }
+    public required CardModel Card { get; init; }
+    public bool Recorded { get; set; }
 }
 
 public sealed class PendingJossPaperDraw

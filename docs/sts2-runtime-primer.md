@@ -678,6 +678,16 @@ so No Draw, hand capacity, and pile exhaustion remain observed zero-value
 outcomes. Persist the shared total under `POWER.VICIOUS` and project it on
 every Vicious card rather than attributing later triggers to one physical copy.
 
+`StampedePower.AfterAutoPostPlayPhaseEntered` selects eligible Attacks from the
+owner's hand and sequentially awaits `CardCmd.AutoPlay`. Keep a callback-wide
+window, claim each direct autoplay, and suspend that window until the claimed
+task completes so nested autoplays caused by the Attack are not misattributed.
+Count the selection only when its primary `CardPlayFinishedEntry` arrives.
+Use that play's `Resources.EnergyValue` as energy saved because it is the
+resolved amount a normal play would spend while autoplay spends zero. Persist
+the totals and rarity splits under `POWER.STAMPEDE` and project them on every
+Stampede card.
+
 `DanseMacabrePower.BeforeCardPlayed` owns both the exact trigger condition and
 the block command: an owner card whose resolved energy cost is at least the
 power's Energy dynamic variable causes one flash and one awaited

@@ -590,6 +590,20 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsStampedePowerFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("stampede-power-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        AssertStampedePowerFixture(
+            loaded.Data.MetaStats.PowerAggregates["POWER.STAMPEDE"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsEntropyPowerFixture()
     {
         var loaded = RunStorage.LoadHistorical(
@@ -1390,6 +1404,17 @@ public class SchemaLoadingTests
         Assert.NotNull(resumed);
         AssertViciousPowerFixture(
             resumed!.MetaStats.PowerAggregates["POWER.VICIOUS"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsStampedePowerFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("stampede-power-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertStampedePowerFixture(
+            resumed!.MetaStats.PowerAggregates["POWER.STAMPEDE"]);
     }
 
     [Fact]
@@ -4313,6 +4338,17 @@ public class SchemaLoadingTests
         Assert.Equal("POWER.VICIOUS", powerAgg.PowerId);
         Assert.Equal("Vicious", powerAgg.DisplayName);
         Assert.Equal(11, powerAgg.ViciousCardsDrawn);
+    }
+
+    private static void AssertStampedePowerFixture(PowerAggregate powerAgg)
+    {
+        Assert.Equal("POWER.STAMPEDE", powerAgg.PowerId);
+        Assert.Equal("Stampede", powerAgg.DisplayName);
+        Assert.Equal(9, powerAgg.StampedeAttacksPlayed);
+        Assert.Equal(4, powerAgg.StampedeCommonAttacksPlayed);
+        Assert.Equal(3, powerAgg.StampedeUncommonAttacksPlayed);
+        Assert.Equal(2, powerAgg.StampedeRareAttacksPlayed);
+        Assert.Equal(14, powerAgg.StampedeEnergySaved);
     }
 
     private static void AssertEntropyPowerFixture(PowerAggregate powerAgg)
