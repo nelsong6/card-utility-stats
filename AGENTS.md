@@ -18,6 +18,25 @@ their build/deploy/reload flow. Explicitly assigned verification tasks (for
 example, a Glimmung verification phase) still count as an explicit request and
 should follow their own validation contract.
 
+## Restart Claims
+
+Never turn uncertainty about hot reload, Harmony, JIT compilation, or any other
+runtime behavior into an instruction for the user to restart the game.
+
+There are exactly three allowed outcomes:
+
+1. If the evidence makes it certain that no restart is needed, say so.
+2. If the evidence makes it certain that a restart is required, say so and name
+   the evidence.
+3. Otherwise, explicitly say that the restart requirement is uncertain and
+   propose a concrete way to learn.
+
+A newly introduced Harmony target is not, by itself, evidence that a restart is
+required. A patched-method log entry proves installation, not whether existing
+compiled callers bypass the patch. Conversely, an observed post-reload behavior
+change proves that the relevant live path is already reaching the patch. Do not
+give the user precautionary restart chores to cover agent uncertainty.
+
 ## Mod Policy
 
 The Slay the Spire 2 install (`D:\SteamLibrary\steamapps\common\Slay the Spire 2\mods\`) runs **only** the user's own mods plus their required prereqs. No third-party mods.

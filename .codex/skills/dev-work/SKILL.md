@@ -46,17 +46,19 @@ After commit and push, validate the exact pushed code path as far as local tooli
 3. Reload SpireLens through automation, not by asking the user to press F5.
    - Prefer MCP tool `reload_spirelens_core` when available.
    - Equivalent bridge call: `POST http://localhost:15526/api/v1/singleplayer` with `{"action":"dev_reload_spirelens_core"}`.
-4. Treat a newly introduced Harmony target as requiring one full Slay the
-   Spire 2 restart before behavioral verification.
-   - Hot reload proves that Harmony discovered and installed the patch, but it
-     cannot invalidate caller code the CLR already inlined or devirtualized.
-   - A new combat or new run is not a substitute; both remain in the same
-     process.
-   - Under the repo's user-owned verification rule, explain the restart
-     requirement and do not restart an active game unless the user explicitly
-     requests verification or authorizes the restart.
-   - Changes to code behind an already-established patch can normally use the
-     regular hot-reload loop.
+4. Report restart requirements as evidence-based facts, never precautionary
+   chores.
+   - If it is certain that no restart is needed, say so.
+   - If it is certain that a restart is required, say so and name the evidence.
+   - Otherwise, explicitly say the restart requirement is uncertain and
+     propose a concrete way to learn.
+   - A newly introduced Harmony target alone does not prove that a restart is
+     required. Hot reload proves installation, but existing compiled callers
+     may or may not bypass the patch through inlining or devirtualization.
+   - An observed post-reload behavior change proves that the relevant live path
+     is already reaching the patch; do not ask for a restart in that case.
+   - Under the repo's user-owned verification rule, do not restart an active
+     game or assign the user a restart merely to cover this uncertainty.
 5. Inspect `%APPDATA%\SlayTheSpire2\logs\godot.log`.
    - Require `Core.Initialize complete`.
    - Treat `Core.Initialize threw` as a failed validation.
