@@ -466,6 +466,11 @@ public class PowerAggregate
     // the other outcome.
     public int AggressionCardsReturnedToHand { get; set; }
     public int AggressionCardsUpgraded { get; set; }
+
+    // Rupture tracking. Strength gained is the observed positive change across
+    // Rupture's own payoff callbacks. TurnsActive is the zero-inclusive
+    // denominator for the power's per-active-turn average.
+    public decimal StrengthGained { get; set; }
 }
 
 public class EnemyAggregate

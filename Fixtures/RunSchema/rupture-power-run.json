@@ -1,0 +1,40 @@
+{
+  "run_id": "rupture-power-fixture",
+  "started_at": "2026-07-30T00:00:00Z",
+  "updated_at": "2026-07-30T00:24:00Z",
+  "character": "IRONCLAD",
+  "ascension": 7,
+  "floor_reached": 23,
+  "outcome": "in_progress",
+  "game_start_time": 1785369600,
+  "aggregates": {
+    "CARD.RUPTURE#1": {
+      "combats_in_deck": 4,
+      "plays": 3,
+      "times_drawn": 6,
+      "floor_added": 7,
+      "initial_upgrade_level": 0
+    }
+  },
+  "events": [],
+  "relic_aggregates": {},
+  "enemy_aggregates": {},
+  "meta_stats": {
+    "power_aggregates": {
+      "POWER.RUPTURE": {
+        "power_id": "POWER.RUPTURE",
+        "display_name": "Rupture",
+        "strength_gained": 18,
+        "turns_active": 6
+      }
+    }
+  },
+  "instance_numbers_by_def": {
+    "CARD.RUPTURE": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.RUPTURE": 1
+  }
+}

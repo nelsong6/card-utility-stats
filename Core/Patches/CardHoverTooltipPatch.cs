@@ -30,6 +30,7 @@ public static class CardHoverShowPatch
     private const string FeelNoPainPowerId = "POWER.FEEL_NO_PAIN";
     private const string FreeAttackPowerId = "POWER.FREE_ATTACK_POWER";
     private const string JugglingPowerId = "POWER.JUGGLING";
+    private const string RupturePowerId = "POWER.RUPTURE";
     private const string StampedePowerId = "POWER.STAMPEDE";
     private const string ViciousPowerId = "POWER.VICIOUS";
     private const string StarIconPath = "res://images/packed/sprite_fonts/star_icon.png";
@@ -350,6 +351,7 @@ public static class CardHoverShowPatch
         AppendViciousPowerStats(sb, cardModel, metaStats);
         AppendStampedePowerStats(sb, cardModel, metaStats, compact: false);
         AppendAggressionPowerStats(sb, cardModel, metaStats);
+        AppendRupturePowerStats(sb, cardModel, metaStats);
         AppendFeelNoPainPowerStats(sb, cardModel, metaStats);
         AppendUnrelentingFreeAttackStats(sb, cardModel, metaStats, compact: false);
         AppendDebtStats(sb, cardModel, agg);
@@ -573,6 +575,7 @@ public static class CardHoverShowPatch
         AppendViciousPowerStats(sb, cardModel, metaStats);
         AppendStampedePowerStats(sb, cardModel, metaStats, compact: true);
         AppendAggressionPowerStats(sb, cardModel, metaStats);
+        AppendRupturePowerStats(sb, cardModel, metaStats);
         AppendFeelNoPainPowerStats(sb, cardModel, metaStats);
         AppendUnrelentingFreeAttackStats(sb, cardModel, metaStats, compact: true);
         AppendDebtStats(sb, cardModel, agg);
@@ -1236,6 +1239,51 @@ public static class CardHoverShowPatch
             sb,
             "Cards upgraded",
             powerAgg.AggressionCardsUpgraded.ToString(),
+            "");
+    }
+
+    private static void AppendRupturePowerStats(
+        StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel card,
+        RunMetaStats metaStats)
+    {
+        if (card is not Rupture
+            && !IsCardId(card, "CARD.RUPTURE"))
+        {
+            return;
+        }
+
+        metaStats ??= new RunMetaStats();
+        PowerAggregate? powerAgg = null;
+        if (metaStats.PowerAggregates != null)
+        {
+            metaStats.PowerAggregates.TryGetValue(
+                RupturePowerId,
+                out powerAgg);
+            powerAgg ??= metaStats.PowerAggregates.Values.FirstOrDefault(candidate =>
+                string.Equals(
+                    candidate.PowerId,
+                    RupturePowerId,
+                    StringComparison.Ordinal)
+                || string.Equals(
+                    candidate.DisplayName,
+                    "Rupture",
+                    StringComparison.OrdinalIgnoreCase));
+        }
+        powerAgg ??= new PowerAggregate();
+
+        var strengthPerActiveTurn = powerAgg.TurnsActive <= 0
+            ? 0m
+            : powerAgg.StrengthGained / powerAgg.TurnsActive;
+        Row3(
+            sb,
+            "Strength gained",
+            FormatDecimal(powerAgg.StrengthGained),
+            "");
+        Row3(
+            sb,
+            "Strength gained / active turn",
+            FormatDecimal(strengthPerActiveTurn),
             "");
     }
 

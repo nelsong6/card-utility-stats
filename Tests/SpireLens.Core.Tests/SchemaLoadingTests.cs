@@ -618,6 +618,20 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsRupturePowerFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("rupture-power-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        AssertRupturePowerFixture(
+            loaded.Data.MetaStats.PowerAggregates["POWER.RUPTURE"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsFeelNoPainPowerFixture()
     {
         var loaded = RunStorage.LoadHistorical(
@@ -1454,6 +1468,17 @@ public class SchemaLoadingTests
         Assert.NotNull(resumed);
         AssertAggressionPowerFixture(
             resumed!.MetaStats.PowerAggregates["POWER.AGGRESSION"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsRupturePowerFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("rupture-power-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertRupturePowerFixture(
+            resumed!.MetaStats.PowerAggregates["POWER.RUPTURE"]);
     }
 
     [Fact]
@@ -4407,6 +4432,14 @@ public class SchemaLoadingTests
         Assert.Equal("Aggression", powerAgg.DisplayName);
         Assert.Equal(8, powerAgg.AggressionCardsReturnedToHand);
         Assert.Equal(5, powerAgg.AggressionCardsUpgraded);
+    }
+
+    private static void AssertRupturePowerFixture(PowerAggregate powerAgg)
+    {
+        Assert.Equal("POWER.RUPTURE", powerAgg.PowerId);
+        Assert.Equal("Rupture", powerAgg.DisplayName);
+        Assert.Equal(18m, powerAgg.StrengthGained);
+        Assert.Equal(6, powerAgg.TurnsActive);
     }
 
     private static void AssertFeelNoPainPowerFixture(PowerAggregate powerAgg)

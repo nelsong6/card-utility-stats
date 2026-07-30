@@ -697,6 +697,17 @@ upgrade only when the exact callback-selected card reaches
 `CardModel.UpgradeInternal`. Persist both shared outcomes under
 `POWER.AGGRESSION` and project them on every Aggression card.
 
+`RupturePower` has two payoff boundaries. Qualifying self-damage outside the
+currently resolving owner card applies Strength immediately from
+`AfterDamageReceived`; damage caused during an owner card play is accumulated
+and applied once from `AfterCardPlayed`. Compare the owner's Strength before
+and after both completed callbacks, so multi-hit cards are counted once at
+their combined payoff and Strength modifiers remain reflected in the observed
+gain. Count the positive application turn from `PowerReceivedEntry` and every
+later player turn that starts with Rupture, including zero-trigger turns.
+Persist `StrengthGained` and `TurnsActive` under `POWER.RUPTURE`, then project
+the shared total and per-active-turn quotient on every Rupture card.
+
 `FeelNoPainPower.AfterCardExhausted` owns an exact owner-card check and then
 awaits the decimal/`ValueProp` `CreatureCmd.GainBlock` overload. Arm from that
 callback and replace the command's returned task with an observer so the

@@ -4338,6 +4338,128 @@ public static class RunTracker
         agg.AggressionCardsUpgraded += Math.Max(0, cardsUpgraded);
     }
 
+    internal static PendingRuptureStrengthObservation?
+        BeginRuptureStrengthObservation(RupturePower? power)
+    {
+        if (power?.Owner?.Player is not Player player) return null;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return null;
+                if (CombatManager.Instance?.IsInProgress != true) return null;
+                if (!IsTrackedPlayer(player)) return null;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordRupturePowerActiveForPlayerLocked(power, player);
+                return new PendingRuptureStrengthObservation
+                {
+                    PendingCombat = _pendingCombat,
+                    Owner = power.Owner,
+                    PowerId = power.Id.ToString(),
+                    DisplayName = GetPowerDisplayName(power),
+                    StrengthBefore = CurrentStrength(power.Owner),
+                };
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"BeginRuptureStrengthObservation failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+    internal static void CompleteRuptureStrengthObservation(
+        PendingRuptureStrengthObservation? observation)
+    {
+        if (observation == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ReferenceEquals(observation.PendingCombat, _pendingCombat))
+                    return;
+
+                var strengthGained = Math.Max(
+                    0m,
+                    CurrentStrength(observation.Owner)
+                        - observation.StrengthBefore);
+                if (strengthGained <= 0m) return;
+
+                var agg = GetOrCreatePowerAggregate(
+                    _pendingCombat!.MetaStats,
+                    observation.PowerId,
+                    observation.DisplayName);
+                RecordRuptureStrengthGainedForTest(agg, strengthGained);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"CompleteRuptureStrengthObservation failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordRupturePowerTurnStarted(Player? player)
+    {
+        if (player?.Creature == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+                if (!IsTrackedPlayer(player)) return;
+                var power = player.Creature.GetPower<RupturePower>();
+                if (power == null) return;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordRupturePowerActiveForPlayerLocked(power, player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordRupturePowerTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void RecordRupturePowerActiveForPlayerLocked(
+        RupturePower power,
+        Player player)
+    {
+        if (_pendingCombat == null) return;
+
+        var agg = GetOrCreatePowerAggregate(
+            _pendingCombat.MetaStats,
+            power.Id.ToString(),
+            GetPowerDisplayName(power));
+
+        int turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.RupturePowerTurnCountedTurns.TryGetValue(
+                player,
+                out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.RupturePowerTurnCountedTurns[player] = turnNumber;
+        agg.TurnsActive++;
+    }
+
+    internal static void RecordRuptureStrengthGainedForTest(
+        PowerAggregate agg,
+        decimal amount)
+    {
+        if (agg == null || amount <= 0m) return;
+        agg.StrengthGained += amount;
+    }
+
     private static PowerAggregate GetOrCreatePowerAggregate(
         RunMetaStats metaStats,
         string powerId,
@@ -24951,6 +25073,16 @@ public static class RunTracker
                         feelNoPain.Owner.Player);
                 }
 
+                if (entry.Amount > 0m
+                    && entry.Power is RupturePower rupture
+                    && rupture.Owner?.Player != null
+                    && IsTrackedPlayer(rupture.Owner.Player))
+                {
+                    RecordRupturePowerActiveForPlayerLocked(
+                        rupture,
+                        rupture.Owner.Player);
+                }
+
                 var causingPlay = FindCurrentlyResolvingCardPlay();
                 if (causingPlay?.Card == null)
                 {
@@ -25967,6 +26099,7 @@ public static class RunTracker
                 sourceAgg.AggressionCardsReturnedToHand;
             targetAgg.AggressionCardsUpgraded +=
                 sourceAgg.AggressionCardsUpgraded;
+            targetAgg.StrengthGained += sourceAgg.StrengthGained;
         }
     }
 
@@ -26759,6 +26892,8 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> FeelNoPainPowerTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> RupturePowerTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
     public Dictionary<CardModel, decimal> FreeAttackEnergySavingsByCard { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<string, int> DrainPowerTurnCountedTurns { get; }
@@ -26906,6 +27041,15 @@ internal sealed class PendingAggressionCardMove
 {
     public required PendingAggressionCallback Callback { get; init; }
     public required CardModel Card { get; init; }
+}
+
+internal sealed class PendingRuptureStrengthObservation
+{
+    public required PendingCombat PendingCombat { get; init; }
+    public required Creature Owner { get; init; }
+    public required string PowerId { get; init; }
+    public required string DisplayName { get; init; }
+    public decimal StrengthBefore { get; init; }
 }
 
 public sealed class PendingJossPaperDraw

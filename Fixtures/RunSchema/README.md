@@ -119,6 +119,10 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds a power-ID-keyed Aggression aggregate with successful discard-to-hand
   Attack moves and separately confirmed upgrades. Every Aggression card
   projects these shared power totals.
+- `rupture-power-run.json`
+  Adds a power-ID-keyed Rupture aggregate with observed Strength gained and
+  its zero-inclusive active-turn denominator. Every Rupture card projects the
+  shared total and per-active-turn average.
 - `feel-no-pain-power-run.json`
   Adds a power-ID-keyed Feel No Pain aggregate with observed post-modifier
   block and active-turn denominator data. Every Feel No Pain card projects
