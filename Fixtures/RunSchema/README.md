@@ -398,6 +398,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `burning-sticks-relic-run.json`
   Adds Burning Sticks confirmed duplicate activations, exact generated-card
   plays, duplicate rarity splits, and its held-combat denominator.
+- `throwing-axe-relic-run.json`
+  Adds Throwing Axe's confirmed extra card plays, play-time energy values,
+  rarity splits, and zero-inclusive held-combat denominator.
 - `gnarled-hammer-relic-run.json`
   Adds Gnarled Hammer's observed list of permanent deck cards whose Sharp
   enchantment was applied or increased by its pickup effect.

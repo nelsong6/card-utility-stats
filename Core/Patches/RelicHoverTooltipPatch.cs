@@ -1304,6 +1304,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is ThrowingAxe)
+        {
+            title = "Throwing Axe";
+            body = BuildThrowingAxeBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is JuzuBracelet)
         {
             title = "Juzu Bracelet";
@@ -4593,6 +4600,53 @@ public static class RelicHoverShowPatch
             agg.BurningSticksRareCardsDuplicated.ToString(),
             "",
             "Rare cards successfully duplicated by Burning Sticks.");
+        return sb.ToString();
+    }
+
+    private static string BuildThrowingAxeBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var averageEnergyCostPerCombat = agg.ThrowingAxeCombats <= 0
+            ? 0m
+            : (decimal)agg.ThrowingAxeExtraPlayEnergyCostTotal
+              / agg.ThrowingAxeCombats;
+
+        Row3(
+            sb,
+            "Extra cards played",
+            agg.ThrowingAxeExtraCardsPlayed.ToString(),
+            "",
+            "Finished extra card plays contributed by Throwing Axe.");
+        Row3(
+            sb,
+            "Total energy cost of extra plays",
+            agg.ThrowingAxeExtraPlayEnergyCostTotal.ToString(),
+            "",
+            "The play-time energy values of cards replayed by Throwing Axe.");
+        Row3(
+            sb,
+            "Avg energy cost per combat",
+            FormatDecimal(averageEnergyCostPerCombat),
+            "",
+            "Total energy cost of Throwing Axe extra plays divided by combats where it was held.");
+        Row3(
+            sb,
+            "Commons played",
+            agg.ThrowingAxeCommonCardsPlayed.ToString(),
+            "",
+            "Common cards replayed by Throwing Axe.");
+        Row3(
+            sb,
+            "Uncommons played",
+            agg.ThrowingAxeUncommonCardsPlayed.ToString(),
+            "",
+            "Uncommon cards replayed by Throwing Axe.");
+        Row3(
+            sb,
+            "Rares played",
+            agg.ThrowingAxeRareCardsPlayed.ToString(),
+            "",
+            "Rare cards replayed by Throwing Axe.");
         return sb.ToString();
     }
 

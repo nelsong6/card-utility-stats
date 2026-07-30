@@ -214,6 +214,14 @@ as plain `Replay`; this is the fallback for card-native/base replay counts and
 other effects that mutate the card's replay count before the hook can expose a
 source.
 
+Throwing Axe uses this same hook-listener path: its model appears in
+`Hook.ModifyCardPlayCount`'s `modifyingModels` only when it contributes one
+extra play. Attribute the relic from a later finished replay, not from the
+planned count alone. Every `CardPlay` in the series shares the same
+`ResourceInfo`; `EnergyValue` is therefore the play-time cost/value of the card
+that Throwing Axe replayed, while `EnergySpent` describes the one resource
+payment for the series.
+
 Replay shortfalls and no-outcome replays are not the same thing. `PlayCardAction`
 can cancel before `OnPlayWrapper` starts if `CanPlay` or `IsValidTarget` fails;
 that produces no `CardPlayStartedEntry`, no `CardPlayFinishedEntry`, and no

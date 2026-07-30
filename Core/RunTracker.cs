@@ -200,6 +200,7 @@ public static class RunTracker
     private static readonly HashSet<CardModel> _pendingMakeItSoSummons = new();
     private static readonly Dictionary<CardModel, Queue<PendingReplayExtraPlaySource>> _pendingReplayExtraPlaySources = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardModel, bool> _pendingReplayExtraPlaySeriesStarted = new(ReferenceEqualityComparer.Instance);
+    private static readonly Dictionary<CardModel, int> _pendingThrowingAxeExtraPlays = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardPlay, PendingReplayAttackOutcome> _pendingReplayAttackOutcomes = new(ReferenceEqualityComparer.Instance);
 
     // DamageResult objects already seen through a real DamageReceivedEntry
@@ -1115,6 +1116,7 @@ public static class RunTracker
         _pendingMakeItSoSummons.Clear();
         _pendingReplayExtraPlaySources.Clear();
         _pendingReplayExtraPlaySeriesStarted.Clear();
+        _pendingThrowingAxeExtraPlays.Clear();
         _pendingReplayAttackOutcomes.Clear();
         _observedDamageResults.Clear();
         if (_pendingRankRestores.Count > 0)
@@ -2106,6 +2108,12 @@ public static class RunTracker
         target.BurningSticksCommonCardsDuplicated += source.BurningSticksCommonCardsDuplicated;
         target.BurningSticksUncommonCardsDuplicated += source.BurningSticksUncommonCardsDuplicated;
         target.BurningSticksRareCardsDuplicated += source.BurningSticksRareCardsDuplicated;
+        target.ThrowingAxeExtraCardsPlayed += source.ThrowingAxeExtraCardsPlayed;
+        target.ThrowingAxeExtraPlayEnergyCostTotal += source.ThrowingAxeExtraPlayEnergyCostTotal;
+        target.ThrowingAxeCombats += source.ThrowingAxeCombats;
+        target.ThrowingAxeCommonCardsPlayed += source.ThrowingAxeCommonCardsPlayed;
+        target.ThrowingAxeUncommonCardsPlayed += source.ThrowingAxeUncommonCardsPlayed;
+        target.ThrowingAxeRareCardsPlayed += source.ThrowingAxeRareCardsPlayed;
         target.BingBongExtraCardsAdded += source.BingBongExtraCardsAdded;
         target.BingBongCommonCardsAdded += source.BingBongCommonCardsAdded;
         target.BingBongUncommonCardsAdded += source.BingBongUncommonCardsAdded;
@@ -2331,6 +2339,7 @@ public static class RunTracker
             RecordBurningSticksGeneratedCardPlayedLocked(cardPlay.Card);
             RecordBrilliantScarfDiscountTaken(cardPlay);
             RecordPaelsClawGoopyCardPlayedIfOwnedLocked(cardPlay.Card);
+            RecordThrowingAxeExtraPlayLocked(cardPlay);
 
             if (!ShouldTrackCardStatsDuringCombatLocked()) return;
             RecordDrainPowerUpgradedCardPlayedLocked(cardPlay.Card);
@@ -2405,6 +2414,11 @@ public static class RunTracker
 
         lock (_lock)
         {
+            NoteThrowingAxeReplayContributionLocked(
+                card,
+                remaining,
+                modifyingModels);
+
             if (!ShouldTrackCardStatsDuringCombatLocked()) return;
             foreach (var modifier in modifyingModels)
             {
@@ -2417,6 +2431,77 @@ public static class RunTracker
                 remaining -= count;
             }
         }
+    }
+
+    private static void NoteThrowingAxeReplayContributionLocked(
+        CardModel card,
+        int extraPlayCount,
+        IEnumerable<AbstractModel> modifyingModels)
+    {
+        if (extraPlayCount <= 0 || !modifyingModels.Any(model => model is ThrowingAxe))
+            return;
+
+        if (card.Owner != null)
+            RecordThrowingAxeCombatForPlayerLocked(card.Owner);
+
+        var key = Canonical(card);
+        _pendingThrowingAxeExtraPlays.TryGetValue(key, out var pending);
+        // Throwing Axe contributes exactly one play when it appears in the
+        // game's modifier list. Other replay contributors may add more.
+        _pendingThrowingAxeExtraPlays[key] = pending + 1;
+    }
+
+    private static void RecordThrowingAxeExtraPlayLocked(CardPlay cardPlay)
+    {
+        if (!IsReplayExtraPlay(cardPlay)) return;
+
+        var key = Canonical(cardPlay.Card);
+        if (!_pendingThrowingAxeExtraPlays.TryGetValue(key, out var pending)
+            || pending <= 0)
+        {
+            return;
+        }
+
+        if (pending == 1)
+            _pendingThrowingAxeExtraPlays.Remove(key);
+        else
+            _pendingThrowingAxeExtraPlays[key] = pending - 1;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(ThrowingAxeRelicId);
+        RecordThrowingAxeExtraPlayForTest(
+            agg,
+            cardPlay.Resources.EnergyValue,
+            cardPlay.Card.Rarity);
+    }
+
+    internal static void RecordThrowingAxeExtraPlayForTest(
+        RelicAggregate agg,
+        int energyValue,
+        CardRarity rarity)
+    {
+        agg.ThrowingAxeExtraCardsPlayed++;
+        agg.ThrowingAxeExtraPlayEnergyCostTotal += Math.Max(0, energyValue);
+
+        switch (rarity)
+        {
+            case CardRarity.Common:
+                agg.ThrowingAxeCommonCardsPlayed++;
+                break;
+            case CardRarity.Uncommon:
+                agg.ThrowingAxeUncommonCardsPlayed++;
+                break;
+            case CardRarity.Rare:
+                agg.ThrowingAxeRareCardsPlayed++;
+                break;
+        }
+    }
+
+    internal static void RecordThrowingAxeCombatForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (count <= 0) return;
+        agg.ThrowingAxeCombats += count;
     }
 
     private static void EnqueueReplayExtraPlaySourceLocked(
@@ -4486,6 +4571,7 @@ public static class RunTracker
     private const string RuinedHelmetRelicId = "RELIC.RUINED_HELMET";
     private const string MummifiedHandRelicId = "RELIC.MUMMIFIED_HAND";
     private const string BurningSticksRelicId = "RELIC.BURNING_STICKS";
+    private const string ThrowingAxeRelicId = "RELIC.THROWING_AXE";
     private const string BingBongRelicId = "RELIC.BING_BONG";
     private const string GnarledHammerRelicId = "RELIC.GNARLED_HAMMER";
     private const string SilkenTressRelicId = "RELIC.SILKEN_TRESS";
@@ -18959,6 +19045,7 @@ public static class RunTracker
             RecordRuinedHelmetCombatForPlayerLocked(player);
             RecordMummifiedHandCombatForPlayerLocked(player);
             RecordBurningSticksCombatForPlayerLocked(player);
+            RecordThrowingAxeCombatForPlayerLocked(player);
             RecordToastyMittensCombatForPlayerLocked(player);
         }
         catch (Exception e)
@@ -19863,6 +19950,16 @@ public static class RunTracker
         RecordBurningSticksCombatForTest(agg);
     }
 
+    private static void RecordThrowingAxeCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasThrowingAxe(player)) return;
+        if (!_pendingCombat.ThrowingAxeCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(ThrowingAxeRelicId);
+        RecordThrowingAxeCombatForTest(agg);
+    }
+
     private static void RecordToastyMittensCombatForPlayerLocked(Player player)
     {
         if (_pendingCombat == null) return;
@@ -20405,6 +20502,18 @@ public static class RunTracker
         try
         {
             return player.Relics.Any(r => r is BurningSticks);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool PlayerHasThrowingAxe(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is ThrowingAxe);
         }
         catch
         {
@@ -25484,6 +25593,8 @@ internal class PendingCombat
     public Dictionary<Player, int> MummifiedHandTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> BurningSticksCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> ThrowingAxeCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, PendingBurningSticksDuplicateWindow> PendingBurningSticksDuplicateWindows { get; }
         = new(ReferenceEqualityComparer.Instance);

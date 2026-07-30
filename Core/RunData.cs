@@ -1146,6 +1146,17 @@ public class RelicAggregate
     public int BurningSticksUncommonCardsDuplicated { get; set; }
     public int BurningSticksRareCardsDuplicated { get; set; }
 
+    // Throwing Axe tracking. An extra play counts only after the relic's
+    // contribution to the shared replay series produces a finished CardPlay.
+    // Energy cost is the replayed card's play-time EnergyValue; combats is a
+    // zero-inclusive held denominator for the requested average.
+    public int ThrowingAxeExtraCardsPlayed { get; set; }
+    public int ThrowingAxeExtraPlayEnergyCostTotal { get; set; }
+    public int ThrowingAxeCombats { get; set; }
+    public int ThrowingAxeCommonCardsPlayed { get; set; }
+    public int ThrowingAxeUncommonCardsPlayed { get; set; }
+    public int ThrowingAxeRareCardsPlayed { get; set; }
+
     // Bing Bong tracking. Counts only successful clonedBy:BingBong additions
     // to the permanent deck. Curse is a mutually exclusive type bucket; the
     // rarity buckets cover non-Curse Common, Uncommon, and Rare cards.

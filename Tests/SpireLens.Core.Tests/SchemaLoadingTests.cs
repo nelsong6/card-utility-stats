@@ -4682,4 +4682,37 @@ public class SchemaLoadingTests
         Assert.Equal(8, relicAgg.FloorAcquired);
         Assert.Equal(3, relicAgg.CardRewardsSkipped);
     }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsThrowingAxeRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("throwing-axe-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertThrowingAxeFixture(
+            loaded.Data.RelicAggregates["RELIC.THROWING_AXE"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsThrowingAxeRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("throwing-axe-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertThrowingAxeFixture(
+            resumed!.RelicAggregates["RELIC.THROWING_AXE"]);
+    }
+
+    private static void AssertThrowingAxeFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(3, relicAgg.ThrowingAxeExtraCardsPlayed);
+        Assert.Equal(7, relicAgg.ThrowingAxeExtraPlayEnergyCostTotal);
+        Assert.Equal(4, relicAgg.ThrowingAxeCombats);
+        Assert.Equal(1, relicAgg.ThrowingAxeCommonCardsPlayed);
+        Assert.Equal(1, relicAgg.ThrowingAxeUncommonCardsPlayed);
+        Assert.Equal(1, relicAgg.ThrowingAxeRareCardsPlayed);
+    }
 }
