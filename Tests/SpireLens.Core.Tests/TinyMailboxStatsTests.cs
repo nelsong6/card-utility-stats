@@ -127,9 +127,18 @@ public class TinyMailboxStatsTests
         Assert.Contains("Rest-site heals where Tiny Mailbox", body);
         Assert.Contains("offered", body);
         Assert.Contains("taken", body);
-        Assert.Contains("Common potions offered", body);
-        Assert.Contains("Uncommon potions offered", body);
-        Assert.Contains("Rare potions offered", body);
+        Assert.Contains(
+            StatConceptGlossary.RenderHintedGlyph("potion_common"),
+            body);
+        Assert.Contains(
+            StatConceptGlossary.RenderHintedGlyph("potion_uncommon"),
+            body);
+        Assert.Contains(
+            StatConceptGlossary.RenderHintedGlyph("potion_rare"),
+            body);
+        Assert.DoesNotContain("Common potions offered", body);
+        Assert.DoesNotContain("Uncommon potions offered", body);
+        Assert.DoesNotContain("Rare potions offered", body);
         Assert.Contains(
             StatConceptGlossary.RenderHintedGlyph("fruit_juice"),
             body);

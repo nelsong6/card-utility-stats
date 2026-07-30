@@ -4847,23 +4847,26 @@ public static class RelicHoverShowPatch
             "taken",
             agg.TinyMailboxPotionsTaken.ToString(),
             "Tiny Mailbox potions successfully taken.");
-        Row3(
+        DescribedIconRow(
             sb,
-            "Common potions offered",
+            ["potion_common"],
+            [],
+            "offered",
             agg.TinyMailboxCommonPotionsOffered.ToString(),
-            "",
             "Common potion rewards offered by Tiny Mailbox.");
-        Row3(
+        DescribedIconRow(
             sb,
-            "Uncommon potions offered",
+            ["potion_uncommon"],
+            [],
+            "offered",
             agg.TinyMailboxUncommonPotionsOffered.ToString(),
-            "",
             "Uncommon potion rewards offered by Tiny Mailbox.");
-        Row3(
+        DescribedIconRow(
             sb,
-            "Rare potions offered",
+            ["potion_rare"],
+            [],
+            "offered",
             agg.TinyMailboxRarePotionsOffered.ToString(),
-            "",
             "Rare potion rewards offered by Tiny Mailbox.");
         DescribedIconRow(
             sb,
