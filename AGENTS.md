@@ -61,6 +61,7 @@ When inspecting `mods/`, treat any non-(SpireLens|BaseLib|SpireLensMcp) entry as
 - Read [README.md](D:/repos/SpireLens/README.md:1) for the product-level overview.
 - Read [docs/architecture.md](D:/repos/SpireLens/docs/architecture.md:1) for subsystem layout and data flow.
 - Read [docs/sts2-runtime-primer.md](docs/sts2-runtime-primer.md) before changing card/relic attribution hooks; it captures stable Slay the Spire 2 lifecycle, combat-history, async hook, pile, and attribution timing behavior.
+- Read [docs/steam-workshop-publishing.md](docs/steam-workshop-publishing.md) for how SpireLens is published/updated on the Steam Workshop (item 3774710835, workspace at `D:\repos\spirelens-workshop\`).
 - For tracking behavior, start in [Core/RunTracker.cs](D:/repos/SpireLens/Core/RunTracker.cs:18).
 - For tooltip/UI behavior, start in:
   - [Core/Patches/ViewStatsInjectorPatch.cs](D:/repos/SpireLens/Core/Patches/ViewStatsInjectorPatch.cs:11)
