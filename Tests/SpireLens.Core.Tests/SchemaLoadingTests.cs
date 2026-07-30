@@ -4773,4 +4773,29 @@ public class SchemaLoadingTests
         Assert.NotNull(resumed);
         Assert.Equal(7, resumed!.Aggregates["CARD.FEED#1"].TotalMaxHpGained);
     }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsArmamentsCardFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("armaments-card-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.Equal(
+            9,
+            loaded.Data.Aggregates["CARD.ARMAMENTS#1"].ArmamentsCardsUpgraded);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsArmamentsCardFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("armaments-card-run.json"));
+
+        Assert.NotNull(resumed);
+        Assert.Equal(
+            9,
+            resumed!.Aggregates["CARD.ARMAMENTS#1"].ArmamentsCardsUpgraded);
+    }
 }

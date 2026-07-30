@@ -4253,6 +4253,48 @@ public static class RunTracker
             type,
             Math.Max(0, costBefore - costAfter));
 
+    private static void RecordArmamentsCardUpgradedLocked(CardModel upgradedCard)
+    {
+        if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+
+        var sourceCard = FindCurrentlyResolvingCardPlay()?.Card;
+        if (!IsArmamentsCard(sourceCard)) return;
+        if (!IsTrackedCard(sourceCard)) return;
+        if (sourceCard!.Owner == null || upgradedCard.Owner == null) return;
+        if (!ReferenceEquals(sourceCard.Owner, upgradedCard.Owner)) return;
+
+        _pendingCombat ??= new PendingCombat();
+        var sourceId = GetOrAssignInstanceId(sourceCard);
+        var sourceAgg = GetOrCreateAggregate(_pendingCombat, sourceId);
+        AccumulateArmamentsUpgrade(sourceAgg);
+    }
+
+    private static bool IsArmamentsCard(CardModel? card)
+    {
+        if (card is Armaments) return true;
+
+        try
+        {
+            return string.Equals(
+                card?.Id?.ToString(),
+                "CARD.ARMAMENTS",
+                StringComparison.Ordinal);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static void AccumulateArmamentsUpgrade(CardAggregate agg, int count = 1)
+    {
+        if (agg == null || count <= 0) return;
+        agg.ArmamentsCardsUpgraded += count;
+    }
+
+    internal static void RecordArmamentsUpgradeForTest(CardAggregate agg, int count = 1)
+        => AccumulateArmamentsUpgrade(agg, count);
+
     /// <summary>
     /// Count every player turn that starts while each physical Drain Power is
     /// in the permanent deck. This is the zero-inclusive turn denominator for
@@ -22342,6 +22384,7 @@ public static class RunTracker
             RecordFragrantMushroomCardUpgradedLocked(card);
             RecordFishingRodCardUpgradedLocked(card);
             RecordWarHammerCardUpgradedLocked(card);
+            RecordArmamentsCardUpgradedLocked(card);
             RecordDrainPowerCardUpgradedLocked(card);
 
             // Card lineage is different: only mutation of the exact object in
@@ -25133,6 +25176,7 @@ public static class RunTracker
         target.DiscoverySkillsPicked += source.DiscoverySkillsPicked;
         target.DiscoveryPowersPicked += source.DiscoveryPowersPicked;
         target.DiscoveryEnergyDiscountTotal += source.DiscoveryEnergyDiscountTotal;
+        target.ArmamentsCardsUpgraded += source.ArmamentsCardsUpgraded;
         target.DrainPowerCardsUpgraded += source.DrainPowerCardsUpgraded;
         target.DrainPowerTurnsInDeck += source.DrainPowerTurnsInDeck;
         target.DrainPowerUpgradedCardPlays += source.DrainPowerUpgradedCardPlays;

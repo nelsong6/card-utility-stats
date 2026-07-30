@@ -558,6 +558,14 @@ arming a window around that exact callback and consuming the existing
 `CardModel.UpgradeInternal` observation; do not infer the chosen card from deck
 state or independently reproduce the relic's RNG selection.
 
+Armaments upgrades through the same synchronous `CardCmd.Upgrade` /
+`CardModel.UpgradeInternal` path while its `OnPlay` callback is still the
+currently resolving card. Attribute each observed upgrade to that physical
+Armaments instance at the shared `UpgradeInternal` observer. Normal Armaments
+therefore contributes at most one upgrade per play, while Armaments+ contributes
+one for every upgradable hand card it actually changes; already fully upgraded
+cards are absent from the game's candidate set and are not inferred or counted.
+
 War Hammer's `AfterCombatVictory` callback runs after an Elite victory, before
 the game's later `CombatEnded` event promotes SpireLens's pending combat. It
 selects up to four random upgradable permanent-deck cards and calls

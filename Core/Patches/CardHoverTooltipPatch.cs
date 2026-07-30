@@ -338,6 +338,7 @@ public static class CardHoverShowPatch
         AppendAlchemizePotionStats(sb, cardModel, agg, compact: false);
         AppendJackOfAllTradesStats(sb, cardModel, agg, compact: false);
         AppendDiscoveryStats(sb, cardModel, agg, compact: false);
+        AppendArmamentsStats(sb, cardModel, agg);
         AppendDrainPowerStats(sb, cardModel, agg, compact: false);
         AppendEntropyPowerStats(sb, cardModel, metaStats, compact: false);
         AppendJugglingPowerStats(sb, cardModel, metaStats, compact: false);
@@ -556,6 +557,7 @@ public static class CardHoverShowPatch
         AppendAlchemizePotionStats(sb, cardModel, agg, compact: true);
         AppendJackOfAllTradesStats(sb, cardModel, agg, compact: true);
         AppendDiscoveryStats(sb, cardModel, agg, compact: true);
+        AppendArmamentsStats(sb, cardModel, agg);
         AppendDrainPowerStats(sb, cardModel, agg, compact: true);
         AppendEntropyPowerStats(sb, cardModel, metaStats, compact: true);
         AppendJugglingPowerStats(sb, cardModel, metaStats, compact: true);
@@ -802,6 +804,16 @@ public static class CardHoverShowPatch
         Row3(sb, "Avg cards upgraded per combat", FormatDecimal(upgradesPerCombat), "");
         Row3(sb, "Avg upgraded-card plays per turn", FormatDecimal(upgradedPlaysPerTurn), "");
         Row3(sb, "Avg upgraded-card plays per combat", FormatDecimal(upgradedPlaysPerCombat), "");
+    }
+
+    private static void AppendArmamentsStats(
+        StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel card,
+        CardAggregate agg)
+    {
+        if (card is not Armaments && !IsCardId(card, "CARD.ARMAMENTS")) return;
+
+        Row3(sb, "Cards upgraded", agg.ArmamentsCardsUpgraded.ToString(), "");
     }
 
     private static void AppendEntropyPowerStats(

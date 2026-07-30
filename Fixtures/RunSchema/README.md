@@ -91,6 +91,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `alchemize-card-run.json`
   Adds Alchemize potion procurement tracking with successful common, uncommon,
   and rare potion splits plus failed procure results.
+- `armaments-card-run.json`
+  Adds the count of successful card upgrades caused by each physical
+  Armaments, including every hand card actually upgraded by Armaments+.
 - `jack-of-all-trades-card-run.json`
   Adds Jack of All Trades generated colorless-card totals, uncommon/rare and
   attack/skill/power splits, plus the numerator for average added-card cost.

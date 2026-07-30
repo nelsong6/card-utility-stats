@@ -191,6 +191,12 @@ public class CardAggregate
     public int DiscoveryPowersPicked { get; set; }
     public int DiscoveryEnergyDiscountTotal { get; set; }
 
+    // Armaments outcomes. Counts successful UpgradeInternal calls observed
+    // while this physical Armaments is resolving. Armaments+ may add several
+    // upgrades in one play; cards that were already fully upgraded never
+    // enter UpgradeInternal and therefore are not counted.
+    public int ArmamentsCardsUpgraded { get; set; }
+
     // Drain Power outcomes. CardsUpgraded counts only UpgradeInternal calls
     // observed while this physical Drain Power is resolving. The raw combat
     // cards it upgraded are remembered for the rest of that combat so their
