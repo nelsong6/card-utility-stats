@@ -3673,6 +3673,132 @@ public static class RunTracker
         agg.BlockGained += amount;
     }
 
+    internal static PendingViciousDraw? ArmViciousDrawAttribution(
+        ViciousPower? vicious,
+        PowerModel? changedPower,
+        decimal amount,
+        Creature? applier)
+    {
+        if (vicious?.Owner?.Player is not Player player) return null;
+        if (!ViciousTriggerQualifiesForTest(
+                amount,
+                applier == vicious.Owner,
+                changedPower is VulnerablePower))
+        {
+            return null;
+        }
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return null;
+                if (!IsTrackedPlayer(player)) return null;
+
+                _pendingCombat ??= new PendingCombat();
+                var pending = new PendingViciousDraw
+                {
+                    PendingCombat = _pendingCombat,
+                    Owner = player,
+                    PowerId = vicious.Id.ToString(),
+                    DisplayName = GetPowerDisplayName(vicious),
+                };
+                _pendingCombat.PendingViciousDraws[player] = pending;
+                return pending;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"ArmViciousDrawAttribution failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+    internal static bool TryConsumeViciousDrawAttribution(
+        Player? player,
+        bool fromHandDraw,
+        out PendingViciousDraw? pending)
+    {
+        pending = null;
+        if (player == null || fromHandDraw) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null) return false;
+                if (!_pendingCombat.PendingViciousDraws.Remove(player, out pending))
+                    return false;
+                if (ReferenceEquals(pending.PendingCombat, _pendingCombat))
+                    return true;
+                pending = null;
+                return false;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"TryConsumeViciousDrawAttribution failed: {e.Message}");
+                pending = null;
+                return false;
+            }
+        }
+    }
+
+    internal static void RecordViciousCardsDrawn(
+        PendingViciousDraw? pending,
+        int cardsDrawn)
+    {
+        if (pending == null || cardsDrawn <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ReferenceEquals(pending.PendingCombat, _pendingCombat)) return;
+                var agg = GetOrCreatePowerAggregate(
+                    _pendingCombat!.MetaStats,
+                    pending.PowerId,
+                    pending.DisplayName);
+                RecordViciousCardsDrawnForTest(agg, cardsDrawn);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordViciousCardsDrawn failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void DisarmViciousDrawAttribution(PendingViciousDraw? pending)
+    {
+        if (pending == null) return;
+
+        lock (_lock)
+        {
+            if (_pendingCombat == null) return;
+            if (_pendingCombat.PendingViciousDraws.TryGetValue(
+                    pending.Owner,
+                    out var active)
+                && ReferenceEquals(active, pending))
+            {
+                _pendingCombat.PendingViciousDraws.Remove(pending.Owner);
+            }
+        }
+    }
+
+    internal static bool ViciousTriggerQualifiesForTest(
+        decimal amount,
+        bool applierIsOwner,
+        bool changedPowerIsVulnerable)
+        => amount > 0m && applierIsOwner && changedPowerIsVulnerable;
+
+    internal static void RecordViciousCardsDrawnForTest(
+        PowerAggregate agg,
+        int cardsDrawn)
+    {
+        if (agg == null || cardsDrawn <= 0) return;
+        agg.ViciousCardsDrawn += cardsDrawn;
+    }
+
     private static PowerAggregate GetOrCreatePowerAggregate(
         RunMetaStats metaStats,
         string powerId,
@@ -25278,6 +25404,7 @@ public static class RunTracker
                 sourceAgg.EntropyUncommonCardsGenerated;
             targetAgg.EntropyRareCardsGenerated +=
                 sourceAgg.EntropyRareCardsGenerated;
+            targetAgg.ViciousCardsDrawn += sourceAgg.ViciousCardsDrawn;
         }
     }
 
@@ -26048,6 +26175,8 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, PendingEntropyTransformWindow> PendingEntropyTransformWindows { get; }
         = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, PendingViciousDraw> PendingViciousDraws { get; }
+        = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> DanseMacabrePowerCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> DanseMacabrePowerTurnCountedTurns { get; }
@@ -26159,6 +26288,14 @@ internal sealed class PendingPollinousCoreDraw
     }
 
     public int CardsRequested { get; }
+}
+
+internal sealed class PendingViciousDraw
+{
+    public required PendingCombat PendingCombat { get; init; }
+    public required Player Owner { get; init; }
+    public required string PowerId { get; init; }
+    public required string DisplayName { get; init; }
 }
 
 public sealed class PendingJossPaperDraw

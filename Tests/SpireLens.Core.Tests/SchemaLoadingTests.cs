@@ -576,6 +576,20 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsViciousPowerFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("vicious-power-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        AssertViciousPowerFixture(
+            loaded.Data.MetaStats.PowerAggregates["POWER.VICIOUS"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsEntropyPowerFixture()
     {
         var loaded = RunStorage.LoadHistorical(
@@ -1365,6 +1379,17 @@ public class SchemaLoadingTests
         Assert.NotNull(resumed);
         AssertJugglingPowerFixture(
             resumed!.MetaStats.PowerAggregates["POWER.JUGGLING"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsViciousPowerFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("vicious-power-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertViciousPowerFixture(
+            resumed!.MetaStats.PowerAggregates["POWER.VICIOUS"]);
     }
 
     [Fact]
@@ -4281,6 +4306,13 @@ public class SchemaLoadingTests
         Assert.Equal(2, powerAgg.RareAttacksCopied);
         Assert.Equal(5, powerAgg.TurnsActive);
         Assert.Equal(2, powerAgg.CombatsActive);
+    }
+
+    private static void AssertViciousPowerFixture(PowerAggregate powerAgg)
+    {
+        Assert.Equal("POWER.VICIOUS", powerAgg.PowerId);
+        Assert.Equal("Vicious", powerAgg.DisplayName);
+        Assert.Equal(11, powerAgg.ViciousCardsDrawn);
     }
 
     private static void AssertEntropyPowerFixture(PowerAggregate powerAgg)

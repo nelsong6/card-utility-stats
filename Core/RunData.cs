@@ -445,6 +445,11 @@ public class PowerAggregate
     public int EntropyCommonCardsGenerated { get; set; }
     public int EntropyUncommonCardsGenerated { get; set; }
     public int EntropyRareCardsGenerated { get; set; }
+
+    // Vicious tracking. This is the number of cards confirmed by the exact
+    // draw command issued when the shared power reacts to its owner applying
+    // Vulnerable. Failed/blocked draws contribute zero.
+    public int ViciousCardsDrawn { get; set; }
 }
 
 public class EnemyAggregate

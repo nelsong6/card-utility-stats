@@ -1,0 +1,39 @@
+{
+  "run_id": "vicious-power-fixture",
+  "started_at": "2026-07-29T21:00:00Z",
+  "updated_at": "2026-07-29T21:18:00Z",
+  "character": "IRONCLAD",
+  "ascension": 7,
+  "floor_reached": 14,
+  "outcome": "in_progress",
+  "game_start_time": 1785358800,
+  "aggregates": {
+    "CARD.VICIOUS#1": {
+      "combats_in_deck": 3,
+      "plays": 2,
+      "times_drawn": 4,
+      "floor_added": 4,
+      "initial_upgrade_level": 0
+    }
+  },
+  "events": [],
+  "relic_aggregates": {},
+  "enemy_aggregates": {},
+  "meta_stats": {
+    "power_aggregates": {
+      "POWER.VICIOUS": {
+        "power_id": "POWER.VICIOUS",
+        "display_name": "Vicious",
+        "vicious_cards_drawn": 11
+      }
+    }
+  },
+  "instance_numbers_by_def": {
+    "CARD.VICIOUS": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.VICIOUS": 1
+  }
+}

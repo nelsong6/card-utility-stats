@@ -28,6 +28,7 @@ public static class CardHoverShowPatch
     private const string EntropyPowerId = "POWER.ENTROPY";
     private const string FreeAttackPowerId = "POWER.FREE_ATTACK_POWER";
     private const string JugglingPowerId = "POWER.JUGGLING";
+    private const string ViciousPowerId = "POWER.VICIOUS";
     private const string StarIconPath = "res://images/packed/sprite_fonts/star_icon.png";
     private const string SovereignBladeMetaNote = "Reflects All Sovereign Blade Usage";
 
@@ -343,6 +344,7 @@ public static class CardHoverShowPatch
         AppendEntropyPowerStats(sb, cardModel, metaStats, compact: false);
         AppendJugglingPowerStats(sb, cardModel, metaStats, compact: false);
         AppendDanseMacabrePowerStats(sb, cardModel, metaStats, compact: false);
+        AppendViciousPowerStats(sb, cardModel, metaStats);
         AppendUnrelentingFreeAttackStats(sb, cardModel, metaStats, compact: false);
         AppendDebtStats(sb, cardModel, agg);
         AppendNormalityStats(sb, cardModel, agg);
@@ -562,6 +564,7 @@ public static class CardHoverShowPatch
         AppendEntropyPowerStats(sb, cardModel, metaStats, compact: true);
         AppendJugglingPowerStats(sb, cardModel, metaStats, compact: true);
         AppendDanseMacabrePowerStats(sb, cardModel, metaStats, compact: true);
+        AppendViciousPowerStats(sb, cardModel, metaStats);
         AppendUnrelentingFreeAttackStats(sb, cardModel, metaStats, compact: true);
         AppendDebtStats(sb, cardModel, agg);
         AppendNormalityStats(sb, cardModel, agg);
@@ -1056,6 +1059,37 @@ public static class CardHoverShowPatch
             sb,
             "Rare Attacks discounted",
             powerAgg.FreeAttackRareAttacksDiscounted.ToString(),
+            "");
+    }
+
+    private static void AppendViciousPowerStats(
+        StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel card,
+        RunMetaStats metaStats)
+    {
+        if (card is not Vicious && !IsCardId(card, "CARD.VICIOUS")) return;
+
+        metaStats ??= new RunMetaStats();
+        PowerAggregate? powerAgg = null;
+        if (metaStats.PowerAggregates != null)
+        {
+            metaStats.PowerAggregates.TryGetValue(ViciousPowerId, out powerAgg);
+            powerAgg ??= metaStats.PowerAggregates.Values.FirstOrDefault(candidate =>
+                string.Equals(
+                    candidate.PowerId,
+                    ViciousPowerId,
+                    StringComparison.Ordinal)
+                || string.Equals(
+                    candidate.DisplayName,
+                    "Vicious",
+                    StringComparison.OrdinalIgnoreCase));
+        }
+        powerAgg ??= new PowerAggregate();
+
+        Row3(
+            sb,
+            GetDrawStatLabel("cards drawn"),
+            powerAgg.ViciousCardsDrawn.ToString(),
             "");
     }
 

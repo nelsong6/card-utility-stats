@@ -107,6 +107,10 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds a power-ID-keyed Juggling aggregate with confirmed Attack copies,
   rarity splits, and active turn/combat denominators. The related Juggling
   card projects this shared power data rather than owning the counters.
+- `vicious-power-run.json`
+  Adds a power-ID-keyed Vicious aggregate with the cards confirmed by its
+  owner-applied-Vulnerable draw commands. Every Vicious card projects this
+  shared power total.
 - `entropy-power-run.json`
   Adds a power-ID-keyed Entropy aggregate with confirmed replacement-card
   rarities, Bound cards transformed, and a zero-inclusive active-combat
