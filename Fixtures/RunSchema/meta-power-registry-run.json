@@ -1,0 +1,60 @@
+{
+  "run_id": "meta-power-registry-fixture",
+  "started_at": "2026-07-30T18:00:00Z",
+  "updated_at": "2026-07-30T18:20:00Z",
+  "character": "IRONCLAD",
+  "ascension": 7,
+  "floor_reached": 18,
+  "outcome": "in_progress",
+  "game_start_time": 1785444000,
+  "aggregates": {
+    "CARD.DANSE_MACABRE#1": {
+      "combats_in_deck": 3,
+      "plays": 2,
+      "times_drawn": 4,
+      "floor_added": 6,
+      "initial_upgrade_level": 0
+    }
+  },
+  "events": [],
+  "relic_aggregates": {},
+  "enemy_aggregates": {},
+  "meta_stats": {
+    "extra_block_gained_from_unmovable_power": 12,
+    "power_aggregates": {
+      "POWER.DANSE_MACABRE": {
+        "power_id": "POWER.DANSE_MACABRE",
+        "display_name": "Danse Macabre",
+        "power_cards_played": 5,
+        "generated_power_cards_played": 2,
+        "successful_applications": 4,
+        "meta_deck_turns": 12,
+        "meta_active_turns": 8,
+        "meta_active_application_turns": 13,
+        "times_triggered": 9,
+        "rate_times_triggered": 7,
+        "block_gained": 31,
+        "rate_block_gained": 24
+      },
+      "POWER.UNMOVABLE": {
+        "power_id": "POWER.UNMOVABLE",
+        "display_name": "Unmovable",
+        "power_cards_played": 1,
+        "successful_applications": 1,
+        "meta_deck_turns": 5,
+        "meta_active_turns": 3,
+        "meta_active_application_turns": 3,
+        "unmovable_extra_block_gained": 12,
+        "rate_unmovable_extra_block_gained": 8
+      }
+    }
+  },
+  "instance_numbers_by_def": {
+    "CARD.DANSE_MACABRE": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.DANSE_MACABRE": 1
+  }
+}

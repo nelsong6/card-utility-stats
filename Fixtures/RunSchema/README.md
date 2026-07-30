@@ -135,6 +135,11 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds a power-ID-keyed Danse Macabre aggregate with observed triggers,
   post-modifier block gained, and active turn/combat denominators. The related
   Danse Macabre card projects this shared power data.
+- `meta-power-registry-run.json`
+  Adds the shared meta-power play/application counts, permanent-deck,
+  active-turn, and active-application-turn denominators, plus matching
+  observation-era outcome numerators. These records back the canonical
+  synthetic Power cards in the not-in-deck view.
 - `unrelenting-free-attack-power-run.json`
   Adds a power-ID-keyed Free Attack aggregate with charges granted and used,
   observed energy savings, zero-savings uses, and discounted Attack rarity

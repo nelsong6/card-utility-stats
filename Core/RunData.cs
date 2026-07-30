@@ -406,6 +406,40 @@ public class PowerAggregate
     public string PowerId { get; set; } = "";
     public string DisplayName { get; set; } = "";
 
+    // Shared meta-power accounting. One aggregate represents every physical
+    // and generated play of the same Power card definition.
+    //
+    // DeckTurns: every player turn in a combat where at least one permanent
+    // copy of the Power card was in the deck at combat setup. Multiple copies
+    // do not multiply this denominator.
+    // ActiveTurns: one unit for each turn where the power family was active.
+    // ActiveApplicationTurns: one unit per successful application per active
+    // turn, so two played copies contribute two units on later shared turns.
+    public int PowerCardsPlayed { get; set; }
+    public int GeneratedPowerCardsPlayed { get; set; }
+    public int SuccessfulApplications { get; set; }
+    public int MetaDeckTurns { get; set; }
+    public int MetaActiveTurns { get; set; }
+    public int MetaActiveApplicationTurns { get; set; }
+
+    // Matching observation-era numerators for the three meta-power rate
+    // denominators above. Lifetime totals predate these denominators in saved
+    // runs, so dividing those older totals by newer denominators would create
+    // false rates.
+    public int RateAttacksCopied { get; set; }
+    public int RateTimesTriggered { get; set; }
+    public decimal RateBlockGained { get; set; }
+    public int RateEntropyCardsGenerated { get; set; }
+    public int RateViciousCardsDrawn { get; set; }
+    public int RateDarkEmbraceCardsDrawn { get; set; }
+    public int RateStampedeAttacksPlayed { get; set; }
+    public int RateStampedeEnergySaved { get; set; }
+    public int RateAggressionCardsReturnedToHand { get; set; }
+    public int RateAggressionCardsUpgraded { get; set; }
+    public decimal RateStrengthGained { get; set; }
+    public decimal UnmovableExtraBlockGained { get; set; }
+    public decimal RateUnmovableExtraBlockGained { get; set; }
+
     // Juggling tracking. Copies count only generated Attack cards confirmed
     // by the combat-pile add result. Turns and combats are held-power
     // denominators and include active periods with no copy.

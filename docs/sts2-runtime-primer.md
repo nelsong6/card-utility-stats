@@ -1278,6 +1278,41 @@ only Status definitions actually encountered during the run. Its show-all
 option enumerates `ModelDb.AllCards` for every `CardType.Status`, while the
 tooltip pools normal per-instance aggregates by card definition.
 
+Recurring Power-card outcomes use a second kind of pooled meta-card. One
+synthetic card per supported power family reuses the source Power card's art
+and name, carries an explicit meta-power badge, and is the canonical home for
+the complete shared record. It appears after that card definition is actually
+played; the show-all option also exposes supported zero-value entries.
+Physical copies project only a compact shared summary.
+
+Keep these cohorts and denominators distinct:
+
+- `PowerCardsPlayed` counts every completed play of the card definition,
+  including replays and generated copies.
+- `GeneratedPowerCardsPlayed` is a subset: completed plays whose canonical
+  card is not a member of the permanent deck.
+- `SuccessfulApplications` counts positive observed applications of the
+  matching shared power. Do not infer this from the power's `Amount`; one card
+  play can add several Amount units.
+- `/ turn` uses every player turn in a combat where at least one permanent
+  copy of that card definition was present at combat setup. Multiple copies do
+  not multiply this denominator. A generated-only combat is excluded.
+- `/ active turn` uses one unit for each turn where the shared power is live,
+  regardless of its stack/application count.
+- `/ active application-turn` uses one unit per successfully applied Power
+  card per turn it remains active. This measures output per played
+  application without confusing a card's dynamic Amount with card count.
+
+Generated applications contribute to active and application-turn metrics. If
+a permanent copy also made the combat deck-eligible, all family output in that
+combat contributes to the `/ turn` deck metric; do not claim an exact marginal
+split that the shared game power no longer preserves.
+
+When adding these denominators to an existing lifetime stat, also add a
+matching observation-era numerator. Older run files can contain the lifetime
+total without any historic denominator samples; dividing the old total by a
+new denominator would manufacture a false rate.
+
 Entropy's shared power owns its later transformations. Keep a narrow window
 around `EntropyPower.AfterPlayerTurnStart`, then observe the already-established
 `CardCmd.Transform(IEnumerable<CardTransformation>, Rng, CardPreviewStyle)`

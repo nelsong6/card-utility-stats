@@ -183,6 +183,11 @@ public static class RunTracker
         new(StringComparer.Ordinal);
     private static readonly Dictionary<CardModel, string> _statusDeckViewDefinitionsByCard =
         new(ReferenceEqualityComparer.Instance);
+    private static readonly Dictionary<string, CardModel> _metaPowerDeckViewCardsByPowerId =
+        new(StringComparer.Ordinal);
+    private static readonly Dictionary<CardModel, MetaPowerDefinition>
+        _metaPowerDeckViewDefinitionsByCard =
+            new(ReferenceEqualityComparer.Instance);
     private const decimal PoisonOwnershipEpsilon = 0.0001m;
     private static bool _sovereignBladeAvailableThisRun;
     private static CardModel? _sovereignBladeDeckViewCard;
@@ -458,6 +463,21 @@ public static class RunTracker
         }
     }
 
+    internal static bool TryGetMetaPowerDeckViewDefinition(
+        CardModel? card,
+        [NotNullWhen(true)] out MetaPowerDefinition? definition)
+    {
+        definition = null;
+        if (card == null) return false;
+
+        lock (_lock)
+        {
+            return _metaPowerDeckViewDefinitionsByCard.TryGetValue(
+                Canonical(card),
+                out definition);
+        }
+    }
+
     private static bool TryGetStatusDeckViewDefinitionIdLocked(
         CardModel card,
         [NotNullWhen(true)] out string? definitionId)
@@ -613,6 +633,8 @@ public static class RunTracker
         _soulDeckViewCard = null;
         _statusDeckViewCardsByDefinition.Clear();
         _statusDeckViewDefinitionsByCard.Clear();
+        _metaPowerDeckViewCardsByPowerId.Clear();
+        _metaPowerDeckViewDefinitionsByCard.Clear();
         _sovereignBladeAvailableThisRun = false;
         _sovereignBladeDeckViewCard = null;
         _sovereignBladeDefinitionIdThisRun = null;
@@ -1675,6 +1697,7 @@ public static class RunTracker
             RecordPantographCombatStartForTrackedPlayerLocked(state);
             if (ShouldTrackCardStatsDuringCombatLocked())
             {
+                InitializeMetaPowerDeckEligibilityLocked(state);
                 RecordCombatsInDeckForCurrentDeckLocked();
             }
             else
@@ -2365,6 +2388,7 @@ public static class RunTracker
             RecordStampedeAutoPlayedAttackLocked(cardPlay);
 
             if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+            RecordMetaPowerCardPlayedLocked(cardPlay.Card);
             RecordDrainPowerUpgradedCardPlayedLocked(cardPlay.Card);
 
             // Per-instance tracking: each physical card in the deck gets its
@@ -3668,6 +3692,7 @@ public static class RunTracker
     {
         if (agg == null || count <= 0) return;
         agg.TimesTriggered += count;
+        agg.RateTimesTriggered += count;
     }
 
     internal static void RecordDanseMacabreBlockGainedForTest(
@@ -3676,6 +3701,7 @@ public static class RunTracker
     {
         if (agg == null || amount <= 0m) return;
         agg.BlockGained += amount;
+        agg.RateBlockGained += amount;
     }
 
     internal static PendingFeelNoPainBlockAttribution?
@@ -3830,6 +3856,7 @@ public static class RunTracker
     {
         if (agg == null || amount <= 0m) return;
         agg.BlockGained += amount;
+        agg.RateBlockGained += amount;
     }
 
     internal static PendingViciousDraw? ArmViciousDrawAttribution(
@@ -3956,6 +3983,7 @@ public static class RunTracker
     {
         if (agg == null || cardsDrawn <= 0) return;
         agg.ViciousCardsDrawn += cardsDrawn;
+        agg.RateViciousCardsDrawn += cardsDrawn;
     }
 
     internal static PendingDarkEmbraceDraw?
@@ -4195,6 +4223,7 @@ public static class RunTracker
     {
         if (agg == null || cardsDrawn <= 0) return;
         agg.DarkEmbraceCardsDrawn += cardsDrawn;
+        agg.RateDarkEmbraceCardsDrawn += cardsDrawn;
     }
 
     internal static void RecordDarkEmbraceCombatTurnsForTest(
@@ -4370,6 +4399,8 @@ public static class RunTracker
 
         agg.StampedeAttacksPlayed++;
         agg.StampedeEnergySaved += Math.Max(0, energySaved);
+        agg.RateStampedeAttacksPlayed++;
+        agg.RateStampedeEnergySaved += Math.Max(0, energySaved);
         switch (rarity)
         {
             case CardRarity.Common:
@@ -4583,8 +4614,12 @@ public static class RunTracker
         int cardsUpgraded)
     {
         if (agg == null) return;
-        agg.AggressionCardsReturnedToHand += Math.Max(0, cardsReturnedToHand);
-        agg.AggressionCardsUpgraded += Math.Max(0, cardsUpgraded);
+        int returned = Math.Max(0, cardsReturnedToHand);
+        int upgraded = Math.Max(0, cardsUpgraded);
+        agg.AggressionCardsReturnedToHand += returned;
+        agg.AggressionCardsUpgraded += upgraded;
+        agg.RateAggressionCardsReturnedToHand += returned;
+        agg.RateAggressionCardsUpgraded += upgraded;
     }
 
     internal static PendingRuptureStrengthObservation?
@@ -4707,6 +4742,224 @@ public static class RunTracker
     {
         if (agg == null || amount <= 0m) return;
         agg.StrengthGained += amount;
+        agg.RateStrengthGained += amount;
+    }
+
+    private static void InitializeMetaPowerDeckEligibilityLocked(
+        CombatState state)
+    {
+        if (_pendingCombat == null) return;
+
+        foreach (var player in state.Players)
+        {
+            if (!IsTrackedPlayer(player)) continue;
+
+            foreach (var card in player.Deck.Cards)
+            {
+                if (MetaPowerRegistry.TryGetByCard(card, out var definition))
+                    _pendingCombat.MetaPowerDeckEligiblePowerIds.Add(
+                        definition.PowerId);
+            }
+        }
+    }
+
+    private static void RecordMetaPowerCardPlayedLocked(CardModel card)
+    {
+        if (_pendingCombat == null
+            || !MetaPowerRegistry.TryGetByCard(card, out var definition))
+        {
+            return;
+        }
+
+        var aggregate = GetOrCreatePowerAggregate(
+            _pendingCombat.MetaStats,
+            definition.PowerId,
+            definition.DisplayName);
+        aggregate.PowerCardsPlayed++;
+
+        var canonical = Canonical(card);
+        var permanentDeckCards = card.Owner?.Deck?.Cards;
+        if (!IsExactPermanentDeckCardForTest(
+                canonical,
+                permanentDeckCards))
+        {
+            aggregate.GeneratedPowerCardsPlayed++;
+        }
+    }
+
+    private static void RecordMetaPowerApplicationLocked(
+        PowerModel power,
+        decimal amount,
+        Creature? target,
+        CardPlay? causingPlay)
+    {
+        if (_pendingCombat == null
+            || amount <= 0m
+            || target?.Player is not Player player
+            || !IsTrackedPlayer(player)
+            || causingPlay?.Card == null
+            || !MetaPowerRegistry.TryGetByPower(power, out var powerDefinition)
+            || !MetaPowerRegistry.TryGetByCard(
+                causingPlay.Card,
+                out var cardDefinition)
+            || !string.Equals(
+                powerDefinition.PowerId,
+                cardDefinition.PowerId,
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var aggregate = GetOrCreatePowerAggregate(
+            _pendingCombat.MetaStats,
+            powerDefinition.PowerId,
+            powerDefinition.DisplayName);
+        aggregate.SuccessfulApplications++;
+
+        _pendingCombat.MetaPowerActiveApplicationsByPowerId.TryGetValue(
+            powerDefinition.PowerId,
+            out var activeApplications);
+        activeApplications++;
+        _pendingCombat.MetaPowerActiveApplicationsByPowerId[
+            powerDefinition.PowerId] = activeApplications;
+
+        RecordMetaPowerActiveTurnLocked(
+            powerDefinition,
+            player,
+            activeApplications);
+    }
+
+    /// <summary>
+    /// Samples the shared meta-power denominator model once at each tracked
+    /// player turn start. The application turn itself is sampled from the
+    /// successful PowerReceived entry so a power played mid-turn is included.
+    /// </summary>
+    public static void RecordMetaPowerTurnStarted(Player? player)
+    {
+        if (player?.Creature == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()
+                    || !IsTrackedPlayer(player)
+                    || _pendingCombat == null)
+                {
+                    return;
+                }
+
+                int turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+                if (turnNumber <= 0) return;
+
+                foreach (var definition in MetaPowerRegistry.All)
+                {
+                    if (_pendingCombat.MetaPowerDeckEligiblePowerIds.Contains(
+                            definition.PowerId))
+                    {
+                        RecordMetaPowerDeckTurnLocked(
+                            definition,
+                            turnNumber);
+                    }
+
+                    bool isActive = player.Creature.Powers.Any(power =>
+                        power.Amount > 0
+                        && string.Equals(
+                            power.Id.ToString(),
+                            definition.PowerId,
+                            StringComparison.Ordinal));
+                    if (!isActive)
+                    {
+                        _pendingCombat.MetaPowerActiveApplicationsByPowerId
+                            .Remove(definition.PowerId);
+                        continue;
+                    }
+
+                    _pendingCombat.MetaPowerActiveApplicationsByPowerId
+                        .TryGetValue(
+                            definition.PowerId,
+                            out var activeApplications);
+                    RecordMetaPowerActiveTurnLocked(
+                        definition,
+                        player,
+                        activeApplications);
+                }
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordMetaPowerTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void RecordMetaPowerDeckTurnLocked(
+        MetaPowerDefinition definition,
+        int turnNumber)
+    {
+        if (_pendingCombat == null) return;
+        if (_pendingCombat.MetaPowerLastDeckTurnByPowerId.TryGetValue(
+                definition.PowerId,
+                out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.MetaPowerLastDeckTurnByPowerId[definition.PowerId] =
+            turnNumber;
+        var aggregate = GetOrCreatePowerAggregate(
+            _pendingCombat.MetaStats,
+            definition.PowerId,
+            definition.DisplayName);
+        aggregate.MetaDeckTurns++;
+    }
+
+    private static void RecordMetaPowerActiveTurnLocked(
+        MetaPowerDefinition definition,
+        Player player,
+        int activeApplications)
+    {
+        if (_pendingCombat == null) return;
+
+        int turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+
+        var aggregate = GetOrCreatePowerAggregate(
+            _pendingCombat.MetaStats,
+            definition.PowerId,
+            definition.DisplayName);
+
+        if (!_pendingCombat.MetaPowerLastActiveTurnByPowerId.TryGetValue(
+                definition.PowerId,
+                out var activeTurn)
+            || activeTurn != turnNumber)
+        {
+            _pendingCombat.MetaPowerLastActiveTurnByPowerId[
+                definition.PowerId] = turnNumber;
+            aggregate.MetaActiveTurns++;
+        }
+
+        if (activeApplications <= 0) return;
+
+        if (!_pendingCombat.MetaPowerLastApplicationTurnByPowerId.TryGetValue(
+                definition.PowerId,
+                out var applicationTurn)
+            || applicationTurn != turnNumber)
+        {
+            _pendingCombat.MetaPowerLastApplicationTurnByPowerId[
+                definition.PowerId] = turnNumber;
+            _pendingCombat.MetaPowerApplicationsCountedInLastTurnByPowerId[
+                definition.PowerId] = 0;
+        }
+
+        _pendingCombat.MetaPowerApplicationsCountedInLastTurnByPowerId
+            .TryGetValue(definition.PowerId, out var countedApplications);
+        int additionalApplicationTurns =
+            Math.Max(0, activeApplications - countedApplications);
+        aggregate.MetaActiveApplicationTurns += additionalApplicationTurns;
+        _pendingCombat.MetaPowerApplicationsCountedInLastTurnByPowerId[
+            definition.PowerId] = activeApplications;
     }
 
     private static PowerAggregate GetOrCreatePowerAggregate(
@@ -4744,6 +4997,7 @@ public static class RunTracker
         if (agg == null || !success) return;
 
         agg.AttacksCopied++;
+        agg.RateAttacksCopied++;
         switch (rarity)
         {
             case CardRarity.Common:
@@ -5001,6 +5255,7 @@ public static class RunTracker
         if (agg == null || !success) return;
 
         agg.EntropyCardsGenerated++;
+        agg.RateEntropyCardsGenerated++;
         if (originalWasBound)
             agg.EntropyChainsOfBindingBroken++;
 
@@ -8182,6 +8437,12 @@ public static class RunTracker
     {
         if (metaStats == null || extraBlock <= 0m) return;
         metaStats.ExtraBlockGainedFromUnmovablePower += extraBlock;
+        var aggregate = GetOrCreatePowerAggregate(
+            metaStats,
+            "POWER.UNMOVABLE",
+            "Unmovable");
+        aggregate.UnmovableExtraBlockGained += extraBlock;
+        aggregate.RateUnmovableExtraBlockGained += extraBlock;
     }
 
     internal static void RecordVambraceExtraBlockGainedForTest(RelicAggregate agg, decimal modifiedAmount)
@@ -23680,6 +23941,12 @@ public static class RunTracker
                 AddMetaCardIfPresent(result, metaCard);
             }
 
+            foreach (var metaPowerCard in
+                     GetMetaPowerDeckViewCardsLocked(includeAllMetaCards))
+            {
+                AddMetaCardIfPresent(result, metaPowerCard);
+            }
+
             foreach (var statusCard in GetStatusDeckViewCardsLocked(includeAllMetaCards))
                 AddMetaCardIfPresent(result, statusCard);
 
@@ -23708,7 +23975,102 @@ public static class RunTracker
                 _ => "",
             })
             .Where(id => id.Length > 0)
+            .Concat(MetaPowerRegistry.All.Select(definition => definition.CardId))
             .ToArray();
+
+    private static IReadOnlyList<CardModel> GetMetaPowerDeckViewCardsLocked(
+        bool includeAllMetaCards)
+    {
+        var result = new List<CardModel>();
+        foreach (var definition in MetaPowerRegistry.All)
+        {
+            if (!ShouldIncludeMetaCard(
+                    HasMetaPowerAppearedThisRunLocked(definition),
+                    includeAllMetaCards))
+            {
+                continue;
+            }
+
+            if (!_metaPowerDeckViewCardsByPowerId.TryGetValue(
+                    definition.PowerId,
+                    out var syntheticCard))
+            {
+                try
+                {
+                    syntheticCard = ModelDb
+                        .GetById<CardModel>(ModelId.Deserialize(definition.CardId))
+                        .ToMutable();
+                    _metaPowerDeckViewCardsByPowerId[definition.PowerId] =
+                        syntheticCard;
+                    _metaPowerDeckViewDefinitionsByCard[syntheticCard] =
+                        definition;
+                }
+                catch (Exception e)
+                {
+                    CoreMain.LogDebug(
+                        $"GetMetaPowerDeckViewCardsLocked failed for " +
+                        $"{definition.CardId}: {e.Message}");
+                    continue;
+                }
+            }
+
+            result.Add(syntheticCard);
+        }
+
+        return result;
+    }
+
+    private static bool HasMetaPowerAppearedThisRunLocked(
+        MetaPowerDefinition definition)
+    {
+        if (TryGetEffectivePowerAggregateLocked(
+                definition.PowerId,
+                out var powerAggregate)
+            && powerAggregate.PowerCardsPlayed > 0)
+        {
+            return true;
+        }
+
+        return HasPlayedCardDefinition(
+                _currentRun?.Aggregates,
+                definition.CardId)
+            || HasPlayedCardDefinition(
+                _pendingCombat?.CombatAggregates,
+                definition.CardId);
+    }
+
+    private static bool HasPlayedCardDefinition(
+        IReadOnlyDictionary<string, CardAggregate>? aggregates,
+        string definitionId)
+    {
+        if (aggregates == null) return false;
+
+        foreach (var (key, aggregate) in aggregates)
+        {
+            if (aggregate.Plays > 0
+                && CardAggregatePooler.IsAggregateForDefinition(
+                    key,
+                    definitionId))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool TryGetEffectivePowerAggregateLocked(
+        string powerId,
+        [NotNullWhen(true)] out PowerAggregate? aggregate)
+    {
+        var effective = new RunMetaStats();
+        if (_currentRun != null)
+            MergeMetaStatsInto(effective, _currentRun.MetaStats);
+        if (_pendingCombat != null)
+            MergeMetaStatsInto(effective, _pendingCombat.MetaStats);
+
+        return effective.PowerAggregates.TryGetValue(powerId, out aggregate);
+    }
 
     private static IReadOnlyList<CardModel> GetStatusDeckViewCardsLocked(
         bool includeAllMetaCards)
@@ -25302,6 +25664,13 @@ public static class RunTracker
 
                 if (!ShouldTrackCardStatsDuringCombatLocked()) return;
 
+                var causingPlay = FindCurrentlyResolvingCardPlay();
+                RecordMetaPowerApplicationLocked(
+                    entry.Power,
+                    entry.Amount,
+                    target,
+                    causingPlay);
+
                 if (entry.Amount > 0m
                     && entry.Power is DanseMacabrePower danseMacabre
                     && danseMacabre.Owner?.Player != null
@@ -25342,7 +25711,6 @@ public static class RunTracker
                         darkEmbrace.Owner.Player);
                 }
 
-                var causingPlay = FindCurrentlyResolvingCardPlay();
                 if (causingPlay?.Card == null)
                 {
                     if (target != null
@@ -26320,6 +26688,37 @@ public static class RunTracker
                 && !string.IsNullOrWhiteSpace(sourceAgg.DisplayName))
                 targetAgg.DisplayName = sourceAgg.DisplayName;
 
+            targetAgg.PowerCardsPlayed += sourceAgg.PowerCardsPlayed;
+            targetAgg.GeneratedPowerCardsPlayed +=
+                sourceAgg.GeneratedPowerCardsPlayed;
+            targetAgg.SuccessfulApplications +=
+                sourceAgg.SuccessfulApplications;
+            targetAgg.MetaDeckTurns += sourceAgg.MetaDeckTurns;
+            targetAgg.MetaActiveTurns += sourceAgg.MetaActiveTurns;
+            targetAgg.MetaActiveApplicationTurns +=
+                sourceAgg.MetaActiveApplicationTurns;
+            targetAgg.RateAttacksCopied += sourceAgg.RateAttacksCopied;
+            targetAgg.RateTimesTriggered += sourceAgg.RateTimesTriggered;
+            targetAgg.RateBlockGained += sourceAgg.RateBlockGained;
+            targetAgg.RateEntropyCardsGenerated +=
+                sourceAgg.RateEntropyCardsGenerated;
+            targetAgg.RateViciousCardsDrawn +=
+                sourceAgg.RateViciousCardsDrawn;
+            targetAgg.RateDarkEmbraceCardsDrawn +=
+                sourceAgg.RateDarkEmbraceCardsDrawn;
+            targetAgg.RateStampedeAttacksPlayed +=
+                sourceAgg.RateStampedeAttacksPlayed;
+            targetAgg.RateStampedeEnergySaved +=
+                sourceAgg.RateStampedeEnergySaved;
+            targetAgg.RateAggressionCardsReturnedToHand +=
+                sourceAgg.RateAggressionCardsReturnedToHand;
+            targetAgg.RateAggressionCardsUpgraded +=
+                sourceAgg.RateAggressionCardsUpgraded;
+            targetAgg.RateStrengthGained += sourceAgg.RateStrengthGained;
+            targetAgg.UnmovableExtraBlockGained +=
+                sourceAgg.UnmovableExtraBlockGained;
+            targetAgg.RateUnmovableExtraBlockGained +=
+                sourceAgg.RateUnmovableExtraBlockGained;
             targetAgg.AttacksCopied += sourceAgg.AttacksCopied;
             targetAgg.CommonAttacksCopied += sourceAgg.CommonAttacksCopied;
             targetAgg.UncommonAttacksCopied += sourceAgg.UncommonAttacksCopied;
@@ -27139,6 +27538,19 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> ToastyMittensCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
+    public HashSet<string> MetaPowerDeckEligiblePowerIds { get; }
+        = new(StringComparer.Ordinal);
+    public Dictionary<string, int> MetaPowerActiveApplicationsByPowerId { get; }
+        = new(StringComparer.Ordinal);
+    public Dictionary<string, int> MetaPowerLastDeckTurnByPowerId { get; }
+        = new(StringComparer.Ordinal);
+    public Dictionary<string, int> MetaPowerLastActiveTurnByPowerId { get; }
+        = new(StringComparer.Ordinal);
+    public Dictionary<string, int> MetaPowerLastApplicationTurnByPowerId { get; }
+        = new(StringComparer.Ordinal);
+    public Dictionary<string, int>
+        MetaPowerApplicationsCountedInLastTurnByPowerId { get; }
+            = new(StringComparer.Ordinal);
     public HashSet<Player> JugglingPowerCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> JugglingPowerTurnCountedTurns { get; }

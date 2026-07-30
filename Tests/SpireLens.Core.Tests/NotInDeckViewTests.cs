@@ -59,6 +59,16 @@ public class NotInDeckViewTests
                 "CARD.SHIV",
                 "CARD.SOUL",
                 "CARD.SOVEREIGN_BLADE",
+                "CARD.AGGRESSION",
+                "CARD.DANSE_MACABRE",
+                "CARD.DARK_EMBRACE",
+                "CARD.ENTROPY",
+                "CARD.FEEL_NO_PAIN",
+                "CARD.JUGGLING",
+                "CARD.RUPTURE",
+                "CARD.STAMPEDE",
+                "CARD.UNMOVABLE",
+                "CARD.VICIOUS",
             },
             ids);
         Assert.Equal(ids.Count, ids.Distinct().Count());

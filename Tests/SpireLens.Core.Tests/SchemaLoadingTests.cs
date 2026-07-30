@@ -604,6 +604,19 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsMetaPowerRegistryFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("meta-power-registry-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        AssertMetaPowerRegistryFixture(loaded.Data.MetaStats);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsStampedePowerFixture()
     {
         var loaded = RunStorage.LoadHistorical(
@@ -1471,6 +1484,16 @@ public class SchemaLoadingTests
         Assert.NotNull(resumed);
         AssertDarkEmbracePowerFixture(
             resumed!.MetaStats.PowerAggregates["POWER.DARK_EMBRACE"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsMetaPowerRegistryFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("meta-power-registry-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertMetaPowerRegistryFixture(resumed!.MetaStats);
     }
 
     [Fact]
@@ -4448,6 +4471,25 @@ public class SchemaLoadingTests
         Assert.Equal(6, powerAgg.TurnsActive);
         Assert.Equal(9, powerAgg.DarkEmbraceCombatTurns);
         Assert.Equal(3, powerAgg.CombatsActive);
+    }
+
+    private static void AssertMetaPowerRegistryFixture(RunMetaStats metaStats)
+    {
+        var danse = metaStats.PowerAggregates["POWER.DANSE_MACABRE"];
+        Assert.Equal(5, danse.PowerCardsPlayed);
+        Assert.Equal(2, danse.GeneratedPowerCardsPlayed);
+        Assert.Equal(4, danse.SuccessfulApplications);
+        Assert.Equal(12, danse.MetaDeckTurns);
+        Assert.Equal(8, danse.MetaActiveTurns);
+        Assert.Equal(13, danse.MetaActiveApplicationTurns);
+        Assert.Equal(9, danse.TimesTriggered);
+        Assert.Equal(7, danse.RateTimesTriggered);
+        Assert.Equal(31m, danse.BlockGained);
+        Assert.Equal(24m, danse.RateBlockGained);
+
+        var unmovable = metaStats.PowerAggregates["POWER.UNMOVABLE"];
+        Assert.Equal(12m, unmovable.UnmovableExtraBlockGained);
+        Assert.Equal(8m, unmovable.RateUnmovableExtraBlockGained);
     }
 
     private static void AssertStampedePowerFixture(PowerAggregate powerAgg)
