@@ -4135,6 +4135,209 @@ public static class RunTracker
         }
     }
 
+    internal static PendingAggressionCallback? ArmAggressionCallback(
+        AggressionPower? aggression,
+        IReadOnlyList<Creature>? participants)
+    {
+        if (aggression?.Owner?.Player is not Player owner) return null;
+        if (participants == null
+            || !participants.Any(participant =>
+                ReferenceEquals(participant, aggression.Owner)))
+        {
+            return null;
+        }
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return null;
+                if (!IsTrackedPlayer(owner)) return null;
+
+                _pendingCombat ??= new PendingCombat();
+                var pending = new PendingAggressionCallback
+                {
+                    PendingCombat = _pendingCombat,
+                    Owner = owner,
+                    PowerId = aggression.Id.ToString(),
+                    DisplayName = GetPowerDisplayName(aggression),
+                };
+                _pendingCombat.PendingAggressionCallbacks[owner] = pending;
+                return pending;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"ArmAggressionCallback failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+    internal static PendingAggressionCardMove? TryBeginAggressionCardMove(
+        CardModel? card,
+        PileType newPileType)
+    {
+        if (card?.Owner is not Player owner) return null;
+        if (newPileType != PileType.Hand
+            || card.Type != CardType.Attack
+            || card.Pile?.Type != PileType.Discard)
+        {
+            return null;
+        }
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null
+                    || !_pendingCombat.PendingAggressionCallbacks.TryGetValue(
+                        owner,
+                        out var callback)
+                    || !ReferenceEquals(callback.PendingCombat, _pendingCombat)
+                    || callback.CardMoveInProgress)
+                {
+                    return null;
+                }
+
+                // An already-upgraded prior card never calls UpgradeInternal.
+                // Its stale marker must not survive into the next selection.
+                callback.PendingUpgradeCard = null;
+                callback.CardMoveInProgress = true;
+                return new PendingAggressionCardMove
+                {
+                    Callback = callback,
+                    Card = card,
+                };
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"TryBeginAggressionCardMove failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+    internal static void CompleteAggressionCardMove(
+        PendingAggressionCardMove? pending,
+        CardPileAddResult result)
+    {
+        if (pending == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var callback = pending.Callback;
+                if (_pendingCombat == null
+                    || !ReferenceEquals(callback.PendingCombat, _pendingCombat)
+                    || !_pendingCombat.PendingAggressionCallbacks.TryGetValue(
+                        callback.Owner,
+                        out var active)
+                    || !ReferenceEquals(active, callback))
+                {
+                    return;
+                }
+
+                callback.CardMoveInProgress = false;
+                // Aggression performs this card's upgrade check immediately
+                // after the awaited add returns, even if the move was blocked.
+                callback.PendingUpgradeCard = pending.Card;
+
+                if (!result.success
+                    || result.cardAdded == null
+                    || result.cardAdded.Pile?.Type != PileType.Hand)
+                {
+                    return;
+                }
+
+                var agg = GetOrCreatePowerAggregate(
+                    _pendingCombat.MetaStats,
+                    callback.PowerId,
+                    callback.DisplayName);
+                RecordAggressionOutcomesForTest(
+                    agg,
+                    cardsReturnedToHand: 1,
+                    cardsUpgraded: 0);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"CompleteAggressionCardMove failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void AbortAggressionCardMove(
+        PendingAggressionCardMove? pending)
+    {
+        if (pending == null) return;
+
+        lock (_lock)
+        {
+            var callback = pending.Callback;
+            if (_pendingCombat == null
+                || !ReferenceEquals(callback.PendingCombat, _pendingCombat))
+            {
+                return;
+            }
+
+            callback.CardMoveInProgress = false;
+            callback.PendingUpgradeCard = null;
+        }
+    }
+
+    internal static void DisarmAggressionCallback(
+        PendingAggressionCallback? pending)
+    {
+        if (pending == null) return;
+
+        lock (_lock)
+        {
+            if (_pendingCombat == null) return;
+            if (_pendingCombat.PendingAggressionCallbacks.TryGetValue(
+                    pending.Owner,
+                    out var active)
+                && ReferenceEquals(active, pending))
+            {
+                _pendingCombat.PendingAggressionCallbacks.Remove(pending.Owner);
+            }
+        }
+    }
+
+    private static void RecordAggressionCardUpgradedLocked(CardModel card)
+    {
+        if (_pendingCombat == null || card?.Owner is not Player owner) return;
+        if (!_pendingCombat.PendingAggressionCallbacks.TryGetValue(
+                owner,
+                out var callback)
+            || !ReferenceEquals(callback.PendingCombat, _pendingCombat)
+            || !ReferenceEquals(callback.PendingUpgradeCard, card))
+        {
+            return;
+        }
+
+        callback.PendingUpgradeCard = null;
+        var agg = GetOrCreatePowerAggregate(
+            _pendingCombat.MetaStats,
+            callback.PowerId,
+            callback.DisplayName);
+        RecordAggressionOutcomesForTest(
+            agg,
+            cardsReturnedToHand: 0,
+            cardsUpgraded: 1);
+    }
+
+    internal static void RecordAggressionOutcomesForTest(
+        PowerAggregate agg,
+        int cardsReturnedToHand,
+        int cardsUpgraded)
+    {
+        if (agg == null) return;
+        agg.AggressionCardsReturnedToHand += Math.Max(0, cardsReturnedToHand);
+        agg.AggressionCardsUpgraded += Math.Max(0, cardsUpgraded);
+    }
+
     private static PowerAggregate GetOrCreatePowerAggregate(
         RunMetaStats metaStats,
         string powerId,
@@ -22848,6 +23051,7 @@ public static class RunTracker
             RecordWarHammerCardUpgradedLocked(card);
             RecordArmamentsCardUpgradedLocked(card);
             RecordDrainPowerCardUpgradedLocked(card);
+            RecordAggressionCardUpgradedLocked(card);
 
             // Card lineage is different: only mutation of the exact object in
             // the permanent deck counts. Do not canonicalize a combat clone
@@ -25759,6 +25963,10 @@ public static class RunTracker
             targetAgg.StampedeRareAttacksPlayed +=
                 sourceAgg.StampedeRareAttacksPlayed;
             targetAgg.StampedeEnergySaved += sourceAgg.StampedeEnergySaved;
+            targetAgg.AggressionCardsReturnedToHand +=
+                sourceAgg.AggressionCardsReturnedToHand;
+            targetAgg.AggressionCardsUpgraded +=
+                sourceAgg.AggressionCardsUpgraded;
         }
     }
 
@@ -26543,6 +26751,8 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, PendingStampedeAutoPlay> PendingStampedeAutoPlays { get; }
         = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, PendingAggressionCallback> PendingAggressionCallbacks { get; }
+        = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> DanseMacabrePowerCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> DanseMacabrePowerTurnCountedTurns { get; }
@@ -26680,6 +26890,22 @@ internal sealed class PendingStampedeAutoPlay
     public required PendingStampedeCallback Callback { get; init; }
     public required CardModel Card { get; init; }
     public bool Recorded { get; set; }
+}
+
+internal sealed class PendingAggressionCallback
+{
+    public required PendingCombat PendingCombat { get; init; }
+    public required Player Owner { get; init; }
+    public required string PowerId { get; init; }
+    public required string DisplayName { get; init; }
+    public bool CardMoveInProgress { get; set; }
+    public CardModel? PendingUpgradeCard { get; set; }
+}
+
+internal sealed class PendingAggressionCardMove
+{
+    public required PendingAggressionCallback Callback { get; init; }
+    public required CardModel Card { get; init; }
 }
 
 public sealed class PendingJossPaperDraw

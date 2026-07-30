@@ -24,6 +24,7 @@ public static class CardHoverShowPatch
     private const string DrawCardsNextTurnPowerIconPath = "res://images/atlases/power_atlas.sprites/draw_cards_next_turn_power.tres";
     private const string BlockedDrawIconPath = DrawCardsNextTurnPowerIconPath;
     private const int DebtGoldLossPerTrigger = 5;
+    private const string AggressionPowerId = "POWER.AGGRESSION";
     private const string DanseMacabrePowerId = "POWER.DANSE_MACABRE";
     private const string EntropyPowerId = "POWER.ENTROPY";
     private const string FeelNoPainPowerId = "POWER.FEEL_NO_PAIN";
@@ -348,6 +349,7 @@ public static class CardHoverShowPatch
         AppendDanseMacabrePowerStats(sb, cardModel, metaStats, compact: false);
         AppendViciousPowerStats(sb, cardModel, metaStats);
         AppendStampedePowerStats(sb, cardModel, metaStats, compact: false);
+        AppendAggressionPowerStats(sb, cardModel, metaStats);
         AppendFeelNoPainPowerStats(sb, cardModel, metaStats);
         AppendUnrelentingFreeAttackStats(sb, cardModel, metaStats, compact: false);
         AppendDebtStats(sb, cardModel, agg);
@@ -570,6 +572,7 @@ public static class CardHoverShowPatch
         AppendDanseMacabrePowerStats(sb, cardModel, metaStats, compact: true);
         AppendViciousPowerStats(sb, cardModel, metaStats);
         AppendStampedePowerStats(sb, cardModel, metaStats, compact: true);
+        AppendAggressionPowerStats(sb, cardModel, metaStats);
         AppendFeelNoPainPowerStats(sb, cardModel, metaStats);
         AppendUnrelentingFreeAttackStats(sb, cardModel, metaStats, compact: true);
         AppendDebtStats(sb, cardModel, agg);
@@ -1191,6 +1194,48 @@ public static class CardHoverShowPatch
             sb,
             GetBlockStatLabel("added / active turn"),
             FormatDecimal(blockPerActiveTurn),
+            "");
+    }
+
+    private static void AppendAggressionPowerStats(
+        StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel card,
+        RunMetaStats metaStats)
+    {
+        if (card is not Aggression
+            && !IsCardId(card, "CARD.AGGRESSION"))
+        {
+            return;
+        }
+
+        metaStats ??= new RunMetaStats();
+        PowerAggregate? powerAgg = null;
+        if (metaStats.PowerAggregates != null)
+        {
+            metaStats.PowerAggregates.TryGetValue(
+                AggressionPowerId,
+                out powerAgg);
+            powerAgg ??= metaStats.PowerAggregates.Values.FirstOrDefault(candidate =>
+                string.Equals(
+                    candidate.PowerId,
+                    AggressionPowerId,
+                    StringComparison.Ordinal)
+                || string.Equals(
+                    candidate.DisplayName,
+                    "Aggression",
+                    StringComparison.OrdinalIgnoreCase));
+        }
+        powerAgg ??= new PowerAggregate();
+
+        Row3(
+            sb,
+            "Cards returned to hand",
+            powerAgg.AggressionCardsReturnedToHand.ToString(),
+            "");
+        Row3(
+            sb,
+            "Cards upgraded",
+            powerAgg.AggressionCardsUpgraded.ToString(),
             "");
     }
 

@@ -604,6 +604,20 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsAggressionPowerFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("aggression-power-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        AssertAggressionPowerFixture(
+            loaded.Data.MetaStats.PowerAggregates["POWER.AGGRESSION"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsFeelNoPainPowerFixture()
     {
         var loaded = RunStorage.LoadHistorical(
@@ -1429,6 +1443,17 @@ public class SchemaLoadingTests
         Assert.NotNull(resumed);
         AssertStampedePowerFixture(
             resumed!.MetaStats.PowerAggregates["POWER.STAMPEDE"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsAggressionPowerFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("aggression-power-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertAggressionPowerFixture(
+            resumed!.MetaStats.PowerAggregates["POWER.AGGRESSION"]);
     }
 
     [Fact]
@@ -4374,6 +4399,14 @@ public class SchemaLoadingTests
         Assert.Equal(3, powerAgg.StampedeUncommonAttacksPlayed);
         Assert.Equal(2, powerAgg.StampedeRareAttacksPlayed);
         Assert.Equal(14, powerAgg.StampedeEnergySaved);
+    }
+
+    private static void AssertAggressionPowerFixture(PowerAggregate powerAgg)
+    {
+        Assert.Equal("POWER.AGGRESSION", powerAgg.PowerId);
+        Assert.Equal("Aggression", powerAgg.DisplayName);
+        Assert.Equal(8, powerAgg.AggressionCardsReturnedToHand);
+        Assert.Equal(5, powerAgg.AggressionCardsUpgraded);
     }
 
     private static void AssertFeelNoPainPowerFixture(PowerAggregate powerAgg)

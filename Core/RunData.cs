@@ -459,6 +459,13 @@ public class PowerAggregate
     public int StampedeUncommonAttacksPlayed { get; set; }
     public int StampedeRareAttacksPlayed { get; set; }
     public int StampedeEnergySaved { get; set; }
+
+    // Aggression tracking. Returned cards count only successful moves from the
+    // discard pile into hand. Upgrades are observed separately at the exact
+    // card mutation, so a full hand or an already-upgraded card cannot inflate
+    // the other outcome.
+    public int AggressionCardsReturnedToHand { get; set; }
+    public int AggressionCardsUpgraded { get; set; }
 }
 
 public class EnemyAggregate

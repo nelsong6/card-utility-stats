@@ -679,7 +679,7 @@ outcomes. Persist the shared total under `POWER.VICIOUS` and project it on
 every Vicious card rather than attributing later triggers to one physical copy.
 
 `StampedePower.AfterAutoPostPlayPhaseEntered` selects eligible Attacks from the
-owner's hand and sequentially awaits `CardCmd.AutoPlay`. Keep a callback-wide
+owner’s hand and sequentially awaits `CardCmd.AutoPlay`. Keep a callback-wide
 window, claim each direct autoplay, and suspend that window until the claimed
 task completes so nested autoplays caused by the Attack are not misattributed.
 Count the selection only when its primary `CardPlayFinishedEntry` arrives.
@@ -687,6 +687,15 @@ Use that play's `Resources.EnergyValue` as energy saved because it is the
 resolved amount a normal play would spend while autoplay spends zero. Persist
 the totals and rarity splits under `POWER.STAMPEDE` and project them on every
 Stampede card.
+
+`AggressionPower.BeforeSideTurnStart` selects owner Attacks from the discard
+pile, sequentially awaits `CardPileCmd.Add(card, PileType.Hand)`, and then
+upgrades each selected card only when it remains upgradable. Keep a
+callback-wide window while excluding nested pile adds. Count a return only
+from a successful add whose resulting card is in hand; independently count an
+upgrade only when the exact callback-selected card reaches
+`CardModel.UpgradeInternal`. Persist both shared outcomes under
+`POWER.AGGRESSION` and project them on every Aggression card.
 
 `FeelNoPainPower.AfterCardExhausted` owns an exact owner-card check and then
 awaits the decimal/`ValueProp` `CreatureCmd.GainBlock` overload. Arm from that
