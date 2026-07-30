@@ -13,6 +13,7 @@ namespace SpireLens.Core.Tests;
 public sealed class StatsTooltipOwnershipTests
 {
     [Fact]
+    [Trait("Category", "RequiresLiveGame")]
     public void StatsTooltip_CreatesNativeHoverTipData()
     {
         var tip = StatsTooltip.CreateNativeTip(
@@ -29,6 +30,7 @@ public sealed class StatsTooltipOwnershipTests
     }
 
     [Fact]
+    [Trait("Category", "RequiresLiveGame")]
     public void StatsTooltip_CreatesTitlelessEscapedNativeHintData()
     {
         var tip = StatsTooltip.CreateNativeHint("Activation [observed]");

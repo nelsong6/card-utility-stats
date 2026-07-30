@@ -103,7 +103,13 @@ public class BookOfFiveRingsStatsTests
 
         RunTracker.MergeRelicAggregateInto(target, source);
 
-        AssertPopulatedAggregate(target);
+        Assert.Equal(8, target.CardsAddedToDeck);
+        Assert.Equal(1, target.Activations);
+        Assert.Equal(20m, target.TotalHealingAttempted);
+        Assert.Equal(12m, target.TotalHealingRestored);
+        Assert.Equal(10m, target.TotalHealingLost);
+        Assert.Equal(3, target.CardRewardsSkipped);
+        Assert.Equal(8, target.FloorAcquired);
     }
 
     [Fact]

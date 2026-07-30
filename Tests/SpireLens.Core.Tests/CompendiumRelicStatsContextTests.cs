@@ -50,7 +50,7 @@ public class CompendiumRelicStatsContextTests
             out var body);
 
         Assert.True(ok);
-        Assert.Equal("???", title);
+        Assert.Equal("Anchor???", title);
         Assert.Contains("Activations", body);
         Assert.Contains("[b]1[/b]", body);
         Assert.Contains("block gained", body);
@@ -66,7 +66,7 @@ public class CompendiumRelicStatsContextTests
             out var body);
 
         Assert.True(ok);
-        Assert.Equal("???", title);
+        Assert.Equal("Anchor???", title);
         Assert.Contains("Activations", body);
         Assert.Contains("block gained", body);
         Assert.Equal(2, body.Split("[b]0[/b]").Length - 1);

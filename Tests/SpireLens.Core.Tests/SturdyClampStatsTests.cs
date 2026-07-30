@@ -107,10 +107,10 @@ public class SturdyClampStatsTests
     {
         var body = BuildBody(PopulatedAggregate());
 
-        Assert.Contains("avg block retained per turn", body);
-        Assert.Contains("avg block retained per combat", body);
-        Assert.Contains("avg excess block over 10 per turn", body);
-        Assert.Contains("avg excess block over 10 per combat", body);
+        Assert.Contains("Average block retained by Sturdy Clamp per turn.", body);
+        Assert.Contains("Average block retained by Sturdy Clamp per combat.", body);
+        Assert.Contains("Average block discarded above Sturdy Clamp's 10-block retention cap per turn.", body);
+        Assert.Contains("Average block discarded above Sturdy Clamp's 10-block retention cap per combat.", body);
         Assert.Contains("[b]5.67[/b]", body);
         Assert.Contains("[b]8.5[/b]", body);
         Assert.Contains("[b]1[/b]", body);
@@ -123,8 +123,8 @@ public class SturdyClampStatsTests
     {
         var body = BuildBody(new RelicAggregate());
 
-        Assert.Contains("avg block retained per turn", body);
-        Assert.Contains("avg excess block over 10 per combat", body);
+        Assert.Contains("Average block retained by Sturdy Clamp per turn.", body);
+        Assert.Contains("Average block discarded above Sturdy Clamp's 10-block retention cap per combat.", body);
         Assert.Contains("[b]0[/b]", body);
     }
 

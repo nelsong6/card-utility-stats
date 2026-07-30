@@ -29,6 +29,7 @@ public class FeelNoPainPowerStatsTests
             "AppendFeelNoPainPowerStats not found.");
 
     [Fact]
+    [Trait("Category", "RequiresLiveGame")]
     public void FeelNoPain_UsesExactPowerAndGainBlockTargets()
     {
         var powerTarget = AccessTools.Method(

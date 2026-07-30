@@ -115,6 +115,7 @@ internal static class RelicStatRowVocabulary
         Rule("stars", @"\bstars?\b"),
         Rule("strength_gained", @"\bstrength\s+(?:added|gained)\b"),
         Rule("strength", @"\bstrength\b"),
+        Rule("swift", @"\bswift\b"),
         Rule("taken", @"(?<!not\s)\btaken\b"),
         Rule("turn", @"\bturns?\b", true),
         Rule("upgraded", @"(?<!non-)\b(?:upgrade|upgraded|upgrades)\b"),

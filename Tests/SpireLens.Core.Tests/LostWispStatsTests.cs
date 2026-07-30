@@ -1,5 +1,6 @@
 using System;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using MegaCrit.Sts2.Core.Models.Relics;
 using SpireLens.Core;
 using SpireLens.Core.Patches;
@@ -68,7 +69,7 @@ public class LostWispStatsTests
     public void TooltipDispatch_RecognizesLostWisp()
     {
         var recognized = RelicHoverShowPatch.TryBuildBodyBBCode(
-            new LostWisp(),
+            (LostWisp)RuntimeHelpers.GetUninitializedObject(typeof(LostWisp)),
             new RelicAggregate { Activations = 1 },
             floorCount: null,
             bloodSoakedRoseCurseAgg: null,

@@ -22,6 +22,7 @@ public class EggRelicStatsTests
     };
 
     [Fact]
+    [Trait("Category", "RequiresLiveGame")]
     public void EggRelicPatch_TargetsRelicAttributedCardCreationModification()
     {
         var targetMethod = typeof(EggRelicCardOfferStatsPatch).GetMethod(

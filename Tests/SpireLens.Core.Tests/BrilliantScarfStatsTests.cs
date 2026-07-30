@@ -244,7 +244,20 @@ public class BrilliantScarfStatsTests
 
     private static void AssertContainsRow(string body, string label, string value)
     {
-        Assert.Contains(label, body);
-        Assert.Contains($"[color=#e0e0e0]{label}[/color][/cell][cell expand=0 padding=0,0,12,0][right][b]{value}[/b][/right]", body);
+        var plainLabel = label
+            .Replace(EnergyIcon, string.Empty, StringComparison.Ordinal)
+            .Replace(StarIcon, string.Empty, StringComparison.Ordinal)
+            .Replace("  ", " ", StringComparison.Ordinal)
+            .Trim();
+        var rowStart = body.IndexOf(plainLabel, StringComparison.Ordinal);
+        Assert.True(rowStart >= 0, $"Row label '{plainLabel}' was not rendered.");
+        var nextRow = body.IndexOf(
+            "[cell expand=0 padding=0,0,10,0]",
+            rowStart + plainLabel.Length,
+            StringComparison.Ordinal);
+        var row = nextRow >= 0
+            ? body[rowStart..nextRow]
+            : body[rowStart..];
+        Assert.Contains($"[b]{value}[/b]", row);
     }
 }

@@ -136,7 +136,7 @@ public class FresnelLensStatsTests
         Assert.Contains("reward screens with 2", body);
         Assert.Contains("reward screens with 3+", body);
         Assert.Contains("reward screens with none", body);
-        Assert.Contains("offered, none taken", body);
+        Assert.Contains("Reward screens that offered Nimble cards but from which none were taken.", body);
         Assert.Contains("[b]70[/b]", body);
         Assert.Contains("[b]57[/b]", body);
         Assert.Contains("[b]13[/b]", body);

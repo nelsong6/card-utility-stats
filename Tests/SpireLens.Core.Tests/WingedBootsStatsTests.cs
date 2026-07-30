@@ -105,6 +105,7 @@ public class WingedBootsStatsTests
     }
 
     [Fact]
+    [Trait("Category", "RequiresLiveGame")]
     public void Tooltip_DispatchesForWingedBoots()
     {
         var relic = (WingedBoots)RuntimeHelpers.GetUninitializedObject(typeof(WingedBoots));

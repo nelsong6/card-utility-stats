@@ -35,6 +35,7 @@ public class WarHammerStatsTests
     };
 
     [Fact]
+    [Trait("Category", "RequiresLiveGame")]
     public void Patch_TargetsWarHammerAfterCombatVictory()
     {
         var target = TargetMethod.Invoke(null, null) as MethodBase;

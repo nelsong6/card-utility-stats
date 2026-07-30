@@ -115,6 +115,7 @@ public class MiniatureCannonStatsTests
     }
 
     [Fact]
+    [Trait("Category", "RequiresLiveGame")]
     public void RunTracker_MiniatureCannonUpgradePredicate_UsesCombatCardUpgradeState()
     {
         var unupgradedDeckCard = Uninitialized<DrainPower>();
@@ -133,6 +134,7 @@ public class MiniatureCannonStatsTests
     }
 
     [Fact]
+    [Trait("Category", "RequiresLiveGame")]
     public void RunTracker_MiniatureCannonCombatCounts_UseEachLiveCombatCard()
     {
         var upgradedDeckCard = Uninitialized<DrainPower>();

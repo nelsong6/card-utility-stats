@@ -168,7 +168,8 @@ public class PoisonTooltipTests
         AppendAppliedEffects(sb, agg, compact: false, excludePoison: false);
         var text = sb.ToString();
 
-        Assert.Contains("[img=16x16]res://images/atlases/power_atlas.sprites/energy_next_turn_power.tres[/img] Energy Next Turn", text);
+        Assert.Contains("ironclad_energy_icon.png", text);
+        Assert.Contains("Next Turn", text);
         Assert.Contains("[b]2[/b]", text);
     }
 

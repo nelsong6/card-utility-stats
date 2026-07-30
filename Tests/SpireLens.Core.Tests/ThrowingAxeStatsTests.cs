@@ -103,12 +103,12 @@ public class ThrowingAxeStatsTests
     {
         var body = BuildBody(PopulatedAggregate());
 
-        Assert.Contains("Extra cards played", body);
-        Assert.Contains("Total energy cost of extra plays", body);
-        Assert.Contains("Avg energy cost per combat", body);
-        Assert.Contains("Commons played", body);
-        Assert.Contains("Uncommons played", body);
-        Assert.Contains("Rares played", body);
+        Assert.Contains("Finished extra card plays contributed by Throwing Axe.", body);
+        Assert.Contains("play-time energy values of cards replayed by Throwing Axe.", body);
+        Assert.Contains("Total energy cost of Throwing Axe extra plays divided by combats", body);
+        Assert.Contains("Common cards replayed by Throwing Axe.", body);
+        Assert.Contains("Uncommon cards replayed by Throwing Axe.", body);
+        Assert.Contains("Rare cards replayed by Throwing Axe.", body);
         Assert.Contains("[b]1.75[/b]", body);
     }
 

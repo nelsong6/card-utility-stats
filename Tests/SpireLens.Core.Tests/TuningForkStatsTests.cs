@@ -164,7 +164,7 @@ public class TuningForkStatsTests
 
         Assert.Contains("Skills played", body);
         Assert.Contains("Activations", body);
-        Assert.Contains("[hint=\"Block:", body);
+        Assert.Contains("[hint=\"Block gained:", body);
         Assert.Contains("[hint=\"Activation:", body);
         Assert.Contains("block gained", body);
         Assert.Contains("block gained per activation", body);

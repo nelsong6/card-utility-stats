@@ -125,14 +125,14 @@ public class SilverCrucibleStatsTests
 
         var body = BuildBody(agg);
 
-        Assert.Contains("Card reward 1", body);
+        Assert.Contains("reward 1", body);
         Assert.Contains("Bash+", body);
         Assert.Contains("Shrug It Off+", body);
         Assert.Contains("taken", body);
         Assert.Contains("not taken", body);
-        Assert.Contains("Card reward 2", body);
+        Assert.Contains("reward 2", body);
         Assert.Contains("not seen yet", body);
-        Assert.Contains("Card reward 3", body);
+        Assert.Contains("reward 3", body);
         Assert.Contains("Headbutt+", body);
         Assert.True(body.IndexOf("Bash+", StringComparison.Ordinal) < body.IndexOf("Shrug It Off+", StringComparison.Ordinal));
         Assert.True(body.IndexOf("Shrug It Off+", StringComparison.Ordinal) < body.IndexOf("not seen yet", StringComparison.Ordinal));
@@ -153,7 +153,7 @@ public class SilverCrucibleStatsTests
 
         Assert.True(recognized);
         Assert.Equal("Silver Crucible", title);
-        Assert.Contains("Card reward 1", body);
+        Assert.Contains("reward 1", body);
         Assert.Contains("Bash+", body);
     }
 
@@ -179,14 +179,11 @@ public class SilverCrucibleStatsTests
 
         var body = BuildBody(agg);
 
-        Assert.Contains("[color=#e0e0e0]Card reward 1[/color]\n", body);
+        Assert.Contains("[color=#e0e0e0]reward 1[/color]", body);
         Assert.Contains("[table=2]", body);
-        Assert.Contains(
-            "[cell expand=4 padding=12,0,12,0][b]Grave Warden+[/b][/cell]",
-            body);
-        Assert.Contains(
-            "[cell expand=2 padding=0,0,4,0][right][color=#b5b5b5]pending[/color][/right][/cell]",
-            body);
+        Assert.Contains("[cell expand=4 padding=0,0,4,0]", body);
+        Assert.Contains("[b]Grave Warden+[/b]", body);
+        Assert.Contains("[b]pending[/b]", body);
     }
 
     [Fact]

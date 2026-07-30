@@ -68,9 +68,9 @@ public class PhylacteryStatsTests
         var body = (string)(BuildPhylacteryBodyMethod.Invoke(null, new object?[] { agg })
             ?? throw new InvalidOperationException("BuildPhylacteryBodyBBCode returned null."));
 
-        Assert.Contains("ⓘ", body);
+        Assert.Contains("generated-icons/information-", body);
         Assert.Contains("Times this relic has been activated.", body);
-        Assert.Contains("[color=#F4C95D][b]A[/b][/color]", body);
+        Assert.Contains("generated-icons/activation-", body);
         Assert.Contains("[b]4[/b]", body);
         Assert.Contains("Total Osty summon gained from this relic.", body);
         Assert.Contains(

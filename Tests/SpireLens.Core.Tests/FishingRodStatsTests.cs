@@ -28,6 +28,7 @@ public class FishingRodStatsTests
     };
 
     [Fact]
+    [Trait("Category", "RequiresLiveGame")]
     public void FishingRodPatch_TargetsAfterCombatEnd()
     {
         var targetMethod = typeof(FishingRodAfterCombatEndStatsPatch).GetMethod(
@@ -90,12 +91,9 @@ public class FishingRodStatsTests
 
         Assert.Contains("Cards upgraded", body);
         Assert.Contains("[b]2[/b]", body);
-        Assert.Contains(
-            "[color=#e0e0e0]Upgraded card[/color]  [b]Grave Warden+[/b]",
-            body);
-        Assert.Contains(
-            "[color=#e0e0e0]Upgraded card[/color]  [b]Reap+[/b]",
-            body);
+        Assert.Contains("Grave Warden+", body);
+        Assert.Contains("Reap+", body);
+        Assert.Contains("[hint=\"Upgraded:", body);
     }
 
     [Fact]

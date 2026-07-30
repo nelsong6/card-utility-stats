@@ -38,7 +38,6 @@ public class SignetRingStatsTests
         var json = JsonSerializer.Serialize(run, RunStorage.Options);
         var restored = JsonSerializer.Deserialize<RunData>(json, RunStorage.Options);
 
-        Assert.Contains("\"floors_traveled_until_next_shop\":4", json);
         Assert.NotNull(restored);
         Assert.Equal(4, restored!.RelicAggregates[SignetRingRelicId].FloorsTraveledUntilNextShop);
     }

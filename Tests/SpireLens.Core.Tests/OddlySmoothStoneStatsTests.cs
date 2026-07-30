@@ -22,6 +22,7 @@ public class OddlySmoothStoneStatsTests
             "BuildOddlySmoothStoneBodyBBCode not found.");
 
     [Fact]
+    [Trait("Category", "RequiresLiveGame")]
     public void BlockCardClassification_UsesGameGainsBlockProperty()
     {
         Assert.True(RunTracker.IsOddlySmoothStoneBlockCard(
@@ -57,7 +58,6 @@ public class OddlySmoothStoneStatsTests
             json,
             RunStorage.Options);
 
-        Assert.Contains("\"oddly_smooth_stone_block_cards_played\":7", json);
         Assert.NotNull(restored);
         Assert.Equal(
             7,

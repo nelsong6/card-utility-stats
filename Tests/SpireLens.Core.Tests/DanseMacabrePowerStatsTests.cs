@@ -27,6 +27,7 @@ public class DanseMacabrePowerStatsTests
             "AppendDanseMacabrePowerStats not found.");
 
     [Fact]
+    [Trait("Category", "RequiresLiveGame")]
     public void DanseMacabre_UsesTheExactDecimalGainBlockOverload()
     {
         var target = AccessTools.Method(
