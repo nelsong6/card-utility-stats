@@ -9,8 +9,11 @@ public sealed class RuntimeOptions
 {
     public bool ViewStatsToggleEnabled { get; set; }
     public bool ShowRemovedCardsInDeckView { get; set; } = true;
+    public bool ShowAllMetaCardsInNotInDeckView { get; set; }
     public bool ShowEnemyStatsOnHover { get; set; }
     public bool ShowCardStatsDuringCombat { get; set; }
+    public bool HideNonCombatRelicStats { get; set; }
+    public bool ShowCombatOnlyRelicsAtCombatScreen { get; set; }
     public bool ShowHandTooltips { get; set; } = true;
     public bool UseVerboseHandStats { get; set; }
     public bool DisableCardStatsDuringCombat { get; set; }
@@ -24,8 +27,12 @@ public static class RuntimeOptionsProvider
     private const string GetCurrentOptionsJsonMethodName = "GetCurrentOptionsJson";
     private const string SetViewStatsToggleEnabledMethodName = "SetViewStatsToggleEnabled";
     private const string SetShowRemovedCardsInDeckViewMethodName = "SetShowRemovedCardsInDeckView";
+    private const string SetShowAllMetaCardsInNotInDeckViewMethodName =
+        "SetShowAllMetaCardsInNotInDeckView";
     private const string SetShowEnemyStatsOnHoverMethodName = "SetShowEnemyStatsOnHover";
     private const string SetShowCardStatsDuringCombatMethodName = "SetShowCardStatsDuringCombat";
+    private const string SetHideNonCombatRelicStatsMethodName = "SetHideNonCombatRelicStats";
+    private const string SetShowCombatOnlyRelicsAtCombatScreenMethodName = "SetShowCombatOnlyRelicsAtCombatScreen";
     private const string SetVerboseHandStatsEnabledMethodName = "SetVerboseHandStatsEnabled";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -37,15 +44,21 @@ public static class RuntimeOptionsProvider
     private static MethodInfo? _getCurrentOptionsJsonMethod;
     private static MethodInfo? _setViewStatsToggleEnabledMethod;
     private static MethodInfo? _setShowRemovedCardsInDeckViewMethod;
+    private static MethodInfo? _setShowAllMetaCardsInNotInDeckViewMethod;
     private static MethodInfo? _setShowEnemyStatsOnHoverMethod;
     private static MethodInfo? _setShowCardStatsDuringCombatMethod;
+    private static MethodInfo? _setHideNonCombatRelicStatsMethod;
+    private static MethodInfo? _setShowCombatOnlyRelicsAtCombatScreenMethod;
     private static MethodInfo? _setVerboseHandStatsEnabledMethod;
     private static bool _loggedMissingBridge;
     private static bool _loggedRefreshFailure;
     private static bool _loggedToggleFailure;
     private static bool _loggedShowRemovedCardsFailure;
+    private static bool _loggedShowAllMetaCardsFailure;
     private static bool _loggedShowEnemyStatsFailure;
     private static bool _loggedShowCardStatsDuringCombatFailure;
+    private static bool _loggedHideNonCombatRelicStatsFailure;
+    private static bool _loggedShowCombatOnlyRelicsAtCombatScreenFailure;
     private static bool _loggedVerboseHandStatsFailure;
 
     public static RuntimeOptions Current { get; private set; } = new();
@@ -115,6 +128,36 @@ public static class RuntimeOptionsProvider
         Refresh();
     }
 
+    public static void SetShowAllMetaCardsInNotInDeckView(bool isEnabled)
+    {
+        try
+        {
+            var method = ResolveSetShowAllMetaCardsInNotInDeckViewMethod();
+            if (method == null)
+            {
+                // The stable Loader cannot gain a new bridge method through a
+                // Core hot reload. Keep the option functional in memory until
+                // the next full game restart loads the updated Loader.
+                Current.ShowAllMetaCardsInNotInDeckView = isEnabled;
+                return;
+            }
+
+            method.Invoke(null, new object?[] { isEnabled });
+            _loggedShowAllMetaCardsFailure = false;
+        }
+        catch (Exception e)
+        {
+            if (!_loggedShowAllMetaCardsFailure)
+            {
+                CoreMain.Logger.Warn(
+                    $"RuntimeOptionsProvider.SetShowAllMetaCardsInNotInDeckView failed: {e.Message}");
+                _loggedShowAllMetaCardsFailure = true;
+            }
+        }
+
+        Refresh();
+    }
+
     public static void SetShowEnemyStatsOnHover(bool isEnabled)
     {
         try
@@ -149,6 +192,46 @@ public static class RuntimeOptionsProvider
             {
                 CoreMain.Logger.Warn($"RuntimeOptionsProvider.SetShowCardStatsDuringCombat failed: {e.Message}");
                 _loggedShowCardStatsDuringCombatFailure = true;
+            }
+        }
+
+        Refresh();
+    }
+
+    public static void SetHideNonCombatRelicStats(bool isEnabled)
+    {
+        try
+        {
+            var method = ResolveSetHideNonCombatRelicStatsMethod();
+            method?.Invoke(null, new object?[] { isEnabled });
+            _loggedHideNonCombatRelicStatsFailure = false;
+        }
+        catch (Exception e)
+        {
+            if (!_loggedHideNonCombatRelicStatsFailure)
+            {
+                CoreMain.Logger.Warn($"RuntimeOptionsProvider.SetHideNonCombatRelicStats failed: {e.Message}");
+                _loggedHideNonCombatRelicStatsFailure = true;
+            }
+        }
+
+        Refresh();
+    }
+
+    public static void SetShowCombatOnlyRelicsAtCombatScreen(bool isEnabled)
+    {
+        try
+        {
+            var method = ResolveSetShowCombatOnlyRelicsAtCombatScreenMethod();
+            method?.Invoke(null, new object?[] { isEnabled });
+            _loggedShowCombatOnlyRelicsAtCombatScreenFailure = false;
+        }
+        catch (Exception e)
+        {
+            if (!_loggedShowCombatOnlyRelicsAtCombatScreenFailure)
+            {
+                CoreMain.Logger.Warn($"RuntimeOptionsProvider.SetShowCombatOnlyRelicsAtCombatScreen failed: {e.Message}");
+                _loggedShowCombatOnlyRelicsAtCombatScreenFailure = true;
             }
         }
 
@@ -199,6 +282,14 @@ public static class RuntimeOptionsProvider
         return _setShowRemovedCardsInDeckViewMethod;
     }
 
+    private static MethodInfo? ResolveSetShowAllMetaCardsInNotInDeckViewMethod()
+    {
+        _setShowAllMetaCardsInNotInDeckViewMethod ??= ResolveBridgeType()?.GetMethod(
+            SetShowAllMetaCardsInNotInDeckViewMethodName,
+            BindingFlags.Public | BindingFlags.Static);
+        return _setShowAllMetaCardsInNotInDeckViewMethod;
+    }
+
     private static MethodInfo? ResolveSetShowEnemyStatsOnHoverMethod()
     {
         _setShowEnemyStatsOnHoverMethod ??= ResolveBridgeType()?.GetMethod(
@@ -221,6 +312,22 @@ public static class RuntimeOptionsProvider
             SetVerboseHandStatsEnabledMethodName,
             BindingFlags.Public | BindingFlags.Static);
         return _setVerboseHandStatsEnabledMethod;
+    }
+
+    private static MethodInfo? ResolveSetHideNonCombatRelicStatsMethod()
+    {
+        _setHideNonCombatRelicStatsMethod ??= ResolveBridgeType()?.GetMethod(
+            SetHideNonCombatRelicStatsMethodName,
+            BindingFlags.Public | BindingFlags.Static);
+        return _setHideNonCombatRelicStatsMethod;
+    }
+
+    private static MethodInfo? ResolveSetShowCombatOnlyRelicsAtCombatScreenMethod()
+    {
+        _setShowCombatOnlyRelicsAtCombatScreenMethod ??= ResolveBridgeType()?.GetMethod(
+            SetShowCombatOnlyRelicsAtCombatScreenMethodName,
+            BindingFlags.Public | BindingFlags.Static);
+        return _setShowCombatOnlyRelicsAtCombatScreenMethod;
     }
 
     private static Type? ResolveBridgeType()

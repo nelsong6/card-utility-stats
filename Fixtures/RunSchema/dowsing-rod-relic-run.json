@@ -1,0 +1,27 @@
+{
+  "run_id": "dowsing-rod-relic-fixture",
+  "started_at": "2026-07-19T00:00:00Z",
+  "updated_at": "2026-07-19T00:10:00Z",
+  "outcome": "in_progress",
+  "aggregates": {
+    "CARD.DOWSING#1": {
+      "plays": 0,
+      "total_energy_spent": 0
+    }
+  },
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.DOWSING_ROD": {
+      "dowsing_question_rooms_remaining": 2
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.DOWSING": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.DOWSING": 1
+  }
+}

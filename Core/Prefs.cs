@@ -16,11 +16,20 @@ public class Prefs
     [JsonPropertyName("show_removed_cards_ticked")]
     public bool ShowRemovedCardsTicked { get; set; } = true;
 
+    [JsonPropertyName("show_all_meta_cards_in_not_in_deck_view")]
+    public bool ShowAllMetaCardsInNotInDeckView { get; set; }
+
     [JsonPropertyName("show_enemy_stats_ticked")]
     public bool ShowEnemyStatsTicked { get; set; }
 
     [JsonPropertyName("show_combat_card_stats_ticked")]
     public bool ShowCombatCardStatsTicked { get; set; }
+
+    [JsonPropertyName("hide_non_combat_relic_stats")]
+    public bool HideNonCombatRelicStats { get; set; }
+
+    [JsonPropertyName("show_combat_only_relics_at_combat_screen")]
+    public bool ShowCombatOnlyRelicsAtCombatScreen { get; set; }
 }
 
 public static class PrefsStorage
@@ -34,8 +43,12 @@ public static class PrefsStorage
             {
                 ViewStatsTicked = options.ViewStatsToggleEnabled,
                 ShowRemovedCardsTicked = options.ShowRemovedCardsInDeckView,
+                ShowAllMetaCardsInNotInDeckView =
+                    options.ShowAllMetaCardsInNotInDeckView,
                 ShowEnemyStatsTicked = options.ShowEnemyStatsOnHover,
                 ShowCombatCardStatsTicked = options.ShowCardStatsDuringCombat,
+                HideNonCombatRelicStats = options.HideNonCombatRelicStats,
+                ShowCombatOnlyRelicsAtCombatScreen = options.ShowCombatOnlyRelicsAtCombatScreen,
             };
         }
         catch (Exception e)
@@ -53,6 +66,10 @@ public static class PrefsStorage
             RuntimeOptionsProvider.SetShowRemovedCardsInDeckView(prefs.ShowRemovedCardsTicked);
             RuntimeOptionsProvider.SetShowEnemyStatsOnHover(prefs.ShowEnemyStatsTicked);
             RuntimeOptionsProvider.SetShowCardStatsDuringCombat(prefs.ShowCombatCardStatsTicked);
+            RuntimeOptionsProvider.SetHideNonCombatRelicStats(prefs.HideNonCombatRelicStats);
+            RuntimeOptionsProvider.SetShowCombatOnlyRelicsAtCombatScreen(prefs.ShowCombatOnlyRelicsAtCombatScreen);
+            RuntimeOptionsProvider.SetShowAllMetaCardsInNotInDeckView(
+                prefs.ShowAllMetaCardsInNotInDeckView);
         }
         catch (Exception e)
         {

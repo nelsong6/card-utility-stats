@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 
 namespace SpireLens.Core;
 
@@ -9,6 +10,10 @@ internal sealed record RelicTaxonomyCategory(
     string DisplayName,
     IReadOnlySet<string> RelicIds,
     IReadOnlyList<RelicTaxonomyCategory> Children);
+
+internal sealed record LoadedRelicTaxonomy(
+    IReadOnlySet<string> UncategorizedRelicIds,
+    IReadOnlyDictionary<string, IReadOnlySet<string>> CategorizedRelicIds);
 
 internal enum RelicTaxonomyCategorySelectionState
 {
@@ -19,6 +24,8 @@ internal enum RelicTaxonomyCategorySelectionState
 
 internal static class RelicTaxonomy
 {
+    private const string EmbeddedFileSuffix = "Config.relic-taxonomy.json";
+
     public const string ChargeCategoryId = "charge";
     public const string ChargeAcrossCombatsCategoryId = "charge_across_combats";
     public const string ChargeAcrossCombatsCyclingCategoryId = "charge_across_combats_cycling";
@@ -30,54 +37,32 @@ internal static class RelicTaxonomy
     public const string ChargeResetsEachTurnUnlimitedActivationsCategoryId =
         "charge_resets_each_turn_unlimited_activations";
 
+    private static readonly IReadOnlySet<string> EmptyRelicIds =
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+    private static readonly LoadedRelicTaxonomy TaxonomyData = LoadTaxonomy();
+
+    private static readonly IReadOnlyDictionary<string, IReadOnlySet<string>> RelicIdsByCategory =
+        TaxonomyData.CategorizedRelicIds;
+
+    public static IReadOnlySet<string> UncategorizedRelicIds => TaxonomyData.UncategorizedRelicIds;
+
     private static readonly RelicTaxonomyCategory ChargeAcrossTurnsCategory = new(
         ChargeAcrossTurnsCategoryId,
         "Across turns",
-        new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "RELIC.METRONOME",
-            "RELIC.PAELS_FLESH",
-            "RELIC.PAELS_LEGION",
-            "RELIC.STONE_CALENDAR",
-        },
+        RelicIdsFor(ChargeAcrossTurnsCategoryId),
         []);
 
     private static readonly RelicTaxonomyCategory ChargeAcrossCombatsCyclingCategory = new(
         ChargeAcrossCombatsCyclingCategoryId,
         "Cycling",
-        new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "RELIC.BOOK_OF_FIVE_RINGS",
-            "RELIC.FAKE_HAPPY_FLOWER",
-            "RELIC.FISHING_ROD",
-            "RELIC.GALACTIC_DUST",
-            "RELIC.HAPPY_FLOWER",
-            "RELIC.IRON_CLUB",
-            "RELIC.JOSS_PAPER",
-            "RELIC.LASTING_CANDY",
-            "RELIC.NUNCHAKU",
-            "RELIC.PAELS_WING",
-            "RELIC.PENDULUM",
-            "RELIC.PEN_NIB",
-            "RELIC.POLLINOUS_CORE",
-            "RELIC.TOY_BOX",
-            "RELIC.TUNING_FORK",
-        },
+        RelicIdsFor(ChargeAcrossCombatsCyclingCategoryId),
         []);
 
     private static readonly RelicTaxonomyCategory ChargeAcrossCombatsNonCyclingCategory = new(
         ChargeAcrossCombatsNonCyclingCategoryId,
         "Non-cycling",
-        new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "RELIC.GIRYA",
-            "RELIC.PAELS_TOOTH",
-            "RELIC.PUMPKIN_CANDLE",
-            "RELIC.SILVER_CRUCIBLE",
-            "RELIC.SWORD_OF_STONE",
-            "RELIC.WINGED_BOOTS",
-            "RELIC.WONGOS_MYSTERY_TICKET",
-        },
+        RelicIdsFor(ChargeAcrossCombatsNonCyclingCategoryId),
         []);
 
     private static readonly RelicTaxonomyCategory ChargeAcrossCombatsCategory = new(
@@ -92,27 +77,13 @@ internal static class RelicTaxonomy
     private static readonly RelicTaxonomyCategory ChargeResetsEachTurnLimitedActivationsCategory = new(
         ChargeResetsEachTurnLimitedActivationsCategoryId,
         "Limited activations",
-        new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "RELIC.BRILLIANT_SCARF",
-            "RELIC.DIAMOND_DIADEM",
-            "RELIC.POCKETWATCH",
-            "RELIC.RAINBOW_RING",
-            "RELIC.VELVET_CHOKER",
-        },
+        RelicIdsFor(ChargeResetsEachTurnLimitedActivationsCategoryId),
         []);
 
     private static readonly RelicTaxonomyCategory ChargeResetsEachTurnUnlimitedActivationsCategory = new(
         ChargeResetsEachTurnUnlimitedActivationsCategoryId,
         "Unlimited activations",
-        new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "RELIC.KUNAI",
-            "RELIC.KUSARIGAMA",
-            "RELIC.LETTER_OPENER",
-            "RELIC.ORNAMENTAL_FAN",
-            "RELIC.SHURIKEN",
-        },
+        RelicIdsFor(ChargeResetsEachTurnUnlimitedActivationsCategoryId),
         []);
 
     private static readonly RelicTaxonomyCategory ChargeResetsEachTurnCategory = new(
@@ -223,6 +194,144 @@ internal static class RelicTaxonomy
         return LeafCategories.Any(category =>
             selected.Contains(category.Id)
             && category.RelicIds.Contains(relicId));
+    }
+
+    private static IReadOnlySet<string> RelicIdsFor(string categoryId)
+    {
+        return RelicIdsByCategory.TryGetValue(categoryId, out var relicIds)
+            ? relicIds
+            : EmptyRelicIds;
+    }
+
+    private static LoadedRelicTaxonomy LoadTaxonomy()
+    {
+        try
+        {
+            var assembly = typeof(RelicTaxonomy).Assembly;
+            var resourceName = assembly.GetManifestResourceNames().FirstOrDefault(name =>
+                name.EndsWith(EmbeddedFileSuffix, StringComparison.Ordinal));
+            if (resourceName == null)
+                throw new InvalidOperationException("Embedded relic taxonomy was not found.");
+
+            using var stream = assembly.GetManifestResourceStream(resourceName)
+                ?? throw new InvalidOperationException("Embedded relic taxonomy could not be opened.");
+            using var document = JsonDocument.Parse(stream);
+            var root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object)
+                throw new InvalidOperationException("Relic taxonomy root must be an object.");
+
+            if (!root.TryGetProperty("uncategorized", out var uncategorizedElement))
+                throw new InvalidOperationException("Relic taxonomy is missing 'uncategorized'.");
+            if (!root.TryGetProperty("charge", out var chargeElement))
+                throw new InvalidOperationException("Relic taxonomy is missing 'charge'.");
+
+            var unknownRootKeys = root.EnumerateObject()
+                .Where(property => property.Name is not "uncategorized" and not "charge")
+                .Select(property => property.Name)
+                .ToArray();
+            if (unknownRootKeys.Length > 0)
+            {
+                throw new InvalidOperationException(
+                    $"Relic taxonomy has unknown root key(s): {string.Join(", ", unknownRootKeys)}.");
+            }
+
+            var uncategorized = ReadRelicIds(uncategorizedElement, "uncategorized");
+            var categorized = new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase);
+            CollectCategoryLeaves(chargeElement, ChargeCategoryId, categorized);
+
+            var requiredLeafIds = new[]
+            {
+                ChargeAcrossCombatsCyclingCategoryId,
+                ChargeAcrossCombatsNonCyclingCategoryId,
+                ChargeAcrossTurnsCategoryId,
+                ChargeResetsEachTurnLimitedActivationsCategoryId,
+                ChargeResetsEachTurnUnlimitedActivationsCategoryId,
+            };
+            var missingLeafIds = requiredLeafIds.Where(id => !categorized.ContainsKey(id)).ToArray();
+            if (missingLeafIds.Length > 0)
+            {
+                throw new InvalidOperationException(
+                    $"Relic taxonomy is missing leaf category/categories: {string.Join(", ", missingLeafIds)}.");
+            }
+
+            ValidateExclusiveRelicPlacement(uncategorized, categorized);
+            return new LoadedRelicTaxonomy(uncategorized, categorized);
+        }
+        catch (Exception e)
+        {
+            CoreMain.Logger.Error($"Could not read embedded relic taxonomy: {e.Message}");
+            return new LoadedRelicTaxonomy(
+                EmptyRelicIds,
+                new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase));
+        }
+    }
+
+    private static void CollectCategoryLeaves(
+        JsonElement element,
+        string categoryId,
+        IDictionary<string, IReadOnlySet<string>> destination)
+    {
+        if (element.ValueKind == JsonValueKind.Array)
+        {
+            destination[categoryId] = ReadRelicIds(element, categoryId);
+            return;
+        }
+
+        if (element.ValueKind != JsonValueKind.Object)
+        {
+            throw new InvalidOperationException(
+                $"Relic taxonomy category '{categoryId}' must be an object or array.");
+        }
+
+        foreach (var child in element.EnumerateObject())
+            CollectCategoryLeaves(child.Value, $"{categoryId}_{child.Name}", destination);
+    }
+
+    private static IReadOnlySet<string> ReadRelicIds(JsonElement element, string path)
+    {
+        if (element.ValueKind != JsonValueKind.Array)
+            throw new InvalidOperationException($"Relic taxonomy '{path}' must be an array.");
+
+        var relicIds = element.EnumerateArray()
+            .Select(value => value.ValueKind == JsonValueKind.String ? value.GetString()?.Trim() : null)
+            .ToArray();
+        if (relicIds.Any(string.IsNullOrWhiteSpace))
+            throw new InvalidOperationException($"Relic taxonomy '{path}' contains a blank or non-string relic ID.");
+
+        var normalized = relicIds.Select(id => id!).ToArray();
+        var distinct = new HashSet<string>(normalized, StringComparer.OrdinalIgnoreCase);
+        if (distinct.Count != normalized.Length)
+            throw new InvalidOperationException($"Relic taxonomy '{path}' contains a duplicate relic ID.");
+
+        if (!normalized.SequenceEqual(normalized.OrderBy(id => id, StringComparer.Ordinal), StringComparer.Ordinal))
+            throw new InvalidOperationException($"Relic taxonomy '{path}' must be alphabetically sorted.");
+
+        return distinct;
+    }
+
+    private static void ValidateExclusiveRelicPlacement(
+        IReadOnlySet<string> uncategorized,
+        IReadOnlyDictionary<string, IReadOnlySet<string>> categorized)
+    {
+        var placements = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        void Register(string path, IEnumerable<string> relicIds)
+        {
+            foreach (var relicId in relicIds)
+            {
+                if (placements.TryGetValue(relicId, out var previousPath))
+                {
+                    throw new InvalidOperationException(
+                        $"Relic taxonomy lists '{relicId}' in both '{previousPath}' and '{path}'.");
+                }
+
+                placements[relicId] = path;
+            }
+        }
+
+        Register("uncategorized", uncategorized);
+        foreach (var category in categorized)
+            Register(category.Key, category.Value);
     }
 
     private static IReadOnlyList<RelicTaxonomyCategory> Flatten(

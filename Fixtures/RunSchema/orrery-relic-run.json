@@ -1,0 +1,89 @@
+{
+  "run_id": "orrery-relic-fixture",
+  "started_at": "2026-07-23T20:00:00Z",
+  "updated_at": "2026-07-23T20:15:00Z",
+  "outcome": "in_progress",
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.ORRERY": {
+      "orrery_rewards": [
+        {
+          "reward_number": 1,
+          "floor": 12,
+          "outcome": "skipped",
+          "alternative_id": "",
+          "offered_card_ids": [
+            "CARD.BASH",
+            "CARD.SHRUG_IT_OFF",
+            "CARD.INFLAME"
+          ],
+          "cards_obtained": []
+        },
+        {
+          "reward_number": 2,
+          "floor": 12,
+          "outcome": "obtained",
+          "alternative_id": "",
+          "offered_card_ids": [
+            "CARD.POMMEL_STRIKE",
+            "CARD.TRUE_GRIT",
+            "CARD.SPOT_WEAKNESS"
+          ],
+          "cards_obtained": [
+            {
+              "card_id": "CARD.POMMEL_STRIKE",
+              "display_name": "Pommel Strike",
+              "upgrade_level": 0
+            }
+          ]
+        },
+        {
+          "reward_number": 3,
+          "floor": 12,
+          "outcome": "alternative",
+          "alternative_id": "SACRIFICE",
+          "offered_card_ids": [
+            "CARD.HEADBUTT",
+            "CARD.IRON_WAVE",
+            "CARD.BATTLE_TRANCE"
+          ],
+          "cards_obtained": []
+        },
+        {
+          "reward_number": 4,
+          "floor": 12,
+          "outcome": "pending",
+          "alternative_id": "",
+          "offered_card_ids": [
+            "CARD.CLEAVE",
+            "CARD.ARMAMENTS",
+            "CARD.FLEX"
+          ],
+          "cards_obtained": []
+        },
+        {
+          "reward_number": 5,
+          "floor": 12,
+          "outcome": "obtained",
+          "alternative_id": "",
+          "offered_card_ids": [
+            "CARD.UPPERCUT",
+            "CARD.IMMOLATE",
+            "CARD.BARRICADE"
+          ],
+          "cards_obtained": [
+            {
+              "card_id": "CARD.UPPERCUT",
+              "display_name": "Uppercut+",
+              "upgrade_level": 1
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

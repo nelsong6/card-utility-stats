@@ -70,6 +70,7 @@ Examples already implemented:
 - Regent stars spent / generated
 - forge granted from cards
 - Alchemize potions actually procured, failed procurements, and gained rarity splits
+- Discovery cards actually selected, including rarity/type and observed energy discount
 - observed cards drawn from draw effects
 - blocked draw attempts, categorized blocked reasons, and effect-side downstream blocked counts
 - successful self-summons to hand for recurring cards like Make It So
@@ -85,14 +86,26 @@ When attribution is not naturally one-card-to-one-outcome, the code prefers:
 - pooled summaries for combat-generated cards when they do not have stable deck identity
 - run-level meta-stats surfaced on related cards when the value describes all
   instances or occurrences of a mechanic rather than one card's own effect
+  (including power-ID-keyed aggregates such as Juggling's confirmed Attack
+  copies and active turn/combat denominators)
 - explicitly heuristic handling instead of pretending certainty
 
 ## UI Surface
 
-- [Core/Patches/ViewStatsInjectorPatch.cs](../Core/Patches/ViewStatsInjectorPatch.cs) injects the deck-view master, card-stats, removed-card, and opt-in monster-hover toggles.
-- [Core/Patches/StatsVisibilityHotkeyPatch.cs](../Core/Patches/StatsVisibilityHotkeyPatch.cs) maps a standalone Left Shift tap and Right Stick (R3) press to the same persisted global visibility state while preserving Shift-based chords; Left Trigger remains Draw Pile and Left Stick press remains Peek.
+- [Core/Patches/ViewStatsInjectorPatch.cs](../Core/Patches/ViewStatsInjectorPatch.cs) injects the deck-view shortcut for the global SpireLens options menu.
+- [Core/SpireLensOptionsMenu.cs](../Core/SpireLensOptionsMenu.cs) owns the modal, screen-independent checkbox window and its keyboard/gamepad shortcuts. Its highlighted row is independent of Godot GUI focus so the underlying game selection remains untouched while the modal intercepts input.
+- [Core/Patches/RelicBarFilterPatch.cs](../Core/Patches/RelicBarFilterPatch.cs) optionally hides classified, already-resolved relics from the standard in-run relic bar without changing ownership, effects, or any other relic surface, then rewires top-bar controller navigation across the remaining visible relics.
+- [Core/RelicClassificationStore.cs](../Core/RelicClassificationStore.cs) loads the embedded combat/non-combat JSON, normalizes it against the current game relic database, persists the editable AppData copy, and applies compendium changes immediately.
+- [Core/Patches/RelicCompendiumClassificationPatch.cs](../Core/Patches/RelicCompendiumClassificationPatch.cs) turns compendium mouse/controller presses into classification toggles while edit mode is active and renders the classification badges.
+- [Core/StatConceptGlossary.cs](../Core/StatConceptGlossary.cs) validates and caches the embedded [Core/Config/stat-concepts.json](../Core/Config/stat-concepts.json) vocabulary once per Core load, then renders the same native rich-text hint markup for stat rows and the relic compendium's **Icon glossary** mode.
+- [Core/Patches/StatsVisibilityHotkeyPatch.cs](../Core/Patches/StatsVisibilityHotkeyPatch.cs) maps a standalone Left Shift tap and Right Stick (R3) press to opening/closing that menu while preserving Shift-based chords regardless of whether another modifier was pressed before or after Shift; Left Trigger remains Draw Pile and Left Stick press remains Peek.
 - [Core/Patches/CardHoverTooltipPatch.cs](../Core/Patches/CardHoverTooltipPatch.cs) builds compact and full tooltip bodies.
-- [Core/StatsTooltip.cs](../Core/StatsTooltip.cs) renders the side tooltip panel.
+- [Core/Patches/DeckViewNotInDeckPatch.cs](../Core/Patches/DeckViewNotInDeckPatch.cs) switches the native deck grid between current deck cards and the separate removed/meta-card collection; those two sets are never mixed.
+- [Core/Patches/NativeHoverTipAugmentationPatch.cs](../Core/Patches/NativeHoverTipAugmentationPatch.cs) appends owner-specific SpireLens data to the game's `IHoverTip` sequence immediately before `NHoverTipSet` renders it, then applies the SpireLens blue panel tint and brand to only the resulting native stats control.
+- [Core/Patches/StatsTooltipPinManager.cs](../Core/Patches/StatsTooltipPinManager.cs) pins one native card or relic tooltip set under a dedicated surrogate owner, including card and relic rows rebuilt inside run history, displays the game's top-panel lock icon on its source, and releases the pin on the next non-motion user action.
+- [Core/RunHistoryDeckViewer.cs](../Core/RunHistoryDeckViewer.cs) adds a deck icon to the run-history Cards section and hosts the game's native deck-view scene over run history. It reconstructs the selected player's final deck from the game's individual `SerializableCard` entries and binds duplicate cards back to their SpireLens per-instance keys by saved deck rank.
+- [Core/Patches/CardTooltipPinInputPatch.cs](../Core/Patches/CardTooltipPinInputPatch.cs) intercepts right press on every declared `NCardHolder.OnMousePressed` implementation before the game records an alternate-click action, but claims it only for holders inside passive card-pile or cards-view screens.
+- [Core/StatsTooltip.cs](../Core/StatsTooltip.cs) creates native `HoverTip` values with the established 20px stats typography and owns no scene-tree nodes or hover lifecycle.
 - [Config/SpireLensConfig.cs](../Config/SpireLensConfig.cs) provides the persistent mod-settings UI for runtime display options.
 
 Current UI conventions:
@@ -102,9 +115,20 @@ Current UI conventions:
 - card tooltips on every surface are display-only opt-in; disabling them does not disable attribution
 - deck-view tooltips can be fuller and include lineage/context
 - rows should be self-describing
+- numeric relic-row values and percentages use the right-aligned value
+  columns; card names, relic names, destinations, and other textual outcomes
+  render inline in the expanding label cell so Godot cannot squeeze them into
+  a narrow numeric column; do not use character-count wrapping heuristics
 - loud section headers are discouraged unless they add real clarity
 - inline icons are preferred for keyword-like effects when they improve scanning
+- rows phrased as “per <recognized concept>” render `/` immediately before
+  the denominator icon; “in” and “this” indicate scope and do not receive a
+  slash
+- every icon-driven stat row can pair a left-side information hint for the full row meaning with a separate semantic concept hint; the central compendium glossary describes those same concept symbols
 - when the game already exposes a recognizable asset, prefer the in-game block/draw/energy/star iconography over generic text-only rows
+- native lifecycle does not erase visual ownership: SpireLens stats tips retain
+  their larger body text, blue background treatment, and top-right brand while
+  the game owns positioning, layering, and removal
 
 ## Generated And Non-Deck Cards
 
@@ -112,7 +136,13 @@ Not every card the player sees should be treated as a stable deck resident.
 
 - stable deck cards use per-instance numbering
 - removed cards remain viewable with their accumulated stats
-- some combat-generated cards are better represented as pooled summaries than as fake permanent instances
+- the not-in-deck view replaces the live deck grid with removed physical cards
+  plus supported pooled meta-cards
+- Shiv, Soul, Sovereign Blade, and each encountered Status definition render as
+  pooled meta-cards; the show-all option also enumerates every Status card in
+  the current game database and renders unseen entries with zeroed stats
+- some combat-generated cards are better represented as pooled summaries than
+  as fake permanent instances
 
 That distinction matters for both tooltip wording and data integrity.
 

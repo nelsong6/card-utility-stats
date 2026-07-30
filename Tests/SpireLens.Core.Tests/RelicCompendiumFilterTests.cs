@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using SpireLens.Core.Patches;
 using Xunit;
 
@@ -8,11 +9,148 @@ namespace SpireLens.Core.Tests;
 
 public class RelicCompendiumFilterTests
 {
+    private static readonly string RepoRoot =
+        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+
+    [Fact]
+    public void CombatRelevanceTurn_IsAnExclusiveCutoff()
+    {
+        Assert.True(RelicBarFilterPatch.IsBeforeCombatRelevanceCutoff(0, 2));
+        Assert.True(RelicBarFilterPatch.IsBeforeCombatRelevanceCutoff(1, 2));
+        Assert.False(RelicBarFilterPatch.IsBeforeCombatRelevanceCutoff(2, 2));
+        Assert.False(RelicBarFilterPatch.IsBeforeCombatRelevanceCutoff(3, 2));
+        Assert.True(RelicBarFilterPatch.IsBeforeCombatRelevanceCutoff(3, null));
+    }
+
+    [Theory]
+    [InlineData(false, false, true)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    public void ContextualRelicFilter_RestoresFullBarForDeckAndActMap(
+        bool isActMapOpen,
+        bool isDeckViewOpen,
+        bool expectedFilter)
+    {
+        Assert.Equal(
+            expectedFilter,
+            RelicBarFilterPatch.ShouldFilterForContext(
+                forceCombatRelicsOnly: false,
+                showCombatOnlyAtCombatScreen: true,
+                isCombatInProgress: true,
+                isActMapOpen,
+                isDeckViewOpen));
+    }
+
+    [Fact]
+    public void ForcedRelicFilter_RemainsActiveOnActMap()
+    {
+        Assert.True(RelicBarFilterPatch.ShouldFilterForContext(
+            forceCombatRelicsOnly: true,
+            showCombatOnlyAtCombatScreen: false,
+            isCombatInProgress: true,
+            isActMapOpen: true,
+            isDeckViewOpen: false));
+    }
+
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(1, 2)]
+    [InlineData(2, 0)]
+    public void HiddenRelicFocus_PrefersNearestVisibleRelicToTheRight(
+        int sourceIndex,
+        int expectedIndex)
+    {
+        var visibility = new[] { true, true, true };
+        visibility[sourceIndex] = false;
+
+        Assert.Equal(
+            expectedIndex,
+            RelicBarFilterPatch.FindNearestVisibleIndex(visibility, sourceIndex));
+    }
+
+    [Fact]
+    public void HiddenRelicFocus_FallsBackLeftWhenNoVisibleRelicRemainsToTheRight()
+    {
+        Assert.Equal(
+            0,
+            RelicBarFilterPatch.FindNearestVisibleIndex(
+                new[] { true, false, false },
+                sourceIndex: 2));
+    }
+
+    [Fact]
+    public void HiddenRelicFocus_ReturnsNoTargetWhenEveryRelicIsHidden()
+    {
+        Assert.Equal(
+            -1,
+            RelicBarFilterPatch.FindNearestVisibleIndex(
+                new[] { false, false, false },
+                sourceIndex: 0));
+    }
+
     [Fact]
     public void Taxonomy_OmitsRemovedEnergyCategory()
     {
         Assert.DoesNotContain(RelicTaxonomy.Categories, category => category.Id == "energy");
         Assert.DoesNotContain(RelicTaxonomy.Categories, category => category.DisplayName == "Energy relics");
+    }
+
+    [Fact]
+    public void TaxonomyJson_MirrorsHierarchyAndPlacesEveryRelicExactlyOnce()
+    {
+        using var taxonomyDocument = JsonDocument.Parse(File.ReadAllText(
+            Path.Combine(RepoRoot, "Core", "Config", "relic-taxonomy.json")));
+        using var classificationDocument = JsonDocument.Parse(File.ReadAllText(
+            Path.Combine(RepoRoot, "Core", "Config", "relic-classifications.json")));
+
+        var root = taxonomyDocument.RootElement;
+        Assert.Equal(
+            new[] { "uncategorized", "charge" },
+            root.EnumerateObject().Select(property => property.Name).ToArray());
+
+        var charge = root.GetProperty("charge");
+        Assert.Equal(
+            new[] { "across_combats", "across_turns", "resets_each_turn" },
+            charge.EnumerateObject().Select(property => property.Name).ToArray());
+        Assert.Equal(
+            new[] { "cycling", "non_cycling" },
+            charge.GetProperty("across_combats").EnumerateObject()
+                .Select(property => property.Name).ToArray());
+        Assert.Equal(
+            new[] { "limited_activations", "unlimited_activations" },
+            charge.GetProperty("resets_each_turn").EnumerateObject()
+                .Select(property => property.Name).ToArray());
+
+        var lists = EnumerateRelicLists(root).ToArray();
+        foreach (var list in lists)
+        {
+            Assert.Equal(
+                list.RelicIds.OrderBy(id => id, StringComparer.Ordinal).ToArray(),
+                list.RelicIds);
+        }
+
+        var placements = lists.SelectMany(list => list.RelicIds).ToArray();
+        Assert.Equal(
+            placements.Length,
+            placements.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+
+        var knownRelics = classificationDocument.RootElement.GetProperty("combat").EnumerateArray()
+            .Concat(classificationDocument.RootElement.GetProperty("non_combat").EnumerateArray())
+            .Select(value => value.GetString()!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(id => id, StringComparer.Ordinal)
+            .ToArray();
+        Assert.Equal(
+            knownRelics,
+            placements.OrderBy(id => id, StringComparer.Ordinal).ToArray());
+
+        Assert.Contains(
+            "RELIC.ART_OF_WAR",
+            charge.GetProperty("resets_each_turn").GetProperty("limited_activations")
+                .EnumerateArray().Select(value => value.GetString()));
+        Assert.DoesNotContain(
+            "RELIC.ART_OF_WAR",
+            root.GetProperty("uncategorized").EnumerateArray().Select(value => value.GetString()));
     }
 
     [Fact]
@@ -150,6 +288,7 @@ public class RelicCompendiumFilterTests
         Assert.Equal(
             new[]
             {
+                "RELIC.ART_OF_WAR",
                 "RELIC.BRILLIANT_SCARF",
                 "RELIC.DIAMOND_DIADEM",
                 "RELIC.POCKETWATCH",
@@ -207,6 +346,28 @@ public class RelicCompendiumFilterTests
         Assert.False(RelicTaxonomy.IsRelicInAnySelectedCategory(
             "RELIC.PEN_NIB",
             new[] { RelicTaxonomy.ChargeResetsEachTurnUnlimitedActivationsCategoryId }));
+    }
+
+    private static IEnumerable<(string Path, string[] RelicIds)> EnumerateRelicLists(
+        JsonElement element,
+        string path = "")
+    {
+        foreach (var property in element.EnumerateObject())
+        {
+            var childPath = string.IsNullOrEmpty(path)
+                ? property.Name
+                : $"{path}.{property.Name}";
+            if (property.Value.ValueKind == JsonValueKind.Array)
+            {
+                yield return (
+                    childPath,
+                    property.Value.EnumerateArray().Select(value => value.GetString()!).ToArray());
+                continue;
+            }
+
+            foreach (var child in EnumerateRelicLists(property.Value, childPath))
+                yield return child;
+        }
     }
 
     [Fact]
@@ -330,6 +491,13 @@ public class RelicCompendiumFilterTests
         Assert.Equal(
             CompendiumRelicEntryVisualAction.Normal,
             RelicCompendiumFilterContext.GetVisualAction(CompendiumRelicFilterMode.Off, false, false, false));
+        Assert.Equal(
+            CompendiumRelicEntryVisualAction.Normal,
+            RelicCompendiumFilterContext.GetVisualAction(
+                CompendiumRelicFilterMode.IconGlossary,
+                true,
+                false,
+                false));
         Assert.Equal(
             CompendiumRelicEntryVisualAction.Normal,
             RelicCompendiumFilterContext.GetVisualAction(CompendiumRelicFilterMode.Compare, true, true, true));

@@ -1,0 +1,29 @@
+{
+  "run_id": "winged-boots-relic-fixture",
+  "started_at": "2026-07-25T20:00:00Z",
+  "updated_at": "2026-07-25T20:08:00Z",
+  "outcome": "in_progress",
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.WINGED_BOOTS": {
+      "winged_boots_destinations": [
+        {
+          "use_number": 1,
+          "destination": "combat"
+        },
+        {
+          "use_number": 2,
+          "destination": "shop"
+        },
+        {
+          "use_number": 3,
+          "destination": "question_mark"
+        }
+      ]
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

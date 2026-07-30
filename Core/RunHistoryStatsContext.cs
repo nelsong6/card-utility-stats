@@ -4,9 +4,12 @@ using System.Linq;
 using System.Reflection;
 using Godot;
 using HarmonyLib;
+using MegaCrit.Sts2.Core.HoverTips;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Models.Cards;
 using MegaCrit.Sts2.Core.Models.Relics;
 using MegaCrit.Sts2.Core.Nodes.Relics;
+using MegaCrit.Sts2.Core.Nodes.Screens;
 using MegaCrit.Sts2.Core.Nodes.Screens.RunHistoryScreen;
 using MegaCrit.Sts2.Core.Runs;
 using SpireLens.Core.Patches;
@@ -25,8 +28,105 @@ internal static class RunHistoryStatsContext
     private static LoadedRunFile? _loaded;
     private static long? _gameStartTime;
     private static bool _loadAttempted;
+    private static NDeckViewScreen? _historicalDeckViewer;
+    private static readonly Dictionary<CardModel, string> HistoricalDeckKeys =
+        new(ReferenceEqualityComparer.Instance);
 
     public static bool HasCurrent => EnsureLoaded()?.Data != null;
+
+    public static void SetHistoricalDeckViewer(
+        NDeckViewScreen viewer,
+        IReadOnlyList<CardModel> cards)
+    {
+        _historicalDeckViewer = viewer;
+        HistoricalDeckKeys.Clear();
+
+        var run = EnsureLoaded()?.Data;
+        if (run == null) return;
+
+        var keys = SelectAggregateKeysForHistoricalDeck(
+            run,
+            cards.Select(card => card.Id.ToString()));
+        for (var i = 0; i < cards.Count && i < keys.Count; i++)
+        {
+            if (!string.IsNullOrWhiteSpace(keys[i]))
+                HistoricalDeckKeys[cards[i]] = keys[i]!;
+        }
+    }
+
+    public static void ClearHistoricalDeckViewer()
+    {
+        _historicalDeckViewer = null;
+        HistoricalDeckKeys.Clear();
+    }
+
+    public static bool TryBuildHistoricalDeckCardHoverTip(
+        CardModel card,
+        out HoverTip statsTip)
+    {
+        statsTip = default;
+        if (_historicalDeckViewer == null
+            || !GodotObject.IsInstanceValid(_historicalDeckViewer)
+            || !HistoricalDeckKeys.TryGetValue(card, out var key))
+        {
+            return false;
+        }
+
+        var run = EnsureLoaded()?.Data;
+        if (run == null || !run.Aggregates.TryGetValue(key, out var aggregate))
+            return false;
+
+        var title = BuildCardDisplayName(card, new[] { key }, amount: 1);
+        var body = CardHoverShowPatch.BuildHistoricalBodyBBCode(
+            card,
+            aggregate,
+            run.MetaStats,
+            GetPermanentUpgradeEvents(run, key));
+        statsTip = StatsTooltip.CreateNativeTip(title, body);
+        return true;
+    }
+
+    public static bool TryBuildNativeCardHoverTip(
+        NDeckHistoryEntry entry,
+        out HoverTip statsTip)
+    {
+        statsTip = default;
+        if (!CardHoverShowPatch.ResolveCardStatsEnabled(
+                ViewStatsInjectorPatch.StatsVisibilityEnabled,
+                ViewStatsInjectorPatch.CardStatsEnabled))
+        {
+            return false;
+        }
+
+        if (!HasCurrent || !TryBuildCardTooltip(entry, out var title, out var body))
+            return false;
+
+        statsTip = StatsTooltip.CreateNativeTip(title, body);
+        return true;
+    }
+
+    public static bool TryBuildNativeRelicHoverTip(
+        NRelicBasicHolder holder,
+        out HoverTip statsTip)
+    {
+        statsTip = default;
+        if (!ViewStatsInjectorPatch.StatsVisibilityEnabled
+            || !HasCurrent
+            || !HasAncestor<NRelicHistory>(holder)
+            || !TryBuildRelicTooltip(holder, out var title, out var body))
+        {
+            return false;
+        }
+
+        statsTip = StatsTooltip.CreateNativeTip(
+            title,
+            body,
+            stretchHorizontally:
+                RelicHoverShowPatch.ShouldStretchStatsTooltip(
+                    holder.Relic?.Model,
+                    body));
+        return true;
+    }
 
     public static void SetRun(RunHistory? history)
     {
@@ -67,6 +167,7 @@ internal static class RunHistoryStatsContext
 
     public static void Clear()
     {
+        ClearHistoricalDeckViewer();
         _loaded = null;
         _gameStartTime = null;
         _loadAttempted = false;
@@ -108,9 +209,8 @@ internal static class RunHistoryStatsContext
         title = BuildCardDisplayName(card, keys, amount);
         var upgradeEvents = keys.Count == 0
             ? Enumerable.Empty<CardEvent>()
-            : run.Events
-                .Where(e => string.Equals(e.Type, "card_upgraded", StringComparison.Ordinal)
-                    && keys.Contains(e.CardId))
+            : keys
+                .SelectMany(key => GetPermanentUpgradeEvents(run, key))
                 .OrderBy(e => e.Floor ?? int.MaxValue)
                 .ThenBy(e => e.T)
                 .ToList();
@@ -223,6 +323,38 @@ internal static class RunHistoryStatsContext
         return candidates.Take(take).ToArray();
     }
 
+    internal static IReadOnlyList<string?> SelectAggregateKeysForHistoricalDeck(
+        RunData run,
+        IEnumerable<string> definitionIds)
+    {
+        var occurrences = new Dictionary<string, int>(StringComparer.Ordinal);
+        var perDefinitionKeys = new Dictionary<string, IReadOnlyList<string>>(
+            StringComparer.Ordinal);
+        var result = new List<string?>();
+
+        foreach (var definitionId in definitionIds)
+        {
+            occurrences.TryGetValue(definitionId, out var occurrence);
+            occurrences[definitionId] = occurrence + 1;
+
+            if (run.Aggregates.ContainsKey(definitionId))
+            {
+                result.Add(definitionId);
+                continue;
+            }
+
+            if (!perDefinitionKeys.TryGetValue(definitionId, out var keys))
+            {
+                keys = GetPerInstanceKeysForDefinition(run, definitionId);
+                perDefinitionKeys[definitionId] = keys;
+            }
+
+            result.Add(occurrence < keys.Count ? keys[occurrence] : null);
+        }
+
+        return result;
+    }
+
     private static List<string> GetPerInstanceKeysForDefinition(RunData run, string definitionId)
     {
         var result = new List<string>();
@@ -282,15 +414,26 @@ internal static class RunHistoryStatsContext
     private static int GetFinalUpgradeLevel(RunData run, string key, CardAggregate agg)
     {
         var level = agg.InitialUpgradeLevel;
-        foreach (var e in run.Events)
+        foreach (var e in GetPermanentUpgradeEvents(run, key))
         {
-            if (!string.Equals(e.Type, "card_upgraded", StringComparison.Ordinal)) continue;
-            if (!string.Equals(e.CardId, key, StringComparison.Ordinal)) continue;
-            if (e.UpgradeLevel.HasValue)
-                level = e.UpgradeLevel.Value;
+            level = e.UpgradeLevel!.Value;
         }
 
         return level;
+    }
+
+    private static IReadOnlyList<CardEvent> GetPermanentUpgradeEvents(
+        RunData run,
+        string key)
+    {
+        var initialUpgradeLevel = run.Aggregates.TryGetValue(key, out var agg)
+            ? agg.InitialUpgradeLevel
+            : 0;
+        return RunTracker.FilterPermanentUpgradeEvents(
+            run.Events.Where(e =>
+                string.Equals(e.Type, "card_upgraded", StringComparison.Ordinal)
+                && string.Equals(e.CardId, key, StringComparison.Ordinal)),
+            initialUpgradeLevel);
     }
 
     private static CardAggregate CombineCardAggregates(RunData run, IReadOnlyList<string> keys)
@@ -368,11 +511,16 @@ internal static class RunHistoryStatsContext
 public static class RunHistoryDisplayRunStatsContextPatch
 {
     [HarmonyPostfix]
-    public static void Postfix(RunHistory history)
+    public static void Postfix(NRunHistory __instance, RunHistory history)
     {
         PatchGuard.Run(nameof(RunHistoryDisplayRunStatsContextPatch), () =>
         {
+            RunHistoryDeckViewer.Close();
+            StatsTooltipPinManager.ClearPin();
             RunHistoryStatsContext.SetRun(history);
+            StatsTooltipPinManager.AttachRunHistoryTargets(__instance);
+            RunHistoryDeckViewer.InjectButton(__instance);
+            RunHistoryDeckViewer.RestoreVisibleArrowHotkeys(__instance);
         });
     }
 }
@@ -381,82 +529,14 @@ public static class RunHistoryDisplayRunStatsContextPatch
 public static class RunHistoryHiddenStatsContextPatch
 {
     [HarmonyPostfix]
-    public static void Postfix()
+    public static void Postfix(NRunHistory __instance)
     {
-        PatchGuard.Run(nameof(RunHistoryHiddenStatsContextPatch), RunHistoryStatsContext.Clear);
-    }
-}
-
-[HarmonyPatch(typeof(NDeckHistoryEntry), "OnFocus")]
-public static class RunHistoryDeckEntryStatsTooltipShowPatch
-{
-    [HarmonyPostfix]
-    public static void Postfix(NDeckHistoryEntry __instance)
-    {
-        PatchGuard.Run(nameof(RunHistoryDeckEntryStatsTooltipShowPatch), () =>
+        PatchGuard.Run(nameof(RunHistoryHiddenStatsContextPatch), () =>
         {
-            if (!CardHoverShowPatch.ResolveCardStatsEnabled(
-                    ViewStatsInjectorPatch.StatsVisibilityEnabled,
-                    ViewStatsInjectorPatch.CardStatsEnabled)) return;
-            if (!RunHistoryStatsContext.HasCurrent) return;
-
-            var tree = Engine.GetMainLoop() as SceneTree;
-            if (tree == null) return;
-
-            if (!RunHistoryStatsContext.TryBuildCardTooltip(__instance, out var title, out var body))
-                return;
-
-            StatsTooltip.Show(tree, __instance, title, "SpireLens", body);
-        });
-    }
-}
-
-[HarmonyPatch(typeof(NDeckHistoryEntry), "OnUnfocus")]
-public static class RunHistoryDeckEntryStatsTooltipHidePatch
-{
-    [HarmonyPostfix]
-    public static void Postfix(NDeckHistoryEntry __instance)
-    {
-        PatchGuard.Run(nameof(RunHistoryDeckEntryStatsTooltipHidePatch), () =>
-        {
-            StatsTooltip.HideIfAnchoredTo(__instance);
-        });
-    }
-}
-
-[HarmonyPatch(typeof(NRelicBasicHolder), "OnFocus")]
-public static class RunHistoryRelicStatsTooltipShowPatch
-{
-    [HarmonyPostfix]
-    public static void Postfix(NRelicBasicHolder __instance)
-    {
-        PatchGuard.Run(nameof(RunHistoryRelicStatsTooltipShowPatch), () =>
-        {
-            if (!ViewStatsInjectorPatch.StatsVisibilityEnabled) return;
-            if (!RunHistoryStatsContext.HasCurrent) return;
-            if (!RunHistoryStatsContext.HasAncestor<NRelicHistory>(__instance)) return;
-
-            var tree = Engine.GetMainLoop() as SceneTree;
-            if (tree == null) return;
-
-            if (!RunHistoryStatsContext.TryBuildRelicTooltip(__instance, out var title, out var body))
-                return;
-
-            StatsTooltip.Show(tree, __instance, title, "SpireLens", body);
-        });
-    }
-}
-
-[HarmonyPatch(typeof(NRelicBasicHolder), "OnUnfocus")]
-public static class RunHistoryRelicStatsTooltipHidePatch
-{
-    [HarmonyPostfix]
-    public static void Postfix(NRelicBasicHolder __instance)
-    {
-        PatchGuard.Run(nameof(RunHistoryRelicStatsTooltipHidePatch), () =>
-        {
-            if (!RunHistoryStatsContext.HasAncestor<NRelicHistory>(__instance)) return;
-            StatsTooltip.HideIfAnchoredTo(__instance);
+            RunHistoryDeckViewer.Close();
+            RunHistoryDeckViewer.DisableArrowHotkeys(__instance);
+            StatsTooltipPinManager.ClearPin();
+            RunHistoryStatsContext.Clear();
         });
     }
 }

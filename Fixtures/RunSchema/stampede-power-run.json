@@ -1,0 +1,43 @@
+{
+  "run_id": "stampede-power-fixture",
+  "started_at": "2026-07-29T22:00:00Z",
+  "updated_at": "2026-07-29T22:24:00Z",
+  "character": "IRONCLAD",
+  "ascension": 7,
+  "floor_reached": 18,
+  "outcome": "in_progress",
+  "game_start_time": 1785362400,
+  "aggregates": {
+    "CARD.STAMPEDE#1": {
+      "combats_in_deck": 4,
+      "plays": 2,
+      "times_drawn": 5,
+      "floor_added": 5,
+      "initial_upgrade_level": 0
+    }
+  },
+  "events": [],
+  "relic_aggregates": {},
+  "enemy_aggregates": {},
+  "meta_stats": {
+    "power_aggregates": {
+      "POWER.STAMPEDE": {
+        "power_id": "POWER.STAMPEDE",
+        "display_name": "Stampede",
+        "stampede_attacks_played": 9,
+        "stampede_common_attacks_played": 4,
+        "stampede_uncommon_attacks_played": 3,
+        "stampede_rare_attacks_played": 2,
+        "stampede_energy_saved": 14
+      }
+    }
+  },
+  "instance_numbers_by_def": {
+    "CARD.STAMPEDE": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.STAMPEDE": 1
+  }
+}

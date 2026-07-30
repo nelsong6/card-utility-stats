@@ -1,0 +1,20 @@
+{
+  "run_id": "maw-bank-relic-fixture",
+  "started_at": "2026-07-26T08:00:00Z",
+  "updated_at": "2026-07-26T08:10:00Z",
+  "outcome": "in_progress",
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.MAW_BANK": {
+      "activations": 6,
+      "gold_gained": 72,
+      "maw_bank_shops_skipped": 2,
+      "maw_bank_gold_spent_outside_shops": 34
+    }
+  },
+  "maw_bank_pending_shop_floor": 11,
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

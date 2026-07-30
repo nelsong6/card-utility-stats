@@ -1,0 +1,24 @@
+{
+  "run_id": "prayer-wheel-relic-fixture",
+  "started_at": "2026-07-27T22:00:00Z",
+  "updated_at": "2026-07-27T22:20:00Z",
+  "outcome": "in_progress",
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.PRAYER_WHEEL": {
+      "prayer_wheel_extra_reward_screens": 4,
+      "prayer_wheel_extra_reward_screens_rejected": 1,
+      "common_cards_offered": 7,
+      "uncommon_cards_offered": 4,
+      "rare_cards_offered": 1,
+      "common_cards_taken": 3,
+      "uncommon_cards_taken": 1,
+      "rare_cards_taken": 1
+    }
+  },
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

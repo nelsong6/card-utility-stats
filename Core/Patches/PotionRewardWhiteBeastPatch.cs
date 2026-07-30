@@ -51,13 +51,18 @@ public static class PotionRewardWhiteBeastOnSelectPatch
     {
         try
         {
+            RunTracker.RecordTinyMailboxPotionRewardOffered(__instance);
+
             if (__result == null)
                 return;
 
             if (__result.IsCompleted)
             {
                 if (__result.Status == TaskStatus.RanToCompletion && __result.Result)
+                {
                     RunTracker.RecordWhiteBeastPotionRewardClaimed(__instance);
+                    RunTracker.RecordTinyMailboxPotionRewardClaimed(__instance);
+                }
                 return;
             }
 
@@ -65,7 +70,10 @@ public static class PotionRewardWhiteBeastOnSelectPatch
                 task =>
                 {
                     if (task.Status == TaskStatus.RanToCompletion && task.Result)
+                    {
                         RunTracker.RecordWhiteBeastPotionRewardClaimed(__instance);
+                        RunTracker.RecordTinyMailboxPotionRewardClaimed(__instance);
+                    }
                 },
                 TaskScheduler.Default);
         }
@@ -91,6 +99,7 @@ public static class PotionRewardWhiteBeastOnSkippedPatch
         try
         {
             RunTracker.RecordWhiteBeastPotionRewardSkipped(__instance);
+            RunTracker.RecordTinyMailboxPotionRewardSkipped(__instance);
         }
         catch (Exception e)
         {

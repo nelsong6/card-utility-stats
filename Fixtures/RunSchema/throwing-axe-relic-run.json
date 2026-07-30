@@ -1,0 +1,26 @@
+{
+  "run_id": "throwing-axe-relic-fixture",
+  "started_at": "2026-07-29T18:00:00Z",
+  "updated_at": "2026-07-29T18:24:00Z",
+  "character": "CHAR.IRONCLAD",
+  "ascension": 6,
+  "floor_reached": 21,
+  "outcome": "in_progress",
+  "game_start_time": 1785350400,
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.THROWING_AXE": {
+      "throwing_axe_extra_cards_played": 3,
+      "throwing_axe_extra_play_energy_cost_total": 7,
+      "throwing_axe_combats": 4,
+      "throwing_axe_common_cards_played": 1,
+      "throwing_axe_uncommon_cards_played": 1,
+      "throwing_axe_rare_cards_played": 1
+    }
+  },
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

@@ -1,0 +1,40 @@
+{
+  "run_id": "feel-no-pain-power-fixture",
+  "started_at": "2026-07-29T23:00:00Z",
+  "updated_at": "2026-07-29T23:16:00Z",
+  "character": "IRONCLAD",
+  "ascension": 7,
+  "floor_reached": 20,
+  "outcome": "in_progress",
+  "game_start_time": 1785366000,
+  "aggregates": {
+    "CARD.FEEL_NO_PAIN#1": {
+      "combats_in_deck": 4,
+      "plays": 3,
+      "times_drawn": 5,
+      "floor_added": 6,
+      "initial_upgrade_level": 0
+    }
+  },
+  "events": [],
+  "relic_aggregates": {},
+  "enemy_aggregates": {},
+  "meta_stats": {
+    "power_aggregates": {
+      "POWER.FEEL_NO_PAIN": {
+        "power_id": "POWER.FEEL_NO_PAIN",
+        "display_name": "Feel No Pain",
+        "block_gained": 36,
+        "turns_active": 6
+      }
+    }
+  },
+  "instance_numbers_by_def": {
+    "CARD.FEEL_NO_PAIN": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.FEEL_NO_PAIN": 1
+  }
+}

@@ -94,8 +94,10 @@ public class VambraceStatsTests
         Assert.Contains("Activations", body);
         Assert.Contains("Used this combat", body);
         Assert.Contains("[b]false[/b]", body);
-        Assert.Contains("[img=16x16]res://images/ui/combat/block.png[/img] extra block gained", body);
-        Assert.Contains("[img=16x16]res://images/ui/combat/block.png[/img] extra block per activation", body);
+        Assert.Contains("[hint=\"Block:", body);
+        Assert.Contains("[hint=\"Activation:", body);
+        Assert.Contains("extra block gained", body);
+        Assert.Contains("extra block per activation", body);
         Assert.Contains("[b]2[/b]", body);
         Assert.Contains("[b]13[/b]", body);
         Assert.Contains("[b]6.5[/b]", body);

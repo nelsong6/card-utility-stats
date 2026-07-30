@@ -4,844 +4,80 @@ using System.Linq;
 using System.Text;
 using Godot;
 using HarmonyLib;
+using MegaCrit.Sts2.Core.HoverTips;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Models.Cards;
 using MegaCrit.Sts2.Core.Models.Relics;
 using MegaCrit.Sts2.Core.Nodes.Relics;
+using MegaCrit.Sts2.Core.Nodes.Screens.GameOverScreen;
 
 
 namespace SpireLens.Core.Patches;
 
+internal readonly record struct LetterOpenerRates(
+    decimal DamagePerCombat,
+    decimal DamagePerTurn,
+    decimal TargetsPerActivation,
+    decimal DamagePerSkillPlayed);
+
 /// <summary>
-/// Shows per-relic SpireLens stats below the game's relic hover tooltip
-/// when the player hovers a relic in the inventory bar.
+/// Builds the native SpireLens hover-tip entry for an owned relic.
+/// NHoverTipSet owns the rendered node and its complete lifecycle.
 /// </summary>
-[HarmonyPatch(typeof(NRelicInventoryHolder), "OnFocus")]
 public static class RelicHoverShowPatch
 {
+    private const string ScalarStatsTableOpen = "[table=4]";
+    private const string StatsTableClose = "[/table]\n";
     private const string EnthralledDefinitionId = "CARD.ENTHRALLED";
     private const string CursedPearlCurseDefinitionId = "CARD.GREED";
     private const string BrightestFlameDefinitionId = "CARD.BRIGHTEST_FLAME";
-    private const string GameOverScreenNamespace = "MegaCrit.Sts2.Core.Nodes.Screens.GameOverScreen";
+    private const string DowsingRodRelicId = "RELIC.DOWSING_ROD";
     private const string VulnerableIconPath = "res://images/atlases/power_atlas.sprites/vulnerable_power.tres";
     private const string WeakIconPath = "res://images/atlases/power_atlas.sprites/weak_power.tres";
     private const string BlockIconPath = "res://images/ui/combat/block.png";
     private const string DrawIconPath = "res://images/atlases/power_atlas.sprites/draw_cards_next_turn_power.tres";
-    private const string EnergyIconPath = "res://images/atlases/potion_atlas.sprites/energy_potion.tres";
+    private const string PaelsWingIconPath = "res://images/atlases/relic_atlas.sprites/paels_wing.tres";
+    private const string GenericRelicIconPath = "res://images/ui/reward_screen/reward_icon_shared_relic.png";
     private const string StarIconPath = "res://images/packed/sprite_fonts/star_icon.png";
     private const string VigorIconPath = "res://images/atlases/power_atlas.sprites/vigor_power.tres";
-    private const int InlineIconSize = 16;
-    private const int MaxTableLabelVisibleChars = 28;
+    private const string MapCombatIconPath = "res://images/atlases/ui_atlas.sprites/map/icons/map_monster.tres";
+    private const string MapShopIconPath = "res://images/atlases/ui_atlas.sprites/map/icons/map_shop.tres";
+    private const string MapUnknownIconPath = "res://images/atlases/ui_atlas.sprites/map/icons/map_unknown.tres";
+    private const string MapTreasureIconPath = "res://images/atlases/ui_atlas.sprites/map/icons/map_chest.tres";
+    private const string MapRestSiteIconPath = "res://images/atlases/ui_atlas.sprites/map/icons/map_rest.tres";
+    private const int SealOfGoldLossPerTrigger = 5;
+    private const float SturdyClampTooltipWidth = 420f;
+    private const float EmberTeaTooltipWidth = 500f;
+    private const float PaelsWingTooltipWidth = 500f;
+    private const float FresnelLensTooltipWidth = 500f;
     private static readonly System.Reflection.FieldInfo? VambraceBlockGainedThisCombatField =
         AccessTools.Field(typeof(Vambrace), "_blockGainedThisCombat");
+    private static readonly System.Reflection.FieldInfo? PermafrostActivatedThisCombatField =
+        AccessTools.Field(typeof(Permafrost), "_activatedThisCombat");
+    private static readonly System.Reflection.FieldInfo? RainbowRingAttacksPlayedThisTurnField =
+        AccessTools.Field(typeof(RainbowRing), "_attacksPlayedThisTurn");
+    private static readonly System.Reflection.FieldInfo? RainbowRingPowersPlayedThisTurnField =
+        AccessTools.Field(typeof(RainbowRing), "_powersPlayedThisTurn");
+    private static readonly System.Reflection.FieldInfo? RainbowRingSkillsPlayedThisTurnField =
+        AccessTools.Field(typeof(RainbowRing), "_skillsPlayedThisTurn");
 
-    [HarmonyPostfix]
-    public static void Postfix(NRelicInventoryHolder __instance)
+    internal static bool TryBuildNativeHoverTip(
+        NRelicInventoryHolder holder,
+        out HoverTip statsTip)
     {
-        try
-        {
-            if (!ViewStatsInjectorPatch.StatsVisibilityEnabled) return;
-
-            var relicNode = __instance.Relic;
-            if (relicNode?.Model == null) return;
-
-            var tree = Engine.GetMainLoop() as SceneTree;
-            if (tree == null) return;
-
-            if (TryBuildInventoryBodyBBCode(__instance, relicNode.Model, out var statsTitle, out var statsBody))
-            {
-                StatsTooltip.Show(tree, __instance, statsTitle, "SpireLens", statsBody);
-                return;
-            }
-
-            RelicAggregate RelicAgg(string relicId) =>
-                RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
-
-            if (relicNode.Model is BagOfMarbles)
-            {
-                const string relicId = "RELIC.BAG_OF_MARBLES";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildBagOfMarblesBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Bag of Marbles", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is RedMask)
-            {
-                const string relicId = "RELIC.RED_MASK";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildRedMaskBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Red Mask", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is Pocketwatch)
-            {
-                const string relicId = "RELIC.POCKETWATCH";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildPocketwatchBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Pocketwatch", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is Orichalcum)
-            {
-                const string relicId = "RELIC.ORICHALCUM";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildOrichalcumBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Orichalcum", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is Permafrost)
-            {
-                const string relicId = "RELIC.PERMAFROST";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildPermafrostBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Permafrost", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is Vambrace vambrace)
-            {
-                const string relicId = "RELIC.VAMBRACE";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildVambraceBodyBBCode(agg, IsVambraceUsedThisCombat(vambrace));
-                StatsTooltip.Show(tree, __instance, "Vambrace", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is TuningFork)
-            {
-                const string relicId = "RELIC.TUNING_FORK";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildTuningForkBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Tuning Fork", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is RippleBasin)
-            {
-                const string relicId = "RELIC.RIPPLE_BASIN";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildRippleBasinBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Ripple Basin", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is TheAbacus)
-            {
-                const string relicId = "RELIC.THE_ABACUS";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildTheAbacusBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "The Abacus", "SpireLens", body);
-                return;
-            }
-
-            if (IsAnchorStatsRelicModel(relicNode.Model))
-            {
-                const string relicId = "RELIC.ANCHOR";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildAnchorBodyBBCode(agg);
-                var title = IsFakeAnchorRelicModel(relicNode.Model) ? "???" : "Anchor";
-                StatsTooltip.Show(tree, __instance, title, "SpireLens", body);
-                return;
-            }
-
-            if (IsRelicModel(relicNode.Model, "MegaCrit.Sts2.Core.Models.Relics.LetterOpener"))
-            {
-                const string relicId = "RELIC.LETTER_OPENER";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildLetterOpenerBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Letter Opener", "SpireLens", body);
-                return;
-            }
-
-            if (IsRelicModel(relicNode.Model, "MegaCrit.Sts2.Core.Models.Relics.Akabeko"))
-            {
-                const string relicId = "RELIC.AKABEKO";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildAkabekoBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Akabeko", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is BookRepairKnife)
-            {
-                const string relicId = "RELIC.BOOK_REPAIR_KNIFE";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildBookRepairKnifeBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Book Repair Knife", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is EternalFeather)
-            {
-                const string relicId = "RELIC.ETERNAL_FEATHER";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildEternalFeatherBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Eternal Feather", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is BoneFlute)
-            {
-                const string relicId = "RELIC.BONE_FLUTE";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildBoneFluteBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Bone Flute", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is HappyFlower)
-            {
-                const string relicId = "RELIC.HAPPY_FLOWER";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildHappyFlowerBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Happy Flower", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is Nunchaku)
-            {
-                const string relicId = "RELIC.NUNCHAKU";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildNunchakuBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Nunchaku", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is IronClub)
-            {
-                const string relicId = "RELIC.IRON_CLUB";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildIronClubBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Iron Club", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is Vajra)
-            {
-                const string relicId = "RELIC.VAJRA";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildVajraBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Vajra", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is Kunai)
-            {
-                const string relicId = "RELIC.KUNAI";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildKunaiBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Kunai", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is Lantern)
-            {
-                const string relicId = "RELIC.LANTERN";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildLanternBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Lantern", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is VeryHotCocoa)
-            {
-                const string relicId = "RELIC.VERY_HOT_COCOA";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildVeryHotCocoaBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Very Hot Cocoa", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is Candelabra)
-            {
-                const string relicId = "RELIC.CANDELABRA";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildCandelabraBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Candelabra", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is Chandelier)
-            {
-                const string relicId = "RELIC.CHANDELIER";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildChandelierBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Chandelier", "SpireLens", body);
-                return;
-            }
-
-            if (IsRelicModel(relicNode.Model, "MegaCrit.Sts2.Core.Models.Relics.BoomingConch"))
-            {
-                const string relicId = "RELIC.BOOMING_CONCH";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildBoomingConchBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Booming Conch", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is GremlinHorn)
-            {
-                const string relicId = "RELIC.GREMLIN_HORN";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildGremlinHornBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Gremlin Horn", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is Pendulum)
-            {
-                const string relicId = "RELIC.PENDULUM";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildPendulumBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Pendulum", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is MercuryHourglass)
-            {
-                const string relicId = "RELIC.MERCURY_HOURGLASS";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildMercuryHourglassBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Mercury Hourglass", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is ParryingShield)
-            {
-                const string relicId = "RELIC.PARRYING_SHIELD";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildParryingShieldBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Parrying Shield", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is FestivePopper)
-            {
-                const string relicId = "RELIC.FESTIVE_POPPER";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildFestivePopperBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Festive Popper", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is BronzeScales)
-            {
-                const string relicId = "RELIC.BRONZE_SCALES";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildBronzeScalesBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Bronze Scales", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is PenNib)
-            {
-                const string relicId = "RELIC.PEN_NIB";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildPenNibBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Pen Nib", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is HornCleat)
-            {
-                const string relicId = "RELIC.HORN_CLEAT";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildHornCleatBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Horn Cleat", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is PrismaticGem)
-            {
-                const string relicId = "RELIC.PRISMATIC_GEM";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildPrismaticGemBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Prismatic Gem", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is FresnelLens)
-            {
-                const string relicId = "RELIC.FRESNEL_LENS";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildFresnelLensBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Fresnel Lens", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is SilverCrucible)
-            {
-                const string relicId = "RELIC.SILVER_CRUCIBLE";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildSilverCrucibleBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Silver Crucible", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is BloodSoakedRose)
-            {
-                var relicId = relicNode.Model.Id.ToString();
-                var agg = RelicAgg(relicId);
-                var curseAgg = RunTracker.GetEnthralledCurseAggregate();
-
-                var body = BuildBloodSoakedRoseBodyBBCode(agg, curseAgg);
-                StatsTooltip.Show(tree, __instance, "Blood-Soaked Rose", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is Regalite)
-            {
-                const string relicId = "RELIC.REGALITE";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildRegaliteBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Regalite", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is IntimidatingHelmet)
-            {
-                const string relicId = "RELIC.INTIMIDATING_HELMET";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildIntimidatingHelmetBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Intimidating Helmet", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is CloakClasp)
-            {
-                const string relicId = "RELIC.CLOAK_CLASP";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildCloakClaspBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Cloak Clasp", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is ReptileTrinket)
-            {
-                const string relicId = "RELIC.REPTILE_TRINKET";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildReptileTrinketBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Reptile Trinket", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is Gorget)
-            {
-                const string relicId = "RELIC.GORGET";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildGorgetBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Gorget", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is StoneCracker)
-            {
-                const string relicId = "RELIC.STONE_CRACKER";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildStoneCrackerBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Stone Cracker", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is RazorTooth)
-            {
-                const string relicId = "RELIC.RAZOR_TOOTH";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildRazorToothBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Razor Tooth", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is Whetstone)
-            {
-                const string relicId = "RELIC.WHETSTONE";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildWhetstoneBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Whetstone", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is WarPaint)
-            {
-                const string relicId = "RELIC.WAR_PAINT";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildWarPaintBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "War Paint", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is FragrantMushroom)
-            {
-                const string relicId = "RELIC.FRAGRANT_MUSHROOM";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildFragrantMushroomBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Fragrant Mushroom", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is SandCastle)
-            {
-                const string relicId = "RELIC.SAND_CASTLE";
-                var agg = RelicAgg(relicId);
-
-                var body = BuildSandCastleBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Sand Castle", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is MealTicket)
-            {
-                const string relicId = "RELIC.MEAL_TICKET";
-                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
-
-                var body = BuildMealTicketBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Meal Ticket", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is Planisphere)
-            {
-                const string relicId = "RELIC.PLANISPHERE";
-                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
-
-                var body = BuildPlanisphereBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Planisphere", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is LizardTail)
-            {
-                const string relicId = "RELIC.LIZARD_TAIL";
-                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
-
-                var body = BuildLizardTailBodyBBCode(agg, RelicFloorAddedToDeck(relicNode.Model));
-                StatsTooltip.Show(tree, __instance, "Lizard Tail", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is Pantograph)
-            {
-                const string relicId = "RELIC.PANTOGRAPH";
-                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
-
-                var body = BuildPantographBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Pantograph", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is BurningBlood)
-            {
-                const string relicId = "RELIC.BURNING_BLOOD";
-                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
-
-                var body = BuildBurningBloodBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Burning Blood", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is LeesWaffle)
-            {
-                const string relicId = "RELIC.LEES_WAFFLE";
-                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
-
-                var body = BuildLeesWaffleBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Lee's Waffle", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is Strawberry)
-            {
-                const string relicId = "RELIC.STRAWBERRY";
-                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
-
-                var body = BuildStrawberryBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Strawberry", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is Pear)
-            {
-                const string relicId = "RELIC.PEAR";
-                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
-
-                var body = BuildPearBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Pear", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is NutritiousOyster)
-            {
-                const string relicId = "RELIC.NUTRITIOUS_OYSTER";
-                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
-
-                var body = BuildNutritiousOysterBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Nutritious Oyster", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is ChosenCheese)
-            {
-                const string relicId = "RELIC.CHOSEN_CHEESE";
-                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
-
-                var body = BuildChosenCheeseBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Chosen Cheese", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is DarkstonePeriapt)
-            {
-                const string relicId = "RELIC.DARKSTONE_PERIAPT";
-                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
-
-                var body = BuildDarkstonePeriaptBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Darkstone Periapt", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is LeafyPoultice)
-            {
-                const string relicId = "RELIC.LEAFY_POULTICE";
-                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
-
-                var body = BuildLeafyPoulticeBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Leafy Poultice", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is RegalPillow)
-            {
-                const string relicId = "RELIC.REGAL_PILLOW";
-                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
-
-                var body = BuildRegalPillowBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Regal Pillow", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is PrecariousShears)
-            {
-                const string relicId = "RELIC.PRECARIOUS_SHEARS";
-                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
-
-                var body = BuildPrecariousShearsBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Precarious Shears", "SpireLens", body);
-                return;
-            }
-
-            if (IsRelicModel(relicNode.Model, "MegaCrit.Sts2.Core.Models.Relics.BloodVial"))
-            {
-                const string relicId = "RELIC.BLOOD_VIAL";
-                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
-
-                var body = BuildBloodVialBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Blood Vial", "SpireLens", body);
-                return;
-            }
-
-            if (IsRelicModel(relicNode.Model, "MegaCrit.Sts2.Core.Models.Relics.Toolbox"))
-            {
-                const string relicId = "RELIC.TOOLBOX";
-                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
-
-                var body = BuildToolboxBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Toolbox", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is HeftyTablet)
-            {
-                const string relicId = "RELIC.HEFTY_TABLET";
-                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
-
-                var body = BuildHeftyTabletBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Hefty Tablet", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is ArcaneScroll)
-            {
-                const string relicId = "RELIC.ARCANE_SCROLL";
-                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
-
-                var body = BuildArcaneScrollBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Arcane Scroll", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is LargeCapsule)
-            {
-                const string relicId = "RELIC.LARGE_CAPSULE";
-                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
-
-                var body = BuildLargeCapsuleBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Large Capsule", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is PaelsWing)
-            {
-                const string relicId = "RELIC.PAELS_WING";
-                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
-
-                var body = BuildPaelsWingBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Pael's Wing", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is PaelsEye paelsEye)
-            {
-                const string relicId = "RELIC.PAELS_EYE";
-                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
-
-                var body = BuildPaelsEyeBodyBBCode(agg, paelsEye.UsedThisCombat);
-                StatsTooltip.Show(tree, __instance, "Pael's Eye", "SpireLens", body);
-                return;
-            }
-
-            if (IsStrikeDummyStatsRelicModel(relicNode.Model))
-            {
-                var agg = RunTracker.GetStrikeDummyAggregate();
-
-                var body = BuildStrikeDummyBodyBBCode(agg);
-                var title = IsFakeStrikeDummyRelicModel(relicNode.Model) ? "???" : "Strike Dummy";
-                StatsTooltip.Show(tree, __instance, title, "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is BrilliantScarf)
-            {
-                const string relicId = "RELIC.BRILLIANT_SCARF";
-                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
-
-                var body = BuildBrilliantScarfBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Brilliant Scarf", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is JuzuBracelet)
-            {
-                const string relicId = "RELIC.JUZU_BRACELET";
-                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
-
-                var body = BuildJuzuBraceletBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Juzu Bracelet", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is GamblingChip)
-            {
-                const string relicId = "RELIC.GAMBLING_CHIP";
-                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
-
-                var body = BuildGamblingChipBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Gambling Chip", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is CentennialPuzzle centennialPuzzle)
-            {
-                const string relicId = "RELIC.CENTENNIAL_PUZZLE";
-                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
-
-                var body = BuildCentennialPuzzleBodyBBCode(agg, centennialPuzzle.UsedThisCombat);
-                StatsTooltip.Show(tree, __instance, "Centennial Puzzle", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is WhiteBeastStatue)
-            {
-                const string relicId = "RELIC.WHITE_BEAST_STATUE";
-                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
-
-                var body = BuildWhiteBeastStatueBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "White Beast Statue", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is Shovel)
-            {
-                const string relicId = "RELIC.SHOVEL";
-                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
-
-                var body = BuildShovelBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Shovel", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is BoundPhylactery)
-            {
-                const string relicId = "RELIC.BOUND_PHYLACTERY";
-                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
-
-                var body = BuildPhylacteryBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Bound Phylactery", "SpireLens", body);
-                return;
-            }
-
-            if (relicNode.Model is PhylacteryUnbound)
-            {
-                const string relicId = "RELIC.PHYLACTERY_UNBOUND";
-                var agg = RunTracker.GetRelicAggregate(relicId) ?? new RelicAggregate();
-
-                var body = BuildPhylacteryBodyBBCode(agg);
-                StatsTooltip.Show(tree, __instance, "Phylactery Unbound", "SpireLens", body);
-                return;
-            }
-        }
-        catch (Exception e)
-        {
-            CoreMain.Logger.Error($"RelicHoverShowPatch failed: {e.Message}");
-        }
+        statsTip = default;
+        if (!ViewStatsInjectorPatch.StatsVisibilityEnabled) return false;
+
+        var relicModel = holder?.Relic?.Model;
+        if (relicModel == null) return false;
+        if (!TryBuildInventoryBodyBBCode(holder, relicModel, out var title, out var body))
+            return false;
+
+        statsTip = StatsTooltip.CreateNativeTip(
+            title,
+            body,
+            stretchHorizontally: ShouldStretchStatsTooltip(relicModel, body));
+        return true;
     }
 
     internal static bool TryBuildInventoryBodyBBCode(
@@ -900,6 +136,17 @@ public static class RelicHoverShowPatch
             : IsMiniatureCannonStatsRelicModel(relicModel)
                 ? RunTracker.GetMiniatureCannonAggregate()
             : RunTracker.GetRelicAggregate(relicId);
+
+        if (!useEndedRun
+            && string.Equals(relicId, DowsingRodRelicId, StringComparison.Ordinal))
+        {
+            var liveRoomsRemaining = RunTracker.GetLiveDowsingRoomsRemaining();
+            if (liveRoomsRemaining.HasValue)
+            {
+                aggregate ??= new RelicAggregate();
+                aggregate.DowsingQuestionRoomsRemaining = liveRoomsRemaining.Value;
+            }
+        }
 
         if (relicModel is BloodSoakedRose && bloodSoakedRoseCurseAgg == null)
             bloodSoakedRoseCurseAgg = RunTracker.GetEnthralledCurseAggregate();
@@ -965,12 +212,28 @@ public static class RelicHoverShowPatch
     {
         for (var current = node; current != null; current = current.GetParent())
         {
-            for (var type = current.GetType(); type != null; type = type.BaseType)
-            {
-                if (string.Equals(type.Namespace, GameOverScreenNamespace, StringComparison.Ordinal)
-                    && type.Name.StartsWith("NGameOverScreen", StringComparison.Ordinal))
-                    return true;
-            }
+            if (current is NGameOverScreen)
+                return true;
+        }
+
+        // The in-run relic inventory is persistent global UI. On the game-over
+        // screen its holders remain under the global top bar rather than being
+        // reparented beneath NGameOverScreen, so ancestor-only detection can
+        // never identify the death-screen context. Resolve the actual active
+        // screen in the shared scene tree instead.
+        var tree = node?.GetTree() ?? Engine.GetMainLoop() as SceneTree;
+        return tree?.Root != null && ContainsVisibleGameOverScreen(tree.Root);
+    }
+
+    private static bool ContainsVisibleGameOverScreen(Node node)
+    {
+        if (node is NGameOverScreen screen && screen.IsVisibleInTree())
+            return true;
+
+        for (var i = 0; i < node.GetChildCount(); i++)
+        {
+            if (ContainsVisibleGameOverScreen(node.GetChild(i)))
+                return true;
         }
 
         return false;
@@ -984,6 +247,36 @@ public static class RelicHoverShowPatch
         out string body)
     {
         return TryBuildBodyBBCode(relicModel, agg, floorCount, null, null, null, null, out title, out body);
+    }
+
+    internal static float? GetPreferredStatsTooltipWidth(RelicModel? relicModel)
+        => relicModel switch
+        {
+            SturdyClamp => SturdyClampTooltipWidth,
+            EmberTea => EmberTeaTooltipWidth,
+            RedSkull => EmberTeaTooltipWidth,
+            WhisperingEarring => EmberTeaTooltipWidth,
+            TungstenRod => EmberTeaTooltipWidth,
+            PaelsWing => PaelsWingTooltipWidth,
+            FresnelLens => FresnelLensTooltipWidth,
+            _ => null,
+        };
+
+    internal static bool ShouldStretchStatsTooltip(
+        RelicModel? relicModel,
+        string? bodyBBCode)
+    {
+        if (relicModel == null) return false;
+
+        // A shared scalar table deliberately sizes its label column from the
+        // longest row. The game's default 360px wrapped hover tip does not
+        // shrink table columns, so allow the native control to grow to that
+        // calculated width instead of clipping the aligned value columns.
+        return GetPreferredStatsTooltipWidth(relicModel).HasValue
+               || (!string.IsNullOrEmpty(bodyBBCode)
+                   && bodyBBCode.Contains(
+                       ScalarStatsTableOpen,
+                       StringComparison.Ordinal));
     }
 
     internal static bool TryBuildBodyBBCode(
@@ -1023,6 +316,13 @@ public static class RelicHoverShowPatch
         body = "";
         agg ??= new RelicAggregate();
 
+        if (relicModel is BagOfPreparation)
+        {
+            title = "Bag of Preparation";
+            body = BuildBagOfPreparationBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is BagOfMarbles)
         {
             title = "Bag of Marbles";
@@ -1051,6 +351,20 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is PollinousCore)
+        {
+            title = "Pollinous Core";
+            body = BuildPollinousCoreBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is JossPaper)
+        {
+            title = "Joss Paper";
+            body = BuildJossPaperBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is Orichalcum)
         {
             title = "Orichalcum";
@@ -1058,10 +372,10 @@ public static class RelicHoverShowPatch
             return true;
         }
 
-        if (relicModel is Permafrost)
+        if (relicModel is Permafrost permafrost)
         {
             title = "Permafrost";
-            body = BuildPermafrostBodyBBCode(agg);
+            body = BuildPermafrostBodyBBCode(agg, IsPermafrostActivatedThisCombat(permafrost));
             return true;
         }
 
@@ -1095,8 +409,22 @@ public static class RelicHoverShowPatch
 
         if (IsAnchorStatsRelicModel(relicModel))
         {
-            title = IsFakeAnchorRelicModel(relicModel) ? "???" : "Anchor";
+            title = IsFakeAnchorRelicModel(relicModel) ? "Anchor???" : "Anchor";
             body = BuildAnchorBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is FakeVenerableTeaSet)
+        {
+            title = "Venerable Tea Set???";
+            body = BuildVenerableTeaSetBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is VenerableTeaSet)
+        {
+            title = "Venerable Tea Set";
+            body = BuildVenerableTeaSetBodyBBCode(agg);
             return true;
         }
 
@@ -1135,9 +463,46 @@ public static class RelicHoverShowPatch
             return true;
         }
 
-        if (relicModel is HappyFlower)
+        if (relicModel is ArtOfWar)
         {
-            title = "Happy Flower";
+            title = "Art of War";
+            body = BuildArtOfWarBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is CrackedCore)
+        {
+            title = "Cracked Core";
+            body = BuildCrackedCoreBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is SymbioticVirus)
+        {
+            title = "Symbiotic Virus";
+            body = BuildSymbioticVirusBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is BingBong)
+        {
+            title = "Bing Bong";
+            body = BuildBingBongBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is GoldPlatedCables)
+        {
+            title = "Gold-Plated Cables";
+            body = BuildGoldPlatedCablesBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is HappyFlower or FakeHappyFlower)
+        {
+            title = relicModel is FakeHappyFlower
+                ? "Happy Flower???"
+                : "Happy Flower";
             body = BuildHappyFlowerBodyBBCode(agg);
             return true;
         }
@@ -1160,6 +525,34 @@ public static class RelicHoverShowPatch
         {
             title = "Vajra";
             body = BuildVajraBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is OddlySmoothStone)
+        {
+            title = "Oddly Smooth Stone";
+            body = BuildOddlySmoothStoneBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is EmberTea)
+        {
+            title = "Ember Tea";
+            body = BuildEmberTeaBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is RedSkull)
+        {
+            title = "Red Skull";
+            body = BuildRedSkullBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is ToastyMittens)
+        {
+            title = "Toasty Mittens";
+            body = BuildToastyMittensBodyBBCode(agg);
             return true;
         }
 
@@ -1188,6 +581,13 @@ public static class RelicHoverShowPatch
         {
             title = "Shuriken";
             body = BuildShurikenBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is RuinedHelmet)
+        {
+            title = "Ruined Helmet";
+            body = BuildRuinedHelmetBodyBBCode(agg);
             return true;
         }
 
@@ -1261,6 +661,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is LostWisp)
+        {
+            title = "Lost Wisp";
+            body = BuildLostWispBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is ParryingShield)
         {
             title = "Parrying Shield";
@@ -1296,10 +703,24 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is CaptainsWheel)
+        {
+            title = "Captain's Wheel";
+            body = BuildCaptainsWheelBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is PrismaticGem)
         {
             title = "Prismatic Gem";
             body = BuildPrismaticGemBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is SealOfGold)
+        {
+            title = "Seal of Gold";
+            body = BuildSealOfGoldBodyBBCode(agg);
             return true;
         }
 
@@ -1310,10 +731,52 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is WingCharm)
+        {
+            title = "Wing Charm";
+            body = BuildWingCharmBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is FishingRod)
+        {
+            title = "Fishing Rod";
+            body = BuildFishingRodBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is MoltenEgg)
+        {
+            title = "Molten Egg";
+            body = BuildEggBodyBBCode(agg, "attack");
+            return true;
+        }
+
+        if (relicModel is ToxicEgg)
+        {
+            title = "Toxic Egg";
+            body = BuildEggBodyBBCode(agg, "skill");
+            return true;
+        }
+
+        if (relicModel is FrozenEgg)
+        {
+            title = "Frozen Egg";
+            body = BuildEggBodyBBCode(agg, "power");
+            return true;
+        }
+
         if (relicModel is SilverCrucible)
         {
             title = "Silver Crucible";
             body = BuildSilverCrucibleBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is Orrery)
+        {
+            title = "Orrery";
+            body = BuildOrreryBodyBBCode(agg);
             return true;
         }
 
@@ -1345,6 +808,20 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is DaughterOfTheWind)
+        {
+            title = "Daughter of the Wind";
+            body = BuildDaughterOfTheWindBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is SturdyClamp)
+        {
+            title = "Sturdy Clamp";
+            body = BuildSturdyClampBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is CursedPearl)
         {
             title = "Cursed Pearl";
@@ -1373,6 +850,46 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is RainbowRing rainbowRing)
+        {
+            title = "Rainbow Ring";
+            var turnState = GetRainbowRingTurnState(rainbowRing);
+            body = BuildRainbowRingBodyBBCode(
+                agg,
+                turnState.AttackPlayed,
+                turnState.PowerPlayed,
+                turnState.SkillPlayed);
+            return true;
+        }
+
+        if (relicModel is SparklingRouge)
+        {
+            title = "Sparkling Rouge";
+            body = BuildSparklingRougeBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is BeatingRemnant)
+        {
+            title = "Beating Remnant";
+            body = BuildBeatingRemnantBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is WhisperingEarring)
+        {
+            title = "Whispering Earring";
+            body = BuildWhisperingEarringBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is TungstenRod)
+        {
+            title = "Tungsten Rod";
+            body = BuildTungstenRodBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is Gorget)
         {
             title = "Gorget";
@@ -1394,10 +911,45 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is WarHammer)
+        {
+            title = "War Hammer";
+            body = BuildWarHammerBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is GnarledHammer)
+        {
+            title = "Gnarled Hammer";
+            body = BuildGnarledHammerBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is SilkenTress)
+        {
+            title = "Silken Tress";
+            body = BuildSilkenTressBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is TriBoomerang)
+        {
+            title = "Tri-Boomerang";
+            body = BuildTriBoomerangBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is Whetstone)
         {
             title = "Whetstone";
             body = BuildWhetstoneBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is YummyCookie)
+        {
+            title = "Yummy Cookie";
+            body = BuildYummyCookieBodyBBCode(agg);
             return true;
         }
 
@@ -1426,6 +978,13 @@ public static class RelicHoverShowPatch
         {
             title = "Meal Ticket";
             body = BuildMealTicketBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is MeatOnTheBone)
+        {
+            title = "Meat on the Bone";
+            body = BuildMeatOnTheBoneBodyBBCode(agg);
             return true;
         }
 
@@ -1464,6 +1023,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is FakeLeesWaffle)
+        {
+            title = "Lee's Waffle???";
+            body = BuildFakeLeesWaffleBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is Strawberry)
         {
             title = "Strawberry";
@@ -1485,6 +1051,27 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is Mango)
+        {
+            title = "Mango";
+            body = BuildMangoBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is FakeMango)
+        {
+            title = "Mango???";
+            body = BuildMangoBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is StoneHumidifier)
+        {
+            title = "Stone Humidifier";
+            body = BuildStoneHumidifierBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is ChosenCheese)
         {
             title = "Chosen Cheese";
@@ -1496,6 +1083,72 @@ public static class RelicHoverShowPatch
         {
             title = "Darkstone Periapt";
             body = BuildDarkstonePeriaptBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is LuckyFysh)
+        {
+            title = "Lucky Fysh";
+            body = BuildLuckyFyshBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is BowlerHat)
+        {
+            title = "Bowler Hat";
+            body = BuildBowlerHatBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is AmethystAubergine)
+        {
+            title = "Amethyst Aubergine";
+            body = BuildAmethystAubergineBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is WongosMysteryTicket)
+        {
+            title = "Wongo's Mystery Ticket";
+            body = BuildWongosMysteryTicketBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is MawBank)
+        {
+            title = "Maw Bank";
+            body = BuildMawBankBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is OldCoin)
+        {
+            title = "Old Coin";
+            body = BuildOldCoinBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is BookOfFiveRings)
+        {
+            title = "Book of Five Rings";
+            body = BuildBookOfFiveRingsBodyBBCode(
+                agg,
+                floorCount,
+                RelicFloorAddedToDeck(relicModel));
+            return true;
+        }
+
+        if (relicModel is SignetRing)
+        {
+            title = "Signet Ring";
+            body = BuildSignetRingBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is WingedBoots wingedBoots)
+        {
+            title = "Winged Boots";
+            body = BuildWingedBootsBodyBBCode(agg, wingedBoots.TimesUsed);
             return true;
         }
 
@@ -1527,10 +1180,31 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is FakeBloodVial)
+        {
+            title = "Blood Vial???";
+            body = BuildBloodVialBodyBBCode(agg);
+            return true;
+        }
+
         if (IsRelicModel(relicModel, "MegaCrit.Sts2.Core.Models.Relics.Toolbox"))
         {
             title = "Toolbox";
             body = BuildToolboxBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is WhiteStar)
+        {
+            title = "White Star";
+            body = BuildWhiteStarBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is PrayerWheel)
+        {
+            title = "Prayer Wheel";
+            body = BuildPrayerWheelBodyBBCode(agg);
             return true;
         }
 
@@ -1562,13 +1236,17 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is PaelsClaw)
+        {
+            title = "Pael's Claw";
+            body = BuildPaelsClawBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is PaelsWing)
         {
             title = "Pael's Wing";
-            body = BuildPaelsWingBodyBBCodeForFloor(
-                agg,
-                floorCount,
-                RelicFloorAddedToDeck(relicModel));
+            body = BuildPaelsWingBodyBBCode(agg);
             return true;
         }
 
@@ -1614,10 +1292,41 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is MummifiedHand)
+        {
+            title = "Mummified Hand";
+            body = BuildMummifiedHandBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is BurningSticks)
+        {
+            title = "Burning Sticks";
+            body = BuildBurningSticksBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is ThrowingAxe)
+        {
+            title = "Throwing Axe";
+            body = BuildThrowingAxeBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is JuzuBracelet)
         {
             title = "Juzu Bracelet";
             body = BuildJuzuBraceletBodyBBCode(agg);
+            return true;
+        }
+
+        if (string.Equals(
+                relicModel.Id.ToString(),
+                DowsingRodRelicId,
+                StringComparison.Ordinal))
+        {
+            title = "Dowsing Rod";
+            body = BuildDowsingRodBodyBBCode(agg);
             return true;
         }
 
@@ -1649,6 +1358,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is TinyMailbox)
+        {
+            title = "Tiny Mailbox";
+            body = BuildTinyMailboxBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is BoundPhylactery)
         {
             title = "Bound Phylactery";
@@ -1664,6 +1380,22 @@ public static class RelicHoverShowPatch
         }
 
         return false;
+    }
+
+    private static string BuildBagOfPreparationBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        RelicActivationRow(
+            sb,
+            agg.Activations.ToString(),
+            "Activations — first-turn hand draws whose requested card count Bag of Preparation increased.");
+        Row3(
+            sb,
+            "Cards drawn",
+            agg.AdditionalCardsDrawn.ToString(),
+            "",
+            "Cards drawn — first-turn cards that were actually drawn because of Bag of Preparation's added hand-draw count.");
+        return sb.ToString();
     }
 
     private static string BuildBagOfMarblesBodyBBCode(RelicAggregate agg)
@@ -1713,7 +1445,238 @@ public static class RelicHoverShowPatch
     private static string BuildPocketwatchBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "additional cards drawn", agg.AdditionalCardsDrawn.ToString(), "");
+        var averageCountAtTurnEnd = agg.PocketwatchTurns <= 0
+            ? 0m
+            : (decimal)agg.PocketwatchTurnEndCountTotal / agg.PocketwatchTurns;
+        var averageValueWhenActivated = agg.PocketwatchActivationValueSamples <= 0
+            ? 0m
+            : (decimal)agg.PocketwatchActivatedTurnEndCountTotal
+                / agg.PocketwatchActivationValueSamples;
+        var averageValueWhenMissed = agg.PocketwatchTurnsActivationMissed <= 0
+            ? 0m
+            : (decimal)agg.PocketwatchMissedTurnEndCountTotal
+                / agg.PocketwatchTurnsActivationMissed;
+        var averageActivationsPerTurn = agg.PocketwatchTurns <= 0
+            ? 0m
+            : (decimal)agg.Activations / agg.PocketwatchTurns;
+        var averageActivationsPerCombat = agg.PocketwatchCombats <= 0
+            ? 0m
+            : (decimal)agg.Activations / agg.PocketwatchCombats;
+
+        Row3(
+            sb,
+            "Additional cards drawn",
+            agg.AdditionalCardsDrawn.ToString(),
+            "",
+            "Additional cards drawn — cards actually added to hand draws by Pocketwatch.");
+        Row3(
+            sb,
+            "Avg count at turn end",
+            FormatDecimal(averageCountAtTurnEnd),
+            "",
+            "Average count at turn end — cards played by the relic's owner at the end of each turn while Pocketwatch was held.");
+        Row3(
+            sb,
+            "Turns activation missed",
+            agg.PocketwatchTurnsActivationMissed.ToString(),
+            "",
+            "Turns activation missed — turns that ended above Pocketwatch's card threshold and therefore could not activate it.");
+        Row3(
+            sb,
+            "Avg value when activated",
+            FormatDecimal(averageValueWhenActivated),
+            "",
+            "Average value when activated — the prior turn's card count when Pocketwatch actually added cards to the next hand draw.");
+        Row3(
+            sb,
+            "Avg value when missed",
+            FormatDecimal(averageValueWhenMissed),
+            "",
+            "Average value when missed — the card count on turns that ended above Pocketwatch's activation threshold.");
+        Row3(
+            sb,
+            "Avg activations per turn",
+            FormatDecimal(averageActivationsPerTurn),
+            "",
+            "Average activations per turn — actual Pocketwatch activations divided by turns completed while it was held.");
+        Row3(
+            sb,
+            "Avg activations per combat",
+            FormatDecimal(averageActivationsPerCombat),
+            "",
+            "Average activations per combat — actual Pocketwatch activations divided by combats in which it was held.");
+        return sb.ToString();
+    }
+
+    private static string BuildPollinousCoreBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var averageActivationsPerCombat = agg.PollinousCoreCombats <= 0
+            ? 0m
+            : (decimal)agg.Activations / agg.PollinousCoreCombats;
+        var averageTurnsPerCombat = agg.PollinousCoreCombats <= 0
+            ? 0m
+            : (decimal)agg.PollinousCoreTurns / agg.PollinousCoreCombats;
+        var averageCardsDrawnPerCombat = agg.PollinousCoreCombats <= 0
+            ? 0m
+            : (decimal)agg.AdditionalCardsDrawn / agg.PollinousCoreCombats;
+
+        Row3(
+            sb,
+            "Activations",
+            agg.Activations.ToString(),
+            "",
+            "Times Pollinous Core reached four counters and added cards to the upcoming hand draw.");
+        Row3(
+            sb,
+            "Turns ended on 0 counters",
+            agg.PollinousCoreTurnsEndedOn0Counters.ToString(),
+            "",
+            "Player turns that ended after Pollinous Core activated and reset its counter to zero.");
+        Row3(
+            sb,
+            "Turns ended on 1 counter",
+            agg.PollinousCoreTurnsEndedOn1Counter.ToString(),
+            "",
+            "Player turns that ended with Pollinous Core showing one counter.");
+        Row3(
+            sb,
+            "Turns ended on 2 counters",
+            agg.PollinousCoreTurnsEndedOn2Counters.ToString(),
+            "",
+            "Player turns that ended with Pollinous Core showing two counters.");
+        Row3(
+            sb,
+            "Turns ended on 3 counters",
+            agg.PollinousCoreTurnsEndedOn3Counters.ToString(),
+            "",
+            "Player turns that ended with Pollinous Core showing three counters.");
+        Row3(
+            sb,
+            "Avg activations/combat",
+            FormatDecimal(averageActivationsPerCombat),
+            "",
+            "Average activations per combat — activations divided by combats where Pollinous Core was held.");
+        Row3(
+            sb,
+            "Avg turns/combat",
+            FormatDecimal(averageTurnsPerCombat),
+            "",
+            "Average turns per combat — completed player turns divided by combats where Pollinous Core was held.");
+        Row3(
+            sb,
+            "Cards drawn",
+            agg.AdditionalCardsDrawn.ToString(),
+            "",
+            "Cards drawn — Pollinous Core cards that actually reached the hand.");
+        Row3(
+            sb,
+            "Card draws blocked",
+            agg.AdditionalCardDrawsBlocked.ToString(),
+            "",
+            "Card draws blocked — Pollinous Core cards requested but prevented by draw limits or draw-prevention effects.");
+        Row3(
+            sb,
+            "Avg cards drawn/combat",
+            FormatDecimal(averageCardsDrawnPerCombat),
+            "",
+            "Average cards drawn per combat — observed Pollinous Core cards drawn divided by combats where it was held.");
+        return sb.ToString();
+    }
+
+    private static string BuildJossPaperBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var combats = agg.JossPaperCombats;
+        var averageActivationsPerCombat = combats <= 0
+            ? 0m
+            : (decimal)agg.Activations / combats;
+        var averageExhaustsPerCombat = combats <= 0
+            ? 0m
+            : (decimal)agg.JossPaperCardsExhausted / combats;
+        var averageTurnsPerCombat = combats <= 0
+            ? 0m
+            : (decimal)agg.JossPaperTurns / combats;
+        var averageCardsDrawnPerCombat = combats <= 0
+            ? 0m
+            : (decimal)agg.AdditionalCardsDrawn / combats;
+
+        RelicActivationRow(
+            sb,
+            agg.Activations.ToString(),
+            "Activations — five-card exhaust thresholds reached by Joss Paper.");
+        ConceptRow(
+            sb,
+            "exhaust",
+            agg.JossPaperCardsExhausted.ToString(),
+            "Cards exhausted while Joss Paper was held.");
+        Row3(
+            sb,
+            "Turns ended on 0 counters",
+            agg.JossPaperTurnsEndedOn0Counters.ToString(),
+            "",
+            "Player turns that ended after Joss Paper activated and reset its counter to zero.");
+        Row3(
+            sb,
+            "Turns ended on 1 counter",
+            agg.JossPaperTurnsEndedOn1Counter.ToString(),
+            "",
+            "Player turns that ended with Joss Paper showing one counter.");
+        Row3(
+            sb,
+            "Turns ended on 2 counters",
+            agg.JossPaperTurnsEndedOn2Counters.ToString(),
+            "",
+            "Player turns that ended with Joss Paper showing two counters.");
+        Row3(
+            sb,
+            "Turns ended on 3 counters",
+            agg.JossPaperTurnsEndedOn3Counters.ToString(),
+            "",
+            "Player turns that ended with Joss Paper showing three counters.");
+        Row3(
+            sb,
+            "Turns ended on 4 counters",
+            agg.JossPaperTurnsEndedOn4Counters.ToString(),
+            "",
+            "Player turns that ended with Joss Paper showing four counters.");
+        Row3(
+            sb,
+            "Avg activations/combat",
+            FormatDecimal(averageActivationsPerCombat),
+            "",
+            "Average activations per combat — thresholds reached divided by combats where Joss Paper was held.");
+        DescribedIconRow(
+            sb,
+            ["average", "exhaust", "combat"],
+            ["combat"],
+            string.Empty,
+            FormatDecimal(averageExhaustsPerCombat),
+            "Average cards exhausted per combat while Joss Paper was held.");
+        Row3(
+            sb,
+            "Avg turns/combat",
+            FormatDecimal(averageTurnsPerCombat),
+            "",
+            "Average turns per combat — completed player turns divided by combats where Joss Paper was held.");
+        Row3(
+            sb,
+            "Cards drawn",
+            agg.AdditionalCardsDrawn.ToString(),
+            "",
+            "Cards drawn — Joss Paper cards that actually reached the hand.");
+        Row3(
+            sb,
+            "Card draws blocked",
+            agg.AdditionalCardDrawsBlocked.ToString(),
+            "",
+            "Card draws blocked — Joss Paper draws prevented by draw limits, a full hand, or draw-prevention effects.");
+        Row3(
+            sb,
+            "Avg cards drawn/combat",
+            FormatDecimal(averageCardsDrawnPerCombat),
+            "",
+            "Average cards drawn per combat — observed Joss Paper draws divided by combats where it was held.");
         return sb.ToString();
     }
 
@@ -1725,16 +1688,34 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
-    private static string BuildPermafrostBodyBBCode(RelicAggregate agg)
+    private static string BuildPermafrostBodyBBCode(RelicAggregate agg, bool triggeredThisCombat)
     {
         var sb = new StringBuilder();
         var blockPerCombat = agg.Activations <= 0
             ? 0m
             : (decimal)agg.AdditionalBlockGained / agg.Activations;
+        var effectivePermafrostCombats = Math.Max(agg.PermafrostCombats, agg.Activations);
+        var triggersPerCombat = effectivePermafrostCombats <= 0
+            ? 0m
+            : (decimal)agg.Activations / effectivePermafrostCombats;
+        Row3(sb, "Triggered this combat", triggeredThisCombat ? "true" : "false", "");
         Row3(sb, "Combats triggered", agg.Activations.ToString(), "");
+        Row3(sb, "Avg times triggered per combat", FormatDecimal(triggersPerCombat), "");
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
         Row3(sb, BlockLabel("block gained per combat"), FormatDecimal(blockPerCombat), "");
         return sb.ToString();
+    }
+
+    private static bool IsPermafrostActivatedThisCombat(Permafrost permafrost)
+    {
+        try
+        {
+            return PermafrostActivatedThisCombatField?.GetValue(permafrost) is true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static string BuildVambraceBodyBBCode(RelicAggregate agg, bool usedThisCombat = false)
@@ -1743,7 +1724,7 @@ public static class RelicHoverShowPatch
         var blockPerActivation = agg.Activations <= 0
             ? 0m
             : (decimal)agg.AdditionalBlockGained / agg.Activations;
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, "Used this combat", usedThisCombat ? "true" : "false", "");
         Row3(sb, BlockLabel("extra block gained"), agg.AdditionalBlockGained.ToString(), "");
         Row3(sb, BlockLabel("extra block per activation"), FormatDecimal(blockPerActivation), "");
@@ -1767,7 +1748,7 @@ public static class RelicHoverShowPatch
             : (decimal)agg.TuningForkTurnEndChargeTotal / agg.TuningForkTurnEndChargeCount;
 
         Row3(sb, "Skills played", agg.TuningForkSkillsPlayed.ToString(), "");
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
         Row3(sb, BlockLabel("block gained per activation"), FormatDecimal(blockPerActivation), "");
         Row3(sb, "Avg skills played per combat", FormatDecimal(skillsPerCombat), "");
@@ -1784,10 +1765,18 @@ public static class RelicHoverShowPatch
         var blockPerActivation = agg.Activations <= 0
             ? 0m
             : (decimal)agg.AdditionalBlockGained / agg.Activations;
+        var blockPerTurn = agg.RippleBasinTurns <= 0
+            ? 0m
+            : (decimal)agg.AdditionalBlockGained / agg.RippleBasinTurns;
+        var blockPerCombat = agg.RippleBasinCombats <= 0
+            ? 0m
+            : (decimal)agg.AdditionalBlockGained / agg.RippleBasinCombats;
 
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
         Row3(sb, BlockLabel("block gained per activation"), FormatDecimal(blockPerActivation), "");
+        Row3(sb, BlockLabel("avg block gained per turn"), FormatDecimal(blockPerTurn), "");
+        Row3(sb, BlockLabel("avg block gained per combat"), FormatDecimal(blockPerCombat), "");
         return sb.ToString();
     }
 
@@ -1801,33 +1790,52 @@ public static class RelicHoverShowPatch
     private static string BuildAnchorBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildVenerableTeaSetBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        RelicActivationRow(sb, agg.Activations.ToString());
+        Row3(sb, EnergyLabel("Energy gained"), agg.EnergyGenerated.ToString(), "");
         return sb.ToString();
     }
 
     private static string BuildLetterOpenerBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        var averageDamagePerCombat = agg.LetterOpenerCombats <= 0
-            ? 0m
-            : (decimal)agg.TotalDamageAttempted / agg.LetterOpenerCombats;
-        var averageDamagePerTurn = agg.LetterOpenerTurns <= 0
-            ? 0m
-            : (decimal)agg.TotalDamageAttempted / agg.LetterOpenerTurns;
-        var averageDamagePerSkill = agg.LetterOpenerSkillsPlayed <= 0
-            ? 0m
-            : (decimal)agg.TotalDamageAttempted / agg.LetterOpenerSkillsPlayed;
+        var rates = CalculateLetterOpenerRates(agg);
 
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, "Damage attempted", agg.TotalDamageAttempted.ToString(), "");
         Row3(sb, "Targets hit", agg.TotalTargets.ToString(), "");
-        Row3(sb, "Avg damage per combat", FormatDecimal(averageDamagePerCombat), "");
-        Row3(sb, "Avg damage per turn", FormatDecimal(averageDamagePerTurn), "");
+        Row3(sb, "Targets hit per activation", FormatDecimal(rates.TargetsPerActivation), "");
+        Row3(sb, "Avg damage per combat", FormatDecimal(rates.DamagePerCombat), "");
+        Row3(sb, "Avg damage per turn", FormatDecimal(rates.DamagePerTurn), "");
         Row3(sb, "Turns ended at 1 charge", agg.LetterOpenerTurnsEndedAt1Charge.ToString(), "");
         Row3(sb, "Turns ended at 2 charges", agg.LetterOpenerTurnsEndedAt2Charges.ToString(), "");
-        Row3(sb, "Avg damage per skill played", FormatDecimal(averageDamagePerSkill), "");
+        Row3(sb, "Avg damage per skill played", FormatDecimal(rates.DamagePerSkillPlayed), "");
         return sb.ToString();
+    }
+
+    internal static LetterOpenerRates CalculateLetterOpenerRates(RelicAggregate agg)
+    {
+        agg ??= new RelicAggregate();
+        return new LetterOpenerRates(
+            DamagePerCombat: agg.LetterOpenerCombats <= 0
+                ? 0m
+                : (decimal)agg.TotalDamageAttempted / agg.LetterOpenerCombats,
+            DamagePerTurn: agg.LetterOpenerTurns <= 0
+                ? 0m
+                : (decimal)agg.TotalDamageAttempted / agg.LetterOpenerTurns,
+            TargetsPerActivation: agg.Activations <= 0
+                ? 0m
+                : (decimal)agg.TotalTargets / agg.Activations,
+            DamagePerSkillPlayed: agg.LetterOpenerSkillsPlayed <= 0
+                ? 0m
+                : (decimal)agg.TotalDamageAttempted / agg.LetterOpenerSkillsPlayed);
     }
 
     private static string BuildAkabekoBodyBBCode(RelicAggregate agg)
@@ -1843,7 +1851,7 @@ public static class RelicHoverShowPatch
         AppendRelicDamageStats(
             sb,
             agg,
-            triggerLabel: "Times triggered",
+            triggerDescription: "Times triggered — the number of times this relic has activated.",
             averageLabel: "Damage per trigger",
             averageDenominator: agg.Activations);
         return sb.ToString();
@@ -1860,7 +1868,7 @@ public static class RelicHoverShowPatch
     private static string BuildEternalFeatherBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         AppendHealingStats(sb, agg);
         return sb.ToString();
     }
@@ -1868,8 +1876,144 @@ public static class RelicHoverShowPatch
     private static string BuildBoneFluteBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Times triggered", agg.BoneFluteTriggers.ToString(), "");
+        RelicActivationRow(
+            sb,
+            agg.BoneFluteTriggers.ToString(),
+            "Times triggered — the number of times this relic has activated.");
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildArtOfWarBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var energyPerTurn = agg.ArtOfWarTurns <= 0
+            ? 0m
+            : (decimal)agg.EnergyGenerated / agg.ArtOfWarTurns;
+        var energyPerCombat = agg.EnergyGeneratedCombats <= 0
+            ? 0m
+            : (decimal)agg.EnergyGenerated / agg.EnergyGeneratedCombats;
+        var energyPerTurnThisCombat = agg.ArtOfWarTurnsThisCombat <= 0
+            ? 0m
+            : (decimal)agg.ArtOfWarEnergyAddedThisCombat / agg.ArtOfWarTurnsThisCombat;
+
+        Row3(sb, EnergyLabel("Total energy gained"), agg.EnergyGenerated.ToString(), "");
+        Row3(sb, EnergyLabel("Avg energy gained per turn"), FormatDecimal(energyPerTurn), "");
+        Row3(sb, EnergyLabel("Avg energy gained per combat"), FormatDecimal(energyPerCombat), "");
+        Row3(
+            sb,
+            EnergyLabel("Energy added this combat"),
+            agg.ArtOfWarEnergyAddedThisCombat.ToString(),
+            "");
+        Row3(
+            sb,
+            EnergyLabel("Energy added this turn"),
+            agg.ArtOfWarEnergyAddedThisTurn.ToString(),
+            "");
+        Row3(
+            sb,
+            EnergyLabel("Avg energy added per turn this combat"),
+            FormatDecimal(energyPerTurnThisCombat),
+            "");
+        return sb.ToString();
+    }
+
+    private static string BuildCrackedCoreBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Times orb was evoked", agg.CrackedCoreOrbEvokes.ToString(), "");
+        Row3(
+            sb,
+            "Times orb passive triggered",
+            agg.CrackedCoreOrbPassiveTriggers.ToString(),
+            "");
+        Row3(sb, "Times orb fizzled", agg.CrackedCoreOrbFizzles.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildSymbioticVirusBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(
+            sb,
+            "Times orb was evoked",
+            agg.SymbioticVirusOrbEvokes.ToString(),
+            "");
+        Row3(
+            sb,
+            "Times orb passive triggered",
+            agg.SymbioticVirusOrbPassiveTriggers.ToString(),
+            "");
+        Row3(
+            sb,
+            "Times orb fizzled",
+            agg.SymbioticVirusOrbFizzles.ToString(),
+            "");
+        return sb.ToString();
+    }
+
+    private static string BuildGoldPlatedCablesBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(
+            sb,
+            "Activations with orb",
+            agg.Activations.ToString(),
+            "",
+            "Activations with orb — times Gold-Plated Cables increased the passive trigger count of the owner's first orb.");
+
+        var activationsByOrb = agg.GoldPlatedCablesActivationsByOrbType
+            ?? new Dictionary<string, RelicOrbActivationAggregate>();
+        var standardOrbs = new[]
+        {
+            ("ORB.LIGHTNING", "Lightning"),
+            ("ORB.FROST", "Frost"),
+            ("ORB.DARK", "Dark"),
+            ("ORB.PLASMA", "Plasma"),
+            ("ORB.GLASS", "Glass"),
+        };
+
+        foreach (var (orbId, fallbackName) in standardOrbs)
+        {
+            activationsByOrb.TryGetValue(orbId, out var bucket);
+            var displayName = string.IsNullOrWhiteSpace(bucket?.DisplayName)
+                ? fallbackName
+                : bucket.DisplayName;
+            Row3(
+                sb,
+                $"{displayName} activations",
+                Math.Max(0, bucket?.Activations ?? 0).ToString(),
+                "",
+                $"{displayName} activations — confirmed Gold-Plated Cables activations that targeted a {displayName} orb.");
+        }
+
+        foreach (var bucket in activationsByOrb
+                     .Where(kvp => standardOrbs.All(standard =>
+                         !string.Equals(
+                             standard.Item1,
+                             kvp.Key,
+                             StringComparison.Ordinal)))
+                     .Select(kvp => kvp.Value)
+                     .Where(bucket => bucket != null && bucket.Activations > 0)
+                     .OrderBy(bucket => bucket.DisplayName, StringComparer.Ordinal))
+        {
+            var displayName = string.IsNullOrWhiteSpace(bucket.DisplayName)
+                ? RunTracker.FormatOrbIdForDisplay(bucket.OrbId)
+                : bucket.DisplayName;
+            Row3(
+                sb,
+                $"{displayName} activations",
+                bucket.Activations.ToString(),
+                "",
+                $"{displayName} activations — confirmed Gold-Plated Cables activations that targeted a {displayName} orb.");
+        }
+
+        Row3(
+            sb,
+            "Turns with no orb to target",
+            agg.GoldPlatedCablesNoOrbTargets.ToString(),
+            "",
+            "Turns with no orb to target — player turns that ended while Gold-Plated Cables had no first orb available.");
         return sb.ToString();
     }
 
@@ -1979,11 +2123,11 @@ public static class RelicHoverShowPatch
         bool includeCombatsWithEnergyNotGained)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         AppendEnergyGeneratedStats(sb, agg);
         Row3(sb, excessEnergyLabel, turnsEndedWithExcessEnergy.ToString(), "");
         if (includeCombatsWithEnergyNotGained)
-            Row3(sb, "Combats with energy not gained", agg.CombatsWithoutActivation.ToString(), "");
+            Row3(sb, "Combats without energy", agg.CombatsWithoutActivation.ToString(), "");
         return sb.ToString();
     }
 
@@ -1998,7 +2142,7 @@ public static class RelicHoverShowPatch
     private static string BuildGremlinHornBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         AppendEnergyGeneratedStats(sb, agg);
         Row3(sb, "Cards drawn", agg.AdditionalCardsDrawn.ToString(), "");
         return sb.ToString();
@@ -2007,8 +2151,32 @@ public static class RelicHoverShowPatch
     private static string BuildPendulumBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        var cardsDrawnPerCombat = agg.PendulumCombats <= 0
+            ? 0m
+            : (decimal)agg.AdditionalCardsDrawn / agg.PendulumCombats;
+        var chargeSamples = agg.PendulumCombatEndChargeCount;
+        var chargeTotal = agg.PendulumCombatEndChargeTotal;
+        if (chargeSamples <= 0)
+        {
+            chargeSamples =
+                agg.PendulumCombatsEndedOn0Charges
+                + agg.PendulumCombatsEndedOn1Charge
+                + agg.PendulumCombatsEndedOn2Charges;
+            chargeTotal =
+                agg.PendulumCombatsEndedOn1Charge
+                + (agg.PendulumCombatsEndedOn2Charges * 2);
+        }
+        var averageEndCharge = chargeSamples <= 0
+            ? 0m
+            : (decimal)chargeTotal / chargeSamples;
+
+        RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, "Cards drawn", agg.AdditionalCardsDrawn.ToString(), "");
+        Row3(sb, "Avg cards drawn per combat", FormatDecimal(cardsDrawnPerCombat), "");
+        Row3(sb, "Combats ended on 0 charges", agg.PendulumCombatsEndedOn0Charges.ToString(), "");
+        Row3(sb, "Combats ended on 1 charge", agg.PendulumCombatsEndedOn1Charge.ToString(), "");
+        Row3(sb, "Combats ended on 2 charges", agg.PendulumCombatsEndedOn2Charges.ToString(), "");
+        Row3(sb, "Avg charge at combat end", FormatDecimal(averageEndCharge), "");
         return sb.ToString();
     }
 
@@ -2018,7 +2186,7 @@ public static class RelicHoverShowPatch
         AppendRelicDamageStats(
             sb,
             agg,
-            triggerLabel: "Combats triggered",
+            triggerDescription: "Combats triggered — the number of combats in which this relic activated.",
             averageLabel: "Damage per combat",
             averageDenominator: agg.Activations);
         return sb.ToString();
@@ -2030,9 +2198,32 @@ public static class RelicHoverShowPatch
         AppendRelicDamageStats(
             sb,
             agg,
-            triggerLabel: "Activations",
+            triggerDescription: "Activations — the number of times this relic has activated.",
             averageLabel: "Damage per activation",
             averageDenominator: agg.Activations);
+        return sb.ToString();
+    }
+
+    private static string BuildLostWispBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var damagePerPower = agg.Activations <= 0
+            ? 0m
+            : (decimal)agg.TotalDamageDealt / agg.Activations;
+
+        Row3(
+            sb,
+            "Powers played",
+            agg.Activations.ToString(),
+            "",
+            "Power cards played by this relic's owner while Lost Wisp could activate.");
+        Row3(sb, "Damage attempted", agg.TotalDamageAttempted.ToString(), "");
+        Row3(sb, "Damage dealt", agg.TotalDamageDealt.ToString(), "");
+        Row3(sb, "Damage blocked", agg.TotalDamageBlocked.ToString(), "");
+        Row3(sb, "Overkill", agg.TotalDamageOverkill.ToString(), "");
+        Row3(sb, "Kills", agg.Kills.ToString(), "");
+        Row3(sb, "Targets hit", agg.TotalTargets.ToString(), "");
+        Row3(sb, "Avg damage per Power", FormatDecimal(damagePerPower), "");
         return sb.ToString();
     }
 
@@ -2042,7 +2233,7 @@ public static class RelicHoverShowPatch
         AppendRelicDamageStats(
             sb,
             agg,
-            triggerLabel: "Activations",
+            triggerDescription: "Activations — the number of times this relic has activated.",
             averageLabel: "Damage per activation",
             averageDenominator: agg.Activations);
         return sb.ToString();
@@ -2054,7 +2245,7 @@ public static class RelicHoverShowPatch
         AppendRelicDamageStats(
             sb,
             agg,
-            triggerLabel: "Combats triggered",
+            triggerDescription: "Combats triggered — the number of combats in which this relic activated.",
             averageLabel: "Damage per combat",
             averageDenominator: agg.Activations);
         return sb.ToString();
@@ -2063,11 +2254,11 @@ public static class RelicHoverShowPatch
     private static void AppendRelicDamageStats(
         StringBuilder sb,
         RelicAggregate agg,
-        string triggerLabel,
+        string triggerDescription,
         string? averageLabel = null,
         int averageDenominator = 0)
     {
-        Row3(sb, triggerLabel, agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString(), triggerDescription);
         Row3(sb, "Damage attempted", agg.TotalDamageAttempted.ToString(), "");
         Row3(sb, "Damage dealt", agg.TotalDamageDealt.ToString(), "");
         Row3(sb, "Damage blocked", agg.TotalDamageBlocked.ToString(), "");
@@ -2093,7 +2284,11 @@ public static class RelicHoverShowPatch
         var averageEndCharge = agg.PenNibTurnEndChargeCount <= 0
             ? 0m
             : (decimal)agg.PenNibTurnEndChargeTotal / agg.PenNibTurnEndChargeCount;
+        var activations = Math.Max(
+            agg.Activations,
+            agg.PenNibAttacksPlayed / 10);
 
+        RelicActivationRow(sb, activations.ToString());
         Row3(sb, "Base damage added", agg.TotalDamageAttempted.ToString(), "");
         Row3(sb, "Avg base damage added per attack", FormatDecimal(averageBaseDamage), "");
         Row3(sb, "Attacks played", agg.PenNibAttacksPlayed.ToString(), "");
@@ -2106,7 +2301,15 @@ public static class RelicHoverShowPatch
     private static string BuildHornCleatBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
+        Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildCaptainsWheelBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
         return sb.ToString();
     }
@@ -2126,17 +2329,227 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
+    private static string BuildSealOfGoldBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        RelicActivationRow(
+            sb,
+            agg.Activations.ToString(),
+            "Times triggered — the number of times this relic has activated.");
+        Row3(sb, "Gold loss attempted", (agg.Activations * SealOfGoldLossPerTrigger).ToString(), "");
+        Row3(sb, "Gold lost", agg.GoldLost.ToString(), "");
+        Row3(sb, "Gold loss blocked", agg.GoldLossBlocked.ToString(), "");
+        AppendEnergyGeneratedStats(
+            sb,
+            agg,
+            totalLabel: "Energy gained total",
+            includeAveragePerCombat: true,
+            combatCount: agg.EnergyGeneratedCombats);
+        return sb.ToString();
+    }
+
     private static string BuildFresnelLensBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
         AppendMaxHpChangeRows(sb, agg, "Max HP lost to Drowning Beacon", MaxHpLost(agg));
-        Row3(sb, "Nimble cards taken", agg.NimbleCardsTaken.ToString(), "");
-        Row3(sb, "Reward screens with Nimble cards", agg.RewardScreensWithNimbleCards.ToString(), "");
-        Row3(sb, "Reward screens with 2 Nimble cards", agg.RewardScreensWithTwoNimbleCards.ToString(), "");
-        Row3(sb, "Reward screens with 3+ Nimble cards", agg.RewardScreensWithThreeOrMoreNimbleCards.ToString(), "");
-        Row3(sb, "Reward screens with no Nimble cards", agg.RewardScreensWithoutNimbleCards.ToString(), "");
-        Row3(sb, "Nimble offered, none taken", agg.RewardScreensWithNimbleCardsButNoneTaken.ToString(), "");
+        NimbleRow(
+            sb,
+            "cards taken",
+            agg.NimbleCardsTaken,
+            "Nimble cards taken from rewards affected by Fresnel Lens.");
+        NimbleRow(
+            sb,
+            "reward screens",
+            agg.RewardScreensWithNimbleCards,
+            "Reward screens that offered at least one Nimble card.");
+        NimbleRow(
+            sb,
+            "reward screens with 2",
+            agg.RewardScreensWithTwoNimbleCards,
+            "Reward screens that offered exactly two Nimble cards.");
+        NimbleRow(
+            sb,
+            "reward screens with 3+",
+            agg.RewardScreensWithThreeOrMoreNimbleCards,
+            "Reward screens that offered three or more Nimble cards.");
+        NimbleRow(
+            sb,
+            "reward screens with none",
+            agg.RewardScreensWithoutNimbleCards,
+            "Reward screens that offered no Nimble cards.");
+        NimbleRow(
+            sb,
+            "offered, none taken",
+            agg.RewardScreensWithNimbleCardsButNoneTaken,
+            "Reward screens that offered Nimble cards but from which none were taken.");
         return sb.ToString();
+    }
+
+    private static void NimbleRow(
+        StringBuilder sb,
+        string label,
+        int value,
+        string fullDescription)
+    {
+        var presentation = RelicStatRowVocabulary.Create(
+            label,
+            fullDescription);
+        DescribedIconRow(
+            sb,
+            new[] { "nimble" }
+                .Concat(presentation.ConceptIds)
+                .Distinct(StringComparer.Ordinal)
+                .ToArray(),
+            presentation.DenominatorConceptIds,
+            presentation.Label,
+            value.ToString(),
+            presentation.FullDescription);
+    }
+
+    private static string BuildWingCharmBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        WingCharmSwiftRow(
+            sb,
+            "card",
+            "taken",
+            agg.WingCharmSwiftCardsTaken,
+            "Swift cards successfully taken from Wing Charm-modified rewards.");
+        WingCharmSwiftRow(
+            sb,
+            "card",
+            "not taken",
+            agg.WingCharmSwiftCardsNotTaken,
+            "Swift cards offered by Wing Charm but not taken.");
+        WingCharmSwiftRow(
+            sb,
+            "card",
+            "offered",
+            agg.WingCharmCommonSwiftCardsOffered,
+            "Common Swift cards offered by Wing Charm.");
+        WingCharmSwiftRow(
+            sb,
+            "card_uncommon",
+            "offered",
+            agg.WingCharmUncommonSwiftCardsOffered,
+            "Uncommon Swift cards offered by Wing Charm.");
+        WingCharmSwiftRow(
+            sb,
+            "card_rare",
+            "offered",
+            agg.WingCharmRareSwiftCardsOffered,
+            "Rare Swift cards offered by Wing Charm.");
+        return sb.ToString();
+    }
+
+    private static void WingCharmSwiftRow(
+        StringBuilder sb,
+        string cardConceptId,
+        string action,
+        int value,
+        string fullDescription)
+    {
+        var actionExpression = action switch
+        {
+            "offered" or "taken" =>
+                StatConceptGlossary.RenderHintedGlyph(action),
+            "not taken" =>
+                $"not {StatConceptGlossary.RenderHintedGlyph("taken")}",
+            _ => StatsTooltip.EscapeBbcode(action),
+        };
+        var iconExpression =
+            $"[b]+[/b] {StatConceptGlossary.RenderHintedGlyph("swift")} {actionExpression}";
+        DescribedIconFlowRow(
+            sb,
+            new[] { cardConceptId },
+            Array.Empty<string>(),
+            iconExpression,
+            value.ToString(),
+            fullDescription);
+    }
+
+    private static string BuildFishingRodBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        AppendUpgradedCardStats(sb, agg);
+        return sb.ToString();
+    }
+
+    private static string BuildEggBodyBBCode(RelicAggregate agg, string cardType)
+    {
+        var sb = new StringBuilder();
+        AppendEggCardRow(
+            sb,
+            cardType,
+            rarity: null,
+            count: agg.UpgradedCardsOffered,
+            action: "offered");
+        AppendEggCardRow(
+            sb,
+            cardType,
+            "common",
+            agg.UpgradedCommonCardsOffered,
+            "offered");
+        AppendEggCardRow(
+            sb,
+            cardType,
+            "uncommon",
+            agg.UpgradedUncommonCardsOffered,
+            "offered");
+        AppendEggCardRow(
+            sb,
+            cardType,
+            "rare",
+            agg.UpgradedRareCardsOffered,
+            "offered");
+        AppendEggCardRow(
+            sb,
+            cardType,
+            rarity: null,
+            count: agg.UpgradedCardsTaken,
+            action: "taken");
+        AppendEggCardRow(
+            sb,
+            cardType,
+            "common",
+            agg.UpgradedCommonCardsTaken,
+            "taken");
+        AppendEggCardRow(
+            sb,
+            cardType,
+            "uncommon",
+            agg.UpgradedUncommonCardsTaken,
+            "taken");
+        AppendEggCardRow(
+            sb,
+            cardType,
+            "rare",
+            agg.UpgradedRareCardsTaken,
+            "taken");
+        return sb.ToString();
+    }
+
+    private static void AppendEggCardRow(
+        StringBuilder sb,
+        string cardType,
+        string? rarity,
+        int count,
+        string action)
+    {
+        var pluralCardType = $"{cardType}s";
+        var rarityText = string.IsNullOrEmpty(rarity)
+            ? string.Empty
+            : $"{rarity} ";
+        var typeConceptId = string.IsNullOrEmpty(rarity)
+            ? cardType
+            : $"{cardType}_{rarity}";
+        DescribedIconRow(
+            sb,
+            ["upgraded", typeConceptId, action],
+            [],
+            string.Empty,
+            count.ToString(),
+            $"Upgraded {rarityText}{pluralCardType} {action}.");
     }
 
     private static string BuildSilverCrucibleBodyBBCode(RelicAggregate agg)
@@ -2150,17 +2563,23 @@ public static class RelicHoverShowPatch
                 candidate != null && candidate.ScreenNumber == screenNumber);
             if (screen == null)
             {
-                Row3(sb, $"Card reward {screenNumber}", "not seen yet", "");
+                TextValueRow(sb, $"Card reward {screenNumber}", "not seen yet", "");
                 continue;
             }
 
             var cards = screen.Cards ?? new List<RelicCardRewardOptionAggregate>();
             if (cards.Count == 0)
             {
-                Row3(sb, $"Card reward {screenNumber}", "no cards offered", "");
+                TextValueRow(sb, $"Card reward {screenNumber}", "no cards offered", "");
                 continue;
             }
 
+            Row3(
+                sb,
+                $"Card reward {screenNumber}",
+                string.Empty,
+                "",
+                $"The cards offered in Silver Crucible reward {screenNumber}.");
             foreach (var card in cards)
             {
                 if (card == null) continue;
@@ -2170,15 +2589,100 @@ public static class RelicHoverShowPatch
                     : !string.IsNullOrWhiteSpace(card.CardId)
                         ? RunTracker.FormatCardIdForDisplay(card.CardId)
                         : "Unknown card";
-                Row3(
+                AppendSilverCrucibleCardRow(
                     sb,
-                    $"Card reward {screenNumber}",
                     StatsTooltip.EscapeBbcode(displayName),
                     !screen.Resolved ? "pending" : card.Taken ? "taken" : "not taken");
             }
         }
 
         return sb.ToString();
+    }
+
+    private static void AppendSilverCrucibleCardRow(
+        StringBuilder sb,
+        string displayName,
+        string outcome)
+    {
+        DescribedIconFlowRow(
+            sb,
+            ["card"],
+            [],
+            $"[b]{displayName}[/b]",
+            outcome,
+            $"This card was offered by Silver Crucible and was {outcome}.");
+    }
+
+    private static string BuildOrreryBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var rewards = agg.OrreryRewards ?? new List<OrreryRewardAggregate>();
+
+        for (var rewardNumber = 1; rewardNumber <= 5; rewardNumber++)
+        {
+            var reward = rewards.LastOrDefault(candidate =>
+                candidate != null && candidate.RewardNumber == rewardNumber);
+            TextValueRow(
+                sb,
+                $"Reward {rewardNumber}",
+                reward == null ? "not seen yet" : FormatOrreryRewardOutcome(reward),
+                "");
+        }
+
+        return sb.ToString();
+    }
+
+    private static string FormatOrreryRewardOutcome(OrreryRewardAggregate reward)
+    {
+        if (string.Equals(reward.Outcome, "skipped", StringComparison.OrdinalIgnoreCase))
+            return "skipped";
+
+        if (string.Equals(reward.Outcome, "alternative", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.Equals(
+                    reward.AlternativeId,
+                    PaelsWing.sacrificeAlternativeKey,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return StatConceptGlossary.RenderInlineImage(
+                    PaelsWingIconPath);
+            }
+
+            var alternative = string.IsNullOrWhiteSpace(reward.AlternativeId)
+                ? "alternative"
+                : reward.AlternativeId.Replace('_', ' ').ToLowerInvariant();
+            return $"selected {StatsTooltip.EscapeBbcode(alternative)}";
+        }
+
+        if (string.Equals(reward.Outcome, "obtained", StringComparison.OrdinalIgnoreCase))
+        {
+            var cards = (reward.CardsObtained ?? new List<OrreryObtainedCardAggregate>())
+                .Where(card => card != null)
+                .Select(card =>
+                {
+                    var displayName = !string.IsNullOrWhiteSpace(card.DisplayName)
+                        ? card.DisplayName
+                        : !string.IsNullOrWhiteSpace(card.CardId)
+                            ? RunTracker.FormatCardIdForDisplay(card.CardId)
+                            : "Unknown card";
+                    var upgradeSuffix = card.UpgradeLevel <= 0
+                        ? ""
+                        : new string('+', card.UpgradeLevel);
+                    return StatsTooltip.EscapeBbcode(displayName + upgradeSuffix);
+                })
+                .ToList();
+            return cards.Count == 0
+                ? "obtained card"
+                : $"obtained {string.Join(", ", cards)}";
+        }
+
+        if (string.Equals(
+                reward.Outcome,
+                "completed_without_card",
+                StringComparison.OrdinalIgnoreCase))
+            return "completed without obtaining a card";
+
+        return "pending";
     }
 
     private static string BuildBloodSoakedRoseBodyBBCode(RelicAggregate agg, CardAggregate curseAgg)
@@ -2201,7 +2705,11 @@ public static class RelicHoverShowPatch
         var sb = new StringBuilder();
         Row3(sb, "Brightest Flame played", brightestFlameAgg.Plays.ToString(), "");
         Row3(sb, DrawLabel("Brightest Flame drawn"), brightestFlameAgg.TimesDrawn.ToString(), "");
-        Row3(sb, EnergyLabel("gained by Flame"), brightestFlameAgg.TotalEnergyGenerated.ToString(), "");
+        Row3(
+            sb,
+            EnergyLabel("Energy gained by Flame"),
+            brightestFlameAgg.TotalEnergyGenerated.ToString(),
+            "");
         Row3(sb, DrawLabel("Cards drawn by Flame"), brightestFlameAgg.TimesCardsDrawn.ToString(), "");
         Row3(sb, "Max HP lost to Flame", brightestFlameAgg.TotalMaxHpLost.ToString(), "");
         return sb.ToString();
@@ -2241,6 +2749,69 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
+    private static string BuildDaughterOfTheWindBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var blockPerTurn = agg.DaughterOfTheWindTurns <= 0
+            ? 0m
+            : (decimal)agg.AdditionalBlockGained / agg.DaughterOfTheWindTurns;
+        var blockPerCombat = agg.DaughterOfTheWindCombats <= 0
+            ? 0m
+            : (decimal)agg.AdditionalBlockGained / agg.DaughterOfTheWindCombats;
+
+        Row3(sb, BlockLabel("Total block gained"), agg.AdditionalBlockGained.ToString(), "");
+        Row3(sb, BlockLabel("Avg block gained per turn"), FormatDecimal(blockPerTurn), "");
+        Row3(sb, BlockLabel("Avg block gained per combat"), FormatDecimal(blockPerCombat), "");
+        return sb.ToString();
+    }
+
+    private static string BuildSturdyClampBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var blockRetainedPerTurn = agg.SturdyClampTurns <= 0
+            ? 0m
+            : (decimal)agg.SturdyClampBlockRetained / agg.SturdyClampTurns;
+        var blockRetainedPerCombat = agg.SturdyClampCombats <= 0
+            ? 0m
+            : (decimal)agg.SturdyClampBlockRetained / agg.SturdyClampCombats;
+        var excessBlockPerTurn = agg.SturdyClampTurns <= 0
+            ? 0m
+            : (decimal)agg.SturdyClampExcessBlockOverTen / agg.SturdyClampTurns;
+        var excessBlockPerCombat = agg.SturdyClampCombats <= 0
+            ? 0m
+            : (decimal)agg.SturdyClampExcessBlockOverTen / agg.SturdyClampCombats;
+
+        DescribedIconRow(
+            sb,
+            ["average", "block", "turn"],
+            ["turn"],
+            "retained",
+            FormatDecimal(blockRetainedPerTurn),
+            "Average block retained by Sturdy Clamp per turn.");
+        DescribedIconRow(
+            sb,
+            ["average", "block", "combat"],
+            ["combat"],
+            "retained",
+            FormatDecimal(blockRetainedPerCombat),
+            "Average block retained by Sturdy Clamp per combat.");
+        DescribedIconRow(
+            sb,
+            ["average", "block_wasted", "turn"],
+            ["turn"],
+            "excess over 10",
+            FormatDecimal(excessBlockPerTurn),
+            "Average block discarded above Sturdy Clamp's 10-block retention cap per turn.");
+        DescribedIconRow(
+            sb,
+            ["average", "block_wasted", "combat"],
+            ["combat"],
+            "excess over 10",
+            FormatDecimal(excessBlockPerCombat),
+            "Average block discarded above Sturdy Clamp's 10-block retention cap per combat.");
+        return sb.ToString();
+    }
+
     private static string BuildCursedPearlBodyBBCode(RelicAggregate agg, CardAggregate curseAgg)
     {
         var sb = new StringBuilder();
@@ -2272,7 +2843,7 @@ public static class RelicHoverShowPatch
                 ? RunTracker.FormatRelicIdForDisplay(relic.RelicId)
                 : relic.DisplayName);
             var value = relic.Count == 1 ? displayName : $"{displayName} x{relic.Count}";
-            Row3(sb, "Neow relic", value, "");
+            TextValueRow(sb, "Neow relic", value, "");
         }
 
         var curses = agg.CardsGranted.Values
@@ -2295,7 +2866,7 @@ public static class RelicHoverShowPatch
                 ? RunTracker.FormatCardIdForDisplay(curse.CardId)
                 : curse.DisplayName);
             var value = curse.Count == 1 ? displayName : $"{displayName} x{curse.Count}";
-            Row3(sb, "Curse added", value, "");
+            TextValueRow(sb, "Curse added", value, "");
 
             CardAggregate? curseAgg = null;
             curseAggregates?.TryGetValue(curse.CardId, out curseAgg);
@@ -2337,31 +2908,293 @@ public static class RelicHoverShowPatch
     private static string BuildCloakClaspBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
+        var blockPerTurn = agg.CloakClaspTurns <= 0
+            ? 0m
+            : (decimal)agg.AdditionalBlockGained / agg.CloakClaspTurns;
+        var blockPerCombat = agg.CloakClaspCombats <= 0
+            ? 0m
+            : (decimal)agg.AdditionalBlockGained / agg.CloakClaspCombats;
+
         Row3(sb, BlockLabel("Block gained"), agg.AdditionalBlockGained.ToString(), "");
+        Row3(sb, BlockLabel("avg block gained per turn"), FormatDecimal(blockPerTurn), "");
+        Row3(sb, BlockLabel("avg block gained per combat"), FormatDecimal(blockPerCombat), "");
         return sb.ToString();
     }
 
     private static string BuildReptileTrinketBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        var activationsPerTurn = agg.ReptileTrinketTurns <= 0
+            ? 0m
+            : (decimal)agg.Activations / agg.ReptileTrinketTurns;
+        var activationsPerCombat = agg.ReptileTrinketCombats <= 0
+            ? 0m
+            : (decimal)agg.Activations / agg.ReptileTrinketCombats;
+
+        RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, "Strength added", FormatDecimal(agg.StrengthAdded), "");
+        Row3(sb, "Avg activations per turn", FormatDecimal(activationsPerTurn), "");
+        Row3(sb, "Avg activations per combat", FormatDecimal(activationsPerCombat), "");
+        Row3(
+            sb,
+            "Turns with exactly 2 activations",
+            agg.ReptileTrinketTurnsWithExactlyTwoActivations.ToString(),
+            "");
+        Row3(
+            sb,
+            "Turns with more than 2 activations",
+            agg.ReptileTrinketTurnsWithMoreThanTwoActivations.ToString(),
+            "");
         return sb.ToString();
     }
+
+    private static string BuildRainbowRingBodyBBCode(
+        RelicAggregate agg,
+        bool attackPlayedThisTurn,
+        bool powerPlayedThisTurn,
+        bool skillPlayedThisTurn)
+    {
+        var sb = new StringBuilder();
+        var activationsPerTurn = agg.RainbowRingTurns <= 0
+            ? 0m
+            : (decimal)agg.Activations / agg.RainbowRingTurns;
+        var activationsPerCombat = agg.RainbowRingCombats <= 0
+            ? 0m
+            : (decimal)agg.Activations / agg.RainbowRingCombats;
+
+        RelicActivationRow(sb, agg.Activations.ToString());
+        Row3(sb, "Avg activations per turn", FormatDecimal(activationsPerTurn), "");
+        Row3(sb, "Avg activations per combat", FormatDecimal(activationsPerCombat), "");
+        Row3(sb, "Attack played this turn", FormatBoolean(attackPlayedThisTurn), "");
+        Row3(sb, "Power played this turn", FormatBoolean(powerPlayedThisTurn), "");
+        Row3(sb, "Skill played this turn", FormatBoolean(skillPlayedThisTurn), "");
+        return sb.ToString();
+    }
+
+    private static string BuildSparklingRougeBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(
+            sb,
+            "Combats ended on turn 1",
+            agg.SparklingRougeCombatsEndedOnTurn1.ToString(),
+            "");
+        Row3(
+            sb,
+            "Combats ended on turn 2",
+            agg.SparklingRougeCombatsEndedOnTurn2.ToString(),
+            "");
+        Row3(
+            sb,
+            "Combats ended on turn 3+",
+            agg.SparklingRougeCombatsEndedOnTurn3Plus.ToString(),
+            "");
+        return sb.ToString();
+    }
+
+    private static (
+        bool AttackPlayed,
+        bool PowerPlayed,
+        bool SkillPlayed) GetRainbowRingTurnState(RainbowRing relic)
+    {
+        try
+        {
+            return (
+                ReadPositiveInt(RainbowRingAttacksPlayedThisTurnField, relic),
+                ReadPositiveInt(RainbowRingPowersPlayedThisTurnField, relic),
+                ReadPositiveInt(RainbowRingSkillsPlayedThisTurnField, relic));
+        }
+        catch
+        {
+            return (false, false, false);
+        }
+    }
+
+    private static bool ReadPositiveInt(
+        System.Reflection.FieldInfo? field,
+        object instance)
+        => field?.GetValue(instance) is int value && value > 0;
+
+    private static string FormatBoolean(bool value)
+        => value ? "true" : "false";
 
     private static string BuildGorgetBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, "Plating added", FormatDecimal(agg.PlatingAdded), "");
         return sb.ToString();
     }
 
+    private static string BuildBeatingRemnantBodyBBCode(RelicAggregate agg)
+    {
+        var preventedPerTurn = agg.BeatingRemnantTurns <= 0
+            ? 0m
+            : agg.BeatingRemnantHpLossPrevented / agg.BeatingRemnantTurns;
+        var preventedPerCombat = agg.BeatingRemnantCombats <= 0
+            ? 0m
+            : agg.BeatingRemnantHpLossPrevented / agg.BeatingRemnantCombats;
+
+        var sb = new StringBuilder();
+        Row3(
+            sb,
+            "HP loss prevented",
+            FormatDecimal(agg.BeatingRemnantHpLossPrevented),
+            "");
+        Row3(
+            sb,
+            "Avg HP loss prevented per turn",
+            FormatDecimal(preventedPerTurn),
+            "");
+        Row3(
+            sb,
+            "Avg HP loss prevented per combat",
+            FormatDecimal(preventedPerCombat),
+            "");
+        return sb.ToString();
+    }
+
+    private static string BuildWhisperingEarringBodyBBCode(RelicAggregate agg)
+    {
+        var lifeLostPerCombat = agg.WhisperingEarringCombats <= 0
+            ? 0m
+            : agg.WhisperingEarringFirstRoundHpLost / agg.WhisperingEarringCombats;
+
+        var sb = new StringBuilder();
+        Row3(
+            sb,
+            "Total life lost, player's first turn through opponent's first turn",
+            FormatDecimal(agg.WhisperingEarringFirstRoundHpLost),
+            "");
+        Row3(
+            sb,
+            "Avg life lost, player's first turn through opponent's first turn per combat",
+            FormatDecimal(lifeLostPerCombat),
+            "");
+        return sb.ToString();
+    }
+
+    private static string BuildTungstenRodBodyBBCode(RelicAggregate agg)
+    {
+        var turns = agg.TungstenRodTurns;
+        var combats = agg.TungstenRodCombats;
+        var sb = new StringBuilder();
+
+        AddPreventionRows(
+            "Damage prevented",
+            "Lost life prevented",
+            agg.TungstenRodDamagePrevented,
+            turns,
+            combats,
+            "HP loss prevented by Tungsten Rod.",
+            "Average HP loss prevented by Tungsten Rod per player turn while it was held.",
+            "Average HP loss prevented by Tungsten Rod per combat while it was held.");
+        AddPreventionRows(
+            "Self-inflicted lost life prevented",
+            "Self-inflicted lost life prevented",
+            agg.TungstenRodSelfDamagePrevented,
+            turns,
+            combats,
+            "HP loss prevented from the player's own non-Curse, non-Status cards and Buff powers.",
+            "Average self-inflicted HP loss prevented per player turn while Tungsten Rod was held.",
+            "Average self-inflicted HP loss prevented per combat while Tungsten Rod was held.");
+        AddPreventionRows(
+            "Curse-inflicted lost life prevented",
+            "Curse-inflicted lost life prevented",
+            agg.TungstenRodCurseDamagePrevented,
+            turns,
+            combats,
+            "HP loss prevented from direct Curse-card damage.",
+            "Average Curse-inflicted HP loss prevented per player turn while Tungsten Rod was held.",
+            "Average Curse-inflicted HP loss prevented per combat while Tungsten Rod was held.");
+        AddPreventionRows(
+            "Status-inflicted lost life prevented",
+            "Status-inflicted lost life prevented",
+            agg.TungstenRodStatusDamagePrevented,
+            turns,
+            combats,
+            "HP loss prevented from direct Status-card damage.",
+            "Average Status-inflicted HP loss prevented per player turn while Tungsten Rod was held.",
+            "Average Status-inflicted HP loss prevented per combat while Tungsten Rod was held.");
+        AddPreventionRows(
+            "Enemy-source lost life prevented",
+            "Enemy-source lost life prevented",
+            agg.TungstenRodEnemyDamagePrevented,
+            turns,
+            combats,
+            "HP loss prevented from enemy creatures and Debuff powers.",
+            "Average enemy-source HP loss prevented per player turn while Tungsten Rod was held.",
+            "Average enemy-source HP loss prevented per combat while Tungsten Rod was held.");
+
+        return sb.ToString();
+
+        void AddPreventionRows(
+            string totalLabel,
+            string averageLabel,
+            decimal total,
+            int turnCount,
+            int combatCount,
+            string totalDescription,
+            string turnDescription,
+            string combatDescription)
+        {
+            var perTurn = turnCount <= 0 ? 0m : total / turnCount;
+            var perCombat = combatCount <= 0 ? 0m : total / combatCount;
+
+            Row3(sb, totalLabel, FormatDecimal(total), "", totalDescription);
+            Row3(
+                sb,
+                $"Avg {LowercaseFirst(averageLabel)} per turn",
+                FormatDecimal(perTurn),
+                "",
+                turnDescription);
+            Row3(
+                sb,
+                $"Avg {LowercaseFirst(averageLabel)} per combat",
+                FormatDecimal(perCombat),
+                "",
+                combatDescription);
+        }
+    }
+
+    private static string LowercaseFirst(string value)
+        => string.IsNullOrEmpty(value)
+            ? value
+            : char.ToLowerInvariant(value[0]) + value[1..];
+
     private static string BuildStoneCrackerBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        var upgradedPlaysPerTurn = agg.StoneCrackerTurns <= 0
+            ? 0m
+            : (decimal)agg.StoneCrackerUpgradedCardPlays / agg.StoneCrackerTurns;
+        var upgradedPlaysPerCombat = agg.StoneCrackerCombats <= 0
+            ? 0m
+            : (decimal)agg.StoneCrackerUpgradedCardPlays / agg.StoneCrackerCombats;
+
+        RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, "Cards upgraded", agg.CardsUpgraded.ToString(), "");
+        Row3(sb, "Upgraded commons", agg.StoneCrackerUpgradedCommons.ToString(), "");
+        Row3(sb, "Upgraded uncommons", agg.StoneCrackerUpgradedUncommons.ToString(), "");
+        Row3(sb, "Upgraded rares", agg.StoneCrackerUpgradedRares.ToString(), "");
+        Row3(
+            sb,
+            "Cards played upgraded",
+            agg.StoneCrackerUpgradedCardPlays.ToString(),
+            "",
+            "Cards upgraded by Stone Cracker that were played.");
+        Row3(
+            sb,
+            "Avg cards played upgraded per turn",
+            FormatDecimal(upgradedPlaysPerTurn),
+            "",
+            "Average number of cards upgraded by Stone Cracker that were played per turn.");
+        Row3(
+            sb,
+            "Avg cards played upgraded per combat",
+            FormatDecimal(upgradedPlaysPerCombat),
+            "",
+            "Average number of cards upgraded by Stone Cracker that were played per combat.");
         return sb.ToString();
     }
 
@@ -2399,6 +3232,33 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
+    private static string BuildWarHammerBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var cardsPerActivation = agg.Activations <= 0
+            ? 0m
+            : (decimal)agg.CardsUpgraded / agg.Activations;
+        var upgradedPlaysPerTurn = agg.WarHammerTurns <= 0
+            ? 0m
+            : (decimal)agg.WarHammerUpgradedCardPlays / agg.WarHammerTurns;
+        var upgradedPlaysPerCombat = agg.WarHammerCombats <= 0
+            ? 0m
+            : (decimal)agg.WarHammerUpgradedCardPlays / agg.WarHammerCombats;
+
+        RelicActivationRow(sb, agg.Activations.ToString());
+        Row3(sb, "Cards upgraded", agg.CardsUpgraded.ToString(), "");
+        Row3(sb, "Avg cards upgraded/activation", FormatDecimal(cardsPerActivation), "");
+        foreach (var card in (agg.UpgradedCards ?? new List<string>())
+                     .Where(card => !string.IsNullOrWhiteSpace(card)))
+        {
+            TextValueRow(sb, "Upgraded card", StatsTooltip.EscapeBbcode(card), "");
+        }
+        Row3(sb, "Upgraded-card plays", agg.WarHammerUpgradedCardPlays.ToString(), "");
+        Row3(sb, "Avg upgraded plays/turn", FormatDecimal(upgradedPlaysPerTurn), "");
+        Row3(sb, "Avg upgraded plays/combat", FormatDecimal(upgradedPlaysPerCombat), "");
+        return sb.ToString();
+    }
+
     private static string BuildSandCastleBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
@@ -2409,14 +3269,115 @@ public static class RelicHoverShowPatch
     private static string BuildWhetstoneBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
+        AppendUpgradedCardStats(
+            sb,
+            agg,
+            totalLabel: "Attacks upgraded",
+            itemLabel: "Upgraded attack");
+        return sb.ToString();
+    }
+
+    private static string BuildYummyCookieBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
         AppendUpgradedCardStats(sb, agg);
+        return sb.ToString();
+    }
+
+    private static string BuildGnarledHammerBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var cards = (agg.SharpEnchantedCards ?? new List<string>())
+            .Where(card => !string.IsNullOrWhiteSpace(card))
+            .ToList();
+
+        Row3(sb, "Cards enchanted with Sharp", cards.Count.ToString(), "");
+        foreach (var card in cards)
+            TextValueRow(sb, "Sharp-enchanted card", StatsTooltip.EscapeBbcode(card), "");
+        return sb.ToString();
+    }
+
+    private static string BuildSilkenTressBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var cards = (agg.SilkenTressGlamCards ?? new List<string>())
+            .Where(card => !string.IsNullOrWhiteSpace(card))
+            .ToList();
+
+        if (cards.Count == 0)
+        {
+            SilkenTressGlamCardRow(sb, "none");
+            return sb.ToString();
+        }
+
+        foreach (var card in cards)
+            SilkenTressGlamCardRow(sb, StatsTooltip.EscapeBbcode(card));
+
+        return sb.ToString();
+    }
+
+    private static void SilkenTressGlamCardRow(
+        StringBuilder sb,
+        string value)
+    {
+        var iconExpression =
+            $"[b]+[/b] {StatConceptGlossary.RenderHintedGlyph("glam")}";
+        DescribedIconFlowRow(
+            sb,
+            new[] { "card" },
+            Array.Empty<string>(),
+            iconExpression,
+            value,
+            "The card successfully taken after Silken Tress applied Glam.");
+    }
+
+    private static string BuildTriBoomerangBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var cards = (agg.TriBoomerangInstinctCards
+                ?? new List<RelicEnchantedCardAggregate>())
+            .Where(card =>
+                card != null
+                && !string.IsNullOrWhiteSpace(card.CardInstanceId))
+            .ToList();
+        decimal playsPerCombat = agg.TriBoomerangCombats > 0
+            ? (decimal)agg.TriBoomerangInstinctCardPlays
+                / agg.TriBoomerangCombats
+            : 0m;
+
+        Row3(sb, "Cards enchanted with Instinct", cards.Count.ToString(), "");
+        foreach (var card in cards)
+        {
+            var displayName = string.IsNullOrWhiteSpace(card.DisplayName)
+                ? card.CardInstanceId
+                : card.DisplayName;
+            TextValueRow(
+                sb,
+                "Instinct-enchanted card",
+                StatsTooltip.EscapeBbcode(displayName),
+                "");
+        }
+        Row3(
+            sb,
+            "Times Instinct cards were played",
+            agg.TriBoomerangInstinctCardPlays.ToString(),
+            "");
+        Row3(
+            sb,
+            "Avg Instinct-card plays per combat",
+            FormatDecimal(playsPerCombat),
+            "");
         return sb.ToString();
     }
 
     private static string BuildWarPaintBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        AppendUpgradedCardStats(sb, agg);
+        AppendUpgradedCardStats(
+            sb,
+            agg,
+            totalLabel: "Skills upgraded",
+            itemLabel: "Upgraded skill");
         return sb.ToString();
     }
 
@@ -2427,21 +3388,33 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
-    private static void AppendUpgradedCardStats(StringBuilder sb, RelicAggregate agg)
+    private static void AppendUpgradedCardStats(
+        StringBuilder sb,
+        RelicAggregate agg,
+        string totalLabel = "Cards upgraded",
+        string itemLabel = "Upgraded card")
     {
         var upgradedCards = (agg.UpgradedCards ?? new System.Collections.Generic.List<string>())
             .Where(card => !string.IsNullOrWhiteSpace(card))
             .ToList();
 
-        Row3(sb, "Cards upgraded", agg.CardsUpgraded.ToString(), "");
+        Row3(sb, totalLabel, agg.CardsUpgraded.ToString(), "");
         foreach (var card in upgradedCards)
-            Row3(sb, "Upgraded card", StatsTooltip.EscapeBbcode(card), "");
+            TextValueRow(sb, itemLabel, StatsTooltip.EscapeBbcode(card), "");
     }
 
     private static string BuildMealTicketBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
+        AppendHealingStats(sb, agg);
+        return sb.ToString();
+    }
+
+    private static string BuildMeatOnTheBoneBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        RelicActivationRow(sb, agg.Activations.ToString());
         AppendHealingStats(sb, agg);
         return sb.ToString();
     }
@@ -2449,7 +3422,7 @@ public static class RelicHoverShowPatch
     private static string BuildPlanisphereBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "? floors gained", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         AppendHealingStats(sb, agg);
         return sb.ToString();
     }
@@ -2470,7 +3443,7 @@ public static class RelicHoverShowPatch
     private static string BuildPantographBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         AppendHealingStats(sb, agg, lostLabel: "healing wasted", reasonPrefix: "wasted to");
         return sb.ToString();
     }
@@ -2478,8 +3451,38 @@ public static class RelicHoverShowPatch
     private static string BuildBurningBloodBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
-        AppendHealingStats(sb, agg);
+        ConceptRow(
+            sb,
+            "activation",
+            agg.Activations.ToString(),
+            "Times Burning Blood has activated.");
+        ConceptRow(
+            sb,
+            "healing_gained",
+            FormatDecimal(agg.TotalHealingRestored),
+            "Total HP restored by Burning Blood.");
+        ConceptRow(
+            sb,
+            "healing_blocked",
+            FormatDecimal(agg.TotalHealingLost),
+            "Total Burning Blood healing that did not restore HP.");
+
+        if (agg.TotalHealingLost <= 0m) return sb.ToString();
+
+        foreach (var reason in NonRedundantHealingLostReasons(agg))
+        {
+            var reasonName = string.IsNullOrWhiteSpace(reason.DisplayName)
+                ? "other/prevented causes"
+                : StatsTooltip.EscapeBbcode(reason.DisplayName);
+            DescribedIconRow(
+                sb,
+                ["healing_blocked"],
+                [],
+                $"blocked by {reasonName}",
+                FormatDecimal(reason.Amount),
+                $"Burning Blood healing that did not restore HP because of {reasonName}.");
+        }
+
         return sb.ToString();
     }
 
@@ -2491,10 +3494,18 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
+    private static string BuildFakeLeesWaffleBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        RelicActivationRow(sb, agg.Activations.ToString());
+        AppendHealingStats(sb, agg);
+        return sb.ToString();
+    }
+
     private static string BuildStrawberryBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         AppendMaxHpChangeRows(sb, agg, "Max HP gained", agg.MaxHpGained);
         return sb.ToString();
     }
@@ -2502,7 +3513,7 @@ public static class RelicHoverShowPatch
     private static string BuildPearBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         AppendMaxHpChangeRows(sb, agg, "Max HP gained", agg.MaxHpGained);
         return sb.ToString();
     }
@@ -2510,8 +3521,49 @@ public static class RelicHoverShowPatch
     private static string BuildNutritiousOysterBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         AppendMaxHpChangeRows(sb, agg, "Max HP gained", agg.MaxHpGained);
+        return sb.ToString();
+    }
+
+    private static string BuildMangoBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        RelicActivationRow(sb, agg.Activations.ToString());
+        AppendMaxHpChangeRows(sb, agg, "Max HP gained", agg.MaxHpGained);
+        return sb.ToString();
+    }
+
+    private static string BuildStoneHumidifierBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var activations = agg.MaxHpActivations
+            ?? new List<RelicMaxHpActivationAggregate>();
+
+        RelicActivationRow(
+            sb,
+            agg.Activations.ToString(),
+            "Times triggered — the number of times this relic has activated.");
+        Row3(sb, "Max HP gained", FormatDecimal(Math.Max(0m, agg.MaxHpGained)), "");
+
+        for (var index = 0; index < activations.Count; index++)
+        {
+            var activation = activations[index];
+            if (activation == null) continue;
+
+            var activationNumber = index + 1;
+            Row3(
+                sb,
+                $"Activation {activationNumber} starting HP",
+                FormatDecimal(Math.Max(0m, activation.StartingHp)),
+                "");
+            Row3(
+                sb,
+                $"Activation {activationNumber} resulting HP",
+                FormatDecimal(Math.Max(0m, activation.ResultingHp)),
+                "");
+        }
+
         return sb.ToString();
     }
 
@@ -2531,10 +3583,246 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
+    private static string BuildLuckyFyshBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Gold gained", agg.GoldGained.ToString(), "");
+        Row3(sb, "Cards added to deck", agg.CardsAddedToDeck.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildBowlerHatBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var averageExtraGold = agg.Activations <= 0
+            ? 0m
+            : (decimal)agg.GoldGained / agg.Activations;
+
+        RelicActivationRow(
+            sb,
+            agg.Activations.ToString(),
+            "Activations — positive gold grants where Bowler Hat's 25% increase added at least one gold after integer truncation.");
+        Row3(
+            sb,
+            "Extra gold gained",
+            agg.GoldGained.ToString(),
+            "",
+            "Extra gold gained — gold that actually reached the player beyond each grant's unmodified integer amount.");
+        Row3(
+            sb,
+            "Avg extra gold/activation",
+            FormatDecimal(averageExtraGold),
+            "",
+            "Average extra gold per activation — observed Bowler Hat bonus gold divided by successful positive-integer bonuses.");
+        return sb.ToString();
+    }
+
+    private static string BuildAmethystAubergineBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        RelicActivationRow(
+            sb,
+            agg.Activations.ToString(),
+            "Times triggered — successful Amethyst Aubergine reward additions.");
+        Row3(
+            sb,
+            "Extra gold received",
+            agg.GoldGained.ToString(),
+            "",
+            "Extra gold received — the total amount on Gold rewards added by Amethyst Aubergine.");
+        return sb.ToString();
+    }
+
+    private static string BuildWongosMysteryTicketBodyBBCode(
+        RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var floorsBeforeActivation =
+            agg.FloorAcquired.HasValue && agg.FloorActivated.HasValue
+                ? Math.Max(
+                    0,
+                    agg.FloorActivated.Value - agg.FloorAcquired.Value)
+                    .ToString()
+                : "not yet";
+
+        Row3(
+            sb,
+            "Floors ascended before activating",
+            floorsBeforeActivation,
+            "",
+            "Floors ascended before activating — the distance from receiving Wongo's Mystery Ticket to the combat reward where it activated.");
+
+        var relics = agg.RelicsGranted.Values
+            .Where(relic => relic.Count > 0)
+            .OrderByDescending(relic => relic.Count)
+            .ThenBy(
+                relic => relic.DisplayName,
+                StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var total = relics.Sum(relic => Math.Max(0, relic.Count));
+        Row3(
+            sb,
+            "Relics received",
+            total.ToString(),
+            "",
+            "Relics received — relics successfully claimed from Wongo's Mystery Ticket rewards.");
+
+        foreach (var relic in relics)
+        {
+            var displayName = StatsTooltip.EscapeBbcode(
+                string.IsNullOrWhiteSpace(relic.DisplayName)
+                    ? RunTracker.FormatRelicIdForDisplay(relic.RelicId)
+                    : relic.DisplayName);
+            var value = relic.Count == 1
+                ? displayName
+                : $"{displayName} x{relic.Count}";
+            TextValueRow(sb, "Relic received", value, "");
+        }
+
+        return sb.ToString();
+    }
+
+    private static string BuildMawBankBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        RelicActivationRow(
+            sb,
+            agg.Activations.ToString(),
+            "Activations — completed room entries where Maw Bank was still active.");
+        Row3(
+            sb,
+            "Gold gained",
+            agg.GoldGained.ToString(),
+            "",
+            "Gold gained — the actual gold added by Maw Bank across its completed activations.");
+        Row3(
+            sb,
+            "Shops skipped",
+            agg.MawBankShopsSkipped.ToString(),
+            "",
+            "Shops skipped — shops entered while Maw Bank was active and left without spending gold.");
+        Row3(
+            sb,
+            "Gold spent outside shops",
+            agg.MawBankGoldSpentOutsideShops.ToString(),
+            "",
+            "Gold spent outside shops — actual gold spent while Maw Bank was active and the current room was not a shop.");
+        return sb.ToString();
+    }
+
+    private static string BuildOldCoinBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(
+            sb,
+            "Granted gold spent",
+            $"{agg.OldCoinGoldSpent}/{agg.OldCoinGoldGranted}",
+            "",
+            "Granted gold spent — how much of Old Coin's observed gold grant was later consumed by purchases.");
+        return sb.ToString();
+    }
+
+    private static string BuildBookOfFiveRingsBodyBBCode(
+        RelicAggregate agg,
+        int? currentFloor,
+        int? floorAcquiredFallback = null)
+    {
+        var sb = new StringBuilder();
+        var floorAcquired = agg.FloorAcquired ?? floorAcquiredFallback;
+        var floorsHeld = currentFloor.HasValue && floorAcquired.HasValue
+            ? Math.Max(1, currentFloor.Value - floorAcquired.Value + 1)
+            : Math.Max(1, currentFloor ?? 1);
+        var cardsPerFloor = (decimal)agg.CardsAddedToDeck / floorsHeld;
+
+        Row3(sb, "Total cards added to deck", agg.CardsAddedToDeck.ToString(), "");
+        Row3(sb, "Avg cards added per floor", FormatDecimal(cardsPerFloor), "");
+        RelicActivationRow(
+            sb,
+            agg.Activations.ToString(),
+            "Total times triggered — the number of times this relic has activated.");
+        Row3(sb, "Total HP healed", FormatDecimal(agg.TotalHealingRestored), "");
+        Row3(sb, "Total HP healing blocked", FormatDecimal(agg.TotalHealingLost), "");
+        Row3(sb, "Card rewards skipped", agg.CardRewardsSkipped.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildSignetRingBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(
+            sb,
+            "Floors traveled until next shop reached",
+            (agg.FloorsTraveledUntilNextShop ?? 0).ToString(),
+            "");
+        return sb.ToString();
+    }
+
+    private static string BuildWingedBootsBodyBBCode(
+        RelicAggregate agg,
+        int liveTimesUsed = 0)
+    {
+        var sb = new StringBuilder();
+        var destinations = agg.WingedBootsDestinations
+            ?? new List<WingedBootsDestinationAggregate>();
+
+        for (var useNumber = 1; useNumber <= 3; useNumber++)
+        {
+            var destination = destinations.FirstOrDefault(
+                entry => entry != null && entry.UseNumber == useNumber);
+            var value = destination != null
+                ? FormatWingedBootsDestinationIcon(destination.Destination)
+                : useNumber <= liveTimesUsed
+                    ? "not tracked"
+                    : "not used yet";
+
+            DescribedIconFlowRow(
+                sb,
+                ["floor"],
+                [],
+                string.Empty,
+                value,
+                WingedBootsDestinationDescription(useNumber));
+        }
+
+        return sb.ToString();
+    }
+
+    private static string FormatWingedBootsDestinationIcon(string? destination)
+    {
+        if (string.Equals(destination, "elite", StringComparison.Ordinal))
+            return StatConceptGlossary.RenderHintedGlyph("elite");
+
+        var iconPath = destination switch
+        {
+            "combat" => MapCombatIconPath,
+            "shop" => MapShopIconPath,
+            "question_mark" => MapUnknownIconPath,
+            "treasure" => MapTreasureIconPath,
+            "rest_site" => MapRestSiteIconPath,
+            _ => null,
+        };
+
+        var displayName = RunTracker.FormatWingedBootsDestination(destination);
+        return iconPath == null
+            ? StatsTooltip.EscapeBbcode(displayName)
+            : StatConceptGlossary.RenderHintedInlineImage(
+                iconPath,
+                $"{displayName} destination");
+    }
+
+    private static string WingedBootsDestinationDescription(int useNumber)
+        => useNumber switch
+        {
+            1 => "The destination reached by the first use of Winged Boots.",
+            2 => "The destination reached by the second use of Winged Boots.",
+            3 => "The destination reached by the third use of Winged Boots.",
+            _ => "A destination reached by using Winged Boots.",
+        };
+
     private static string BuildLeafyPoulticeBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         AppendMaxHpChangeRows(sb, agg, "Max HP lost", MaxHpLost(agg));
         AppendCardTransformationRows(sb, agg, expectedCount: 2);
         return sb.ToString();
@@ -2543,7 +3831,7 @@ public static class RelicHoverShowPatch
     private static string BuildRegalPillowBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         AppendHealingStats(sb, agg);
         return sb.ToString();
     }
@@ -2557,7 +3845,7 @@ public static class RelicHoverShowPatch
 
         Row3(sb, "Cards removed", cardsRemoved.Count.ToString(), "");
         foreach (var card in cardsRemoved)
-            Row3(sb, "Removed card", StatsTooltip.EscapeBbcode(card), "");
+            TextValueRow(sb, "Removed card", StatsTooltip.EscapeBbcode(card), "");
 
         AppendMaxHpChangeRows(sb, agg, "Max HP lost", MaxHpLost(agg));
         return sb.ToString();
@@ -2566,7 +3854,7 @@ public static class RelicHoverShowPatch
     private static string BuildBloodVialBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         AppendHealingStats(sb, agg);
         return sb.ToString();
     }
@@ -2574,7 +3862,7 @@ public static class RelicHoverShowPatch
     private static string BuildToolboxBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, "Uncommon cards offered", agg.UncommonCardsOffered.ToString(), "");
         Row3(sb, "Rare cards offered", agg.RareCardsOffered.ToString(), "");
         Row3(sb, "Uncommon cards taken", agg.UncommonCardsTaken.ToString(), "");
@@ -2582,11 +3870,124 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
+    private static string BuildWhiteStarBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        RelicActivationRow(
+            sb,
+            agg.Activations.ToString(),
+            "Activations — extra rare card rewards created by White Star after Elite victories.");
+        DescribedIconRow(
+            sb,
+            ["card_rare", "offered"],
+            [],
+            string.Empty,
+            agg.RareCardsOffered.ToString(),
+            "Rares offered — Rare card options generated by White Star, including rerolled options.");
+        DescribedIconRow(
+            sb,
+            ["attack_rare", "offered"],
+            [],
+            string.Empty,
+            agg.RareAttackCardsOffered.ToString(),
+            "Rare Attacks offered — Rare Attack options generated by White Star.");
+        DescribedIconRow(
+            sb,
+            ["skill_rare", "offered"],
+            [],
+            string.Empty,
+            agg.RareSkillCardsOffered.ToString(),
+            "Rare Skills offered — Rare Skill options generated by White Star.");
+        DescribedIconRow(
+            sb,
+            ["power_rare", "offered"],
+            [],
+            string.Empty,
+            agg.RarePowerCardsOffered.ToString(),
+            "Rare Powers offered — Rare Power options generated by White Star.");
+        DescribedIconRow(
+            sb,
+            ["card_rare"],
+            [],
+            "reward screens declined",
+            agg.RareCardRewardScreensDeclined.ToString(),
+            "Rare card reward screens declined — White Star rewards terminally resolved without taking a Rare card.");
+        return sb.ToString();
+    }
+
+    private static string BuildPrayerWheelBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        DescribedIconRow(
+            sb,
+            ["card"],
+            [],
+            "extra reward screens",
+            agg.PrayerWheelExtraRewardScreens.ToString(),
+            "Extra reward screens — additional card rewards created by Prayer Wheel after normal monster combats.");
+        DescribedIconRow(
+            sb,
+            ["card"],
+            [],
+            "extra reward screens rejected",
+            agg.PrayerWheelExtraRewardScreensRejected.ToString(),
+            "Times extra reward screen rejected — Prayer Wheel rewards terminally resolved without taking a card.");
+        DescribedIconRow(
+            sb,
+            ["card", "offered"],
+            [],
+            string.Empty,
+            agg.CommonCardsOffered.ToString(),
+            "Commons offered — Common card options generated by Prayer Wheel, including rerolled options.");
+        DescribedIconRow(
+            sb,
+            ["card_uncommon", "offered"],
+            [],
+            string.Empty,
+            agg.UncommonCardsOffered.ToString(),
+            "Uncommons offered — Uncommon card options generated by Prayer Wheel, including rerolled options.");
+        DescribedIconRow(
+            sb,
+            ["card_rare", "offered"],
+            [],
+            string.Empty,
+            agg.RareCardsOffered.ToString(),
+            "Rares offered — Rare card options generated by Prayer Wheel, including rerolled options.");
+        DescribedIconRow(
+            sb,
+            ["card", "taken"],
+            [],
+            string.Empty,
+            agg.CommonCardsTaken.ToString(),
+            "Commons taken — Common cards obtained from Prayer Wheel's extra rewards.");
+        DescribedIconRow(
+            sb,
+            ["card_uncommon", "taken"],
+            [],
+            string.Empty,
+            agg.UncommonCardsTaken.ToString(),
+            "Uncommons taken — Uncommon cards obtained from Prayer Wheel's extra rewards.");
+        DescribedIconRow(
+            sb,
+            ["card_rare", "taken"],
+            [],
+            string.Empty,
+            agg.RareCardsTaken.ToString(),
+            "Rares taken — Rare cards obtained from Prayer Wheel's extra rewards.");
+        return sb.ToString();
+    }
+
     private static string BuildHeftyTabletBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
         var cardsGranted = agg.CardsGranted.Values.Sum(card => Math.Max(0, card.Count));
-        Row3(sb, "Cards granted", cardsGranted.ToString(), "");
+        DescribedIconRow(
+            sb,
+            ["card_rare"],
+            [],
+            "[b]+[/b]",
+            cardsGranted.ToString(),
+            "Rare cards granted by Hefty Tablet.");
         Row3(sb, "Skipped", agg.CardChoicesSkipped.ToString(), "");
 
         foreach (var card in agg.CardsGranted.Values
@@ -2598,7 +3999,13 @@ public static class RelicHoverShowPatch
                 ? RunTracker.FormatCardIdForDisplay(card.CardId)
                 : card.DisplayName);
             var value = card.Count == 1 ? displayName : $"{displayName} x{card.Count}";
-            Row3(sb, "Granted", value, "");
+            DescribedIconFlowRow(
+                sb,
+                ["card_rare"],
+                [],
+                "[b]+[/b]",
+                value,
+                $"The Rare card granted by Hefty Tablet: {displayName}.");
         }
 
         return sb.ToString();
@@ -2625,7 +4032,7 @@ public static class RelicHoverShowPatch
                 ? RunTracker.FormatCardIdForDisplay(card.CardId)
                 : card.DisplayName);
             var value = card.Count == 1 ? displayName : $"{displayName} x{card.Count}";
-            Row3(sb, "Rare received", value, "");
+            TextValueRow(sb, "Rare received", value, "");
         }
 
         return sb.ToString();
@@ -2649,7 +4056,7 @@ public static class RelicHoverShowPatch
                 ? RunTracker.FormatRelicIdForDisplay(relic.RelicId)
                 : relic.DisplayName);
             var value = relic.Count == 1 ? displayName : $"{displayName} x{relic.Count}";
-            Row3(sb, "Obtained", value, "");
+            TextValueRow(sb, "Obtained", value, "");
         }
 
         return sb.ToString();
@@ -2657,7 +4064,78 @@ public static class RelicHoverShowPatch
 
     private static string BuildPaelsWingBodyBBCode(RelicAggregate agg)
     {
-        return BuildPaelsWingBodyBBCodeForFloor(agg, RunTracker.GetCurrentFloorForRateStats(), floorAdded: null);
+        var sb = new StringBuilder();
+        Row3(sb, "common cards consumed", agg.CommonCardsConsumed.ToString(), "");
+        Row3(sb, "uncommon cards consumed", agg.UncommonCardsConsumed.ToString(), "");
+        Row3(sb, "rare cards consumed", agg.RareCardsConsumed.ToString(), "");
+        var relics = agg.RelicsGranted.Values
+            .Where(relic => relic.Count > 0)
+            .OrderByDescending(relic => relic.Count)
+            .ThenBy(relic => relic.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var relicsGained = relics.Sum(relic => Math.Max(0, relic.Count));
+        Row3(sb, "Relics gained", relicsGained.ToString(), "");
+
+        foreach (var relic in relics)
+        {
+            var value = RenderGrantedRelic(relic);
+            TextValueRow(sb, "Relic gained", value, "");
+        }
+
+        Row3(sb, "Sacrifices made", agg.SacrificesMade.ToString(), "");
+        Row3(sb, "Sacrifices skipped", agg.SacrificesSkipped.ToString(), "");
+        var sacrificesMade = Math.Max(0, agg.SacrificesMade);
+        var sacrificeOpportunities = sacrificesMade + Math.Max(0, agg.SacrificesSkipped);
+        if (sacrificeOpportunities > 0)
+        {
+            var ratePercent = 100m * sacrificesMade / sacrificeOpportunities;
+            Row3(
+                sb,
+                "Sacrifice rate",
+                $"{sacrificesMade}/{sacrificeOpportunities}",
+                $"{FormatDecimal(ratePercent)}%");
+        }
+
+        return sb.ToString();
+    }
+
+    private static string RenderGrantedRelic(RelicGrantedAggregate relic)
+    {
+        var displayName = string.IsNullOrWhiteSpace(relic.DisplayName)
+            ? RunTracker.FormatRelicIdForDisplay(relic.RelicId)
+            : relic.DisplayName;
+        var icon = StatConceptGlossary.RenderHintedInlineImage(
+            ResolveGrantedRelicIconPath(relic.RelicId),
+            displayName);
+        return relic.Count > 1 ? $"{icon} ×{relic.Count}" : icon;
+    }
+
+    internal static string ResolveGrantedRelicIconPath(string? relicId)
+    {
+        if (string.IsNullOrWhiteSpace(relicId))
+            return GenericRelicIconPath;
+
+        try
+        {
+            var modelId = ModelId.Deserialize(relicId);
+            var relicModel = ModelDb.GetByIdOrNull<RelicModel>(modelId);
+            if (!string.IsNullOrWhiteSpace(relicModel?.IconPath))
+                return relicModel.IconPath;
+
+            if (string.Equals(modelId.Category, "RELIC", StringComparison.Ordinal)
+                && !string.IsNullOrWhiteSpace(modelId.Entry))
+            {
+                return $"res://images/atlases/relic_atlas.sprites/"
+                       + $"{modelId.Entry.ToLowerInvariant()}.tres";
+            }
+        }
+        catch
+        {
+            // Historical data can outlive a removed model. Use the generic
+            // relic artwork instead of restoring the old text-only value.
+        }
+
+        return GenericRelicIconPath;
     }
 
     private static string BuildPaelsToothBodyBBCode(RelicAggregate agg)
@@ -2680,66 +4158,40 @@ public static class RelicHoverShowPatch
                     displayName += new string('+', card.UpgradeLevel);
             }
 
-            Row3(sb, "Returned card", StatsTooltip.EscapeBbcode(displayName), "");
+            TextValueRow(sb, "Returned card", StatsTooltip.EscapeBbcode(displayName), "");
         }
 
         return sb.ToString();
     }
 
-    private static string BuildPaelsWingBodyBBCodeForFloor(
-        RelicAggregate agg,
-        int? floorReached,
-        int? floorAdded)
+    private static string BuildPaelsClawBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "common cards consumed", agg.CommonCardsConsumed.ToString(), "");
-        Row3(sb, "uncommon cards consumed", agg.UncommonCardsConsumed.ToString(), "");
-        Row3(sb, "rare cards consumed", agg.RareCardsConsumed.ToString(), "");
-        var artifacts = agg.RelicsGranted.Values
-            .Where(artifact => artifact.Count > 0)
-            .OrderByDescending(artifact => artifact.Count)
-            .ThenBy(artifact => artifact.DisplayName, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-        var artifactsGained = artifacts.Sum(artifact => Math.Max(0, artifact.Count));
-        Row3(sb, "Artifacts gained", artifactsGained.ToString(), "");
+        var goopyCardsPlayedPerTurn = agg.PaelsClawTurns <= 0
+            ? 0m
+            : (decimal)agg.PaelsClawGoopyCardsPlayed / agg.PaelsClawTurns;
+        var goopyCardsPlayedPerCombat = agg.PaelsClawCombats <= 0
+            ? 0m
+            : (decimal)agg.PaelsClawGoopyCardsPlayed / agg.PaelsClawCombats;
+        var enhancementsPerGoopyCard = agg.PaelsClawGoopyCards <= 0
+            ? 0m
+            : (decimal)agg.PaelsClawGoopyEnhancements / agg.PaelsClawGoopyCards;
 
-        foreach (var artifact in artifacts)
-        {
-            var displayName = StatsTooltip.EscapeBbcode(string.IsNullOrWhiteSpace(artifact.DisplayName)
-                ? RunTracker.FormatRelicIdForDisplay(artifact.RelicId)
-                : artifact.DisplayName);
-            var value = artifact.Count == 1 ? displayName : $"{displayName} x{artifact.Count}";
-            Row3(sb, "Artifact gained", value, "");
-        }
-
-        Row3(sb, "Sacrifices made", agg.SacrificesMade.ToString(), "");
-        Row3(sb, "Sacrifices skipped", agg.SacrificesSkipped.ToString(), "");
-        if (TryFloorCountSinceRelicObtained(floorReached, floorAdded, out var floorCount))
-        {
-            var rate = (decimal)agg.SacrificesMade / floorCount;
-            Row3(sb, "Sacrifice rate", FormatDecimal(rate), "/floor");
-        }
-
+        Row3(sb, "Goopy cards played", agg.PaelsClawGoopyCardsPlayed.ToString(), "");
+        Row3(sb, "Avg Goopy cards played per turn", FormatDecimal(goopyCardsPlayedPerTurn), "");
+        Row3(sb, "Avg Goopy cards played per combat", FormatDecimal(goopyCardsPlayedPerCombat), "");
+        Row3(
+            sb,
+            "Avg number of Goopy enhancements per card with Goopy",
+            FormatDecimal(enhancementsPerGoopyCard),
+            "");
         return sb.ToString();
-    }
-
-    private static bool TryFloorCountSinceRelicObtained(int? floorReached, int? floorAdded, out int floorCount)
-    {
-        floorCount = 0;
-        var reached = floorReached.GetValueOrDefault();
-        if (reached <= 0) return false;
-
-        var added = floorAdded.GetValueOrDefault();
-        if (added <= 0 || reached < added) return false;
-
-        floorCount = reached - added + 1;
-        return true;
     }
 
     private static string BuildPaelsEyeBodyBBCode(RelicAggregate agg, bool activatedThisCombat = false)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, "Activated this combat", activatedThisCombat ? "true" : "false", "");
         Row3(sb, "Combats without activation", agg.CombatsWithoutActivation.ToString(), "");
         Row3(sb, "Statuses exhausted", agg.StatusCardsExhausted.ToString(), "");
@@ -2781,6 +4233,9 @@ public static class RelicHoverShowPatch
 
         Row3(sb, "Combats held", agg.Activations.ToString(), "");
         Row3(sb, "Upgraded attacks in deck", agg.MiniatureCannonUpgradedAttacksInDeck.ToString(), "");
+        Row3(sb, "Non-upgraded attacks in deck", agg.MiniatureCannonNonUpgradedAttacksInDeck.ToString(), "");
+        Row3(sb, "Upgraded attacks in combat", agg.MiniatureCannonUpgradedAttacksInCombat.ToString(), "");
+        Row3(sb, "Non-upgraded attacks in combat", agg.MiniatureCannonNonUpgradedAttacksInCombat.ToString(), "");
         Row3(sb, "Upgraded attack plays", agg.MiniatureCannonUpgradedAttackPlays.ToString(), "");
         Row3(sb, "Upgraded attack hits", agg.MiniatureCannonUpgradedAttackHits.ToString(), "");
         Row3(sb, "Avg plays per combat", FormatDecimal(averagePlays), "");
@@ -2796,6 +4251,86 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
+    private static string BuildOddlySmoothStoneBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        DescribedIconRow(
+            sb,
+            ["block"],
+            [],
+            "cards played",
+            agg.OddlySmoothStoneBlockCardsPlayed.ToString(),
+            "Block cards played — cards classified by the game as immediately gaining Dexterity-scaled Block.");
+        return sb.ToString();
+    }
+
+    private static string BuildEmberTeaBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var attacksPerTurn = agg.EmberTeaActiveTurns <= 0
+            ? 0m
+            : (decimal)agg.EmberTeaAttacksPlayedWhileActive / agg.EmberTeaActiveTurns;
+        var attacksPerCombat = agg.EmberTeaActiveCombats <= 0
+            ? 0m
+            : (decimal)agg.EmberTeaAttacksPlayedWhileActive / agg.EmberTeaActiveCombats;
+        var hitsPerTurn = agg.EmberTeaActiveTurns <= 0
+            ? 0m
+            : (decimal)agg.EmberTeaHitsWhileActive / agg.EmberTeaActiveTurns;
+        var hitsPerCombat = agg.EmberTeaActiveCombats <= 0
+            ? 0m
+            : (decimal)agg.EmberTeaHitsWhileActive / agg.EmberTeaActiveCombats;
+
+        Row3(sb, "Attacks played while active", agg.EmberTeaAttacksPlayedWhileActive.ToString(), "");
+        Row3(sb, "Avg attacks played per turn while active", FormatDecimal(attacksPerTurn), "");
+        Row3(sb, "Avg attacks played per combat while active", FormatDecimal(attacksPerCombat), "");
+        Row3(sb, "Hits while active", agg.EmberTeaHitsWhileActive.ToString(), "");
+        Row3(sb, "Avg hits per turn while active", FormatDecimal(hitsPerTurn), "");
+        Row3(sb, "Avg hits per combat while active", FormatDecimal(hitsPerCombat), "");
+        return sb.ToString();
+    }
+
+    private static string BuildRedSkullBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var attacksPerTurn = agg.RedSkullActiveTurns <= 0
+            ? 0m
+            : (decimal)agg.RedSkullAttacksPlayedWhileActive / agg.RedSkullActiveTurns;
+        var attacksPerCombat = agg.RedSkullActiveCombats <= 0
+            ? 0m
+            : (decimal)agg.RedSkullAttacksPlayedWhileActive / agg.RedSkullActiveCombats;
+        var hitsPerTurn = agg.RedSkullActiveTurns <= 0
+            ? 0m
+            : (decimal)agg.RedSkullHitsWhileActive / agg.RedSkullActiveTurns;
+        var hitsPerCombat = agg.RedSkullActiveCombats <= 0
+            ? 0m
+            : (decimal)agg.RedSkullHitsWhileActive / agg.RedSkullActiveCombats;
+
+        Row3(sb, "Attacks played while active", agg.RedSkullAttacksPlayedWhileActive.ToString(), "");
+        Row3(sb, "Avg attacks played while active per turn", FormatDecimal(attacksPerTurn), "");
+        Row3(sb, "Avg attacks played while active per combat", FormatDecimal(attacksPerCombat), "");
+        Row3(sb, "Hits while active", agg.RedSkullHitsWhileActive.ToString(), "");
+        Row3(sb, "Avg hits while active per turn", FormatDecimal(hitsPerTurn), "");
+        Row3(sb, "Avg hits while active per combat", FormatDecimal(hitsPerCombat), "");
+        return sb.ToString();
+    }
+
+    private static string BuildToastyMittensBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var cardsPerCombat = agg.ToastyMittensCombats <= 0
+            ? 0m
+            : (decimal)agg.ToastyMittensCardsExhausted / agg.ToastyMittensCombats;
+        var strengthPerCombat = agg.ToastyMittensCombats <= 0
+            ? 0m
+            : agg.StrengthAdded / agg.ToastyMittensCombats;
+
+        Row3(sb, "Cards exhausted total", agg.ToastyMittensCardsExhausted.ToString(), "");
+        Row3(sb, "Strength added total", FormatDecimal(agg.StrengthAdded), "");
+        Row3(sb, "Cards exhausted per combat", FormatDecimal(cardsPerCombat), "");
+        Row3(sb, "Strength added per combat", FormatDecimal(strengthPerCombat), "");
+        return sb.ToString();
+    }
+
     private static string BuildKunaiBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
@@ -2804,7 +4339,7 @@ public static class RelicHoverShowPatch
             : (decimal)agg.KunaiTurnEndChargeTotal / agg.KunaiTurnEndChargeCount;
 
         Row3(sb, "Attacks played", agg.KunaiAttacksPlayed.ToString(), "");
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, "Dexterity gained", agg.KunaiDexterityGained.ToString(), "");
         Row3(sb, "Turns ended at 1 charge", agg.KunaiTurnsEndedAt1Charge.ToString(), "");
         Row3(sb, "Turns ended at 2 charges", agg.KunaiTurnsEndedAt2Charges.ToString(), "");
@@ -2815,13 +4350,20 @@ public static class RelicHoverShowPatch
     private static string BuildKusarigamaBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
+        var turnsEndedAt0Charges = Math.Max(
+            0,
+            agg.KusarigamaTurnEndChargeCount
+            - agg.KusarigamaTurnsEndedAt1Charge
+            - agg.KusarigamaTurnsEndedAt2Charges);
+
         Row3(sb, "Attacks played", agg.KusarigamaAttacksPlayed.ToString(), "");
         AppendRelicDamageStats(
             sb,
             agg,
-            triggerLabel: "Activations",
+            triggerDescription: "Activations — the number of times this relic has activated.",
             averageLabel: "Damage per activation",
             averageDenominator: agg.Activations);
+        Row3(sb, "Turns ended at 0 charges", turnsEndedAt0Charges.ToString(), "");
         AppendTurnResetChargeRows(
             sb,
             agg.KusarigamaTurnsEndedAt1Charge,
@@ -2839,9 +4381,10 @@ public static class RelicHoverShowPatch
             : (decimal)agg.AdditionalBlockGained / agg.Activations;
 
         Row3(sb, "Attacks played", agg.OrnamentalFanAttacksPlayed.ToString(), "");
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
         Row3(sb, BlockLabel("block gained per activation"), FormatDecimal(blockPerActivation), "");
+        Row3(sb, "Turns ended at 0 charges", agg.OrnamentalFanTurnsEndedAt0Charges.ToString(), "");
         AppendTurnResetChargeRows(
             sb,
             agg.OrnamentalFanTurnsEndedAt1Charge,
@@ -2859,7 +4402,7 @@ public static class RelicHoverShowPatch
             : agg.StrengthAdded / agg.Activations;
 
         Row3(sb, "Attacks played", agg.ShurikenAttacksPlayed.ToString(), "");
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, "Strength gained", FormatDecimal(agg.StrengthAdded), "");
         Row3(sb, "Strength gained per activation", FormatDecimal(strengthPerActivation), "");
         AppendTurnResetChargeRows(
@@ -2868,6 +4411,35 @@ public static class RelicHoverShowPatch
             agg.ShurikenTurnsEndedAt2Charges,
             agg.ShurikenTurnEndChargeTotal,
             agg.ShurikenTurnEndChargeCount);
+        return sb.ToString();
+    }
+
+    private static string BuildRuinedHelmetBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var strengthPerActivation = agg.Activations <= 0
+            ? 0m
+            : agg.StrengthAdded / agg.Activations;
+        var strengthPerCombat = agg.RuinedHelmetCombats <= 0
+            ? 0m
+            : agg.StrengthAdded / agg.RuinedHelmetCombats;
+
+        RelicActivationRow(
+            sb,
+            agg.Activations.ToString(),
+            "Times activated — the number of times this relic has activated.");
+        Row3(sb, "Total strength gained", FormatDecimal(agg.StrengthAdded), "");
+        Row3(
+            sb,
+            "Strength gained this combat",
+            FormatDecimal(agg.RuinedHelmetStrengthAddedThisCombat),
+            "");
+        Row3(
+            sb,
+            "Avg strength gained per activation",
+            FormatDecimal(strengthPerActivation),
+            "");
+        Row3(sb, "Avg strength gained per combat", FormatDecimal(strengthPerCombat), "");
         return sb.ToString();
     }
 
@@ -2919,7 +4491,7 @@ public static class RelicHoverShowPatch
             ? 0m
             : (decimal)agg.Activations / agg.BookmarkCombats;
 
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, "common activations", agg.BookmarkCommonActivations.ToString(), "");
         Row3(sb, "uncommon activations", agg.BookmarkUncommonActivations.ToString(), "");
         Row3(sb, "rare activations", agg.BookmarkRareActivations.ToString(), "");
@@ -2931,6 +4503,9 @@ public static class RelicHoverShowPatch
     private static string BuildBrilliantScarfBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
+        var energySavedPerTurn = agg.DiscountTurns <= 0
+            ? 0m
+            : (decimal)agg.BrilliantScarfEnergySavedForTurnAverage / agg.DiscountTurns;
         var energySavedPerCombat = agg.DiscountCombats <= 0
             ? 0m
             : (decimal)agg.EnergySavedByDiscount / agg.DiscountCombats;
@@ -2941,6 +4516,7 @@ public static class RelicHoverShowPatch
         Row3(sb, "Discounts offered", agg.DiscountsOffered.ToString(), "");
         Row3(sb, "Discounts taken", agg.DiscountsTaken.ToString(), "");
         Row3(sb, EnergyLabel("Energy saved"), agg.EnergySavedByDiscount.ToString(), "");
+        Row3(sb, EnergyLabel("saved / turn"), FormatDecimal(energySavedPerTurn), "");
         Row3(sb, EnergyLabel("saved / combat"), FormatDecimal(energySavedPerCombat), "");
         Row3(sb, EnergyLabel("saved / use"), FormatDecimal(energySavedPerUse), "");
 
@@ -2950,7 +4526,8 @@ public static class RelicHoverShowPatch
                 sb,
                 BrilliantScarfCostLabel(energyCost, starCost: 0),
                 BrilliantScarfCostCount(agg, energyCost, starCost: 0).ToString(),
-                "");
+                "",
+                BrilliantScarfCostDescription(energyCost, starCost: 0));
         }
 
         foreach (var bucket in DynamicBrilliantScarfCostBuckets(agg))
@@ -2959,16 +4536,205 @@ public static class RelicHoverShowPatch
                 sb,
                 BrilliantScarfCostLabel(bucket.EnergyCost, bucket.StarCost),
                 bucket.Count.ToString(),
-                "");
+                "",
+                BrilliantScarfCostDescription(bucket.EnergyCost, bucket.StarCost));
         }
 
+        return sb.ToString();
+    }
+
+    private static string BuildMummifiedHandBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var averageTriggeringPowerCost = agg.Activations <= 0
+            ? 0m
+            : agg.MummifiedHandTriggeringPowerCostTotal / agg.Activations;
+        var averageDiscountGiven = agg.Activations <= 0
+            ? 0m
+            : agg.MummifiedHandDiscountGivenTotal / agg.Activations;
+        var averageEnergySpentToDiscountedCostRatio =
+            agg.MummifiedHandEnergySpentToDiscountedCostRatioCount <= 0
+                ? 0m
+                : agg.MummifiedHandEnergySpentToDiscountedCostRatioTotal
+                  / agg.MummifiedHandEnergySpentToDiscountedCostRatioCount;
+        var averageActivationsPerCombat = agg.MummifiedHandCombats <= 0
+            ? 0m
+            : (decimal)agg.Activations / agg.MummifiedHandCombats;
+        var averageActivationsPerTurn = agg.MummifiedHandTurns <= 0
+            ? 0m
+            : (decimal)agg.Activations / agg.MummifiedHandTurns;
+
+        RelicActivationRow(
+            sb,
+            agg.Activations.ToString(),
+            "Times triggered — the number of times this relic has activated.");
+        Row3(sb, EnergyLabel("Avg cost of triggering Power"), FormatDecimal(averageTriggeringPowerCost), "");
+        Row3(sb, EnergyLabel("Avg discount given"), FormatDecimal(averageDiscountGiven), "");
+        Row3(
+            sb,
+            "Avg ratio: Power energy spent / discounted card cost",
+            FormatDecimal(averageEnergySpentToDiscountedCostRatio),
+            "");
+        Row3(sb, "Avg activations per combat", FormatDecimal(averageActivationsPerCombat), "");
+        Row3(sb, "Avg activations per turn", FormatDecimal(averageActivationsPerTurn), "");
+        Row3(sb, "Discounted Powers", agg.MummifiedHandDiscountedPowers.ToString(), "");
+        Row3(sb, "Discounted Attacks", agg.MummifiedHandDiscountedAttacks.ToString(), "");
+        Row3(sb, "Discounted Skills", agg.MummifiedHandDiscountedSkills.ToString(), "");
+        Row3(sb, "Discounted Commons", agg.MummifiedHandDiscountedCommons.ToString(), "");
+        Row3(sb, "Discounted Uncommons", agg.MummifiedHandDiscountedUncommons.ToString(), "");
+        Row3(sb, "Discounted Rares", agg.MummifiedHandDiscountedRares.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildBurningSticksBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var averageActivationsPerCombat = agg.BurningSticksCombats <= 0
+            ? 0m
+            : (decimal)agg.Activations / agg.BurningSticksCombats;
+        var averageGeneratedCardPlaysPerCombat = agg.BurningSticksCombats <= 0
+            ? 0m
+            : (decimal)agg.BurningSticksGeneratedCardPlays / agg.BurningSticksCombats;
+
+        RelicActivationRow(
+            sb,
+            agg.Activations.ToString(),
+            "Times this relic successfully duplicated an exhausted Skill.");
+        Row3(
+            sb,
+            "Avg activations per combat",
+            FormatDecimal(averageActivationsPerCombat),
+            "",
+            "Successful Burning Sticks activations divided by combats where it was held.");
+        Row3(
+            sb,
+            "Avg times generated card played per combat",
+            FormatDecimal(averageGeneratedCardPlaysPerCombat),
+            "",
+            "Finished plays of cards generated by Burning Sticks divided by combats where it was held.");
+        Row3(
+            sb,
+            "Commons duplicated",
+            agg.BurningSticksCommonCardsDuplicated.ToString(),
+            "",
+            "Common cards successfully duplicated by Burning Sticks.");
+        Row3(
+            sb,
+            "Uncommons duplicated",
+            agg.BurningSticksUncommonCardsDuplicated.ToString(),
+            "",
+            "Uncommon cards successfully duplicated by Burning Sticks.");
+        Row3(
+            sb,
+            "Rares duplicated",
+            agg.BurningSticksRareCardsDuplicated.ToString(),
+            "",
+            "Rare cards successfully duplicated by Burning Sticks.");
+        return sb.ToString();
+    }
+
+    private static string BuildThrowingAxeBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var averageEnergyCostPerCombat = agg.ThrowingAxeCombats <= 0
+            ? 0m
+            : (decimal)agg.ThrowingAxeExtraPlayEnergyCostTotal
+              / agg.ThrowingAxeCombats;
+
+        Row3(
+            sb,
+            "Extra cards played",
+            agg.ThrowingAxeExtraCardsPlayed.ToString(),
+            "",
+            "Finished extra card plays contributed by Throwing Axe.");
+        Row3(
+            sb,
+            "Total energy cost of extra plays",
+            agg.ThrowingAxeExtraPlayEnergyCostTotal.ToString(),
+            "",
+            "The play-time energy values of cards replayed by Throwing Axe.");
+        Row3(
+            sb,
+            "Avg energy cost per combat",
+            FormatDecimal(averageEnergyCostPerCombat),
+            "",
+            "Total energy cost of Throwing Axe extra plays divided by combats where it was held.");
+        Row3(
+            sb,
+            "Commons played",
+            agg.ThrowingAxeCommonCardsPlayed.ToString(),
+            "",
+            "Common cards replayed by Throwing Axe.");
+        Row3(
+            sb,
+            "Uncommons played",
+            agg.ThrowingAxeUncommonCardsPlayed.ToString(),
+            "",
+            "Uncommon cards replayed by Throwing Axe.");
+        Row3(
+            sb,
+            "Rares played",
+            agg.ThrowingAxeRareCardsPlayed.ToString(),
+            "",
+            "Rare cards replayed by Throwing Axe.");
+        return sb.ToString();
+    }
+
+    private static string BuildBingBongBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(
+            sb,
+            "Extra cards added",
+            agg.BingBongExtraCardsAdded.ToString(),
+            "",
+            "Extra cards successfully added to the permanent deck by Bing Bong.");
+        Row3(
+            sb,
+            "Commons added",
+            agg.BingBongCommonCardsAdded.ToString(),
+            "",
+            "Non-Curse Common cards successfully added to the permanent deck by Bing Bong.");
+        Row3(
+            sb,
+            "Uncommons added",
+            agg.BingBongUncommonCardsAdded.ToString(),
+            "",
+            "Non-Curse Uncommon cards successfully added to the permanent deck by Bing Bong.");
+        Row3(
+            sb,
+            "Rares added",
+            agg.BingBongRareCardsAdded.ToString(),
+            "",
+            "Non-Curse Rare cards successfully added to the permanent deck by Bing Bong.");
+        Row3(
+            sb,
+            "Curses added",
+            agg.BingBongCurseCardsAdded.ToString(),
+            "",
+            "Curse cards successfully added to the permanent deck by Bing Bong.");
         return sb.ToString();
     }
 
     private static string BuildJuzuBraceletBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "? sites entered", agg.QuestionMarkSitesEntered.ToString(), "");
+        ConceptRow(
+            sb,
+            "unknown_room",
+            agg.QuestionMarkSitesEntered.ToString(),
+            "Question-mark map sites entered while Juzu Bracelet was held.");
+        return sb.ToString();
+    }
+
+    private static string BuildDowsingRodBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var roomsRemaining = Math.Clamp(
+            agg.DowsingQuestionRoomsRemaining ?? RunTracker.DowsingMaxRooms,
+            0,
+            RunTracker.DowsingMaxRooms);
+        Row3(sb, "? rooms remaining", roomsRemaining.ToString(), "");
         return sb.ToString();
     }
 
@@ -2992,10 +4758,50 @@ public static class RelicHoverShowPatch
         var averageDrawn = agg.Activations <= 0
             ? 0m
             : (decimal)agg.AdditionalCardsDrawn / agg.Activations;
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
+        var averageActivationTurn = agg.CentennialPuzzleActivationTurnSamples <= 0
+            ? 0m
+            : (decimal)agg.CentennialPuzzleActivationTurnTotal
+                / agg.CentennialPuzzleActivationTurnSamples;
+        RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, "Triggered this combat", triggeredThisCombat ? "true" : "false", "");
         Row3(sb, "Cards drawn total", agg.AdditionalCardsDrawn.ToString(), "");
         Row3(sb, "Avg cards drawn per combat", FormatDecimal(averageDrawn), "");
+        Row3(
+            sb,
+            "Avg activation turn",
+            FormatDecimal(averageActivationTurn),
+            "",
+            "The average player turn number when Centennial Puzzle activated.");
+        Row3(
+            sb,
+            "Activated during your turn",
+            agg.CentennialPuzzlePlayerTurnActivations.ToString(),
+            "",
+            "Times Centennial Puzzle activated during your turn.");
+        Row3(
+            sb,
+            "Activated during opponent's turn",
+            agg.CentennialPuzzleOpponentTurnActivations.ToString(),
+            "",
+            "Times Centennial Puzzle activated during the opponent's turn.");
+        Row3(
+            sb,
+            "Activated by Status",
+            agg.CentennialPuzzleStatusActivations.ToString(),
+            "",
+            "Times a Status card caused the HP loss that activated Centennial Puzzle.");
+        Row3(
+            sb,
+            "Activated by Curse",
+            agg.CentennialPuzzleCurseActivations.ToString(),
+            "",
+            "Times a Curse card caused the HP loss that activated Centennial Puzzle.");
+        Row3(
+            sb,
+            "Activated by enemy source",
+            agg.CentennialPuzzleEnemySourceActivations.ToString(),
+            "",
+            "Times an enemy attack or enemy-applied debuff caused the HP loss that activated Centennial Puzzle.");
         return sb.ToString();
     }
 
@@ -3013,32 +4819,121 @@ public static class RelicHoverShowPatch
     private static string BuildShovelBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Relics acquired", agg.RelicsAcquired.ToString(), "");
-        Row3(sb, "common relics", agg.CommonRelicsAcquired.ToString(), "");
-        Row3(sb, "uncommon relics", agg.UncommonRelicsAcquired.ToString(), "");
-        Row3(sb, "rare relics", agg.RareRelicsAcquired.ToString(), "");
-        Row3(sb, "Campfires not dug", agg.CampfiresNotDug.ToString(), "");
+        ConceptRow(
+            sb,
+            "relic_gained",
+            agg.RelicsAcquired.ToString(),
+            "Relics acquired by digging with Shovel.");
+        ConceptRow(
+            sb,
+            "relic_common",
+            agg.CommonRelicsAcquired.ToString(),
+            "Common relics acquired by digging with Shovel.");
+        ConceptRow(
+            sb,
+            "relic_uncommon",
+            agg.UncommonRelicsAcquired.ToString(),
+            "Uncommon relics acquired by digging with Shovel.");
+        ConceptRow(
+            sb,
+            "relic_rare",
+            agg.RareRelicsAcquired.ToString(),
+            "Rare relics acquired by digging with Shovel.");
+        DescribedIconRow(
+            sb,
+            ["campfire"],
+            [],
+            "not dug",
+            agg.CampfiresNotDug.ToString(),
+            "Campfires where Shovel was available but Dig was not chosen.");
+        return sb.ToString();
+    }
+
+    private static string BuildTinyMailboxBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        RelicActivationRow(
+            sb,
+            agg.Activations.ToString(),
+            "Rest-site heals where Tiny Mailbox added its potion rewards.");
+        DescribedIconRow(
+            sb,
+            ["potion", "offered"],
+            [],
+            string.Empty,
+            agg.TinyMailboxPotionsOffered.ToString(),
+            "Potion rewards offered by Tiny Mailbox.");
+        DescribedIconRow(
+            sb,
+            ["potion", "taken"],
+            [],
+            string.Empty,
+            agg.TinyMailboxPotionsTaken.ToString(),
+            "Tiny Mailbox potions successfully taken.");
+        DescribedIconRow(
+            sb,
+            ["potion_common", "offered"],
+            [],
+            string.Empty,
+            agg.TinyMailboxCommonPotionsOffered.ToString(),
+            "Common potion rewards offered by Tiny Mailbox.");
+        DescribedIconRow(
+            sb,
+            ["potion_uncommon", "offered"],
+            [],
+            string.Empty,
+            agg.TinyMailboxUncommonPotionsOffered.ToString(),
+            "Uncommon potion rewards offered by Tiny Mailbox.");
+        DescribedIconRow(
+            sb,
+            ["potion_rare", "offered"],
+            [],
+            string.Empty,
+            agg.TinyMailboxRarePotionsOffered.ToString(),
+            "Rare potion rewards offered by Tiny Mailbox.");
+        DescribedIconRow(
+            sb,
+            ["fruit_juice", "offered"],
+            [],
+            string.Empty,
+            agg.TinyMailboxFruitJuicesOffered.ToString(),
+            "Fruit Juice rewards offered by Tiny Mailbox; these also count as Rare offers.");
+        DescribedIconRow(
+            sb,
+            ["campfire"],
+            [],
+            "not rested",
+            agg.TinyMailboxCampfiresNotRested.ToString(),
+            "Campfires where Rest was available while Tiny Mailbox was held but was not chosen.");
         return sb.ToString();
     }
 
     private static string BuildPhylacteryBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Activations", agg.Activations.ToString(), "");
-        Row3(sb, "Osty summon gained", FormatDecimal(agg.TotalOstyHpSummoned), "");
+        ConceptRow(
+            sb,
+            "activation",
+            agg.Activations.ToString(),
+            "Times this relic has been activated.");
+        ConceptRow(
+            sb,
+            "osty_summon_gained",
+            FormatDecimal(agg.TotalOstyHpSummoned),
+            "Total Osty summon gained from this relic.");
         return sb.ToString();
     }
 
     private static string VulnerableLabel(string suffix)
     {
         var path = NormalizeResourcePath(VulnerableIconPath);
-        return $"[img={InlineIconSize}x{InlineIconSize}]{path}[/img] {suffix}";
+        return $"{StatConceptGlossary.RenderInlineImage(path)} {suffix}";
     }
 
     private static string WeakLabel(string suffix)
     {
         var path = NormalizeResourcePath(WeakIconPath);
-        return $"[img={InlineIconSize}x{InlineIconSize}]{path}[/img] {suffix}";
+        return $"{StatConceptGlossary.RenderInlineImage(path)} {suffix}";
     }
 
     private static IEnumerable<AppliedEffectAggregate> OtherUnsettlingLampDebuffs(RelicAggregate agg)
@@ -3067,7 +4962,7 @@ public static class RelicHoverShowPatch
     private static string BlockLabel(string suffix)
     {
         var path = NormalizeResourcePath(BlockIconPath);
-        return $"[img={InlineIconSize}x{InlineIconSize}]{path}[/img] {suffix}";
+        return $"{StatConceptGlossary.RenderInlineImage(path)} {suffix}";
     }
 
     private static void AppendHealingStats(
@@ -3081,16 +4976,34 @@ public static class RelicHoverShowPatch
 
         if (agg.TotalHealingLost <= 0m) return;
 
-        foreach (var reason in agg.HealingLostReasons.Values
-                     .OrderByDescending(r => r.Amount)
-                     .ThenBy(r => r.DisplayName))
+        foreach (var reason in NonRedundantHealingLostReasons(agg))
         {
-            if (reason.Amount <= 0m) continue;
-            var label = string.IsNullOrWhiteSpace(reason.DisplayName)
-                ? $"{reasonPrefix} other/prevented"
-                : $"{reasonPrefix} {StatsTooltip.EscapeBbcode(reason.DisplayName)}";
-            Row3(sb, label, FormatDecimal(reason.Amount), "");
+            var reasonName = string.IsNullOrWhiteSpace(reason.DisplayName)
+                ? "other/prevented causes"
+                : StatsTooltip.EscapeBbcode(reason.DisplayName);
+            DescribedIconRow(
+                sb,
+                ["healing_blocked"],
+                [],
+                $"{reasonPrefix} {reasonName}",
+                FormatDecimal(reason.Amount),
+                $"Healing from this relic that did not restore HP because of {reasonName}.");
         }
+    }
+
+    private static IReadOnlyList<HealingLostReasonAggregate> NonRedundantHealingLostReasons(
+        RelicAggregate agg)
+    {
+        var reasons = agg.HealingLostReasons.Values
+            .Where(reason => reason.Amount > 0m)
+            .OrderByDescending(reason => reason.Amount)
+            .ThenBy(reason => reason.DisplayName)
+            .ToList();
+
+        if (reasons.Count == 1 && reasons[0].Amount == agg.TotalHealingLost)
+            return Array.Empty<HealingLostReasonAggregate>();
+
+        return reasons;
     }
 
     private static void AppendEnergyGeneratedStats(
@@ -3146,10 +5059,10 @@ public static class RelicHoverShowPatch
         for (var i = 0; i < expectedCount; i++)
         {
             var transformation = i < transformations.Count ? transformations[i] : null;
-            Row3(sb, $"Transform {i + 1} source", CardTransformationDisplay(
+            TextValueRow(sb, $"Transform {i + 1} source", CardTransformationDisplay(
                 transformation?.SourceDisplayName,
                 transformation?.SourceCardId), "");
-            Row3(sb, $"Transform {i + 1} result", CardTransformationDisplay(
+            TextValueRow(sb, $"Transform {i + 1} result", CardTransformationDisplay(
                 transformation?.ResultDisplayName,
                 transformation?.ResultCardId), "");
         }
@@ -3180,19 +5093,18 @@ public static class RelicHoverShowPatch
 
     private static string EnergyLabel(string suffix)
     {
-        var path = NormalizeResourcePath(EnergyIconPath);
-        return $"[img={InlineIconSize}x{InlineIconSize}]{path}[/img] {suffix}";
+        return $"{StatEnergyIcon.RenderInline(StatConceptGlossary.IconSlotSize)} {suffix}";
     }
 
     private static string DrawLabel(string suffix)
     {
         var path = NormalizeResourcePath(DrawIconPath);
-        return $"[img={InlineIconSize}x{InlineIconSize}]{path}[/img] {suffix}";
+        return $"{StatConceptGlossary.RenderInlineImage(path)} {suffix}";
     }
 
     private static string BrilliantScarfCostLabel(int energyCost, int starCost)
     {
-        var energyIcon = InlineIcon(EnergyIconPath);
+        var energyIcon = StatEnergyIcon.RenderInline(16);
         if (starCost > 0)
         {
             var starIcon = InlineIcon(StarIconPath);
@@ -3200,6 +5112,17 @@ public static class RelicHoverShowPatch
         }
 
         return $"{Math.Max(0, energyCost)} {energyIcon} cost reduced";
+    }
+
+    private static string BrilliantScarfCostDescription(int energyCost, int starCost)
+    {
+        var normalizedEnergy = Math.Max(0, energyCost);
+        var normalizedStars = Math.Max(0, starCost);
+        var starPart = normalizedStars > 0
+            ? $" and {normalizedStars} Star{(normalizedStars == 1 ? string.Empty : "s")}"
+            : string.Empty;
+        return $"Cards discounted by Brilliant Scarf with a cost of "
+               + $"{normalizedEnergy} Energy{starPart}.";
     }
 
     private static int BrilliantScarfCostCount(RelicAggregate agg, int energyCost, int starCost)
@@ -3237,13 +5160,13 @@ public static class RelicHoverShowPatch
     private static string InlineIcon(string path)
     {
         var normalized = NormalizeResourcePath(path);
-        return $"[img={InlineIconSize}x{InlineIconSize}]{normalized}[/img]";
+        return StatConceptGlossary.RenderInlineImage(normalized);
     }
 
     private static string VigorLabel(string suffix)
     {
         var path = NormalizeResourcePath(VigorIconPath);
-        return $"[img={InlineIconSize}x{InlineIconSize}]{path}[/img] {suffix}";
+        return $"{StatConceptGlossary.RenderInlineImage(path)} {suffix}";
     }
 
     private static bool IsRelicModel(object model, string typeName)
@@ -3310,24 +5233,167 @@ public static class RelicHoverShowPatch
             : $"res://{path.TrimStart('/')}";
     }
 
-    private static void Row3(StringBuilder sb, string label, string value, string pct)
+    private static void Row3(
+        StringBuilder sb,
+        string label,
+        string value,
+        string pct,
+        string? fullDescription = null)
     {
-        if (VisibleTextLength(label) > MaxTableLabelVisibleChars)
-        {
-            RowFlow(sb, label, value, pct);
-            return;
-        }
-
-        sb.Append("[table=3]");
-        sb.Append($"[cell expand=4 padding=0,0,12,0][color=#e0e0e0]{label}[/color][/cell]");
-        sb.Append($"[cell expand=1 padding=0,0,12,0][right][b]{value}[/b][/right][/cell]");
-        sb.Append($"[cell expand=1 padding=0,0,4,0][right][color=#b5b5b5]{pct}[/color][/right][/cell]");
-        sb.Append("[/table]\n");
+        var presentation = RelicStatRowVocabulary.Create(label, fullDescription);
+        DescribedIconRow(
+            sb,
+            presentation.ConceptIds,
+            presentation.DenominatorConceptIds,
+            presentation.Label,
+            value,
+            presentation.FullDescription,
+            pct);
     }
 
-    private static void RowFlow(StringBuilder sb, string label, string value, string pct)
+    private static void ConceptRow(
+        StringBuilder sb,
+        string conceptId,
+        string value,
+        string fullDescription,
+        string pct = "")
     {
-        sb.Append($"[color=#e0e0e0]{label}[/color]");
+        DescribedIconRow(
+            sb,
+            [conceptId],
+            [],
+            string.Empty,
+            value,
+            fullDescription,
+            pct);
+    }
+
+    private static void RelicActivationRow(
+        StringBuilder sb,
+        string value,
+        string fullDescription = "Activations — the number of times this relic has activated.")
+    {
+        ConceptRow(
+            sb,
+            "activation",
+            value,
+            fullDescription);
+    }
+
+    private static void DescribedIconRow(
+        StringBuilder sb,
+        IReadOnlyList<string> conceptIds,
+        IReadOnlyList<string> denominatorConceptIds,
+        string label,
+        string value,
+        string fullDescription,
+        string pct = "")
+    {
+        BeginOrContinueScalarTable(sb);
+        sb.Append("[cell expand=0 padding=0,0,10,0]");
+        sb.Append(StatConceptGlossary.RenderInformationHint(fullDescription));
+        sb.Append("[/cell]");
+        sb.Append("[cell expand=4 padding=0,0,12,0]");
+        AppendConceptLabel(
+            sb,
+            conceptIds,
+            denominatorConceptIds,
+            label);
+        sb.Append("[/cell]");
+        sb.Append($"[cell expand=0 padding=0,0,12,0][right][b]{value}[/b][/right][/cell]");
+        sb.Append($"[cell expand=0 padding=0,0,4,0][right][color=#b5b5b5]{pct}[/color][/right][/cell]");
+        sb.Append(StatsTableClose);
+    }
+
+    private static void BeginOrContinueScalarTable(StringBuilder sb)
+    {
+        if (TryReopenTrailingScalarTable(sb))
+            return;
+
+        sb.Append(ScalarStatsTableOpen);
+    }
+
+    private static bool TryReopenTrailingScalarTable(StringBuilder sb)
+    {
+        if (!EndsWith(sb, StatsTableClose))
+            return false;
+
+        var lastTableStart = LastIndexOf(sb, "[table=");
+        if (lastTableStart < 0
+            || !MatchesAt(sb, lastTableStart, ScalarStatsTableOpen))
+        {
+            return false;
+        }
+
+        sb.Length -= StatsTableClose.Length;
+        return true;
+    }
+
+    private static bool EndsWith(StringBuilder sb, string suffix)
+    {
+        if (sb.Length < suffix.Length)
+            return false;
+
+        return MatchesAt(sb, sb.Length - suffix.Length, suffix);
+    }
+
+    private static int LastIndexOf(StringBuilder sb, string value)
+    {
+        for (var start = sb.Length - value.Length; start >= 0; start--)
+        {
+            if (MatchesAt(sb, start, value))
+                return start;
+        }
+
+        return -1;
+    }
+
+    private static bool MatchesAt(StringBuilder sb, int start, string value)
+    {
+        if (start < 0 || start + value.Length > sb.Length)
+            return false;
+
+        for (var index = 0; index < value.Length; index++)
+        {
+            if (sb[start + index] != value[index])
+                return false;
+        }
+
+        return true;
+    }
+
+    private static void TextValueRow(StringBuilder sb, string label, string value, string pct)
+    {
+        var presentation = RelicStatRowVocabulary.Create(label);
+        DescribedIconFlowRow(
+            sb,
+            presentation.ConceptIds,
+            presentation.DenominatorConceptIds,
+            presentation.Label,
+            value,
+            presentation.FullDescription,
+            pct);
+    }
+
+    private static void DescribedIconFlowRow(
+        StringBuilder sb,
+        IReadOnlyList<string> conceptIds,
+        IReadOnlyList<string> denominatorConceptIds,
+        string label,
+        string value,
+        string fullDescription,
+        string pct = "")
+    {
+        sb.Append("[table=2]");
+        sb.Append("[cell expand=0 padding=0,0,10,0]");
+        sb.Append(StatConceptGlossary.RenderInformationHint(fullDescription));
+        sb.Append("[/cell]");
+        sb.Append("[cell expand=4 padding=0,0,4,0]");
+        AppendConceptLabel(
+            sb,
+            conceptIds,
+            denominatorConceptIds,
+            label);
         if (!string.IsNullOrEmpty(value))
         {
             sb.Append($"  [b]{value}[/b]");
@@ -3336,53 +5402,32 @@ public static class RelicHoverShowPatch
         {
             sb.Append($"  [color=#b5b5b5]{pct}[/color]");
         }
-        sb.Append('\n');
+        sb.Append("[/cell]");
+        sb.Append(StatsTableClose);
     }
 
-    private static int VisibleTextLength(string bbcode)
+    private static void AppendConceptLabel(
+        StringBuilder sb,
+        IReadOnlyList<string> conceptIds,
+        IReadOnlyList<string> denominatorConceptIds,
+        string label)
     {
-        var count = 0;
-        for (var i = 0; i < bbcode.Length;)
+        for (var index = 0; index < conceptIds.Count; index++)
         {
-            if (bbcode[i] == '[')
+            if (index > 0) sb.Append(' ');
+            if (denominatorConceptIds.Contains(
+                    conceptIds[index],
+                    StringComparer.Ordinal))
             {
-                var close = bbcode.IndexOf(']', i);
-                if (close < 0)
-                {
-                    count += 1;
-                    i += 1;
-                    continue;
-                }
-
-                var tag = bbcode.Substring(i + 1, close - i - 1).Trim();
-                if (tag.StartsWith("img", StringComparison.OrdinalIgnoreCase))
-                {
-                    var imageClose = bbcode.IndexOf("[/img]", close + 1, StringComparison.OrdinalIgnoreCase);
-                    i = imageClose >= 0
-                        ? imageClose + "[/img]".Length
-                        : close + 1;
-                    continue;
-                }
-
-                i = close + 1;
-                continue;
+                sb.Append("[color=#b5b5b5]/[/color] ");
             }
-
-            count += 1;
-            i += 1;
+            sb.Append(StatConceptGlossary.RenderHintedGlyph(conceptIds[index]));
         }
 
-        return count;
-    }
-}
+        if (string.IsNullOrWhiteSpace(label)) return;
 
-[HarmonyPatch(typeof(NRelicInventoryHolder), "OnUnfocus")]
-public static class RelicHoverHidePatch
-{
-    [HarmonyPostfix]
-    public static void Postfix()
-    {
-        try { StatsTooltip.Hide(); }
-        catch (Exception e) { CoreMain.Logger.Error($"RelicHoverHidePatch failed: {e.Message}"); }
+        if (conceptIds.Count > 0) sb.Append(' ');
+        sb.Append($"[color=#e0e0e0]{label}[/color]");
     }
+
 }

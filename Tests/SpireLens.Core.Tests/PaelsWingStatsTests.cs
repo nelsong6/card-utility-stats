@@ -1,7 +1,9 @@
 using System;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using MegaCrit.Sts2.Core.Models.Relics;
 using SpireLens.Core;
 using SpireLens.Core.Patches;
 using Xunit;
@@ -15,10 +17,6 @@ public class PaelsWingStatsTests
     private static readonly MethodInfo BuildPaelsWingBodyMethod =
         typeof(RelicHoverShowPatch).GetMethod("BuildPaelsWingBodyBBCode", BindingFlags.NonPublic | BindingFlags.Static)
         ?? throw new InvalidOperationException("BuildPaelsWingBodyBBCode not found.");
-
-    private static readonly MethodInfo BuildPaelsWingBodyForFloorMethod =
-        typeof(RelicHoverShowPatch).GetMethod("BuildPaelsWingBodyBBCodeForFloor", BindingFlags.NonPublic | BindingFlags.Static)
-        ?? throw new InvalidOperationException("BuildPaelsWingBodyBBCodeForFloor not found.");
 
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
@@ -120,11 +118,23 @@ public class PaelsWingStatsTests
         Assert.Contains("rare cards consumed", body);
         Assert.Contains("Sacrifices made", body);
         Assert.Contains("Sacrifices skipped", body);
-        Assert.Contains("Artifacts gained", body);
-        Assert.Contains("Artifact gained", body);
-        Assert.Contains("Kunai x2", body);
-        Assert.Contains("Bag of Preparation", body);
-        Assert.DoesNotContain("Sacrifice rate", body);
+        Assert.Contains("Relics gained", body);
+        Assert.Contains("Relic gained", body);
+        Assert.Contains(
+            "user://SpireLens/generated-icons/relic_gained-",
+            body);
+        Assert.Contains(
+            "res://images/atlases/relic_atlas.sprites/kunai.tres",
+            body);
+        Assert.Contains(
+            "res://images/atlases/relic_atlas.sprites/bag_of_preparation.tres",
+            body);
+        Assert.Contains("[hint=\"Kunai\"]", body);
+        Assert.Contains("[hint=\"Bag of Preparation\"]", body);
+        Assert.Contains("×2", body);
+        Assert.Contains("Sacrifice rate", body);
+        Assert.Contains("[b]3/5[/b]", body);
+        Assert.Contains("60%", body);
         Assert.DoesNotContain("/floor", body);
         Assert.Contains("[b]5[/b]", body);
         Assert.Contains("[b]3[/b]", body);
@@ -132,18 +142,45 @@ public class PaelsWingStatsTests
         Assert.Contains("[b]1[/b]", body);
     }
 
+    [Theory]
+    [InlineData(
+        "RELIC.KUNAI",
+        "res://images/atlases/relic_atlas.sprites/kunai.tres")]
+    [InlineData(
+        "RELIC.BAG_OF_PREPARATION",
+        "res://images/atlases/relic_atlas.sprites/bag_of_preparation.tres")]
+    [InlineData(
+        "invalid",
+        "res://images/ui/reward_screen/reward_icon_shared_relic.png")]
+    public void RelicTooltip_PaelsWingResolvesGrantedRelicArtwork(
+        string relicId,
+        string expectedPath)
+    {
+        Assert.Equal(
+            expectedPath,
+            RelicHoverShowPatch.ResolveGrantedRelicIconPath(relicId));
+    }
+
     [Fact]
-    public void RunTracker_PaelsWingHelper_RecordsEachArtifactGained()
+    public void RelicTooltip_PaelsWingRetainsExpandedStatsWidth()
+    {
+        var relic = (PaelsWing)RuntimeHelpers.GetUninitializedObject(typeof(PaelsWing));
+
+        Assert.Equal(500f, RelicHoverShowPatch.GetPreferredStatsTooltipWidth(relic));
+    }
+
+    [Fact]
+    public void RunTracker_PaelsWingHelper_RecordsEachRelicGained()
     {
         var agg = new RelicAggregate();
 
-        RunTracker.RecordPaelsWingArtifactGainedForTest(agg, "RELIC.KUNAI", "Kunai");
-        RunTracker.RecordPaelsWingArtifactGainedForTest(agg, "RELIC.KUNAI", "Kunai");
-        RunTracker.RecordPaelsWingArtifactGainedForTest(
+        RunTracker.RecordPaelsWingRelicGainedForTest(agg, "RELIC.KUNAI", "Kunai");
+        RunTracker.RecordPaelsWingRelicGainedForTest(agg, "RELIC.KUNAI", "Kunai");
+        RunTracker.RecordPaelsWingRelicGainedForTest(
             agg,
             "RELIC.BAG_OF_PREPARATION",
             "Bag of Preparation");
-        RunTracker.RecordPaelsWingArtifactGainedForTest(agg, null, null);
+        RunTracker.RecordPaelsWingRelicGainedForTest(agg, null, null);
 
         Assert.Equal(2, agg.RelicsGranted.Count);
         Assert.Equal(2, agg.RelicsGranted["RELIC.KUNAI"].Count);
@@ -153,36 +190,52 @@ public class PaelsWingStatsTests
     }
 
     [Fact]
-    public void RelicTooltip_PaelsWingRate_UsesFloorsSinceRelicWasObtained()
+    public void RelicTooltip_PaelsWingRate_UsesActualSacrificeOpportunities()
     {
         var agg = new RelicAggregate
         {
-            SacrificesMade = 3,
+            SacrificesMade = 2,
+            SacrificesSkipped = 0,
         };
 
-        var body = (string)(BuildPaelsWingBodyForFloorMethod.Invoke(null, new object?[] { agg, 8, 5 })
-            ?? throw new InvalidOperationException("BuildPaelsWingBodyBBCodeForFloor returned null."));
+        var body = (string)(BuildPaelsWingBodyMethod.Invoke(null, new object?[] { agg })
+            ?? throw new InvalidOperationException("BuildPaelsWingBodyBBCode returned null."));
 
         Assert.Contains("Sacrifice rate", body);
-        Assert.Contains("[b]0.75[/b]", body);
-        Assert.DoesNotContain("[b]0.38[/b]", body);
+        Assert.Contains("[b]2/2[/b]", body);
+        Assert.Contains("100%", body);
+        Assert.DoesNotContain("0.67", body);
+        Assert.DoesNotContain("/floor", body);
     }
 
     [Fact]
-    public void RelicTooltip_PaelsWingRate_HidesRateWithoutObtainedFloor()
+    public void RelicTooltip_PaelsWingRate_ShowsSkippedOpportunitiesInDenominator()
     {
         var agg = new RelicAggregate
         {
-            SacrificesMade = 3,
+            SacrificesMade = 2,
+            SacrificesSkipped = 1,
         };
 
-        var body = (string)(BuildPaelsWingBodyForFloorMethod.Invoke(null, new object?[] { agg, 8, null })
-            ?? throw new InvalidOperationException("BuildPaelsWingBodyBBCodeForFloor returned null."));
+        var body = (string)(BuildPaelsWingBodyMethod.Invoke(null, new object?[] { agg })
+            ?? throw new InvalidOperationException("BuildPaelsWingBodyBBCode returned null."));
+
+        Assert.Contains("Sacrifice rate", body);
+        Assert.Contains("[b]2/3[/b]", body);
+        Assert.Contains("66.67%", body);
+        Assert.DoesNotContain("/floor", body);
+    }
+
+    [Fact]
+    public void RelicTooltip_PaelsWingRate_HidesRateWithoutRecordedOpportunities()
+    {
+        var body = (string)(BuildPaelsWingBodyMethod.Invoke(
+                null,
+                new object?[] { new RelicAggregate() })
+            ?? throw new InvalidOperationException("BuildPaelsWingBodyBBCode returned null."));
 
         Assert.Contains("Sacrifices made", body);
         Assert.DoesNotContain("Sacrifice rate", body);
-        Assert.DoesNotContain("/floor", body);
-        Assert.DoesNotContain("[b]0.38[/b]", body);
     }
 
     [Fact]

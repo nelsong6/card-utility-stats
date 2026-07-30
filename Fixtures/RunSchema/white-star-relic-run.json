@@ -1,0 +1,22 @@
+{
+  "run_id": "white-star-relic-fixture",
+  "started_at": "2026-07-27T20:00:00Z",
+  "updated_at": "2026-07-27T20:20:00Z",
+  "outcome": "in_progress",
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.WHITE_STAR": {
+      "activations": 3,
+      "rare_cards_offered": 8,
+      "rare_attack_cards_offered": 4,
+      "rare_skill_cards_offered": 2,
+      "rare_power_cards_offered": 2,
+      "rare_card_reward_screens_declined": 2
+    }
+  },
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

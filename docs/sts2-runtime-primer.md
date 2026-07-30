@@ -53,14 +53,60 @@ When adding a hook:
 - If it subscribes to game events or Godot signals directly, add teardown.
 - If it creates UI nodes, make hot-reload reinjection and `QueueFree()` behavior explicit.
 
+### Newly Added Harmony Targets Need One Full Restart
+
+Core hot reload can install a Harmony detour, but it cannot reliably invalidate
+machine code the CLR already generated for callers of that game method. A
+caller may already have inlined the original method or devirtualized a virtual
+call to it. In that case Harmony lists the target as patched, while the existing
+compiled caller continues to execute the original path and never enters the new
+prefix or postfix.
+
+This matters specifically when a build introduces a Harmony patch for a game
+method that was unpatched earlier in the same Slay the Spire 2 process:
+
+- hot reload is sufficient to prove that patch discovery and initialization
+  succeeded;
+- a new combat or a new run is not sufficient, because both reuse the same CLR
+  process and its compiled code;
+- fully restart Slay the Spire 2 once before behavioral verification of that
+  newly introduced target;
+- after restart, the loader installs the patch during startup before ordinary
+  gameplay compiles the relevant caller path.
+
+Changes behind a hook that was already established before its caller compiled
+can usually use the normal hot-reload loop. The restart rule is for newly added
+targets and for any diagnostic where Harmony reports the target as patched but
+an entry log proves the prefix/postfix never runs.
+
+Cracked Core exposed this boundary. Its `LightningOrb.Passive` target was first
+added at Core hot reload 39 in an already-running game process. Harmony listed
+the patch, but the diagnostic prefix never ran while the already-compiled
+`OrbModel.TriggerPassive` async path continued to execute. Starting new combats
+and runs did not change that. A full game restart cleared the compiled call
+site; the same patch then began recording passive activations without a code
+change.
+
 ## Run And Combat Boundaries
 
 SpireLens persistence is combat-boundary based.
 
 - `RunManager.Instance.RunStarted` starts a new run record — or resumes one; see below.
 - `CombatManager.Instance.CombatSetUp` creates `_pendingCombat`.
+- `CombatSetUp` fires before `Hook.BeforeCombatStart`. Glory's two consecutive
+  boss rooms each receive their own setup/start/end lifecycle; combat-start
+  relic attribution must therefore count them as separate activations.
 - During combat, live observations accumulate in `_pendingCombat`.
+- `ICombatState.RoundNumber == 1` spans the entire first round: the player's
+  first side (including extra player turns) and the enemy's first side. It
+  increments before the next player side. On the player side,
+  `PlayerCombatState.Phase == None` is still the pre-turn setup window; reject
+  it when a first-round stat should begin at the player's actual first turn.
 - `CombatManager.Instance.CombatEnded` promotes pending aggregates/events into committed `RunData`, updates run metadata, saves, and clears `_pendingCombat`.
+- The tracked player's final `PlayerCombatState.TurnNumber` remains available
+  while pending combat data is promoted. Combat-duration buckets such as
+  Sparkling Rouge should be recorded at this shared promotion boundary rather
+  than by patching the relic's unrelated effect callback.
 - `RunTracker.OnRunEnded` also promotes `_pendingCombat` before stamping the outcome — for the `loss` outcome only. Loss ordering (decompiled `CreatureCmd.Kill` → `LoseCombat()` → `RunManager.OnEnded`): `OnRunEnded` runs synchronously from the killing action, and the fatal combat's `CombatEnded` only fires LATER via `ProcessPendingLoss` — after the buffer has been consumed. Without this second promotion site the fatal combat's stats would be discarded. Abandoning mid-combat still discards the buffer (a half-played fight is not a resolved combat — a save-and-quit may even have rolled it back), and wins always get a normal `CombatEnded` first. Promotion is idempotent per buffer (the buffer is nulled after), so the two sites cannot double-promote. `RecordCombatEndingSuppressedDamage` stops capturing once `_currentRun` is null so the post-`OnRunEnded` damage tail can't resurrect the buffer and mint a junk run file at that deferred `CombatEnded`.
 - Between-combat and between-floor reloads are supported.
 - Mid-combat restore is intentionally out of scope.
@@ -100,6 +146,10 @@ Key facts:
 - Combat clones point back to the deck original through `CardModel.DeckVersion`.
 - Deck-view cards are already the original and usually have `DeckVersion == null`.
 - `RunTracker.Canonical(card)` uses `card.DeckVersion ?? card` so combat-time and hover-time references converge.
+- Canonicalization is for identity and attribution, not proof that a mutation
+  was permanent. For card upgrade lineage, snapshot whether the exact object
+  passed to `UpgradeInternal` is present in the permanent deck; a combat clone
+  pointing at a deck original remains only a temporary upgrade.
 - Aggregates are keyed as `{card_definition_id}#{monotonic_number}`.
 - The monotonic number is per card definition and is never reused within a run.
 - Removed cards keep their aggregate and removal snapshot rather than being deleted.
@@ -164,6 +214,14 @@ as plain `Replay`; this is the fallback for card-native/base replay counts and
 other effects that mutate the card's replay count before the hook can expose a
 source.
 
+Throwing Axe uses this same hook-listener path: its model appears in
+`Hook.ModifyCardPlayCount`'s `modifyingModels` only when it contributes one
+extra play. Attribute the relic from a later finished replay, not from the
+planned count alone. Every `CardPlay` in the series shares the same
+`ResourceInfo`; `EnergyValue` is therefore the play-time cost/value of the card
+that Throwing Axe replayed, while `EnergySpent` describes the one resource
+payment for the series.
+
 Replay shortfalls and no-outcome replays are not the same thing. `PlayCardAction`
 can cancel before `OnPlayWrapper` starts if `CanPlay` or `IsValidTarget` fails;
 that produces no `CardPlayStartedEntry`, no `CardPlayFinishedEntry`, and no
@@ -192,6 +250,53 @@ actual gained potion and rarity; a failed result means no potion entered the
 belt (currently a full belt or a `ShouldProcurePotion` blocker such as Sozu).
 Do not resolve the source after awaiting: `CardPlayFinished` can clear the
 current-card context as soon as Alchemize resumes.
+
+Jack of All Trades selects distinct cards from the unlocked colorless combat
+pool, then awaits `CardPileCmd.AddGeneratedCardToCombat` once for each selected
+card. Capture the currently resolving physical Jack before each async command,
+then classify only a successful returned `CardPileAddResult.cardAdded`. That
+post-hook card is the authoritative source for rarity, card type, and effective
+energy cost; the pre-command candidate is intent and can diverge from the card
+that pile/add hooks actually allow into combat.
+
+Discovery awaits `CardSelectCmd.FromChooseACardScreen`, then calls
+`SetToFreeThisTurn` on the returned card before adding it to Hand. Wrap the
+exact `SetToFreeThisTurn` call only when Discovery is the currently resolving
+card, classify that card, and measure its effective energy cost before and
+after the call. A null/skip result never reaches this boundary and does not
+count as a pick.
+
+Debt applies its curse effect from the owner-specific
+`Debt.OnTurnEndInHand(PlayerChoiceContext)` callback. Its intended loss is the
+card's `Gold` dynamic var, but Debt clamps the amount passed to
+`PlayerCmd.LoseGold` to the owner's current balance. Observe the owner's gold
+before and after the completed callback: that delta is actual gold lost, and
+`intended - actual` is the amount blocked by insufficient gold. Patching the
+generic gold-loss command would lose Debt's unclamped intent and risk
+attributing unrelated gold changes.
+
+Normality has no owner-specific turn-end callback; its behavior is a passive
+`ShouldPlay` veto while the card remains in Hand. Observe the established
+`Hook.BeforeSideTurnEnd` prefix instead, where both Hand contents and the
+player's unspent energy are still intact. Record each exact physical Normality
+in Hand once for that player turn, and include zero-energy qualifying turns in
+the denominator for average excess energy.
+
+Seal of Gold uses its owner-specific
+`AfterSideTurnStart(CombatSide, IReadOnlyList<Creature>, ICombatState)`
+callback. It activates only when the owner is in the callback's participant
+list and has at least its five-gold cost, then awaits energy gain followed by
+gold loss. Apply the same affordability gate in the prefix, wrap the returned
+task, and observe both resource deltas on completion. Count held combats
+separately from activations so its boss-relic energy-per-combat average includes
+combats where the owner ran out of gold and the relic produced no energy.
+
+Amethyst Aubergine uses its owner-specific
+`TryModifyRewards(Player, List<Reward>, AbstractRoom)` callback. A `true`
+return confirms a trigger, and the `GoldReward` appended during that exact call
+contains the observed extra-gold amount. Snapshot the reward-list count before
+the callback and inspect only the appended tail afterward; do not copy the
+relic's current 15-gold text value into tracking.
 
 ## Damage Attribution
 
@@ -230,6 +335,14 @@ maximum. Wrap Brightest Flame's returned `OnPlay` task and compare the owner's
 max HP before and after the callback so SpireLens records only the actual max
 HP removed, including a zero delta at the one-max-HP floor. Keep this in the
 card aggregate, separate from `TotalHpLost`.
+
+Feed's owner-specific `OnPlay` awaits its damage command, applies its own Fatal
+eligibility and observed-kill checks, and only then awaits
+`CreatureCmd.GainMaxHp` as the callback's final action. Wrap Feed's returned
+`OnPlay` task and compare the owner's max HP before and after successful
+completion. This credits only the physical Feed that produced an actual gain;
+nonlethal plays and enemies whose powers suppress Fatal naturally produce a
+zero delta.
 
 Storybook grants a permanent-deck Brightest Flame but does not retain a
 reference to that exact granted card. Its tooltip therefore uses the explicit
@@ -375,6 +488,28 @@ This is intentionally outcome-shaped but still simple. It assumes the relic appl
 
 Relic aggregates live in `RunData.RelicAggregates`, keyed by relic id. Fields are shared across relics; each relic uses only relevant fields.
 
+Bag of Preparation raises its owner's first-turn hand-draw request inside
+`ModifyHandDraw`; the game then finishes the complete normal/late modifier
+chain, raises the first hand to any larger eligible Innate count, clamps it to
+the hand limit, and finally awaits the four-argument `CardPileCmd.Draw`.
+Count the positive owner-specific modifier as the activation, but measure cards
+drawn from that completed draw task. Its observed contribution is the cards
+that arrived beyond the counterfactual request with Bag's delta removed,
+capped by Bag's surviving contribution after Innate and hand-limit clamping.
+This preserves activations when draw prevention yields no cards and avoids
+crediting Bag for a starting hand that Innate cards would already have made
+equally large.
+
+Joss Paper is a mixed immediate/deferred exhaust counter. Its owner-specific
+`AfterCardExhausted` callback is the authoritative successful-exhaust count,
+but Ethereal cards are only folded into `CardsExhausted` at
+`AfterSideTurnEnd`. Patch the private `DrawIfThresholdMet` method to count every
+completed five-card threshold (one deferred batch can cross multiple
+thresholds), then observe the returned cards from the exact four-argument
+`CardPileCmd.Draw` call instead of assuming every requested draw reached the
+hand. Sample the 0-4 remainder only after Joss Paper's awaited turn-end callback
+finishes, so the snapshot includes Ethereal cards and any resulting reset.
+
 Centennial Puzzle already exposes the exact combat-local state needed for a
 live tooltip through `UsedThisCombat`. The relic sets it before drawing from
 its first qualifying unblocked HP-loss callback and resets it in
@@ -388,17 +523,105 @@ Juzu Bracelet is map-point based, not resolved-room based. Count
 `RoomType.Event` or `EventRoom`: a `?` can resolve into multiple room types, and
 later room transitions can happen after the map site was already entered.
 
+Winged Boots owns the authoritative signal for spending one of its three
+off-path jumps. Its `AfterRoomEntered` callback compares the prior map point's
+children with the current point and increments its saved `TimesUsed` only when
+the move consumed a charge. Compare `TimesUsed` before and after that callback,
+then record the current point's original `MapPointType` under the resulting use
+number. Do not infer activations from general room entry or merely from the
+relic allowing free travel; those also occur for normal connected movement.
+
+Wongo's Mystery Ticket activates through its owner-specific
+`TryModifyRewards` callback after its saved `CombatsFinished` counter reaches
+five. A successful call appends three concrete `RelicReward` objects to that
+combat's reward list. Mark only those appended references, preserve the weak
+markers in process-stable `AppDomain` data across Core hot reloads, and record
+each reward's `ClaimedRelic` only after its `OnSelect` task succeeds. This keeps
+an ordinary Elite relic reward on the same screen out of the ticket's ledger.
+The activation floor is the current run floor at that successful reward
+modification; subtract the relic's saved `FloorAddedToDeck` to report floors
+ascended before activation.
+
+Dowsing Rod itself only grants the Dowsing quest card. The card owns the saved
+`RoomsEntered` counter, updates it only for qualifying `?` room entries, and
+transforms into Abundance at five. Observe the `Dowsing.RoomsEntered` setter and
+derive remaining rooms as `5 - RoomsEntered`; do not independently decrement at
+the broader map-point hook. Reconcile from the live Dowsing/Abundance deck card
+after Continue or hot reload so the relic tooltip inherits the game's persisted
+quest state.
+
+Fishing Rod owns a saved `CombatsSeen` counter and increments it only after
+normal monster combats. Every third increment, `FishingRod.AfterCombatEnd`
+chooses one random upgradable permanent-deck card and calls `CardCmd.Upgrade`
+synchronously before returning its completed task. Attribute the result by
+arming a window around that exact callback and consuming the existing
+`CardModel.UpgradeInternal` observation; do not infer the chosen card from deck
+state or independently reproduce the relic's RNG selection.
+
+Armaments upgrades through the same synchronous `CardCmd.Upgrade` /
+`CardModel.UpgradeInternal` path while its `OnPlay` callback is still the
+currently resolving card. Attribute each observed upgrade to that physical
+Armaments instance at the shared `UpgradeInternal` observer. Normal Armaments
+therefore contributes at most one upgrade per play, while Armaments+ contributes
+one for every upgradable hand card it actually changes; already fully upgraded
+cards are absent from the game's candidate set and are not inferred or counted.
+
+War Hammer's `AfterCombatVictory` callback runs after an Elite victory, before
+the game's later `CombatEnded` event promotes SpireLens's pending combat. It
+selects up to four random upgradable permanent-deck cards and calls
+`CardCmd.Upgrade` synchronously. Wrap the callback's returned task so attribution
+finishes before promotion, and consume the existing `CardModel.UpgradeInternal`
+observation. Persist each upgraded card's stable deck instance id as well as
+its display name; later completed plays can then be attributed to the exact
+physical cards across combats and hot reloads. Use every player turn and combat
+where War Hammer was held as the zero-inclusive play-rate denominators.
+
+Molten Egg, Toxic Egg, and Frozen Egg share `EggRelicHelper.UpgradeValidCards`
+for both late card-reward modification and merchant inventory modification.
+For each matching upgradable option, that helper calls the two-argument
+`CardCreationResult.ModifyCard(CardModel, RelicModel)` overload with the egg as
+the modifying relic. Observe that exact call to count upgraded cards offered:
+it covers rewards, shops, and other choosable-card surfaces that use the shared
+helper, while excluding the eggs' separate `TryModifyCardBeingAddedToDeck`
+path for direct non-choosable deck additions. The `CardModel` passed to
+`ModifyCard` is the upgraded clone and retains the offered card's rarity, so
+Common, Uncommon, and Rare breakdowns should be read from that same confirmed
+offer callback rather than reconstructed from later reward state. Keep a
+one-use reference marker on that exact modified `CardModel`; card rewards,
+merchant purchases, and other normal choice surfaces then pass the same model
+to `CardPileCmd.Add(CardModel, PileType, ...)`. Consume the marker only after a
+successful permanent-deck add to count the card as taken. This distinguishes
+observed takes from skipped offers and from direct non-choosable grants without
+inferring egg attribution from the card's upgrade level. Keep this weak
+reference ledger in process-stable `AppDomain` data rather than a Core-static
+collection so an open offer remains attributable across a Core hot reload;
+weak keys let skipped or replaced offers disappear with the game's card model.
+
+Bing Bong handles every same-owner card entering the permanent Deck by cloning
+that card and calling the five-argument `CardPileCmd.Add` overload with the
+relic itself as `clonedBy`. Observe that established overload and wrap its
+returned task only when `clonedBy is BingBong`; classify the final
+`CardPileAddResult.cardAdded` after a successful add rather than the requested
+clone before the shared add pipeline can replace or reject it. Curse is a card
+type and should take precedence over the card's rarity so Curse and
+Common/Uncommon/Rare remain mutually exclusive display buckets. Basic or Event
+edge cases still belong in the total successful extra-card count without being
+misreported as one of those requested buckets.
+
 Pael's sacrifice reward option is owned by `PaelsWing`, not `PaelsFlesh`.
 `PaelsWing.TryModifyCardRewardAlternatives` adds the `SACRIFICE` card reward
 alternative and `PaelsWing.OnSacrifice` increments the saved sacrifice count.
 `PaelsFlesh` is a separate combat max-energy relic that activates after turn 3.
 Track consumed card reward rarities and skipped sacrifice opportunities from the
 card reward alternative flow, not from PaelsFlesh's energy hooks. Every second
-sacrifice pulls and obtains a normal `RelicModel`. Capture that direct artifact
+sacrifice pulls and obtains a normal `RelicModel`. Capture that direct relic
 from the owner's first `RelicObtained` event during `OnSacrifice`; the event fires
 synchronously when the relic enters inventory, before its async `AfterObtained`
 callback. Store its id, display name, and count in Pael's Wing's `RelicsGranted`
-ledger.
+ledger. Derive the displayed sacrifice rate from exact recorded opportunities:
+`SacrificesMade / (SacrificesMade + SacrificesSkipped)`. Do not use floors since
+pickup; that incorrectly counts acquisition or non-reward floors where Sacrifice
+was never offered.
 
 Pael's Tooth is a separate pickup-and-return mechanic. Its native `CardTitles`
 text is rebuilt from only the `SerializableCards` still held by the relic, so a
@@ -412,7 +635,14 @@ and deck-add replacement modifiers. Do not infer a successful return merely
 from the stored entry disappearing; Tooth removes it even when the deck-add
 result reports failure.
 
-For relics that grant block after a specific owner-owned condition, arm a narrow block-gain window at the relic callback and let `Hook.AfterBlockGained` record the modified amount. Permafrost follows this pattern from `Permafrost.AfterCardPlayed`: mirror the first-owned-Power condition, count that combat trigger, then derive block per combat from observed block gained divided by triggers.
+For relics that grant block after a specific owner-owned condition, arm a narrow block-gain window at the relic callback and let `Hook.AfterBlockGained` record the modified amount. Permafrost follows this pattern from `Permafrost.AfterCardPlayed`: mirror the first-owned-Power condition, count that combat trigger, then derive block per triggered combat from observed block gained divided by triggers. Count every combat where Permafrost was held, including zero-trigger combats, as the separate trigger-rate denominator. Older runs predate that denominator; because Permafrost can trigger at most once per combat, backfill the minimum known historical combat count from its activation total before adding newly observed combats. Its private `_activatedThisCombat` field is the authoritative live source for whether it has triggered in the current combat; display that state directly rather than inferring it from persisted activation totals.
+
+Cloak Clasp's owner-specific `BeforeSideTurnEnd` callback makes exactly one
+block command for `cards in hand * Block`, and skips the command when the hand
+is empty. Keep its existing one-shot observed-block attribution window for the
+numerator. Count every player turn and combat where the relic was held as the
+average denominators, including empty-hand turns and turns where combat ended
+before the end-turn callback could run.
 
 Intimidating Helmet's `BeforeCardPlayed` condition uses the frozen play-time
 `cardPlay.Resources.EnergyValue`, not printed cost or `EnergySpent`. Normal
@@ -431,9 +661,101 @@ and `AfterSideTurnEnd` resets it. Surface that field through `DisplayAmount` and
 raise `DisplayAmountChanged` after each mutation; do not repurpose `Amount`,
 which remains Juggling's stack count and controls how many Attack copies it
 creates. The progress counter continues above the third-Attack trigger and does
-not belong in persisted run data.
+not belong in persisted run data. Juggling's outcomes are power-owned rather
+than source-card-owned: arm a narrow window when the pre-increment counter is
+`2`, observe each awaited `CardPileCmd.AddGeneratedCardToCombat` result, and
+count only copies that actually enter a pile. Persist those totals and rarity
+splits in the run meta-stats power aggregate keyed by `POWER.JUGGLING`; every
+Juggling card tooltip projects that shared record. Count the application turn
+and each later turn that starts with the power, plus each distinct combat, so
+the per-turn and per-combat averages include active zero-copy periods.
+
+`ViciousPower.AfterPowerAmountChanged` owns the exact trigger condition: a
+positive Vulnerable change applied by the power's owner. Arm a narrow window
+around that callback and consume it at the immediate `CardPileCmd.Draw` call.
+Count the non-null cards returned by that command, not the Vicious stack amount,
+so No Draw, hand capacity, and pile exhaustion remain observed zero-value
+outcomes. Persist the shared total under `POWER.VICIOUS` and project it on
+every Vicious card rather than attributing later triggers to one physical copy.
+
+`StampedePower.AfterAutoPostPlayPhaseEntered` selects eligible Attacks from the
+owner’s hand and sequentially awaits `CardCmd.AutoPlay`. Keep a callback-wide
+window, claim each direct autoplay, and suspend that window until the claimed
+task completes so nested autoplays caused by the Attack are not misattributed.
+Count the selection only when its primary `CardPlayFinishedEntry` arrives.
+Use that play's `Resources.EnergyValue` as energy saved because it is the
+resolved amount a normal play would spend while autoplay spends zero. Persist
+the totals and rarity splits under `POWER.STAMPEDE` and project them on every
+Stampede card.
+
+`AggressionPower.BeforeSideTurnStart` selects owner Attacks from the discard
+pile, sequentially awaits `CardPileCmd.Add(card, PileType.Hand)`, and then
+upgrades each selected card only when it remains upgradable. Keep a
+callback-wide window while excluding nested pile adds. Count a return only
+from a successful add whose resulting card is in hand; independently count an
+upgrade only when the exact callback-selected card reaches
+`CardModel.UpgradeInternal`. Persist both shared outcomes under
+`POWER.AGGRESSION` and project them on every Aggression card.
+
+`RupturePower` has two payoff boundaries. Qualifying self-damage outside the
+currently resolving owner card applies Strength immediately from
+`AfterDamageReceived`; damage caused during an owner card play is accumulated
+and applied once from `AfterCardPlayed`. Compare the owner's Strength before
+and after both completed callbacks, so multi-hit cards are counted once at
+their combined payoff and Strength modifiers remain reflected in the observed
+gain. Count the positive application turn from `PowerReceivedEntry` and every
+later player turn that starts with Rupture, including zero-trigger turns.
+Persist `StrengthGained` and `TurnsActive` under `POWER.RUPTURE`, then project
+the shared total and per-active-turn quotient on every Rupture card.
+
+`FeelNoPainPower.AfterCardExhausted` owns an exact owner-card check and then
+awaits the decimal/`ValueProp` `CreatureCmd.GainBlock` overload. Arm from that
+callback and replace the command's returned task with an observer so the
+post-modifier block amount is recorded before the power listener completes.
+For the per-active-turn denominator, count the positive application turn from
+`PowerReceivedEntry` and every later player turn that starts with the power,
+including turns with no exhausts. Persist the numerator as `BlockGained` and
+the denominator as `TurnsActive` under `POWER.FEEL_NO_PAIN`, then project the
+shared quotient on every Feel No Pain card.
+
+`DarkEmbracePower` has two draw paths. Non-Ethereal owner cards draw
+immediately from `AfterCardExhausted`; Ethereal cards increment an internal
+counter and produce one deferred batch from `AfterSideTurnEnd`. Arm each native
+callback independently, consume the window at its direct `CardPileCmd.Draw`,
+and count only the cards returned by that command so blocked or capacity-limited
+draws stay observed outcomes. Count the application turn and later turns that
+start while the power is active for the active-turn denominator. Also count
+every player turn in a combat where Dark Embrace became active, including turns
+before it was played, by finalizing that combat-wide denominator at promotion.
+Persist both turn denominators, the active-combat count, and cards drawn under
+`POWER.DARK_EMBRACE`, then project all four rows on every Dark Embrace card.
+
+`DanseMacabrePower.BeforeCardPlayed` owns both the exact trigger condition and
+the block command: an owner card whose resolved energy cost is at least the
+power's Energy dynamic variable causes one flash and one awaited
+`CreatureCmd.GainBlock(Creature, decimal, ValueProp, CardPlay, bool)`. Count
+the callback trigger there, arm only that immediate overload, and use its
+returned post-modifier amount as block gained. The application turn is
+observed from the successful `PowerReceivedEntry`; later turns come from
+`Hook.AfterPlayerTurnStart`. Persist the shared totals and active
+turn/combat denominators under the power ID, and project them on every Danse
+Macabre card rather than assigning later power behavior to one physical copy.
 
 For relics that emit damage commands, prefer the relic-owned callback plus the resolved `CreatureCmd.Damage` result. Mercury Hourglass arms from `MercuryHourglass.AfterPlayerTurnStart`, records the actual multi-target damage split from the command result on each turn, and counts the combat once so damage per combat is not confused with damage per turn-start trigger.
+
+Lost Wisp uses the same observed-result pattern from
+`LostWisp.AfterCardPlayed`. Arm only when the callback receives an owner Power
+while combat is in progress, count that qualifying Power as the activation,
+then consume the window at the immediately emitted decimal-plus-`ValueProp`
+multi-target `CreatureCmd.Damage` overload. The resolved results are
+authoritative for blocked damage, overkill, kills, and targets hit.
+
+Gremlin Horn's `AfterDeath` callback still runs for the combat-ending enemy and
+flashes the relic, but `PlayerCmd.GainEnergy` and `CardPileCmd.Draw` suppress
+their outcomes once combat is over or ending. Exclude that callback before
+incrementing activations or arming resource-attribution windows; otherwise
+activation count measures attempted callbacks while the other rows measure
+observed outcomes.
 
 Mr. Struggles follows the same owner-specific turn-start pattern, but its
 damage amount is the current turn number, so it uses the multi-target
@@ -451,16 +773,86 @@ across the full pickup callback when that is what the player experiences. Lee's
 Waffle records current-HP gained across `AfterObtained`, covering both its
 max-HP grant and the follow-up heal-to-full.
 
-For simple max-HP pickup relics such as Strawberry, Pear, and Nutritious Oyster,
-snapshot the owner's max HP in an `AfterObtained` prefix and observe it only
-after the returned task completes successfully. This captures the actual gain,
-including caps or other runtime changes, without counting relic restoration.
+Lee's Waffle??? (`FakeLeesWaffle`) is mechanically different: its
+`AfterObtained` callback attempts to heal ten percent of the owner's current
+maximum HP and does not change maximum HP. Calculate that exact decimal attempt
+before the callback, then finalize the shared relic-healing ledger after the
+returned task completes so restored HP, full-HP overfill, and other prevention
+remain distinct from normal Lee's Waffle's aggregate.
+
+For simple max-HP pickup relics such as Strawberry, Pear, Mango, Mango???
+(`FakeMango`), and Nutritious Oyster, snapshot the owner's max HP in an
+`AfterObtained` prefix and observe it only after the returned task completes
+successfully. This captures the actual gain, including caps or other runtime
+changes, without counting relic restoration. Mango and Mango??? use separate
+relic aggregates even though they share the same presentation.
+
+Gnarled Hammer's `AfterObtained` awaits a deck selection, then synchronously
+calls `CardCmd.Enchant` with Sharp on each returned physical deck card. Snapshot
+the deck card references and their optional Sharp amounts before the callback,
+then compare them after its task completes successfully. A transition to Sharp
+or an increased Sharp amount is an observed enchantment; the selector's
+three-card maximum is not itself evidence that three cards changed.
+
+Tri-Boomerang uses the same `AfterObtained` lifecycle with Instinct. Snapshot
+the permanent deck's exact card references and optional Instinct amounts, then
+persist only cards whose Instinct amount actually changed. Keep each card's
+stable SpireLens instance ID with its display name: later completed combat
+plays arrive on clones, so canonical instance identity—not a name or card
+definition—is what proves the played card was enchanted by Tri-Boomerang.
+Count held combats at combat setup so zero-play combats remain in the
+Instinct-card-play average.
 
 Darkstone Periapt is owned by `DarkstonePeriapt.AfterCardChangedPiles`. Mirror
 the relic's own final-pile condition (`card.Pile.Type == Deck`, same owner,
 `CardType.Curse`), then record the actual max-HP delta after the async
 `GainMaxHp` command resolves. Count the curse acquisition from that same
 owner-specific match rather than from every generic curse card entry.
+
+Lucky Fysh uses the same owner-specific `AfterCardChangedPiles` surface for
+every same-owner card whose final pile is the permanent Deck. Wrap its returned
+task, count the confirmed deck addition only after successful completion, and
+measure the owner's completed gold-balance delta so gold modifiers or
+prevention are reflected instead of assuming its base 15 gold.
+
+Bowler Hat applies its 25% multiplier through the central
+`PlayerCmd.GainGold` → `Hook.ModifyGoldGained` path without filtering the
+source. It therefore affects normal Gold rewards (including stolen gold being
+returned), events, cards, potions, relic grants, and any other positive grant
+that uses `PlayerCmd.GainGold`; direct balance restoration/loading is outside
+that hook. Snapshot the owner's balance and the command's unmodified amount,
+then wait for the complete command. The observed bonus is the completed
+integer balance gain minus the integer unmodified grant, clamped at zero. This
+captures truncation and correctly records zero when Ectoplasm later prevents
+the gain. For SpireLens, count an activation only when at least one bonus gold
+actually reaches the balance; zero-benefit modifier calls stay out of both the
+activation and average.
+
+Maw Bank gains gold from its owner-specific `AfterRoomEntered` callback while
+its saved `HasItemBeenBought` flag is false. Mirror the callback's BaseRoom
+gate, then record the owner's completed gold-balance delta rather than its
+listed 12-gold value. A shop skip is not known at shop entry: persist that
+MerchantRoom's floor as an open visit, then resolve it at the next distinct
+room entry. Count the skip only when `HasItemBeenBought` is still false; a
+positive-gold purchase sets that game-owned flag and therefore resolves the
+visit without a skip. Keeping the pending floor in `RunData` makes duplicate
+same-room callbacks idempotent and preserves an open shop across Continue or
+Core hot reload. For spending outside shops, reuse the established
+`PlayerCmd.LoseGold` before/after balance observation: count only transactions
+classified by the game as `GoldLossType.Spent`, while `HasItemBeenBought` is
+still false and the owner's current `BaseRoom` is not a `MerchantRoom`.
+Ordinary gold loss and shop purchases do not belong in that total.
+
+Book of Five Rings also owns an `AfterCardChangedPiles` callback for every
+same-owner card whose final pile is the permanent Deck. Its saved `CardsAdded`
+counter advances on each callback and triggers healing whenever the post-add
+counter is divisible by its five-card threshold. Mirror that exact transition
+before the async callback starts so the shared relic-healing ledger is armed
+before `CreatureCmd.Heal`; finalize after the callback task completes to retain
+actual healing and the blocked remainder. Count outer `CardReward.OnSkipped`
+calls separately while the tracked owner holds the book. For cards added per
+floor, use inclusive floors held from the relic's pickup floor rather than all
+floors in the run.
 
 Chosen Cheese gains max HP from `AfterCombatEnd`, then the game heals the same
 amount as part of `CreatureCmd.GainMaxHp`. Snapshot the owner's max HP before
@@ -479,6 +871,14 @@ to confirm the eligibility rule. Base Strikes are `IsBasicStrikeOrDefend` cards
 that also carry the Strike tag, while non-base Strike cards are every other
 permanent deck card with that tag.
 
+Oddly Smooth Stone's tracked input is a completed play of a card whose
+`CardModel.GainsBlock` property is true while the relic is owned. That is the
+game's explicit classification for cards that immediately gain Block through
+their Dexterity-sensitive block value; it intentionally excludes delayed block
+engines such as Shadowmeld. Count the finished play even if the resulting Block
+is later modified or prevented, because this stat measures qualifying cards
+played rather than Block actually gained.
+
 Kunai, Kusarigama, Ornamental Fan, and Shuriken share the same repeatable
 three-Attack counter shape: their owner-specific `AfterCardPlayed` callback
 increments a turn-local counter and activates at every threshold multiple.
@@ -486,8 +886,10 @@ Count owner Attack plays at that callback, snapshot unused modulo charge from
 `Hook.BeforeSideTurnEnd` before the relic resets, and observe each payoff at its
 narrow outcome: power delta for Kunai/Shuriken, the resolved block-command
 result for Ornamental Fan, and the resolved single-target damage result for
-Kusarigama. Kusarigama only activates when its threshold play can choose a
-hittable enemy; do not infer an activation from the counter alone.
+Kusarigama. Ornamental Fan preserves zero-charge turn ends as an explicit
+bucket in addition to the shared average-charge sample. Kusarigama only
+activates when its threshold play can choose a hittable enemy; do not infer an
+activation from the counter alone.
 
 Razor Tooth upgrades eligible Attack and Skill cards synchronously inside its
 owner-specific `AfterCardPlayed` callback, after the finished card-play history
@@ -504,13 +906,246 @@ triggering play is not an upgraded-card play; later finished replay iterations
 are. Count later successful draws only from `Hook.AfterCardDrawn`, and use held
 player turns/combats (including zero-result ones) as rate denominators.
 
+Drain Power awaits its attack, then synchronously calls `CardCmd.Upgrade` on
+random upgradable cards in its owner's Discard pile before its `OnPlay`
+finishes. The existing `CardModel.UpgradeInternal` postfix is therefore the
+observed upgrade boundary, and `FindCurrentlyResolvingCardPlay` still resolves
+the physical Drain Power source there. Retain each upgraded combat card by raw
+reference and associate it with that source instance; later completed plays of
+the exact same combat card count for the source, while copies do not. Use every
+turn and combat where that physical Drain Power was in the permanent deck as
+the zero-inclusive average denominators.
+
+Miniature Cannon checks the live attack source's `IsUpgraded` property when
+modifying powered Attack damage. Its play and hit attribution must inspect that
+same combat card rather than its canonical deck version. Permanent upgrades are
+copied onto combat cards, while combat-only upgrades such as Drain Power exist
+only on the raw combat card. Its deck composition rows inspect the permanent
+deck, while its combat composition rows inspect every live card across the
+owner's hand, draw, discard, exhaust, and play piles. Use each card's live
+`IsUpgraded` value for both splits so generated cards and temporary combat
+upgrades are represented exactly as Miniature Cannon sees them.
+
+Ember Tea's `AfterRoomEntered` callback runs after `CombatSetUp`, applies
+Strength for a combat while `CombatsLeft` is positive, and immediately
+decrements the saved counter. The fifth activation therefore spends the last
+charge and leaves `CombatsLeft == 0` before turn one even though Tea is active
+for that combat. Wrap the callback and retain a combat-local active-player
+marker only after the awaited callback successfully consumes a charge. Count
+finished owner Attack plays and each observed enemy damage entry from those
+Attacks while that marker exists; multi-hit and multi-target Attacks contribute
+one hit per resolved entry. Active turn/combat denominators include marked
+periods with zero attacks or hits.
+
+Red Skull's private mutable `StrengthApplied` flag is its authoritative active
+state; the visible status and HP threshold merely explain why that state
+changes. Observe it after the established async `Hook.AfterCurrentHpChanged`
+dispatch fully completes, and again at each player-turn start, to count every
+distinct active turn/combat including zero-attack periods. Capture whether an
+Attack was active at `CardPlayStartedEntry` and commit that play only when its
+matching finished entry arrives. Count hits from observed enemy damage entries
+only while `StrengthApplied` is currently true, so multi-hit/multi-target
+Attacks count each resolved hit and mid-resolution threshold changes are
+respected.
+
 Brilliant Scarf increments its per-turn card counter from `AfterCardPlayed`,
 after `CardPlayFinished` has already entered combat history. Its actual cost
 discounts happen through `TryModifyEnergyCostInCombatLate` and `TryModifyStarCost`
 when that counter is one short of the configured threshold. Cost modifiers are
 queried repeatedly for UI/playability, so count the offer from the counter
 transition and use the modifier only to measure energy saved by the card that
-later consumes the offer.
+later consumes the offer. Count every distinct held player turn from
+`Hook.AfterPlayerTurnStart`, and reconcile the current turn at combat
+promotion, so average energy saved per turn includes zero-offer and
+zero-saving turns as well as combat-ending turns. Persist a matching
+observation-era saved-energy numerator for this new denominator; historic run
+files can already contain total saved energy but cannot reconstruct their
+earlier held turns, so mixing that total with only newly observed turns would
+inflate the average after an upgrade or hot reload.
+
+Pendulum advances its persistent turn counter from its owner-specific
+`AfterPlayerTurnStart` callback and can activate multiple times in a long
+combat—or not at all in a short one. Observe the actual draw-command result for
+its cards-drawn numerator, and count every combat where the relic was held as
+the per-combat denominator rather than using activations. Its public
+`TurnsSeen` counter is always modulo three, so snapshot that live 0/1/2 value
+once during combat promotion, before the pending aggregate is merged into the
+run, for combat-end charge buckets and averages.
+
+Pocketwatch increments its private current-turn counter from owner
+`AfterCardPlayed` callbacks and transfers that value to its private
+previous-turn counter during `BeforeSideTurnStart`. Its hand-draw modifier is
+the authoritative activation signal: count an activation only when
+`ModifyHandDraw` returns a positive bonus, and read that same callback's
+previous-turn counter for the activation-value sample. Count every held player
+turn at `Hook.BeforeSideTurnEnd`, using finished owner card plays as the
+turn-counter observation, then reconcile the still-current turn during combat
+promotion because a combat-ending play can bypass the turn-end hook. A turn
+ending above `CardThreshold` is a missed activation; a qualifying final combat
+turn is neither an activation nor a miss because no later hand draw occurred.
+Keep the new turn/combat denominators and their numerators observation-era:
+historic additional-draw totals cannot reconstruct the earlier card-count
+distribution.
+
+Stone Cracker selects and upgrades combat-card instances from the owner's draw
+pile inside `AfterRoomEntered`; it does not upgrade the permanent deck cards.
+All upgrades occur synchronously before that async callback's first await, so
+snapshot draw-pile card references and upgrade levels in a prefix, compare them
+in the immediate postfix, and retain the positively changed raw references for
+later finished-play attribution during that combat.
+
+Mummified Hand resolves entirely inside its `AfterCardPlayed` callback despite
+returning `Task.CompletedTask`: after an owner Power play, it selects one card
+already in hand and calls that card's `SetToFreeThisTurn`. Observe the selected
+card and its effective energy cost immediately around that exact call. The
+triggering `CardPlay.Resources.EnergyValue` is the Power's play-time cost, while
+`EnergySpent` is the distinct numerator for spend-to-discounted-cost ratios.
+Read both type and rarity from that exact selected card; a trigger with no card
+left to discount belongs in activation rates but not in either recipient
+breakdown.
+
+Unrelenting applies one stack of the shared `FreeAttackPower`; multiple
+physical copies therefore lose distinct ownership once their stacks merge.
+Persist downstream charge use in a power-ID-keyed aggregate and project that
+shared record from every Unrelenting tooltip. The power's
+`TryModifyEnergyCostInCombatLate` method can be queried repeatedly for UI and
+playability, so its marginal cost reduction is only a snapshot. Confirm one
+use only after the exact Attack reaches `BeforeCardPlayed` and the awaited
+`PowerCmd.Decrement` actually lowers the stack. Naturally free and auto-played
+Attacks still consume a charge; count those uses with zero energy saved.
+
+Pael's Claw applies Goopy with amount 1 to every eligible permanent deck card
+in its synchronous `AfterObtained` callback. That initial amount is the
+enchantment baseline: Goopy's block bonus is `Amount - 1`. A finished Goopy
+card play is observable from `CardPlayFinishedEntry`, but Goopy earns its
+permanent increment later in `Goopy.AfterCardPlayed`, where both the combat
+copy and `DeckVersion` amounts are incremented. The game skips the entire
+`Hook.AfterCardPlayed` dispatch once combat has ended, so count finished Goopy
+plays and observed earned enhancements separately rather than assuming they
+are identical.
+
+Stone Humidifier applies its repeatable max-HP gain from the owner-specific
+async `AfterRestSiteHeal(Player, bool)` callback. Snapshot the owner's max HP
+before the callback and only record the resulting max HP after its returned
+task completes successfully; the callback awaits `CreatureCmd.GainMaxHp`, so
+the post-task value is the observed result after game modifiers or prevention.
+
+Sturdy Clamp prevents the normal player block clear in `ShouldClearBlock`, and
+its owner-specific `AfterPreventingBlockClear(AbstractModel, Creature)` callback
+runs from `Creature.AfterTurnStart` on every player turn after turn 1, including
+when block is zero. Capture the pre-callback block, then wait for its task before
+reading retained block because the relic asynchronously removes the amount over
+10. The pre-callback amount above 10 is the excess; the post-task block is the
+observed retained result.
+
+Ripple Basin checks its owner's finished card-play history in
+`BeforeSideTurnEnd` and grants block only when no Attack was played that turn.
+Use that exact owner-specific callback for activation and observed-block
+attribution, but do not use activations as a rate denominator. Count every
+distinct held player turn from `Hook.AfterPlayerTurnStart` and every combat
+where the relic was held, including periods where an Attack prevented the
+block. Reconcile the current turn at combat promotion so combat-ending paths do
+not omit the denominator.
+
+Reptile Trinket's owner-specific `AfterPotionUsed` callback is the activation
+source of truth: it has already confirmed the potion owner and active combat,
+and its Strength dynamic variable supplies the amount actually requested.
+Count every held player turn at `Hook.AfterPlayerTurnStart` and every held
+combat in the combat baseline so zero-activation periods remain in both
+averages. Track the current turn live: activation two places that turn in the
+exactly-two bucket, while activation three moves the same turn into the
+more-than-two bucket. Later activations do not change its bucket. Because the
+bucket transition is complete when the activation occurs, no turn-end callback
+is needed and a combat-ending activation cannot be lost; the combat promotion
+boundary only reconciles a final held turn that missed the normal start hook.
+
+Toasty Mittens exhausts one selected draw-pile card and then applies Strength
+inside its async `BeforeHandDraw` callback. Keep an async-flow-local scope
+around that callback. `CardCmd.Exhaust` writes `CardExhaustedEntry` only after
+the card reaches the exhaust pile and before dispatching nested exhaust hooks,
+so the first matching owner-card entry in the scope is the relic's confirmed
+direct exhaust. Retain the last matching owner-to-owner `StrengthPower`
+`PowerReceivedEntry`: Toasty Mittens applies its own Strength as the callback's
+final operation, after the exhaust and its nested hooks. Commit both observed
+outcomes only after the callback task succeeds. Count every combat where the
+relic was held as the zero-inclusive per-combat denominator.
+
+Beating Remnant caps post-Osty HP loss in its owner-specific
+`ModifyHpLostAfterOsty` modifier. The positive difference between that method's
+input and output is the HP loss prevented by Beating Remnant itself; do not
+credit it with prevention performed elsewhere in the damage pipeline. Its
+`BeforeSideTurnStart` callback resets the internal received-damage counter when
+the participants include its owner, making that the matching held-turn
+boundary. Count held combats at setup so both averages include zero-prevention
+periods.
+
+Tungsten Rod uses the same owner-specific `ModifyHpLostAfterOsty` observation:
+its positive input/output delta is the exact HP loss prevented by the rod.
+Direct Curse and Status card sources are authoritative. Normal cards owned by
+the target player and target-owned Buff power callbacks are self-inflicted;
+enemy dealers and target-owned Debuff power callbacks are enemy-sourced. The
+game sometimes passes the player or null as dealer for Debuff ticks, so keep a
+narrow async-local source frame around the current player-damaging power
+callbacks rather than classifying those from dealer alone. Unidentified sources
+belong in the total but not a guessed source bucket. Use every held player turn
+and combat as the zero-inclusive average denominators.
+
+Ruined Helmet doubles the first positive Strength amount its owner receives in
+each combat through `TryModifyPowerAmountReceived`. Capture its exact local
+contribution as `modifiedAmount - amount` at that callback, but do not commit it
+there: a later power-application guard can still cancel the effect. Commit the
+staged bonus only from the relic's matching
+`AfterModifyingPowerAmountReceived` callback, which `PowerCmd` invokes after the
+Strength was actually applied. Count that confirmed application as the
+activation denominator for bonus Strength per activation. Use every combat
+where the relic was held, including zero-trigger combats, as the separate
+per-combat denominator.
+
+Daughter of the Wind's owner-specific `AfterCardPlayed` callback checks for an
+owner Attack, then issues and awaits exactly one
+`CreatureCmd.GainBlock(Creature, BlockVar, CardPlay, bool)` command. Arm only
+that immediate command from the relic callback and record the command task's
+returned post-modifier block amount. Count every player turn and combat where
+the relic was held, including zero-Attack periods, as the average denominators.
+
+Art of War's owner-specific `AfterEnergyReset(Player)` callback runs at each
+owner energy reset, including turn one, but only calls `PlayerCmd.GainEnergy`
+after turn one when no Attack was played on the preceding turn. Snapshot the
+owner's energy pool around that callback and record the positive delta only
+after its task completes successfully. Count every callback turn and every
+combat where the relic was held, including non-trigger periods, as the average
+denominators. For live tooltip values, the pending relic aggregate is the
+current-combat energy numerator and turn denominator. Reset a separate
+combat-local, per-player turn bucket at each newly observed callback turn, then
+add the same observed positive delta to that bucket.
+
+Cracked Core channels its starting Lightning orb from its owner-specific
+`BeforeSideTurnStart` callback on turn one. Snapshot the owner's orb queue
+around that completed callback and retain the exact newly added mutable
+`LightningOrb` reference for the combat. Count each successfully completed
+`LightningOrb.Passive` and `LightningOrb.Evoke` call carrying that reference;
+multi-evoke effects therefore count every actual evoke. The gameplay
+non-evoke removal path is `OrbQueue.RemoveCapacity`, currently used by Bulk
+Up, so compare raw queue references around that method for fizzles. Normal
+combat cleanup uses `OrbQueue.Clear` and must not count as a fizzle.
+
+Symbiotic Virus follows the same exact-reference lifecycle with its
+owner-specific `AfterSideTurnStart` callback and the newly queued mutable
+`DarkOrb`. Keep its tracked-orb set and persisted counters separate from
+Cracked Core's: both relics can be owned at once, and neither should claim the
+other relic's orb. Count completed `DarkOrb.Passive` and `DarkOrb.Evoke` calls,
+and route `OrbQueue.RemoveCapacity` removals through both exact-reference sets
+so only the matching relic records a fizzle.
+
+Gold-Plated Cables contributes through the global
+`Hook.ModifyOrbPassiveTriggerCount` chain. That hook's returned
+`modifyingModels` list is the authoritative confirmation that the relic
+actually increased the trigger count. Observe that list when it is passed to
+`Hook.AfterModifyingOrbPassiveTriggerCount`; its `OrbModel` argument is the
+exact first orb that received the additional passive trigger. When the queue
+is empty, neither the relic modifier nor its follow-up callback runs; count
+that missed opportunity separately at the tracked owner's exact
+`OrbQueue.BeforeTurnEnd` pass, not from generic orb traffic.
 
 Shovel adds `DigRestSiteOption` from `TryModifyRestSiteOptions`; the relic
 itself does not receive the obtained relic payload. Patch
@@ -520,6 +1155,16 @@ instances and their actual `RelicRarity`. To count missed Dig opportunities,
 inspect `RestSiteSynchronizer.BeforeLocalRestSiteExited`: at that point the
 local option list and chosen-option index still reveal whether a Dig option was
 available and whether the selected option was anything other than Dig.
+
+Tiny Mailbox appends two unpopulated `PotionReward` objects from its
+owner-specific `TryModifyRestSiteHealRewards` callback. Bind those exact
+objects from the callback's before/after reward-list delta, then read their
+populated `Potion` when each reward is selected or skipped. Selection success
+is the source of truth for potions taken; an attempted selection can fail while
+the potion belt is full. Fruit Juice is identified from the concrete potion
+model and intentionally overlaps the Rare offer bucket. Actual campfires where
+Rest was available but another option was chosen can share Shovel's
+`RestSiteSynchronizer.BeforeLocalRestSiteExited` observation point.
 
 Fresnel Lens applies Nimble from its owner-specific
 `TryModifyCardRewardOptionsLate` callback. Count the final option only when its
@@ -535,6 +1180,15 @@ reuses that same reward/screen and must refresh, not increment, its snapshot.
 Drowning Beacon applies its max-HP loss before obtaining Fresnel Lens; wrap the
 full async `DrowningBeacon.ClimbOption` to preserve the observed before/after
 max HP because a relic pickup hook begins too late to recover the baseline.
+
+Wing Charm uses the same native card-reward provenance: its
+`TryModifyCardRewardOptionsLate` callback applies Swift to one eligible
+`CardCreationResult` and records Wing Charm in `ModifyingRelics`. Snapshot that
+exact result object and its final rarity when the selection opens. A result
+removed from `CardReward._cards` was successfully taken; a terminal selection
+or outer skip with the result remaining is not taken. A reroll visibly offered
+the old Swift option, so resolve that option before `_cards` is cleared, then
+register the newly generated Swift option after repopulation.
 
 Silver Crucible's first, second, and third reward numbers are generation order,
 not click order. `CardReward.Populate` runs before the outer rewards page is
@@ -565,6 +1219,29 @@ rather than `AfterModifyingCardRewardOptions`, so that free modification does
 not consume `TimesUsed`. Keep it outside the numbered three-use ledger unless
 the game changes its own counter behavior.
 
+Orrery constructs five distinct `CardReward` objects in creation order, then
+passes that exact list to `RewardsCmd.OfferCustom` before its first await.
+Register those object references inside a narrow `Orrery.AfterObtained`
+source window rather than inferring Orrery from generic `CardCreationSource.Other`
+rewards. A terminal outer `CardReward.OnSkipped` is an observed skip; a
+successful `CardReward.OnSelect` can be resolved to the physical cards newly
+present in the deck; and terminal reward alternatives should be wrapped at
+`CardRewardAlternative.Generate` so their exact option id remains available.
+Pael's Wing uses the `SACRIFICE` alternative. Inner card-screen Skip and
+Driftwood reroll do not consume the reward and must preserve its original
+Orrery number.
+
+Prayer Wheel appends one dedicated `CardReward` from its owner-specific
+`TryModifyRewards` callback after a normal monster combat. Bind only the
+appended reward reference so the ordinary card reward on the same page never
+enters Prayer Wheel's totals. Count every populated option set, including
+Driftwood rerolls, by the final cards' observed rarities. A completed selection
+removes its obtained card from the reward, so compare before/after rarity
+counts to classify the actual Common, Uncommon, or Rare card taken. A completed
+selection that removes no card and an outer `CardReward.OnSkipped` are terminal
+rejections; the inner card-screen Skip is not terminal and must preserve the
+same pending reward.
+
 ## Generated And Supplemental Cards
 
 Not every visible card should become a permanent per-instance deck card.
@@ -572,16 +1249,78 @@ Not every visible card should become a permanent per-instance deck card.
 Patterns already in use:
 
 - Stable deck cards get normal instance ids.
-- Removed deck cards keep stats and render via removed-card overlay.
+- Removed deck cards keep stats and render in the separate not-in-deck view.
 - Combat-generated cards can get per-observed identities if they are actually played/tracked.
-- Some generated cards are better represented as pooled deck-view summaries.
+- Some generated cards are better represented as pooled meta-card summaries.
 
 Examples:
 
-- Shiv data is pooled under a synthetic deck-view Shiv overlay once a Shiv has been generated.
-- Sovereign Blade gets a supplemental pooled deck-view overlay once forged/generated behavior makes it relevant.
+- Shiv data is pooled under a synthetic Shiv meta-card once a Shiv has been generated.
+- Soul data is pooled under a synthetic Soul meta-card once a Soul has been generated.
+- Sovereign Blade gets a pooled meta-card once forged/generated behavior makes it relevant.
+- Each Status definition that reaches a combat pile gets one pooled meta-card
+  whose tooltip merges every observed instance of that Status.
 
-Use pooled summaries when a card does not meaningfully exist as a stable deck resident and per-copy identities would mislead the user.
+The deck screen is either in normal mode or not-in-deck mode. Normal mode
+contains only the permanent deck. Not-in-deck mode contains removed physical
+cards plus the supported meta-card registry and must not retain any current
+deck cards. Normally a registry entry appears only after its generated-card
+event or pooled aggregate proves it appeared this run. The show-all option
+constructs every supported registry card even without data, allowing the
+zero-value tooltip to document what SpireLens can track. Use pooled summaries
+when a card does not meaningfully exist as a stable deck resident and per-copy
+identities would mislead the user.
+
+Status encounter availability is recorded at the established
+`Hook.AfterCardGeneratedForCombat` boundary, after the generated card has
+reached its final combat pile. The default not-in-deck view therefore includes
+only Status definitions actually encountered during the run. Its show-all
+option enumerates `ModelDb.AllCards` for every `CardType.Status`, while the
+tooltip pools normal per-instance aggregates by card definition.
+
+Recurring Power-card outcomes use a second kind of pooled meta-card. One
+synthetic card per supported power family reuses the source Power card's art
+and name, carries an explicit meta-power badge, and is the canonical home for
+the complete shared record. It appears after that card definition is actually
+played; the show-all option also exposes supported zero-value entries.
+Physical copies project only a compact shared summary.
+
+Keep these cohorts and denominators distinct:
+
+- `PowerCardsPlayed` counts every completed play of the card definition,
+  including replays and generated copies.
+- `GeneratedPowerCardsPlayed` is a subset: completed plays whose canonical
+  card is not a member of the permanent deck.
+- `SuccessfulApplications` counts positive observed applications of the
+  matching shared power. Do not infer this from the power's `Amount`; one card
+  play can add several Amount units.
+- `/ turn` uses every player turn in a combat where at least one permanent
+  copy of that card definition was present at combat setup. Multiple copies do
+  not multiply this denominator. A generated-only combat is excluded.
+- `/ active turn` uses one unit for each turn where the shared power is live,
+  regardless of its stack/application count.
+- `/ active application-turn` uses one unit per successfully applied Power
+  card per turn it remains active. This measures output per played
+  application without confusing a card's dynamic Amount with card count.
+
+Generated applications contribute to active and application-turn metrics. If
+a permanent copy also made the combat deck-eligible, all family output in that
+combat contributes to the `/ turn` deck metric; do not claim an exact marginal
+split that the shared game power no longer preserves.
+
+When adding these denominators to an existing lifetime stat, also add a
+matching observation-era numerator. Older run files can contain the lifetime
+total without any historic denominator samples; dividing the old total by a
+new denominator would manufacture a false rate.
+
+Entropy's shared power owns its later transformations. Keep a narrow window
+around `EntropyPower.AfterPlayerTurnStart`, then observe the already-established
+`CardCmd.Transform(IEnumerable<CardTransformation>, Rng, CardPreviewStyle)`
+result. The successful result's replacement card is authoritative for rarity.
+Snapshot whether the original card has the Queen's `Bound` affliction before
+the transform removes that original; count a broken Chain of Binding only when
+that same transform succeeds. Count the combat when Entropy becomes active,
+including an active combat that produces no replacement cards.
 
 Enemy status-card pollution uses a source-window plus observed-result pattern:
 
@@ -607,10 +1346,61 @@ Card stats are exposed through Godot UI patches, not through game combat state a
 
 Important surfaces:
 
-- `ViewStatsInjectorPatch` hooks `NCardsViewScreen.ConnectSignals`, gates to `NDeckViewScreen`, clones the existing View Upgrades tickbox, rewires duplicated node internals, persists preferences, and reinjects on hot reload if the deck view is already open. The master on/off control gates every SpireLens stats surface, while separate default-off controls gate card stats and monster hover stats. Gate both `NCardHolder.CreateHoverTips` and run-history deck-entry focus before aggregate lookup or tooltip construction when Card Stats is off. The Card Stats control is presentation-only and must not be wired to `DisableCardStatsDuringCombat`, which suppresses attribution itself.
-- `StatsVisibilityHotkeyPatch` postfixes the stable Loader input node so hot-reloaded Core code can handle both keyboard and controller events. A standalone Left Shift tap and raw Right Stick (R3) press share the persisted master toggle and the same focus/overlay/transition/rebind guards. Left Stick press is the game's Peek action; R3 is absent from the shipped and saved controller action maps. Native Steam Input layouts must expose R3 as a virtual joypad button for the raw event to reach the mod.
+- `ViewStatsInjectorPatch` hooks `NCardsViewScreen.ConnectSignals`, gates to `NDeckViewScreen`, persists preferences, and reinjects its menu shortcut on hot reload if the deck view is already open. The master on/off control gates every SpireLens stats surface, while separate default-off controls gate card stats and monster hover stats. Gate `NativeStatsHoverTipFactory` before aggregate lookup or tooltip construction when the relevant stats option is off. The Card Stats control is presentation-only and must not be wired to `DisableCardStatsDuringCombat`, which suppresses attribution itself.
+- `StatsVisibilityHotkeyPatch` postfixes the stable Loader input node so hot-reloaded Core code can handle both keyboard and controller events. A standalone Left Shift tap and raw Right Stick (R3) press share the persisted master toggle and the same focus/overlay/transition/rebind guards. Shift chords are rejected whether the other modifier is pressed before or after Shift, covering shortcuts such as Windows+Shift+S. Left Stick press is the game's Peek action; R3 is absent from the shipped and saved controller action maps. Native Steam Input layouts must expose R3 as a virtual joypad button for the raw event to reach the mod.
 - `NCardsViewScreen.ConnectSignals` calls its controller-state update before the SpireLens postfix. Controller mode hides the built-in `%Upgrades` tickbox, so clones of that subtree inherit `Visible=false` unless SpireLens explicitly restores visibility. Any injected deck controls cloned from View Upgrades must set their own visibility rather than inherit the source's controller-specific state.
-- `CardHoverTooltipPatch` hooks `NCardHolder.CreateHoverTips` and `ClearHoverTips` to show/hide the SpireLens tooltip.
+- `CardHoverTooltipPatch` builds compact/full card titles and BBCode bodies; it
+  does not create or remove UI nodes.
+- `NativeHoverTipAugmentationPatch` prefixes the game's nontrivial
+  `NHoverTipSet.CreateAndShow(Control, IEnumerable<IHoverTip>,
+  HoverTipAlignment)` overload and appends at most one SpireLens `HoverTip` to
+  that owner’s native sequence. Owner-specific builders cover card holders,
+  owned relics, enemies, visible compendium relics, and run-history cards and
+  relics. Its postfix styles only the final native text control created for
+  that appended tip: the SpireLens blue background tint and top-right brand
+  return without creating a parallel panel or retaining the control.
+- Card/relic pinning does not override ordinary unfocus or
+  `NHoverTipSet.Remove`. A right-clicked card or relic receives a dedicated
+  surrogate `Control` owner for a second native tooltip set; ordinary unfocus
+  removes only the transient source-owned set. While pinned, attempts to create
+  another transient set for that same source are suppressed. The surrogate,
+  any mouse-input signal, and the lock badge are all removed during Core
+  shutdown so hot reload cannot leave callbacks from an orphaned assembly.
+  Pointer motion is the only input that preserves a pin: the stable Loader
+  input postfix dismisses it before the next mouse, keyboard, or controller
+  action continues through the game's normal input path. A second right press
+  over the pinned source unlocks during that global pass. The manager keeps a
+  right-button press/release latch until the physical button is released, so
+  the later holder callback cannot repin on the same dispatch even when Godot
+  supplies `_Input` and `_GuiInput` with different managed wrappers for that
+  one native event. Do not correlate those phases with
+  `GodotObject.GetInstanceId()`.
+- Run-history pinning attaches to both the existing card/relic rows and the
+  native card/relic containers. Those containers survive multiplayer player
+  selection while their rows are rebuilt, so their `ChildEnteredTree` signals
+  attach the same right-click behavior to each replacement row without
+  introducing separate lifecycle patches for the two row factories.
+- Card right-click must be claimed on the press, not the release.
+  `NCardHolder.OnMousePressed` normally stores right press as
+  `_currentPressedAction`; its matching release then emits `AltPressed`.
+  SpireLens prefixes every implementation of that virtual method declared by
+  an `NCardHolder` subtype and skips the original when the pin toggle handles
+  the press. Patching only the base method is insufficient because
+  `NHandCardHolder` declares an override. The prefix claims right press only
+  when the holder has an `NCardPileScreen` or `NCardsViewScreen` ancestor;
+  combat-hand and active card-selection surfaces retain their normal input.
+- `StatsTooltip` only constructs the native `HoverTip` value and escapes
+  dynamic BBCode. It also wraps the stats description in the established 20px
+  body size. It must not retain a `Control`, create a scene-root panel, position
+  UI per frame, or mirror native focus/unfocus cleanup. `NHoverTipSet` owns the
+  stats node together with the rest of that owner’s tips, so the game’s
+  ordinary `Remove(owner)` and tree-exit paths remove it.
+- Reusable stat concepts are loaded once from the embedded
+  `Core/Config/stat-concepts.json`. Inline symbols and their short definitions
+  use Godot `RichTextLabel` `[hint]` markup, while the relic compendium's
+  **Icon glossary** mode renders the same cached definitions in its existing
+  scrollable content area. This is interactive content inside the pinned native
+  SpireLens page, not a second `NHoverTipSet` page.
 - Hand hovers are compact unless verbose hand stats are enabled.
 - Deck view and other card-view hovers can show full lineage and stat breakdown.
 - Tooltip aggregate display merges committed run data plus current pending combat so combat stats appear immediately.
@@ -676,6 +1466,28 @@ Healing has its own attribution rule: track attempted, actually restored, and
 lost healing separately, with lost-healing reason buckets such as `full_hp` and
 specific blocker ids as they are discovered. See [ADR 0002](adr/0002-healing-attribution.md).
 
+Blood Vial and Blood Vial??? (`FakeBloodVial`) both heal from their
+owner-specific `AfterPlayerTurnStartLate` callback on the first turn. Arm the
+shared relic-healing ledger from that exact callback, use the model's current
+`DynamicVars.Heal` value as the attempted amount, and finalize after the
+returned task completes. Keep `RELIC.BLOOD_VIAL` and
+`RELIC.FAKE_BLOOD_VIAL` in separate aggregates even though their tooltip rows
+are identical.
+
+Happy Flower and Happy Flower??? (`FakeHappyFlower`) both grant energy from
+their owner-specific `AfterSideTurnStart` callback, but on three-turn and
+five-turn counters respectively. Patch both callbacks, key the energy window
+to the relic owner, and keep `RELIC.HAPPY_FLOWER` and
+`RELIC.FAKE_HAPPY_FLOWER` in separate aggregates. Their held-combat
+denominators must likewise be keyed by both player and relic id so owning one
+variant cannot suppress the other's combat count.
+
+Meat on the Bone evaluates its healing threshold and heals from the
+owner-specific `AfterCombatVictoryEarly` callback. Mirror the game's integer
+threshold calculation (`current HP <= int(max HP * threshold percent)`), arm
+the shared relic-healing ledger only when that condition is true, and finalize
+after the callback's returned task completes.
+
 Good hook surfaces already proven useful:
 
 - `CombatHistory.Add`: broad real-entry observation point. Caveat: does NOT see damage from combat-ending killing blows (see the Damage Attribution known trap).
@@ -683,7 +1495,17 @@ Good hook surfaces already proven useful:
 - `Hook.AfterCardDrawn`: reliable card draw arrival.
 - `Hook.ShouldDraw`: draw attempts and blocked draw modifier.
 - `Hook.AfterCardChangedPiles`: final pile result.
+- `Hook.AfterCardGeneratedForCombat`: a generated or transformed card has
+  already reached its final combat pile. This is the reliable boundary for
+  per-source Soul destination counts; use the still-resolving card play as the
+  source and the generated Soul's actual pile as the destination.
 - `PlayerCombatState.GainEnergy`: actual energy delta.
+- `FakeVenerableTeaSet.AfterEnergyReset` and
+  `VenerableTeaSet.AfterEnergyReset`: each checks its saved
+  `GainEnergyInNextCombat` flag, awaits its immediate energy command, and then
+  clears the flag. Capture the armed state and starting energy in a prefix,
+  then record the completed callback's observed energy delta; keep the fake
+  and revealed relic ids separate.
 - `PlayerCombatState.GainStars`: actual star delta.
 - `Hook.AfterForge`: actual forge gain/source.
 - `Hook.BeforePowerAmountChanged`: attempted power application context.
@@ -691,16 +1513,26 @@ Good hook surfaces already proven useful:
 - `Hook.ShouldClearBlock`, `Hook.AfterBlockCleared`, `Hook.AfterPreventingBlockClear`: block expiry/waste window.
 - `CardPile.AddInternal` filtered to Deck: permanent card entry.
 - `CardPileCmd.RemoveFromDeck` prefix: permanent card removal.
-- `CardModel.UpgradeInternal` postfix: upgrades from all sources.
+- `CardModel.UpgradeInternal` prefix/postfix: source-specific stats can observe
+  upgrades from all sources, but card lineage must first snapshot that the
+  exact upgraded object is in the permanent deck. Do not canonicalize a combat
+  clone through `DeckVersion` for the “Upgraded floor…” lineage.
 - `RunManager.EnterMapPointInternal`: original map point entry, before `?`
   points resolve into concrete room types.
 - Specific power/relic methods via `AccessTools.TypeByName`: useful when no public compile-time type is safe or when patching optional/specific models.
+- `RainbowRing.AfterCardPlayed`: its private Attack, Skill, and Power
+  current-turn counters are updated inside this callback. A successful trigger
+  is authoritative only after its returned task completes and
+  `_activationCountThisTurn` advances; that increment follows both of the
+  relic's awaited power applications.
 
 ## Diagnostic Habits
 
 When a new stat does not work, first determine which of these failed:
 
 - The patch did not install.
+- The patch installed after its caller was already JIT-compiled and needs one
+  full game restart before its behavior can be judged.
 - The target method never fires for this mechanic.
 - The target fires but before/after timing is wrong.
 - The outcome has no card source at that point.
@@ -710,7 +1542,10 @@ When a new stat does not work, first determine which of these failed:
 - The data was recorded but shape/default/merge omitted it.
 - The stat is correct but compact tooltip intentionally hides it.
 
-`CoreMain.Initialize()` logs Harmony-patched methods for diagnostics. Use that list to confirm a hook exists before chasing tracker logic.
+`CoreMain.Initialize()` logs Harmony-patched methods for diagnostics. Use that
+list to confirm a hook exists before chasing tracker logic. For a newly added
+target, “listed as patched” plus “entry diagnostic never fires” is a restart
+signal before it is evidence that the target method is wrong.
 
 For source/context debugging, log compact identifiers that line up with JSON events: card id, instance id, card hash, `DeckVersion` status, creature id, history count, current/pending play, and current floor.
 

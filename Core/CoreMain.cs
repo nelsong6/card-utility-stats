@@ -82,6 +82,8 @@ public static class CoreMain
 
         Logger.Info($"Core.Initialize starting (harmony_id={_harmonyId}, debug={DebugLogging})");
 
+        StatConceptGlossary.Initialize();
+
         _harmony = new Harmony(_harmonyId);
 
         // Install each patch class in its own try/catch instead of a bare
@@ -118,6 +120,7 @@ public static class CoreMain
         foreach (var m in patched)
             Logger.Info($"[CUS-diag]   {m.DeclaringType?.FullName}.{m.Name}");
 
+        RelicClassificationStore.Initialize();
         RunTracker.InitializeHooks();
 
         // Resume an active run across hot reload. Our static state (current
@@ -137,8 +140,11 @@ public static class CoreMain
         // the user would see the checkbox disappear until they close and
         // reopen the deck view.
         Patches.ViewStatsInjectorPatch.ReinjectIntoActiveDeckView();
+        RunHistoryDeckViewer.ReinjectIntoActiveRunHistory();
+        RunHistoryDeckViewer.RefreshAllArrowHotkeys();
+        Patches.RelicBarFilterPatch.InitializeHooks();
+        Patches.RelicBarFilterPatch.RefreshAll("core initialized");
         Patches.RelicCompendiumFilterUi.ReinjectIntoActiveCollections();
-        Patches.RelicCompendiumStatsSignals.ReattachToActiveEntries();
 
         // Visible confirmation on screen so hot reload has immediate feedback.
         // Kept in Core (not Loader) so toast text/style can be tweaked and
@@ -172,14 +178,23 @@ public static class CoreMain
         try { ViewStatsInjectorPatch.TeardownInjectedUI(); }
         catch (Exception e) { Logger.Error($"Shutdown: UI teardown failed: {e}"); }
 
-        try { RelicCompendiumStatsSignals.TeardownAttachedSignals(); }
-        catch (Exception e) { Logger.Error($"Shutdown: relic compendium signal teardown failed: {e}"); }
+        try { RunHistoryDeckViewer.Teardown(); }
+        catch (Exception e) { Logger.Error($"Shutdown: run-history deck viewer teardown failed: {e}"); }
+
+        try { SpireLensOptionsMenu.Destroy(); }
+        catch (Exception e) { Logger.Error($"Shutdown: options menu teardown failed: {e}"); }
+
+        try { StatsTooltipPinManager.Teardown(); }
+        catch (Exception e) { Logger.Error($"Shutdown: stats tooltip pin teardown failed: {e}"); }
+
+        try { RelicBarFilterPatch.TeardownHooks(); }
+        catch (Exception e) { Logger.Error($"Shutdown: relic bar filter hook teardown failed: {e}"); }
+
+        try { RelicClassificationStore.Shutdown(); }
+        catch (Exception e) { Logger.Error($"Shutdown: relic classification teardown failed: {e}"); }
 
         try { RelicCompendiumFilterUi.TeardownInjectedUI(); }
         catch (Exception e) { Logger.Error($"Shutdown: relic compendium filter teardown failed: {e}"); }
-
-        try { StatsTooltip.Destroy(); }
-        catch (Exception e) { Logger.Error($"Shutdown: StatsTooltip teardown failed: {e}"); }
 
         try { RunTracker.TeardownHooks(); }
         catch (Exception e) { Logger.Error($"Shutdown: TeardownHooks failed: {e}"); }

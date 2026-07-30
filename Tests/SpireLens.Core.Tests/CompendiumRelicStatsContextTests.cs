@@ -89,10 +89,25 @@ public class CompendiumRelicStatsContextTests
     }
 
     [Fact]
-    public void TryBuildEmptyRelicTooltip_DoesNotCreatePanelForUnsupportedRelic()
+    public void TryBuildEmptyRelicTooltip_MangoUsesZeroMaxHpRows()
     {
         var ok = CompendiumRelicStatsContext.TryBuildEmptyRelicTooltip(
             Uninitialized<Mango>(),
+            out var title,
+            out var body);
+
+        Assert.True(ok);
+        Assert.Equal("Mango", title);
+        Assert.Contains("Original max HP", body);
+        Assert.Contains("New max HP", body);
+        Assert.Contains("Max HP gained", body);
+    }
+
+    [Fact]
+    public void TryBuildEmptyRelicTooltip_DoesNotCreatePanelForUnsupportedRelic()
+    {
+        var ok = CompendiumRelicStatsContext.TryBuildEmptyRelicTooltip(
+            Uninitialized<DreamCatcher>(),
             out var title,
             out var body);
 

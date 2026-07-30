@@ -17,7 +17,14 @@
   "relic_aggregates": {
     "RELIC.CENTENNIAL_PUZZLE": {
       "activations": 4,
-      "additional_cards_drawn": 11
+      "additional_cards_drawn": 11,
+      "centennial_puzzle_activation_turn_total": 9,
+      "centennial_puzzle_activation_turn_samples": 4,
+      "centennial_puzzle_player_turn_activations": 3,
+      "centennial_puzzle_opponent_turn_activations": 1,
+      "centennial_puzzle_status_activations": 1,
+      "centennial_puzzle_curse_activations": 1,
+      "centennial_puzzle_enemy_source_activations": 2
     }
   },
   "meta_stats": {},

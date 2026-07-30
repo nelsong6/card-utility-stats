@@ -1,8 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using HarmonyLib;
+using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
+using MegaCrit.Sts2.Core.Entities.Players;
+using MegaCrit.Sts2.Core.Hooks;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Powers;
 
@@ -58,31 +62,153 @@ public static class JugglingPowerAfterAppliedStatsPatch
 {
     [HarmonyPostfix]
     public static void Postfix(JugglingPower __instance)
-        => JugglingPowerDisplayAmountPatch.NotifyDisplayAmountChanged(__instance);
+    {
+        RunTracker.RecordJugglingPowerApplied(__instance);
+        JugglingPowerDisplayAmountPatch.NotifyDisplayAmountChanged(__instance);
+    }
 }
 
 /// <summary>
-/// Juggling increments before its first await, so its returned Task need not
-/// finish before the native amount label can show the new Attack count.
+/// Juggling increments before its first await. Arm its exact third-Attack
+/// copy window from the pre-increment counter, refresh the live counter after
+/// the native callback starts, and keep attribution armed until every awaited
+/// generated-card add has completed.
 /// </summary>
 [HarmonyPatch(typeof(JugglingPower), nameof(JugglingPower.AfterCardPlayed))]
-public static class JugglingPowerAfterCardPlayedStatsPatch
+internal static class JugglingPowerAfterCardPlayedStatsPatch
 {
+    [HarmonyPrefix]
+    public static void Prefix(
+        JugglingPower __instance,
+        CardPlay cardPlay,
+        out PendingJugglingCopyWindow? __state)
+    {
+        __state = RunTracker.ArmJugglingCopyAttribution(__instance, cardPlay);
+    }
+
     [HarmonyPostfix]
-    public static void Postfix(JugglingPower __instance, CardPlay cardPlay)
+    public static void Postfix(
+        JugglingPower __instance,
+        CardPlay cardPlay,
+        PendingJugglingCopyWindow? __state,
+        ref Task __result)
     {
         try
         {
-            if (cardPlay?.Card == null || __instance?.Owner?.Player == null) return;
-            if (!ReferenceEquals(cardPlay.Card.Owner, __instance.Owner.Player)) return;
-            if (cardPlay.Card.Type != CardType.Attack) return;
+            if (cardPlay?.Card != null
+                && __instance?.Owner?.Player != null
+                && ReferenceEquals(cardPlay.Card.Owner, __instance.Owner.Player)
+                && cardPlay.Card.Type == CardType.Attack)
+            {
+                JugglingPowerDisplayAmountPatch.NotifyDisplayAmountChanged(__instance);
+            }
 
-            JugglingPowerDisplayAmountPatch.NotifyDisplayAmountChanged(__instance);
+            if (__state == null) return;
+            if (__result == null)
+            {
+                RunTracker.DisarmJugglingCopyAttribution(__state);
+                return;
+            }
+
+            __result = ObserveAsync(__result, __state);
         }
         catch (Exception e)
         {
             CoreMain.LogDebug($"JugglingPowerAfterCardPlayedStatsPatch failed: {e.Message}");
+            RunTracker.DisarmJugglingCopyAttribution(__state);
         }
+    }
+
+    [HarmonyFinalizer]
+    public static Exception? Finalizer(
+        Exception? __exception,
+        PendingJugglingCopyWindow? __state)
+    {
+        if (__exception != null)
+            RunTracker.DisarmJugglingCopyAttribution(__state);
+        return __exception;
+    }
+
+    private static async Task ObserveAsync(
+        Task inner,
+        PendingJugglingCopyWindow window)
+    {
+        try
+        {
+            await inner.ConfigureAwait(false);
+        }
+        finally
+        {
+            RunTracker.DisarmJugglingCopyAttribution(window);
+        }
+    }
+}
+
+/// <summary>
+/// Observe the exact pile-add result of each generated Juggling clone. Failed
+/// additions do not count; successful additions use the final card rarity
+/// returned by the command.
+/// </summary>
+[HarmonyPatch(
+    typeof(CardPileCmd),
+    nameof(CardPileCmd.AddGeneratedCardToCombat),
+    new[] { typeof(CardModel), typeof(PileType), typeof(Player), typeof(CardPilePosition) })]
+internal static class JugglingGeneratedCardStatsPatch
+{
+    [HarmonyPrefix]
+    public static void Prefix(
+        CardModel card,
+        Player creator,
+        out PendingJugglingCopyWindow? __state)
+    {
+        __state = RunTracker.CaptureJugglingCopyAttempt(card, creator);
+    }
+
+    [HarmonyPostfix]
+    public static void Postfix(
+        PendingJugglingCopyWindow? __state,
+        ref Task<CardPileAddResult> __result)
+    {
+        try
+        {
+            if (__state == null || __result == null) return;
+            __result = ObserveAsync(__result, __state);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"JugglingGeneratedCardStatsPatch.Postfix failed: {e.Message}");
+        }
+    }
+
+    private static async Task<CardPileAddResult> ObserveAsync(
+        Task<CardPileAddResult> inner,
+        PendingJugglingCopyWindow window)
+    {
+        var result = await inner.ConfigureAwait(false);
+        try
+        {
+            RunTracker.RecordJugglingCopyResult(window, result);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"JugglingGeneratedCardStatsPatch.ObserveAsync failed: {e.Message}");
+        }
+
+        return result;
+    }
+}
+
+/// <summary>
+/// Count each distinct player turn that starts while Juggling is active,
+/// including turns where it never reaches the third Attack.
+/// </summary>
+[HarmonyPatch(typeof(Hook), nameof(Hook.AfterPlayerTurnStart))]
+public static class HookAfterPlayerTurnStartJugglingStatsPatch
+{
+    [HarmonyPrefix]
+    public static void Prefix(Player player)
+    {
+        RunTracker.RecordJugglingPowerTurnStarted(player);
     }
 }
 

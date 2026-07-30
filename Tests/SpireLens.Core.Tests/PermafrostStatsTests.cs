@@ -30,6 +30,7 @@ public class PermafrostStatsTests
         {
             Activations = 3,
             AdditionalBlockGained = 21,
+            PermafrostCombats = 5,
         };
 
         var json = JsonSerializer.Serialize(run, SerializerOptions);
@@ -37,6 +38,7 @@ public class PermafrostStatsTests
         Assert.Contains("relic_aggregates", json);
         Assert.Contains("activations", json);
         Assert.Contains("additional_block_gained", json);
+        Assert.Contains("permafrost_combats", json);
 
         var restored = JsonSerializer.Deserialize<RunData>(json, SerializerOptions);
 
@@ -44,6 +46,29 @@ public class PermafrostStatsTests
         var agg = restored!.RelicAggregates[PermafrostRelicId];
         Assert.Equal(3, agg.Activations);
         Assert.Equal(21, agg.AdditionalBlockGained);
+        Assert.Equal(5, agg.PermafrostCombats);
+    }
+
+    [Fact]
+    public void MergeRelicAggregateInto_PermafrostCombats_Accumulates()
+    {
+        var target = new RelicAggregate { PermafrostCombats = 2 };
+        var source = new RelicAggregate { PermafrostCombats = 3 };
+
+        RunTracker.MergeRelicAggregateInto(target, source);
+
+        Assert.Equal(5, target.PermafrostCombats);
+    }
+
+    [Fact]
+    public void RunTracker_PermafrostCombatHelper_AccumulatesAndClamps()
+    {
+        var agg = new RelicAggregate();
+
+        RunTracker.RecordPermafrostCombatForTest(agg, 5);
+        RunTracker.RecordPermafrostCombatForTest(agg, -2);
+
+        Assert.Equal(5, agg.PermafrostCombats);
     }
 
     [Fact]
@@ -53,12 +78,17 @@ public class PermafrostStatsTests
         {
             Activations = 2,
             AdditionalBlockGained = 15,
+            PermafrostCombats = 5,
         });
 
         Assert.Contains("Combats triggered", body);
-        Assert.Contains("[img=16x16]res://images/ui/combat/block.png[/img] block gained", body);
-        Assert.Contains("[img=16x16]res://images/ui/combat/block.png[/img] block gained per combat", body);
+        Assert.Contains("Avg times triggered per combat", body);
+        Assert.Contains("[hint=\"Block:", body);
+        Assert.Contains("[hint=\"Combat:", body);
+        Assert.Contains("block gained", body);
+        Assert.Contains("block gained per combat", body);
         Assert.Contains("[b]2[/b]", body);
+        Assert.Contains("[b]0.4[/b]", body);
         Assert.Contains("[b]15[/b]", body);
         Assert.Contains("[b]7.5[/b]", body);
     }
@@ -70,10 +100,33 @@ public class PermafrostStatsTests
 
         Assert.Contains("Combats triggered", body);
         Assert.Contains("[b]0[/b]", body);
+        Assert.Contains("Avg times triggered per combat", body);
         Assert.Contains("block gained per combat", body);
     }
 
-    private static string BuildBody(RelicAggregate agg)
-        => (string)(BuildPermafrostBodyMethod.Invoke(null, new object?[] { agg })
+    [Fact]
+    public void RelicTooltip_PermafrostFields_BackfillsOldCombatDenominatorFromTriggers()
+    {
+        var body = BuildBody(new RelicAggregate
+        {
+            Activations = 3,
+        });
+
+        Assert.Contains("Avg times triggered per combat[/color]  [b]1[/b]", body);
+    }
+
+    [Theory]
+    [InlineData(true, "true")]
+    [InlineData(false, "false")]
+    public void RelicTooltip_PermafrostFields_ShowTriggeredThisCombat(bool triggeredThisCombat, string expected)
+    {
+        var body = BuildBody(new RelicAggregate(), triggeredThisCombat);
+
+        Assert.Contains("Triggered this combat", body);
+        Assert.Contains($"[b]{expected}[/b]", body);
+    }
+
+    private static string BuildBody(RelicAggregate agg, bool triggeredThisCombat = false)
+        => (string)(BuildPermafrostBodyMethod.Invoke(null, new object?[] { agg, triggeredThisCombat })
             ?? throw new InvalidOperationException("BuildPermafrostBodyBBCode returned null."));
 }

@@ -1,0 +1,25 @@
+{
+  "run_id": "bing-bong-relic-fixture",
+  "started_at": "2026-07-26T23:00:00Z",
+  "updated_at": "2026-07-26T23:30:00Z",
+  "character": "CHARACTER.IRONCLAD",
+  "ascension": 11,
+  "floor_reached": 33,
+  "outcome": "in_progress",
+  "game_start_time": 1785126000,
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.BING_BONG": {
+      "bing_bong_extra_cards_added": 8,
+      "bing_bong_common_cards_added": 3,
+      "bing_bong_uncommon_cards_added": 2,
+      "bing_bong_rare_cards_added": 1,
+      "bing_bong_curse_cards_added": 2
+    }
+  },
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

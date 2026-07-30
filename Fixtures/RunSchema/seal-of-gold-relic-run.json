@@ -1,0 +1,25 @@
+{
+  "run_id": "seal-of-gold-relic-fixture",
+  "started_at": "2026-07-21T20:00:00Z",
+  "updated_at": "2026-07-21T20:18:00Z",
+  "character": "CHAR.IRONCLAD",
+  "ascension": 8,
+  "floor_reached": 24,
+  "outcome": "in_progress",
+  "game_start_time": 1784664000,
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.SEAL_OF_GOLD": {
+      "activations": 4,
+      "gold_lost": 17,
+      "gold_loss_blocked": 3,
+      "energy_generated": 3,
+      "energy_generated_combats": 2
+    }
+  },
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

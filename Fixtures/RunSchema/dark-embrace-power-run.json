@@ -1,0 +1,42 @@
+{
+  "run_id": "dark-embrace-power-fixture",
+  "started_at": "2026-07-30T01:00:00Z",
+  "updated_at": "2026-07-30T01:22:00Z",
+  "character": "IRONCLAD",
+  "ascension": 7,
+  "floor_reached": 24,
+  "outcome": "in_progress",
+  "game_start_time": 1785373200,
+  "aggregates": {
+    "CARD.DARK_EMBRACE#1": {
+      "combats_in_deck": 4,
+      "plays": 3,
+      "times_drawn": 6,
+      "floor_added": 7,
+      "initial_upgrade_level": 0
+    }
+  },
+  "events": [],
+  "relic_aggregates": {},
+  "enemy_aggregates": {},
+  "meta_stats": {
+    "power_aggregates": {
+      "POWER.DARK_EMBRACE": {
+        "power_id": "POWER.DARK_EMBRACE",
+        "display_name": "Dark Embrace",
+        "dark_embrace_cards_drawn": 18,
+        "dark_embrace_combat_turns": 9,
+        "turns_active": 6,
+        "combats_active": 3
+      }
+    }
+  },
+  "instance_numbers_by_def": {
+    "CARD.DARK_EMBRACE": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.DARK_EMBRACE": 1
+  }
+}

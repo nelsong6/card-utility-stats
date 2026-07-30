@@ -1,0 +1,736 @@
+{
+  "schema_version": 1,
+  "concepts": {
+    "activation": {
+      "display": {
+        "type": "embedded_image",
+        "resource": "Assets.stat-activation.svg"
+      },
+      "help": {
+        "label": "Activation",
+        "description": "An activation occurs when an effect successfully triggers."
+      }
+    },
+    "attack": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/packed/card_library/type_sort_attack.png"
+      },
+      "help": {
+        "label": "Attack",
+        "description": "An Attack card or a count of Attack cards."
+      }
+    },
+    "attack_common": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/packed/card_library/type_sort_attack.png"
+      },
+      "help": {
+        "label": "Common Attack",
+        "description": "A Common Attack card or a count of Common Attack cards."
+      }
+    },
+    "attack_rare": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/packed/card_library/type_sort_attack.png",
+        "modulate": "#EFC850"
+      },
+      "help": {
+        "label": "Rare Attack",
+        "description": "A Rare Attack card or a count of Rare Attack cards."
+      }
+    },
+    "attack_uncommon": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/packed/card_library/type_sort_attack.png",
+        "modulate": "#87CEEB"
+      },
+      "help": {
+        "label": "Uncommon Attack",
+        "description": "An Uncommon Attack card or a count of Uncommon Attack cards."
+      }
+    },
+    "average": {
+      "display": {
+        "type": "embedded_image",
+        "resource": "Assets.stat-average.svg"
+      },
+      "help": {
+        "label": "Average",
+        "description": "A mean value: the total divided by the relevant number of turns, combats, floors, or activations."
+      }
+    },
+    "block": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/ui/combat/block.png"
+      },
+      "help": {
+        "label": "Block",
+        "description": "Block gained, retained, spent, or otherwise measured by a stat."
+      }
+    },
+    "block_gained": {
+      "display": {
+        "type": "game_resource_badge",
+        "path": "res://images/ui/combat/block.png",
+        "badge": "plus"
+      },
+      "help": {
+        "label": "Block gained",
+        "description": "Block added by a card, relic, or other effect."
+      }
+    },
+    "block_wasted": {
+      "display": {
+        "type": "embedded_image",
+        "resource": "Assets.stat-block-wasted.svg"
+      },
+      "help": {
+        "label": "Block wasted",
+        "description": "Block that expired or exceeded a retention limit without preventing damage."
+      }
+    },
+    "campfire": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/atlases/ui_atlas.sprites/map/icons/map_rest.tres"
+      },
+      "help": {
+        "label": "Campfire",
+        "description": "A campfire or rest site on the act map."
+      }
+    },
+    "card": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/ui/reward_screen/reward_icon_card.png"
+      },
+      "help": {
+        "label": "Card",
+        "description": "A card or a count of cards."
+      }
+    },
+    "card_rare": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/ui/reward_screen/reward_icon_card.png",
+        "modulate": "#EFC850"
+      },
+      "help": {
+        "label": "Rare card",
+        "description": "A Rare card or a count of Rare cards."
+      }
+    },
+    "card_uncommon": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/ui/reward_screen/reward_icon_card.png",
+        "modulate": "#87CEEB"
+      },
+      "help": {
+        "label": "Uncommon card",
+        "description": "An Uncommon card or a count of Uncommon cards."
+      }
+    },
+    "charge": {
+      "display": {
+        "type": "embedded_image",
+        "resource": "Assets.stat-charge.svg"
+      },
+      "help": {
+        "label": "Charge",
+        "description": "A stored charge accumulated or used by a relic."
+      }
+    },
+    "combat": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/atlases/ui_atlas.sprites/map/icons/map_monster.tres"
+      },
+      "help": {
+        "label": "Combat",
+        "description": "A combat encounter or a value measured across combats."
+      }
+    },
+    "damage": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/packed/statistics_screen/stats_swords.png"
+      },
+      "help": {
+        "label": "Damage",
+        "description": "Damage attempted, dealt, blocked, prevented, or otherwise measured by a stat."
+      }
+    },
+    "dexterity": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/atlases/power_atlas.sprites/dexterity_power.tres"
+      },
+      "help": {
+        "label": "Dexterity",
+        "description": "Dexterity gained, lost, or otherwise measured by a stat."
+      }
+    },
+    "dexterity_gained": {
+      "display": {
+        "type": "game_resource_badge",
+        "path": "res://images/atlases/power_atlas.sprites/dexterity_power.tres",
+        "badge": "plus"
+      },
+      "help": {
+        "label": "Dexterity gained",
+        "description": "Dexterity added by a card, relic, or other effect."
+      }
+    },
+    "discard": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/packed/combat_ui/discard_pile.png"
+      },
+      "help": {
+        "label": "Discard",
+        "description": "A card discarded or moved to the discard pile."
+      }
+    },
+    "draw": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/atlases/power_atlas.sprites/draw_cards_next_turn_power.tres"
+      },
+      "help": {
+        "label": "Draw",
+        "description": "A card drawn or a count of cards drawn."
+      }
+    },
+    "elite": {
+      "display": {
+        "type": "game_resource_overlay",
+        "resources": [
+          {
+            "path": "res://images/atlases/compressed.sprites/map/map_elite_outline.tres",
+            "scale": 1
+          },
+          {
+            "path": "res://images/atlases/ui_atlas.sprites/map/icons/map_elite.tres",
+            "scale": 1
+          }
+        ]
+      },
+      "help": {
+        "label": "Elite",
+        "description": "An Elite combat destination on the act map."
+      }
+    },
+    "energy": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/packed/sprite_fonts/ironclad_energy_icon.png"
+      },
+      "help": {
+        "label": "Energy",
+        "description": "Energy gained, generated, saved, spent, or otherwise measured by a stat."
+      }
+    },
+    "energy_gained": {
+      "display": {
+        "type": "game_resource_badge",
+        "path": "res://images/packed/sprite_fonts/ironclad_energy_icon.png",
+        "badge": "plus"
+      },
+      "help": {
+        "label": "Energy gained",
+        "description": "Energy added by a card, relic, or other effect."
+      }
+    },
+    "energy_wasted": {
+      "display": {
+        "type": "embedded_image",
+        "resource": "Assets.stat-energy-wasted.svg"
+      },
+      "help": {
+        "label": "Energy wasted",
+        "description": "Energy that remained unused or prevented an energy-granting effect from benefiting the player."
+      }
+    },
+    "exhaust": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/packed/combat_ui/exhaust_pile.png"
+      },
+      "help": {
+        "label": "Exhaust",
+        "description": "A card exhausted or moved to the exhaust pile."
+      }
+    },
+    "floor": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/atlases/ui_atlas.sprites/top_bar/top_bar_floor.tres"
+      },
+      "help": {
+        "label": "Floor",
+        "description": "A run floor or a value measured across floors."
+      }
+    },
+    "fruit_juice": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/atlases/potion_atlas.sprites/fruit_juice.tres"
+      },
+      "help": {
+        "label": "Fruit Juice",
+        "description": "The Fruit Juice potion, which permanently increases Max HP."
+      }
+    },
+    "glam": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/enchantments/glam.png"
+      },
+      "help": {
+        "label": "Glam",
+        "description": "A card enchanted with Glam."
+      }
+    },
+    "gold": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/atlases/ui_atlas.sprites/top_bar/top_bar_gold.tres"
+      },
+      "help": {
+        "label": "Gold",
+        "description": "Gold gained, lost, spent, blocked, or otherwise measured by a stat."
+      }
+    },
+    "gold_gained": {
+      "display": {
+        "type": "game_resource_badge",
+        "path": "res://images/atlases/ui_atlas.sprites/top_bar/top_bar_gold.tres",
+        "badge": "plus"
+      },
+      "help": {
+        "label": "Gold gained",
+        "description": "Gold added by a card, relic, or other effect."
+      }
+    },
+    "healing_blocked": {
+      "display": {
+        "type": "embedded_image",
+        "resource": "Assets.healing-blocked.png"
+      },
+      "help": {
+        "label": "Healing blocked",
+        "description": "Healing that was attempted but did not restore HP."
+      }
+    },
+    "healing_gained": {
+      "display": {
+        "type": "embedded_image",
+        "resource": "Assets.stat-healing-gained.svg"
+      },
+      "help": {
+        "label": "Healing gained",
+        "description": "HP successfully restored by a healing effect."
+      }
+    },
+    "healing_wasted": {
+      "display": {
+        "type": "embedded_image",
+        "resource": "Assets.stat-healing-wasted.svg"
+      },
+      "help": {
+        "label": "Healing wasted",
+        "description": "Healing that could not restore HP, such as healing offered while already at full HP."
+      }
+    },
+    "information": {
+      "display": {
+        "type": "embedded_image",
+        "resource": "Assets.stat-information.svg"
+      },
+      "help": {
+        "label": "Information",
+        "description": "Hover this symbol beside a stat to read the row's full description."
+      }
+    },
+    "max_hp": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/atlases/ui_atlas.sprites/top_bar/top_bar_heart.tres"
+      },
+      "help": {
+        "label": "Max HP",
+        "description": "Maximum HP gained, lost, or otherwise measured by a stat."
+      }
+    },
+    "max_hp_gained": {
+      "display": {
+        "type": "game_resource_badge",
+        "path": "res://images/atlases/ui_atlas.sprites/top_bar/top_bar_heart.tres",
+        "badge": "plus"
+      },
+      "help": {
+        "label": "Maximum HP gained",
+        "description": "Maximum HP added by a relic or other effect."
+      }
+    },
+    "nimble": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/enchantments/nimble.png"
+      },
+      "help": {
+        "label": "Nimble",
+        "description": "A card enchanted with Nimble or a reward containing a Nimble card."
+      }
+    },
+    "offered": {
+      "display": {
+        "type": "embedded_image",
+        "resource": "Assets.stat-offered.svg"
+      },
+      "help": {
+        "label": "Offered",
+        "description": "An item or reward presented as a selectable option."
+      }
+    },
+    "osty_summon_gained": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/atlases/relic_atlas.sprites/bound_phylactery.tres"
+      },
+      "help": {
+        "label": "Osty summon gained",
+        "description": "An increase to Osty's summon amount."
+      }
+    },
+    "potion": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/packed/sprite_fonts/potion_icon.png"
+      },
+      "help": {
+        "label": "Potion",
+        "description": "A potion gained, skipped, offered, or otherwise counted by a stat."
+      }
+    },
+    "potion_common": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/packed/sprite_fonts/potion_icon.png"
+      },
+      "help": {
+        "label": "Common potion",
+        "description": "A Common potion or a count of Common potions."
+      }
+    },
+    "potion_gained": {
+      "display": {
+        "type": "game_resource_badge",
+        "path": "res://images/packed/sprite_fonts/potion_icon.png",
+        "badge": "plus"
+      },
+      "help": {
+        "label": "Potion gained",
+        "description": "A potion successfully added to the potion belt."
+      }
+    },
+    "potion_rare": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/packed/sprite_fonts/potion_icon.png",
+        "modulate": "#EFC850"
+      },
+      "help": {
+        "label": "Rare potion",
+        "description": "A Rare potion or a count of Rare potions."
+      }
+    },
+    "potion_uncommon": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/packed/sprite_fonts/potion_icon.png",
+        "modulate": "#87CEEB"
+      },
+      "help": {
+        "label": "Uncommon potion",
+        "description": "An Uncommon potion or a count of Uncommon potions."
+      }
+    },
+    "power": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/packed/card_library/type_sort_power.png"
+      },
+      "help": {
+        "label": "Power",
+        "description": "A Power card or a count of Power cards."
+      }
+    },
+    "power_common": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/packed/card_library/type_sort_power.png"
+      },
+      "help": {
+        "label": "Common Power",
+        "description": "A Common Power card or a count of Common Power cards."
+      }
+    },
+    "power_rare": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/packed/card_library/type_sort_power.png",
+        "modulate": "#EFC850"
+      },
+      "help": {
+        "label": "Rare Power",
+        "description": "A Rare Power card or a count of Rare Power cards."
+      }
+    },
+    "power_uncommon": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/packed/card_library/type_sort_power.png",
+        "modulate": "#87CEEB"
+      },
+      "help": {
+        "label": "Uncommon Power",
+        "description": "An Uncommon Power card or a count of Uncommon Power cards."
+      }
+    },
+    "relic": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/ui/reward_screen/reward_icon_shared_relic.png"
+      },
+      "help": {
+        "label": "Relic",
+        "description": "A relic gained, skipped, offered, or otherwise counted by a stat."
+      }
+    },
+    "relic_common": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/ui/reward_screen/reward_icon_shared_relic.png",
+        "modulate": "#B5B5B5"
+      },
+      "help": {
+        "label": "Common relic",
+        "description": "A Common relic or a count of Common relics."
+      }
+    },
+    "relic_gained": {
+      "display": {
+        "type": "game_resource_badge",
+        "path": "res://images/ui/reward_screen/reward_icon_shared_relic.png",
+        "badge": "plus"
+      },
+      "help": {
+        "label": "Relic gained",
+        "description": "A relic successfully added to the player's relic inventory."
+      }
+    },
+    "relic_rare": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/ui/reward_screen/reward_icon_shared_relic.png",
+        "modulate": "#EFC850"
+      },
+      "help": {
+        "label": "Rare relic",
+        "description": "A Rare relic or a count of Rare relics."
+      }
+    },
+    "relic_uncommon": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/ui/reward_screen/reward_icon_shared_relic.png",
+        "modulate": "#87CEEB"
+      },
+      "help": {
+        "label": "Uncommon relic",
+        "description": "An Uncommon relic or a count of Uncommon relics."
+      }
+    },
+    "skill": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/packed/card_library/type_sort_skill.png"
+      },
+      "help": {
+        "label": "Skill",
+        "description": "A Skill card or a count of Skill cards."
+      }
+    },
+    "skill_common": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/packed/card_library/type_sort_skill.png"
+      },
+      "help": {
+        "label": "Common Skill",
+        "description": "A Common Skill card or a count of Common Skill cards."
+      }
+    },
+    "skill_rare": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/packed/card_library/type_sort_skill.png",
+        "modulate": "#EFC850"
+      },
+      "help": {
+        "label": "Rare Skill",
+        "description": "A Rare Skill card or a count of Rare Skill cards."
+      }
+    },
+    "skill_uncommon": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/packed/card_library/type_sort_skill.png",
+        "modulate": "#87CEEB"
+      },
+      "help": {
+        "label": "Uncommon Skill",
+        "description": "An Uncommon Skill card or a count of Uncommon Skill cards."
+      }
+    },
+    "stars": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/packed/sprite_fonts/star_icon.png"
+      },
+      "help": {
+        "label": "Stars",
+        "description": "Regent Stars gained, spent, saved, or otherwise measured by a stat."
+      }
+    },
+    "strength": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/atlases/power_atlas.sprites/strength_power.tres"
+      },
+      "help": {
+        "label": "Strength",
+        "description": "Strength gained, lost, or otherwise measured by a stat."
+      }
+    },
+    "strength_gained": {
+      "display": {
+        "type": "game_resource_badge",
+        "path": "res://images/atlases/power_atlas.sprites/strength_power.tres",
+        "badge": "plus"
+      },
+      "help": {
+        "label": "Strength gained",
+        "description": "Strength added by a card, relic, or other effect."
+      }
+    },
+    "swift": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/enchantments/swift.png"
+      },
+      "help": {
+        "label": "Swift",
+        "description": "A card enchanted with Swift."
+      }
+    },
+    "taken": {
+      "display": {
+        "type": "embedded_image",
+        "resource": "Assets.stat-taken.svg"
+      },
+      "help": {
+        "label": "Taken",
+        "description": "An offered item or reward selected by the player."
+      }
+    },
+    "turn": {
+      "display": {
+        "type": "embedded_image",
+        "resource": "Assets.stat-turn.svg"
+      },
+      "help": {
+        "label": "Turn",
+        "description": "A combat turn or a value measured across turns."
+      }
+    },
+    "unknown_room": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/atlases/ui_atlas.sprites/map/icons/map_unknown.tres"
+      },
+      "help": {
+        "label": "Unknown room",
+        "description": "A question-mark site on the map."
+      }
+    },
+    "upgraded": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/ui/cards/upgrade_preview/upgrade_arrow.png"
+      },
+      "help": {
+        "label": "Upgraded",
+        "description": "A card that received an upgrade, or an upgrade applied to a card."
+      }
+    },
+    "vigor": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/atlases/power_atlas.sprites/vigor_power.tres"
+      },
+      "help": {
+        "label": "Vigor",
+        "description": "Vigor gained, spent, or otherwise measured by a stat."
+      }
+    },
+    "vigor_gained": {
+      "display": {
+        "type": "game_resource_badge",
+        "path": "res://images/atlases/power_atlas.sprites/vigor_power.tres",
+        "badge": "plus"
+      },
+      "help": {
+        "label": "Vigor gained",
+        "description": "Vigor added by a card, relic, or other effect."
+      }
+    },
+    "vulnerable": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/atlases/power_atlas.sprites/vulnerable_power.tres"
+      },
+      "help": {
+        "label": "Vulnerable",
+        "description": "Vulnerable applied, received, or otherwise measured by a stat."
+      }
+    },
+    "wasted": {
+      "display": {
+        "type": "embedded_image",
+        "resource": "Assets.stat-wasted.svg"
+      },
+      "help": {
+        "label": "Wasted",
+        "description": "A resource that was available or generated but produced no benefit."
+      }
+    },
+    "weak": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/atlases/power_atlas.sprites/weak_power.tres"
+      },
+      "help": {
+        "label": "Weak",
+        "description": "Weak applied, received, or otherwise measured by a stat."
+      }
+    }
+  }
+}

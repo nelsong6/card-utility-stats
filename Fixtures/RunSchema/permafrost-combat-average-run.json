@@ -1,0 +1,18 @@
+{
+  "run_id": "permafrost-combat-average-fixture",
+  "started_at": "2026-07-24T01:00:00Z",
+  "updated_at": "2026-07-24T01:10:00Z",
+  "outcome": "in_progress",
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.PERMAFROST": {
+      "activations": 3,
+      "additional_block_gained": 21,
+      "permafrost_combats": 5
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

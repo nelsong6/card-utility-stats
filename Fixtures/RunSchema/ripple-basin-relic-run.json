@@ -8,7 +8,9 @@
   "relic_aggregates": {
     "RELIC.RIPPLE_BASIN": {
       "activations": 3,
-      "additional_block_gained": 12
+      "additional_block_gained": 12,
+      "ripple_basin_combats": 2,
+      "ripple_basin_turns": 6
     }
   },
   "meta_stats": {},

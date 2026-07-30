@@ -450,6 +450,20 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsMangoRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("mango-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.MANGO"];
+        Assert.Equal(1, relicAgg.Activations);
+        Assert.Equal(14m, relicAgg.MaxHpGained);
+        Assert.Equal(70m, relicAgg.OriginalMaxHp);
+        Assert.Equal(84m, relicAgg.NewMaxHp);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsNutritiousOysterRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("nutritious-oyster-relic-run.json"));
@@ -495,6 +509,256 @@ public class SchemaLoadingTests
         Assert.Equal(2, cardAgg.UncommonPotionsGained);
         Assert.Equal(1, cardAgg.RarePotionsGained);
         Assert.Equal(3, cardAgg.PotionsSkipped);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsJackOfAllTradesCardFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("jack-of-all-trades-card-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        var cardAgg = loaded.Data.Aggregates["CARD.JACK_OF_ALL_TRADES#1"];
+        Assert.Equal(5, cardAgg.JackColorlessCardsAdded);
+        Assert.Equal(3, cardAgg.JackUncommonCardsAdded);
+        Assert.Equal(2, cardAgg.JackRareCardsAdded);
+        Assert.Equal(2, cardAgg.JackAttacksAdded);
+        Assert.Equal(2, cardAgg.JackSkillsAdded);
+        Assert.Equal(1, cardAgg.JackPowersAdded);
+        Assert.Equal(7, cardAgg.JackAddedCardCostTotal);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsDiscoveryCardFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("discovery-card-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        var cardAgg = loaded.Data.Aggregates["CARD.DISCOVERY#1"];
+        Assert.Equal(5, cardAgg.DiscoveryCardsPicked);
+        Assert.Equal(2, cardAgg.DiscoveryCommonCardsPicked);
+        Assert.Equal(2, cardAgg.DiscoveryUncommonCardsPicked);
+        Assert.Equal(1, cardAgg.DiscoveryRareCardsPicked);
+        Assert.Equal(2, cardAgg.DiscoveryAttacksPicked);
+        Assert.Equal(2, cardAgg.DiscoverySkillsPicked);
+        Assert.Equal(1, cardAgg.DiscoveryPowersPicked);
+        Assert.Equal(7, cardAgg.DiscoveryEnergyDiscountTotal);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsDrainPowerCardFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("drain-power-card-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        AssertDrainPowerFixture(loaded.Data.Aggregates["CARD.DRAIN_POWER#1"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsJugglingPowerFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("juggling-power-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        AssertJugglingPowerFixture(
+            loaded.Data.MetaStats.PowerAggregates["POWER.JUGGLING"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsViciousPowerFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("vicious-power-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        AssertViciousPowerFixture(
+            loaded.Data.MetaStats.PowerAggregates["POWER.VICIOUS"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsDarkEmbracePowerFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("dark-embrace-power-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        AssertDarkEmbracePowerFixture(
+            loaded.Data.MetaStats.PowerAggregates["POWER.DARK_EMBRACE"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsMetaPowerRegistryFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("meta-power-registry-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        AssertMetaPowerRegistryFixture(loaded.Data.MetaStats);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsStampedePowerFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("stampede-power-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        AssertStampedePowerFixture(
+            loaded.Data.MetaStats.PowerAggregates["POWER.STAMPEDE"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsAggressionPowerFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("aggression-power-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        AssertAggressionPowerFixture(
+            loaded.Data.MetaStats.PowerAggregates["POWER.AGGRESSION"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsRupturePowerFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("rupture-power-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        AssertRupturePowerFixture(
+            loaded.Data.MetaStats.PowerAggregates["POWER.RUPTURE"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsFeelNoPainPowerFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("feel-no-pain-power-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        AssertFeelNoPainPowerFixture(
+            loaded.Data.MetaStats.PowerAggregates["POWER.FEEL_NO_PAIN"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsEntropyPowerFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("entropy-power-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        AssertEntropyPowerFixture(
+            loaded.Data.MetaStats.PowerAggregates["POWER.ENTROPY"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsDanseMacabrePowerFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("danse-macabre-power-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        AssertDanseMacabrePowerFixture(
+            loaded.Data.MetaStats.PowerAggregates["POWER.DANSE_MACABRE"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsUnrelentingFreeAttackPowerFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("unrelenting-free-attack-power-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        AssertUnrelentingFreeAttackPowerFixture(
+            loaded.Data.MetaStats.PowerAggregates["POWER.FREE_ATTACK_POWER"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsDebtCardFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("debt-card-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        var cardAgg = loaded.Data.Aggregates["CARD.DEBT#1"];
+        Assert.Equal(4, cardAgg.DebtTriggers);
+        Assert.Equal(13, cardAgg.DebtGoldLost);
+        Assert.Equal(7, cardAgg.DebtGoldLossBlocked);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsNormalityCardFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("normality-card-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        var cardAgg = loaded.Data.Aggregates["CARD.NORMALITY#1"];
+        Assert.Equal(4, cardAgg.NormalityTurnsEndedInHand);
+        Assert.Equal(7, cardAgg.NormalityExcessEnergyAtTurnEndTotal);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsSealOfGoldRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("seal-of-gold-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.SEAL_OF_GOLD"];
+        Assert.Equal(4, relicAgg.Activations);
+        Assert.Equal(17, relicAgg.GoldLost);
+        Assert.Equal(3, relicAgg.GoldLossBlocked);
+        Assert.Equal(3, relicAgg.EnergyGenerated);
+        Assert.Equal(2, relicAgg.EnergyGeneratedCombats);
     }
 
     [Fact]
@@ -833,6 +1097,7 @@ public class SchemaLoadingTests
         Assert.NotNull(loaded);
         Assert.True(loaded!.SupportsResume);
         var relicAgg = loaded.Data.RelicAggregates["RELIC.PEN_NIB"];
+        Assert.Equal(1, relicAgg.Activations);
         Assert.Equal(27, relicAgg.TotalDamageAttempted);
         Assert.Equal(9, relicAgg.PenNibAttacksPlayed);
         Assert.Equal(2, relicAgg.PenNibTurnsEndedOn8Charges);
@@ -848,6 +1113,7 @@ public class SchemaLoadingTests
 
         Assert.NotNull(resumed);
         var relicAgg = resumed!.RelicAggregates["RELIC.PEN_NIB"];
+        Assert.Equal(1, relicAgg.Activations);
         Assert.Equal(27, relicAgg.TotalDamageAttempted);
         Assert.Equal(9, relicAgg.PenNibAttacksPlayed);
         Assert.Equal(2, relicAgg.PenNibTurnsEndedOn8Charges);
@@ -892,6 +1158,41 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsPendulumCombatEndChargeFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("pendulum-combat-end-charge-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.PENDULUM"];
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(6, relicAgg.AdditionalCardsDrawn);
+        Assert.Equal(4, relicAgg.PendulumCombats);
+        Assert.Equal(1, relicAgg.PendulumCombatsEndedOn0Charges);
+        Assert.Equal(1, relicAgg.PendulumCombatsEndedOn1Charge);
+        Assert.Equal(2, relicAgg.PendulumCombatsEndedOn2Charges);
+        Assert.Equal(5, relicAgg.PendulumCombatEndChargeTotal);
+        Assert.Equal(4, relicAgg.PendulumCombatEndChargeCount);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsPendulumCombatEndChargeFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("pendulum-combat-end-charge-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.PENDULUM"];
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(6, relicAgg.AdditionalCardsDrawn);
+        Assert.Equal(4, relicAgg.PendulumCombats);
+        Assert.Equal(1, relicAgg.PendulumCombatsEndedOn0Charges);
+        Assert.Equal(1, relicAgg.PendulumCombatsEndedOn1Charge);
+        Assert.Equal(2, relicAgg.PendulumCombatsEndedOn2Charges);
+        Assert.Equal(5, relicAgg.PendulumCombatEndChargeTotal);
+        Assert.Equal(4, relicAgg.PendulumCombatEndChargeCount);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsV20CloakClaspFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("v20-cloak-clasp-run.json"));
@@ -901,6 +1202,8 @@ public class SchemaLoadingTests
         Assert.True(loaded.HasPerInstanceIdentity);
         var relicAgg = loaded.Data.RelicAggregates["RELIC.CLOAK_CLASP"];
         Assert.Equal(21, relicAgg.AdditionalBlockGained);
+        Assert.Equal(7, relicAgg.CloakClaspTurns);
+        Assert.Equal(3, relicAgg.CloakClaspCombats);
     }
 
     [Fact]
@@ -921,6 +1224,8 @@ public class SchemaLoadingTests
         Assert.NotNull(resumed);
         var relicAgg = resumed!.RelicAggregates["RELIC.CLOAK_CLASP"];
         Assert.Equal(21, relicAgg.AdditionalBlockGained);
+        Assert.Equal(7, relicAgg.CloakClaspTurns);
+        Assert.Equal(3, relicAgg.CloakClaspCombats);
     }
 
     [Fact]
@@ -1054,6 +1359,19 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void ResumableLoad_AcceptsMangoRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("mango-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.MANGO"];
+        Assert.Equal(1, relicAgg.Activations);
+        Assert.Equal(14m, relicAgg.MaxHpGained);
+        Assert.Equal(70m, relicAgg.OriginalMaxHp);
+        Assert.Equal(84m, relicAgg.NewMaxHp);
+    }
+
+    [Fact]
     public void ResumableLoad_AcceptsNutritiousOysterRelicFixture()
     {
         var resumed = RunStorage.LoadResumable(FixturePath("nutritious-oyster-relic-run.json"));
@@ -1092,6 +1410,193 @@ public class SchemaLoadingTests
         Assert.Equal(2, cardAgg.UncommonPotionsGained);
         Assert.Equal(1, cardAgg.RarePotionsGained);
         Assert.Equal(3, cardAgg.PotionsSkipped);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsJackOfAllTradesCardFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("jack-of-all-trades-card-run.json"));
+
+        Assert.NotNull(resumed);
+        var cardAgg = resumed!.Aggregates["CARD.JACK_OF_ALL_TRADES#1"];
+        Assert.Equal(5, cardAgg.JackColorlessCardsAdded);
+        Assert.Equal(3, cardAgg.JackUncommonCardsAdded);
+        Assert.Equal(2, cardAgg.JackRareCardsAdded);
+        Assert.Equal(2, cardAgg.JackAttacksAdded);
+        Assert.Equal(2, cardAgg.JackSkillsAdded);
+        Assert.Equal(1, cardAgg.JackPowersAdded);
+        Assert.Equal(7, cardAgg.JackAddedCardCostTotal);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsDiscoveryCardFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("discovery-card-run.json"));
+
+        Assert.NotNull(resumed);
+        var cardAgg = resumed!.Aggregates["CARD.DISCOVERY#1"];
+        Assert.Equal(5, cardAgg.DiscoveryCardsPicked);
+        Assert.Equal(2, cardAgg.DiscoveryCommonCardsPicked);
+        Assert.Equal(2, cardAgg.DiscoveryUncommonCardsPicked);
+        Assert.Equal(1, cardAgg.DiscoveryRareCardsPicked);
+        Assert.Equal(2, cardAgg.DiscoveryAttacksPicked);
+        Assert.Equal(2, cardAgg.DiscoverySkillsPicked);
+        Assert.Equal(1, cardAgg.DiscoveryPowersPicked);
+        Assert.Equal(7, cardAgg.DiscoveryEnergyDiscountTotal);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsDrainPowerCardFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("drain-power-card-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertDrainPowerFixture(resumed!.Aggregates["CARD.DRAIN_POWER#1"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsJugglingPowerFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("juggling-power-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertJugglingPowerFixture(
+            resumed!.MetaStats.PowerAggregates["POWER.JUGGLING"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsViciousPowerFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("vicious-power-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertViciousPowerFixture(
+            resumed!.MetaStats.PowerAggregates["POWER.VICIOUS"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsDarkEmbracePowerFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("dark-embrace-power-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertDarkEmbracePowerFixture(
+            resumed!.MetaStats.PowerAggregates["POWER.DARK_EMBRACE"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsMetaPowerRegistryFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("meta-power-registry-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertMetaPowerRegistryFixture(resumed!.MetaStats);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsStampedePowerFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("stampede-power-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertStampedePowerFixture(
+            resumed!.MetaStats.PowerAggregates["POWER.STAMPEDE"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsAggressionPowerFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("aggression-power-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertAggressionPowerFixture(
+            resumed!.MetaStats.PowerAggregates["POWER.AGGRESSION"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsRupturePowerFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("rupture-power-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertRupturePowerFixture(
+            resumed!.MetaStats.PowerAggregates["POWER.RUPTURE"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsFeelNoPainPowerFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("feel-no-pain-power-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertFeelNoPainPowerFixture(
+            resumed!.MetaStats.PowerAggregates["POWER.FEEL_NO_PAIN"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsEntropyPowerFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("entropy-power-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertEntropyPowerFixture(
+            resumed!.MetaStats.PowerAggregates["POWER.ENTROPY"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsDanseMacabrePowerFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("danse-macabre-power-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertDanseMacabrePowerFixture(
+            resumed!.MetaStats.PowerAggregates["POWER.DANSE_MACABRE"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsUnrelentingFreeAttackPowerFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("unrelenting-free-attack-power-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertUnrelentingFreeAttackPowerFixture(
+            resumed!.MetaStats.PowerAggregates["POWER.FREE_ATTACK_POWER"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsDebtCardFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("debt-card-run.json"));
+
+        Assert.NotNull(resumed);
+        var cardAgg = resumed!.Aggregates["CARD.DEBT#1"];
+        Assert.Equal(4, cardAgg.DebtTriggers);
+        Assert.Equal(13, cardAgg.DebtGoldLost);
+        Assert.Equal(7, cardAgg.DebtGoldLossBlocked);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsSealOfGoldRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("seal-of-gold-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.SEAL_OF_GOLD"];
+        Assert.Equal(4, relicAgg.Activations);
+        Assert.Equal(17, relicAgg.GoldLost);
+        Assert.Equal(3, relicAgg.GoldLossBlocked);
+        Assert.Equal(3, relicAgg.EnergyGenerated);
+        Assert.Equal(2, relicAgg.EnergyGeneratedCombats);
     }
 
     [Fact]
@@ -1141,6 +1646,71 @@ public class SchemaLoadingTests
         var relicAgg = resumed!.RelicAggregates["RELIC.REPTILE_TRINKET"];
         Assert.Equal(3, relicAgg.Activations);
         Assert.Equal(6m, relicAgg.StrengthAdded);
+        Assert.Equal(0, relicAgg.ReptileTrinketTurns);
+        Assert.Equal(0, relicAgg.ReptileTrinketCombats);
+        Assert.Equal(0, relicAgg.ReptileTrinketTurnsWithExactlyTwoActivations);
+        Assert.Equal(0, relicAgg.ReptileTrinketTurnsWithMoreThanTwoActivations);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsReptileTrinketRatesFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("reptile-trinket-rates-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertReptileTrinketRatesFixture(
+            loaded.Data.RelicAggregates["RELIC.REPTILE_TRINKET"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsReptileTrinketRatesFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("reptile-trinket-rates-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertReptileTrinketRatesFixture(
+            resumed!.RelicAggregates["RELIC.REPTILE_TRINKET"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsRainbowRingRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("rainbow-ring-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertRainbowRingFixture(loaded.Data.RelicAggregates["RELIC.RAINBOW_RING"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsRainbowRingRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("rainbow-ring-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertRainbowRingFixture(resumed!.RelicAggregates["RELIC.RAINBOW_RING"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsSparklingRougeRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("sparkling-rouge-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertSparklingRougeFixture(
+            loaded.Data.RelicAggregates["RELIC.SPARKLING_ROUGE"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsSparklingRougeRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("sparkling-rouge-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertSparklingRougeFixture(
+            resumed!.RelicAggregates["RELIC.SPARKLING_ROUGE"]);
     }
 
     [Fact]
@@ -1163,6 +1733,25 @@ public class SchemaLoadingTests
         var relicAgg = resumed!.RelicAggregates["RELIC.STONE_CRACKER"];
         Assert.Equal(3, relicAgg.Activations);
         Assert.Equal(6, relicAgg.CardsUpgraded);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsStoneCrackerPlayTrackingFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("stone-cracker-play-tracking-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertStoneCrackerPlayTracking(loaded.Data.RelicAggregates["RELIC.STONE_CRACKER"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsStoneCrackerPlayTrackingFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("stone-cracker-play-tracking-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertStoneCrackerPlayTracking(resumed!.RelicAggregates["RELIC.STONE_CRACKER"]);
     }
 
     [Fact]
@@ -1240,6 +1829,7 @@ public class SchemaLoadingTests
         var pendulumAgg = loaded.Data.RelicAggregates["RELIC.PENDULUM"];
         Assert.Equal(3, pendulumAgg.Activations);
         Assert.Equal(6, pendulumAgg.AdditionalCardsDrawn);
+        Assert.Equal(2, pendulumAgg.PendulumCombats);
         var parryingShieldAgg = loaded.Data.RelicAggregates["RELIC.PARRYING_SHIELD"];
         Assert.Equal(2, parryingShieldAgg.Activations);
         Assert.Equal(17, parryingShieldAgg.TotalDamageAttempted);
@@ -1271,6 +1861,7 @@ public class SchemaLoadingTests
         Assert.Equal(16, resumed.RelicAggregates["RELIC.AKABEKO"].VigorGained);
         Assert.Equal(4, resumed.RelicAggregates["RELIC.BOOMING_CONCH"].AdditionalCardsDrawn);
         Assert.Equal(6, resumed.RelicAggregates["RELIC.PENDULUM"].AdditionalCardsDrawn);
+        Assert.Equal(2, resumed.RelicAggregates["RELIC.PENDULUM"].PendulumCombats);
         Assert.Equal(11, resumed.RelicAggregates["RELIC.PARRYING_SHIELD"].TotalDamageDealt);
         Assert.Equal(4, resumed.RelicAggregates["RELIC.PARRYING_SHIELD"].TotalDamageBlocked);
         Assert.Equal(24, resumed.RelicAggregates["RELIC.HORN_CLEAT"].AdditionalBlockGained);
@@ -1313,6 +1904,32 @@ public class SchemaLoadingTests
         Assert.Equal(6, relicAgg.LetterOpenerTurns);
         Assert.Equal(2, relicAgg.LetterOpenerTurnsEndedAt1Charge);
         Assert.Equal(3, relicAgg.LetterOpenerTurnsEndedAt2Charges);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsPermafrostCombatAverageFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("permafrost-combat-average-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.PERMAFROST"];
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(21, relicAgg.AdditionalBlockGained);
+        Assert.Equal(5, relicAgg.PermafrostCombats);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsPermafrostCombatAverageFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("permafrost-combat-average-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.PERMAFROST"];
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(21, relicAgg.AdditionalBlockGained);
+        Assert.Equal(5, relicAgg.PermafrostCombats);
     }
 
     [Fact]
@@ -1569,12 +2186,30 @@ public class SchemaLoadingTests
         Assert.True(loaded!.SupportsResume);
         var relicAgg = loaded.Data.RelicAggregates["RELIC.BRILLIANT_SCARF"];
         Assert.Equal(2, relicAgg.DiscountCombats);
+        Assert.Equal(0, relicAgg.DiscountTurns);
         Assert.Equal(5, relicAgg.DiscountsOffered);
         Assert.Equal(3, relicAgg.DiscountsTaken);
         Assert.Equal(7, relicAgg.EnergySavedByDiscount);
+        Assert.Equal(0, relicAgg.BrilliantScarfEnergySavedForTurnAverage);
         Assert.Equal(2, relicAgg.DiscountedCardCosts["energy:2|stars:0"].Count);
         Assert.Equal(1, relicAgg.DiscountedCardCosts["energy:1|stars:2"].Count);
         Assert.Equal(1, relicAgg.DiscountedCardCosts["energy:4|stars:0"].Count);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsBrilliantScarfTurnAverageFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("brilliant-scarf-turn-average-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.BRILLIANT_SCARF"];
+        Assert.Equal(2, relicAgg.DiscountCombats);
+        Assert.Equal(6, relicAgg.DiscountTurns);
+        Assert.Equal(5, relicAgg.DiscountsOffered);
+        Assert.Equal(3, relicAgg.DiscountsTaken);
+        Assert.Equal(7, relicAgg.EnergySavedByDiscount);
+        Assert.Equal(7, relicAgg.BrilliantScarfEnergySavedForTurnAverage);
     }
 
     [Fact]
@@ -1590,6 +2225,97 @@ public class SchemaLoadingTests
         Assert.Equal(18, relicAgg.TotalMaxHpGained);
         Assert.Equal(70m, relicAgg.OriginalMaxHp);
         Assert.Equal(88m, relicAgg.NewMaxHp);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsLuckyFyshRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("lucky-fysh-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.LUCKY_FYSH"];
+        Assert.Equal(45, relicAgg.GoldGained);
+        Assert.Equal(3, relicAgg.CardsAddedToDeck);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsMawBankRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("maw-bank-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.MAW_BANK"];
+        Assert.Equal(6, relicAgg.Activations);
+        Assert.Equal(72, relicAgg.GoldGained);
+        Assert.Equal(2, relicAgg.MawBankShopsSkipped);
+        Assert.Equal(34, relicAgg.MawBankGoldSpentOutsideShops);
+        Assert.Equal(11, loaded.Data.MawBankPendingShopFloor);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsOldCoinRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("old-coin-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.OLD_COIN"];
+        Assert.Equal(300, relicAgg.OldCoinGoldGranted);
+        Assert.Equal(120, relicAgg.OldCoinGoldSpent);
+        Assert.Collection(
+            loaded.Data.GoldAttributionLedger,
+            chunk =>
+            {
+                Assert.Equal("RELIC.OLD_COIN", chunk.SourceRelicId);
+                Assert.Equal(180, chunk.AmountRemaining);
+            },
+            chunk =>
+            {
+                Assert.Null(chunk.SourceRelicId);
+                Assert.Equal(25, chunk.AmountRemaining);
+            });
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsPocketwatchTurnStatsFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("pocketwatch-turn-stats-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.POCKETWATCH"];
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(9, relicAgg.AdditionalCardsDrawn);
+        Assert.Equal(6, relicAgg.PocketwatchTurns);
+        Assert.Equal(2, relicAgg.PocketwatchCombats);
+        Assert.Equal(20, relicAgg.PocketwatchTurnEndCountTotal);
+        Assert.Equal(2, relicAgg.PocketwatchTurnsActivationMissed);
+        Assert.Equal(5, relicAgg.PocketwatchActivatedTurnEndCountTotal);
+        Assert.Equal(3, relicAgg.PocketwatchActivationValueSamples);
+        Assert.Equal(10, relicAgg.PocketwatchMissedTurnEndCountTotal);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsBookOfFiveRingsRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("book-of-five-rings-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertBookOfFiveRingsFixture(loaded.Data.RelicAggregates["RELIC.BOOK_OF_FIVE_RINGS"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsSignetRingRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("signet-ring-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.SIGNET_RING"];
+        Assert.Equal(4, relicAgg.FloorsTraveledUntilNextShop);
     }
 
     [Fact]
@@ -1626,12 +2352,29 @@ public class SchemaLoadingTests
         Assert.NotNull(resumed);
         var relicAgg = resumed!.RelicAggregates["RELIC.BRILLIANT_SCARF"];
         Assert.Equal(2, relicAgg.DiscountCombats);
+        Assert.Equal(0, relicAgg.DiscountTurns);
         Assert.Equal(5, relicAgg.DiscountsOffered);
         Assert.Equal(3, relicAgg.DiscountsTaken);
         Assert.Equal(7, relicAgg.EnergySavedByDiscount);
+        Assert.Equal(0, relicAgg.BrilliantScarfEnergySavedForTurnAverage);
         Assert.Equal(2, relicAgg.DiscountedCardCosts["energy:2|stars:0"].Count);
         Assert.Equal(1, relicAgg.DiscountedCardCosts["energy:1|stars:2"].Count);
         Assert.Equal(1, relicAgg.DiscountedCardCosts["energy:4|stars:0"].Count);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsBrilliantScarfTurnAverageFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("brilliant-scarf-turn-average-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.BRILLIANT_SCARF"];
+        Assert.Equal(2, relicAgg.DiscountCombats);
+        Assert.Equal(6, relicAgg.DiscountTurns);
+        Assert.Equal(5, relicAgg.DiscountsOffered);
+        Assert.Equal(3, relicAgg.DiscountsTaken);
+        Assert.Equal(7, relicAgg.EnergySavedByDiscount);
+        Assert.Equal(7, relicAgg.BrilliantScarfEnergySavedForTurnAverage);
     }
 
     [Fact]
@@ -1646,6 +2389,80 @@ public class SchemaLoadingTests
         Assert.Equal(18, relicAgg.TotalMaxHpGained);
         Assert.Equal(70m, relicAgg.OriginalMaxHp);
         Assert.Equal(88m, relicAgg.NewMaxHp);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsLuckyFyshRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("lucky-fysh-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.LUCKY_FYSH"];
+        Assert.Equal(45, relicAgg.GoldGained);
+        Assert.Equal(3, relicAgg.CardsAddedToDeck);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsMawBankRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("maw-bank-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.MAW_BANK"];
+        Assert.Equal(6, relicAgg.Activations);
+        Assert.Equal(72, relicAgg.GoldGained);
+        Assert.Equal(2, relicAgg.MawBankShopsSkipped);
+        Assert.Equal(34, relicAgg.MawBankGoldSpentOutsideShops);
+        Assert.Equal(11, resumed.MawBankPendingShopFloor);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsOldCoinRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("old-coin-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.OLD_COIN"];
+        Assert.Equal(300, relicAgg.OldCoinGoldGranted);
+        Assert.Equal(120, relicAgg.OldCoinGoldSpent);
+        Assert.Equal(2, resumed.GoldAttributionLedger.Count);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsPocketwatchTurnStatsFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("pocketwatch-turn-stats-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.POCKETWATCH"];
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(9, relicAgg.AdditionalCardsDrawn);
+        Assert.Equal(6, relicAgg.PocketwatchTurns);
+        Assert.Equal(2, relicAgg.PocketwatchCombats);
+        Assert.Equal(20, relicAgg.PocketwatchTurnEndCountTotal);
+        Assert.Equal(2, relicAgg.PocketwatchTurnsActivationMissed);
+        Assert.Equal(5, relicAgg.PocketwatchActivatedTurnEndCountTotal);
+        Assert.Equal(3, relicAgg.PocketwatchActivationValueSamples);
+        Assert.Equal(10, relicAgg.PocketwatchMissedTurnEndCountTotal);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsBookOfFiveRingsRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("book-of-five-rings-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertBookOfFiveRingsFixture(resumed!.RelicAggregates["RELIC.BOOK_OF_FIVE_RINGS"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsSignetRingRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("signet-ring-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.SIGNET_RING"];
+        Assert.Equal(4, relicAgg.FloorsTraveledUntilNextShop);
     }
 
     [Fact]
@@ -1765,6 +2582,7 @@ public class SchemaLoadingTests
         var relicAgg = loaded.Data.RelicAggregates["RELIC.CENTENNIAL_PUZZLE"];
         Assert.Equal(4, relicAgg.Activations);
         Assert.Equal(11, relicAgg.AdditionalCardsDrawn);
+        AssertCentennialPuzzleActivationContext(relicAgg);
     }
 
     [Fact]
@@ -1776,6 +2594,187 @@ public class SchemaLoadingTests
         var relicAgg = resumed!.RelicAggregates["RELIC.CENTENNIAL_PUZZLE"];
         Assert.Equal(4, relicAgg.Activations);
         Assert.Equal(11, relicAgg.AdditionalCardsDrawn);
+        AssertCentennialPuzzleActivationContext(relicAgg);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsPollinousCoreRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("pollinous-core-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertPollinousCoreFixture(
+            loaded.Data.RelicAggregates["RELIC.POLLINOUS_CORE"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsPollinousCoreRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("pollinous-core-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertPollinousCoreFixture(
+            resumed!.RelicAggregates["RELIC.POLLINOUS_CORE"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsJossPaperRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("joss-paper-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertJossPaperFixture(
+            loaded.Data.RelicAggregates["RELIC.JOSS_PAPER"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsJossPaperRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("joss-paper-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertJossPaperFixture(
+            resumed!.RelicAggregates["RELIC.JOSS_PAPER"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsWhiteStarRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("white-star-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertWhiteStarFixture(
+            loaded.Data.RelicAggregates["RELIC.WHITE_STAR"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsWhiteStarRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("white-star-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertWhiteStarFixture(
+            resumed!.RelicAggregates["RELIC.WHITE_STAR"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsOddlySmoothStoneRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("oddly-smooth-stone-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.Equal(
+            7,
+            loaded.Data.RelicAggregates["RELIC.ODDLY_SMOOTH_STONE"]
+                .OddlySmoothStoneBlockCardsPlayed);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsOddlySmoothStoneRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("oddly-smooth-stone-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        Assert.Equal(
+            7,
+            resumed!.RelicAggregates["RELIC.ODDLY_SMOOTH_STONE"]
+                .OddlySmoothStoneBlockCardsPlayed);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsPrayerWheelRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("prayer-wheel-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertPrayerWheelFixture(
+            loaded.Data.RelicAggregates["RELIC.PRAYER_WHEEL"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsPrayerWheelRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("prayer-wheel-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertPrayerWheelFixture(
+            resumed!.RelicAggregates["RELIC.PRAYER_WHEEL"]);
+    }
+
+    private static void AssertCentennialPuzzleActivationContext(RelicAggregate relicAgg)
+    {
+        Assert.Equal(9, relicAgg.CentennialPuzzleActivationTurnTotal);
+        Assert.Equal(4, relicAgg.CentennialPuzzleActivationTurnSamples);
+        Assert.Equal(3, relicAgg.CentennialPuzzlePlayerTurnActivations);
+        Assert.Equal(1, relicAgg.CentennialPuzzleOpponentTurnActivations);
+        Assert.Equal(1, relicAgg.CentennialPuzzleStatusActivations);
+        Assert.Equal(1, relicAgg.CentennialPuzzleCurseActivations);
+        Assert.Equal(2, relicAgg.CentennialPuzzleEnemySourceActivations);
+    }
+
+    private static void AssertPollinousCoreFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(5, relicAgg.AdditionalCardsDrawn);
+        Assert.Equal(1, relicAgg.AdditionalCardDrawsBlocked);
+        Assert.Equal(10, relicAgg.PollinousCoreTurns);
+        Assert.Equal(2, relicAgg.PollinousCoreCombats);
+        Assert.Equal(2, relicAgg.PollinousCoreTurnsEndedOn0Counters);
+        Assert.Equal(3, relicAgg.PollinousCoreTurnsEndedOn1Counter);
+        Assert.Equal(3, relicAgg.PollinousCoreTurnsEndedOn2Counters);
+        Assert.Equal(2, relicAgg.PollinousCoreTurnsEndedOn3Counters);
+    }
+
+    private static void AssertJossPaperFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(5, relicAgg.AdditionalCardsDrawn);
+        Assert.Equal(1, relicAgg.AdditionalCardDrawsBlocked);
+        Assert.Equal(11, relicAgg.JossPaperCardsExhausted);
+        Assert.Equal(10, relicAgg.JossPaperTurns);
+        Assert.Equal(2, relicAgg.JossPaperCombats);
+        Assert.Equal(2, relicAgg.JossPaperTurnsEndedOn0Counters);
+        Assert.Equal(3, relicAgg.JossPaperTurnsEndedOn1Counter);
+        Assert.Equal(3, relicAgg.JossPaperTurnsEndedOn2Counters);
+        Assert.Equal(2, relicAgg.JossPaperTurnsEndedOn3Counters);
+        Assert.Equal(0, relicAgg.JossPaperTurnsEndedOn4Counters);
+    }
+
+    private static void AssertWhiteStarFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(8, relicAgg.RareCardsOffered);
+        Assert.Equal(4, relicAgg.RareAttackCardsOffered);
+        Assert.Equal(2, relicAgg.RareSkillCardsOffered);
+        Assert.Equal(2, relicAgg.RarePowerCardsOffered);
+        Assert.Equal(2, relicAgg.RareCardRewardScreensDeclined);
+    }
+
+    private static void AssertPrayerWheelFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(4, relicAgg.PrayerWheelExtraRewardScreens);
+        Assert.Equal(1, relicAgg.PrayerWheelExtraRewardScreensRejected);
+        Assert.Equal(7, relicAgg.CommonCardsOffered);
+        Assert.Equal(4, relicAgg.UncommonCardsOffered);
+        Assert.Equal(1, relicAgg.RareCardsOffered);
+        Assert.Equal(3, relicAgg.CommonCardsTaken);
+        Assert.Equal(1, relicAgg.UncommonCardsTaken);
+        Assert.Equal(1, relicAgg.RareCardsTaken);
     }
 
     [Fact]
@@ -1903,6 +2902,146 @@ public class SchemaLoadingTests
         var relicAgg = resumed!.RelicAggregates["RELIC.WHETSTONE"];
         Assert.Equal(2, relicAgg.CardsUpgraded);
         Assert.Equal(new[] { "Strike+", "Pommel Strike+" }, relicAgg.UpgradedCards);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsFishingRodRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("fishing-rod-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.FISHING_ROD"];
+        Assert.Equal(2, relicAgg.CardsUpgraded);
+        Assert.Equal(new[] { "Grave Warden+", "Reap+" }, relicAgg.UpgradedCards);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsFishingRodRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("fishing-rod-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.FISHING_ROD"];
+        Assert.Equal(2, relicAgg.CardsUpgraded);
+        Assert.Equal(new[] { "Grave Warden+", "Reap+" }, relicAgg.UpgradedCards);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsWarHammerRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("war-hammer-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertWarHammerFixture(loaded.Data.RelicAggregates["RELIC.WAR_HAMMER"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsWarHammerRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("war-hammer-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertWarHammerFixture(resumed!.RelicAggregates["RELIC.WAR_HAMMER"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsEggRelicOffersFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("egg-relic-offers-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertEggOfferFixture(
+            loaded.Data.RelicAggregates["RELIC.MOLTEN_EGG"],
+            total: 7,
+            common: 4,
+            uncommon: 2,
+            rare: 1,
+            taken: 4,
+            commonTaken: 2,
+            uncommonTaken: 1,
+            rareTaken: 1);
+        AssertEggOfferFixture(
+            loaded.Data.RelicAggregates["RELIC.TOXIC_EGG"],
+            total: 5,
+            common: 2,
+            uncommon: 2,
+            rare: 1,
+            taken: 3,
+            commonTaken: 1,
+            uncommonTaken: 1,
+            rareTaken: 1);
+        AssertEggOfferFixture(
+            loaded.Data.RelicAggregates["RELIC.FROZEN_EGG"],
+            total: 3,
+            common: 1,
+            uncommon: 1,
+            rare: 1,
+            taken: 2,
+            commonTaken: 1,
+            uncommonTaken: 0,
+            rareTaken: 1);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsEggRelicOffersFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("egg-relic-offers-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertEggOfferFixture(
+            resumed!.RelicAggregates["RELIC.MOLTEN_EGG"],
+            total: 7,
+            common: 4,
+            uncommon: 2,
+            rare: 1,
+            taken: 4,
+            commonTaken: 2,
+            uncommonTaken: 1,
+            rareTaken: 1);
+        AssertEggOfferFixture(
+            resumed.RelicAggregates["RELIC.TOXIC_EGG"],
+            total: 5,
+            common: 2,
+            uncommon: 2,
+            rare: 1,
+            taken: 3,
+            commonTaken: 1,
+            uncommonTaken: 1,
+            rareTaken: 1);
+        AssertEggOfferFixture(
+            resumed.RelicAggregates["RELIC.FROZEN_EGG"],
+            total: 3,
+            common: 1,
+            uncommon: 1,
+            rare: 1,
+            taken: 2,
+            commonTaken: 1,
+            uncommonTaken: 0,
+            rareTaken: 1);
+    }
+
+    private static void AssertEggOfferFixture(
+        RelicAggregate agg,
+        int total,
+        int common,
+        int uncommon,
+        int rare,
+        int taken,
+        int commonTaken,
+        int uncommonTaken,
+        int rareTaken)
+    {
+        Assert.Equal(total, agg.UpgradedCardsOffered);
+        Assert.Equal(common, agg.UpgradedCommonCardsOffered);
+        Assert.Equal(uncommon, agg.UpgradedUncommonCardsOffered);
+        Assert.Equal(rare, agg.UpgradedRareCardsOffered);
+        Assert.Equal(taken, agg.UpgradedCardsTaken);
+        Assert.Equal(commonTaken, agg.UpgradedCommonCardsTaken);
+        Assert.Equal(uncommonTaken, agg.UpgradedUncommonCardsTaken);
+        Assert.Equal(rareTaken, agg.UpgradedRareCardsTaken);
     }
 
     [Fact]
@@ -2257,6 +3396,8 @@ public class SchemaLoadingTests
         var relicAgg = loaded.Data.RelicAggregates["RELIC.RIPPLE_BASIN"];
         Assert.Equal(3, relicAgg.Activations);
         Assert.Equal(12, relicAgg.AdditionalBlockGained);
+        Assert.Equal(2, relicAgg.RippleBasinCombats);
+        Assert.Equal(6, relicAgg.RippleBasinTurns);
     }
 
     [Fact]
@@ -2313,6 +3454,8 @@ public class SchemaLoadingTests
         var relicAgg = resumed!.RelicAggregates["RELIC.RIPPLE_BASIN"];
         Assert.Equal(3, relicAgg.Activations);
         Assert.Equal(12, relicAgg.AdditionalBlockGained);
+        Assert.Equal(2, relicAgg.RippleBasinCombats);
+        Assert.Equal(6, relicAgg.RippleBasinTurns);
     }
 
     [Fact]
@@ -2348,6 +3491,7 @@ public class SchemaLoadingTests
         var relicAgg = loaded.Data.RelicAggregates["RELIC.MINIATURE_CANNON"];
         Assert.Equal(4, relicAgg.Activations);
         Assert.Equal(3, relicAgg.MiniatureCannonUpgradedAttacksInDeck);
+        Assert.Equal(5, relicAgg.MiniatureCannonNonUpgradedAttacksInDeck);
         Assert.Equal(10, relicAgg.MiniatureCannonUpgradedAttackPlays);
         Assert.Equal(17, relicAgg.MiniatureCannonUpgradedAttackHits);
     }
@@ -2361,6 +3505,7 @@ public class SchemaLoadingTests
         var relicAgg = resumed!.RelicAggregates["RELIC.MINIATURE_CANNON"];
         Assert.Equal(4, relicAgg.Activations);
         Assert.Equal(3, relicAgg.MiniatureCannonUpgradedAttacksInDeck);
+        Assert.Equal(5, relicAgg.MiniatureCannonNonUpgradedAttacksInDeck);
         Assert.Equal(10, relicAgg.MiniatureCannonUpgradedAttackPlays);
         Assert.Equal(17, relicAgg.MiniatureCannonUpgradedAttackHits);
     }
@@ -2386,6 +3531,85 @@ public class SchemaLoadingTests
         var relicAgg = resumed!.RelicAggregates["RELIC.VAJRA"];
         Assert.Equal(6, relicAgg.VajraAttacksPlayed);
         Assert.Equal(11, relicAgg.VajraAttackHits);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsEmberTeaRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("ember-tea-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.EMBER_TEA"];
+        Assert.Equal(14, relicAgg.EmberTeaAttacksPlayedWhileActive);
+        Assert.Equal(22, relicAgg.EmberTeaHitsWhileActive);
+        Assert.Equal(6, relicAgg.EmberTeaActiveTurns);
+        Assert.Equal(2, relicAgg.EmberTeaActiveCombats);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsEmberTeaRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("ember-tea-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.EMBER_TEA"];
+        Assert.Equal(14, relicAgg.EmberTeaAttacksPlayedWhileActive);
+        Assert.Equal(22, relicAgg.EmberTeaHitsWhileActive);
+        Assert.Equal(6, relicAgg.EmberTeaActiveTurns);
+        Assert.Equal(2, relicAgg.EmberTeaActiveCombats);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsRedSkullRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("red-skull-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.RED_SKULL"];
+        Assert.Equal(9, relicAgg.RedSkullAttacksPlayedWhileActive);
+        Assert.Equal(17, relicAgg.RedSkullHitsWhileActive);
+        Assert.Equal(5, relicAgg.RedSkullActiveTurns);
+        Assert.Equal(3, relicAgg.RedSkullActiveCombats);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsRedSkullRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("red-skull-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.RED_SKULL"];
+        Assert.Equal(9, relicAgg.RedSkullAttacksPlayedWhileActive);
+        Assert.Equal(17, relicAgg.RedSkullHitsWhileActive);
+        Assert.Equal(5, relicAgg.RedSkullActiveTurns);
+        Assert.Equal(3, relicAgg.RedSkullActiveCombats);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsToastyMittensRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("toasty-mittens-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.TOASTY_MITTENS"];
+        Assert.Equal(7, relicAgg.ToastyMittensCardsExhausted);
+        Assert.Equal(10m, relicAgg.StrengthAdded);
+        Assert.Equal(4, relicAgg.ToastyMittensCombats);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsToastyMittensRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("toasty-mittens-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.TOASTY_MITTENS"];
+        Assert.Equal(7, relicAgg.ToastyMittensCardsExhausted);
+        Assert.Equal(10m, relicAgg.StrengthAdded);
+        Assert.Equal(4, relicAgg.ToastyMittensCombats);
     }
 
     [Fact]
@@ -2447,6 +3671,7 @@ public class SchemaLoadingTests
         Assert.Equal(11, ornamentalFan.OrnamentalFanAttacksPlayed);
         Assert.Equal(3, ornamentalFan.Activations);
         Assert.Equal(13, ornamentalFan.AdditionalBlockGained);
+        Assert.Equal(1, ornamentalFan.OrnamentalFanTurnsEndedAt0Charges);
         Assert.Equal(1, ornamentalFan.OrnamentalFanTurnsEndedAt1Charge);
         Assert.Equal(3, ornamentalFan.OrnamentalFanTurnsEndedAt2Charges);
         Assert.Equal(7, ornamentalFan.OrnamentalFanTurnEndChargeTotal);
@@ -2487,6 +3712,7 @@ public class SchemaLoadingTests
         Assert.Equal(11, ornamentalFan.OrnamentalFanAttacksPlayed);
         Assert.Equal(3, ornamentalFan.Activations);
         Assert.Equal(13, ornamentalFan.AdditionalBlockGained);
+        Assert.Equal(1, ornamentalFan.OrnamentalFanTurnsEndedAt0Charges);
         Assert.Equal(1, ornamentalFan.OrnamentalFanTurnsEndedAt1Charge);
         Assert.Equal(3, ornamentalFan.OrnamentalFanTurnsEndedAt2Charges);
         Assert.Equal(7, ornamentalFan.OrnamentalFanTurnEndChargeTotal);
@@ -2640,6 +3866,29 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsWingCharmRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("wing-charm-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertWingCharmFixture(
+            loaded.Data.RelicAggregates["RELIC.WING_CHARM"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsWingCharmRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("wing-charm-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertWingCharmFixture(
+            resumed!.RelicAggregates["RELIC.WING_CHARM"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsSilverCrucibleRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("silver-crucible-relic-run.json"));
@@ -2656,6 +3905,25 @@ public class SchemaLoadingTests
 
         Assert.NotNull(resumed);
         AssertSilverCrucibleFixture(resumed!.RelicAggregates["RELIC.SILVER_CRUCIBLE"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsOrreryRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("orrery-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertOrreryFixture(loaded.Data.RelicAggregates["RELIC.ORRERY"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsOrreryRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("orrery-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertOrreryFixture(resumed!.RelicAggregates["RELIC.ORRERY"]);
     }
 
     [Fact]
@@ -2679,6 +3947,56 @@ public class SchemaLoadingTests
         Assert.Equal(24m, resumed!.MetaStats.ExtraBlockGainedFromUnmovablePower);
     }
 
+    [Fact]
+    public void HistoricalLoad_AcceptsDowsingRodRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("dowsing-rod-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.Equal(
+            2,
+            loaded.Data.RelicAggregates["RELIC.DOWSING_ROD"].DowsingQuestionRoomsRemaining);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsDowsingRodRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("dowsing-rod-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        Assert.Equal(
+            2,
+            resumed!.RelicAggregates["RELIC.DOWSING_ROD"].DowsingQuestionRoomsRemaining);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsWingedBootsRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("winged-boots-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.Collection(
+            loaded.Data.RelicAggregates["RELIC.WINGED_BOOTS"].WingedBootsDestinations,
+            entry => Assert.Equal((1, "combat"), (entry.UseNumber, entry.Destination)),
+            entry => Assert.Equal((2, "shop"), (entry.UseNumber, entry.Destination)),
+            entry => Assert.Equal((3, "question_mark"), (entry.UseNumber, entry.Destination)));
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsWingedBootsRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("winged-boots-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        Assert.Equal(
+            new[] { "combat", "shop", "question_mark" },
+            resumed!.RelicAggregates["RELIC.WINGED_BOOTS"]
+                .WingedBootsDestinations
+                .Select(entry => entry.Destination));
+    }
+
     private static void AssertLeafyPoulticeTransformations(RelicAggregate relicAgg)
     {
         Assert.Equal(2, relicAgg.CardTransformations.Count);
@@ -2692,6 +4010,767 @@ public class SchemaLoadingTests
         Assert.Equal("Shrug It Off", relicAgg.CardTransformations[1].ResultDisplayName);
     }
 
+    [Fact]
+    public void HistoricalLoad_AcceptsMummifiedHandRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("mummified-hand-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertMummifiedHandFixture(loaded.Data.RelicAggregates["RELIC.MUMMIFIED_HAND"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsMummifiedHandRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("mummified-hand-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertMummifiedHandFixture(resumed!.RelicAggregates["RELIC.MUMMIFIED_HAND"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsBurningSticksRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("burning-sticks-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertBurningSticksFixture(loaded.Data.RelicAggregates["RELIC.BURNING_STICKS"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsBurningSticksRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("burning-sticks-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertBurningSticksFixture(resumed!.RelicAggregates["RELIC.BURNING_STICKS"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsGnarledHammerRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("gnarled-hammer-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertGnarledHammerFixture(loaded.Data.RelicAggregates["RELIC.GNARLED_HAMMER"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsGnarledHammerRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("gnarled-hammer-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertGnarledHammerFixture(resumed!.RelicAggregates["RELIC.GNARLED_HAMMER"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsSilkenTressRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("silken-tress-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertSilkenTressFixture(
+            loaded.Data.RelicAggregates["RELIC.SILKEN_TRESS"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsSilkenTressRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("silken-tress-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertSilkenTressFixture(
+            resumed!.RelicAggregates["RELIC.SILKEN_TRESS"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsTriBoomerangRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("tri-boomerang-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertTriBoomerangFixture(
+            loaded.Data.RelicAggregates["RELIC.TRI_BOOMERANG"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsTriBoomerangRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("tri-boomerang-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertTriBoomerangFixture(
+            resumed!.RelicAggregates["RELIC.TRI_BOOMERANG"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsStoneHumidifierRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("stone-humidifier-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertStoneHumidifierFixture(loaded.Data.RelicAggregates["RELIC.STONE_HUMIDIFIER"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsStoneHumidifierRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("stone-humidifier-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertStoneHumidifierFixture(resumed!.RelicAggregates["RELIC.STONE_HUMIDIFIER"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsSturdyClampRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("sturdy-clamp-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertSturdyClampFixture(loaded.Data.RelicAggregates["RELIC.STURDY_CLAMP"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsSturdyClampRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("sturdy-clamp-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertSturdyClampFixture(resumed!.RelicAggregates["RELIC.STURDY_CLAMP"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsBeatingRemnantRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("beating-remnant-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertBeatingRemnantFixture(
+            loaded.Data.RelicAggregates["RELIC.BEATING_REMNANT"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsBeatingRemnantRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("beating-remnant-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertBeatingRemnantFixture(
+            resumed!.RelicAggregates["RELIC.BEATING_REMNANT"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsWhisperingEarringRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("whispering-earring-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertWhisperingEarringFixture(
+            loaded.Data.RelicAggregates["RELIC.WHISPERING_EARRING"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsWhisperingEarringRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("whispering-earring-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertWhisperingEarringFixture(
+            resumed!.RelicAggregates["RELIC.WHISPERING_EARRING"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsTungstenRodRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("tungsten-rod-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertTungstenRodFixture(
+            loaded.Data.RelicAggregates["RELIC.TUNGSTEN_ROD"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsTungstenRodRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("tungsten-rod-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertTungstenRodFixture(
+            resumed!.RelicAggregates["RELIC.TUNGSTEN_ROD"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsRuinedHelmetRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("ruined-helmet-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertRuinedHelmetFixture(loaded.Data.RelicAggregates["RELIC.RUINED_HELMET"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsRuinedHelmetRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("ruined-helmet-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertRuinedHelmetFixture(resumed!.RelicAggregates["RELIC.RUINED_HELMET"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsDaughterOfTheWindRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("daughter-of-the-wind-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertDaughterOfTheWindFixture(
+            loaded.Data.RelicAggregates["RELIC.DAUGHTER_OF_THE_WIND"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsDaughterOfTheWindRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("daughter-of-the-wind-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertDaughterOfTheWindFixture(
+            resumed!.RelicAggregates["RELIC.DAUGHTER_OF_THE_WIND"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsArtOfWarRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("art-of-war-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertArtOfWarFixture(loaded.Data.RelicAggregates["RELIC.ART_OF_WAR"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsArtOfWarRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("art-of-war-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertArtOfWarFixture(resumed!.RelicAggregates["RELIC.ART_OF_WAR"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsCrackedCoreRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("cracked-core-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertCrackedCoreFixture(loaded.Data.RelicAggregates["RELIC.CRACKED_CORE"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsCrackedCoreRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("cracked-core-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertCrackedCoreFixture(resumed!.RelicAggregates["RELIC.CRACKED_CORE"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsSymbioticVirusRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("symbiotic-virus-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertSymbioticVirusFixture(
+            loaded.Data.RelicAggregates["RELIC.SYMBIOTIC_VIRUS"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsSymbioticVirusRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("symbiotic-virus-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertSymbioticVirusFixture(
+            resumed!.RelicAggregates["RELIC.SYMBIOTIC_VIRUS"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsBingBongRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("bing-bong-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertBingBongFixture(
+            loaded.Data.RelicAggregates["RELIC.BING_BONG"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsBingBongRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("bing-bong-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertBingBongFixture(
+            resumed!.RelicAggregates["RELIC.BING_BONG"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsGoldPlatedCablesRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("gold-plated-cables-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertGoldPlatedCablesFixture(
+            loaded.Data.RelicAggregates["RELIC.GOLD_PLATED_CABLES"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsGoldPlatedCablesRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("gold-plated-cables-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertGoldPlatedCablesFixture(
+            resumed!.RelicAggregates["RELIC.GOLD_PLATED_CABLES"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsPaelsClawRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("paels-claw-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertPaelsClawFixture(loaded.Data.RelicAggregates["RELIC.PAELS_CLAW"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsPaelsClawRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("paels-claw-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertPaelsClawFixture(resumed!.RelicAggregates["RELIC.PAELS_CLAW"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsSoulPileCardFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("soul-pile-card-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertSoulPileCardFixture(loaded.Data.Aggregates["CARD.SEVERANCE#1"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsSoulPileCardFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("soul-pile-card-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertSoulPileCardFixture(resumed!.Aggregates["CARD.SEVERANCE#1"]);
+    }
+
+    private static void AssertReptileTrinketRatesFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(9, relicAgg.Activations);
+        Assert.Equal(18m, relicAgg.StrengthAdded);
+        Assert.Equal(6, relicAgg.ReptileTrinketTurns);
+        Assert.Equal(3, relicAgg.ReptileTrinketCombats);
+        Assert.Equal(2, relicAgg.ReptileTrinketTurnsWithExactlyTwoActivations);
+        Assert.Equal(1, relicAgg.ReptileTrinketTurnsWithMoreThanTwoActivations);
+    }
+
+    private static void AssertRainbowRingFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(5, relicAgg.Activations);
+        Assert.Equal(12, relicAgg.RainbowRingTurns);
+        Assert.Equal(4, relicAgg.RainbowRingCombats);
+    }
+
+    private static void AssertSparklingRougeFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(2, relicAgg.SparklingRougeCombatsEndedOnTurn1);
+        Assert.Equal(3, relicAgg.SparklingRougeCombatsEndedOnTurn2);
+        Assert.Equal(4, relicAgg.SparklingRougeCombatsEndedOnTurn3Plus);
+    }
+
+    private static void AssertPaelsClawFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(7, relicAgg.PaelsClawGoopyCardsPlayed);
+        Assert.Equal(5, relicAgg.PaelsClawGoopyEnhancements);
+        Assert.Equal(4, relicAgg.PaelsClawGoopyCards);
+        Assert.Equal(4, relicAgg.PaelsClawTurns);
+        Assert.Equal(2, relicAgg.PaelsClawCombats);
+    }
+
+    private static void AssertDrainPowerFixture(CardAggregate cardAgg)
+    {
+        Assert.Equal(3, cardAgg.CombatsInDeck);
+        Assert.Equal(8, cardAgg.DrainPowerCardsUpgraded);
+        Assert.Equal(6, cardAgg.DrainPowerTurnsInDeck);
+        Assert.Equal(9, cardAgg.DrainPowerUpgradedCardPlays);
+    }
+
+    private static void AssertJugglingPowerFixture(PowerAggregate powerAgg)
+    {
+        Assert.Equal("POWER.JUGGLING", powerAgg.PowerId);
+        Assert.Equal("Juggling", powerAgg.DisplayName);
+        Assert.Equal(7, powerAgg.AttacksCopied);
+        Assert.Equal(3, powerAgg.CommonAttacksCopied);
+        Assert.Equal(2, powerAgg.UncommonAttacksCopied);
+        Assert.Equal(2, powerAgg.RareAttacksCopied);
+        Assert.Equal(5, powerAgg.TurnsActive);
+        Assert.Equal(2, powerAgg.CombatsActive);
+    }
+
+    private static void AssertViciousPowerFixture(PowerAggregate powerAgg)
+    {
+        Assert.Equal("POWER.VICIOUS", powerAgg.PowerId);
+        Assert.Equal("Vicious", powerAgg.DisplayName);
+        Assert.Equal(11, powerAgg.ViciousCardsDrawn);
+    }
+
+    private static void AssertDarkEmbracePowerFixture(PowerAggregate powerAgg)
+    {
+        Assert.Equal("POWER.DARK_EMBRACE", powerAgg.PowerId);
+        Assert.Equal("Dark Embrace", powerAgg.DisplayName);
+        Assert.Equal(18, powerAgg.DarkEmbraceCardsDrawn);
+        Assert.Equal(6, powerAgg.TurnsActive);
+        Assert.Equal(9, powerAgg.DarkEmbraceCombatTurns);
+        Assert.Equal(3, powerAgg.CombatsActive);
+    }
+
+    private static void AssertMetaPowerRegistryFixture(RunMetaStats metaStats)
+    {
+        var danse = metaStats.PowerAggregates["POWER.DANSE_MACABRE"];
+        Assert.Equal(5, danse.PowerCardsPlayed);
+        Assert.Equal(2, danse.GeneratedPowerCardsPlayed);
+        Assert.Equal(4, danse.SuccessfulApplications);
+        Assert.Equal(12, danse.MetaDeckTurns);
+        Assert.Equal(8, danse.MetaActiveTurns);
+        Assert.Equal(13, danse.MetaActiveApplicationTurns);
+        Assert.Equal(9, danse.TimesTriggered);
+        Assert.Equal(7, danse.RateTimesTriggered);
+        Assert.Equal(31m, danse.BlockGained);
+        Assert.Equal(24m, danse.RateBlockGained);
+
+        var unmovable = metaStats.PowerAggregates["POWER.UNMOVABLE"];
+        Assert.Equal(12m, unmovable.UnmovableExtraBlockGained);
+        Assert.Equal(8m, unmovable.RateUnmovableExtraBlockGained);
+    }
+
+    private static void AssertStampedePowerFixture(PowerAggregate powerAgg)
+    {
+        Assert.Equal("POWER.STAMPEDE", powerAgg.PowerId);
+        Assert.Equal("Stampede", powerAgg.DisplayName);
+        Assert.Equal(9, powerAgg.StampedeAttacksPlayed);
+        Assert.Equal(4, powerAgg.StampedeCommonAttacksPlayed);
+        Assert.Equal(3, powerAgg.StampedeUncommonAttacksPlayed);
+        Assert.Equal(2, powerAgg.StampedeRareAttacksPlayed);
+        Assert.Equal(14, powerAgg.StampedeEnergySaved);
+    }
+
+    private static void AssertAggressionPowerFixture(PowerAggregate powerAgg)
+    {
+        Assert.Equal("POWER.AGGRESSION", powerAgg.PowerId);
+        Assert.Equal("Aggression", powerAgg.DisplayName);
+        Assert.Equal(8, powerAgg.AggressionCardsReturnedToHand);
+        Assert.Equal(5, powerAgg.AggressionCardsUpgraded);
+    }
+
+    private static void AssertRupturePowerFixture(PowerAggregate powerAgg)
+    {
+        Assert.Equal("POWER.RUPTURE", powerAgg.PowerId);
+        Assert.Equal("Rupture", powerAgg.DisplayName);
+        Assert.Equal(18m, powerAgg.StrengthGained);
+        Assert.Equal(6, powerAgg.TurnsActive);
+    }
+
+    private static void AssertFeelNoPainPowerFixture(PowerAggregate powerAgg)
+    {
+        Assert.Equal("POWER.FEEL_NO_PAIN", powerAgg.PowerId);
+        Assert.Equal("Feel No Pain", powerAgg.DisplayName);
+        Assert.Equal(36m, powerAgg.BlockGained);
+        Assert.Equal(6, powerAgg.TurnsActive);
+    }
+
+    private static void AssertEntropyPowerFixture(PowerAggregate powerAgg)
+    {
+        Assert.Equal("POWER.ENTROPY", powerAgg.PowerId);
+        Assert.Equal("Entropy", powerAgg.DisplayName);
+        Assert.Equal(2, powerAgg.EntropyChainsOfBindingBroken);
+        Assert.Equal(7, powerAgg.EntropyCardsGenerated);
+        Assert.Equal(3, powerAgg.EntropyCommonCardsGenerated);
+        Assert.Equal(2, powerAgg.EntropyUncommonCardsGenerated);
+        Assert.Equal(2, powerAgg.EntropyRareCardsGenerated);
+        Assert.Equal(2, powerAgg.CombatsActive);
+    }
+
+    private static void AssertDanseMacabrePowerFixture(PowerAggregate powerAgg)
+    {
+        Assert.Equal("POWER.DANSE_MACABRE", powerAgg.PowerId);
+        Assert.Equal("Danse Macabre", powerAgg.DisplayName);
+        Assert.Equal(9, powerAgg.TimesTriggered);
+        Assert.Equal(45m, powerAgg.BlockGained);
+        Assert.Equal(6, powerAgg.TurnsActive);
+        Assert.Equal(3, powerAgg.CombatsActive);
+    }
+
+    private static void AssertUnrelentingFreeAttackPowerFixture(PowerAggregate powerAgg)
+    {
+        Assert.Equal("POWER.FREE_ATTACK_POWER", powerAgg.PowerId);
+        Assert.Equal("Free Attack", powerAgg.DisplayName);
+        Assert.Equal(10, powerAgg.FreeAttackChargesGranted);
+        Assert.Equal(8, powerAgg.FreeAttackChargesUsed);
+        Assert.Equal(2, powerAgg.FreeAttackZeroEnergySavingsUses);
+        Assert.Equal(13m, powerAgg.FreeAttackEnergySaved);
+        Assert.Equal(2, powerAgg.FreeAttackBasicAttacksDiscounted);
+        Assert.Equal(2, powerAgg.FreeAttackCommonAttacksDiscounted);
+        Assert.Equal(3, powerAgg.FreeAttackUncommonAttacksDiscounted);
+        Assert.Equal(1, powerAgg.FreeAttackRareAttacksDiscounted);
+    }
+
+    private static void AssertSturdyClampFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(17, relicAgg.SturdyClampBlockRetained);
+        Assert.Equal(3, relicAgg.SturdyClampExcessBlockOverTen);
+        Assert.Equal(3, relicAgg.SturdyClampTurns);
+        Assert.Equal(2, relicAgg.SturdyClampCombats);
+    }
+
+    private static void AssertSoulPileCardFixture(CardAggregate cardAgg)
+    {
+        Assert.Equal(4, cardAgg.SoulsAddedToDrawPile);
+        Assert.Equal(2, cardAgg.SoulsAddedToHand);
+        Assert.Equal(3, cardAgg.SoulsAddedToDiscardPile);
+    }
+
+    private static void AssertBeatingRemnantFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(18m, relicAgg.BeatingRemnantHpLossPrevented);
+        Assert.Equal(6, relicAgg.BeatingRemnantTurns);
+        Assert.Equal(3, relicAgg.BeatingRemnantCombats);
+    }
+
+    private static void AssertWhisperingEarringFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(21m, relicAgg.WhisperingEarringFirstRoundHpLost);
+        Assert.Equal(3, relicAgg.WhisperingEarringCombats);
+    }
+
+    private static void AssertTungstenRodFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(18m, relicAgg.TungstenRodDamagePrevented);
+        Assert.Equal(4m, relicAgg.TungstenRodSelfDamagePrevented);
+        Assert.Equal(3m, relicAgg.TungstenRodCurseDamagePrevented);
+        Assert.Equal(2m, relicAgg.TungstenRodStatusDamagePrevented);
+        Assert.Equal(8m, relicAgg.TungstenRodEnemyDamagePrevented);
+        Assert.Equal(6, relicAgg.TungstenRodTurns);
+        Assert.Equal(3, relicAgg.TungstenRodCombats);
+    }
+
+    private static void AssertRuinedHelmetFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(2, relicAgg.Activations);
+        Assert.Equal(7.5m, relicAgg.StrengthAdded);
+        Assert.Equal(3, relicAgg.RuinedHelmetCombats);
+    }
+
+    private static void AssertDaughterOfTheWindFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(24, relicAgg.AdditionalBlockGained);
+        Assert.Equal(6, relicAgg.DaughterOfTheWindTurns);
+        Assert.Equal(3, relicAgg.DaughterOfTheWindCombats);
+    }
+
+    private static void AssertArtOfWarFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(4, relicAgg.EnergyGenerated);
+        Assert.Equal(8, relicAgg.ArtOfWarTurns);
+        Assert.Equal(2, relicAgg.EnergyGeneratedCombats);
+    }
+
+    private static void AssertCrackedCoreFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(3, relicAgg.CrackedCoreOrbEvokes);
+        Assert.Equal(7, relicAgg.CrackedCoreOrbPassiveTriggers);
+        Assert.Equal(1, relicAgg.CrackedCoreOrbFizzles);
+    }
+
+    private static void AssertSymbioticVirusFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(3, relicAgg.SymbioticVirusOrbEvokes);
+        Assert.Equal(7, relicAgg.SymbioticVirusOrbPassiveTriggers);
+        Assert.Equal(1, relicAgg.SymbioticVirusOrbFizzles);
+    }
+
+    private static void AssertGoldPlatedCablesFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(7, relicAgg.Activations);
+        Assert.Equal(
+            4,
+            relicAgg.GoldPlatedCablesActivationsByOrbType["ORB.LIGHTNING"]
+                .Activations);
+        Assert.Equal(
+            "Lightning",
+            relicAgg.GoldPlatedCablesActivationsByOrbType["ORB.LIGHTNING"]
+                .DisplayName);
+        Assert.Equal(
+            2,
+            relicAgg.GoldPlatedCablesActivationsByOrbType["ORB.FROST"]
+                .Activations);
+        Assert.Equal(
+            1,
+            relicAgg.GoldPlatedCablesActivationsByOrbType["ORB.PLASMA"]
+                .Activations);
+        Assert.Equal(3, relicAgg.GoldPlatedCablesNoOrbTargets);
+    }
+
+    private static void AssertStoneHumidifierFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(2, relicAgg.Activations);
+        Assert.Equal(9m, relicAgg.MaxHpGained);
+        Assert.Collection(
+            relicAgg.MaxHpActivations,
+            activation =>
+            {
+                Assert.Equal(70m, activation.StartingHp);
+                Assert.Equal(75m, activation.ResultingHp);
+            },
+            activation =>
+            {
+                Assert.Equal(80m, activation.StartingHp);
+                Assert.Equal(84m, activation.ResultingHp);
+            });
+    }
+
+    private static void AssertMummifiedHandFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(4, relicAgg.Activations);
+        Assert.Equal(6m, relicAgg.MummifiedHandTriggeringPowerCostTotal);
+        Assert.Equal(6m, relicAgg.MummifiedHandDiscountGivenTotal);
+        Assert.Equal(1.25m, relicAgg.MummifiedHandEnergySpentToDiscountedCostRatioTotal);
+        Assert.Equal(2, relicAgg.MummifiedHandEnergySpentToDiscountedCostRatioCount);
+        Assert.Equal(2, relicAgg.MummifiedHandCombats);
+        Assert.Equal(5, relicAgg.MummifiedHandTurns);
+        Assert.Equal(1, relicAgg.MummifiedHandDiscountedPowers);
+        Assert.Equal(1, relicAgg.MummifiedHandDiscountedAttacks);
+        Assert.Equal(1, relicAgg.MummifiedHandDiscountedSkills);
+        Assert.Equal(1, relicAgg.MummifiedHandDiscountedCommons);
+        Assert.Equal(1, relicAgg.MummifiedHandDiscountedUncommons);
+        Assert.Equal(1, relicAgg.MummifiedHandDiscountedRares);
+    }
+
+    private static void AssertBurningSticksFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(4, relicAgg.BurningSticksCombats);
+        Assert.Equal(5, relicAgg.BurningSticksGeneratedCardPlays);
+        Assert.Equal(1, relicAgg.BurningSticksCommonCardsDuplicated);
+        Assert.Equal(1, relicAgg.BurningSticksUncommonCardsDuplicated);
+        Assert.Equal(1, relicAgg.BurningSticksRareCardsDuplicated);
+    }
+
+    private static void AssertBingBongFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(8, relicAgg.BingBongExtraCardsAdded);
+        Assert.Equal(3, relicAgg.BingBongCommonCardsAdded);
+        Assert.Equal(2, relicAgg.BingBongUncommonCardsAdded);
+        Assert.Equal(1, relicAgg.BingBongRareCardsAdded);
+        Assert.Equal(2, relicAgg.BingBongCurseCardsAdded);
+    }
+
+    private static void AssertGnarledHammerFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(
+            new[] { "Pommel Strike", "Uppercut+", "Pommel Strike" },
+            relicAgg.SharpEnchantedCards);
+    }
+
+    private static void AssertSilkenTressFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(
+            new[] { "Pommel Strike" },
+            relicAgg.SilkenTressGlamCards);
+    }
+
+    private static void AssertTriBoomerangFixture(RelicAggregate relicAgg)
+    {
+        Assert.Collection(
+            relicAgg.TriBoomerangInstinctCards,
+            card =>
+            {
+                Assert.Equal("CARD.REAP#1", card.CardInstanceId);
+                Assert.Equal("Reap", card.DisplayName);
+            },
+            card =>
+            {
+                Assert.Equal("CARD.GRAVE_WARDEN#1", card.CardInstanceId);
+                Assert.Equal("Grave Warden", card.DisplayName);
+            },
+            card =>
+            {
+                Assert.Equal("CARD.SEVERANCE#2", card.CardInstanceId);
+                Assert.Equal("Severance+", card.DisplayName);
+            });
+        Assert.Equal(7, relicAgg.TriBoomerangInstinctCardPlays);
+        Assert.Equal(3, relicAgg.TriBoomerangCombats);
+    }
+
+    private static void AssertWarHammerFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(2, relicAgg.Activations);
+        Assert.Equal(4, relicAgg.CardsUpgraded);
+        Assert.Equal(
+            new[] { "Grave Warden+", "Reap+", "Defy+", "Bash+" },
+            relicAgg.UpgradedCards);
+        Assert.Equal(
+            new[]
+            {
+                "CARD.GRAVE_WARDEN#1",
+                "CARD.REAP#1",
+                "CARD.DEFY#1",
+                "CARD.BASH#1",
+            },
+            relicAgg.WarHammerUpgradedCardInstanceIds);
+        Assert.Equal(12, relicAgg.WarHammerUpgradedCardPlays);
+        Assert.Equal(3, relicAgg.WarHammerCombats);
+        Assert.Equal(6, relicAgg.WarHammerTurns);
+    }
+
     private static void AssertFresnelLensFixture(RelicAggregate relicAgg)
     {
         Assert.Equal(70m, relicAgg.OriginalMaxHp);
@@ -2702,6 +4781,15 @@ public class SchemaLoadingTests
         Assert.Equal(2, relicAgg.RewardScreensWithThreeOrMoreNimbleCards);
         Assert.Equal(5, relicAgg.RewardScreensWithoutNimbleCards);
         Assert.Equal(4, relicAgg.RewardScreensWithNimbleCardsButNoneTaken);
+    }
+
+    private static void AssertWingCharmFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(3, relicAgg.WingCharmSwiftCardsTaken);
+        Assert.Equal(4, relicAgg.WingCharmSwiftCardsNotTaken);
+        Assert.Equal(4, relicAgg.WingCharmCommonSwiftCardsOffered);
+        Assert.Equal(2, relicAgg.WingCharmUncommonSwiftCardsOffered);
+        Assert.Equal(1, relicAgg.WingCharmRareSwiftCardsOffered);
     }
 
     private static void AssertPaelsToothFixture(RelicAggregate relicAgg)
@@ -2762,6 +4850,18 @@ public class SchemaLoadingTests
         });
     }
 
+    private static void AssertStoneCrackerPlayTracking(RelicAggregate relicAgg)
+    {
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(6, relicAgg.CardsUpgraded);
+        Assert.Equal(3, relicAgg.StoneCrackerUpgradedCommons);
+        Assert.Equal(2, relicAgg.StoneCrackerUpgradedUncommons);
+        Assert.Equal(1, relicAgg.StoneCrackerUpgradedRares);
+        Assert.Equal(9, relicAgg.StoneCrackerUpgradedCardPlays);
+        Assert.Equal(3, relicAgg.StoneCrackerCombats);
+        Assert.Equal(6, relicAgg.StoneCrackerTurns);
+    }
+
     private static void AssertSilverCrucibleCard(
         RelicCardRewardOptionAggregate card,
         string cardId,
@@ -2773,5 +4873,173 @@ public class SchemaLoadingTests
         Assert.Equal(displayName, card.DisplayName);
         Assert.Equal(upgradeLevel, card.UpgradeLevel);
         Assert.Equal(taken, card.Taken);
+    }
+
+    private static void AssertOrreryFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(new[] { 1, 2, 3, 4, 5 }, relicAgg.OrreryRewards.Select(reward => reward.RewardNumber));
+
+        var skipped = relicAgg.OrreryRewards[0];
+        Assert.Equal(12, skipped.Floor);
+        Assert.Equal("skipped", skipped.Outcome);
+        Assert.Empty(skipped.CardsObtained);
+        Assert.Equal(
+            new[] { "CARD.BASH", "CARD.SHRUG_IT_OFF", "CARD.INFLAME" },
+            skipped.OfferedCardIds);
+
+        var obtained = relicAgg.OrreryRewards[1];
+        Assert.Equal("obtained", obtained.Outcome);
+        Assert.Collection(
+            obtained.CardsObtained,
+            card =>
+            {
+                Assert.Equal("CARD.POMMEL_STRIKE", card.CardId);
+                Assert.Equal("Pommel Strike", card.DisplayName);
+                Assert.Equal(0, card.UpgradeLevel);
+            });
+
+        var sacrificed = relicAgg.OrreryRewards[2];
+        Assert.Equal("alternative", sacrificed.Outcome);
+        Assert.Equal("SACRIFICE", sacrificed.AlternativeId);
+        Assert.Empty(sacrificed.CardsObtained);
+
+        Assert.Equal("pending", relicAgg.OrreryRewards[3].Outcome);
+
+        var upgraded = relicAgg.OrreryRewards[4];
+        Assert.Equal("obtained", upgraded.Outcome);
+        Assert.Collection(
+            upgraded.CardsObtained,
+            card =>
+            {
+                Assert.Equal("CARD.UPPERCUT", card.CardId);
+                Assert.Equal("Uppercut+", card.DisplayName);
+                Assert.Equal(1, card.UpgradeLevel);
+            });
+    }
+
+    private static void AssertBookOfFiveRingsFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(8, relicAgg.CardsAddedToDeck);
+        Assert.Equal(1, relicAgg.Activations);
+        Assert.Equal(20m, relicAgg.TotalHealingAttempted);
+        Assert.Equal(12m, relicAgg.TotalHealingRestored);
+        Assert.Equal(8m, relicAgg.TotalHealingLost);
+        Assert.Equal(8m, relicAgg.HealingLostReasons["full_hp"].Amount);
+        Assert.Equal(8, relicAgg.FloorAcquired);
+        Assert.Equal(3, relicAgg.CardRewardsSkipped);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsThrowingAxeRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("throwing-axe-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertThrowingAxeFixture(
+            loaded.Data.RelicAggregates["RELIC.THROWING_AXE"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsThrowingAxeRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("throwing-axe-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertThrowingAxeFixture(
+            resumed!.RelicAggregates["RELIC.THROWING_AXE"]);
+    }
+
+    private static void AssertThrowingAxeFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(3, relicAgg.ThrowingAxeExtraCardsPlayed);
+        Assert.Equal(7, relicAgg.ThrowingAxeExtraPlayEnergyCostTotal);
+        Assert.Equal(4, relicAgg.ThrowingAxeCombats);
+        Assert.Equal(1, relicAgg.ThrowingAxeCommonCardsPlayed);
+        Assert.Equal(1, relicAgg.ThrowingAxeUncommonCardsPlayed);
+        Assert.Equal(1, relicAgg.ThrowingAxeRareCardsPlayed);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsTinyMailboxRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("tiny-mailbox-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertTinyMailboxFixture(
+            loaded.Data.RelicAggregates["RELIC.TINY_MAILBOX"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsTinyMailboxRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("tiny-mailbox-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertTinyMailboxFixture(
+            resumed!.RelicAggregates["RELIC.TINY_MAILBOX"]);
+    }
+
+    private static void AssertTinyMailboxFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(2, relicAgg.Activations);
+        Assert.Equal(4, relicAgg.TinyMailboxPotionsOffered);
+        Assert.Equal(3, relicAgg.TinyMailboxPotionsTaken);
+        Assert.Equal(1, relicAgg.TinyMailboxCommonPotionsOffered);
+        Assert.Equal(1, relicAgg.TinyMailboxUncommonPotionsOffered);
+        Assert.Equal(2, relicAgg.TinyMailboxRarePotionsOffered);
+        Assert.Equal(1, relicAgg.TinyMailboxFruitJuicesOffered);
+        Assert.Equal(2, relicAgg.TinyMailboxCampfiresNotRested);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsFeedCardFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("feed-card-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.Equal(
+            7,
+            loaded.Data.Aggregates["CARD.FEED#1"].TotalMaxHpGained);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsFeedCardFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("feed-card-run.json"));
+
+        Assert.NotNull(resumed);
+        Assert.Equal(7, resumed!.Aggregates["CARD.FEED#1"].TotalMaxHpGained);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsArmamentsCardFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("armaments-card-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.Equal(
+            9,
+            loaded.Data.Aggregates["CARD.ARMAMENTS#1"].ArmamentsCardsUpgraded);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsArmamentsCardFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("armaments-card-run.json"));
+
+        Assert.NotNull(resumed);
+        Assert.Equal(
+            9,
+            resumed!.Aggregates["CARD.ARMAMENTS#1"].ArmamentsCardsUpgraded);
     }
 }

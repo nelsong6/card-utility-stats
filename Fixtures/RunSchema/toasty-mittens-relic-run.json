@@ -1,0 +1,30 @@
+{
+  "run_id": "toasty-mittens-relic-fixture",
+  "started_at": "2026-07-24T20:00:00Z",
+  "updated_at": "2026-07-24T20:08:00Z",
+  "outcome": "in_progress",
+  "aggregates": {
+    "CARD.STRIKE_IRONCLAD#1": {
+      "plays": 4,
+      "total_intended": 24,
+      "total_effective": 21
+    }
+  },
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.TOASTY_MITTENS": {
+      "toasty_mittens_cards_exhausted": 7,
+      "strength_added": 10,
+      "toasty_mittens_combats": 4
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.STRIKE_IRONCLAD": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.STRIKE_IRONCLAD": 1
+  }
+}

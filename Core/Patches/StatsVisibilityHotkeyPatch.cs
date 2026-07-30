@@ -6,16 +6,17 @@ using HarmonyLib;
 using MegaCrit.Sts2.Core.Nodes;
 using MegaCrit.Sts2.Core.Nodes.CommonUi;
 using MegaCrit.Sts2.Core.Nodes.Debug;
+using MegaCrit.Sts2.Core.Nodes.Screens.Capstones;
 using MegaCrit.Sts2.Core.Nodes.Screens.Settings;
 using MegaCrit.Sts2.Core.Platform;
+using MegaCrit.Sts2.Core.Runs;
 
 namespace SpireLens.Core.Patches;
 
 /// <summary>
-/// Toggles the persisted global stats visibility setting with Left Shift or
-/// Right Stick press (R3). The game does not bind either input in its default
-/// or current gameplay map, while Left Trigger is intentionally left alone
-/// because it opens the draw pile and Left Stick press is Peek.
+/// Opens and closes the global SpireLens options menu with Left Shift or
+/// Right Stick press (R3), closes it with Escape, and dispatches the menu's
+/// keyboard/controller option shortcuts while that modal is open.
 /// </summary>
 [HarmonyPatch]
 public static class StatsVisibilityHotkeyPatch
@@ -35,6 +36,26 @@ public static class StatsVisibilityHotkeyPatch
     {
         try
         {
+            StatsTooltipPinManager.HandlePinnedHintHover(evt);
+            StatsTooltipPinManager.DismissOnGlobalAction(evt);
+
+            var inputManager = NInputManager.Instance;
+            if (inputManager == null) return;
+
+            if (RunHistoryDeckViewer.HandleInput(evt))
+            {
+                inputManager.GetViewport()?.SetInputAsHandled();
+                return;
+            }
+
+            if (SpireLensOptionsMenu.HandleShortcut(evt))
+            {
+                inputManager.GetViewport()?.SetInputAsHandled();
+                return;
+            }
+
+            if (!CanToggle(inputManager)) return;
+
             string toggleSource;
             if (evt is InputEventKey keyEvent)
             {
@@ -43,7 +64,15 @@ public static class StatsVisibilityHotkeyPatch
                         keyEvent.PhysicalKeycode,
                         keyEvent.Location,
                         keyEvent.Pressed,
-                        keyEvent.Echo)) return;
+                        keyEvent.Echo,
+                        keyEvent.CtrlPressed
+                        || keyEvent.AltPressed
+                        || keyEvent.MetaPressed))
+                {
+                    if (SpireLensOptionsMenu.IsOpen)
+                        inputManager.GetViewport()?.SetInputAsHandled();
+                    return;
+                }
 
                 toggleSource = "Left Shift hotkey";
             }
@@ -54,11 +83,10 @@ public static class StatsVisibilityHotkeyPatch
             }
             else
             {
+                if (SpireLensOptionsMenu.IsOpen && evt is InputEventJoypadButton or InputEventJoypadMotion)
+                    inputManager.GetViewport()?.SetInputAsHandled();
                 return;
             }
-
-            var inputManager = NInputManager.Instance;
-            if (inputManager == null || !CanToggle(inputManager)) return;
 
             // Shift is free in the shipped and current mappings. If the player
             // later assigns it to a game action, the game binding wins and the
@@ -68,7 +96,8 @@ public static class StatsVisibilityHotkeyPatch
                 && NInputManager.remappableKeyboardInputs.Any(
                     action => inputManager.GetShortcutKey(action) == Key.Shift)) return;
 
-            ViewStatsInjectorPatch.ToggleStatsVisibility(toggleSource);
+            SpireLensOptionsMenu.Toggle(toggleSource);
+            inputManager.GetViewport()?.SetInputAsHandled();
         }
         catch (Exception e)
         {
@@ -78,6 +107,7 @@ public static class StatsVisibilityHotkeyPatch
 
     private static bool CanToggle(NInputManager inputManager)
     {
+        if (!IsRunGameplaySurface()) return false;
         if (!NGame.IsGameFocusedWindow()) return false;
         if (PlatformUtil.IsPlatformOverlayOpen()) return false;
         if (NGame.Instance?.Transition?.InTransition == true) return false;
@@ -91,6 +121,22 @@ public static class StatsVisibilityHotkeyPatch
         if (tree != null && HasActiveInputRebind(tree.Root)) return false;
 
         return true;
+    }
+
+    private static bool IsRunGameplaySurface()
+    {
+        var run = NRun.Instance;
+        if (run == null || !RunManager.Instance.IsInProgress) return false;
+
+        // The run keeps existing behind Pause, Settings, Compendium, and
+        // Feedback. Those screens all share this dedicated capstone submenu
+        // stack, so run state alone cannot tell them from gameplay surfaces.
+        // Other capstones (rewards, etc.) are part of the run and remain valid.
+        var submenuStack = run.GlobalUi?.SubmenuStack;
+        return submenuStack == null
+               || !ReferenceEquals(
+                   NCapstoneContainer.Instance?.CurrentCapstoneScreen,
+                   submenuStack);
     }
 
     internal static bool IsRightStickPress(JoyButton buttonIndex, bool pressed)
@@ -117,8 +163,9 @@ public static class StatsVisibilityHotkeyPatch
 
 /// <summary>
 /// Recognizes a tap of Left Shift without claiming Shift-based chords such as
-/// Steam's Shift+Tab overlay shortcut. The toggle fires on release only when
-/// no other key was pressed during the hold.
+/// Steam's Shift+Tab overlay shortcut or Windows+Shift+S. The toggle fires on
+/// release only when no other modifier was already held and no other key was
+/// pressed during the hold.
 /// </summary>
 internal sealed class LeftShiftTapTracker
 {
@@ -130,7 +177,8 @@ internal sealed class LeftShiftTapTracker
         Key physicalKeycode,
         KeyLocation location,
         bool pressed,
-        bool echo)
+        bool echo,
+        bool otherModifierPressed)
     {
         if (echo) return false;
 
@@ -139,11 +187,17 @@ internal sealed class LeftShiftTapTracker
             if (pressed)
             {
                 _leftShiftHeld = true;
-                _usedAsModifier = false;
+                // A chord may start before Shift (for example
+                // Windows+Shift+S), so the later key-event check alone is
+                // insufficient. Capture modifiers already held when Shift
+                // arrives.
+                _usedAsModifier = otherModifierPressed;
                 return false;
             }
 
-            var isTap = _leftShiftHeld && !_usedAsModifier;
+            var isTap = _leftShiftHeld
+                        && !_usedAsModifier
+                        && !otherModifierPressed;
             _leftShiftHeld = false;
             _usedAsModifier = false;
             return isTap;

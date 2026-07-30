@@ -1,0 +1,28 @@
+{
+  "run_id": "tiny-mailbox-relic-fixture",
+  "started_at": "2026-07-29T19:00:00Z",
+  "updated_at": "2026-07-29T19:24:00Z",
+  "character": "CHAR.IRONCLAD",
+  "ascension": 6,
+  "floor_reached": 21,
+  "outcome": "in_progress",
+  "game_start_time": 1785354000,
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.TINY_MAILBOX": {
+      "activations": 2,
+      "tiny_mailbox_potions_offered": 4,
+      "tiny_mailbox_potions_taken": 3,
+      "tiny_mailbox_common_potions_offered": 1,
+      "tiny_mailbox_uncommon_potions_offered": 1,
+      "tiny_mailbox_rare_potions_offered": 2,
+      "tiny_mailbox_fruit_juices_offered": 1,
+      "tiny_mailbox_campfires_not_rested": 2
+    }
+  },
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

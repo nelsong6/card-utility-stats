@@ -47,6 +47,46 @@ public class RunHistoryStatsContextTests
     }
 
     [Fact]
+    public void SelectAggregateKeysForHistoryEntry_IgnoresLegacyTemporaryUpgradeEvents()
+    {
+        var run = new RunData();
+        run.InstanceNumbersByDef["CARD.STRIKE"] = new List<int> { 1, 2 };
+        run.Aggregates["CARD.STRIKE#1"] = new CardAggregate
+        {
+            FloorAdded = 1,
+            InitialUpgradeLevel = 0,
+        };
+        run.Aggregates["CARD.STRIKE#2"] = new CardAggregate
+        {
+            FloorAdded = 1,
+            InitialUpgradeLevel = 0,
+        };
+        run.Events.Add(new CardEvent
+        {
+            Type = "card_upgraded",
+            CardId = "CARD.STRIKE#1",
+            Floor = 3,
+            UpgradeLevel = 1,
+        });
+        run.Events.Add(new CardEvent
+        {
+            Type = "card_upgraded",
+            CardId = "CARD.STRIKE#1",
+            Floor = 4,
+            UpgradeLevel = 0,
+        });
+
+        var keys = RunHistoryStatsContext.SelectAggregateKeysForHistoryEntry(
+            run,
+            "CARD.STRIKE",
+            amount: 1,
+            currentUpgradeLevel: 1,
+            floorsAdded: new[] { 1 });
+
+        Assert.Equal(new[] { "CARD.STRIKE#1" }, keys);
+    }
+
+    [Fact]
     public void SelectAggregateKeysForHistoryEntry_AcceptsHistoricPooledShape()
     {
         var run = new RunData();
@@ -86,6 +126,38 @@ public class RunHistoryStatsContextTests
             floorsAdded: new[] { 2 });
 
         Assert.Equal(new[] { "CARD.DEFEND#2", "CARD.DEFEND#1" }, keys);
+    }
+
+    [Fact]
+    public void SelectAggregateKeysForHistoricalDeck_PreservesDuplicateDeckOrder()
+    {
+        var run = new RunData();
+        run.InstanceNumbersByDef["CARD.STRIKE"] = new List<int> { 2, 5 };
+        run.InstanceNumbersByDef["CARD.DEFEND"] = new List<int> { 3 };
+        run.Aggregates["CARD.STRIKE#2"] = new CardAggregate();
+        run.Aggregates["CARD.STRIKE#5"] = new CardAggregate();
+        run.Aggregates["CARD.DEFEND#3"] = new CardAggregate();
+
+        var keys = RunHistoryStatsContext.SelectAggregateKeysForHistoricalDeck(
+            run,
+            new[] { "CARD.STRIKE", "CARD.DEFEND", "CARD.STRIKE" });
+
+        Assert.Equal(
+            new string?[] { "CARD.STRIKE#2", "CARD.DEFEND#3", "CARD.STRIKE#5" },
+            keys);
+    }
+
+    [Fact]
+    public void SelectAggregateKeysForHistoricalDeck_AcceptsPooledHistoryShape()
+    {
+        var run = new RunData();
+        run.Aggregates["CARD.SHIV"] = new CardAggregate();
+
+        var keys = RunHistoryStatsContext.SelectAggregateKeysForHistoricalDeck(
+            run,
+            new[] { "CARD.SHIV", "CARD.SHIV" });
+
+        Assert.Equal(new string?[] { "CARD.SHIV", "CARD.SHIV" }, keys);
     }
 
     [Fact]

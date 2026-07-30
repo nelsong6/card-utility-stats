@@ -19,6 +19,7 @@
     "RELIC.MINIATURE_CANNON": {
       "activations": 4,
       "miniature_cannon_upgraded_attacks_in_deck": 3,
+      "miniature_cannon_non_upgraded_attacks_in_deck": 5,
       "miniature_cannon_upgraded_attack_plays": 10,
       "miniature_cannon_upgraded_attack_hits": 17
     }

@@ -38,6 +38,7 @@ public class OpenBranchRelicStatsTests
         Assert.Equal(0, agg.RareCardsOffered);
         Assert.Equal(0, agg.UncommonCardsTaken);
         Assert.Equal(0, agg.RareCardsTaken);
+        Assert.Equal(0, agg.PendulumCombats);
         Assert.Equal(0, agg.PenNibAttacksPlayed);
         Assert.Equal(0, agg.PenNibTurnsEndedOn8Charges);
         Assert.Equal(0, agg.PenNibTurnsEndedOn9Charges);
@@ -68,6 +69,7 @@ public class OpenBranchRelicStatsTests
         {
             Activations = 3,
             AdditionalCardsDrawn = 6,
+            PendulumCombats = 2,
         };
         run.RelicAggregates["RELIC.PARRYING_SHIELD"] = new RelicAggregate
         {
@@ -81,6 +83,7 @@ public class OpenBranchRelicStatsTests
         };
         run.RelicAggregates["RELIC.PEN_NIB"] = new RelicAggregate
         {
+            Activations = 1,
             TotalDamageAttempted = 27,
             PenNibAttacksPlayed = 9,
             PenNibTurnsEndedOn8Charges = 2,
@@ -107,6 +110,7 @@ public class OpenBranchRelicStatsTests
         Assert.Contains("total_damage_blocked", json);
         Assert.Contains("total_damage_overkill", json);
         Assert.Contains("kills", json);
+        Assert.Contains("pendulum_combats", json);
         Assert.Contains("pen_nib_attacks_played", json);
         Assert.Contains("pen_nib_turns_ended_on8_charges", json);
         Assert.Contains("pen_nib_turns_ended_on9_charges", json);
@@ -127,6 +131,7 @@ public class OpenBranchRelicStatsTests
         Assert.Equal(1, restored.RelicAggregates["RELIC.TOOLBOX"].RareCardsTaken);
         Assert.Equal(3, restored.RelicAggregates["RELIC.PENDULUM"].Activations);
         Assert.Equal(6, restored.RelicAggregates["RELIC.PENDULUM"].AdditionalCardsDrawn);
+        Assert.Equal(2, restored.RelicAggregates["RELIC.PENDULUM"].PendulumCombats);
         Assert.Equal(2, restored.RelicAggregates["RELIC.PARRYING_SHIELD"].Activations);
         Assert.Equal(17, restored.RelicAggregates["RELIC.PARRYING_SHIELD"].TotalDamageAttempted);
         Assert.Equal(11, restored.RelicAggregates["RELIC.PARRYING_SHIELD"].TotalDamageDealt);
@@ -134,6 +139,7 @@ public class OpenBranchRelicStatsTests
         Assert.Equal(2, restored.RelicAggregates["RELIC.PARRYING_SHIELD"].TotalDamageOverkill);
         Assert.Equal(1, restored.RelicAggregates["RELIC.PARRYING_SHIELD"].Kills);
         Assert.Equal(2, restored.RelicAggregates["RELIC.PARRYING_SHIELD"].TotalTargets);
+        Assert.Equal(1, restored.RelicAggregates["RELIC.PEN_NIB"].Activations);
         Assert.Equal(27, restored.RelicAggregates["RELIC.PEN_NIB"].TotalDamageAttempted);
         Assert.Equal(9, restored.RelicAggregates["RELIC.PEN_NIB"].PenNibAttacksPlayed);
         Assert.Equal(2, restored.RelicAggregates["RELIC.PEN_NIB"].PenNibTurnsEndedOn8Charges);
@@ -142,6 +148,28 @@ public class OpenBranchRelicStatsTests
         Assert.Equal(5, restored.RelicAggregates["RELIC.PEN_NIB"].PenNibTurnEndChargeCount);
         Assert.Equal(2, restored.RelicAggregates["RELIC.HORN_CLEAT"].Activations);
         Assert.Equal(24, restored.RelicAggregates["RELIC.HORN_CLEAT"].AdditionalBlockGained);
+    }
+
+    [Fact]
+    public void RunTracker_RecordPendulumCombatForTest_AccumulatesAndClamps()
+    {
+        var agg = new RelicAggregate();
+
+        RunTracker.RecordPendulumCombatForTest(agg, 2);
+        RunTracker.RecordPendulumCombatForTest(agg, -1);
+
+        Assert.Equal(2, agg.PendulumCombats);
+    }
+
+    [Fact]
+    public void MergeRelicAggregateInto_PendulumCombats_Accumulates()
+    {
+        var target = new RelicAggregate { PendulumCombats = 2 };
+        var source = new RelicAggregate { PendulumCombats = 3 };
+
+        RunTracker.MergeRelicAggregateInto(target, source);
+
+        Assert.Equal(5, target.PendulumCombats);
     }
 
     [Fact]
@@ -162,14 +190,19 @@ public class OpenBranchRelicStatsTests
     {
         var agg = new RelicAggregate();
 
-        RunTracker.RecordPenNibAttackPlayedForTest(agg, 3);
+        RunTracker.RecordPenNibAttackPlayedForTest(agg, 9);
+        RunTracker.RecordPenNibAttackPlayedForTest(
+            agg,
+            willActivate: true);
+        RunTracker.RecordPenNibAttackPlayedForTest(agg, 10);
         RunTracker.RecordPenNibAttackPlayedForTest(agg, -2);
         RunTracker.RecordPenNibTurnEndChargeForTest(agg, 8);
         RunTracker.RecordPenNibTurnEndChargeForTest(agg, 9);
         RunTracker.RecordPenNibTurnEndChargeForTest(agg, 12);
         RunTracker.RecordPenNibTurnEndChargeForTest(agg, -1);
 
-        Assert.Equal(3, agg.PenNibAttacksPlayed);
+        Assert.Equal(20, agg.PenNibAttacksPlayed);
+        Assert.Equal(2, agg.Activations);
         Assert.Equal(1, agg.PenNibTurnsEndedOn8Charges);
         Assert.Equal(1, agg.PenNibTurnsEndedOn9Charges);
         Assert.Equal(19, agg.PenNibTurnEndChargeTotal);
@@ -276,9 +309,11 @@ public class OpenBranchRelicStatsTests
 
         var pendulumBody = InvokeTooltipBuilder(
             "BuildPendulumBodyBBCode",
-            new RelicAggregate { Activations = 3, AdditionalCardsDrawn = 6 });
+            new RelicAggregate { Activations = 4, AdditionalCardsDrawn = 6, PendulumCombats = 2 });
         Assert.Contains("Activations", pendulumBody);
         Assert.Contains("Cards drawn", pendulumBody);
+        Assert.Contains("Avg cards drawn per combat", pendulumBody);
+        Assert.Contains("[b]4[/b]", pendulumBody);
         Assert.Contains("[b]3[/b]", pendulumBody);
         Assert.Contains("[b]6[/b]", pendulumBody);
 
@@ -308,6 +343,7 @@ public class OpenBranchRelicStatsTests
             "BuildPenNibBodyBBCode",
             new RelicAggregate
             {
+                Activations = 1,
                 TotalDamageAttempted = 27,
                 PenNibAttacksPlayed = 9,
                 PenNibTurnsEndedOn8Charges = 2,
@@ -315,6 +351,9 @@ public class OpenBranchRelicStatsTests
                 PenNibTurnEndChargeTotal = 34,
                 PenNibTurnEndChargeCount = 5,
             });
+        Assert.Contains(
+            StatConceptGlossary.RenderHintedGlyph("activation"),
+            penNibBody);
         Assert.Contains("Base damage added", penNibBody);
         Assert.Contains("Avg base damage added per attack", penNibBody);
         Assert.Contains("Attacks played", penNibBody);
@@ -332,6 +371,12 @@ public class OpenBranchRelicStatsTests
         Assert.Contains("block gained", hornCleatBody);
         Assert.Contains("[b]2[/b]", hornCleatBody);
         Assert.Contains("[b]24[/b]", hornCleatBody);
+
+        var captainsWheelBody = InvokeTooltipBuilder(
+            "BuildCaptainsWheelBodyBBCode",
+            new RelicAggregate { Activations = 3, AdditionalBlockGained = 54 });
+        Assert.Contains("[b]3[/b]", captainsWheelBody);
+        Assert.Contains("[b]54[/b]", captainsWheelBody);
     }
 
     private static string InvokeTooltipBuilder(string methodName, RelicAggregate agg)

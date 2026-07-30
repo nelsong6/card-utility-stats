@@ -12,8 +12,11 @@ public sealed class RuntimeOptionsSnapshot
 {
     public bool ViewStatsToggleEnabled { get; set; }
     public bool ShowRemovedCardsInDeckView { get; set; } = true;
+    public bool ShowAllMetaCardsInNotInDeckView { get; set; }
     public bool ShowEnemyStatsOnHover { get; set; }
     public bool ShowCardStatsDuringCombat { get; set; }
+    public bool HideNonCombatRelicStats { get; set; }
+    public bool ShowCombatOnlyRelicsAtCombatScreen { get; set; }
     public bool ShowHandTooltips { get; set; } = true;
     public bool UseVerboseHandStats { get; set; }
     public bool DisableCardStatsDuringCombat { get; set; }
@@ -55,6 +58,14 @@ public static class RuntimeOptionsBridge
         ModConfig.SaveDebounced<SpireLensConfig>();
     }
 
+    public static void SetShowAllMetaCardsInNotInDeckView(bool isEnabled)
+    {
+        if (SpireLensConfig.ShowAllMetaCardsInNotInDeckView == isEnabled) return;
+
+        SpireLensConfig.ShowAllMetaCardsInNotInDeckView = isEnabled;
+        ModConfig.SaveDebounced<SpireLensConfig>();
+    }
+
     public static void SetShowEnemyStatsOnHover(bool isEnabled)
     {
         if (SpireLensConfig.ShowEnemyStatsOnHover == isEnabled) return;
@@ -68,6 +79,28 @@ public static class RuntimeOptionsBridge
         if (SpireLensConfig.ShowCardStatsDuringCombat == isEnabled) return;
 
         SpireLensConfig.ShowCardStatsDuringCombat = isEnabled;
+        ModConfig.SaveDebounced<SpireLensConfig>();
+    }
+
+    public static void SetHideNonCombatRelicStats(bool isEnabled)
+    {
+        if (SpireLensConfig.HideNonCombatRelicStats == isEnabled
+            && (!isEnabled || !SpireLensConfig.ShowCombatOnlyRelicsAtCombatScreen)) return;
+
+        SpireLensConfig.HideNonCombatRelicStats = isEnabled;
+        if (isEnabled)
+            SpireLensConfig.ShowCombatOnlyRelicsAtCombatScreen = false;
+        ModConfig.SaveDebounced<SpireLensConfig>();
+    }
+
+    public static void SetShowCombatOnlyRelicsAtCombatScreen(bool isEnabled)
+    {
+        if (SpireLensConfig.ShowCombatOnlyRelicsAtCombatScreen == isEnabled
+            && (!isEnabled || !SpireLensConfig.HideNonCombatRelicStats)) return;
+
+        SpireLensConfig.ShowCombatOnlyRelicsAtCombatScreen = isEnabled;
+        if (isEnabled)
+            SpireLensConfig.HideNonCombatRelicStats = false;
         ModConfig.SaveDebounced<SpireLensConfig>();
     }
 
@@ -85,8 +118,12 @@ public static class RuntimeOptionsBridge
         {
             ViewStatsToggleEnabled = SpireLensConfig.ViewStatsToggleEnabled,
             ShowRemovedCardsInDeckView = SpireLensConfig.ShowRemovedCardsInDeckView,
+            ShowAllMetaCardsInNotInDeckView =
+                SpireLensConfig.ShowAllMetaCardsInNotInDeckView,
             ShowEnemyStatsOnHover = SpireLensConfig.ShowEnemyStatsOnHover,
             ShowCardStatsDuringCombat = SpireLensConfig.ShowCardStatsDuringCombat,
+            HideNonCombatRelicStats = SpireLensConfig.HideNonCombatRelicStats,
+            ShowCombatOnlyRelicsAtCombatScreen = SpireLensConfig.ShowCombatOnlyRelicsAtCombatScreen,
             ShowHandTooltips = SpireLensConfig.ShowHandTooltips,
             UseVerboseHandStats = SpireLensConfig.UseVerboseHandStats,
             DisableCardStatsDuringCombat = SpireLensConfig.DisableCardStatsDuringCombat,

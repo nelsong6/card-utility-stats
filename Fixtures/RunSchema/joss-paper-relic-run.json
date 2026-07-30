@@ -1,0 +1,27 @@
+{
+  "run_id": "joss-paper-relic-fixture",
+  "started_at": "2026-07-29T18:00:00Z",
+  "updated_at": "2026-07-29T18:20:00Z",
+  "outcome": "in_progress",
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.JOSS_PAPER": {
+      "activations": 3,
+      "additional_cards_drawn": 5,
+      "additional_card_draws_blocked": 1,
+      "joss_paper_cards_exhausted": 11,
+      "joss_paper_turns": 10,
+      "joss_paper_combats": 2,
+      "joss_paper_turns_ended_on0_counters": 2,
+      "joss_paper_turns_ended_on1_counter": 3,
+      "joss_paper_turns_ended_on2_counters": 3,
+      "joss_paper_turns_ended_on3_counters": 2,
+      "joss_paper_turns_ended_on4_counters": 0
+    }
+  },
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

@@ -66,7 +66,7 @@ public class WhetstoneStatsTests
     }
 
     [Fact]
-    public void RelicTooltip_Whetstone_ShowsCardsUpgradedAndCardList()
+    public void RelicTooltip_Whetstone_UsesAttackConceptForCountAndList()
     {
         var body = BuildBody(new RelicAggregate
         {
@@ -74,8 +74,11 @@ public class WhetstoneStatsTests
             UpgradedCards = { "Strike+", "Pommel Strike+" },
         });
 
-        Assert.Contains("Cards upgraded", body);
-        Assert.Contains("Upgraded card", body);
+        Assert.Contains("Attacks upgraded", body);
+        Assert.Contains("Upgraded attack", body);
+        Assert.DoesNotContain("Cards upgraded", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("attack"), body);
+        Assert.DoesNotContain(StatConceptGlossary.RenderHintedGlyph("card"), body);
         Assert.Contains("Strike+", body);
         Assert.Contains("Pommel Strike+", body);
         Assert.Contains("[b]2[/b]", body);
@@ -86,7 +89,9 @@ public class WhetstoneStatsTests
     {
         var body = BuildBody(new RelicAggregate());
 
-        Assert.Contains("Cards upgraded", body);
+        Assert.Contains("Attacks upgraded", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("attack"), body);
+        Assert.DoesNotContain(StatConceptGlossary.RenderHintedGlyph("card"), body);
         Assert.Contains("[b]0[/b]", body);
     }
 

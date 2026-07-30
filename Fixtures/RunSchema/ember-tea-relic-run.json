@@ -1,0 +1,40 @@
+{
+  "run_id": "ember-tea-relic-fixture",
+  "started_at": "2026-07-24T19:00:00Z",
+  "updated_at": "2026-07-24T19:08:00Z",
+  "outcome": "in_progress",
+  "aggregates": {
+    "CARD.STRIKE_IRONCLAD#1": {
+      "plays": 4,
+      "total_intended": 24,
+      "total_effective": 21
+    },
+    "CARD.TWIN_STRIKE#1": {
+      "plays": 2,
+      "total_intended": 20,
+      "total_effective": 18
+    }
+  },
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.EMBER_TEA": {
+      "ember_tea_attacks_played_while_active": 14,
+      "ember_tea_hits_while_active": 22,
+      "ember_tea_active_turns": 6,
+      "ember_tea_active_combats": 2
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.STRIKE_IRONCLAD": [
+      1
+    ],
+    "CARD.TWIN_STRIKE": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.STRIKE_IRONCLAD": 1,
+    "CARD.TWIN_STRIKE": 1
+  }
+}

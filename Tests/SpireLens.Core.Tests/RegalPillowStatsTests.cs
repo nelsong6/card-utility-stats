@@ -113,7 +113,7 @@ public class RegalPillowStatsTests
         Assert.Contains("Activations", body);
         Assert.Contains("HP healed", body);
         Assert.Contains("healing lost", body);
-        Assert.Contains("lost to full HP", body);
+        Assert.DoesNotContain("lost to full HP", body);
         Assert.Contains("[b]2[/b]", body);
         Assert.Contains("[b]9[/b]", body);
         Assert.Contains("[b]3[/b]", body);

@@ -92,7 +92,7 @@ public class EternalFeatherStatsTests
         Assert.Contains("Activations", body);
         Assert.Contains("HP healed", body);
         Assert.Contains("healing lost", body);
-        Assert.Contains("lost to full HP", body);
+        Assert.DoesNotContain("lost to full HP", body);
         Assert.Contains("[b]11[/b]", body);
         Assert.Contains("[b]7[/b]", body);
     }

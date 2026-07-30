@@ -1,0 +1,34 @@
+{
+  "run_id": "pendulum-combat-end-charge-fixture",
+  "started_at": "2026-07-23T16:00:00Z",
+  "updated_at": "2026-07-23T16:10:00Z",
+  "outcome": "in_progress",
+  "aggregates": {
+    "CARD.STRIKE_IRONCLAD#1": {
+      "plays": 4,
+      "times_drawn": 5
+    }
+  },
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.PENDULUM": {
+      "activations": 3,
+      "additional_cards_drawn": 6,
+      "pendulum_combats": 4,
+      "pendulum_combats_ended_on0_charges": 1,
+      "pendulum_combats_ended_on1_charge": 1,
+      "pendulum_combats_ended_on2_charges": 2,
+      "pendulum_combat_end_charge_total": 5,
+      "pendulum_combat_end_charge_count": 4
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.STRIKE_IRONCLAD": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.STRIKE_IRONCLAD": 1
+  }
+}

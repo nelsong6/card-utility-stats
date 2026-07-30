@@ -92,13 +92,16 @@ public class BurningBloodStatsTests
         var body = (string)(BuildBurningBloodBodyMethod.Invoke(null, new object?[] { agg })
             ?? throw new InvalidOperationException("BuildBurningBloodBodyBBCode returned null."));
 
-        Assert.Contains("Activations", body);
+        Assert.Contains("[hint=\"Activation:", body);
+        Assert.Contains("Times Burning Blood has activated.", body);
         Assert.Contains("[b]2[/b]", body);
-        Assert.Contains("HP healed", body);
+        Assert.Contains("[hint=\"Healing gained:", body);
+        Assert.Contains("Total HP restored by Burning Blood.", body);
         Assert.Contains("[b]9[/b]", body);
-        Assert.Contains("healing lost", body);
+        Assert.Contains("[hint=\"Healing blocked:", body);
+        Assert.Contains("Total Burning Blood healing that did not restore HP.", body);
         Assert.Contains("[b]3[/b]", body);
-        Assert.Contains("lost to full HP", body);
+        Assert.DoesNotContain("blocked by full HP", body);
     }
 
     [Fact]

@@ -2,8 +2,31 @@ using System;
 using System.Reflection;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Combat;
+using MegaCrit.Sts2.Core.Entities.Players;
+using MegaCrit.Sts2.Core.Hooks;
 
 namespace SpireLens.Core.Patches;
+
+/// <summary>
+/// Counts every distinct player turn while Cloak Clasp is held so empty-hand
+/// turns and combat-ending turns remain in its average-block denominator.
+/// </summary>
+[HarmonyPatch(typeof(Hook), nameof(Hook.AfterPlayerTurnStart))]
+public static class HookAfterPlayerTurnStartCloakClaspPatch
+{
+    [HarmonyPrefix]
+    public static void Prefix(Player player)
+    {
+        try
+        {
+            RunTracker.RecordCloakClaspTurnStarted(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"HookAfterPlayerTurnStartCloakClaspPatch failed: {e.Message}");
+        }
+    }
+}
 
 /// <summary>
 /// Arms the Cloak Clasp block-gain attribution window just before the relic's

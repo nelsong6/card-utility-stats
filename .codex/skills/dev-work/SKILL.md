@@ -46,11 +46,27 @@ After commit and push, validate the exact pushed code path as far as local tooli
 3. Reload SpireLens through automation, not by asking the user to press F5.
    - Prefer MCP tool `reload_spirelens_core` when available.
    - Equivalent bridge call: `POST http://localhost:15526/api/v1/singleplayer` with `{"action":"dev_reload_spirelens_core"}`.
-4. Inspect `%APPDATA%\SlayTheSpire2\logs\godot.log`.
+4. Report restart requirements as evidence-based facts, never precautionary
+   chores.
+   - If it is certain that no restart is needed, say so.
+   - If it is certain that a restart is required, say so and name the evidence.
+   - Otherwise, explicitly say the restart requirement is uncertain and
+     propose a concrete way to learn.
+   - A newly introduced Harmony target alone does not prove that a restart is
+     required. Hot reload proves installation, but existing compiled callers
+     may or may not bypass the patch through inlining or devirtualization.
+   - An observed post-reload behavior change proves that the relevant live path
+     is already reaching the patch; do not ask for a restart in that case.
+   - Under the repo's user-owned verification rule, do not restart an active
+     game or assign the user a restart merely to cover this uncertainty.
+5. Inspect `%APPDATA%\SlayTheSpire2\logs\godot.log`.
    - Require `Core.Initialize complete`.
    - Treat `Core.Initialize threw` as a failed validation.
    - For Harmony changes, reflection-check target method names and parameter names before relying on reload.
-5. For UI/tooltip changes, use SpireLensMcp live tools/screenshots when practical.
+   - For a new Harmony target, a patched-method listing without any expected
+     entry diagnostic is a restart signal before it is evidence that the hook
+     target is wrong.
+6. For UI/tooltip changes, use SpireLensMcp live tools/screenshots when practical.
 
 If validation fails, fix it, commit, push, and repeat the validation loop. Ask the user for help only when automated tooling is unavailable, the game state genuinely needs human setup, or the decision is product-level.
 

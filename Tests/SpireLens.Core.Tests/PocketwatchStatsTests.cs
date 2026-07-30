@@ -6,8 +6,8 @@ using Xunit;
 namespace SpireLens.Core.Tests;
 
 /// <summary>
-/// Tests for Pocketwatch relic stat data model and persistence.
-/// Live RunTracker integration is exercised by STS2 verification.
+/// Tests Pocketwatch's persisted observation math. Live hook timing remains
+/// user-owned gameplay verification.
 /// </summary>
 public class PocketwatchStatsTests
 {
@@ -20,16 +20,35 @@ public class PocketwatchStatsTests
     };
 
     [Fact]
-    public void RelicAggregate_AdditionalCardsDrawn_DefaultsToZero()
+    public void PocketwatchFields_DefaultToZero()
     {
         var agg = new RelicAggregate();
+
         Assert.Equal(0, agg.AdditionalCardsDrawn);
+        Assert.Equal(0, agg.PocketwatchTurns);
+        Assert.Equal(0, agg.PocketwatchCombats);
+        Assert.Equal(0, agg.PocketwatchTurnEndCountTotal);
+        Assert.Equal(0, agg.PocketwatchTurnsActivationMissed);
+        Assert.Equal(0, agg.PocketwatchActivatedTurnEndCountTotal);
+        Assert.Equal(0, agg.PocketwatchActivationValueSamples);
+        Assert.Equal(0, agg.PocketwatchMissedTurnEndCountTotal);
     }
 
     [Fact]
-    public void RelicAggregate_AdditionalCardsDrawn_JsonRoundtrip_PreservesField()
+    public void PocketwatchFields_JsonRoundtrip_PreservesObservationState()
     {
-        var agg = new RelicAggregate { AdditionalCardsDrawn = 9 };
+        var agg = new RelicAggregate
+        {
+            Activations = 3,
+            AdditionalCardsDrawn = 9,
+            PocketwatchTurns = 7,
+            PocketwatchCombats = 2,
+            PocketwatchTurnEndCountTotal = 19,
+            PocketwatchTurnsActivationMissed = 2,
+            PocketwatchActivatedTurnEndCountTotal = 5,
+            PocketwatchActivationValueSamples = 3,
+            PocketwatchMissedTurnEndCountTotal = 11,
+        };
         var run = new RunData();
         run.RelicAggregates[PocketwatchRelicId] = agg;
 
@@ -41,25 +60,78 @@ public class PocketwatchStatsTests
         var restored = JsonSerializer.Deserialize<RunData>(json, SerializerOptions);
         Assert.NotNull(restored);
         Assert.True(restored!.RelicAggregates.ContainsKey(PocketwatchRelicId));
-        Assert.Equal(9, restored.RelicAggregates[PocketwatchRelicId].AdditionalCardsDrawn);
+        var restoredAgg = restored.RelicAggregates[PocketwatchRelicId];
+        Assert.Equal(3, restoredAgg.Activations);
+        Assert.Equal(9, restoredAgg.AdditionalCardsDrawn);
+        Assert.Equal(7, restoredAgg.PocketwatchTurns);
+        Assert.Equal(2, restoredAgg.PocketwatchCombats);
+        Assert.Equal(19, restoredAgg.PocketwatchTurnEndCountTotal);
+        Assert.Equal(2, restoredAgg.PocketwatchTurnsActivationMissed);
+        Assert.Equal(5, restoredAgg.PocketwatchActivatedTurnEndCountTotal);
+        Assert.Equal(3, restoredAgg.PocketwatchActivationValueSamples);
+        Assert.Equal(11, restoredAgg.PocketwatchMissedTurnEndCountTotal);
     }
 
     [Fact]
-    public void RelicAggregate_AdditionalCardsDrawn_AccumulatesAcrossTriggers()
+    public void ObservationMath_DistinguishesQualifiedActivationsFromMissedTurns()
     {
-        var run = new RunData();
+        var agg = new RelicAggregate();
 
-        if (!run.RelicAggregates.TryGetValue(PocketwatchRelicId, out var agg))
+        RunTracker.RecordPocketwatchCombatForTest(agg, 2);
+        RunTracker.RecordPocketwatchTurnEndForTest(agg, cardCount: 2, activationThreshold: 3);
+        RunTracker.RecordPocketwatchTurnEndForTest(agg, cardCount: 5, activationThreshold: 3);
+        RunTracker.RecordPocketwatchTurnEndForTest(agg, cardCount: 7, activationThreshold: 3);
+        RunTracker.RecordPocketwatchActivationForTest(agg, cardsDrawn: 3, cardsPlayedLastTurn: 2);
+        RunTracker.RecordPocketwatchActivationForTest(agg, cardsDrawn: 3, cardsPlayedLastTurn: 0);
+
+        Assert.Equal(2, agg.PocketwatchCombats);
+        Assert.Equal(3, agg.PocketwatchTurns);
+        Assert.Equal(14, agg.PocketwatchTurnEndCountTotal);
+        Assert.Equal(2, agg.PocketwatchTurnsActivationMissed);
+        Assert.Equal(12, agg.PocketwatchMissedTurnEndCountTotal);
+        Assert.Equal(2, agg.Activations);
+        Assert.Equal(6, agg.AdditionalCardsDrawn);
+        Assert.Equal(2, agg.PocketwatchActivatedTurnEndCountTotal);
+        Assert.Equal(2, agg.PocketwatchActivationValueSamples);
+    }
+
+    [Fact]
+    public void MergeRelicAggregateInto_AccumulatesPocketwatchNumeratorsAndDenominators()
+    {
+        var target = new RelicAggregate
         {
-            agg = new RelicAggregate();
-            run.RelicAggregates[PocketwatchRelicId] = agg;
-        }
+            Activations = 1,
+            AdditionalCardsDrawn = 3,
+            PocketwatchTurns = 2,
+            PocketwatchCombats = 1,
+            PocketwatchTurnEndCountTotal = 5,
+            PocketwatchActivatedTurnEndCountTotal = 2,
+            PocketwatchActivationValueSamples = 1,
+        };
+        var source = new RelicAggregate
+        {
+            Activations = 2,
+            AdditionalCardsDrawn = 6,
+            PocketwatchTurns = 3,
+            PocketwatchCombats = 1,
+            PocketwatchTurnEndCountTotal = 12,
+            PocketwatchTurnsActivationMissed = 2,
+            PocketwatchActivatedTurnEndCountTotal = 3,
+            PocketwatchActivationValueSamples = 2,
+            PocketwatchMissedTurnEndCountTotal = 10,
+        };
 
-        agg.AdditionalCardsDrawn += 3;
-        agg.AdditionalCardsDrawn += 3;
-        agg.AdditionalCardsDrawn += 3;
+        RunTracker.MergeRelicAggregateInto(target, source);
 
-        Assert.Equal(9, run.RelicAggregates[PocketwatchRelicId].AdditionalCardsDrawn);
+        Assert.Equal(3, target.Activations);
+        Assert.Equal(9, target.AdditionalCardsDrawn);
+        Assert.Equal(5, target.PocketwatchTurns);
+        Assert.Equal(2, target.PocketwatchCombats);
+        Assert.Equal(17, target.PocketwatchTurnEndCountTotal);
+        Assert.Equal(2, target.PocketwatchTurnsActivationMissed);
+        Assert.Equal(5, target.PocketwatchActivatedTurnEndCountTotal);
+        Assert.Equal(3, target.PocketwatchActivationValueSamples);
+        Assert.Equal(10, target.PocketwatchMissedTurnEndCountTotal);
     }
 
     [Fact]
@@ -89,6 +161,10 @@ public class PocketwatchStatsTests
 
         Assert.NotNull(run);
         Assert.True(run!.RelicAggregates.ContainsKey(PocketwatchRelicId));
-        Assert.Equal(0, run.RelicAggregates[PocketwatchRelicId].AdditionalCardsDrawn);
+        var agg = run.RelicAggregates[PocketwatchRelicId];
+        Assert.Equal(0, agg.AdditionalCardsDrawn);
+        Assert.Equal(0, agg.PocketwatchTurns);
+        Assert.Equal(0, agg.PocketwatchCombats);
+        Assert.Equal(0, agg.PocketwatchTurnsActivationMissed);
     }
 }

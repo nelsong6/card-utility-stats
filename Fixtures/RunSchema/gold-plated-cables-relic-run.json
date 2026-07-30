@@ -1,0 +1,39 @@
+{
+  "run_id": "gold-plated-cables-relic-fixture",
+  "started_at": "2026-07-26T10:00:00Z",
+  "updated_at": "2026-07-26T10:20:00Z",
+  "character": "CHARACTER.DEFECT",
+  "ascension": 8,
+  "floor_reached": 24,
+  "outcome": "in_progress",
+  "game_start_time": 1785088800,
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.GOLD_PLATED_CABLES": {
+      "activations": 7,
+      "gold_plated_cables_activations_by_orb_type": {
+        "ORB.LIGHTNING": {
+          "orb_id": "ORB.LIGHTNING",
+          "display_name": "Lightning",
+          "activations": 4
+        },
+        "ORB.FROST": {
+          "orb_id": "ORB.FROST",
+          "display_name": "Frost",
+          "activations": 2
+        },
+        "ORB.PLASMA": {
+          "orb_id": "ORB.PLASMA",
+          "display_name": "Plasma",
+          "activations": 1
+        }
+      },
+      "gold_plated_cables_no_orb_targets": 3
+    }
+  },
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

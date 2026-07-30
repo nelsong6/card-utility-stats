@@ -171,6 +171,25 @@ public class SilverCrucibleStatsTests
     }
 
     [Fact]
+    public void RelicTooltip_SilverCrucible_GivesMultiWordCardNamesAWideDedicatedColumn()
+    {
+        var pending = Screen(1, Card("CARD.GRAVE_WARDEN", "Grave Warden+", taken: false));
+        pending.Resolved = false;
+        var agg = new RelicAggregate { CardRewardScreens = new() { pending } };
+
+        var body = BuildBody(agg);
+
+        Assert.Contains("[color=#e0e0e0]Card reward 1[/color]\n", body);
+        Assert.Contains("[table=2]", body);
+        Assert.Contains(
+            "[cell expand=4 padding=12,0,12,0][b]Grave Warden+[/b][/cell]",
+            body);
+        Assert.Contains(
+            "[cell expand=2 padding=0,0,4,0][right][color=#b5b5b5]pending[/color][/right][/cell]",
+            body);
+    }
+
+    [Fact]
     public void RunData_OlderShapeWithoutSilverCrucibleScreens_DeserializesWithEmptyDefault()
     {
         const string json = """

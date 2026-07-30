@@ -96,12 +96,14 @@ public class BlockTooltipTests
     }
 
     [Fact]
-    public void GetEnergyStatLabel_UsesEnergyPotionIcon()
+    public void GetEnergyStatLabel_UsesIroncladEnergyIconWithoutRunContext()
     {
         var label = (string)(GetEnergyStatLabelMethod.Invoke(null, new object?[] { "gained" })
             ?? throw new InvalidOperationException("GetEnergyStatLabel returned null."));
 
-        Assert.Equal("[img=16x16]res://images/atlases/potion_atlas.sprites/energy_potion.tres[/img] gained", label);
+        Assert.Equal(
+            "[img=16x16]res://images/packed/sprite_fonts/ironclad_energy_icon.png[/img] gained",
+            label);
     }
 
     [Fact]
@@ -142,7 +144,7 @@ public class BlockTooltipTests
 
     [Trait("Category", "RequiresLiveGame")]
     [Fact]
-    public void AppendCompactBody_UsesEnergyPotionIconForEnergyRows()
+    public void AppendCompactBody_UsesCharacterEnergyIconForEnergyRows()
     {
         var cardModel = CreateCardModel(CardType.Skill);
         var agg = new CardAggregate
@@ -156,7 +158,9 @@ public class BlockTooltipTests
         _ = AppendCompactBodyMethod.Invoke(null, new object?[] { sb, cardModel, agg });
         var text = sb.ToString();
 
-        Assert.Contains("[img=16x16]res://images/atlases/potion_atlas.sprites/energy_potion.tres[/img] gained", text);
+        Assert.Contains(
+            "[img=16x16]res://images/packed/sprite_fonts/ironclad_energy_icon.png[/img] gained",
+            text);
         Assert.Contains("[b]2[/b]", text);
     }
 

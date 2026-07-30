@@ -29,6 +29,8 @@ public class RippleBasinStatsTests
 
         Assert.Equal(0, agg.Activations);
         Assert.Equal(0, agg.AdditionalBlockGained);
+        Assert.Equal(0, agg.RippleBasinTurns);
+        Assert.Equal(0, agg.RippleBasinCombats);
     }
 
     [Fact]
@@ -39,12 +41,16 @@ public class RippleBasinStatsTests
         {
             Activations = 3,
             AdditionalBlockGained = 12,
+            RippleBasinTurns = 6,
+            RippleBasinCombats = 2,
         };
 
         var json = JsonSerializer.Serialize(run, SerializerOptions);
 
         Assert.Contains("activations", json);
         Assert.Contains("additional_block_gained", json);
+        Assert.Contains("ripple_basin_turns", json);
+        Assert.Contains("ripple_basin_combats", json);
 
         var restored = JsonSerializer.Deserialize<RunData>(json, SerializerOptions);
 
@@ -52,6 +58,8 @@ public class RippleBasinStatsTests
         var agg = restored!.RelicAggregates[RippleBasinRelicId];
         Assert.Equal(3, agg.Activations);
         Assert.Equal(12, agg.AdditionalBlockGained);
+        Assert.Equal(6, agg.RippleBasinTurns);
+        Assert.Equal(2, agg.RippleBasinCombats);
     }
 
     [Fact]
@@ -61,17 +69,37 @@ public class RippleBasinStatsTests
         {
             Activations = 1,
             AdditionalBlockGained = 4,
+            RippleBasinTurns = 2,
+            RippleBasinCombats = 1,
         };
         var source = new RelicAggregate
         {
             Activations = 2,
             AdditionalBlockGained = 8,
+            RippleBasinTurns = 4,
+            RippleBasinCombats = 1,
         };
 
         RunTracker.MergeRelicAggregateInto(target, source);
 
         Assert.Equal(3, target.Activations);
         Assert.Equal(12, target.AdditionalBlockGained);
+        Assert.Equal(6, target.RippleBasinTurns);
+        Assert.Equal(2, target.RippleBasinCombats);
+    }
+
+    [Fact]
+    public void RecordRippleBasinDenominators_IncludeHeldTurnsAndCombats()
+    {
+        var agg = new RelicAggregate();
+
+        RunTracker.RecordRippleBasinTurnForTest(agg, 6);
+        RunTracker.RecordRippleBasinCombatForTest(agg, 2);
+        RunTracker.RecordRippleBasinTurnForTest(agg, -1);
+        RunTracker.RecordRippleBasinCombatForTest(agg, -1);
+
+        Assert.Equal(6, agg.RippleBasinTurns);
+        Assert.Equal(2, agg.RippleBasinCombats);
     }
 
     [Fact]
@@ -81,14 +109,25 @@ public class RippleBasinStatsTests
         {
             Activations = 3,
             AdditionalBlockGained = 12,
+            RippleBasinTurns = 6,
+            RippleBasinCombats = 2,
         });
 
         Assert.Contains("Activations", body);
         Assert.Contains("[b]3[/b]", body);
-        Assert.Contains("[img=16x16]res://images/ui/combat/block.png[/img] block gained", body);
+        Assert.Contains("[hint=\"Block:", body);
+        Assert.Contains("block gained", body);
         Assert.Contains("[b]12[/b]", body);
-        Assert.Contains("[img=16x16]res://images/ui/combat/block.png[/img] block gained per activation", body);
+        Assert.Contains("[hint=\"Activation:", body);
+        Assert.Contains("block gained per activation", body);
         Assert.Contains("[b]4[/b]", body);
+        Assert.Contains("[hint=\"Average:", body);
+        Assert.Contains("[hint=\"Turn:", body);
+        Assert.Contains("avg block gained per turn", body);
+        Assert.Contains("[b]2[/b]", body);
+        Assert.Contains("[hint=\"Combat:", body);
+        Assert.Contains("avg block gained per combat", body);
+        Assert.Contains("[b]6[/b]", body);
     }
 
     [Fact]
@@ -99,7 +138,9 @@ public class RippleBasinStatsTests
         Assert.Contains("Activations", body);
         Assert.Contains("block gained", body);
         Assert.Contains("block gained per activation", body);
-        Assert.Equal(3, CountOccurrences(body, "[b]0[/b]"));
+        Assert.Contains("avg block gained per turn", body);
+        Assert.Contains("avg block gained per combat", body);
+        Assert.Equal(5, CountOccurrences(body, "[b]0[/b]"));
     }
 
     [Fact]
@@ -127,6 +168,8 @@ public class RippleBasinStatsTests
         var agg = run!.RelicAggregates[RippleBasinRelicId];
         Assert.Equal(0, agg.Activations);
         Assert.Equal(0, agg.AdditionalBlockGained);
+        Assert.Equal(0, agg.RippleBasinTurns);
+        Assert.Equal(0, agg.RippleBasinCombats);
     }
 
     private static string BuildBody(RelicAggregate agg)

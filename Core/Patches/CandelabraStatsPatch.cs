@@ -111,8 +111,9 @@ public static class ChandelierAfterSideTurnStartPatch
 }
 
 /// <summary>
-/// Counts player rounds that end with unspent energy while the matching
-/// Lantern/Very Hot Cocoa/Candelabra/Chandelier turn-energy relic is held.
+/// Observes the tracked player's intact hand and energy pool immediately
+/// before turn-end hooks run. This supplies both turn-energy relic waste and
+/// Normality's in-hand turn-end stats.
 /// Bound by runtime lookup so a game hook rename does not break build.
 /// </summary>
 [HarmonyPatch]
@@ -146,6 +147,7 @@ public static class HookBeforeSideTurnEndTurnEnergyRelicsPatch
         {
             if (side != CombatSide.Player) return;
             RunTracker.RecordTurnEnergyRelicTurnEndedWithExcessEnergy(combatState, participants);
+            RunTracker.RecordNormalityTurnEndedInHand(participants);
         }
         catch (Exception e)
         {

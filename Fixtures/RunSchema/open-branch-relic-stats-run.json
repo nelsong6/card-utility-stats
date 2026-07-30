@@ -41,7 +41,8 @@
     },
     "RELIC.PENDULUM": {
       "activations": 3,
-      "additional_cards_drawn": 6
+      "additional_cards_drawn": 6,
+      "pendulum_combats": 2
     },
     "RELIC.PARRYING_SHIELD": {
       "activations": 2,

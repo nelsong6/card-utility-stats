@@ -1,0 +1,34 @@
+{
+  "run_id": "drain-power-card-fixture",
+  "started_at": "2026-07-23T22:00:00Z",
+  "updated_at": "2026-07-23T22:18:00Z",
+  "character": "NECROBINDER",
+  "ascension": 7,
+  "floor_reached": 14,
+  "outcome": "in_progress",
+  "game_start_time": 1784847600,
+  "aggregates": {
+    "CARD.DRAIN_POWER#1": {
+      "combats_in_deck": 3,
+      "plays": 4,
+      "times_drawn": 6,
+      "drain_power_cards_upgraded": 8,
+      "drain_power_turns_in_deck": 6,
+      "drain_power_upgraded_card_plays": 9,
+      "floor_added": 4,
+      "initial_upgrade_level": 0
+    }
+  },
+  "events": [],
+  "relic_aggregates": {},
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.DRAIN_POWER": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.DRAIN_POWER": 1
+  }
+}

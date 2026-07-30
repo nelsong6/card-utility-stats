@@ -1,0 +1,42 @@
+{
+  "run_id": "danse-macabre-power-fixture",
+  "started_at": "2026-07-24T20:00:00Z",
+  "updated_at": "2026-07-24T20:24:00Z",
+  "character": "NECROBINDER",
+  "ascension": 8,
+  "floor_reached": 18,
+  "outcome": "in_progress",
+  "game_start_time": 1784923200,
+  "aggregates": {
+    "CARD.DANSE_MACABRE#1": {
+      "combats_in_deck": 4,
+      "plays": 2,
+      "times_drawn": 4,
+      "floor_added": 7,
+      "initial_upgrade_level": 0
+    }
+  },
+  "events": [],
+  "relic_aggregates": {},
+  "enemy_aggregates": {},
+  "meta_stats": {
+    "power_aggregates": {
+      "POWER.DANSE_MACABRE": {
+        "power_id": "POWER.DANSE_MACABRE",
+        "display_name": "Danse Macabre",
+        "times_triggered": 9,
+        "block_gained": 45,
+        "turns_active": 6,
+        "combats_active": 3
+      }
+    }
+  },
+  "instance_numbers_by_def": {
+    "CARD.DANSE_MACABRE": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.DANSE_MACABRE": 1
+  }
+}

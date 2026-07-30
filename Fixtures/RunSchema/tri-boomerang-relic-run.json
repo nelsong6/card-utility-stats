@@ -1,0 +1,44 @@
+{
+  "run_id": "tri-boomerang-relic-fixture",
+  "started_at": "2026-07-24T21:00:00Z",
+  "updated_at": "2026-07-24T21:30:00Z",
+  "character": "NECROBINDER",
+  "ascension": 7,
+  "floor_reached": 25,
+  "outcome": "in_progress",
+  "game_start_time": 1784926800,
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.TRI_BOOMERANG": {
+      "tri_boomerang_instinct_cards": [
+        {
+          "card_instance_id": "CARD.REAP#1",
+          "display_name": "Reap"
+        },
+        {
+          "card_instance_id": "CARD.GRAVE_WARDEN#1",
+          "display_name": "Grave Warden"
+        },
+        {
+          "card_instance_id": "CARD.SEVERANCE#2",
+          "display_name": "Severance+"
+        }
+      ],
+      "tri_boomerang_instinct_card_plays": 7,
+      "tri_boomerang_combats": 3
+    }
+  },
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.REAP": [1],
+    "CARD.GRAVE_WARDEN": [1],
+    "CARD.SEVERANCE": [2]
+  },
+  "def_counters": {
+    "CARD.REAP": 1,
+    "CARD.GRAVE_WARDEN": 1,
+    "CARD.SEVERANCE": 2
+  }
+}

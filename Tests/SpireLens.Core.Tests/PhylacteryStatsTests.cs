@@ -57,7 +57,7 @@ public class PhylacteryStatsTests
     }
 
     [Fact]
-    public void RelicTooltip_PhylacteryFields_ShowActivationsAndSummonGained()
+    public void RelicTooltip_PhylacteryFields_ShowConceptIconsAndFullRowHelp()
     {
         var agg = new RelicAggregate
         {
@@ -68,9 +68,14 @@ public class PhylacteryStatsTests
         var body = (string)(BuildPhylacteryBodyMethod.Invoke(null, new object?[] { agg })
             ?? throw new InvalidOperationException("BuildPhylacteryBodyBBCode returned null."));
 
-        Assert.Contains("Activations", body);
+        Assert.Contains("ⓘ", body);
+        Assert.Contains("Times this relic has been activated.", body);
+        Assert.Contains("[color=#F4C95D][b]A[/b][/color]", body);
         Assert.Contains("[b]4[/b]", body);
-        Assert.Contains("Osty summon gained", body);
+        Assert.Contains("Total Osty summon gained from this relic.", body);
+        Assert.Contains(
+            "res://images/atlases/relic_atlas.sprites/bound_phylactery.tres",
+            body);
         Assert.Contains("[b]17[/b]", body);
     }
 

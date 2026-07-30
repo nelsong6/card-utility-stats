@@ -2,7 +2,7 @@
 
 Per-card attribution stats mod for [Slay the Spire 2](https://store.steampowered.com/app/2868840/Slay_the_Spire_2/). For every card you play, it tracks what actually happened: effective damage vs. overkill, block that absorbed vs. wasted, drawn cards played vs. idle, energy generated vs. unused, and effect-oriented outcomes like poison damage.
 
-**Status:** Dev build - core per-instance card stats are live in-game, including damage/block attribution, observed draw and energy generation, card-caused current/max-HP loss, Regent star-resource spend/gain tracking, forge granted from cards, Alchemize potion outcomes by rarity, blocked-draw attribution, recurring summon-to-hand tracking, applied-effect summaries, Artifact-blocked debuffs, removed-card viewing, pooled combat-generated card summaries, and dedicated poison application/damage rows. Not yet published to Nexus (M6).
+**Status:** Dev build - core per-instance card stats are live in-game, including damage/block attribution, observed draw and energy generation, card-caused current/max-HP loss, Regent star-resource spend/gain tracking, forge granted from cards, Alchemize potion outcomes by rarity, Jack of All Trades generated-card totals with rarity/type/cost breakdowns, Discovery picked-card rarity/type/discount outcomes, Juggling power-owned Attack-copy totals with rarity and active turn/combat averages, Unrelenting's shared Free Attack charge utilization and energy savings, blocked-draw attribution, recurring summon-to-hand tracking, applied-effect summaries, Artifact-blocked debuffs, removed-card viewing, pooled combat-generated card summaries, and dedicated poison application/damage rows. Not yet published to Nexus (M6).
 
 For codebase orientation, start with [AGENTS.md](AGENTS.md), [docs/architecture.md](docs/architecture.md), and [docs/sts2-runtime-primer.md](docs/sts2-runtime-primer.md).
 
@@ -35,19 +35,96 @@ Existing stats mods answer "how often did I *pick* this card" ([SlayTheStats](ht
 
 ## How you'd use it
 
-A **"SpireLens: on/off"** checkbox sits next to the game's existing "View Upgrades" toggle on the in-run deck view. It is the master switch for SpireLens tooltip stats and coexists with the game's built-in hover tips rather than replacing them.
+A compact **Open SpireLens menu** shortcut sits beside the game's existing
+"View Upgrades" toggle on the in-run deck view. During an active run, the same
+modal options window can be opened from gameplay screens by tapping **Left
+Shift** on keyboard or pressing **Right Stick (R3)** on controller. The
+shortcuts do nothing on the run's Pause, Settings, Compendium, or Feedback
+screens, or on main-menu surfaces such as the compendium or run history.
+Shift-based chords such as Steam's Shift+Tab and Windows+Shift+S are left
+alone, including chords whose other modifier was pressed before Left Shift.
 
-Tap **Left Shift** on keyboard or press **Right Stick (R3)** on controller to
-toggle the same global stats-visibility setting during normal play. Shift-based
-chords such as Steam's Shift+Tab are left alone.
-Turning stats off hides any open SpireLens panel and skips aggregate
-lookup and tooltip construction while stats are hidden; attribution continues
-in the background. Controller Left Trigger remains the game's Draw Pile input,
-and Left Stick press remains Peek, so neither is claimed by SpireLens.
+The modal blocks normal game input while open and contains the master stats
+visibility, card stats, monster stats, and not-in-deck card controls. It does not
+take Godot focus from the game screen beneath it, so closing the menu returns
+to the exact selection and highlight that were already active. The D-pad and
+left stick move the menu's independent highlight between rows, and `A` toggles
+the highlighted option. Any other non-direction controller button closes the
+menu. Mouse selection remains fully supported; Escape, Left Shift, or the
+window's Close button also closes it.
 
-A separate, default-off **"SpireLens: card stats"** checkbox controls per-card panels on every supported card surface, including the deck, hand, combat piles, and run history. It changes presentation only: card attribution continues to be recorded while the checkbox is off. Hand hovers stay compact unless verbose hand stats are enabled.
+The optional, mutually exclusive relic-bar filters hide already-resolved relics
+while leaving them owned, functional, and visible on every other relic surface.
+The contextual mode filters during combat and combat pile overlays but restores
+the full bar in the deck/library view and on the act map; the forced mode keeps
+the filtered bar throughout the active run. The category includes
+already-resolved max-HP relics, permanent inventory upgrades, card-reward
+upgrades, and other relics whose effects do not need combat-bar attention.
 
-A separate **"show removed cards"** checkbox controls the removed-card overlay: cards you've removed this run (Smith, events, curse dispose) appear inline in the deck grid, marked with a red "Card Removed" banner in their tooltip so you can review their stats post-removal. Generated combat-only cards that do not live in the deck permanently can also render as pooled summaries when that is a better representation than pretending each temporary copy is a normal deck instance. Checkbox state persists across hot reloads through the mod configuration.
+Right-click an owned relic, a card in a passive pile view, a compendium relic,
+or a card or relic in run history with SpireLens stats to pin its complete
+native tooltip set. The game's compact top-panel lock icon appears on the pinned
+item, and the tooltip remains visible and mouse-interactive after the pointer
+leaves it. Right-clicking the locked item again always unlocks it. Pointer
+movement is allowed so inline help can be inspected; any other mouse click or
+wheel action, key press, or controller action removes the pin and continues to
+the game normally.
+
+Run history also has a deck icon beside its Cards section. It opens the
+selected player's final deck in the normal deck viewer, with duplicate cards
+kept as separate, inspectable card instances.
+
+The relic compendium's **Edit combat relevance** mode shows each discovered
+relic's classification with the game's enemy-map icon for combat or top-bar
+map icon for non-combat. Inspecting a discovered relic opens explicit **Combat**
+and **Non-combat** radio buttons on the full relic inspection screen. Combat
+relics also have an **Always / Until turn 1 / Until turn 2 / Until turn 3**
+dropdown; a finite assignment leaves the filtered relic bar when that turn
+begins. For example, **Until turn 2** shows the relic on turn 1 and hides it
+starting on turn 2. The same assignment controls appear
+when inspecting an owned relic from the in-run relic bar. The duration dropdown
+stays available for both categories; choosing a duration also selects Combat.
+Changes apply immediately and are saved under
+`user://SpireLens/relic-classifications.json`. Run
+`scripts/sync-relic-classifications.ps1` to promote the working file into the
+repository's shipped default.
+
+The same relic-view mode dropdown includes **Icon glossary**. It replaces the
+relic grid with the SpireLens symbol vocabulary and its definitions; the
+glossary and inline stat-row symbols both render from the cached definitions in
+`Core/Config/stat-concepts.json`. Concept symbols use Godot's native rich-text
+hover hints, so pinned relic stats can expose short concept help without
+creating another tooltip page.
+
+The relic compendium's charge taxonomy is maintained in
+`Core/Config/relic-taxonomy.json`. Its nested objects mirror the category tree,
+and its top-level `uncategorized` list contains every relic not assigned to a
+leaf category. Every relic ID appears exactly once and each list is alphabetical.
+Move IDs between lists, then rebuild and hot-reload the Core to apply changes;
+display names remain defined in `Core/RelicTaxonomy.cs`.
+
+Turning stats off closes the current native hover-tip set and skips aggregate
+lookup and SpireLens hover-tip construction while stats are hidden; attribution
+continues in the background. Controller Left Trigger remains the game's Draw
+Pile input, and Left Stick press remains Peek, so neither is claimed by
+SpireLens.
+
+A separate, default-off **"SpireLens: card stats"** checkbox controls per-card
+native hover-tip entries on every supported card surface, including the deck,
+hand, combat piles, and run history. It changes presentation only: card
+attribution continues to be recorded while the checkbox is off. Hand hovers
+stay compact unless verbose hand stats are enabled.
+
+**"Show cards not in deck"** switches the native deck screen to a separate
+SpireLens collection: every current deck card leaves the grid, and removed
+physical cards plus pooled meta-cards take their place. Removed cards retain
+their individual run stats and removal marker. Meta-cards such as Shiv, Soul,
+Sovereign Blade, and encountered Status cards aggregate every observed instance
+of that generated card family into one inspectable card. By default a meta-card
+enters this view after it appears during the run; **"Show all meta-cards in
+\"not in deck\" view"** also renders every supported meta-card and every Status
+card in the current game database with zeroed stats before it is encountered.
+Both choices persist through the mod configuration.
 
 A separate, default-off **"show monster stats"** checkbox in the deck viewer controls combat monster hover popups when general stats are enabled. Keeping it off bypasses enemy aggregate lookup and tooltip construction on creature focus while leaving card and relic stats enabled.
 
@@ -66,7 +143,16 @@ The controls themselves are injected only into the in-run deck viewer for now (n
 | **M5b** | Run History integration - browse past-run stats | [#9](https://github.com/romaine-life/spirelens/issues/9) |
 | **M6** | Publish v0.1 to Nexus | - |
 
-Additional shipped: discard count, pile-top placements (from hand / from discard), exhaust-others attribution, self-exhaust count, current/max-HP lost from card costs, cards-drawn attribution, blocked-draw attempt/reason tracking, Regent star-resource tracking, forge granted tracking, observed Alchemize potion gains/failures with rarity splits, recurring summon-to-hand tracking, effect application summaries, Artifact-blocked debuff tracking, and downstream poison damage attribution including stacked Noxious Fumes contributor preservation.
+Additional shipped: discard count, pile-top placements (from hand / from discard), exhaust-others attribution, self-exhaust count, current/max-HP lost from card costs, cards-drawn attribution, blocked-draw attempt/reason tracking, Regent star-resource tracking, forge granted tracking, observed Alchemize potion gains/failures with rarity splits, observed Jack of All Trades colorless-card additions with rarity/type and average-cost splits, observed Discovery selections with rarity/type and average-energy-discount splits, Debt and Seal of Gold triggers with attempted, actual, and blocked gold loss, Seal of Gold's generated-energy total and per-combat average, Art of War's observed energy total, held-turn/combat averages, and live turn/combat energy, Cracked Core's exact starting-Lightning passive, evoke, and fizzle lifecycle, Reptile Trinket's activation rates and exact-two/over-two per-turn distribution, Pendulum's observed draws and held-combat average, Mummified Hand trigger/discount efficiency with discounted-card type and rarity tracking, Ruined Helmet's observed bonus Strength total with per-activation and held-combat averages, Daughter of the Wind's and Ripple Basin's observed block totals with held-turn/combat averages, observed max-HP pickup tracking for Strawberry, Pear, Mango, and Nutritious Oyster, Gnarled Hammer's observed Sharp-enchanted card list, Stone Humidifier's observed max-HP gains with per-activation before/after snapshots, Sturdy Clamp's retained/capped block averages per turn and combat, Pael's Claw's Goopy play rates and earned enhancements per Goopy card, recurring summon-to-hand tracking, effect application summaries, Artifact-blocked debuff tracking, downstream poison damage attribution including stacked Noxious Fumes contributor preservation, Dowsing Rod's live `?`-room countdown, Fishing Rod's ordered list of cards actually upgraded, and Molten/Toxic/Frozen Egg counts for matching upgraded cards offered across rewards and shops.
+Drain Power additionally tracks its observed discard-pile upgrades and later
+plays of the exact combat cards it upgraded, with held-turn and held-combat
+averages per physical Drain Power.
+War Hammer records each Elite-victory activation, every permanent deck card it
+actually upgraded, and later plays of those exact physical cards, with
+per-activation upgrade value and held-turn/combat play averages.
+Book of Five Rings records permanent-deck additions, cards added per held
+floor, five-card healing triggers and observed healing outcomes, and skipped
+card rewards.
 
 Run outcome detection (win/loss/abandoned) is implemented ([#10](https://github.com/romaine-life/spirelens/issues/10), closed) via the run-history entry hook.
 

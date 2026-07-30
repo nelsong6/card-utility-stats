@@ -47,6 +47,23 @@ public class RunData
     /// <summary>Per-relic stat aggregates. Keyed by relic id (e.g. "RELIC.BAG_OF_MARBLES").</summary>
     public Dictionary<string, RelicAggregate> RelicAggregates { get; set; } = new();
 
+    /// <summary>
+    /// Ordered provenance for the portion of the player's gold balance that
+    /// still matters to source attribution. Old Coin seeds the first tracked
+    /// chunk; ordinary balance before and after it is represented by chunks
+    /// without a source relic id. The ledger can be cleared once no attributed
+    /// gold remains.
+    /// </summary>
+    public List<GoldAttributionChunk> GoldAttributionLedger { get; set; } = new();
+
+    /// <summary>
+    /// The floor of an active Maw Bank shop visit that has not yet been
+    /// resolved by entering the next room. Persisting the floor makes the
+    /// visit idempotent across Continue and Core hot reload while the shop is
+    /// still open.
+    /// </summary>
+    public int? MawBankPendingShopFloor { get; set; }
+
     /// <summary>Per-enemy stat aggregates. Keyed by monster id (e.g. "MONSTER.HAUNTED_SHIP").</summary>
     public Dictionary<string, EnemyAggregate> EnemyAggregates { get; set; } = new();
 
@@ -149,6 +166,62 @@ public class CardAggregate
     public int RarePotionsGained { get; set; }
     public int PotionsSkipped { get; set; }
 
+    // Jack of All Trades generated-card outcomes. The total counts only cards
+    // that the combat pile command confirms were added. Rarity/type buckets
+    // and energy cost are read from that actual added card, not the candidate
+    // Jack selected before add hooks and pile rules ran.
+    public int JackColorlessCardsAdded { get; set; }
+    public int JackUncommonCardsAdded { get; set; }
+    public int JackRareCardsAdded { get; set; }
+    public int JackAttacksAdded { get; set; }
+    public int JackSkillsAdded { get; set; }
+    public int JackPowersAdded { get; set; }
+    public int JackAddedCardCostTotal { get; set; }
+
+    // Discovery choice outcomes. CardsPicked is the denominator for average
+    // discount and counts only non-null selections from Discovery's own
+    // choose-card screen. The discount is the selected card's observed
+    // effective energy-cost reduction when Discovery makes it free.
+    public int DiscoveryCardsPicked { get; set; }
+    public int DiscoveryCommonCardsPicked { get; set; }
+    public int DiscoveryUncommonCardsPicked { get; set; }
+    public int DiscoveryRareCardsPicked { get; set; }
+    public int DiscoveryAttacksPicked { get; set; }
+    public int DiscoverySkillsPicked { get; set; }
+    public int DiscoveryPowersPicked { get; set; }
+    public int DiscoveryEnergyDiscountTotal { get; set; }
+
+    // Armaments outcomes. Counts successful UpgradeInternal calls observed
+    // while this physical Armaments is resolving. Armaments+ may add several
+    // upgrades in one play; cards that were already fully upgraded never
+    // enter UpgradeInternal and therefore are not counted.
+    public int ArmamentsCardsUpgraded { get; set; }
+
+    // Drain Power outcomes. CardsUpgraded counts only UpgradeInternal calls
+    // observed while this physical Drain Power is resolving. The raw combat
+    // cards it upgraded are remembered for the rest of that combat so their
+    // later completed plays can be credited back to this source instance.
+    // TurnsInDeck and the shared CombatsInDeck field are held denominators,
+    // including turns/combats where Drain Power produces no upgrade or play.
+    public int DrainPowerCardsUpgraded { get; set; }
+    public int DrainPowerTurnsInDeck { get; set; }
+    public int DrainPowerUpgradedCardPlays { get; set; }
+
+    // Debt's end-of-turn curse effect. The intended amount comes from the
+    // card's Gold dynamic var; actual loss is observed from the owner's gold
+    // balance before/after the callback. Any unaffordable remainder is kept
+    // separately so a trigger at zero gold is still visible and explainable.
+    public int DebtTriggers { get; set; }
+    public int DebtGoldLost { get; set; }
+    public int DebtGoldLossBlocked { get; set; }
+
+    // Normality turn-end exposure. A qualifying turn is observed before hand
+    // cleanup while this exact physical Normality is still in Hand. The
+    // energy total includes zero-energy turns so the display-side average is
+    // over every qualifying turn, not only turns with leftover energy.
+    public int NormalityTurnsEndedInHand { get; set; }
+    public int NormalityExcessEnergyAtTurnEndTotal { get; set; }
+
     // M2a: Block gained (how much block this card contributed over the run,
     // summed across plays). M2b extends this with absorbed/wasted splits
     // using an ordered provenance ledger for the player's block pool.
@@ -206,6 +279,12 @@ public class CardAggregate
     // card using this field.
     public int TotalMaxHpLost { get; set; }
 
+    // Maximum HP actually gained from playing this card. Feed is the first
+    // card using this field. Its printed Fatal amount is not assumed: the
+    // tracker records the owner's observed max-HP delta after Feed's complete
+    // async play callback succeeds.
+    public int TotalMaxHpGained { get; set; }
+
     // M3i: Draw attribution. When THIS card's play causes OTHER cards to
     // be drawn. Signal for draw-enabler cards (Prepared, Coolheaded,
     // Acrobatics etc. depending on the character). Excludes turn-start
@@ -249,6 +328,13 @@ public class CardAggregate
     public int TimesOstySummoned { get; set; }
     public decimal TotalOstyHpSummoned { get; set; }
 
+    // Successful generated/transformed Soul arrivals caused while this card
+    // was resolving. The final combat pile is observed after the game's add
+    // and redirection hooks, rather than inferred from card text.
+    public int SoulsAddedToDrawPile { get; set; }
+    public int SoulsAddedToHand { get; set; }
+    public int SoulsAddedToDiscardPile { get; set; }
+
     // M3p: Extra plays caused by the game's replay/multi-play series. Total
     // Plays already includes these; this field tracks the subset where the
     // finished CardPlay was not the first play in its series.
@@ -277,9 +363,10 @@ public class CardAggregate
     //   InitialUpgradeLevel: CurrentUpgradeLevel at first observation.
     //                       If > 0, the card arrived already upgraded.
     //
-    // Subsequent upgrades are recorded in the Events log as "card_upgraded"
-    // entries with Floor + UpgradeLevel, so the tooltip can render a full
-    // lineage like "Arrived: floor 3, +1" followed by "Upgraded: floor 6 → +2".
+    // Subsequent permanent-deck upgrades are recorded in the Events log as
+    // "card_upgraded" entries with Floor + UpgradeLevel, so the tooltip can
+    // render a full lineage like "Arrived: floor 3, +1" followed by
+    // "Upgraded: floor 6 → +2". Temporary combat-copy upgrades are excluded.
     public int? FloorAdded { get; set; }
     public int InitialUpgradeLevel { get; set; }
 
@@ -306,6 +393,125 @@ public class RunMetaStats
     public decimal TotalOstyHpSummoned { get; set; }
     public decimal TotalOstyDamageAbsorbed { get; set; }
     public decimal ExtraBlockGainedFromUnmovablePower { get; set; }
+
+    // Power-owned outcomes that should not be attributed to one physical
+    // source-card instance. The related card can project these aggregate
+    // values in its tooltip without pretending that one copy of the card
+    // caused every later activation of the shared power.
+    public Dictionary<string, PowerAggregate> PowerAggregates { get; set; } = new();
+}
+
+public class PowerAggregate
+{
+    public string PowerId { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+
+    // Shared meta-power accounting. One aggregate represents every physical
+    // and generated play of the same Power card definition.
+    //
+    // DeckTurns: every player turn in a combat where at least one permanent
+    // copy of the Power card was in the deck at combat setup. Multiple copies
+    // do not multiply this denominator.
+    // ActiveTurns: one unit for each turn where the power family was active.
+    // ActiveApplicationTurns: one unit per successful application per active
+    // turn, so two played copies contribute two units on later shared turns.
+    public int PowerCardsPlayed { get; set; }
+    public int GeneratedPowerCardsPlayed { get; set; }
+    public int SuccessfulApplications { get; set; }
+    public int MetaDeckTurns { get; set; }
+    public int MetaActiveTurns { get; set; }
+    public int MetaActiveApplicationTurns { get; set; }
+
+    // Matching observation-era numerators for the three meta-power rate
+    // denominators above. Lifetime totals predate these denominators in saved
+    // runs, so dividing those older totals by newer denominators would create
+    // false rates.
+    public int RateAttacksCopied { get; set; }
+    public int RateTimesTriggered { get; set; }
+    public decimal RateBlockGained { get; set; }
+    public int RateEntropyCardsGenerated { get; set; }
+    public int RateViciousCardsDrawn { get; set; }
+    public int RateDarkEmbraceCardsDrawn { get; set; }
+    public int RateStampedeAttacksPlayed { get; set; }
+    public int RateStampedeEnergySaved { get; set; }
+    public int RateAggressionCardsReturnedToHand { get; set; }
+    public int RateAggressionCardsUpgraded { get; set; }
+    public decimal RateStrengthGained { get; set; }
+    public decimal UnmovableExtraBlockGained { get; set; }
+    public decimal RateUnmovableExtraBlockGained { get; set; }
+
+    // Juggling tracking. Copies count only generated Attack cards confirmed
+    // by the combat-pile add result. Turns and combats are held-power
+    // denominators and include active periods with no copy.
+    public int AttacksCopied { get; set; }
+    public int CommonAttacksCopied { get; set; }
+    public int UncommonAttacksCopied { get; set; }
+    public int RareAttacksCopied { get; set; }
+    public int TurnsActive { get; set; }
+    public int CombatsActive { get; set; }
+
+    // Danse Macabre tracking. A trigger is one qualifying owner card observed
+    // by the shared power. Block is the post-modifier amount returned by the
+    // power's exact gain-block command. Active denominators include the
+    // application turn and later zero-trigger turns while the power remains.
+    public int TimesTriggered { get; set; }
+    public decimal BlockGained { get; set; }
+
+    // Unrelenting / Free Attack tracking. The power owns these outcomes
+    // because multiple physical Unrelenting cards contribute to one shared
+    // stack. A use is confirmed only when FreeAttackPower completes its
+    // charge decrement. Energy saved is the power's observed marginal
+    // reduction from the cost immediately before its own late modifier.
+    public int FreeAttackChargesGranted { get; set; }
+    public int FreeAttackChargesUsed { get; set; }
+    public int FreeAttackZeroEnergySavingsUses { get; set; }
+    public decimal FreeAttackEnergySaved { get; set; }
+    public int FreeAttackBasicAttacksDiscounted { get; set; }
+    public int FreeAttackCommonAttacksDiscounted { get; set; }
+    public int FreeAttackUncommonAttacksDiscounted { get; set; }
+    public int FreeAttackRareAttacksDiscounted { get; set; }
+
+    // Entropy tracking. Generated cards are confirmed from successful
+    // CardCmd.Transform results. Chains broken counts replacements whose
+    // original card had the Queen's Bound affliction before transformation.
+    public int EntropyChainsOfBindingBroken { get; set; }
+    public int EntropyCardsGenerated { get; set; }
+    public int EntropyCommonCardsGenerated { get; set; }
+    public int EntropyUncommonCardsGenerated { get; set; }
+    public int EntropyRareCardsGenerated { get; set; }
+
+    // Vicious tracking. This is the number of cards confirmed by the exact
+    // draw command issued when the shared power reacts to its owner applying
+    // Vulnerable. Failed/blocked draws contribute zero.
+    public int ViciousCardsDrawn { get; set; }
+
+    // Dark Embrace tracking. Drawn cards are the observed results of both its
+    // immediate Exhaust draw and deferred Ethereal batch. TurnsActive counts
+    // only turns while the power is active; DarkEmbraceCombatTurns counts all
+    // player turns in combats where it became active.
+    public int DarkEmbraceCardsDrawn { get; set; }
+    public int DarkEmbraceCombatTurns { get; set; }
+
+    // Stampede tracking. An Attack counts only after the exact autoplay
+    // selected by Stampede reaches a finished primary play. Energy saved is
+    // that play's resolved EnergyValue; autoplay itself spends zero.
+    public int StampedeAttacksPlayed { get; set; }
+    public int StampedeCommonAttacksPlayed { get; set; }
+    public int StampedeUncommonAttacksPlayed { get; set; }
+    public int StampedeRareAttacksPlayed { get; set; }
+    public int StampedeEnergySaved { get; set; }
+
+    // Aggression tracking. Returned cards count only successful moves from the
+    // discard pile into hand. Upgrades are observed separately at the exact
+    // card mutation, so a full hand or an already-upgraded card cannot inflate
+    // the other outcome.
+    public int AggressionCardsReturnedToHand { get; set; }
+    public int AggressionCardsUpgraded { get; set; }
+
+    // Rupture tracking. Strength gained is the observed positive change across
+    // Rupture's own payoff callbacks. TurnsActive is the zero-inclusive
+    // denominator for the power's per-active-turn average.
+    public decimal StrengthGained { get; set; }
 }
 
 public class EnemyAggregate
@@ -371,6 +577,12 @@ public class ReplayExtraPlayReasonAggregate
     public int Count { get; set; }
 }
 
+public class GoldAttributionChunk
+{
+    public string? SourceRelicId { get; set; }
+    public int AmountRemaining { get; set; }
+}
+
 /// <summary>
 /// Aggregated stats for a single relic across this run.
 /// Fields are shared across relics; each relic uses only the fields relevant to it.
@@ -404,27 +616,179 @@ public class RelicAggregate
     // combat start).
     public int AdditionalCardsDrawn { get; set; }
 
+    // Centennial Puzzle's once-per-combat activation context. The turn total
+    // is summed at the exact HP-loss callback and uses the owning player's
+    // turn number. Turn-side and HP-loss-source buckets are mutually
+    // exclusive within their respective groups.
+    public int CentennialPuzzleActivationTurnTotal { get; set; }
+    public int CentennialPuzzleActivationTurnSamples { get; set; }
+    public int CentennialPuzzlePlayerTurnActivations { get; set; }
+    public int CentennialPuzzleOpponentTurnActivations { get; set; }
+    public int CentennialPuzzleStatusActivations { get; set; }
+    public int CentennialPuzzleCurseActivations { get; set; }
+    public int CentennialPuzzleEnemySourceActivations { get; set; }
+
+    // Pocketwatch held-period observations. A turn is missed when its ending
+    // card count is above Pocketwatch's threshold; an activation is counted
+    // only when the relic actually adds cards to the following hand draw.
+    public int PocketwatchTurns { get; set; }
+    public int PocketwatchCombats { get; set; }
+    public int PocketwatchTurnEndCountTotal { get; set; }
+    public int PocketwatchTurnsActivationMissed { get; set; }
+    public int PocketwatchActivatedTurnEndCountTotal { get; set; }
+    public int PocketwatchActivationValueSamples { get; set; }
+    public int PocketwatchMissedTurnEndCountTotal { get; set; }
+
+    // Pollinous Core held-period observations. The relic increments its saved
+    // counter before each hand draw, adds two cards on the fourth turn, then
+    // resets to zero before that turn ends. AdditionalCardsDrawn stores the
+    // observed marginal cards that actually reached the hand.
+    public int AdditionalCardDrawsBlocked { get; set; }
+    public int PollinousCoreTurns { get; set; }
+    public int PollinousCoreCombats { get; set; }
+    public int PollinousCoreTurnsEndedOn0Counters { get; set; }
+    public int PollinousCoreTurnsEndedOn1Counter { get; set; }
+    public int PollinousCoreTurnsEndedOn2Counters { get; set; }
+    public int PollinousCoreTurnsEndedOn3Counters { get; set; }
+
+    // Joss Paper observes every owned card exhausted while held. Each full
+    // five-card threshold is one activation and one requested card draw.
+    // AdditionalCardsDrawn / AdditionalCardDrawsBlocked store the observed
+    // draw result. End-of-turn snapshots retain its 0-4 remainder
+    // distribution, including the deferred Ethereal exhaust batch.
+    public int JossPaperCardsExhausted { get; set; }
+    public int JossPaperTurns { get; set; }
+    public int JossPaperCombats { get; set; }
+    public int JossPaperTurnsEndedOn0Counters { get; set; }
+    public int JossPaperTurnsEndedOn1Counter { get; set; }
+    public int JossPaperTurnsEndedOn2Counters { get; set; }
+    public int JossPaperTurnsEndedOn3Counters { get; set; }
+    public int JossPaperTurnsEndedOn4Counters { get; set; }
+
+    // Combats where Pendulum was held, including combats too short for it to
+    // activate. Used as the denominator for cards drawn per combat.
+    public int PendulumCombats { get; set; }
+
+    // Pendulum's live 0-2 turn counter at the end of each completed combat.
+    public int PendulumCombatsEndedOn0Charges { get; set; }
+    public int PendulumCombatsEndedOn1Charge { get; set; }
+    public int PendulumCombatsEndedOn2Charges { get; set; }
+    public int PendulumCombatEndChargeTotal { get; set; }
+    public int PendulumCombatEndChargeCount { get; set; }
+
     // Total block gained from this relic across all combats.
     // Used by Orichalcum, Permafrost, The Abacus, Bone Flute, Cloak Clasp,
-    // Anchor, Horn Cleat, Tuning Fork, Ornamental Fan, Regalite, and Vambrace's
-    // extra block from its multiplier.
+    // Anchor, Horn Cleat, Captain's Wheel, Tuning Fork, Ornamental Fan,
+    // Regalite, and Vambrace's extra block from its multiplier.
     public int AdditionalBlockGained { get; set; }
+
+    // Cloak Clasp held-period denominators. Turns include every player turn
+    // where the relic was held, even when combat ended before its turn-end
+    // callback or the player had no cards in hand.
+    public int CloakClaspTurns { get; set; }
+    public int CloakClaspCombats { get; set; }
+
+    // Combats where Permafrost was held, including combats where no Power was
+    // played. Used as the zero-inclusive denominator for triggers per combat.
+    public int PermafrostCombats { get; set; }
 
     // Total times this relic got its own trigger check but was blocked by
     // its condition not being met. Used by Orichalcum when the player already
     // has block at end of turn.
     public int BlockedTriggers { get; set; }
 
-    // Total Strength this relic added. Used by Reptile Trinket and Shuriken.
+    // Total Strength this relic added. Used by Reptile Trinket, Shuriken,
+    // Ruined Helmet, and Toasty Mittens.
     public decimal StrengthAdded { get; set; }
+
+    // Toasty Mittens outcomes and its zero-inclusive held-combat denominator.
+    public int ToastyMittensCardsExhausted { get; set; }
+    public int ToastyMittensCombats { get; set; }
+
+    // Reptile Trinket held-period denominators and per-turn activation
+    // distribution. The two turn buckets are mutually exclusive.
+    public int ReptileTrinketTurns { get; set; }
+    public int ReptileTrinketCombats { get; set; }
+    public int ReptileTrinketTurnsWithExactlyTwoActivations { get; set; }
+    public int ReptileTrinketTurnsWithMoreThanTwoActivations { get; set; }
+
+    // Rainbow Ring held-period denominators. Activations use the shared
+    // Activations field; the current-turn card-type state is read live.
+    public int RainbowRingTurns { get; set; }
+    public int RainbowRingCombats { get; set; }
+
+    // Final-turn distribution for completed combats where Sparkling Rouge was
+    // held. These buckets are mutually exclusive.
+    public int SparklingRougeCombatsEndedOnTurn1 { get; set; }
+    public int SparklingRougeCombatsEndedOnTurn2 { get; set; }
+    public int SparklingRougeCombatsEndedOnTurn3Plus { get; set; }
+
+    // Beating Remnant tracking. The prevented amount is the positive
+    // before/after delta at the relic's own post-Osty HP-loss modifier.
+    // Turns and combats are zero-inclusive held denominators.
+    public decimal BeatingRemnantHpLossPrevented { get; set; }
+    public int BeatingRemnantTurns { get; set; }
+    public int BeatingRemnantCombats { get; set; }
+
+    // Whispering Earring tracking. Life lost is the sum of observed downward
+    // current-HP deltas from player turn 1 through opponent turn 1. Combats is
+    // a zero-inclusive held denominator.
+    public decimal WhisperingEarringFirstRoundHpLost { get; set; }
+    public int WhisperingEarringCombats { get; set; }
+
+    // Tungsten Rod tracking. Each numerator is the exact positive delta at
+    // the rod's own post-Osty HP-loss modifier. Turns and combats are shared,
+    // zero-inclusive held denominators for both the total and source buckets.
+    public decimal TungstenRodDamagePrevented { get; set; }
+    public decimal TungstenRodSelfDamagePrevented { get; set; }
+    public decimal TungstenRodCurseDamagePrevented { get; set; }
+    public decimal TungstenRodStatusDamagePrevented { get; set; }
+    public decimal TungstenRodEnemyDamagePrevented { get; set; }
+    public int TungstenRodTurns { get; set; }
+    public int TungstenRodCombats { get; set; }
 
     // Total Plating this relic added. Used by Gorget.
     public decimal PlatingAdded { get; set; }
 
     // Total cards this relic upgraded. Used by Stone Cracker, Razor Tooth,
-    // Sand Castle, Whetstone, War Paint, and other upgrade-granting relics.
+    // Sand Castle, Whetstone, Yummy Cookie, War Paint, Fishing Rod, War
+    // Hammer, and other upgrade-granting relics.
     public int CardsUpgraded { get; set; }
     public List<string> UpgradedCards { get; set; } = new();
+
+    // Stone Cracker tracking. The upgraded-card set itself is combat-local
+    // because the relic upgrades draw-pile combat instances, not permanent
+    // deck cards. Combats/turns are zero-inclusive held denominators.
+    public int StoneCrackerUpgradedCommons { get; set; }
+    public int StoneCrackerUpgradedUncommons { get; set; }
+    public int StoneCrackerUpgradedRares { get; set; }
+    public int StoneCrackerUpgradedCardPlays { get; set; }
+    public int StoneCrackerCombats { get; set; }
+    public int StoneCrackerTurns { get; set; }
+
+    // War Hammer tracking. The id list preserves the exact permanent deck
+    // cards upgraded after Elite victories so their later completed plays can
+    // be recognized across combats and hot reloads. Combats/turns are held
+    // denominators and include zero-play periods.
+    public List<string> WarHammerUpgradedCardInstanceIds { get; set; } = new();
+    public int WarHammerUpgradedCardPlays { get; set; }
+    public int WarHammerCombats { get; set; }
+    public int WarHammerTurns { get; set; }
+
+    // Permanent deck cards whose Sharp enchantment was applied or increased
+    // by Gnarled Hammer's pickup effect.
+    public List<string> SharpEnchantedCards { get; set; } = new();
+
+    // Reward cards whose Glam enchantment came from Silken Tress and were
+    // successfully taken into the permanent deck.
+    public List<string> SilkenTressGlamCards { get; set; } = new();
+
+    // Permanent deck cards whose Instinct enchantment was applied or increased
+    // by Tri-Boomerang. Stable instance ids let later combat-copy plays remain
+    // attributable across combats, saves, and hot reloads.
+    public List<RelicEnchantedCardAggregate> TriBoomerangInstinctCards { get; set; } = new();
+    public int TriBoomerangInstinctCardPlays { get; set; }
+    public int TriBoomerangCombats { get; set; }
 
     // Razor Tooth tracking. Combats/turns are held denominators for averages.
     // Plays and draws count only events after the exact combat card was
@@ -456,13 +820,19 @@ public class RelicAggregate
     public decimal TotalHealingLost { get; set; }
     public Dictionary<string, HealingLostReasonAggregate> HealingLostReasons { get; set; } = new();
 
-    // Relic lifecycle floor snapshots. Used by Lizard Tail to show where it
-    // was acquired and where its one-shot revive fired.
+    // Relic lifecycle floor snapshots. Used by one-shot relics such as Lizard
+    // Tail and Wongo's Mystery Ticket to show where they were acquired and
+    // where their effect activated.
     public int? FloorAcquired { get; set; }
     public int? FloorActivated { get; set; }
 
     // Total observed maximum HP gained by pickup max-HP relics and Chosen Cheese.
     public decimal MaxHpGained { get; set; }
+
+    // Ordered observed before/after max-HP snapshots for repeatable relic
+    // effects. Used by Stone Humidifier so each rest-site activation remains
+    // inspectable even when unrelated max-HP changes happen between rests.
+    public List<RelicMaxHpActivationAggregate> MaxHpActivations { get; set; } = new();
 
     // Shared max-HP before/after snapshot for relics that add or remove max HP.
     // Original is the first observed value before the relic changed max HP; New
@@ -482,18 +852,87 @@ public class RelicAggregate
     public int DoomKills { get; set; }
 
     // Total energy generated by this relic across all combats.
-    // Used by Happy Flower (gains 1 energy every 3 turns), Gremlin Horn
+    // Used by Art of War, Happy Flower (gains 1 energy every 3 turns), Gremlin Horn
     // (gains after enemy death), Booming Conch (gains at Elite combat start),
     // Lantern/Very Hot Cocoa/Candelabra/Chandelier (gain energy at the start
     // of turns 1/1/2/3),
     // Prismatic Gem, and Blood-Soaked Rose (max-energy relics counted once per
-    // player energy reset). Also used by Nunchaku, whose gained energy is
-    // attributed from the observed PlayerCombatState.GainEnergy delta.
+    // player energy reset), and Seal of Gold (turn-start energy purchased with
+    // gold). Also used by Nunchaku, whose gained energy is attributed from the
+    // observed PlayerCombatState.GainEnergy delta.
     public int EnergyGenerated { get; set; }
 
+    // Gold attributed to a relic effect. Lucky Fysh measures the owner's
+    // completed balance delta after its gold command resolves; Bowler Hat
+    // stores only the observed bonus beyond the unmodified integer grant;
+    // Amethyst Aubergine records the concrete extra GoldReward amount it adds;
+    // Maw Bank measures the completed balance delta from its room-entry callback.
+    public int GoldGained { get; set; }
+
+    // Shops entered while Maw Bank was active and then left without spending
+    // gold. A pending visit is resolved at the next distinct room entry using
+    // the relic's own saved HasItemBeenBought state.
+    public int MawBankShopsSkipped { get; set; }
+
+    // Actual gold removed by transactions the game classifies as Spent while
+    // Maw Bank was still active and the player's current room was not a shop.
+    public int MawBankGoldSpentOutsideShops { get; set; }
+
+    // Old Coin's observed pickup grant and the portion of that attributed
+    // grant later consumed by game transactions marked as Spent. A run-level
+    // FIFO gold ledger keeps pre-existing balance ahead of the grant and later
+    // unrelated gains behind it.
+    public int OldCoinGoldGranted { get; set; }
+    public int OldCoinGoldSpent { get; set; }
+
+    // Permanent deck additions confirmed by a relic-owned pile-change
+    // callback. Used by Lucky Fysh and Book of Five Rings.
+    public int CardsAddedToDeck { get; set; }
+
+    // Completed outer card rewards skipped while Book of Five Rings was held.
+    public int CardRewardsSkipped { get; set; }
+
+    // Gold actually lost to a relic effect and the portion of its attempted
+    // loss that did not leave the player's balance. Seal of Gold is the first
+    // relic using these observed outcome fields; attempted loss is derived
+    // from its activation count and fixed five-gold cost in the tooltip.
+    public int GoldLost { get; set; }
+    public int GoldLossBlocked { get; set; }
+
     // Combats held for relics whose energy-generation tooltip reports a
-    // per-combat average. Used by Happy Flower and Nunchaku.
+    // per-combat average. Used by Art of War, Happy Flower, Nunchaku, and
+    // Seal of Gold.
     public int EnergyGeneratedCombats { get; set; }
+
+    // Player turns where Art of War was held. Includes turns where an Attack
+    // on the preceding turn prevented its energy gain.
+    public int ArtOfWarTurns { get; set; }
+
+    // Tooltip-only projections populated from the live pending combat.
+    // Internal properties are not part of the persisted System.Text.Json shape.
+    internal int ArtOfWarEnergyAddedThisCombat { get; set; }
+    internal int ArtOfWarEnergyAddedThisTurn { get; set; }
+    internal int ArtOfWarTurnsThisCombat { get; set; }
+
+    // Lifecycle outcomes for the exact Lightning orb instance created by
+    // Cracked Core at the start of combat.
+    public int CrackedCoreOrbEvokes { get; set; }
+    public int CrackedCoreOrbPassiveTriggers { get; set; }
+    public int CrackedCoreOrbFizzles { get; set; }
+
+    // Lifecycle outcomes for the exact Dark orb instance created by Symbiotic
+    // Virus at the start of combat.
+    public int SymbioticVirusOrbEvokes { get; set; }
+    public int SymbioticVirusOrbPassiveTriggers { get; set; }
+    public int SymbioticVirusOrbFizzles { get; set; }
+
+    // Gold-Plated Cables tracking. Activations is the total number of confirmed
+    // extra passive triggers with a first orb available. The per-orb ledger
+    // preserves the exact orb type selected by the game's modifier hook.
+    // Empty opportunities are sampled at each owner end-turn orb-queue pass.
+    public Dictionary<string, RelicOrbActivationAggregate>
+        GoldPlatedCablesActivationsByOrbType { get; set; } = new();
+    public int GoldPlatedCablesNoOrbTargets { get; set; }
 
     // Total relevant player turns that ended with unspent energy while the
     // matching turn-energy relic was held.
@@ -552,6 +991,12 @@ public class RelicAggregate
     public int TuningForkTurnEndChargeTotal { get; set; }
     public int TuningForkTurnEndChargeCount { get; set; }
 
+    // Ripple Basin tracking. Activations and AdditionalBlockGained preserve
+    // successful no-Attack turn-end outcomes; these held denominators include
+    // turns and combats where the relic granted no block.
+    public int RippleBasinCombats { get; set; }
+    public int RippleBasinTurns { get; set; }
+
     // Total potions gained from this relic, split by the potion rarity that
     // was actually claimed. Used by White Beast Statue.
     public int PotionsGained { get; set; }
@@ -559,6 +1004,19 @@ public class RelicAggregate
     public int UncommonPotionsGained { get; set; }
     public int RarePotionsGained { get; set; }
     public int PotionsSkipped { get; set; }
+
+    // Tiny Mailbox tracking. Offers are the exact PotionReward objects added
+    // by its rest-heal callback and are counted once when selected or skipped,
+    // after the game has populated their concrete potion. Fruit Juice is an
+    // overlapping subset of Rare offers. Campfires not rested mirrors
+    // Shovel's unused-option count.
+    public int TinyMailboxPotionsOffered { get; set; }
+    public int TinyMailboxPotionsTaken { get; set; }
+    public int TinyMailboxCommonPotionsOffered { get; set; }
+    public int TinyMailboxUncommonPotionsOffered { get; set; }
+    public int TinyMailboxRarePotionsOffered { get; set; }
+    public int TinyMailboxFruitJuicesOffered { get; set; }
+    public int TinyMailboxCampfiresNotRested { get; set; }
 
     // Total relics acquired from this relic, split by the obtained relic's
     // actual rarity. Used by Shovel's Dig rest-site option.
@@ -569,15 +1027,36 @@ public class RelicAggregate
     public int CampfiresNotDug { get; set; }
 
     // Specific relics granted by relic-owned effects. Used by Large Capsule,
-    // Neow's Bones, and Pael's Wing to show which relics/artifacts were obtained.
+    // Neow's Bones, Pael's Wing, and Wongo's Mystery Ticket to show which
+    // relics were obtained.
     public Dictionary<string, RelicGrantedAggregate> RelicsGranted { get; set; } = new();
 
     // Total offered cards by rarity for relics that generate card-choice
-    // screens. Used by Toolbox.
+    // screens. Used by Toolbox, White Star, and Prayer Wheel.
+    public int CommonCardsOffered { get; set; }
     public int UncommonCardsOffered { get; set; }
     public int RareCardsOffered { get; set; }
+    public int CommonCardsTaken { get; set; }
     public int UncommonCardsTaken { get; set; }
     public int RareCardsTaken { get; set; }
+    public int RareAttackCardsOffered { get; set; }
+    public int RareSkillCardsOffered { get; set; }
+    public int RarePowerCardsOffered { get; set; }
+    public int RareCardRewardScreensDeclined { get; set; }
+    public int PrayerWheelExtraRewardScreens { get; set; }
+    public int PrayerWheelExtraRewardScreensRejected { get; set; }
+
+    // Total choosable card options actually upgraded by Molten Egg, Toxic Egg,
+    // or Frozen Egg, plus which of those offers successfully entered the
+    // permanent deck. Direct card grants are intentionally excluded.
+    public int UpgradedCardsOffered { get; set; }
+    public int UpgradedCommonCardsOffered { get; set; }
+    public int UpgradedUncommonCardsOffered { get; set; }
+    public int UpgradedRareCardsOffered { get; set; }
+    public int UpgradedCardsTaken { get; set; }
+    public int UpgradedCommonCardsTaken { get; set; }
+    public int UpgradedUncommonCardsTaken { get; set; }
+    public int UpgradedRareCardsTaken { get; set; }
 
     // Total card reward options consumed when Pael's Wing's Sacrifice option
     // is selected. The game model that owns the sacrifice option is
@@ -587,6 +1066,17 @@ public class RelicAggregate
     public int RareCardsConsumed { get; set; }
     public int SacrificesMade { get; set; }
     public int SacrificesSkipped { get; set; }
+
+    // Pael's Claw tracking. Plays count every finished play of a Goopy card
+    // while the relic is held. Enhancements count the observed permanent
+    // Goopy amount gained after the enchantment's own post-play callback;
+    // the initial amount of 1 is the application baseline, not an earned
+    // enhancement. Cards is the stable denominator of cards given Goopy.
+    public int PaelsClawGoopyCardsPlayed { get; set; }
+    public int PaelsClawGoopyEnhancements { get; set; }
+    public int PaelsClawGoopyCards { get; set; }
+    public int PaelsClawTurns { get; set; }
+    public int PaelsClawCombats { get; set; }
 
     // Status/curse cards exhausted by Pael's Eye when it takes an extra turn.
     public int StatusCardsExhausted { get; set; }
@@ -599,21 +1089,48 @@ public class RelicAggregate
     public int StrikeDummyBaseStrikesInDeck { get; set; }
     public int StrikeDummyNonBaseStrikeCardsInDeck { get; set; }
 
+    // Oddly Smooth Stone tracking. Uses CardModel.GainsBlock, the game's own
+    // classification for cards that immediately gain Dexterity-scaled Block.
+    public int OddlySmoothStoneBlockCardsPlayed { get; set; }
+
     // Nutritious Soup tracking. Counts finished plays of basic Strike-tagged
     // cards carrying the Tezcataras Ember enchantment while the relic is held.
     public int NutritiousSoupEnchantedStrikesPlayed { get; set; }
 
     // Miniature Cannon tracking. Plays and hits are cumulative while the relic
-    // is held; deck count is the current permanent-deck snapshot.
+    // is held; deck counts are current permanent-deck snapshots.
     public int MiniatureCannonUpgradedAttacksInDeck { get; set; }
+    public int MiniatureCannonNonUpgradedAttacksInDeck { get; set; }
     public int MiniatureCannonUpgradedAttackPlays { get; set; }
     public int MiniatureCannonUpgradedAttackHits { get; set; }
+
+    // Tooltip-only projections from the live combat-card piles. Internal
+    // properties are intentionally excluded from persisted run JSON.
+    internal int MiniatureCannonUpgradedAttacksInCombat { get; set; }
+    internal int MiniatureCannonNonUpgradedAttacksInCombat { get; set; }
 
     // Vajra tracking. Counts attack cards played while held, and actual enemy
     // damage hits from those attacks. Multi-hit attacks increment hits per
     // resolved damage entry.
     public int VajraAttacksPlayed { get; set; }
     public int VajraAttackHits { get; set; }
+
+    // Ember Tea tracking is limited to combats where the relic successfully
+    // consumed a charge. The active-combat marker survives the fifth charge
+    // reaching zero immediately after Strength is applied.
+    public int EmberTeaAttacksPlayedWhileActive { get; set; }
+    public int EmberTeaHitsWhileActive { get; set; }
+    public int EmberTeaActiveTurns { get; set; }
+    public int EmberTeaActiveCombats { get; set; }
+
+    // Red Skull tracking uses the relic's live StrengthApplied flag as the
+    // active-state source of truth. Turns and combats count distinct periods
+    // in which that flag was actually active, including periods with no
+    // qualifying attacks or hits.
+    public int RedSkullAttacksPlayedWhileActive { get; set; }
+    public int RedSkullHitsWhileActive { get; set; }
+    public int RedSkullActiveTurns { get; set; }
+    public int RedSkullActiveCombats { get; set; }
 
     // Kunai tracking. Counts owner attack plays, actual Dexterity gained from
     // activation resolution, and player-turn-end charge snapshots.
@@ -634,6 +1151,7 @@ public class RelicAggregate
     public int KusarigamaTurnEndChargeTotal { get; set; }
     public int KusarigamaTurnEndChargeCount { get; set; }
     public int OrnamentalFanAttacksPlayed { get; set; }
+    public int OrnamentalFanTurnsEndedAt0Charges { get; set; }
     public int OrnamentalFanTurnsEndedAt1Charge { get; set; }
     public int OrnamentalFanTurnsEndedAt2Charges { get; set; }
     public int OrnamentalFanTurnEndChargeTotal { get; set; }
@@ -666,6 +1184,80 @@ public class RelicAggregate
     public int IntimidatingHelmetCombats { get; set; }
     public int IntimidatingHelmetTurns { get; set; }
 
+    // Daughter of the Wind tracking. AdditionalBlockGained is the observed
+    // post-modifier result of its owner-Attack block command. Turns and
+    // combats are held denominators, including zero-trigger periods.
+    public int DaughterOfTheWindCombats { get; set; }
+    public int DaughterOfTheWindTurns { get; set; }
+
+    // Sturdy Clamp tracking. Block retained is the observed block remaining
+    // after its async block-clear prevention callback. Excess block is the
+    // pre-callback amount above the relic's 10-block retention cap. Turns count
+    // each callback opportunity, including zero-block turns; combats count
+    // every combat where the relic was held.
+    public int SturdyClampBlockRetained { get; set; }
+    public int SturdyClampExcessBlockOverTen { get; set; }
+    public int SturdyClampTurns { get; set; }
+    public int SturdyClampCombats { get; set; }
+
+    // Ruined Helmet tracking. Activations counts confirmed successful
+    // applications; StrengthAdded is the observed extra Strength contributed
+    // by its doubling modifier. Combats includes every combat where the relic
+    // was held, including zero-trigger combats.
+    public int RuinedHelmetCombats { get; set; }
+
+    // Tooltip-only projection populated from the live pending combat aggregate.
+    // Internal properties are not part of the persisted System.Text.Json shape.
+    internal decimal RuinedHelmetStrengthAddedThisCombat { get; set; }
+
+    // Mummified Hand tracking. Activations is every qualifying owner Power
+    // play, including triggers with no card left to discount. Power cost uses
+    // the play-time EnergyValue; the ratio uses actual EnergySpent divided by
+    // the selected card's pre-discount energy cost. Combats and turns are held
+    // denominators, including zero-trigger periods.
+    public decimal MummifiedHandTriggeringPowerCostTotal { get; set; }
+    public decimal MummifiedHandDiscountGivenTotal { get; set; }
+    public decimal MummifiedHandEnergySpentToDiscountedCostRatioTotal { get; set; }
+    public int MummifiedHandEnergySpentToDiscountedCostRatioCount { get; set; }
+    public int MummifiedHandCombats { get; set; }
+    public int MummifiedHandTurns { get; set; }
+    public int MummifiedHandDiscountedPowers { get; set; }
+    public int MummifiedHandDiscountedAttacks { get; set; }
+    public int MummifiedHandDiscountedSkills { get; set; }
+    public int MummifiedHandDiscountedCommons { get; set; }
+    public int MummifiedHandDiscountedUncommons { get; set; }
+    public int MummifiedHandDiscountedRares { get; set; }
+
+    // Burning Sticks tracking. Activations counts confirmed duplicate cards
+    // added to combat. The generated-card play count follows those exact card
+    // objects, while combats is the held denominator for both requested
+    // averages. Rarity buckets use the successfully added duplicate.
+    public int BurningSticksCombats { get; set; }
+    public int BurningSticksGeneratedCardPlays { get; set; }
+    public int BurningSticksCommonCardsDuplicated { get; set; }
+    public int BurningSticksUncommonCardsDuplicated { get; set; }
+    public int BurningSticksRareCardsDuplicated { get; set; }
+
+    // Throwing Axe tracking. An extra play counts only after the relic's
+    // contribution to the shared replay series produces a finished CardPlay.
+    // Energy cost is the replayed card's play-time EnergyValue; combats is a
+    // zero-inclusive held denominator for the requested average.
+    public int ThrowingAxeExtraCardsPlayed { get; set; }
+    public int ThrowingAxeExtraPlayEnergyCostTotal { get; set; }
+    public int ThrowingAxeCombats { get; set; }
+    public int ThrowingAxeCommonCardsPlayed { get; set; }
+    public int ThrowingAxeUncommonCardsPlayed { get; set; }
+    public int ThrowingAxeRareCardsPlayed { get; set; }
+
+    // Bing Bong tracking. Counts only successful clonedBy:BingBong additions
+    // to the permanent deck. Curse is a mutually exclusive type bucket; the
+    // rarity buckets cover non-Curse Common, Uncommon, and Rare cards.
+    public int BingBongExtraCardsAdded { get; set; }
+    public int BingBongCommonCardsAdded { get; set; }
+    public int BingBongUncommonCardsAdded { get; set; }
+    public int BingBongRareCardsAdded { get; set; }
+    public int BingBongCurseCardsAdded { get; set; }
+
     // Bookmark tracking. Activations is total cost-reduction activations;
     // BookmarkCombats is the denominator for average activations per combat.
     public int BookmarkCombats { get; set; }
@@ -691,11 +1283,15 @@ public class RelicAggregate
     public int IronClubCombatEndChargeTotal { get; set; }
     public int IronClubCombatEndChargeCount { get; set; }
 
-    // Cost-discount tracking. Used by Brilliant Scarf.
+    // Cost-discount tracking. Used by Brilliant Scarf. The turn-average
+    // numerator starts with its additive turn denominator so an older run's
+    // historical saved-energy total is not divided by only newly seen turns.
     public int DiscountCombats { get; set; }
+    public int DiscountTurns { get; set; }
     public int DiscountsOffered { get; set; }
     public int DiscountsTaken { get; set; }
     public int EnergySavedByDiscount { get; set; }
+    public int BrilliantScarfEnergySavedForTurnAverage { get; set; }
     public Dictionary<string, DiscountedCardCostAggregate> DiscountedCardCosts { get; set; } = new();
 
     // Total cards actually discarded while Gambling Chip's combat-start
@@ -705,9 +1301,23 @@ public class RelicAggregate
     // Total ? map points entered while the relic was held. Used by Juzu Bracelet.
     public int QuestionMarkSitesEntered { get; set; }
 
+    // Current Dowsing quest progress granted by Dowsing Rod. Nullable keeps
+    // historic run files distinguishable from an observed zero remaining.
+    public int? DowsingQuestionRoomsRemaining { get; set; }
+
     // Floors already ascended when the first shop map point is entered while
     // the relic is held. Used by Cursed Pearl.
     public int? FloorsAscendedBeforeFirstShop { get; set; }
+
+    // Distance from Signet Ring's pickup floor to the first MerchantRoom
+    // entered afterward. Nullable distinguishes a pending search from a
+    // completed zero-floor result.
+    public int? FloorsTraveledUntilNextShop { get; set; }
+
+    // Ordered off-path destinations reached by spending Winged Boots charges.
+    // UseNumber comes from the relic's own saved TimesUsed counter so tracking
+    // remains correctly numbered when the mod is hot-reloaded mid-run.
+    public List<WingedBootsDestinationAggregate> WingedBootsDestinations { get; set; } = new();
 
     // Cards actually removed while Precarious Shears' pickup effect resolves.
     public List<string> CardsRemoved { get; set; } = new();
@@ -731,12 +1341,25 @@ public class RelicAggregate
     public int RewardScreensWithoutNimbleCards { get; set; }
     public int RewardScreensWithNimbleCardsButNoneTaken { get; set; }
 
+    // Wing Charm card-reward tracking. Each offered rarity is sourced from
+    // the exact CardCreationResult modified by Wing Charm with Swift.
+    public int WingCharmSwiftCardsTaken { get; set; }
+    public int WingCharmSwiftCardsNotTaken { get; set; }
+    public int WingCharmCommonSwiftCardsOffered { get; set; }
+    public int WingCharmUncommonSwiftCardsOffered { get; set; }
+    public int WingCharmRareSwiftCardsOffered { get; set; }
+
     // Ordered card-reward offers modified by Silver Crucible. Each screen is
     // keyed by the relic's own one-based use number (1-3), while Cards keeps
     // the visible left-to-right option order and, once resolved, explicit
     // taken/not-taken outcomes. A list is required because duplicate card
     // definitions can be offered and must remain distinct observations.
     public List<RelicCardRewardScreenAggregate> CardRewardScreens { get; set; } = new();
+
+    // Orrery's five card rewards in creation order. Each entry keeps its final
+    // handling (skipped, obtained card, or reward alternative) and persists
+    // the offered-card signature used to rebind a live reward after hot reload.
+    public List<OrreryRewardAggregate> OrreryRewards { get; set; } = new();
 
     // Observed card reward options by card pool while Prismatic Gem is owned.
     // This is intentionally meta: other reward modifiers may also affect the
@@ -774,6 +1397,19 @@ public class RelicCardAggregate
     public int Count { get; set; }
 }
 
+public class RelicOrbActivationAggregate
+{
+    public string OrbId { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public int Activations { get; set; }
+}
+
+public class RelicEnchantedCardAggregate
+{
+    public string CardInstanceId { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+}
+
 public class RelicCardReturnAggregate
 {
     public string CardId { get; set; } = "";
@@ -803,6 +1439,23 @@ public class RelicCardRewardOptionAggregate
     public bool Taken { get; set; }
 }
 
+public class OrreryRewardAggregate
+{
+    public int RewardNumber { get; set; }
+    public int? Floor { get; set; }
+    public string Outcome { get; set; } = "pending";
+    public string AlternativeId { get; set; } = "";
+    public List<string> OfferedCardIds { get; set; } = new();
+    public List<OrreryObtainedCardAggregate> CardsObtained { get; set; } = new();
+}
+
+public class OrreryObtainedCardAggregate
+{
+    public string CardId { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public int UpgradeLevel { get; set; }
+}
+
 public class RelicGrantedAggregate
 {
     public string RelicId { get; set; } = "";
@@ -816,6 +1469,18 @@ public class RelicCardTransformationAggregate
     public string SourceDisplayName { get; set; } = "";
     public string ResultCardId { get; set; } = "";
     public string ResultDisplayName { get; set; } = "";
+}
+
+public class RelicMaxHpActivationAggregate
+{
+    public decimal StartingHp { get; set; }
+    public decimal ResultingHp { get; set; }
+}
+
+public class WingedBootsDestinationAggregate
+{
+    public int UseNumber { get; set; }
+    public string Destination { get; set; } = "";
 }
 
 public class DiscountedCardCostAggregate

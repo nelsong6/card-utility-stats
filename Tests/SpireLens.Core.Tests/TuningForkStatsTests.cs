@@ -164,8 +164,10 @@ public class TuningForkStatsTests
 
         Assert.Contains("Skills played", body);
         Assert.Contains("Activations", body);
-        Assert.Contains("[img=16x16]res://images/ui/combat/block.png[/img] block gained", body);
-        Assert.Contains("[img=16x16]res://images/ui/combat/block.png[/img] block gained per activation", body);
+        Assert.Contains("[hint=\"Block:", body);
+        Assert.Contains("[hint=\"Activation:", body);
+        Assert.Contains("block gained", body);
+        Assert.Contains("block gained per activation", body);
         Assert.Contains("Avg skills played per combat", body);
         Assert.Contains("Avg skills played per turn", body);
         Assert.Contains("Turns ended on 8 charges", body);

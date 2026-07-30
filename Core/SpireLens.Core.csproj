@@ -60,13 +60,21 @@
         <PackageReference Include="Krafs.Publicizer" Version="2.3.0" PrivateAssets="All"/>
     </ItemGroup>
 
+    <ItemGroup>
+        <EmbeddedResource Include="Config\relic-classifications.json" />
+        <EmbeddedResource Include="Config\relic-taxonomy.json" />
+        <EmbeddedResource Include="Config\stat-concepts.json" />
+        <EmbeddedResource Include="Assets\healing-blocked.png" />
+        <EmbeddedResource Include="Assets\stat-*.svg" />
+    </ItemGroup>
+
     <!-- Only compile files in this directory and subdirectories; ignore the rest of the repo. -->
     <ItemGroup>
         <Compile Remove="..\**\*.cs" />
         <Compile Include="**\*.cs" />
         <Compile Remove="bin\**\*.cs" />
         <Compile Remove="obj\**\*.cs" />
-        <!-- Don't include the asset image from the Loader's asset folder. -->
+        <!-- Binary concept assets are embedded explicitly above. -->
         <None Remove="**\*.png" />
     </ItemGroup>
 
