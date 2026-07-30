@@ -1,7 +1,7 @@
 using System;
 using System.Reflection;
 using HarmonyLib;
-using MegaCrit.Sts2.Core.Models.Cards;
+using MegaCrit.Sts2.Core.Models;
 
 namespace SpireLens.Core.Patches;
 
@@ -14,10 +14,15 @@ namespace SpireLens.Core.Patches;
 public static class DowsingRoomsEnteredStatsPatch
 {
     private static MethodBase? TargetMethod()
-        => AccessTools.PropertySetter(typeof(Dowsing), nameof(Dowsing.RoomsEntered));
+    {
+        var dowsingType = AccessTools.TypeByName(RunTracker.DowsingCardTypeName);
+        return dowsingType == null
+            ? null
+            : AccessTools.PropertySetter(dowsingType, RunTracker.DowsingRoomsEnteredPropertyName);
+    }
 
     [HarmonyPostfix]
-    public static void Postfix(Dowsing __instance)
+    public static void Postfix(CardModel __instance)
     {
         try
         {

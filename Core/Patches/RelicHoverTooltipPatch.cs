@@ -31,6 +31,7 @@ public static class RelicHoverShowPatch
     private const string EnthralledDefinitionId = "CARD.ENTHRALLED";
     private const string CursedPearlCurseDefinitionId = "CARD.GREED";
     private const string BrightestFlameDefinitionId = "CARD.BRIGHTEST_FLAME";
+    private const string DowsingRodRelicId = "RELIC.DOWSING_ROD";
     private const string VulnerableIconPath = "res://images/atlases/power_atlas.sprites/vulnerable_power.tres";
     private const string WeakIconPath = "res://images/atlases/power_atlas.sprites/weak_power.tres";
     private const string BlockIconPath = "res://images/ui/combat/block.png";
@@ -136,7 +137,8 @@ public static class RelicHoverShowPatch
                 ? RunTracker.GetMiniatureCannonAggregate()
             : RunTracker.GetRelicAggregate(relicId);
 
-        if (!useEndedRun && relicModel is DowsingRod)
+        if (!useEndedRun
+            && string.Equals(relicId, DowsingRodRelicId, StringComparison.Ordinal))
         {
             var liveRoomsRemaining = RunTracker.GetLiveDowsingRoomsRemaining();
             if (liveRoomsRemaining.HasValue)
@@ -1318,7 +1320,10 @@ public static class RelicHoverShowPatch
             return true;
         }
 
-        if (relicModel is DowsingRod)
+        if (string.Equals(
+                relicModel.Id.ToString(),
+                DowsingRodRelicId,
+                StringComparison.Ordinal))
         {
             title = "Dowsing Rod";
             body = BuildDowsingRodBodyBBCode(agg);
@@ -4726,9 +4731,9 @@ public static class RelicHoverShowPatch
     {
         var sb = new StringBuilder();
         var roomsRemaining = Math.Clamp(
-            agg.DowsingQuestionRoomsRemaining ?? Dowsing.maxRooms,
+            agg.DowsingQuestionRoomsRemaining ?? RunTracker.DowsingMaxRooms,
             0,
-            Dowsing.maxRooms);
+            RunTracker.DowsingMaxRooms);
         Row3(sb, "? rooms remaining", roomsRemaining.ToString(), "");
         return sb.ToString();
     }

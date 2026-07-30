@@ -49,6 +49,12 @@ namespace SpireLens.Core;
 /// </summary>
 public static class RunTracker
 {
+    internal const string DowsingCardTypeName =
+        "MegaCrit.Sts2.Core.Models.Cards.Dowsing";
+    internal const string DowsingRoomsEnteredPropertyName = "RoomsEntered";
+    internal const int DowsingMaxRooms = 5;
+    private const string AbundanceDefinitionId = "CARD.ABUNDANCE";
+
     private enum DeckViewMetaCardKind
     {
         Shiv,
@@ -9984,9 +9990,9 @@ public static class RunTracker
     /// Snapshot Dowsing's own saved room counter after it changes. The quest
     /// card, not Dowsing Rod, owns the authoritative five-room countdown.
     /// </summary>
-    public static void RecordDowsingRoomsEntered(Dowsing? dowsing)
+    public static void RecordDowsingRoomsEntered(CardModel? dowsing)
     {
-        if (dowsing == null) return;
+        if (dowsing == null || !IsDowsingCard(dowsing)) return;
 
         lock (_lock)
         {
@@ -10009,7 +10015,7 @@ public static class RunTracker
     {
         if (agg == null) return false;
 
-        var roomsRemaining = Math.Clamp(Dowsing.maxRooms - roomsEntered, 0, Dowsing.maxRooms);
+        var roomsRemaining = Math.Clamp(DowsingMaxRooms - roomsEntered, 0, DowsingMaxRooms);
         if (agg.DowsingQuestionRoomsRemaining == roomsRemaining) return false;
         agg.DowsingQuestionRoomsRemaining = roomsRemaining;
         return true;
@@ -10026,7 +10032,7 @@ public static class RunTracker
 
                 var roomsEntered = GetLiveDowsingRoomsEnteredLocked(player);
                 return roomsEntered.HasValue
-                    ? Math.Clamp(Dowsing.maxRooms - roomsEntered.Value, 0, Dowsing.maxRooms)
+                    ? Math.Clamp(DowsingMaxRooms - roomsEntered.Value, 0, DowsingMaxRooms)
                     : null;
             }
             catch (Exception e)
@@ -20633,7 +20639,10 @@ public static class RunTracker
     {
         try
         {
-            return player.Relics.Any(r => r is DowsingRod);
+            return player.Relics.Any(r => string.Equals(
+                r.Id.ToString(),
+                DowsingRodRelicId,
+                StringComparison.Ordinal));
         }
         catch
         {
@@ -20643,7 +20652,7 @@ public static class RunTracker
 
     private static bool RefreshDowsingRoomsRemainingIfOwnedLocked(
         Player? player = null,
-        Dowsing? dowsing = null)
+        CardModel? dowsing = null)
     {
         if (_currentRun == null || !CurrentRunMatchesLiveGameLocked()) return false;
 
@@ -20655,9 +20664,9 @@ public static class RunTracker
         if (!roomsEntered.HasValue) return false;
 
         var roomsRemaining = Math.Clamp(
-            Dowsing.maxRooms - roomsEntered.Value,
+            DowsingMaxRooms - roomsEntered.Value,
             0,
-            Dowsing.maxRooms);
+            DowsingMaxRooms);
         if (_currentRun.RelicAggregates.TryGetValue(DowsingRodRelicId, out var existing)
             && existing.DowsingQuestionRoomsRemaining == roomsRemaining)
             return false;
@@ -20668,17 +20677,33 @@ public static class RunTracker
 
     private static int? GetLiveDowsingRoomsEnteredLocked(
         Player player,
-        Dowsing? dowsing = null)
+        CardModel? dowsing = null)
     {
-        dowsing ??= player.Deck?.Cards?.OfType<Dowsing>().FirstOrDefault();
-        if (dowsing != null) return dowsing.RoomsEntered;
+        dowsing ??= player.Deck?.Cards?.FirstOrDefault(IsDowsingCard);
+        if (dowsing != null)
+        {
+            var roomsEnteredProperty = dowsing.GetType().GetProperty(
+                DowsingRoomsEnteredPropertyName,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (roomsEnteredProperty?.GetValue(dowsing) is int roomsEntered)
+                return roomsEntered;
+        }
 
         // Dowsing transforms into Abundance when its fifth ? room resolves.
         // This reconstructs completion for runs first observed afterward.
-        return player.Deck?.Cards?.Any(card => card is Abundance) == true
-            ? Dowsing.maxRooms
+        return player.Deck?.Cards?.Any(card => string.Equals(
+            card.Id.ToString(),
+            AbundanceDefinitionId,
+            StringComparison.Ordinal)) == true
+            ? DowsingMaxRooms
             : null;
     }
+
+    private static bool IsDowsingCard(CardModel? card)
+        => string.Equals(
+            card?.GetType().FullName,
+            DowsingCardTypeName,
+            StringComparison.Ordinal);
 
     private static bool CurrentRunMatchesLiveGameLocked()
     {

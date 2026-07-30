@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using Godot;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Combat;
@@ -27,6 +28,8 @@ public static class RelicBarFilterPatch
 {
     private static bool _hooksInitialized;
     private static NMapScreen? _hookedMapScreen;
+    private static EventInfo? _combatBeganEvent;
+    private static Delegate? _combatBeganHandler;
 
     [HarmonyPostfix]
     public static void Postfix(NRelicInventoryHolder __instance)
@@ -47,7 +50,7 @@ public static class RelicBarFilterPatch
             return;
         }
 
-        CombatManager.Instance.CombatBegan += OnCombatBegan;
+        AttachCombatBeganHook();
         CombatManager.Instance.CombatEnded += OnCombatEnded;
         _hooksInitialized = true;
         AttachMapScreenHooks();
@@ -59,7 +62,7 @@ public static class RelicBarFilterPatch
         DetachMapScreenHooks();
         if (!_hooksInitialized) return;
 
-        CombatManager.Instance.CombatBegan -= OnCombatBegan;
+        DetachCombatBeganHook();
         CombatManager.Instance.CombatEnded -= OnCombatEnded;
         _hooksInitialized = false;
         CoreMain.Logger.Info("Relic bar filter hooks unwired.");
@@ -372,6 +375,36 @@ public static class RelicBarFilterPatch
     private static void OnCombatBegan(CombatState _) => RefreshAll("combat began");
 
     private static void OnCombatEnded(CombatRoom _) => RefreshAll("combat ended");
+
+    private static void AttachCombatBeganHook()
+    {
+        var manager = CombatManager.Instance;
+        var eventInfo = manager.GetType().GetEvent(
+            "CombatBegan",
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        var handlerType = eventInfo?.EventHandlerType;
+        var handlerMethod = typeof(RelicBarFilterPatch).GetMethod(
+            nameof(OnCombatBegan),
+            BindingFlags.Static | BindingFlags.NonPublic);
+        if (eventInfo == null || handlerType == null || handlerMethod == null)
+            return;
+
+        var handler = Delegate.CreateDelegate(handlerType, handlerMethod);
+        eventInfo.AddEventHandler(manager, handler);
+        _combatBeganEvent = eventInfo;
+        _combatBeganHandler = handler;
+    }
+
+    private static void DetachCombatBeganHook()
+    {
+        var eventInfo = _combatBeganEvent;
+        var handler = _combatBeganHandler;
+        _combatBeganEvent = null;
+        _combatBeganHandler = null;
+        if (eventInfo == null || handler == null) return;
+
+        eventInfo.RemoveEventHandler(CombatManager.Instance, handler);
+    }
 
     private static void OnMapOpened() => RefreshAll("act map opened");
 

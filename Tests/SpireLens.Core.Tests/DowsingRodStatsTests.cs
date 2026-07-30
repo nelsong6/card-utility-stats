@@ -32,6 +32,18 @@ public class DowsingRodStatsTests
             BindingFlags.NonPublic | BindingFlags.Static)
             ?? throw new InvalidOperationException("TargetMethod not found.");
         var target = targetMethod.Invoke(null, null) as MethodBase;
+        var dowsingType = AppDomain.CurrentDomain
+            .GetAssemblies()
+            .Select(assembly => assembly.GetType(
+                RunTracker.DowsingCardTypeName,
+                throwOnError: false))
+            .FirstOrDefault(type => type != null);
+
+        if (dowsingType == null)
+        {
+            Assert.Null(target);
+            return;
+        }
 
         Assert.NotNull(target);
         Assert.Equal("set_RoomsEntered", target!.Name);
