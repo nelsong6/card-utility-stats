@@ -480,6 +480,12 @@ public static class CardHoverShowPatch
             Row3(sb, "HP lost", agg.TotalHpLost.ToString(), "");
         if (agg.TotalMaxHpLost > 0)
             Row3(sb, "Max HP lost", agg.TotalMaxHpLost.ToString(), "");
+        if (cardModel is Feed
+            || IsCardId(cardModel, "CARD.FEED")
+            || agg.TotalMaxHpGained > 0)
+        {
+            Row3(sb, "Max HP gained", agg.TotalMaxHpGained.ToString(), "");
+        }
     }
 
     /// <summary>
@@ -573,6 +579,12 @@ public static class CardHoverShowPatch
             Row3(sb, "HP lost", agg.TotalHpLost.ToString(), "");
         if (agg.TotalMaxHpLost > 0)
             Row3(sb, "Max HP lost", agg.TotalMaxHpLost.ToString(), "");
+        if (cardModel is Feed
+            || IsCardId(cardModel, "CARD.FEED")
+            || agg.TotalMaxHpGained > 0)
+        {
+            Row3(sb, "Max HP gained", agg.TotalMaxHpGained.ToString(), "");
+        }
     }
 
     /// <summary>

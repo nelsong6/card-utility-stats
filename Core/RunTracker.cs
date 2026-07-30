@@ -9410,6 +9410,46 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Record the maximum HP Feed actually grants after its full async OnPlay
+    /// callback resolves. Feed itself owns the Fatal check, so a positive
+    /// before/after delta here is the observed result of that exact card play.
+    /// </summary>
+    public static void RecordFeedMaxHpGained(
+        Feed card,
+        int previousMaxHp,
+        int currentMaxHp)
+    {
+        if (card == null || currentMaxHp <= previousMaxHp) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedCard(card)) return;
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+
+                _pendingCombat ??= new PendingCombat();
+                var instanceId = GetOrAssignInstanceId(card);
+                var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
+                RecordFeedMaxHpGainedForTest(agg, previousMaxHp, currentMaxHp);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordFeedMaxHpGained failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordFeedMaxHpGainedForTest(
+        CardAggregate agg,
+        int previousMaxHp,
+        int currentMaxHp)
+    {
+        if (agg == null || currentMaxHp <= previousMaxHp) return;
+        agg.TotalMaxHpGained += Math.Max(0, currentMaxHp - previousMaxHp);
+    }
+
+    /// <summary>
     /// Record Unleash's Osty-current-HP contribution to its attack payload.
     /// This is card-specific intent metadata captured at the owner callback;
     /// observed damage still flows through DamageReceivedEntry.
@@ -25113,6 +25153,7 @@ public static class RunTracker
         target.TimesExhausted += source.TimesExhausted;
         target.TotalHpLost += source.TotalHpLost;
         target.TotalMaxHpLost += source.TotalMaxHpLost;
+        target.TotalMaxHpGained += source.TotalMaxHpGained;
         target.TimesCardsDrawn += source.TimesCardsDrawn;
         target.TimesCardsDrawAttempted += source.TimesCardsDrawAttempted;
         target.TimesCardsDrawBlocked += source.TimesCardsDrawBlocked;

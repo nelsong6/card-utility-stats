@@ -273,6 +273,12 @@ public class CardAggregate
     // card using this field.
     public int TotalMaxHpLost { get; set; }
 
+    // Maximum HP actually gained from playing this card. Feed is the first
+    // card using this field. Its printed Fatal amount is not assumed: the
+    // tracker records the owner's observed max-HP delta after Feed's complete
+    // async play callback succeeds.
+    public int TotalMaxHpGained { get; set; }
+
     // M3i: Draw attribution. When THIS card's play causes OTHER cards to
     // be drawn. Signal for draw-enabler cards (Prepared, Coolheaded,
     // Acrobatics etc. depending on the character). Excludes turn-start

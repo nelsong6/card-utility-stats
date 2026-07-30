@@ -336,6 +336,14 @@ max HP before and after the callback so SpireLens records only the actual max
 HP removed, including a zero delta at the one-max-HP floor. Keep this in the
 card aggregate, separate from `TotalHpLost`.
 
+Feed's owner-specific `OnPlay` awaits its damage command, applies its own Fatal
+eligibility and observed-kill checks, and only then awaits
+`CreatureCmd.GainMaxHp` as the callback's final action. Wrap Feed's returned
+`OnPlay` task and compare the owner's max HP before and after successful
+completion. This credits only the physical Feed that produced an actual gain;
+nonlethal plays and enemies whose powers suppress Fatal naturally produce a
+zero delta.
+
 Storybook grants a permanent-deck Brightest Flame but does not retain a
 reference to that exact granted card. Its tooltip therefore uses the explicit
 pooled-by-definition model: combine every `CARD.BRIGHTEST_FLAME` aggregate,

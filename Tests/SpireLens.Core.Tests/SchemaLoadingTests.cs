@@ -4752,4 +4752,25 @@ public class SchemaLoadingTests
         Assert.Equal(1, relicAgg.TinyMailboxFruitJuicesOffered);
         Assert.Equal(2, relicAgg.TinyMailboxCampfiresNotRested);
     }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsFeedCardFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("feed-card-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.Equal(
+            7,
+            loaded.Data.Aggregates["CARD.FEED#1"].TotalMaxHpGained);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsFeedCardFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("feed-card-run.json"));
+
+        Assert.NotNull(resumed);
+        Assert.Equal(7, resumed!.Aggregates["CARD.FEED#1"].TotalMaxHpGained);
+    }
 }
