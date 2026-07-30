@@ -103,12 +103,12 @@ public class PrayerWheelStatsTests
 
         Assert.Contains("Extra reward screens", body);
         Assert.Contains("Times extra reward screen rejected", body);
-        Assert.Contains("Commons offered", body);
-        Assert.Contains("Uncommons offered", body);
-        Assert.Contains("Rares offered", body);
-        Assert.Contains("Commons taken", body);
-        Assert.Contains("Uncommons taken", body);
-        Assert.Contains("Rares taken", body);
+        Assert.Contains(
+            StatConceptGlossary.RenderHintedGlyph("offered"),
+            body);
+        Assert.Contains(
+            StatConceptGlossary.RenderHintedGlyph("taken"),
+            body);
         Assert.Contains("color=#87CEEB", body);
         Assert.Contains("color=#EFC850", body);
     }

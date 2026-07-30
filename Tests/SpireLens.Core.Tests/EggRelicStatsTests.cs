@@ -180,14 +180,12 @@ public class EggRelicStatsTests
 
         Assert.True(recognized);
         Assert.Equal(expectedTitle, title);
-        Assert.Contains($"Upgraded {cardType} offered", body);
-        Assert.Contains($"Upgraded common {cardType} offered", body);
-        Assert.Contains($"Upgraded uncommon {cardType} offered", body);
-        Assert.Contains($"Upgraded rare {cardType} offered", body);
-        Assert.Contains($"Upgraded {cardType} taken", body);
-        Assert.Contains($"Upgraded common {cardType} taken", body);
-        Assert.Contains($"Upgraded uncommon {cardType} taken", body);
-        Assert.Contains($"Upgraded rare {cardType} taken", body);
+        Assert.Contains(
+            StatConceptGlossary.RenderHintedGlyph("offered"),
+            body);
+        Assert.Contains(
+            StatConceptGlossary.RenderHintedGlyph("taken"),
+            body);
         Assert.Contains(
             $"res://images/packed/card_library/type_sort_{cardType.TrimEnd('s')}.png",
             body);

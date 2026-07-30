@@ -389,6 +389,16 @@
         "description": "A card enchanted with Nimble or a reward containing a Nimble card."
       }
     },
+    "offered": {
+      "display": {
+        "type": "embedded_image",
+        "resource": "Assets.stat-offered.svg"
+      },
+      "help": {
+        "label": "Offered",
+        "description": "An item or reward presented as a selectable option."
+      }
+    },
     "osty_summon_gained": {
       "display": {
         "type": "game_resource",
@@ -629,6 +639,16 @@
       "help": {
         "label": "Swift",
         "description": "A card enchanted with Swift."
+      }
+    },
+    "taken": {
+      "display": {
+        "type": "embedded_image",
+        "resource": "Assets.stat-taken.svg"
+      },
+      "help": {
+        "label": "Taken",
+        "description": "An offered item or reward selected by the player."
       }
     },
     "turn": {

@@ -125,8 +125,12 @@ public class TinyMailboxStatsTests
         var body = BuildBody(PopulatedAggregate());
 
         Assert.Contains("Rest-site heals where Tiny Mailbox", body);
-        Assert.Contains("offered", body);
-        Assert.Contains("taken", body);
+        Assert.Contains(
+            StatConceptGlossary.RenderHintedGlyph("offered"),
+            body);
+        Assert.Contains(
+            StatConceptGlossary.RenderHintedGlyph("taken"),
+            body);
         Assert.Contains(
             StatConceptGlossary.RenderHintedGlyph("potion_common"),
             body);
@@ -141,6 +145,9 @@ public class TinyMailboxStatsTests
         Assert.DoesNotContain("Rare potions offered", body);
         Assert.Contains(
             StatConceptGlossary.RenderHintedGlyph("fruit_juice"),
+            body);
+        Assert.DoesNotContain(
+            StatConceptGlossary.RenderHintedGlyph("potion_gained"),
             body);
         Assert.DoesNotContain("Fruit Juices offered", body);
         Assert.Contains("not rested", body);

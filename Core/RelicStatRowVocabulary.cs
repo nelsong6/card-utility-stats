@@ -78,6 +78,7 @@ internal static class RelicStatRowVocabulary
             @"\b(?:(?:hp\s+)?healing\s+wasted|wasted\s+(?:hp\s+)?healing)\b"),
         Rule("max_hp_gained", @"\b(?:max|maximum)\s+hp\s+gained\b"),
         Rule("max_hp", @"\b(?:max|maximum)\s+hp\b"),
+        Rule("offered", @"\boffered\b"),
         Rule(
             "healing_blocked",
             @"\b(?:hp\s+)?healing\s+(?:blocked|lost)\b"),
@@ -114,6 +115,7 @@ internal static class RelicStatRowVocabulary
         Rule("stars", @"\bstars?\b"),
         Rule("strength_gained", @"\bstrength\s+(?:added|gained)\b"),
         Rule("strength", @"\bstrength\b"),
+        Rule("taken", @"(?<!not\s)\btaken\b"),
         Rule("turn", @"\bturns?\b", true),
         Rule("upgraded", @"(?<!non-)\b(?:upgrade|upgraded|upgrades)\b"),
         Rule("vigor_gained", @"\bvigor\s+gained\b"),

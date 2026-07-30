@@ -191,6 +191,21 @@ public class RelicStatRowVocabularyTests
         "",
         "vigor_gained",
         "")]
+    [InlineData(
+        "Rare cards offered",
+        "",
+        "card_rare,offered",
+        "")]
+    [InlineData(
+        "Uncommon cards taken",
+        "",
+        "card_uncommon,taken",
+        "")]
+    [InlineData(
+        "Swift cards not taken",
+        "not taken",
+        "swift,card",
+        "")]
     public void Create_ReplacesKnownRelicConceptWords(
         string label,
         string expectedLabel,

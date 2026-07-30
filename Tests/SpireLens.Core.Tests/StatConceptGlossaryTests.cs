@@ -21,6 +21,7 @@ public class StatConceptGlossaryTests
                 "charge",
                 "combat",
                 "attack_common",
+                "potion_common",
                 "power_common",
                 "relic_common",
                 "skill_common",
@@ -35,6 +36,7 @@ public class StatConceptGlossaryTests
                 "energy_wasted",
                 "exhaust",
                 "floor",
+                "fruit_juice",
                 "glam",
                 "gold",
                 "gold_gained",
@@ -45,12 +47,14 @@ public class StatConceptGlossaryTests
                 "max_hp",
                 "max_hp_gained",
                 "nimble",
+                "offered",
                 "osty_summon_gained",
                 "potion",
                 "potion_gained",
                 "power",
                 "attack_rare",
                 "card_rare",
+                "potion_rare",
                 "power_rare",
                 "relic_rare",
                 "skill_rare",
@@ -61,9 +65,11 @@ public class StatConceptGlossaryTests
                 "strength",
                 "strength_gained",
                 "swift",
+                "taken",
                 "turn",
                 "attack_uncommon",
                 "card_uncommon",
+                "potion_uncommon",
                 "power_uncommon",
                 "relic_uncommon",
                 "skill_uncommon",
@@ -135,6 +141,7 @@ public class StatConceptGlossaryTests
         var healingWasted = StatConceptGlossary.RenderHintedGlyph("healing_wasted");
         var informationConcept = StatConceptGlossary.RenderHintedGlyph("information");
         var nimble = StatConceptGlossary.RenderHintedGlyph("nimble");
+        var offered = StatConceptGlossary.RenderHintedGlyph("offered");
         var summon = StatConceptGlossary.RenderHintedGlyph("osty_summon_gained");
         var power = StatConceptGlossary.RenderHintedGlyph("power");
         var commonRelic = StatConceptGlossary.RenderHintedGlyph("relic_common");
@@ -143,6 +150,7 @@ public class StatConceptGlossaryTests
         var skill = StatConceptGlossary.RenderHintedGlyph("skill");
         var strengthGained = StatConceptGlossary.RenderHintedGlyph("strength_gained");
         var swift = StatConceptGlossary.RenderHintedGlyph("swift");
+        var taken = StatConceptGlossary.RenderHintedGlyph("taken");
         var turn = StatConceptGlossary.RenderHintedGlyph("turn");
         var unknownRoom = StatConceptGlossary.RenderHintedGlyph("unknown_room");
         var upgraded = StatConceptGlossary.RenderHintedGlyph("upgraded");
@@ -174,6 +182,7 @@ public class StatConceptGlossaryTests
             healingWasted,
             informationConcept,
             nimble,
+            offered,
             summon,
             power,
             commonRelic,
@@ -182,6 +191,7 @@ public class StatConceptGlossaryTests
             skill,
             strengthGained,
             swift,
+            taken,
             turn,
             unknownRoom,
             upgraded,
@@ -269,6 +279,10 @@ public class StatConceptGlossaryTests
             informationConcept);
         Assert.Contains("[hint=\"Nimble:", nimble);
         Assert.Contains("res://images/enchantments/nimble.png", nimble);
+        Assert.Contains("[hint=\"Offered:", offered);
+        Assert.Contains(
+            "user://SpireLens/generated-icons/offered-",
+            offered);
         Assert.Contains(
             "res://images/atlases/relic_atlas.sprites/bound_phylactery.tres",
             summon);
@@ -292,6 +306,10 @@ public class StatConceptGlossaryTests
             strengthGained);
         Assert.Contains("[hint=\"Swift:", swift);
         Assert.Contains("res://images/enchantments/swift.png", swift);
+        Assert.Contains("[hint=\"Taken:", taken);
+        Assert.Contains(
+            "user://SpireLens/generated-icons/taken-",
+            taken);
         Assert.Contains("[hint=\"Turn:", turn);
         Assert.Contains(
             "user://SpireLens/generated-icons/turn-",

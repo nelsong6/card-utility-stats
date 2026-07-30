@@ -101,10 +101,10 @@ public class WingCharmStatsTests
         Assert.Contains(StatConceptGlossary.RenderHintedGlyph("card"), body);
         Assert.Contains(StatConceptGlossary.RenderHintedGlyph("card_uncommon"), body);
         Assert.Contains(StatConceptGlossary.RenderHintedGlyph("card_rare"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("offered"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("taken"), body);
         Assert.Contains("[b]+[/b]", body);
-        Assert.Contains("taken", body);
         Assert.Contains("not taken", body);
-        Assert.Contains("offered", body);
         Assert.Contains("[b]3[/b]", body);
         Assert.Contains("[b]4[/b]", body);
     }

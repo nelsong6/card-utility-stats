@@ -91,10 +91,9 @@ public class WhiteStarStatsTests
         var body = BuildBody(PopulatedAggregate());
 
         Assert.Contains("Activations", body);
-        Assert.Contains("Rares offered", body);
-        Assert.Contains("Rare Attacks offered", body);
-        Assert.Contains("Rare Skills offered", body);
-        Assert.Contains("Rare Powers offered", body);
+        Assert.Contains(
+            StatConceptGlossary.RenderHintedGlyph("offered"),
+            body);
         Assert.Contains("Rare card reward screens declined", body);
         Assert.Contains("type_sort_attack.png", body);
         Assert.Contains("type_sort_skill.png", body);
