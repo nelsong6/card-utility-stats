@@ -130,7 +130,10 @@ public class TinyMailboxStatsTests
         Assert.Contains("Common potions offered", body);
         Assert.Contains("Uncommon potions offered", body);
         Assert.Contains("Rare potions offered", body);
-        Assert.Contains("Fruit Juices offered", body);
+        Assert.Contains(
+            StatConceptGlossary.RenderHintedGlyph("fruit_juice"),
+            body);
+        Assert.DoesNotContain("Fruit Juices offered", body);
         Assert.Contains("not rested", body);
     }
 

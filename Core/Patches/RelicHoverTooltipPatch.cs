@@ -4865,11 +4865,12 @@ public static class RelicHoverShowPatch
             agg.TinyMailboxRarePotionsOffered.ToString(),
             "",
             "Rare potion rewards offered by Tiny Mailbox.");
-        Row3(
+        DescribedIconRow(
             sb,
-            "Fruit Juices offered",
+            ["fruit_juice"],
+            [],
+            "offered",
             agg.TinyMailboxFruitJuicesOffered.ToString(),
-            "",
             "Fruit Juice rewards offered by Tiny Mailbox; these also count as Rare offers.");
         DescribedIconRow(
             sb,
