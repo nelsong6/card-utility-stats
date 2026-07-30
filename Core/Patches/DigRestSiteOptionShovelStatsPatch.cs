@@ -102,8 +102,8 @@ public static class DigRestSiteOptionShovelStatsPatch
 }
 
 /// <summary>
-/// Counts rest sites where Shovel's Dig option was available but the local
-/// player exited after choosing something else or skipping the campfire.
+/// Counts rest-site options that were available but unused: Shovel's Dig and
+/// Tiny Mailbox's Rest-triggered potion offers.
 /// </summary>
 [HarmonyPatch]
 public static class RestSiteSynchronizerShovelStatsPatch
@@ -122,17 +122,28 @@ public static class RestSiteSynchronizerShovelStatsPatch
             if (__instance == null) return;
 
             var options = __instance.GetLocalOptions();
-            if (options == null || !options.Any(option => option is DigRestSiteOption)) return;
+            if (options == null) return;
             if (LocalPlayerIdField?.GetValue(__instance) is not ulong localPlayerId) return;
 
             var chosenIndex = __instance.GetChosenOptionIndex(localPlayerId);
-            bool choseDig = chosenIndex is int index
+            RestSiteOption? chosenOption = chosenIndex is int index
                 && index >= 0
                 && index < options.Count
-                && options[index] is DigRestSiteOption;
-            if (choseDig) return;
+                ? options[index]
+                : null;
 
-            RunTracker.RecordShovelCampfireNotDug(__instance.LocalPlayer);
+            if (options.Any(option => option is DigRestSiteOption)
+                && chosenOption is not DigRestSiteOption)
+            {
+                RunTracker.RecordShovelCampfireNotDug(__instance.LocalPlayer);
+            }
+
+            if (options.Any(option => option is HealRestSiteOption)
+                && chosenOption is not HealRestSiteOption)
+            {
+                RunTracker.RecordTinyMailboxCampfireNotRested(
+                    __instance.LocalPlayer);
+            }
         }
         catch (Exception e)
         {

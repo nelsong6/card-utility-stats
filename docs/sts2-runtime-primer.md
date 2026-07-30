@@ -1080,6 +1080,16 @@ inspect `RestSiteSynchronizer.BeforeLocalRestSiteExited`: at that point the
 local option list and chosen-option index still reveal whether a Dig option was
 available and whether the selected option was anything other than Dig.
 
+Tiny Mailbox appends two unpopulated `PotionReward` objects from its
+owner-specific `TryModifyRestSiteHealRewards` callback. Bind those exact
+objects from the callback's before/after reward-list delta, then read their
+populated `Potion` when each reward is selected or skipped. Selection success
+is the source of truth for potions taken; an attempted selection can fail while
+the potion belt is full. Fruit Juice is identified from the concrete potion
+model and intentionally overlaps the Rare offer bucket. Actual campfires where
+Rest was available but another option was chosen can share Shovel's
+`RestSiteSynchronizer.BeforeLocalRestSiteExited` observation point.
+
 Fresnel Lens applies Nimble from its owner-specific
 `TryModifyCardRewardOptionsLate` callback. Count the final option only when its
 `CardCreationResult` is still Nimble and names Fresnel Lens in

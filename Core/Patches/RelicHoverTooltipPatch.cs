@@ -1353,6 +1353,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is TinyMailbox)
+        {
+            title = "Tiny Mailbox";
+            body = BuildTinyMailboxBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is BoundPhylactery)
         {
             title = "Bound Phylactery";
@@ -4816,6 +4823,61 @@ public static class RelicHoverShowPatch
             "not dug",
             agg.CampfiresNotDug.ToString(),
             "Campfires where Shovel was available but Dig was not chosen.");
+        return sb.ToString();
+    }
+
+    private static string BuildTinyMailboxBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        RelicActivationRow(
+            sb,
+            agg.Activations.ToString(),
+            "Rest-site heals where Tiny Mailbox added its potion rewards.");
+        DescribedIconRow(
+            sb,
+            ["potion"],
+            [],
+            "offered",
+            agg.TinyMailboxPotionsOffered.ToString(),
+            "Potion rewards offered by Tiny Mailbox.");
+        DescribedIconRow(
+            sb,
+            ["potion_gained"],
+            [],
+            "taken",
+            agg.TinyMailboxPotionsTaken.ToString(),
+            "Tiny Mailbox potions successfully taken.");
+        Row3(
+            sb,
+            "Common potions offered",
+            agg.TinyMailboxCommonPotionsOffered.ToString(),
+            "",
+            "Common potion rewards offered by Tiny Mailbox.");
+        Row3(
+            sb,
+            "Uncommon potions offered",
+            agg.TinyMailboxUncommonPotionsOffered.ToString(),
+            "",
+            "Uncommon potion rewards offered by Tiny Mailbox.");
+        Row3(
+            sb,
+            "Rare potions offered",
+            agg.TinyMailboxRarePotionsOffered.ToString(),
+            "",
+            "Rare potion rewards offered by Tiny Mailbox.");
+        Row3(
+            sb,
+            "Fruit Juices offered",
+            agg.TinyMailboxFruitJuicesOffered.ToString(),
+            "",
+            "Fruit Juice rewards offered by Tiny Mailbox; these also count as Rare offers.");
+        DescribedIconRow(
+            sb,
+            ["campfire"],
+            [],
+            "not rested",
+            agg.TinyMailboxCampfiresNotRested.ToString(),
+            "Campfires where Rest was available while Tiny Mailbox was held but was not chosen.");
         return sb.ToString();
     }
 

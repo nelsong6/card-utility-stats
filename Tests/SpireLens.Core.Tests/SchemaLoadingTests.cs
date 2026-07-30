@@ -4715,4 +4715,39 @@ public class SchemaLoadingTests
         Assert.Equal(1, relicAgg.ThrowingAxeUncommonCardsPlayed);
         Assert.Equal(1, relicAgg.ThrowingAxeRareCardsPlayed);
     }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsTinyMailboxRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("tiny-mailbox-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertTinyMailboxFixture(
+            loaded.Data.RelicAggregates["RELIC.TINY_MAILBOX"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsTinyMailboxRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("tiny-mailbox-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertTinyMailboxFixture(
+            resumed!.RelicAggregates["RELIC.TINY_MAILBOX"]);
+    }
+
+    private static void AssertTinyMailboxFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(2, relicAgg.Activations);
+        Assert.Equal(4, relicAgg.TinyMailboxPotionsOffered);
+        Assert.Equal(3, relicAgg.TinyMailboxPotionsTaken);
+        Assert.Equal(1, relicAgg.TinyMailboxCommonPotionsOffered);
+        Assert.Equal(1, relicAgg.TinyMailboxUncommonPotionsOffered);
+        Assert.Equal(2, relicAgg.TinyMailboxRarePotionsOffered);
+        Assert.Equal(1, relicAgg.TinyMailboxFruitJuicesOffered);
+        Assert.Equal(2, relicAgg.TinyMailboxCampfiresNotRested);
+    }
 }

@@ -249,6 +249,10 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds Shovel Dig tracking: total relics acquired plus common, uncommon, and
   rare rarity splits from the actual obtained relic instances, plus campfires
   where Dig was available but not used.
+- `tiny-mailbox-relic-run.json`
+  Adds Tiny Mailbox rest-heal activations, exact potion offers and selections,
+  offer rarity splits, Fruit Juice offers, and campfires where Rest was
+  available but not used.
 - `juzu-bracelet-relic-run.json`
   Adds Juzu Bracelet tracking for map `?` sites entered while the relic was
   held.

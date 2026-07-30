@@ -926,6 +926,19 @@ public class RelicAggregate
     public int RarePotionsGained { get; set; }
     public int PotionsSkipped { get; set; }
 
+    // Tiny Mailbox tracking. Offers are the exact PotionReward objects added
+    // by its rest-heal callback and are counted once when selected or skipped,
+    // after the game has populated their concrete potion. Fruit Juice is an
+    // overlapping subset of Rare offers. Campfires not rested mirrors
+    // Shovel's unused-option count.
+    public int TinyMailboxPotionsOffered { get; set; }
+    public int TinyMailboxPotionsTaken { get; set; }
+    public int TinyMailboxCommonPotionsOffered { get; set; }
+    public int TinyMailboxUncommonPotionsOffered { get; set; }
+    public int TinyMailboxRarePotionsOffered { get; set; }
+    public int TinyMailboxFruitJuicesOffered { get; set; }
+    public int TinyMailboxCampfiresNotRested { get; set; }
+
     // Total relics acquired from this relic, split by the obtained relic's
     // actual rarity. Used by Shovel's Dig rest-site option.
     public int RelicsAcquired { get; set; }

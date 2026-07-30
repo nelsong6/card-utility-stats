@@ -19,6 +19,7 @@ using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Afflictions;
 using MegaCrit.Sts2.Core.Models.Enchantments;
 using MegaCrit.Sts2.Core.Models.Cards;
+using MegaCrit.Sts2.Core.Models.Potions;
 using MegaCrit.Sts2.Core.Models.Powers;
 using MegaCrit.Sts2.Core.Models.Relics;
 using MegaCrit.Sts2.Core.Rewards;
@@ -81,6 +82,10 @@ public static class RunTracker
         "SpireLens.WhiteStarRewardAttributions";
     private const string PrayerWheelRewardAttributionsAppDomainKey =
         "SpireLens.PrayerWheelRewardAttributions";
+    private const string TinyMailboxRewardAttributionsAppDomainKey =
+        "SpireLens.TinyMailboxRewardAttributions";
+    private const string TinyMailboxOfferRecordedAttributionsAppDomainKey =
+        "SpireLens.TinyMailboxOfferRecordedAttributions";
 
     private static readonly object _lock = new();
 
@@ -110,6 +115,12 @@ public static class RunTracker
     private static readonly ConditionalWeakTable<object, Tuple<int>>
         _prayerWheelRewardAttributions =
             GetPrayerWheelRewardAttributions();
+    private static readonly ConditionalWeakTable<object, Tuple<int>>
+        _tinyMailboxRewardAttributions =
+            GetTinyMailboxRewardAttributions();
+    private static readonly ConditionalWeakTable<object, Tuple<int>>
+        _tinyMailboxOfferRecordedAttributions =
+            GetTinyMailboxOfferRecordedAttributions();
     private static readonly List<PendingPowerChangeAttempt> _pendingPowerChangeAttempts = new();
     private static readonly List<PendingUnsettlingLampDebuff> _pendingUnsettlingLampDebuffs = new();
     private static readonly System.Threading.AsyncLocal<EnemyStatusSourceFrame?> _enemyStatusSourceFrame = new();
@@ -1988,6 +1999,13 @@ public static class RunTracker
         target.UncommonPotionsGained += source.UncommonPotionsGained;
         target.RarePotionsGained += source.RarePotionsGained;
         target.PotionsSkipped += source.PotionsSkipped;
+        target.TinyMailboxPotionsOffered += source.TinyMailboxPotionsOffered;
+        target.TinyMailboxPotionsTaken += source.TinyMailboxPotionsTaken;
+        target.TinyMailboxCommonPotionsOffered += source.TinyMailboxCommonPotionsOffered;
+        target.TinyMailboxUncommonPotionsOffered += source.TinyMailboxUncommonPotionsOffered;
+        target.TinyMailboxRarePotionsOffered += source.TinyMailboxRarePotionsOffered;
+        target.TinyMailboxFruitJuicesOffered += source.TinyMailboxFruitJuicesOffered;
+        target.TinyMailboxCampfiresNotRested += source.TinyMailboxCampfiresNotRested;
         target.RelicsAcquired += source.RelicsAcquired;
         target.CommonRelicsAcquired += source.CommonRelicsAcquired;
         target.UncommonRelicsAcquired += source.UncommonRelicsAcquired;
@@ -4540,6 +4558,7 @@ public static class RunTracker
     private const string RegalPillowRelicId = "RELIC.REGAL_PILLOW";
     private const string WhiteBeastStatueRelicId = "RELIC.WHITE_BEAST_STATUE";
     private const string ShovelRelicId = "RELIC.SHOVEL";
+    private const string TinyMailboxRelicId = "RELIC.TINY_MAILBOX";
     private const string LargeCapsuleRelicId = "RELIC.LARGE_CAPSULE";
     private const string NeowsBonesRelicId = "RELIC.NEOWS_BONES";
     private const string BoundPhylacteryRelicId = "RELIC.BOUND_PHYLACTERY";
@@ -4753,6 +4772,40 @@ public static class RunTracker
         var created = new ConditionalWeakTable<object, Tuple<int>>();
         AppDomain.CurrentDomain.SetData(
             PrayerWheelRewardAttributionsAppDomainKey,
+            created);
+        return created;
+    }
+
+    private static ConditionalWeakTable<object, Tuple<int>>
+        GetTinyMailboxRewardAttributions()
+    {
+        if (AppDomain.CurrentDomain.GetData(
+                TinyMailboxRewardAttributionsAppDomainKey)
+            is ConditionalWeakTable<object, Tuple<int>> existing)
+        {
+            return existing;
+        }
+
+        var created = new ConditionalWeakTable<object, Tuple<int>>();
+        AppDomain.CurrentDomain.SetData(
+            TinyMailboxRewardAttributionsAppDomainKey,
+            created);
+        return created;
+    }
+
+    private static ConditionalWeakTable<object, Tuple<int>>
+        GetTinyMailboxOfferRecordedAttributions()
+    {
+        if (AppDomain.CurrentDomain.GetData(
+                TinyMailboxOfferRecordedAttributionsAppDomainKey)
+            is ConditionalWeakTable<object, Tuple<int>> existing)
+        {
+            return existing;
+        }
+
+        var created = new ConditionalWeakTable<object, Tuple<int>>();
+        AppDomain.CurrentDomain.SetData(
+            TinyMailboxOfferRecordedAttributionsAppDomainKey,
             created);
         return created;
     }
@@ -7287,6 +7340,191 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordWhiteBeastPotionRewardSkipped failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Bind the exact potion rewards appended by Tiny Mailbox's rest-heal
+    /// callback. The weak-table markers survive Core hot reload while the
+    /// game's reward objects remain live.
+    /// </summary>
+    public static void RegisterTinyMailboxPotionRewards(
+        TinyMailbox relic,
+        Player owner,
+        IEnumerable<PotionReward> rewards)
+    {
+        if (relic == null || owner == null || rewards == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(owner)) return;
+                if (!ReferenceEquals(relic.Owner, owner)) return;
+
+                var rewardList = rewards
+                    .Where(reward => reward != null)
+                    .ToList();
+                if (rewardList.Count == 0) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(
+                    TinyMailboxRelicId);
+                RecordTinyMailboxActivationForTest(agg);
+
+                foreach (var reward in rewardList)
+                {
+                    if (!_tinyMailboxRewardAttributions.TryGetValue(
+                            reward,
+                            out _))
+                    {
+                        _tinyMailboxRewardAttributions.Add(
+                            reward,
+                            Tuple.Create(1));
+                    }
+                }
+
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RegisterTinyMailboxPotionRewards failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordTinyMailboxPotionRewardOffered(
+        PotionReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!RecordTinyMailboxPotionOfferLocked(reward)) return;
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordTinyMailboxPotionRewardOffered failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordTinyMailboxPotionRewardClaimed(
+        PotionReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_tinyMailboxRewardAttributions.TryGetValue(
+                        reward,
+                        out _))
+                {
+                    return;
+                }
+
+                RecordTinyMailboxPotionOfferLocked(reward);
+                if (!_tinyMailboxRewardAttributions.Remove(reward)) return;
+                _tinyMailboxOfferRecordedAttributions.Remove(reward);
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(
+                    TinyMailboxRelicId);
+                RecordTinyMailboxPotionTakenForTest(agg);
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordTinyMailboxPotionRewardClaimed failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordTinyMailboxPotionRewardSkipped(
+        PotionReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_tinyMailboxRewardAttributions.TryGetValue(
+                        reward,
+                        out _))
+                {
+                    return;
+                }
+
+                RecordTinyMailboxPotionOfferLocked(reward);
+                _tinyMailboxRewardAttributions.Remove(reward);
+                _tinyMailboxOfferRecordedAttributions.Remove(reward);
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordTinyMailboxPotionRewardSkipped failed: {e.Message}");
+            }
+        }
+    }
+
+    private static bool RecordTinyMailboxPotionOfferLocked(
+        PotionReward reward)
+    {
+        if (!_tinyMailboxRewardAttributions.TryGetValue(reward, out _))
+            return false;
+        if (_tinyMailboxOfferRecordedAttributions.TryGetValue(reward, out _))
+            return false;
+
+        var potion = reward.Potion;
+        if (potion == null) return false;
+
+        _tinyMailboxOfferRecordedAttributions.Add(reward, Tuple.Create(1));
+        var agg = GetOrCreateCurrentRunRelicAggregateLocked(
+            TinyMailboxRelicId);
+        RecordTinyMailboxPotionOfferedForTest(
+            agg,
+            potion.Rarity,
+            potion is FruitJuice);
+        return true;
+    }
+
+    /// <summary>
+    /// Count an actual campfire where Tiny Mailbox was held, Rest was
+    /// available, and the player left after choosing something else.
+    /// </summary>
+    public static void RecordTinyMailboxCampfireNotRested(Player owner)
+    {
+        if (owner == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(owner) || !PlayerHasTinyMailbox(owner))
+                    return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(
+                    TinyMailboxRelicId);
+                RecordTinyMailboxCampfireNotRestedForTest(agg);
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordTinyMailboxCampfireNotRested failed: {e.Message}");
             }
         }
     }
@@ -13998,6 +14236,55 @@ public static class RunTracker
         agg.CampfiresNotDug += Math.Max(0, count);
     }
 
+    internal static void RecordTinyMailboxActivationForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.Activations += Math.Max(0, count);
+    }
+
+    internal static void RecordTinyMailboxPotionOfferedForTest(
+        RelicAggregate agg,
+        PotionRarity rarity,
+        bool isFruitJuice)
+    {
+        if (agg == null) return;
+
+        agg.TinyMailboxPotionsOffered++;
+        switch (rarity)
+        {
+            case PotionRarity.Common:
+                agg.TinyMailboxCommonPotionsOffered++;
+                break;
+            case PotionRarity.Uncommon:
+                agg.TinyMailboxUncommonPotionsOffered++;
+                break;
+            case PotionRarity.Rare:
+                agg.TinyMailboxRarePotionsOffered++;
+                break;
+        }
+
+        if (isFruitJuice)
+            agg.TinyMailboxFruitJuicesOffered++;
+    }
+
+    internal static void RecordTinyMailboxPotionTakenForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.TinyMailboxPotionsTaken += Math.Max(0, count);
+    }
+
+    internal static void RecordTinyMailboxCampfireNotRestedForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.TinyMailboxCampfiresNotRested += Math.Max(0, count);
+    }
+
     internal static bool IsStrikeDummyStatsRelic(RelicModel? relic)
     {
         try
@@ -20514,6 +20801,18 @@ public static class RunTracker
         try
         {
             return player.Relics.Any(r => r is ThrowingAxe);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool PlayerHasTinyMailbox(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(relic => relic is TinyMailbox);
         }
         catch
         {
