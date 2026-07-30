@@ -277,6 +277,16 @@
         "description": "A run floor or a value measured across floors."
       }
     },
+    "fruit_juice": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/atlases/potion_atlas.sprites/fruit_juice.tres"
+      },
+      "help": {
+        "label": "Fruit Juice",
+        "description": "The Fruit Juice potion, which permanently increases Max HP."
+      }
+    },
     "glam": {
       "display": {
         "type": "game_resource",
@@ -408,16 +418,6 @@
       "help": {
         "label": "Potion gained",
         "description": "A potion successfully added to the potion belt."
-      }
-    },
-    "fruit_juice": {
-      "display": {
-        "type": "game_resource",
-        "path": "res://images/atlases/potion_atlas.sprites/fruit_juice.tres"
-      },
-      "help": {
-        "label": "Fruit Juice",
-        "description": "The Fruit Juice potion, which permanently increases Max HP."
       }
     },
     "power": {
