@@ -147,10 +147,18 @@ jobs:
             -OutFile $steamArchive
           Expand-Archive -LiteralPath $steamArchive -DestinationPath $steamDirectory -Force
 
-          # Let SteamCMD update itself before restoring the authenticated config.
-          & (Join-Path $steamDirectory "steamcmd.exe") "+quit"
+          # A fresh SteamCMD can replace and relaunch itself, then return exit
+          # code 7 even though the update completed. Retry the installed client
+          # once and require that post-update invocation to exit cleanly.
+          $steamExecutable = Join-Path $steamDirectory "steamcmd.exe"
+          & $steamExecutable "+quit"
           if ($LASTEXITCODE -ne 0) {
-            throw "SteamCMD bootstrap failed with exit code $LASTEXITCODE."
+            $firstExitCode = $LASTEXITCODE
+            Write-Warning "SteamCMD initial bootstrap exited with code $firstExitCode; retrying the updated client."
+            & $steamExecutable "+quit"
+            if ($LASTEXITCODE -ne 0) {
+              throw "SteamCMD post-update bootstrap failed with exit code $LASTEXITCODE (initial exit code $firstExitCode)."
+            }
           }
 
       - name: Restore Steam publishing credential
