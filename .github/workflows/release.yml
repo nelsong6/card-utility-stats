@@ -217,6 +217,6 @@ jobs:
           if ($logText -match "(?im)^\s*ERROR!|login failure|failed to update workshop item") {
             throw "SteamCMD reported a Workshop publishing failure."
           }
-          if ($logText -notmatch "(?im)^\s*Success[.!]?\s*$") {
+          if ($logText -notmatch "(?im)Committing update\.\.\.\s*Success\.") {
             throw "SteamCMD did not report a successful Workshop update."
           }
