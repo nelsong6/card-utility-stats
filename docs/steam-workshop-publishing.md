@@ -12,7 +12,7 @@ Publishing happens from a standalone workspace **outside this repo** (binaries, 
 D:\repos\spirelens-workshop\
 ├── ModUploader.exe      Megacrit's official uploader (v0.2.0)
 ├── steam_api64.dll      ships with the uploader
-├── workshop.json        Workshop metadata (title, description, visibility, changeNote, deps)
+├── workshop.json        Workshop metadata (changeNote, deps; title/description/visibility null — see below)
 ├── image.png            thumbnail, PNG, must be < 1MB (Steam backend limit)
 ├── mod_id.txt           3774710835 — written by the first upload; makes later runs update instead of create
 └── content\
@@ -52,6 +52,15 @@ D:\repos\spirelens-workshop\
 Success looks like `Status: k_EItemUpdateStatusCommittingChanges` →
 `Successfully uploaded 'SpireLens' ...`. The trailing `k_EItemUpdateStatusInvalid`
 line is the SDK's idle state, not an error.
+
+## workshop.json clobbers page edits
+
+Every upload pushes every **non-null** `workshop.json` field to Steam — including title,
+description, and visibility. An upload with those fields set will silently overwrite anything
+edited on the item's web page (this ate a page-written description once). The workspace file
+therefore keeps `title`, `description`, and `visibility` at `null` — those are managed on the
+item page — and only `changeNote`, `tags`, `dependencies`, and `contentDescriptors` live in
+the file. Null/omitted fields are left untouched by the uploader.
 
 ## Gotchas observed on first publish
 
