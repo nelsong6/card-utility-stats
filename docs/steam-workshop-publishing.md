@@ -53,6 +53,37 @@ Success looks like `Status: k_EItemUpdateStatusCommittingChanges` →
 `Successfully uploaded 'SpireLens' ...`. The trailing `k_EItemUpdateStatusInvalid`
 line is the SDK's idle state, not an error.
 
+## Automated tagged releases
+
+[The release workflow](../.github/workflows/release.yml) publishes the exact
+packaged mod to Workshop item `3774710835` after a successful `v*` tag build.
+The job:
+
+1. requires the tag to exactly match `SpireLens.json`'s version;
+2. validates the package allowlist;
+3. restores an isolated SteamCMD login from the protected `steam-workshop`
+   GitHub environment;
+4. uploads only content and a change note, leaving page-managed metadata alone;
+5. serializes uploads so two tags cannot update the item concurrently.
+
+The environment itself accepts deployments only from tags matching `v*`.
+
+Bootstrap or refresh that environment credential from a trusted Windows machine:
+
+```powershell
+.\scripts\bootstrap-steam-workshop-secret.ps1 -SteamUsername <steam-login-name>
+```
+
+The script opens SteamCMD for one interactive password/Steam Guard login. It
+stores the resulting isolated `config.vdf` as the environment secret
+`STEAM_CONFIG_VDF_B64` and the non-secret login name as `STEAM_USERNAME`.
+It does **not** upload the Steam password or Steam Guard code. Do not substitute
+the desktop Steam client's broad `config.vdf`; use the isolated credential made
+by this script.
+
+The Workshop upload runs only for tags. Pull requests and ordinary `main`
+pushes still build packages but cannot access the protected publishing secret.
+
 ## workshop.json clobbers page edits
 
 Every upload pushes every **non-null** `workshop.json` field to Steam — including title,
