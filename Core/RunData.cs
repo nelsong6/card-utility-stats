@@ -161,6 +161,7 @@ public class CardAggregate
     // so full-slot evocations, capacity changes, and failed channels remain
     // observed outcomes rather than being inferred from card text.
     public int TotalOrbsCreated { get; set; }
+    public Dictionary<string, CardOrbAggregate> OrbOutcomes { get; set; } = new();
 
     // Potion procurement outcomes caused by this card. Alchemize is the
     // first card using these fields: gained counts only successful observed
@@ -392,6 +393,23 @@ public class CardAggregate
     public MegaCrit.Sts2.Core.Saves.Runs.SerializableCard? RemovedSnapshot { get; set; }
 
     // M3c: Draw count attribution. Null until M3c.
+}
+
+/// <summary>
+/// Lifecycle outcomes for exact orb instances created by one physical card,
+/// grouped by orb definition for compact persistence and display.
+/// </summary>
+public class CardOrbAggregate
+{
+    public string OrbId { get; set; } = "";
+    public int Created { get; set; }
+    public int PassiveActivations { get; set; }
+    public int Evokes { get; set; }
+    public int Fizzles { get; set; }
+
+    // Observed block created by this orb type. This remains separate from the
+    // originating card's direct block totals and provenance ledger.
+    public int BlockGained { get; set; }
 }
 
 public class RunMetaStats
@@ -1505,7 +1523,7 @@ public readonly record struct CardRewardCategoryObservation(string Key, string D
 public class CardEvent
 {
     public string T { get; set; } = "";          // ISO-8601 UTC timestamp
-    public string Type { get; set; } = "";       // "card_played" | "damage_received" | "energy_gained" | "stars_gained" | "forge_gained" | "orb_created"
+    public string Type { get; set; } = "";       // "card_played" | "damage_received" | "energy_gained" | "stars_gained" | "forge_gained" | "orb_created" | "orb_passive" | "orb_evoked" | "orb_fizzled" | "orb_block_gained"
     public string CardId { get; set; } = "";
 
     // card_played fields

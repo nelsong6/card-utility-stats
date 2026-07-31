@@ -400,7 +400,7 @@ public static class CardHoverShowPatch
             Row3(sb, GetForgeStatLabel("avg gained"), FormatDecimal(avgGenerated), "");
         }
 
-        AppendOrbCreationStats(sb, agg);
+        AppendOrbCreationStats(sb, agg, compact: false);
 
         // Energy-spent rows — only rendered when the card's cost is actually
         // variable (see IsEnergyInteresting). Same 3-col layout as every
@@ -573,7 +573,7 @@ public static class CardHoverShowPatch
         if (agg.TotalForgeGenerated > 0m)
             Row3(sb, GetForgeStatLabel("gained"), FormatDecimal(agg.TotalForgeGenerated), "");
 
-        AppendOrbCreationStats(sb, agg);
+        AppendOrbCreationStats(sb, agg, compact: true);
 
         if (etherealCardsPlayedThisCombat.HasValue)
             AppendPullFromBelowStats(sb, cardModel, etherealCardsPlayedThisCombat.Value);
@@ -2147,10 +2147,103 @@ public static class CardHoverShowPatch
             Row3(sb, GetDrawStatLabel("cards drawn"), agg.TimesCardsDrawn.ToString(), "");
     }
 
-    private static void AppendOrbCreationStats(StringBuilder sb, CardAggregate agg)
+    private static void AppendOrbCreationStats(
+        StringBuilder sb,
+        CardAggregate agg,
+        bool compact)
     {
-        if (agg.TotalOrbsCreated > 0)
-            Row3(sb, "Orbs created", agg.TotalOrbsCreated.ToString(), "");
+        var outcomes = agg.OrbOutcomes?.Values
+            .Where(outcome =>
+                outcome != null
+                && (outcome.Created > 0
+                    || outcome.PassiveActivations > 0
+                    || outcome.Evokes > 0
+                    || outcome.Fizzles > 0
+                    || outcome.BlockGained > 0))
+            .OrderBy(outcome => outcome.OrbId, StringComparer.Ordinal)
+            .ToList()
+            ?? new List<CardOrbAggregate>();
+
+        if (compact || outcomes.Count == 0)
+        {
+            if (agg.TotalOrbsCreated > 0)
+                Row3(sb, "Orbs created", agg.TotalOrbsCreated.ToString(), "");
+            return;
+        }
+
+        foreach (var outcome in outcomes)
+        {
+            var orbId = string.IsNullOrWhiteSpace(outcome.OrbId)
+                ? "ORB.UNKNOWN"
+                : outcome.OrbId;
+            Row3(
+                sb,
+                GetOrbStatLabel(orbId, "created"),
+                outcome.Created.ToString(),
+                "");
+            Row3(
+                sb,
+                GetOrbStatLabel(orbId, "passive activations"),
+                outcome.PassiveActivations.ToString(),
+                "");
+            Row3(
+                sb,
+                GetOrbStatLabel(orbId, "evoked"),
+                outcome.Evokes.ToString(),
+                "");
+            Row3(
+                sb,
+                GetOrbStatLabel(orbId, "fizzled"),
+                outcome.Fizzles.ToString(),
+                "");
+
+            if (IsFrostOrbId(orbId))
+            {
+                Row3(
+                    sb,
+                    GetFrostOrbBlockStatLabel(),
+                    outcome.BlockGained.ToString(),
+                    "");
+            }
+        }
+    }
+
+    private static string GetOrbStatLabel(string orbId, string suffix)
+    {
+        return GetInlineIconStatLabel(GetOrbIconPath(orbId), suffix);
+    }
+
+    private static string GetFrostOrbBlockStatLabel()
+    {
+        return $"[img={InlineKeywordIconSize}x{InlineKeywordIconSize}]"
+            + $"{GetOrbIconPath("ORB.FROST")}[/img] "
+            + $"[img={InlineKeywordIconSize}x{InlineKeywordIconSize}]"
+            + $"{BlockIconPath}[/img]";
+    }
+
+    private static bool IsFrostOrbId(string orbId)
+    {
+        return orbId.EndsWith(".FROST", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(orbId, "FROST", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string GetOrbIconPath(string orbId)
+    {
+        var separator = orbId.LastIndexOf('.');
+        var entry = separator >= 0 && separator < orbId.Length - 1
+            ? orbId[(separator + 1)..]
+            : orbId;
+        if (string.IsNullOrWhiteSpace(entry))
+            entry = "unknown";
+
+        var safeEntry = new string(entry
+            .Where(ch => char.IsLetterOrDigit(ch) || ch == '_')
+            .ToArray())
+            .ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(safeEntry))
+            safeEntry = "unknown";
+
+        return $"res://images/orbs/{safeEntry}.png";
     }
 
     private static void AppendBlockedDrawReasonRows(StringBuilder sb, CardAggregate agg, int blockedGap)

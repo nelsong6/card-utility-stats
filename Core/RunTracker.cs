@@ -2889,14 +2889,17 @@ public static class RunTracker
                 _pendingCombat ??= new PendingCombat();
                 var instanceId = GetOrAssignInstanceId(sourceCard);
                 var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
+                var orbId = orb.Id.ToString();
                 agg.TotalOrbsCreated++;
+                GetOrCreateCardOrbAggregate(agg, orbId).Created++;
+                _pendingCombat.CardSourceByOrb[orb] = instanceId;
 
                 _pendingCombat.CombatEvents.Add(new CardEvent
                 {
                     T = Now(),
                     Type = "orb_created",
                     CardId = instanceId,
-                    OrbId = orb.Id.ToString(),
+                    OrbId = orbId,
                 });
             }
             catch (Exception e)
@@ -2904,6 +2907,211 @@ public static class RunTracker
                 CoreMain.LogDebug($"RecordOrbCreated failed: {e.Message}");
             }
         }
+    }
+
+    public static bool IsTrackedCardSourcedOrb(OrbModel? orb)
+    {
+        if (orb == null) return false;
+
+        lock (_lock)
+        {
+            return _pendingCombat?.CardSourceByOrb.ContainsKey(orb) == true;
+        }
+    }
+
+    public static void RecordCardSourcedOrbPassive(OrbModel? orb)
+    {
+        RecordCardSourcedOrbLifecycle(
+            orb,
+            "orb_passive",
+            outcome => outcome.PassiveActivations++);
+    }
+
+    public static void RecordCardSourcedOrbEvoked(OrbModel? orb)
+    {
+        RecordCardSourcedOrbLifecycle(
+            orb,
+            "orb_evoked",
+            outcome => outcome.Evokes++);
+    }
+
+    public static void RecordCardSourcedOrbsFizzled(IEnumerable<OrbModel>? removedOrbs)
+    {
+        if (removedOrbs == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null) return;
+
+                foreach (var orb in removedOrbs)
+                {
+                    if (orb == null
+                        || !_pendingCombat.CardSourceByOrb.TryGetValue(
+                            orb,
+                            out var instanceId))
+                    {
+                        continue;
+                    }
+
+                    var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
+                    var orbId = orb.Id.ToString();
+                    GetOrCreateCardOrbAggregate(agg, orbId).Fizzles++;
+                    _pendingCombat.CombatEvents.Add(new CardEvent
+                    {
+                        T = Now(),
+                        Type = "orb_fizzled",
+                        CardId = instanceId,
+                        OrbId = orbId,
+                    });
+                    _pendingCombat.CardSourceByOrb.Remove(orb);
+                }
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordCardSourcedOrbsFizzled failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void RecordCardSourcedOrbLifecycle(
+        OrbModel? orb,
+        string eventType,
+        Action<CardOrbAggregate> record)
+    {
+        if (orb == null || record == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null
+                    || !_pendingCombat.CardSourceByOrb.TryGetValue(
+                        orb,
+                        out var instanceId))
+                {
+                    return;
+                }
+
+                var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
+                var orbId = orb.Id.ToString();
+                record(GetOrCreateCardOrbAggregate(agg, orbId));
+                _pendingCombat.CombatEvents.Add(new CardEvent
+                {
+                    T = Now(),
+                    Type = eventType,
+                    CardId = instanceId,
+                    OrbId = orbId,
+                });
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordCardSourcedOrbLifecycle failed ({eventType}): {e.Message}");
+            }
+        }
+    }
+
+    private static CardOrbAggregate GetOrCreateCardOrbAggregate(
+        CardAggregate aggregate,
+        string orbId)
+    {
+        aggregate.OrbOutcomes ??= new Dictionary<string, CardOrbAggregate>();
+        if (!aggregate.OrbOutcomes.TryGetValue(orbId, out var outcome))
+        {
+            outcome = new CardOrbAggregate
+            {
+                OrbId = orbId,
+            };
+            aggregate.OrbOutcomes[orbId] = outcome;
+        }
+
+        if (string.IsNullOrWhiteSpace(outcome.OrbId))
+            outcome.OrbId = orbId;
+        return outcome;
+    }
+
+    /// <summary>
+    /// Arm a narrow scope around FrostOrb.Passive/Evoke. Any block history
+    /// entry produced inside this scope is orb output, not direct card block.
+    /// The scope is also used for non-card Frost orbs so the generic recent-
+    /// card fallback can never claim their block.
+    /// </summary>
+    public static bool BeginFrostOrbBlockAttribution(OrbModel? orb)
+    {
+        var owner = orb?.Owner;
+        if (orb == null || owner == null) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(owner)) return false;
+                if (CombatManager.Instance?.IsInProgress != true) return false;
+
+                _pendingCombat ??= new PendingCombat();
+                _pendingCombat.ActiveFrostOrbBlockSources.Add(orb);
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"BeginFrostOrbBlockAttribution failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    public static void EndFrostOrbBlockAttribution(OrbModel? orb)
+    {
+        if (orb == null) return;
+
+        lock (_lock)
+        {
+            var active = _pendingCombat?.ActiveFrostOrbBlockSources;
+            if (active == null) return;
+
+            for (var i = active.Count - 1; i >= 0; i--)
+            {
+                if (!ReferenceEquals(active[i], orb)) continue;
+                active.RemoveAt(i);
+                break;
+            }
+        }
+    }
+
+    private static bool TryRecordFrostOrbBlockLocked(BlockGainedEntry entry)
+    {
+        if (_pendingCombat == null || entry.CardPlay != null) return false;
+
+        var activeOrb = _pendingCombat.ActiveFrostOrbBlockSources
+            .LastOrDefault(orb =>
+                orb?.Owner?.Creature != null
+                && ReferenceEquals(orb.Owner.Creature, entry.Receiver));
+        if (activeOrb == null) return false;
+
+        if (_pendingCombat.CardSourceByOrb.TryGetValue(
+                activeOrb,
+                out var instanceId))
+        {
+            var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
+            var orbId = activeOrb.Id.ToString();
+            GetOrCreateCardOrbAggregate(agg, orbId).BlockGained += entry.Amount;
+            _pendingCombat.CombatEvents.Add(new CardEvent
+            {
+                T = Now(),
+                Type = "orb_block_gained",
+                CardId = instanceId,
+                OrbId = orbId,
+                Blocked = entry.Amount,
+            });
+        }
+
+        // True means the entry is known orb output. Even without a card
+        // source, suppress direct/recent-card attribution.
+        return true;
     }
 
     /// <summary>
@@ -26004,11 +26212,12 @@ public static class RunTracker
             _pendingCombat ??= new PendingCombat();
 
             string? instanceId = null;
-            if (entry.CardPlay?.Card != null)
+            bool isFrostOrbBlock = TryRecordFrostOrbBlockLocked(entry);
+            if (!isFrostOrbBlock && entry.CardPlay?.Card != null)
             {
                 instanceId = GetOrAssignInstanceId(entry.CardPlay.Card);
             }
-            else if (entry.Receiver.IsPlayer)
+            else if (!isFrostOrbBlock && entry.Receiver.IsPlayer)
             {
                 var fallbackCard = FindLikelyBlockSourceCard(entry.Receiver);
                 if (fallbackCard != null)
@@ -26028,7 +26237,7 @@ public static class RunTracker
                     Blocked = entry.Amount,
                 });
             }
-            else if (entry.Receiver.IsPlayer)
+            else if (!isFrostOrbBlock && entry.Receiver.IsPlayer)
             {
                 var recvDesc = DescribeCreature(entry.Receiver);
                 CoreMain.LogDebug(
@@ -26663,6 +26872,8 @@ public static class RunTracker
         target.TotalStarsGenerated += source.TotalStarsGenerated;
         target.TotalForgeGenerated += source.TotalForgeGenerated;
         target.TotalOrbsCreated += source.TotalOrbsCreated;
+        target.OrbOutcomes ??= new Dictionary<string, CardOrbAggregate>();
+        MergeCardOrbOutcomesInto(target.OrbOutcomes, source.OrbOutcomes);
         target.PotionsGained += source.PotionsGained;
         target.CommonPotionsGained += source.CommonPotionsGained;
         target.UncommonPotionsGained += source.UncommonPotionsGained;
@@ -26724,6 +26935,36 @@ public static class RunTracker
         MergeReplayExtraPlayReasonsInto(target.ReplayExtraPlayReasons, source.ReplayExtraPlayReasons);
         MergeReplayExtraPlayReasonsInto(target.ReplayAttackNoDamageReasons, source.ReplayAttackNoDamageReasons);
         MergeAppliedEffectsInto(target.AppliedEffects, source.AppliedEffects);
+    }
+
+    private static void MergeCardOrbOutcomesInto(
+        Dictionary<string, CardOrbAggregate> target,
+        Dictionary<string, CardOrbAggregate>? source)
+    {
+        if (source == null) return;
+
+        foreach (var (orbId, sourceOutcome) in source)
+        {
+            if (!target.TryGetValue(orbId, out var targetOutcome))
+            {
+                targetOutcome = new CardOrbAggregate
+                {
+                    OrbId = sourceOutcome.OrbId,
+                };
+                target[orbId] = targetOutcome;
+            }
+
+            if (string.IsNullOrWhiteSpace(targetOutcome.OrbId))
+                targetOutcome.OrbId = sourceOutcome.OrbId;
+            if (string.IsNullOrWhiteSpace(targetOutcome.OrbId))
+                targetOutcome.OrbId = orbId;
+
+            targetOutcome.Created += sourceOutcome.Created;
+            targetOutcome.PassiveActivations += sourceOutcome.PassiveActivations;
+            targetOutcome.Evokes += sourceOutcome.Evokes;
+            targetOutcome.Fizzles += sourceOutcome.Fizzles;
+            targetOutcome.BlockGained += sourceOutcome.BlockGained;
+        }
     }
 
     private static void MergeMetaStatsInto(RunMetaStats target, RunMetaStats? source)
@@ -27471,6 +27712,9 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Creature, PendingPoisonTick> PendingPoisonTicks { get; }
         = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<OrbModel, string> CardSourceByOrb { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public List<OrbModel> ActiveFrostOrbBlockSources { get; } = new();
     public Dictionary<Player, PendingBrilliantScarfDiscount> BrilliantScarfDiscountOffers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> PermafrostCombatCountedPlayers { get; }

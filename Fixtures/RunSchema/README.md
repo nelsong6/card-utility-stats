@@ -95,8 +95,9 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds the count of successful card upgrades caused by each physical
   Armaments, including every hand card actually upgraded by Armaments+.
 - `card-orbs-created-run.json`
-  Adds successfully channeled orbs to the physical card aggregate and records
-  each observed orb definition in the event log.
+  Adds successfully channeled orbs to the physical card aggregate, preserves
+  exact-orb lifecycle outcomes by type, and keeps Frost block separate from
+  the source card's direct block totals.
 - `jack-of-all-trades-card-run.json`
   Adds Jack of All Trades generated colorless-card totals, uncommon/rare and
   attack/skill/power splits, plus the numerator for average added-card cost.

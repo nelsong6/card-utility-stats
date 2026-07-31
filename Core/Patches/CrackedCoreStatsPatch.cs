@@ -113,8 +113,9 @@ public static class CrackedCoreStartingOrbPassiveStatsPatch
     {
         try
         {
-            if (!__state || __result == null) return;
-            __result = ObserveAsync(__result, __instance);
+            if (__result == null) return;
+            if (!__state && !RunTracker.IsTrackedCardSourcedOrb(__instance)) return;
+            __result = ObserveAsync(__result, __instance, __state);
         }
         catch (Exception e)
         {
@@ -122,10 +123,15 @@ public static class CrackedCoreStartingOrbPassiveStatsPatch
         }
     }
 
-    private static async Task ObserveAsync(Task inner, LightningOrb orb)
+    private static async Task ObserveAsync(
+        Task inner,
+        LightningOrb orb,
+        bool isCrackedCoreOrb)
     {
         await inner;
-        RunTracker.RecordCrackedCoreStartingOrbPassive(orb);
+        if (isCrackedCoreOrb)
+            RunTracker.RecordCrackedCoreStartingOrbPassive(orb);
+        RunTracker.RecordCardSourcedOrbPassive(orb);
     }
 }
 
@@ -150,8 +156,9 @@ public static class CrackedCoreStartingOrbEvokeStatsPatch
     {
         try
         {
-            if (!__state || __result == null) return;
-            __result = ObserveAsync(__result, __instance);
+            if (__result == null) return;
+            if (!__state && !RunTracker.IsTrackedCardSourcedOrb(__instance)) return;
+            __result = ObserveAsync(__result, __instance, __state);
         }
         catch (Exception e)
         {
@@ -161,10 +168,13 @@ public static class CrackedCoreStartingOrbEvokeStatsPatch
 
     private static async Task<IEnumerable<Creature>> ObserveAsync(
         Task<IEnumerable<Creature>> inner,
-        LightningOrb orb)
+        LightningOrb orb,
+        bool isCrackedCoreOrb)
     {
         var targets = await inner;
-        RunTracker.RecordCrackedCoreStartingOrbEvoked(orb);
+        if (isCrackedCoreOrb)
+            RunTracker.RecordCrackedCoreStartingOrbEvoked(orb);
+        RunTracker.RecordCardSourcedOrbEvoked(orb);
         return targets;
     }
 }
@@ -183,7 +193,8 @@ public static class StartingRelicOrbFizzleStatsPatch
         __state = __instance.Orbs
             .Where(orb =>
                 RunTracker.IsTrackedCrackedCoreStartingOrb(orb)
-                || RunTracker.IsTrackedSymbioticVirusStartingOrb(orb))
+                || RunTracker.IsTrackedSymbioticVirusStartingOrb(orb)
+                || RunTracker.IsTrackedCardSourcedOrb(orb))
             .ToList();
     }
 
@@ -201,6 +212,7 @@ public static class StartingRelicOrbFizzleStatsPatch
                 .ToList();
             RunTracker.RecordCrackedCoreStartingOrbsFizzled(removedOrbs);
             RunTracker.RecordSymbioticVirusStartingOrbsFizzled(removedOrbs);
+            RunTracker.RecordCardSourcedOrbsFizzled(removedOrbs);
         }
         catch (Exception e)
         {

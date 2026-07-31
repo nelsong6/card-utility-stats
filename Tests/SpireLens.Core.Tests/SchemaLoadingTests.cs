@@ -5051,10 +5051,15 @@ public class SchemaLoadingTests
 
         Assert.NotNull(loaded);
         Assert.True(loaded!.SupportsResume);
-        Assert.Equal(
-            6,
-            loaded.Data.Aggregates["CARD.GLACIER#1"].TotalOrbsCreated);
+        AssertCardOrbLifecycleFixture(
+            loaded.Data.Aggregates["CARD.GLACIER#1"]);
         Assert.Equal("ORB.FROST", loaded.Data.Events[0].OrbId);
+        Assert.Contains(loaded.Data.Events, entry => entry.Type == "orb_passive");
+        Assert.Contains(loaded.Data.Events, entry => entry.Type == "orb_evoked");
+        Assert.Contains(loaded.Data.Events, entry => entry.Type == "orb_fizzled");
+        Assert.Contains(
+            loaded.Data.Events,
+            entry => entry.Type == "orb_block_gained" && entry.Blocked == 28);
     }
 
     [Fact]
@@ -5064,9 +5069,20 @@ public class SchemaLoadingTests
             FixturePath("card-orbs-created-run.json"));
 
         Assert.NotNull(resumed);
-        Assert.Equal(
-            6,
-            resumed!.Aggregates["CARD.GLACIER#1"].TotalOrbsCreated);
+        AssertCardOrbLifecycleFixture(
+            resumed!.Aggregates["CARD.GLACIER#1"]);
         Assert.Equal("ORB.FROST", resumed.Events[0].OrbId);
+    }
+
+    private static void AssertCardOrbLifecycleFixture(CardAggregate aggregate)
+    {
+        Assert.Equal(6, aggregate.TotalOrbsCreated);
+        var frost = aggregate.OrbOutcomes["ORB.FROST"];
+        Assert.Equal("ORB.FROST", frost.OrbId);
+        Assert.Equal(6, frost.Created);
+        Assert.Equal(9, frost.PassiveActivations);
+        Assert.Equal(4, frost.Evokes);
+        Assert.Equal(1, frost.Fizzles);
+        Assert.Equal(28, frost.BlockGained);
     }
 }

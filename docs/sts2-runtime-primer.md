@@ -450,6 +450,19 @@ failed channels and orb creation from relic, turn-start, or other ownerless
 card contexts. Store the orb id on the event even when the current tooltip
 only needs the total, so later type breakdowns remain derivable.
 
+Retain the exact mutable orb reference with the physical source-card instance
+for the rest of combat. Completed orb `Passive` and `Evoke` calls then credit
+that source card's orb-type bucket; `OrbQueue.RemoveCapacity` is the
+non-evoke/fizzle boundary, while ordinary combat cleanup remains excluded.
+This is lineage attribution, not a widened "recent card" timing window.
+
+Frost orbs call `CreatureCmd.GainBlock` with a null `CardPlay`. Arm a narrow
+scope around the exact Frost `Passive`/`Evoke` task and route its observed
+`BlockGainedEntry` into the Frost-orb bucket. Suppress the generic current/
+recent-card fallback for every Frost block entry, including Frost orbs without
+a card source. Otherwise a Glacier play—or an unrelated recently completed
+card—can incorrectly absorb the orb's block into its direct block total.
+
 ## Effects And Powers
 
 Power/effect attribution needs two layers:

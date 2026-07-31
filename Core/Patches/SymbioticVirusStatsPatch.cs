@@ -123,8 +123,9 @@ public static class SymbioticVirusStartingOrbPassiveStatsPatch
     {
         try
         {
-            if (!__state || __result == null) return;
-            __result = ObserveAsync(__result, __instance);
+            if (__result == null) return;
+            if (!__state && !RunTracker.IsTrackedCardSourcedOrb(__instance)) return;
+            __result = ObserveAsync(__result, __instance, __state);
         }
         catch (Exception e)
         {
@@ -133,10 +134,15 @@ public static class SymbioticVirusStartingOrbPassiveStatsPatch
         }
     }
 
-    private static async Task ObserveAsync(Task inner, DarkOrb orb)
+    private static async Task ObserveAsync(
+        Task inner,
+        DarkOrb orb,
+        bool isSymbioticVirusOrb)
     {
         await inner;
-        RunTracker.RecordSymbioticVirusStartingOrbPassive(orb);
+        if (isSymbioticVirusOrb)
+            RunTracker.RecordSymbioticVirusStartingOrbPassive(orb);
+        RunTracker.RecordCardSourcedOrbPassive(orb);
     }
 }
 
@@ -161,8 +167,9 @@ public static class SymbioticVirusStartingOrbEvokeStatsPatch
     {
         try
         {
-            if (!__state || __result == null) return;
-            __result = ObserveAsync(__result, __instance);
+            if (__result == null) return;
+            if (!__state && !RunTracker.IsTrackedCardSourcedOrb(__instance)) return;
+            __result = ObserveAsync(__result, __instance, __state);
         }
         catch (Exception e)
         {
@@ -173,10 +180,13 @@ public static class SymbioticVirusStartingOrbEvokeStatsPatch
 
     private static async Task<IEnumerable<Creature>> ObserveAsync(
         Task<IEnumerable<Creature>> inner,
-        DarkOrb orb)
+        DarkOrb orb,
+        bool isSymbioticVirusOrb)
     {
         var targets = await inner;
-        RunTracker.RecordSymbioticVirusStartingOrbEvoked(orb);
+        if (isSymbioticVirusOrb)
+            RunTracker.RecordSymbioticVirusStartingOrbEvoked(orb);
+        RunTracker.RecordCardSourcedOrbEvoked(orb);
         return targets;
     }
 }
