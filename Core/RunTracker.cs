@@ -10973,24 +10973,33 @@ public static class RunTracker
     /// instance after upgrade and deck-add modifiers have finished. Route it
     /// through pending combat until the normal CombatEnded promotion.
     /// </summary>
-    public static void RecordPaelsToothCardReturned(CardModel cardReturned)
+    public static void RecordPaelsToothCardReturned(
+        PaelsTooth relic,
+        CardModel cardReturned)
     {
-        if (cardReturned == null) return;
+        if (relic == null || cardReturned == null) return;
 
         lock (_lock)
         {
             try
             {
+                if (!IsTrackedRelic(relic)) return;
                 if (!IsTrackedPlayer(cardReturned.Owner)) return;
                 if (_currentRun == null && _pendingCombat == null) return;
 
+                var pickupFloor = RelicFloorAddedToDeckIncludingRunStart(relic);
+                var returnFloor = CurrentRunFloorLocked();
+                var floorsClimbed = CalculatePaelsToothFloorsClimbed(
+                    pickupFloor,
+                    returnFloor);
                 var persistDirectlyToRun = _pendingCombat == null;
                 var agg = GetOrCreateRelicAggregateForCurrentContextLocked(PaelsToothRelicId);
                 RecordPaelsToothCardReturnedForTest(
                     agg,
                     GetCardIdForStats(cardReturned),
                     GetCardDisplayNameForStats(cardReturned),
-                    cardReturned.CurrentUpgradeLevel);
+                    cardReturned.CurrentUpgradeLevel,
+                    floorsClimbed);
                 if (persistDirectlyToRun)
                 {
                     RefreshCurrentRunMetadataLocked();
@@ -15959,7 +15968,8 @@ public static class RunTracker
         RelicAggregate agg,
         string? cardId,
         string? displayName,
-        int upgradeLevel)
+        int upgradeLevel,
+        int? floorsClimbed = null)
     {
         if (agg == null || string.IsNullOrWhiteSpace(cardId)) return;
 
@@ -15978,7 +15988,18 @@ public static class RunTracker
             CardId = cardId,
             DisplayName = normalizedDisplayName,
             UpgradeLevel = normalizedUpgradeLevel,
+            FloorsClimbed = floorsClimbed.HasValue
+                ? Math.Max(0, floorsClimbed.Value)
+                : null,
         });
+    }
+
+    internal static int? CalculatePaelsToothFloorsClimbed(
+        int? pickupFloor,
+        int? returnFloor)
+    {
+        if (!pickupFloor.HasValue || !returnFloor.HasValue) return null;
+        return Math.Max(0, returnFloor.Value - pickupFloor.Value);
     }
 
     internal static void RecordNeowsBonesRelicObtainedForTest(
@@ -23582,6 +23603,9 @@ public static class RunTracker
                 CardId = card.CardId,
                 DisplayName = card.DisplayName ?? "",
                 UpgradeLevel = Math.Max(0, card.UpgradeLevel),
+                FloorsClimbed = card.FloorsClimbed.HasValue
+                    ? Math.Max(0, card.FloorsClimbed.Value)
+                    : null,
             });
         }
     }

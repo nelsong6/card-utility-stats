@@ -78,7 +78,7 @@ public static class PaelsToothAfterCombatEndPatch
                 return;
             }
 
-            RunTracker.RecordPaelsToothCardReturned(returnedCards[0]);
+            RunTracker.RecordPaelsToothCardReturned(state.Relic!, returnedCards[0]);
         }
         catch (Exception e)
         {

@@ -4164,6 +4164,14 @@ public static class RelicHoverShowPatch
             }
 
             TextValueRow(sb, "Returned card", StatsTooltip.EscapeBbcode(displayName), "");
+            if (card.FloorsClimbed.HasValue)
+            {
+                Row3(
+                    sb,
+                    "Floors climbed",
+                    Math.Max(0, card.FloorsClimbed.Value).ToString(),
+                    "");
+            }
         }
 
         return sb.ToString();

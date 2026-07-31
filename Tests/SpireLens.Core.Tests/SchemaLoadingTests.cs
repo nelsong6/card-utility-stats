@@ -4802,20 +4802,22 @@ public class SchemaLoadingTests
     {
         Assert.Collection(
             relicAgg.CardsReturned,
-            card => AssertPaelsToothCard(card, "CARD.STRIKE_KIN", "Strike+", 1),
-            card => AssertPaelsToothCard(card, "CARD.POMMEL_STRIKE", "Pommel Strike++", 2),
-            card => AssertPaelsToothCard(card, "CARD.STRIKE_KIN", "Strike++", 2));
+            card => AssertPaelsToothCard(card, "CARD.STRIKE_KIN", "Strike+", 1, 1),
+            card => AssertPaelsToothCard(card, "CARD.POMMEL_STRIKE", "Pommel Strike++", 2, 2),
+            card => AssertPaelsToothCard(card, "CARD.STRIKE_KIN", "Strike++", 2, 3));
     }
 
     private static void AssertPaelsToothCard(
         RelicCardReturnAggregate card,
         string cardId,
         string displayName,
-        int upgradeLevel)
+        int upgradeLevel,
+        int floorsClimbed)
     {
         Assert.Equal(cardId, card.CardId);
         Assert.Equal(displayName, card.DisplayName);
         Assert.Equal(upgradeLevel, card.UpgradeLevel);
+        Assert.Equal(floorsClimbed, card.FloorsClimbed);
     }
 
     private static void AssertSilverCrucibleFixture(RelicAggregate relicAgg)

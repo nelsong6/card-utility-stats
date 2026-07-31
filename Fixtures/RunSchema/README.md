@@ -210,7 +210,8 @@ New fixtures added going forward do not need a `v*-` prefix.
   specific relics gained from its completed sacrifice pairs.
 - `paels-tooth-relic-run.json`
   Adds Pael's Tooth returned-card history in observed return order, preserving
-  duplicate definitions, final display names, and post-return upgrade levels.
+  duplicate definitions, final display names, post-return upgrade levels, and
+  the floors climbed before each card was returned.
 - `paels-eye-relic-run.json`
   Adds Pael's Eye activation tracking plus counts of status and curse cards
   actually exhausted by its extra-turn callback, and combats where it was held

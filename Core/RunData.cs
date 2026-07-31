@@ -1402,7 +1402,8 @@ public class RelicAggregate
 
     // Physical cards Pael's Tooth has actually returned to the deck. The list
     // preserves observed return order, duplicate definitions, the final title,
-    // and the post-return upgrade level of each new deck instance.
+    // the post-return upgrade level, and the number of floors climbed since
+    // the relic removed the cards on pickup.
     public List<RelicCardReturnAggregate> CardsReturned { get; set; } = new();
 
     // Times a relic-owned card choice was skipped. Used by Hefty Tablet.
@@ -1444,6 +1445,7 @@ public class RelicCardReturnAggregate
     public string CardId { get; set; } = "";
     public string DisplayName { get; set; } = "";
     public int UpgradeLevel { get; set; }
+    public int? FloorsClimbed { get; set; }
 }
 
 public class RelicCardRewardScreenAggregate
