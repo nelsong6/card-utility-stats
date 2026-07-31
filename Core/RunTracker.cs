@@ -44,7 +44,7 @@ namespace SpireLens.Core;
 /// Current scope:
 ///   - per-instance card identity and run persistence
 ///   - combat-boundary aggregation into committed run data
-///   - attack, block, energy, draw, exhaust, and effect attribution
+///   - attack, block, energy, orb, draw, exhaust, and effect attribution
 ///   - case-specific downstream attribution such as poison tick damage
 /// </summary>
 public static class RunTracker
@@ -2310,6 +2310,10 @@ public static class RunTracker
                     if (trackCardStats)
                         RecordBlockGainedEntry(bge);
                     break;
+                case OrbChanneledEntry oce:
+                    if (trackCardStats)
+                        RecordOrbCreated(oce);
+                    break;
                 case DamageReceivedEntry dre:
                     // Remember the result ref so the combat-ending capture
                     // (RecordCombatEndingSuppressedDamage) knows this hit was
@@ -2856,6 +2860,48 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordStarsGained failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Attribute one successfully channeled orb to the card whose play is
+    /// currently resolving. OrbCmd emits OrbChanneledEntry only after
+    /// TryEnqueue succeeds, making this an observed result rather than a
+    /// count inferred from the card's printed channel commands.
+    /// </summary>
+    private static void RecordOrbCreated(OrbChanneledEntry entry)
+    {
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+
+                var causingPlay = FindCurrentlyResolvingCardPlay();
+                var sourceCard = causingPlay?.Card;
+                var orb = entry.Orb;
+                var orbOwner = orb?.Owner;
+                if (sourceCard == null || orb == null || orbOwner == null) return;
+                if (!IsTrackedCard(sourceCard) || !IsTrackedPlayer(orbOwner)) return;
+                if (!ReferenceEquals(sourceCard.Owner, orbOwner)) return;
+
+                _pendingCombat ??= new PendingCombat();
+                var instanceId = GetOrAssignInstanceId(sourceCard);
+                var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
+                agg.TotalOrbsCreated++;
+
+                _pendingCombat.CombatEvents.Add(new CardEvent
+                {
+                    T = Now(),
+                    Type = "orb_created",
+                    CardId = instanceId,
+                    OrbId = orb.Id.ToString(),
+                });
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordOrbCreated failed: {e.Message}");
             }
         }
     }
@@ -26616,6 +26662,7 @@ public static class RunTracker
         target.TotalStarsSpent += source.TotalStarsSpent;
         target.TotalStarsGenerated += source.TotalStarsGenerated;
         target.TotalForgeGenerated += source.TotalForgeGenerated;
+        target.TotalOrbsCreated += source.TotalOrbsCreated;
         target.PotionsGained += source.PotionsGained;
         target.CommonPotionsGained += source.CommonPotionsGained;
         target.UncommonPotionsGained += source.UncommonPotionsGained;

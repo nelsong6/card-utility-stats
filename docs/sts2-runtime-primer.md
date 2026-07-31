@@ -439,6 +439,17 @@ Forge:
 
 For UI, energy/star spent rows intentionally appear only when empirical variance exists or when the resource is otherwise interesting. Absence of a row usually means actual spend matched expected listed cost across plays.
 
+## Card-Sourced Orb Creation
+
+`OrbCmd.Channel` emits `OrbChanneledEntry` only after `OrbQueue.TryEnqueue`
+succeeds. Observe that entry through the established `CombatHistory.Add` hook
+while a tracked card play is still resolving, and require the orb owner to
+match the source card owner. This counts every orb that actually enters the
+queue—including repeated channels from cards such as Glacier—while excluding
+failed channels and orb creation from relic, turn-start, or other ownerless
+card contexts. Store the orb id on the event even when the current tooltip
+only needs the total, so later type breakdowns remain derivable.
+
 ## Effects And Powers
 
 Power/effect attribution needs two layers:

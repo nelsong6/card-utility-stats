@@ -205,6 +205,26 @@ public class BlockTooltipTests
         Assert.Contains("[b]6[/b]", text);
     }
 
+    [Trait("Category", "RequiresLiveGame")]
+    [Fact]
+    public void AppendCompactBody_ShowsObservedOrbsCreated()
+    {
+        var cardModel = CreateCardModel(CardType.Skill);
+        var agg = new CardAggregate
+        {
+            Plays = 2,
+            TimesDrawn = 3,
+            TotalOrbsCreated = 4,
+        };
+
+        var sb = new StringBuilder();
+        _ = AppendCompactBodyMethod.Invoke(null, new object?[] { sb, cardModel, agg });
+        var text = sb.ToString();
+
+        Assert.Contains("Orbs created", text);
+        Assert.Contains("[b]4[/b]", text);
+    }
+
     [Fact]
     public void AppendCardDrawStats_ShowsActualVersusAttemptedWhenGapExists()
     {

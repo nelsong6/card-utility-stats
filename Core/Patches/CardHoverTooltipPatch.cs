@@ -400,6 +400,8 @@ public static class CardHoverShowPatch
             Row3(sb, GetForgeStatLabel("avg gained"), FormatDecimal(avgGenerated), "");
         }
 
+        AppendOrbCreationStats(sb, agg);
+
         // Energy-spent rows — only rendered when the card's cost is actually
         // variable (see IsEnergyInteresting). Same 3-col layout as every
         // other stat row; percent column stays empty since there's nothing
@@ -570,6 +572,8 @@ public static class CardHoverShowPatch
 
         if (agg.TotalForgeGenerated > 0m)
             Row3(sb, GetForgeStatLabel("gained"), FormatDecimal(agg.TotalForgeGenerated), "");
+
+        AppendOrbCreationStats(sb, agg);
 
         if (etherealCardsPlayedThisCombat.HasValue)
             AppendPullFromBelowStats(sb, cardModel, etherealCardsPlayedThisCombat.Value);
@@ -2141,6 +2145,12 @@ public static class CardHoverShowPatch
 
         if (agg.TimesCardsDrawn > 0)
             Row3(sb, GetDrawStatLabel("cards drawn"), agg.TimesCardsDrawn.ToString(), "");
+    }
+
+    private static void AppendOrbCreationStats(StringBuilder sb, CardAggregate agg)
+    {
+        if (agg.TotalOrbsCreated > 0)
+            Row3(sb, "Orbs created", agg.TotalOrbsCreated.ToString(), "");
     }
 
     private static void AppendBlockedDrawReasonRows(StringBuilder sb, CardAggregate agg, int blockedGap)

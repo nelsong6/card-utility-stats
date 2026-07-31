@@ -5042,4 +5042,31 @@ public class SchemaLoadingTests
             9,
             resumed!.Aggregates["CARD.ARMAMENTS#1"].ArmamentsCardsUpgraded);
     }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsCardOrbsCreatedFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("card-orbs-created-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.Equal(
+            6,
+            loaded.Data.Aggregates["CARD.GLACIER#1"].TotalOrbsCreated);
+        Assert.Equal("ORB.FROST", loaded.Data.Events[0].OrbId);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsCardOrbsCreatedFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("card-orbs-created-run.json"));
+
+        Assert.NotNull(resumed);
+        Assert.Equal(
+            6,
+            resumed!.Aggregates["CARD.GLACIER#1"].TotalOrbsCreated);
+        Assert.Equal("ORB.FROST", resumed.Events[0].OrbId);
+    }
 }

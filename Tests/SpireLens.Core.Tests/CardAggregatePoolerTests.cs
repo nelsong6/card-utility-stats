@@ -15,6 +15,7 @@ public class CardAggregatePoolerTests
             TotalEffective = 4,
             TotalBlocked = 1,
             TimesExhausted = 1,
+            TotalOrbsCreated = 2,
             TimesCardsDrawAttempted = 3,
             TimesCardsDrawBlocked = 2,
             TotalOstyHpAttackBonus = 7,
@@ -65,6 +66,7 @@ public class CardAggregatePoolerTests
             TotalEffective = 11,
             TotalBlocked = 2,
             TimesExhausted = 2,
+            TotalOrbsCreated = 3,
             TimesCardsDrawAttempted = 1,
             TimesCardsDrawBlocked = 1,
             TotalOstyHpAttackBonus = 11,
@@ -130,6 +132,7 @@ public class CardAggregatePoolerTests
         Assert.Equal(15, pooled.TotalEffective);
         Assert.Equal(3, pooled.TotalBlocked);
         Assert.Equal(3, pooled.TimesExhausted);
+        Assert.Equal(5, pooled.TotalOrbsCreated);
         Assert.Equal(4, pooled.TimesCardsDrawAttempted);
         Assert.Equal(3, pooled.TimesCardsDrawBlocked);
         Assert.Equal(18, pooled.TotalOstyHpAttackBonus);

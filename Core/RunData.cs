@@ -156,6 +156,12 @@ public class CardAggregate
     // current cards use whole numbers.
     public decimal TotalForgeGenerated { get; set; }
 
+    // Orbs successfully channeled while this card was resolving. The game
+    // emits OrbChanneledEntry only after the orb actually enters the queue,
+    // so full-slot evocations, capacity changes, and failed channels remain
+    // observed outcomes rather than being inferred from card text.
+    public int TotalOrbsCreated { get; set; }
+
     // Potion procurement outcomes caused by this card. Alchemize is the
     // first card using these fields: gained counts only successful observed
     // procure results, rarity buckets use the potion actually returned by
@@ -1499,7 +1505,7 @@ public readonly record struct CardRewardCategoryObservation(string Key, string D
 public class CardEvent
 {
     public string T { get; set; } = "";          // ISO-8601 UTC timestamp
-    public string Type { get; set; } = "";       // "card_played" | "damage_received" | "energy_gained" | "stars_gained" | "forge_gained"
+    public string Type { get; set; } = "";       // "card_played" | "damage_received" | "energy_gained" | "stars_gained" | "forge_gained" | "orb_created"
     public string CardId { get; set; } = "";
 
     // card_played fields
@@ -1509,6 +1515,7 @@ public class CardEvent
     public int? StarsSpent { get; set; }         // actual stars paid for this play
     public int? StarsGained { get; set; }        // actual stars added while this card was resolving
     public decimal? ForgeGained { get; set; }    // actual forge added while this card was resolving
+    public string? OrbId { get; set; }            // successfully channeled orb definition id
 
     // card_upgraded fields (and general-purpose: Floor also stamped on
     // other event types when useful). UpgradeLevel is the NEW level AFTER
