@@ -113,9 +113,8 @@ public static class CrackedCoreStartingOrbPassiveStatsPatch
     {
         try
         {
-            if (__result == null) return;
-            if (!__state && !RunTracker.IsTrackedCardSourcedOrb(__instance)) return;
-            __result = ObserveAsync(__result, __instance, __state);
+            if (!__state || __result == null) return;
+            __result = ObserveAsync(__result, __instance);
         }
         catch (Exception e)
         {
@@ -123,15 +122,10 @@ public static class CrackedCoreStartingOrbPassiveStatsPatch
         }
     }
 
-    private static async Task ObserveAsync(
-        Task inner,
-        LightningOrb orb,
-        bool isCrackedCoreOrb)
+    private static async Task ObserveAsync(Task inner, LightningOrb orb)
     {
         await inner;
-        if (isCrackedCoreOrb)
-            RunTracker.RecordCrackedCoreStartingOrbPassive(orb);
-        RunTracker.RecordCardSourcedOrbPassive(orb);
+        RunTracker.RecordCrackedCoreStartingOrbPassive(orb);
     }
 }
 
@@ -156,9 +150,8 @@ public static class CrackedCoreStartingOrbEvokeStatsPatch
     {
         try
         {
-            if (__result == null) return;
-            if (!__state && !RunTracker.IsTrackedCardSourcedOrb(__instance)) return;
-            __result = ObserveAsync(__result, __instance, __state);
+            if (!__state || __result == null) return;
+            __result = ObserveAsync(__result, __instance);
         }
         catch (Exception e)
         {
@@ -168,13 +161,10 @@ public static class CrackedCoreStartingOrbEvokeStatsPatch
 
     private static async Task<IEnumerable<Creature>> ObserveAsync(
         Task<IEnumerable<Creature>> inner,
-        LightningOrb orb,
-        bool isCrackedCoreOrb)
+        LightningOrb orb)
     {
         var targets = await inner;
-        if (isCrackedCoreOrb)
-            RunTracker.RecordCrackedCoreStartingOrbEvoked(orb);
-        RunTracker.RecordCardSourcedOrbEvoked(orb);
+        RunTracker.RecordCrackedCoreStartingOrbEvoked(orb);
         return targets;
     }
 }

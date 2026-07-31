@@ -21,6 +21,10 @@ public static class HookAfterBlockGainedPatch
             // Single arbitration: the registry decides which ONE window claims
             // this player block gain (FIFO across armed windows).
             RunTracker.DispatchPlayerBlockGain((int)amount);
+            // Card-created Frost orbs arm their own one-shot window through
+            // OrbModel.EvokeActivated/PassiveActivated. Close it even when
+            // block modifiers reduce the observed gain to zero.
+            RunTracker.CompleteFrostOrbBlockAttribution(creature);
         }
         catch (Exception e)
         {

@@ -451,17 +451,18 @@ card contexts. Store the orb id on the event even when the current tooltip
 only needs the total, so later type breakdowns remain derivable.
 
 Retain the exact mutable orb reference with the physical source-card instance
-for the rest of combat. Completed orb `Passive` and `Evoke` calls then credit
-that source card's orb-type bucket; `OrbQueue.RemoveCapacity` is the
-non-evoke/fizzle boundary, while ordinary combat cleanup remains excluded.
-This is lineage attribution, not a widened "recent card" timing window.
+for the rest of combat. Subscribe that instance's native `PassiveActivated`
+and `EvokeActivated` events to credit its source card's orb-type bucket;
+`OrbQueue.RemoveCapacity` remains the non-evoke/fizzle boundary, while ordinary
+combat cleanup remains excluded. This is lineage attribution, not a widened
+"recent card" timing window, and it avoids introducing per-orb Harmony targets.
 
-Frost orbs call `CreatureCmd.GainBlock` with a null `CardPlay`. Arm a narrow
-scope around the exact Frost `Passive`/`Evoke` task and route its observed
-`BlockGainedEntry` into the Frost-orb bucket. Suppress the generic current/
-recent-card fallback for every Frost block entry, including Frost orbs without
-a card source. Otherwise a Glacier play—or an unrelated recently completed
-card—can incorrectly absorb the orb's block into its direct block total.
+Frost orbs call `CreatureCmd.GainBlock` with a null `CardPlay`. Their native
+activation event arms a one-shot window consumed by the already-established
+`Hook.AfterBlockGained` path. The intervening observed `BlockGainedEntry` goes
+to the Frost-orb bucket and bypasses the generic current/recent-card fallback.
+Otherwise a Glacier-created Frost orb can incorrectly add its block to
+Glacier—or to an unrelated recently completed card—as direct card block.
 
 ## Effects And Powers
 

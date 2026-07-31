@@ -19,6 +19,7 @@ using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Afflictions;
 using MegaCrit.Sts2.Core.Models.Enchantments;
 using MegaCrit.Sts2.Core.Models.Cards;
+using MegaCrit.Sts2.Core.Models.Orbs;
 using MegaCrit.Sts2.Core.Models.Potions;
 using MegaCrit.Sts2.Core.Models.Powers;
 using MegaCrit.Sts2.Core.Models.Relics;
@@ -266,6 +267,10 @@ public static class RunTracker
         RunManager.Instance.RunStarted -= OnRunStarted;
         CombatManager.Instance.CombatSetUp -= OnCombatSetUp;
         CombatManager.Instance.CombatEnded -= OnCombatEnded;
+        lock (_lock)
+        {
+            UnsubscribeCardOrbEventsLocked();
+        }
         CoreMain.Logger.Info("SpireLens hooks unwired.");
     }
 
@@ -1295,6 +1300,7 @@ public static class RunTracker
 
         bool repairedDamageAggregates = repairAggregates && RepairOffensiveDamageAggregatesFromEvents(run);
 
+        UnsubscribeCardOrbEventsLocked();
         _pendingCombat = null;
         ResetCombatContextState();
         ResetRewardContextState();
@@ -1621,6 +1627,7 @@ public static class RunTracker
                 // RunStarted dispatch exactly when the first read failed.
                 GameStartTime = gameStartTime != 0 ? gameStartTime : null,
             };
+            UnsubscribeCardOrbEventsLocked();
             _pendingCombat = null;
 
             // Note: deck cards are NOT walked here. The RunStarted event
@@ -1681,6 +1688,7 @@ public static class RunTracker
 
             // Clear state so the next OnRunStarted sees a clean slate.
             _currentRun = null;
+            UnsubscribeCardOrbEventsLocked();
             _pendingCombat = null;
             ResetCombatContextState();
             ResetRewardContextState();
@@ -1698,6 +1706,7 @@ public static class RunTracker
             RuntimeOptionsProvider.Refresh();
             // Fresh pending buffer for this combat. Anything accumulated from a prior
             // combat that didn't get a CombatEnded (shouldn't happen but defensive) is dropped.
+            UnsubscribeCardOrbEventsLocked();
             _pendingCombat = new PendingCombat();
             ResetCombatContextState();
             RecordPantographCombatStartForTrackedPlayerLocked(state);
@@ -1742,6 +1751,7 @@ public static class RunTracker
             }
             _currentRun.UpdatedAt = Now();
 
+            UnsubscribeCardOrbEventsLocked();
             _pendingCombat = null;
             ResetCombatContextState();
             SaveCurrentRun();
@@ -2892,7 +2902,22 @@ public static class RunTracker
                 var orbId = orb.Id.ToString();
                 agg.TotalOrbsCreated++;
                 GetOrCreateCardOrbAggregate(agg, orbId).Created++;
+                var firstRegistration =
+                    !_pendingCombat.CardSourceByOrb.ContainsKey(orb);
                 _pendingCombat.CardSourceByOrb[orb] = instanceId;
+                if (firstRegistration)
+                {
+                    Action passiveHandler =
+                        () => RecordCardSourcedOrbPassiveActivated(orb);
+                    Action<Creature[]> evokeHandler =
+                        _ => RecordCardSourcedOrbEvokeActivated(orb);
+                    orb.PassiveActivated += passiveHandler;
+                    orb.EvokeActivated += evokeHandler;
+                    _pendingCombat.CardOrbSubscriptions[orb] =
+                        new CardOrbEventSubscription(
+                            passiveHandler,
+                            evokeHandler);
+                }
 
                 _pendingCombat.CombatEvents.Add(new CardEvent
                 {
@@ -2919,20 +2944,24 @@ public static class RunTracker
         }
     }
 
-    public static void RecordCardSourcedOrbPassive(OrbModel? orb)
+    private static void RecordCardSourcedOrbPassiveActivated(OrbModel? orb)
     {
         RecordCardSourcedOrbLifecycle(
             orb,
             "orb_passive",
             outcome => outcome.PassiveActivations++);
+        if (orb is FrostOrb)
+            ArmFrostOrbBlockAttribution(orb);
     }
 
-    public static void RecordCardSourcedOrbEvoked(OrbModel? orb)
+    private static void RecordCardSourcedOrbEvokeActivated(OrbModel? orb)
     {
         RecordCardSourcedOrbLifecycle(
             orb,
             "orb_evoked",
             outcome => outcome.Evokes++);
+        if (orb is FrostOrb)
+            ArmFrostOrbBlockAttribution(orb);
     }
 
     public static void RecordCardSourcedOrbsFizzled(IEnumerable<OrbModel>? removedOrbs)
@@ -2965,6 +2994,13 @@ public static class RunTracker
                         CardId = instanceId,
                         OrbId = orbId,
                     });
+                    if (_pendingCombat.CardOrbSubscriptions.Remove(
+                            orb,
+                            out var subscription))
+                    {
+                        orb.PassiveActivated -= subscription.PassiveHandler;
+                        orb.EvokeActivated -= subscription.EvokeHandler;
+                    }
                     _pendingCombat.CardSourceByOrb.Remove(orb);
                 }
             }
@@ -3033,49 +3069,73 @@ public static class RunTracker
         return outcome;
     }
 
+    private static void UnsubscribeCardOrbEventsLocked()
+    {
+        if (_pendingCombat == null) return;
+
+        foreach (var (orb, subscription) in
+                 _pendingCombat.CardOrbSubscriptions)
+        {
+            try
+            {
+                orb.PassiveActivated -= subscription.PassiveHandler;
+                orb.EvokeActivated -= subscription.EvokeHandler;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"UnsubscribeCardOrbEventsLocked failed: {e.Message}");
+            }
+        }
+
+        _pendingCombat.CardOrbSubscriptions.Clear();
+    }
+
     /// <summary>
-    /// Arm a narrow scope around FrostOrb.Passive/Evoke. Any block history
-    /// entry produced inside this scope is orb output, not direct card block.
-    /// The scope is also used for non-card Frost orbs so the generic recent-
-    /// card fallback can never claim their block.
+    /// Arm a one-shot window from FrostOrb's native activation event. The
+    /// observed block history entry is orb output, not direct card block.
     /// </summary>
-    public static bool BeginFrostOrbBlockAttribution(OrbModel? orb)
+    private static void ArmFrostOrbBlockAttribution(OrbModel? orb)
     {
         var owner = orb?.Owner;
-        if (orb == null || owner == null) return false;
+        if (orb == null || owner == null) return;
 
         lock (_lock)
         {
             try
             {
-                if (!IsTrackedPlayer(owner)) return false;
-                if (CombatManager.Instance?.IsInProgress != true) return false;
+                if (!IsTrackedPlayer(owner)) return;
+                if (CombatManager.Instance?.IsInProgress != true) return;
 
                 _pendingCombat ??= new PendingCombat();
                 _pendingCombat.ActiveFrostOrbBlockSources.Add(orb);
-                return true;
             }
             catch (Exception e)
             {
                 CoreMain.LogDebug(
-                    $"BeginFrostOrbBlockAttribution failed: {e.Message}");
-                return false;
+                    $"ArmFrostOrbBlockAttribution failed: {e.Message}");
             }
         }
     }
 
-    public static void EndFrostOrbBlockAttribution(OrbModel? orb)
+    public static void CompleteFrostOrbBlockAttribution(Creature? receiver)
     {
-        if (orb == null) return;
+        if (receiver == null) return;
 
         lock (_lock)
         {
             var active = _pendingCombat?.ActiveFrostOrbBlockSources;
             if (active == null) return;
 
-            for (var i = active.Count - 1; i >= 0; i--)
+            for (var i = 0; i < active.Count; i++)
             {
-                if (!ReferenceEquals(active[i], orb)) continue;
+                var orb = active[i];
+                if (orb?.Owner?.Creature == null
+                    || !ReferenceEquals(orb.Owner.Creature, receiver))
+                {
+                    continue;
+                }
+
                 active.RemoveAt(i);
                 break;
             }
@@ -3087,7 +3147,7 @@ public static class RunTracker
         if (_pendingCombat == null || entry.CardPlay != null) return false;
 
         var activeOrb = _pendingCombat.ActiveFrostOrbBlockSources
-            .LastOrDefault(orb =>
+            .FirstOrDefault(orb =>
                 orb?.Owner?.Creature != null
                 && ReferenceEquals(orb.Owner.Creature, entry.Receiver));
         if (activeOrb == null) return false;
@@ -27689,6 +27749,10 @@ internal sealed class PendingDarkEmbraceDraw
     public required string DisplayName { get; init; }
 }
 
+internal sealed record CardOrbEventSubscription(
+    Action PassiveHandler,
+    Action<Creature[]> EvokeHandler);
+
 /// <summary>
 /// Holds per-combat stats and events while a combat is in progress.
 /// Discarded if the combat doesn't finish cleanly; promoted into the run on CombatEnded.
@@ -27713,6 +27777,8 @@ internal class PendingCombat
     public Dictionary<Creature, PendingPoisonTick> PendingPoisonTicks { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<OrbModel, string> CardSourceByOrb { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<OrbModel, CardOrbEventSubscription> CardOrbSubscriptions { get; }
         = new(ReferenceEqualityComparer.Instance);
     public List<OrbModel> ActiveFrostOrbBlockSources { get; } = new();
     public Dictionary<Player, PendingBrilliantScarfDiscount> BrilliantScarfDiscountOffers { get; }
