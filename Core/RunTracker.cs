@@ -1772,6 +1772,7 @@ public static class RunTracker
         RecordPocketwatchTurnForTrackedPlayerLocked();
         RecordPollinousCoreTurnForTrackedPlayerLocked();
         RecordJossPaperTurnForTrackedPlayerLocked();
+        RecordStrikeDummyTurnForTrackedPlayerLocked();
         RecordLetterOpenerTurnForTrackedPlayerLocked();
         RecordTuningForkTurnForTrackedPlayerLocked();
         RecordCloakClaspTurnForTrackedPlayerLocked();
@@ -2090,6 +2091,9 @@ public static class RunTracker
         target.CombatsWithoutActivation += source.CombatsWithoutActivation;
 
         target.StrikeDummyStrikesPlayed += source.StrikeDummyStrikesPlayed;
+        target.StrikeDummyRateStrikesPlayed += source.StrikeDummyRateStrikesPlayed;
+        target.StrikeDummyTurns += source.StrikeDummyTurns;
+        target.StrikeDummyCombats += source.StrikeDummyCombats;
         if (source.StrikeDummyBaseStrikesInDeck != 0 || target.StrikeDummyBaseStrikesInDeck == 0)
             target.StrikeDummyBaseStrikesInDeck = source.StrikeDummyBaseStrikesInDeck;
         if (source.StrikeDummyNonBaseStrikeCardsInDeck != 0 || target.StrikeDummyNonBaseStrikeCardsInDeck == 0)
@@ -13290,6 +13294,7 @@ public static class RunTracker
             try
             {
                 RefreshStrikeDummyDeckCountsIfOwnedLocked();
+                RecordStrikeDummyTurnForTrackedPlayerLocked();
 
                 RelicAggregate? result = null;
                 if (_currentRun != null && _currentRun.RelicAggregates.TryGetValue(StrikeDummyRelicId, out var committed))
@@ -14088,6 +14093,19 @@ public static class RunTracker
     {
         if (agg == null) return;
         agg.StrikeDummyStrikesPlayed += 1;
+        agg.StrikeDummyRateStrikesPlayed += 1;
+    }
+
+    internal static void RecordStrikeDummyTurnForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.StrikeDummyTurns += Math.Max(0, count);
+    }
+
+    internal static void RecordStrikeDummyCombatForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.StrikeDummyCombats += Math.Max(0, count);
     }
 
     internal static void RecordOddlySmoothStoneBlockCardPlayedForTest(
@@ -20285,8 +20303,10 @@ public static class RunTracker
         var owner = card.Owner;
         if (owner == null || !IsTrackedPlayer(owner) || !PlayerHasStrikeDummy(owner)) return;
 
+        RecordStrikeDummyTurnForPlayerLocked(owner);
         var agg = GetOrCreateRelicAggregateForCurrentContextLocked(StrikeDummyRelicId);
         agg.StrikeDummyStrikesPlayed += 1;
+        agg.StrikeDummyRateStrikesPlayed += 1;
     }
 
     private static void RecordOddlySmoothStoneBlockCardPlayedIfOwnedLocked(
@@ -21064,6 +21084,7 @@ public static class RunTracker
             var player = GetTrackedRunPlayerLocked();
             if (player == null) return;
 
+            RecordStrikeDummyCombatForPlayerLocked(player);
             RecordPermafrostCombatForPlayerLocked(player);
             RecordPocketwatchCombatForPlayerLocked(player);
             RecordPollinousCoreCombatForPlayerLocked(player);
@@ -21109,6 +21130,71 @@ public static class RunTracker
         {
             CoreMain.LogDebug($"RecordHeldCombatRelicBaselinesForTrackedPlayerLocked failed: {e.Message}");
         }
+    }
+
+    private static void RecordStrikeDummyCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasStrikeDummy(player)) return;
+        if (!_pendingCombat.StrikeDummyCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(StrikeDummyRelicId);
+        RecordStrikeDummyCombatForTest(agg);
+    }
+
+    public static void RecordStrikeDummyTurnStarted(Player? player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                RecordStrikeDummyTurnForPlayerLocked(player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordStrikeDummyTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void RecordStrikeDummyTurnForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordStrikeDummyTurnForPlayerLocked(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug(
+                $"RecordStrikeDummyTurnForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordStrikeDummyTurnForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasStrikeDummy(player)) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.StrikeDummyTurnCountedTurns.TryGetValue(
+                player,
+                out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.StrikeDummyTurnCountedTurns[player] = turnNumber;
+        RecordStrikeDummyCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(StrikeDummyRelicId);
+        RecordStrikeDummyTurnForTest(agg);
     }
 
     private static void RecordPermafrostCombatForPlayerLocked(Player player)
@@ -27786,6 +27872,10 @@ internal class PendingCombat
     public HashSet<Player> PermafrostCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> BagOfPreparationActivationCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> StrikeDummyCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> StrikeDummyTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> PocketwatchCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

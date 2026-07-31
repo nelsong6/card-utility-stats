@@ -1108,8 +1108,13 @@ public class RelicAggregate
     public int CombatsWithoutActivation { get; set; }
 
     // Strike Dummy tracking. StrikesPlayed is cumulative since the relic was
-    // picked up; deck counts are current permanent-deck snapshots.
+    // picked up; RateStrikesPlayed is the matching observation-era numerator
+    // for the held turn/combat denominators so older lifetime totals do not
+    // manufacture rates. Deck counts are current permanent-deck snapshots.
     public int StrikeDummyStrikesPlayed { get; set; }
+    public int StrikeDummyRateStrikesPlayed { get; set; }
+    public int StrikeDummyTurns { get; set; }
+    public int StrikeDummyCombats { get; set; }
     public int StrikeDummyBaseStrikesInDeck { get; set; }
     public int StrikeDummyNonBaseStrikeCardsInDeck { get; set; }
 

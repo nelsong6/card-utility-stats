@@ -4207,7 +4207,16 @@ public static class RelicHoverShowPatch
     private static string BuildStrikeDummyBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
+        var strikesPerTurn = agg.StrikeDummyTurns <= 0
+            ? 0m
+            : (decimal)agg.StrikeDummyRateStrikesPlayed / agg.StrikeDummyTurns;
+        var strikesPerCombat = agg.StrikeDummyCombats <= 0
+            ? 0m
+            : (decimal)agg.StrikeDummyRateStrikesPlayed / agg.StrikeDummyCombats;
+
         Row3(sb, "Strikes played", agg.StrikeDummyStrikesPlayed.ToString(), "");
+        Row3(sb, "Avg Strikes played per turn", FormatDecimal(strikesPerTurn), "");
+        Row3(sb, "Avg Strikes played per combat", FormatDecimal(strikesPerCombat), "");
         Row3(sb, "Base Strikes in deck", agg.StrikeDummyBaseStrikesInDeck.ToString(), "");
         Row3(sb, "Non-base Strike cards in deck", agg.StrikeDummyNonBaseStrikeCardsInDeck.ToString(), "");
         return sb.ToString();

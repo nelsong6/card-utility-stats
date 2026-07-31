@@ -2111,6 +2111,9 @@ public class SchemaLoadingTests
         Assert.True(loaded!.SupportsResume);
         var relicAgg = loaded.Data.RelicAggregates["RELIC.STRIKE_DUMMY"];
         Assert.Equal(8, relicAgg.StrikeDummyStrikesPlayed);
+        Assert.Equal(6, relicAgg.StrikeDummyRateStrikesPlayed);
+        Assert.Equal(4, relicAgg.StrikeDummyTurns);
+        Assert.Equal(2, relicAgg.StrikeDummyCombats);
         Assert.Equal(4, relicAgg.StrikeDummyBaseStrikesInDeck);
         Assert.Equal(3, relicAgg.StrikeDummyNonBaseStrikeCardsInDeck);
     }
@@ -2123,6 +2126,9 @@ public class SchemaLoadingTests
         Assert.NotNull(resumed);
         var relicAgg = resumed!.RelicAggregates["RELIC.STRIKE_DUMMY"];
         Assert.Equal(8, relicAgg.StrikeDummyStrikesPlayed);
+        Assert.Equal(6, relicAgg.StrikeDummyRateStrikesPlayed);
+        Assert.Equal(4, relicAgg.StrikeDummyTurns);
+        Assert.Equal(2, relicAgg.StrikeDummyCombats);
         Assert.Equal(4, relicAgg.StrikeDummyBaseStrikesInDeck);
         Assert.Equal(3, relicAgg.StrikeDummyNonBaseStrikeCardsInDeck);
     }
