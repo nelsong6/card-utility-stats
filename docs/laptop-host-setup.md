@@ -72,16 +72,14 @@ re-installed per run (only `SpireLensMcp` is), and the per-run checkout sync
 deliberately does not `git clean` the game's `mods/` directory. Whatever is
 deployed under `mods\BaseLib\` stays until a human changes it.
 
-### BaseLib version floor: **>= v3.1.8**
+### BaseLib version floor: **>= v3.4.0**
 
-`BaseLib` must be **v3.1.8 or newer**. The current STS2 build renamed
-`Creature.ShowsInfiniteHp` to `Creature.HpDisplay`. BaseLib < 3.1.8
-hard-references the old getter, and its combat HP-display patch throws
-`MissingMethodException: Creature.get_ShowsInfiniteHp()` on every HP-bar
-refresh. On debug-loaded mid-combat saves this freezes the combat HUD at
-placeholder values (e.g. `88/88` HP, `0/4` energy), so screenshots no longer
-reflect true game state. BaseLib v3.1.8 ("main branch compatibility") added a
-graceful `HpDisplay` reflection fallback that resolves the freeze.
+`BaseLib` must be **v3.4.0 or newer**. STS2 v0.110.1 removed
+`MegaInput.releaseCard`; BaseLib v3.3.7 hard-references that field from its
+`NPlayerHand.StartCardPlay` safety patch and throws `MissingFieldException` on
+every attempted card play. BaseLib v3.4.0's beta-compat update uses the current
+input fallback and restores card play. This floor also retains the earlier
+v3.1.8 compatibility fix for `Creature.HpDisplay`.
 
 `probe-mod-set` **enforces** this floor: after the name check it reads
 `mods\BaseLib\BaseLib.json` over SSH and prints the checked state before it
@@ -92,12 +90,10 @@ parse error. It fails closed with
 `baselib_missing_or_unversioned:found=<ver-or-empty>:manifest_exists=<bool>:expected>=<floor>`
 if BaseLib is absent or its version is unparseable), and emits
 `baselib_version` as a phase output on pass. The floor itself is the
-`BASELIB_MIN_VERSION` constant near the top of
-`scripts/glimmung-native/env-prep.sh`; the numeric comparison is
-`native_semver_ge` in `scripts/glimmung-native/lib.sh`. **Bump
-`BASELIB_MIN_VERSION`** when a future STS2 update requires a newer BaseLib. When
+`BaseLibMinVersion` constant near the top of `internal/host/probe.go`. **Bump
+`BaseLibMinVersion`** when a future STS2 update requires a newer BaseLib. When
 re-provisioning a host, fetch the current Alchyr/BaseLib-StS2 release and confirm
-`mods\BaseLib\BaseLib.json` reports `"version": "v3.1.8"` or newer.
+`mods\BaseLib\BaseLib.json` reports `"version": "v3.4.0"` or newer.
 
 > Game updates land about every two weeks and routinely break this — see
 > [docs/surviving-sts2-updates.md](./surviving-sts2-updates.md) for the full

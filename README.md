@@ -176,10 +176,10 @@ Per-run JSON files at `%APPDATA%/SlayTheSpire2/SpireLens/runs/<run-id>.json` (Go
 - [BaseLib](https://www.nexusmods.com/slaythespire2/mods/103) - required dependency
 
 > [!NOTE]
-> **Active Environment Reference (May 31, 2026)**
+> **Active Environment Reference (August 1, 2026)**
 >
-> The mod is verified working against **Slay the Spire 2 (v0.106.1)** on local dev setups with the following mod stack configuration:
-> - **BaseLib** (`v3.1.2`) — Modding utility dependency
+> The mod is built against **Slay the Spire 2 (v0.110.1)** on local dev setups with the following mod stack configuration:
+> - **BaseLib** (`v3.4.0+`) — Modding utility dependency
 > - **SpireLens** (`v0.0.0` loader / `v1.0.0` core) — Per-card stats attribution mod
 > - **SpireLens MCP** (`v0.3.4`) — MCP bridge running on port `15526` (`http://localhost:15526/`)
 

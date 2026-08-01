@@ -84,6 +84,12 @@ symbol the update renamed**. Its patch then throws on every HP-bar refresh,
 pinning the bars at their placeholder. **This is third-party code**
 (`Alchyr/BaseLib-StS2`), not ours — but it breaks our screenshot evidence.
 
+The same failure shape can block input rather than HUD rendering. In STS2
+v0.110.1, `MegaInput.releaseCard` was removed. BaseLib v3.3.7 referenced that
+field from its `NPlayerHand.StartCardPlay` safety patch, so selecting any card
+threw `MissingFieldException` before play could start. BaseLib v3.4.0's
+beta-compat update changed the fallback to the current input field.
+
 > **2026-05 example.** STS2 renamed `Creature.ShowsInfiniteHp` →
 > `Creature.HpDisplay`. The deployed **BaseLib v3.0.9** referenced the old
 > getter and threw on every bar refresh. **BaseLib v3.1.8** ("main branch
@@ -105,8 +111,8 @@ pinning the bars at their placeholder. **This is third-party code**
 2. Deploy `BaseLib.dll` / `BaseLib.json` / `BaseLib.pck` into host
    `mods\BaseLib\` (game **closed**), back up the old ones.
 3. Confirm `BaseLib.json` reports the new version.
-4. **Bump the enforced floor** if needed: `BASELIB_MIN_VERSION` at the top of
-   `scripts/glimmung-native/env-prep.sh`. `env-prep`'s `probe-mod-set` reads the
+4. **Bump the enforced floor** if needed: `BaseLibMinVersion` at the top of
+   `internal/host/probe.go`. `env-prep`'s `probe-mod-set` reads the
    host's `BaseLib.json` over SSH and fails closed with
    `baselib_too_old:found=<ver>:expected>=<floor>` below the floor (or
    `baselib_missing_or_unversioned:found=<ver-or-empty>:manifest_exists=<bool>:expected>=<floor>`).
