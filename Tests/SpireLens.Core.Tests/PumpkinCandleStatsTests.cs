@@ -115,7 +115,18 @@ public class PumpkinCandleStatsTests
         Assert.Contains("Energy gained total", body);
         Assert.Contains("Avg energy gained per combat", body);
         Assert.Contains("Avg charges at combat start", body);
-        Assert.Contains("Times rekindled", body);
+        Assert.Contains(
+            StatConceptGlossary.RenderHintedGlyph("campfire"),
+            body);
+        Assert.Contains(
+            StatConceptGlossary.RenderHintedInlineImage(
+                RelicHoverShowPatch.ResolveGrantedRelicIconPath(
+                    PumpkinCandleRelicId),
+                "Pumpkin Candle"),
+            body);
+        Assert.Contains(
+            "Times Pumpkin Candle was rekindled at a campfire.",
+            body);
         Assert.Contains("[b]14[/b]", body);
         Assert.Contains("[b]3.5[/b]", body);
         Assert.Contains("[b]3[/b]", body);

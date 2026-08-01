@@ -2502,7 +2502,16 @@ public static class RelicHoverShowPatch
             "Avg charges at combat start",
             FormatDecimal(averageCharges),
             "");
-        Row3(sb, "Times rekindled", agg.PumpkinCandleRekindles.ToString(), "");
+        var candleIcon = StatConceptGlossary.RenderHintedInlineImage(
+            ResolveGrantedRelicIconPath("RELIC.PUMPKIN_CANDLE"),
+            "Pumpkin Candle");
+        DescribedIconRow(
+            sb,
+            ["campfire"],
+            [],
+            candleIcon,
+            agg.PumpkinCandleRekindles.ToString(),
+            "Times Pumpkin Candle was rekindled at a campfire.");
         return sb.ToString();
     }
 
