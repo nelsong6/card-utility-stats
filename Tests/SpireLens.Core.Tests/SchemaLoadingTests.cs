@@ -5367,6 +5367,37 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsPumpkinCandleRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("pumpkin-candle-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertPumpkinCandleFixture(
+            loaded.Data.RelicAggregates["RELIC.PUMPKIN_CANDLE"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsPumpkinCandleRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("pumpkin-candle-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertPumpkinCandleFixture(
+            resumed!.RelicAggregates["RELIC.PUMPKIN_CANDLE"]);
+    }
+
+    private static void AssertPumpkinCandleFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(14, relicAgg.EnergyGenerated);
+        Assert.Equal(12, relicAgg.PumpkinCandleCombatStartChargeTotal);
+        Assert.Equal(4, relicAgg.PumpkinCandleCombatStartChargeSamples);
+        Assert.Equal(2, relicAgg.PumpkinCandleRekindles);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsSwordInTheStoneRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(

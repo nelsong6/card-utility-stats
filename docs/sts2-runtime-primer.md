@@ -1245,6 +1245,15 @@ current-combat energy numerator and turn denominator. Reset a separate
 combat-local, per-player turn bucket at each newly observed callback turn, then
 add the same observed positive delta to that bucket.
 
+Pumpkin Candle contributes its max-energy dynamic value while its saved
+`KindleCount` is positive. Count that contribution at the established
+`Hook.AfterEnergyReset` boundary rather than from `ModifyMaxEnergy`, which can
+be queried without granting a turn's energy. Snapshot `KindleCount` at
+`CombatSetUp`, including zero-charge held combats. Initial pickup calls
+`Rekindle` to seed five charges, so count user rekindles from a selected
+`KindleRestSiteOption` at the established local rest-site exit boundary; do not
+count the pickup call as a rekindle.
+
 Cracked Core channels its starting Lightning orb from its owner-specific
 `BeforeSideTurnStart` callback on turn one. Snapshot the owner's orb queue
 around that completed callback and retain the exact newly added mutable

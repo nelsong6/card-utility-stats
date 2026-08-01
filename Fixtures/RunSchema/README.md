@@ -530,6 +530,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `petrified-toad-relic-run.json`
   Adds Petrified Toad's successful Potion Shaped Rocks and attempts rejected
   specifically because the potion belt was full.
+- `pumpkin-candle-relic-run.json`
+  Adds Pumpkin Candle's generated Ancient energy, zero-inclusive combat-start
+  charge samples, and selected Kindle campfire options.
 
 Why these exist:
 

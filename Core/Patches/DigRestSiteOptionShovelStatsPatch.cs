@@ -102,8 +102,9 @@ public static class DigRestSiteOptionShovelStatsPatch
 }
 
 /// <summary>
-/// Counts rest-site options that were available but unused: Shovel's Dig and
-/// Tiny Mailbox's Rest-triggered potion offers.
+/// Resolves rest-site choices at the established local exit boundary. This
+/// counts options that were available but unused for Shovel and Tiny Mailbox,
+/// and successful Kindle selections for Pumpkin Candle.
 /// </summary>
 [HarmonyPatch]
 public static class RestSiteSynchronizerShovelStatsPatch
@@ -131,6 +132,9 @@ public static class RestSiteSynchronizerShovelStatsPatch
                 && index < options.Count
                 ? options[index]
                 : null;
+
+            if (chosenOption is KindleRestSiteOption)
+                RunTracker.RecordPumpkinCandleRekindled(__instance.LocalPlayer);
 
             if (options.Any(option => option is DigRestSiteOption)
                 && chosenOption is not DigRestSiteOption)

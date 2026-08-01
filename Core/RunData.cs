@@ -949,11 +949,18 @@ public class RelicAggregate
     // (gains after enemy death), Booming Conch (gains at Elite combat start),
     // Lantern/Very Hot Cocoa/Candelabra/Chandelier (gain energy at the start
     // of turns 1/1/2/3),
-    // Prismatic Gem, and Blood-Soaked Rose (max-energy relics counted once per
-    // player energy reset), and Seal of Gold (turn-start energy purchased with
-    // gold). Also used by Nunchaku, whose gained energy is attributed from the
-    // observed PlayerCombatState.GainEnergy delta.
+    // Prismatic Gem, Blood-Soaked Rose, and Pumpkin Candle (max-energy relics
+    // counted once per player energy reset), and Seal of Gold (turn-start
+    // energy purchased with gold). Also used by Nunchaku, whose gained energy
+    // is attributed from the observed PlayerCombatState.GainEnergy delta.
     public int EnergyGenerated { get; set; }
+
+    // Pumpkin Candle's zero-inclusive live charge at each combat start plus
+    // successful selections of its Kindle campfire option. Initial pickup
+    // charges are deliberately not a rekindle.
+    public int PumpkinCandleCombatStartChargeTotal { get; set; }
+    public int PumpkinCandleCombatStartChargeSamples { get; set; }
+    public int PumpkinCandleRekindles { get; set; }
 
     // Gold attributed to a relic effect. Lucky Fysh measures the owner's
     // completed balance delta after its gold command resolves; Bowler Hat

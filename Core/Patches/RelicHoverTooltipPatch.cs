@@ -752,6 +752,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is PumpkinCandle)
+        {
+            title = "Pumpkin Candle";
+            body = BuildPumpkinCandleBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is SealOfGold)
         {
             title = "Seal of Gold";
@@ -2473,6 +2480,29 @@ public static class RelicHoverShowPatch
         {
             Row3(sb, $"{StatsTooltip.EscapeBbcode(category.Value.DisplayName)} rewards", category.Value.Count.ToString(), "");
         }
+        return sb.ToString();
+    }
+
+    private static string BuildPumpkinCandleBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var combatSamples = agg.PumpkinCandleCombatStartChargeSamples;
+        var averageCharges = combatSamples <= 0
+            ? 0m
+            : (decimal)agg.PumpkinCandleCombatStartChargeTotal / combatSamples;
+
+        AppendEnergyGeneratedStats(
+            sb,
+            agg,
+            totalLabel: "Energy gained total",
+            includeAveragePerCombat: true,
+            combatCount: combatSamples);
+        Row3(
+            sb,
+            "Avg charges at combat start",
+            FormatDecimal(averageCharges),
+            "");
+        Row3(sb, "Times rekindled", agg.PumpkinCandleRekindles.ToString(), "");
         return sb.ToString();
     }
 

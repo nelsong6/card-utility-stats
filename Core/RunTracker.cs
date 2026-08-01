@@ -1750,6 +1750,7 @@ public static class RunTracker
             ResetCombatContextState();
             RecordPantographCombatStartForTrackedPlayerLocked(state);
             RecordPotionSlotRelicCombatStartForTrackedPlayerLocked(state);
+            RecordPumpkinCandleCombatStartForTrackedPlayerLocked(state);
             ArmPetrifiedToadPotionProcurementForTrackedPlayerLocked(state);
             if (ShouldTrackCardStatsDuringCombatLocked())
             {
@@ -2038,6 +2039,11 @@ public static class RunTracker
         target.DoomDeathTriggers += source.DoomDeathTriggers;
         target.DoomKills += source.DoomKills;
         target.EnergyGenerated += source.EnergyGenerated;
+        target.PumpkinCandleCombatStartChargeTotal +=
+            source.PumpkinCandleCombatStartChargeTotal;
+        target.PumpkinCandleCombatStartChargeSamples +=
+            source.PumpkinCandleCombatStartChargeSamples;
+        target.PumpkinCandleRekindles += source.PumpkinCandleRekindles;
         target.GoldGained += source.GoldGained;
         target.MawBankShopsSkipped += source.MawBankShopsSkipped;
         target.MawBankGoldSpentOutsideShops +=
@@ -6752,6 +6758,7 @@ public static class RunTracker
     private const string HornCleatRelicId = "RELIC.HORN_CLEAT";
     private const string CaptainsWheelRelicId = "RELIC.CAPTAINS_WHEEL";
     private const string PrismaticGemRelicId = "RELIC.PRISMATIC_GEM";
+    private const string PumpkinCandleRelicId = "RELIC.PUMPKIN_CANDLE";
     private const string SealOfGoldRelicId = "RELIC.SEAL_OF_GOLD";
     private const string FresnelLensRelicId = "RELIC.FRESNEL_LENS";
     private const string WingCharmRelicId = "RELIC.WING_CHARM";
@@ -12640,6 +12647,39 @@ public static class RunTracker
     {
         agg.CombatStartPotionCountTotal += Math.Max(0, potionsHeld);
         agg.CombatStartPotionCountSamples++;
+    }
+
+    /// <summary>
+    /// Snapshot Pumpkin Candle's live KindleCount at combat setup. Zero-charge
+    /// combats remain samples because they are part of the relic's held period
+    /// and contribute zero Ancient energy.
+    /// </summary>
+    private static void RecordPumpkinCandleCombatStartForTrackedPlayerLocked(
+        CombatState state)
+    {
+        if (_pendingCombat == null || state?.Players == null) return;
+
+        foreach (var player in state.Players)
+        {
+            if (!IsTrackedPlayer(player) || player?.Creature == null || player.Creature.IsDead)
+                continue;
+
+            var candle = player.Relics?.OfType<PumpkinCandle>().FirstOrDefault();
+            if (candle == null || !IsTrackedRelic(candle)) continue;
+
+            RecordPumpkinCandleCombatStartForTest(
+                GetOrCreatePendingRelicAggregateLocked(PumpkinCandleRelicId),
+                candle.KindleCount);
+        }
+    }
+
+    internal static void RecordPumpkinCandleCombatStartForTest(
+        RelicAggregate agg,
+        int charges)
+    {
+        if (agg == null) return;
+        agg.PumpkinCandleCombatStartChargeTotal += Math.Max(0, charges);
+        agg.PumpkinCandleCombatStartChargeSamples++;
     }
 
     /// <summary>
@@ -20353,6 +20393,24 @@ public static class RunTracker
             countRoundOneCombat: false);
     }
 
+    /// <summary>
+    /// Count Pumpkin Candle's max-energy contribution only while its live
+    /// charge is positive. The caller supplies the relic's current Energy
+    /// dynamic variable at the actual player energy-reset boundary.
+    /// </summary>
+    public static void RecordPumpkinCandleEnergyGenerated(
+        MegaCrit.Sts2.Core.Combat.ICombatState combatState,
+        Player player,
+        int amount)
+    {
+        RecordEnergyResetRelicEnergyGenerated(
+            PumpkinCandleRelicId,
+            combatState,
+            player,
+            amount,
+            countRoundOneCombat: false);
+    }
+
     public static void RecordBloodSoakedRoseEnergyGenerated(
         MegaCrit.Sts2.Core.Combat.ICombatState combatState,
         Player player,
@@ -20414,6 +20472,44 @@ public static class RunTracker
         agg.EnergyGenerated += amount;
         if (countCombat)
             agg.Activations += 1;
+    }
+
+    /// <summary>
+    /// Count a selected Kindle campfire option. Pumpkin Candle's initial
+    /// <c>AfterObtained</c> call also invokes <c>Rekindle</c>, so selection is
+    /// observed at the established rest-site exit boundary instead of patching
+    /// the shared method and accidentally counting pickup.
+    /// </summary>
+    public static void RecordPumpkinCandleRekindled(Player? owner)
+    {
+        if (owner == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(owner)) return;
+                var candle = owner.Relics?.OfType<PumpkinCandle>().FirstOrDefault();
+                if (candle == null || !IsTrackedRelic(candle)) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(
+                    PumpkinCandleRelicId);
+                RecordPumpkinCandleRekindledForTest(agg);
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPumpkinCandleRekindled failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordPumpkinCandleRekindledForTest(
+        RelicAggregate agg)
+    {
+        if (agg == null) return;
+        agg.PumpkinCandleRekindles++;
     }
 
     /// <summary>
