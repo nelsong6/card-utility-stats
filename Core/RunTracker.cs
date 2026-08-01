@@ -7020,10 +7020,7 @@ public static class RunTracker
                 if (!activationPlayers(_pendingCombat).Add(player)) return;
 
                 var agg = GetOrCreatePendingRelicAggregateLocked(relicId);
-                AccumulateOpeningHandDrawRelicStats(
-                    agg,
-                    activations: 1,
-                    cardsDrawn: 0);
+                AccumulateOpeningHandDrawRelicActivations(agg, 1);
                 pendingDraws(_pendingCombat)[player] =
                     new PendingOpeningHandDrawRelicDraw(cardsRequested);
             }
@@ -7138,38 +7135,45 @@ public static class RunTracker
         }
     }
 
-    public static void RecordBagOfPreparationCardsDrawn(int cardsDrawn)
+    public static void RecordBagOfPreparationDrawResult(
+        int cardsRequested,
+        int cardsDrawn)
     {
-        RecordOpeningHandDrawRelicCardsDrawn(
+        RecordOpeningHandDrawRelicDrawResult(
             BagOfPreparationRelicId,
+            cardsRequested,
             cardsDrawn,
-            nameof(RecordBagOfPreparationCardsDrawn));
+            nameof(RecordBagOfPreparationDrawResult));
     }
 
-    public static void RecordRingOfTheSnakeCardsDrawn(int cardsDrawn)
+    public static void RecordRingOfTheSnakeDrawResult(
+        int cardsRequested,
+        int cardsDrawn)
     {
-        RecordOpeningHandDrawRelicCardsDrawn(
+        RecordOpeningHandDrawRelicDrawResult(
             RingOfTheSnakeRelicId,
+            cardsRequested,
             cardsDrawn,
-            nameof(RecordRingOfTheSnakeCardsDrawn));
+            nameof(RecordRingOfTheSnakeDrawResult));
     }
 
-    private static void RecordOpeningHandDrawRelicCardsDrawn(
+    private static void RecordOpeningHandDrawRelicDrawResult(
         string relicId,
+        int cardsRequested,
         int cardsDrawn,
         string diagnosticName)
     {
-        if (cardsDrawn <= 0) return;
+        if (cardsRequested <= 0) return;
 
         lock (_lock)
         {
             try
             {
                 var agg = GetOrCreatePendingRelicAggregateLocked(relicId);
-                AccumulateOpeningHandDrawRelicStats(
+                AccumulateOpeningHandDrawRelicDrawResult(
                     agg,
-                    activations: 0,
-                    cardsDrawn: cardsDrawn);
+                    cardsRequested,
+                    cardsDrawn);
             }
             catch (Exception e)
             {
@@ -7181,23 +7185,42 @@ public static class RunTracker
     internal static void RecordBagOfPreparationStatsForTest(
         RelicAggregate agg,
         int activations,
+        int cardsRequested,
         int cardsDrawn)
-        => AccumulateOpeningHandDrawRelicStats(agg, activations, cardsDrawn);
+    {
+        AccumulateOpeningHandDrawRelicActivations(agg, activations);
+        AccumulateOpeningHandDrawRelicDrawResult(agg, cardsRequested, cardsDrawn);
+    }
 
     internal static void RecordRingOfTheSnakeStatsForTest(
         RelicAggregate agg,
         int activations,
+        int cardsRequested,
         int cardsDrawn)
-        => AccumulateOpeningHandDrawRelicStats(agg, activations, cardsDrawn);
+    {
+        AccumulateOpeningHandDrawRelicActivations(agg, activations);
+        AccumulateOpeningHandDrawRelicDrawResult(agg, cardsRequested, cardsDrawn);
+    }
 
-    private static void AccumulateOpeningHandDrawRelicStats(
+    private static void AccumulateOpeningHandDrawRelicActivations(
         RelicAggregate agg,
-        int activations,
-        int cardsDrawn)
+        int activations)
     {
         if (agg == null) return;
         agg.Activations += Math.Max(0, activations);
-        agg.AdditionalCardsDrawn += Math.Max(0, cardsDrawn);
+    }
+
+    private static void AccumulateOpeningHandDrawRelicDrawResult(
+        RelicAggregate agg,
+        int cardsRequested,
+        int cardsDrawn)
+    {
+        if (agg == null) return;
+
+        var attempted = Math.Max(0, cardsRequested);
+        var observed = Math.Min(attempted, Math.Max(0, cardsDrawn));
+        agg.AdditionalCardsDrawn += observed;
+        agg.AdditionalCardDrawsBlocked += attempted - observed;
     }
 
     /// <summary>

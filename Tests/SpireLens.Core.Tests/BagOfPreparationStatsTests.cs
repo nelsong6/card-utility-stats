@@ -37,16 +37,20 @@ public class BagOfPreparationStatsTests
     }
 
     [Fact]
-    public void TrackingMath_AccumulatesOnlyPositiveActivationAndDrawObservations()
+    public void TrackingMath_AccumulatesObservedAndBlockedDraws()
     {
         var agg = new RelicAggregate();
 
-        RunTracker.RecordBagOfPreparationStatsForTest(agg, activations: 1, cardsDrawn: 2);
-        RunTracker.RecordBagOfPreparationStatsForTest(agg, activations: 1, cardsDrawn: 1);
-        RunTracker.RecordBagOfPreparationStatsForTest(agg, activations: -1, cardsDrawn: -2);
+        RunTracker.RecordBagOfPreparationStatsForTest(
+            agg, activations: 1, cardsRequested: 2, cardsDrawn: 2);
+        RunTracker.RecordBagOfPreparationStatsForTest(
+            agg, activations: 1, cardsRequested: 2, cardsDrawn: 1);
+        RunTracker.RecordBagOfPreparationStatsForTest(
+            agg, activations: -1, cardsRequested: -2, cardsDrawn: -2);
 
         Assert.Equal(2, agg.Activations);
         Assert.Equal(3, agg.AdditionalCardsDrawn);
+        Assert.Equal(1, agg.AdditionalCardDrawsBlocked);
     }
 
     [Fact]
@@ -56,6 +60,7 @@ public class BagOfPreparationStatsTests
         {
             Activations = 3,
             AdditionalCardsDrawn = 5,
+            AdditionalCardDrawsBlocked = 1,
         };
 
         var body = (string)(BuildBodyMethod.Invoke(null, new object?[] { agg })
@@ -65,6 +70,8 @@ public class BagOfPreparationStatsTests
         Assert.Contains("[b]3[/b]", body);
         Assert.Contains("drawn", body);
         Assert.Contains("[b]5[/b]", body);
+        Assert.Contains("Card draws blocked", body);
+        Assert.Contains("[b]1[/b]", body);
     }
 
     [Fact]

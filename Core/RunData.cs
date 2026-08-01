@@ -677,12 +677,14 @@ public class RelicAggregate
     // Lamp for debuffs beyond the fixed Vulnerable/Weak rows.
     public Dictionary<string, AppliedEffectAggregate> AppliedEffects { get; set; } = new();
 
-    // Total additional cards drawn by this relic across the run.
+    // Total additional cards drawn by this relic across the run, plus the
+    // relic-attributed requests that did not produce a card.
     // Used by Pocketwatch (draws 3 extra cards when 3 or fewer cards were
     // played last turn), Gremlin Horn (draws after enemy death), Pendulum
     // (draws every N turns), and Booming Conch (draws extra cards at Elite
     // combat start).
     public int AdditionalCardsDrawn { get; set; }
+    public int AdditionalCardDrawsBlocked { get; set; }
 
     // Centennial Puzzle's once-per-combat activation context. The turn total
     // is summed at the exact HP-loss callback and uses the owning player's
@@ -711,7 +713,6 @@ public class RelicAggregate
     // counter before each hand draw, adds two cards on the fourth turn, then
     // resets to zero before that turn ends. AdditionalCardsDrawn stores the
     // observed marginal cards that actually reached the hand.
-    public int AdditionalCardDrawsBlocked { get; set; }
     public int PollinousCoreTurns { get; set; }
     public int PollinousCoreCombats { get; set; }
     public int PollinousCoreTurnsEndedOn0Counters { get; set; }

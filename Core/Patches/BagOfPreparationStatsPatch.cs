@@ -101,9 +101,9 @@ public static class HookModifyHandDrawBagOfPreparationPatch
 
 /// <summary>
 /// Measures how many cards from the resolved first-turn hand draw exist only
-/// because of each opening-hand relic's contribution. Draw prevention, a short
-/// deck, the hand cap, and an already-larger Innate hand can reduce this below
-/// the relic's requested cards.
+/// because of each opening-hand relic's contribution. The surviving marginal
+/// request is also retained so observed draw shortfalls can be counted as
+/// blocked draws.
 /// </summary>
 [HarmonyPatch(
     typeof(CardPileCmd),
@@ -200,9 +200,17 @@ public static class BagOfPreparationCardPileDrawPatch
                     observation.MaximumRelicContribution,
                     totalCardsDrawn);
                 if (observation.Kind == OpeningHandDrawRelicKind.BagOfPreparation)
-                    RunTracker.RecordBagOfPreparationCardsDrawn(cardsDrawnBecauseOfRelic);
+                {
+                    RunTracker.RecordBagOfPreparationDrawResult(
+                        observation.MaximumRelicContribution,
+                        cardsDrawnBecauseOfRelic);
+                }
                 else
-                    RunTracker.RecordRingOfTheSnakeCardsDrawn(cardsDrawnBecauseOfRelic);
+                {
+                    RunTracker.RecordRingOfTheSnakeDrawResult(
+                        observation.MaximumRelicContribution,
+                        cardsDrawnBecauseOfRelic);
+                }
             }
         }
         catch (Exception e)

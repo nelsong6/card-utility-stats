@@ -17,16 +17,20 @@ public class RingOfTheSnakeStatsTests
         ?? throw new InvalidOperationException("BuildRingOfTheSnakeBodyBBCode not found.");
 
     [Fact]
-    public void TrackingMath_AccumulatesOnlyPositiveActivationAndDrawObservations()
+    public void TrackingMath_AccumulatesObservedAndBlockedDraws()
     {
         var agg = new RelicAggregate();
 
-        RunTracker.RecordRingOfTheSnakeStatsForTest(agg, activations: 1, cardsDrawn: 2);
-        RunTracker.RecordRingOfTheSnakeStatsForTest(agg, activations: 1, cardsDrawn: 1);
-        RunTracker.RecordRingOfTheSnakeStatsForTest(agg, activations: -1, cardsDrawn: -2);
+        RunTracker.RecordRingOfTheSnakeStatsForTest(
+            agg, activations: 1, cardsRequested: 2, cardsDrawn: 2);
+        RunTracker.RecordRingOfTheSnakeStatsForTest(
+            agg, activations: 1, cardsRequested: 2, cardsDrawn: 1);
+        RunTracker.RecordRingOfTheSnakeStatsForTest(
+            agg, activations: -1, cardsRequested: -2, cardsDrawn: -2);
 
         Assert.Equal(2, agg.Activations);
         Assert.Equal(3, agg.AdditionalCardsDrawn);
+        Assert.Equal(1, agg.AdditionalCardDrawsBlocked);
     }
 
     [Fact]
@@ -36,6 +40,7 @@ public class RingOfTheSnakeStatsTests
         {
             Activations = 3,
             AdditionalCardsDrawn = 5,
+            AdditionalCardDrawsBlocked = 1,
         };
 
         var body = (string)(BuildBodyMethod.Invoke(null, new object?[] { agg })
@@ -46,6 +51,8 @@ public class RingOfTheSnakeStatsTests
         Assert.Contains("[b]3[/b]", body);
         Assert.Contains("drawn", body);
         Assert.Contains("[b]5[/b]", body);
+        Assert.Contains("Card draws blocked", body);
+        Assert.Contains("[b]1[/b]", body);
     }
 
     [Fact]

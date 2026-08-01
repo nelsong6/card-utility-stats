@@ -1416,6 +1416,12 @@ public static class RelicHoverShowPatch
             agg.AdditionalCardsDrawn.ToString(),
             "",
             $"Cards drawn — first-turn cards that were actually drawn because of {relicName}'s added hand-draw count.");
+        Row3(
+            sb,
+            "Card draws blocked",
+            agg.AdditionalCardDrawsBlocked.ToString(),
+            "",
+            $"Card draws blocked — first-turn draws still added by {relicName} after hand-size resolution, but prevented before a card reached the hand.");
         return sb.ToString();
     }
 
