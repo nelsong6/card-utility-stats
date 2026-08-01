@@ -146,6 +146,7 @@ public static class RunTracker
     private static readonly List<Creature> _pendingKusarigamaDamageAttributions = new();
     private static readonly List<Creature> _pendingFestivePopperDamageAttributions = new();
     private static readonly List<Creature> _pendingOrnamentalFanBlockAttributions = new();
+    private static readonly List<Creature> _pendingOrnamentalFanBlockHistorySuppressions = new();
     private static readonly List<Creature> _pendingIntimidatingHelmetBlockAttributions = new();
     private static readonly List<Creature> _pendingDaughterOfTheWindBlockAttributions = new();
     private static readonly List<PendingDanseMacabreBlockAttribution> _pendingDanseMacabreBlockAttributions = new();
@@ -1170,6 +1171,7 @@ public static class RunTracker
         _pendingKusarigamaDamageAttributions.Clear();
         _pendingFestivePopperDamageAttributions.Clear();
         _pendingOrnamentalFanBlockAttributions.Clear();
+        _pendingOrnamentalFanBlockHistorySuppressions.Clear();
         _pendingIntimidatingHelmetBlockAttributions.Clear();
         _pendingDaughterOfTheWindBlockAttributions.Clear();
         _pendingDanseMacabreBlockAttributions.Clear();
@@ -15794,7 +15796,14 @@ public static class RunTracker
         {
             try
             {
-                return ConsumePendingCreatureAttribution(_pendingOrnamentalFanBlockAttributions, creature);
+                if (!ConsumePendingCreatureAttribution(_pendingOrnamentalFanBlockAttributions, creature))
+                    return false;
+
+                // Ornamental Fan invokes GainBlock with a null CardPlay. Mark the
+                // resulting history entry as relic-owned so the generic recent-card
+                // fallback cannot also credit the Attack that triggered the relic.
+                _pendingOrnamentalFanBlockHistorySuppressions.Add(creature);
+                return true;
             }
             catch (Exception e)
             {
@@ -15808,7 +15817,10 @@ public static class RunTracker
     {
         if (creature == null) return;
         lock (_lock)
+        {
             ConsumePendingCreatureAttribution(_pendingOrnamentalFanBlockAttributions, creature);
+            ConsumePendingCreatureAttribution(_pendingOrnamentalFanBlockHistorySuppressions, creature);
+        }
     }
 
     public static void RecordOrnamentalFanBlockGained(decimal amount)
@@ -27573,11 +27585,17 @@ public static class RunTracker
 
             string? instanceId = null;
             bool isFrostOrbBlock = TryRecordFrostOrbBlockLocked(entry);
-            if (!isFrostOrbBlock && entry.CardPlay?.Card != null)
+            bool isOrnamentalFanBlock = !isFrostOrbBlock
+                && entry.Receiver.IsPlayer
+                && ConsumePendingCreatureAttribution(
+                    _pendingOrnamentalFanBlockHistorySuppressions,
+                    entry.Receiver);
+            bool hasKnownNonCardSource = isFrostOrbBlock || isOrnamentalFanBlock;
+            if (!hasKnownNonCardSource && entry.CardPlay?.Card != null)
             {
                 instanceId = GetOrAssignInstanceId(entry.CardPlay.Card);
             }
-            else if (!isFrostOrbBlock && entry.Receiver.IsPlayer)
+            else if (!hasKnownNonCardSource && entry.Receiver.IsPlayer)
             {
                 var fallbackCard = FindLikelyBlockSourceCard(entry.Receiver);
                 if (fallbackCard != null)
@@ -27597,7 +27615,7 @@ public static class RunTracker
                     Blocked = entry.Amount,
                 });
             }
-            else if (!isFrostOrbBlock && entry.Receiver.IsPlayer)
+            else if (!hasKnownNonCardSource && entry.Receiver.IsPlayer)
             {
                 var recvDesc = DescribeCreature(entry.Receiver);
                 CoreMain.LogDebug(

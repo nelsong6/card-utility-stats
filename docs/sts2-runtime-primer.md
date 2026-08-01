@@ -959,8 +959,11 @@ Count owner Attack plays at that callback, snapshot unused modulo charge from
 `Hook.BeforeSideTurnEnd` before the relic resets, and observe each payoff at its
 narrow outcome: power delta for Kunai/Shuriken, the resolved block-command
 result for Ornamental Fan, and the resolved single-target damage result for
-Kusarigama. Ornamental Fan preserves zero-charge turn ends as an explicit
-bucket in addition to the shared average-charge sample. Kusarigama only
+Kusarigama. Ornamental Fan's block command has a null `CardPlay`; recognize its
+single resulting history entry as relic-owned and exclude it from the generic
+current/recent-card fallback and card block ledger. Ornamental Fan preserves
+zero-charge turn ends as an explicit bucket in addition to the shared
+average-charge sample. Kusarigama only
 activates when its threshold play can choose a hittable enemy; do not infer an
 activation from the counter alone.
 

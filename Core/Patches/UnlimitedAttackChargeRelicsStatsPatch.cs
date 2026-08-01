@@ -111,7 +111,8 @@ public static class KusarigamaCreatureDamageStatsPatch
 
 /// <summary>
 /// Ornamental Fan counts owner Attacks and arms its block command on every
-/// third play. The command result is the block amount after modifiers.
+/// third play. The command result is the block amount after modifiers, and its
+/// history entry remains relic-owned rather than falling back to that Attack.
 /// </summary>
 [HarmonyPatch(typeof(OrnamentalFan), nameof(OrnamentalFan.AfterCardPlayed))]
 public static class OrnamentalFanAfterCardPlayedStatsPatch
