@@ -160,6 +160,8 @@ Lead Paperweight records its pickup floor, both concrete Colorless card
 options, and which option actually resulted in a permanent-deck addition.
 Screaming Flagon records every empty-hand activation and its observed AOE
 damage split, including blocked damage, overkill, kills, and targets hit.
+Fishing Rod also records average floor travel to the next qualifying normal
+combat and to each successful card upgrade.
 
 Drain Power additionally tracks its observed discard-pile upgrades and later
 plays of the exact combat cards it upgraded, with held-turn and held-combat

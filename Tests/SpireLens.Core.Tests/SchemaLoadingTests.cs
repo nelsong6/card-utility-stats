@@ -2934,6 +2934,38 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsFishingRodFloorAveragesFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("fishing-rod-floor-averages-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertFishingRodFloorAverages(
+            loaded.Data.RelicAggregates["RELIC.FISHING_ROD"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsFishingRodFloorAveragesFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("fishing-rod-floor-averages-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertFishingRodFloorAverages(
+            resumed!.RelicAggregates["RELIC.FISHING_ROD"]);
+    }
+
+    private static void AssertFishingRodFloorAverages(RelicAggregate relicAgg)
+    {
+        Assert.Equal(5, relicAgg.FloorAcquired);
+        Assert.Equal(new[] { 2, 2, 3, 3, 4, 1 }, relicAgg.FishingRodCombatFloorDistances);
+        Assert.Equal(20, relicAgg.FishingRodLastCombatFloor);
+        Assert.Equal(new[] { 7, 8 }, relicAgg.FishingRodUpgradeFloorDistances);
+        Assert.Equal(20, relicAgg.FishingRodLastUpgradeFloor);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsWarHammerRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("war-hammer-relic-run.json"));

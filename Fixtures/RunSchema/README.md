@@ -392,6 +392,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `fishing-rod-relic-run.json`
   Adds Fishing Rod tracking: every card actually upgraded at its three-combat
   interval, retained in upgrade order.
+- `fishing-rod-floor-averages-run.json`
+  Adds Fishing Rod's completed floor-distance samples from acquisition and
+  between qualifying normal combats and successful card upgrades.
 - `war-hammer-relic-run.json`
   Adds War Hammer's Elite-victory activations, observed permanent-deck
   upgrades, stable upgraded-card instance IDs, later upgraded-card plays, and

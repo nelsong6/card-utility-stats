@@ -835,6 +835,15 @@ public class RelicAggregate
     public int CardsUpgraded { get; set; }
     public List<string> UpgradedCards { get; set; } = new();
 
+    // Fishing Rod floor pacing. Distances contain completed samples from
+    // acquisition to the first observed qualifying event, then between
+    // consecutive normal combats or successful upgrades. The last-floor
+    // snapshots let tracking continue accurately across saves and hot reloads.
+    public List<int> FishingRodCombatFloorDistances { get; set; } = new();
+    public int? FishingRodLastCombatFloor { get; set; }
+    public List<int> FishingRodUpgradeFloorDistances { get; set; } = new();
+    public int? FishingRodLastUpgradeFloor { get; set; }
+
     // Stone Cracker tracking. The upgraded-card set itself is combat-local
     // because the relic upgrades draw-pile combat instances, not permanent
     // deck cards. Combats/turns are zero-inclusive held denominators.

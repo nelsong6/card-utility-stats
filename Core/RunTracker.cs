@@ -1993,6 +1993,7 @@ public static class RunTracker
         target.PlatingAdded += source.PlatingAdded;
         target.CardsUpgraded += source.CardsUpgraded;
         MergeUpgradedCardsInto(target, source);
+        MergeFishingRodFloorTrackingInto(target, source);
         target.StoneCrackerUpgradedCommons += source.StoneCrackerUpgradedCommons;
         target.StoneCrackerUpgradedUncommons += source.StoneCrackerUpgradedUncommons;
         target.StoneCrackerUpgradedRares += source.StoneCrackerUpgradedRares;
@@ -12949,7 +12950,14 @@ public static class RunTracker
                 if (!IsTrackedPlayer(relic.Owner)) return false;
 
                 player = relic.Owner;
-                _pendingFishingRodUpgrades[player] = new PendingFishingRodUpgrade();
+                _pendingFishingRodUpgrades[player] = new PendingFishingRodUpgrade
+                {
+                    FloorAcquired = RelicFloorAddedToDeck(relic) ?? CurrentRunFloorLocked(),
+                    Floor = room.CombatState?.RunState?.TotalFloor
+                        ?? CurrentRunFloorLocked()
+                        ?? 0,
+                    IsFirstCombatSinceAcquisition = relic.CombatsSeen == 0,
+                };
                 return true;
             }
             catch (Exception e)
@@ -12970,10 +12978,24 @@ public static class RunTracker
             try
             {
                 if (!_pendingFishingRodUpgrades.Remove(player, out var pending)) return;
-                if (!succeeded || pending.UpgradedCards.Count == 0) return;
+                if (!succeeded) return;
 
                 var agg = GetOrCreateCurrentRunRelicAggregateLocked(FishingRodRelicId);
-                RecordFishingRodUpgradesForTest(agg, pending.UpgradedCards);
+                RecordRelicFloorAcquiredForTest(agg, pending.FloorAcquired);
+                RecordFishingRodCombatFloorForTest(
+                    agg,
+                    pending.Floor,
+                    pending.IsFirstCombatSinceAcquisition);
+
+                if (pending.UpgradedCards.Count > 0)
+                {
+                    RecordFishingRodUpgradeFloorForTest(
+                        agg,
+                        pending.Floor,
+                        includeAcquisitionInterval: agg.CardsUpgraded <= 0);
+                    RecordFishingRodUpgradesForTest(agg, pending.UpgradedCards);
+                }
+
                 SaveCurrentRun();
             }
             catch (Exception e)
@@ -15001,6 +15023,50 @@ public static class RunTracker
         RelicAggregate agg,
         IEnumerable<string>? upgradedCards)
         => RecordRelicUpgradedCards(agg, upgradedCards);
+
+    internal static void RecordFishingRodCombatFloorForTest(
+        RelicAggregate agg,
+        int floor,
+        bool includeAcquisitionInterval)
+    {
+        if (agg == null || floor <= 0) return;
+        if (agg.FishingRodLastCombatFloor == floor) return;
+
+        var previousFloor = agg.FishingRodLastCombatFloor;
+        if (!previousFloor.HasValue && includeAcquisitionInterval)
+            previousFloor = agg.FloorAcquired;
+
+        if (previousFloor.HasValue && previousFloor.Value > 0)
+        {
+            agg.FishingRodCombatFloorDistances ??= new List<int>();
+            agg.FishingRodCombatFloorDistances.Add(
+                Math.Max(0, floor - previousFloor.Value));
+        }
+
+        agg.FishingRodLastCombatFloor = floor;
+    }
+
+    internal static void RecordFishingRodUpgradeFloorForTest(
+        RelicAggregate agg,
+        int floor,
+        bool includeAcquisitionInterval)
+    {
+        if (agg == null || floor <= 0) return;
+        if (agg.FishingRodLastUpgradeFloor == floor) return;
+
+        var previousFloor = agg.FishingRodLastUpgradeFloor;
+        if (!previousFloor.HasValue && includeAcquisitionInterval)
+            previousFloor = agg.FloorAcquired;
+
+        if (previousFloor.HasValue && previousFloor.Value > 0)
+        {
+            agg.FishingRodUpgradeFloorDistances ??= new List<int>();
+            agg.FishingRodUpgradeFloorDistances.Add(
+                Math.Max(0, floor - previousFloor.Value));
+        }
+
+        agg.FishingRodLastUpgradeFloor = floor;
+    }
 
     internal static void RecordWarHammerActivationForTest(
         RelicAggregate agg,
@@ -24971,6 +25037,31 @@ public static class RunTracker
         target.UpgradedCards.AddRange(source.UpgradedCards.Where(card => !string.IsNullOrWhiteSpace(card)));
     }
 
+    private static void MergeFishingRodFloorTrackingInto(
+        RelicAggregate target,
+        RelicAggregate source)
+    {
+        if (source.FishingRodCombatFloorDistances?.Count > 0)
+        {
+            target.FishingRodCombatFloorDistances ??= new List<int>();
+            target.FishingRodCombatFloorDistances.AddRange(
+                source.FishingRodCombatFloorDistances.Where(distance => distance >= 0));
+        }
+
+        if (source.FishingRodLastCombatFloor.HasValue)
+            target.FishingRodLastCombatFloor = source.FishingRodLastCombatFloor;
+
+        if (source.FishingRodUpgradeFloorDistances?.Count > 0)
+        {
+            target.FishingRodUpgradeFloorDistances ??= new List<int>();
+            target.FishingRodUpgradeFloorDistances.AddRange(
+                source.FishingRodUpgradeFloorDistances.Where(distance => distance >= 0));
+        }
+
+        if (source.FishingRodLastUpgradeFloor.HasValue)
+            target.FishingRodLastUpgradeFloor = source.FishingRodLastUpgradeFloor;
+    }
+
     private static void MergeWarHammerUpgradedCardInstanceIdsInto(
         RelicAggregate target,
         RelicAggregate source)
@@ -30060,6 +30151,9 @@ internal sealed class PendingFragrantMushroomPickup
 
 internal sealed class PendingFishingRodUpgrade
 {
+    public int? FloorAcquired { get; init; }
+    public int Floor { get; init; }
+    public bool IsFirstCombatSinceAcquisition { get; init; }
     public List<string> UpgradedCards { get; } = new();
 }
 

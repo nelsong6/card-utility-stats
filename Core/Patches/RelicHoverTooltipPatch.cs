@@ -2570,8 +2570,43 @@ public static class RelicHoverShowPatch
     private static string BuildFishingRodBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        AppendUpgradedCardStats(sb, agg);
+        var upgradedCards = (agg.UpgradedCards ?? new List<string>())
+            .Where(card => !string.IsNullOrWhiteSpace(card))
+            .ToList();
+        var averageFloorsToCombat = CalculateAverageFishingRodFloorDistance(
+            agg.FishingRodCombatFloorDistances);
+        var averageFloorsPerUpgrade = CalculateAverageFishingRodFloorDistance(
+            agg.FishingRodUpgradeFloorDistances);
+
+        Row3(sb, "Cards upgraded", agg.CardsUpgraded.ToString(), "");
+        Row3(
+            sb,
+            "Avg floors to next combat",
+            FormatDecimal(averageFloorsToCombat),
+            "",
+            "Average floors traveled from Fishing Rod's acquisition to its first normal Monster combat, then between consecutive normal Monster combats.");
+        Row3(
+            sb,
+            "Avg floors per upgrade",
+            FormatDecimal(averageFloorsPerUpgrade),
+            "",
+            "Average floors traveled from Fishing Rod's acquisition to its first successful card upgrade, then between consecutive successful upgrades.");
+
+        foreach (var card in upgradedCards)
+            TextValueRow(sb, "Upgraded card", StatsTooltip.EscapeBbcode(card), "");
+
         return sb.ToString();
+    }
+
+    internal static decimal CalculateAverageFishingRodFloorDistance(
+        IReadOnlyList<int>? distances)
+    {
+        if (distances == null || distances.Count == 0) return 0m;
+
+        var validDistances = distances.Where(distance => distance >= 0).ToList();
+        return validDistances.Count == 0
+            ? 0m
+            : (decimal)validDistances.Sum() / validDistances.Count;
     }
 
     private static string BuildEggBodyBBCode(RelicAggregate agg, string cardType)

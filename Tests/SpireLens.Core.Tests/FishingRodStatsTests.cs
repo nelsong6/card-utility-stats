@@ -50,8 +50,13 @@ public class FishingRodStatsTests
         var run = new RunData();
         run.RelicAggregates[FishingRodRelicId] = new RelicAggregate
         {
+            FloorAcquired = 5,
             CardsUpgraded = 3,
             UpgradedCards = { "Grave Warden+", "Reap+", "Grave Warden+" },
+            FishingRodCombatFloorDistances = { 2, 2, 3, 3, 4, 1 },
+            FishingRodLastCombatFloor = 20,
+            FishingRodUpgradeFloorDistances = { 7, 8 },
+            FishingRodLastUpgradeFloor = 20,
         };
 
         var json = JsonSerializer.Serialize(run, SerializerOptions);
@@ -59,10 +64,15 @@ public class FishingRodStatsTests
 
         Assert.NotNull(restored);
         var agg = restored!.RelicAggregates[FishingRodRelicId];
+        Assert.Equal(5, agg.FloorAcquired);
         Assert.Equal(3, agg.CardsUpgraded);
         Assert.Equal(
             new[] { "Grave Warden+", "Reap+", "Grave Warden+" },
             agg.UpgradedCards);
+        Assert.Equal(new[] { 2, 2, 3, 3, 4, 1 }, agg.FishingRodCombatFloorDistances);
+        Assert.Equal(20, agg.FishingRodLastCombatFloor);
+        Assert.Equal(new[] { 7, 8 }, agg.FishingRodUpgradeFloorDistances);
+        Assert.Equal(20, agg.FishingRodLastUpgradeFloor);
     }
 
     [Fact]
@@ -81,16 +91,82 @@ public class FishingRodStatsTests
     }
 
     [Fact]
+    public void RunTracker_FishingRodFloorTiming_IncludesAcquisitionThenConsecutiveEvents()
+    {
+        var agg = new RelicAggregate { FloorAcquired = 5 };
+
+        RunTracker.RecordFishingRodCombatFloorForTest(
+            agg, floor: 7, includeAcquisitionInterval: true);
+        RunTracker.RecordFishingRodCombatFloorForTest(
+            agg, floor: 9, includeAcquisitionInterval: false);
+        RunTracker.RecordFishingRodCombatFloorForTest(
+            agg, floor: 12, includeAcquisitionInterval: false);
+        RunTracker.RecordFishingRodUpgradeFloorForTest(
+            agg, floor: 12, includeAcquisitionInterval: true);
+        RunTracker.RecordFishingRodUpgradesForTest(agg, ["Grave Warden+"]);
+        RunTracker.RecordFishingRodCombatFloorForTest(
+            agg, floor: 15, includeAcquisitionInterval: false);
+        RunTracker.RecordFishingRodCombatFloorForTest(
+            agg, floor: 19, includeAcquisitionInterval: false);
+        RunTracker.RecordFishingRodCombatFloorForTest(
+            agg, floor: 20, includeAcquisitionInterval: false);
+        RunTracker.RecordFishingRodUpgradeFloorForTest(
+            agg, floor: 20, includeAcquisitionInterval: false);
+        RunTracker.RecordFishingRodUpgradesForTest(agg, ["Reap+"]);
+
+        Assert.Equal(new[] { 2, 2, 3, 3, 4, 1 }, agg.FishingRodCombatFloorDistances);
+        Assert.Equal(20, agg.FishingRodLastCombatFloor);
+        Assert.Equal(new[] { 7, 8 }, agg.FishingRodUpgradeFloorDistances);
+        Assert.Equal(20, agg.FishingRodLastUpgradeFloor);
+        Assert.Equal(
+            2.5m,
+            RelicHoverShowPatch.CalculateAverageFishingRodFloorDistance(
+                agg.FishingRodCombatFloorDistances));
+        Assert.Equal(
+            7.5m,
+            RelicHoverShowPatch.CalculateAverageFishingRodFloorDistance(
+                agg.FishingRodUpgradeFloorDistances));
+    }
+
+    [Fact]
+    public void RunTracker_FishingRodFloorTiming_MidRunTrackingStartsWithABaseline()
+    {
+        var agg = new RelicAggregate
+        {
+            FloorAcquired = 5,
+            CardsUpgraded = 1,
+        };
+
+        RunTracker.RecordFishingRodCombatFloorForTest(
+            agg, floor: 10, includeAcquisitionInterval: false);
+        RunTracker.RecordFishingRodCombatFloorForTest(
+            agg, floor: 12, includeAcquisitionInterval: false);
+        RunTracker.RecordFishingRodUpgradeFloorForTest(
+            agg, floor: 12, includeAcquisitionInterval: false);
+        RunTracker.RecordFishingRodUpgradeFloorForTest(
+            agg, floor: 20, includeAcquisitionInterval: false);
+
+        Assert.Equal(new[] { 2 }, agg.FishingRodCombatFloorDistances);
+        Assert.Equal(new[] { 8 }, agg.FishingRodUpgradeFloorDistances);
+    }
+
+    [Fact]
     public void RelicTooltip_FishingRod_ListsEveryUpgradedCardWithoutNarrowTableCells()
     {
         var body = BuildBody(new RelicAggregate
         {
             CardsUpgraded = 2,
             UpgradedCards = { "Grave Warden+", "Reap+" },
+            FishingRodCombatFloorDistances = { 2, 2, 3, 3 },
+            FishingRodUpgradeFloorDistances = { 7, 8 },
         });
 
         Assert.Contains("Cards upgraded", body);
+        Assert.Contains("first normal Monster combat", body);
+        Assert.Contains("first successful card upgrade", body);
         Assert.Contains("[b]2[/b]", body);
+        Assert.Contains("[b]2.5[/b]", body);
+        Assert.Contains("[b]7.5[/b]", body);
         Assert.Contains("Grave Warden+", body);
         Assert.Contains("Reap+", body);
         Assert.Contains("[hint=\"Upgraded:", body);

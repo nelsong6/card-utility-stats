@@ -610,6 +610,15 @@ arming a window around that exact callback and consuming the existing
 `CardModel.UpgradeInternal` observation; do not infer the chosen card from deck
 state or independently reproduce the relic's RNG selection.
 
+The same completed callback is Fishing Rod's floor-pacing boundary. After it
+succeeds, record the normal combat's total run floor even when no card was
+upgraded. Combat distance runs from acquisition to the first normal combat and
+then between consecutive normal combats; upgrade distance runs from acquisition
+to the first successful upgrade and then between successful upgrades. If floor
+tracking begins after the relic's saved `CombatsSeen` or SpireLens upgrade count
+already indicates prior events, use the first newly observed event only as the
+baseline rather than inventing a distance from incomplete history.
+
 Armaments upgrades through the same synchronous `CardCmd.Upgrade` /
 `CardModel.UpgradeInternal` path while its `OnPlay` callback is still the
 currently resolving card. Attribute each observed upgrade to that physical
