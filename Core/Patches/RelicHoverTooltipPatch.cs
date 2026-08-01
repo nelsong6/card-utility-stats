@@ -1422,6 +1422,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is PetrifiedToad)
+        {
+            title = "Petrified Toad";
+            body = BuildPetrifiedToadBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is Shovel)
         {
             title = "Shovel";
@@ -5204,6 +5211,19 @@ public static class RelicHoverShowPatch
             FormatDecimal(averagePotionsHeld),
             "",
             "Average number of potions held at combat start while this relic was owned.");
+        return sb.ToString();
+    }
+
+    private static string BuildPetrifiedToadBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Potions given", agg.PetrifiedToadPotionsGiven.ToString(), "");
+        Row3(
+            sb,
+            "Potions blocked by full belt",
+            agg.PetrifiedToadPotionsBlockedByFullBelt.ToString(),
+            "",
+            "Potion Shaped Rocks not given because the potion belt was full.");
         return sb.ToString();
     }
 

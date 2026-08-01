@@ -5338,6 +5338,35 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsPetrifiedToadRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("petrified-toad-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertPetrifiedToadFixture(
+            loaded.Data.RelicAggregates["RELIC.PETRIFIED_TOAD"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsPetrifiedToadRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("petrified-toad-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertPetrifiedToadFixture(
+            resumed!.RelicAggregates["RELIC.PETRIFIED_TOAD"]);
+    }
+
+    private static void AssertPetrifiedToadFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(4, relicAgg.PetrifiedToadPotionsGiven);
+        Assert.Equal(3, relicAgg.PetrifiedToadPotionsBlockedByFullBelt);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsSwordInTheStoneRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(

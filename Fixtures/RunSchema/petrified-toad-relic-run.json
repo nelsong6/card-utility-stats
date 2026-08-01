@@ -1,0 +1,28 @@
+{
+  "run_id": "petrified-toad-relic-fixture",
+  "started_at": "2026-08-01T21:00:00Z",
+  "updated_at": "2026-08-01T21:20:00Z",
+  "outcome": "in_progress",
+  "floor_reached": 19,
+  "aggregates": {
+    "CARD.STRIKE_NECROBINDER#1": {
+      "initial_upgrade_level": 0
+    }
+  },
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.PETRIFIED_TOAD": {
+      "petrified_toad_potions_given": 4,
+      "petrified_toad_potions_blocked_by_full_belt": 3
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.STRIKE_NECROBINDER": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.STRIKE_NECROBINDER": 1
+  }
+}

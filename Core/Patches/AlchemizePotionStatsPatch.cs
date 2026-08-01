@@ -9,11 +9,15 @@ using MegaCrit.Sts2.Core.Models;
 
 namespace SpireLens.Core.Patches;
 
+public readonly record struct PotionProcurementStatsSource(
+    CardModel? AlchemizeCard,
+    bool IsPetrifiedToad);
+
 /// <summary>
-/// Observes the exact potion-procurement result used by Alchemize. The card
-/// ignores this return value itself, so capture its physical source before the
-/// async command and wrap the returned task to record success, failure, and
-/// the actual generated potion rarity before the card play finishes.
+/// Observes the exact potion-procurement result used by Alchemize and Petrified
+/// Toad. Their callers ignore this return value, so capture the pending source
+/// before the async command and wrap the returned task to record the observed
+/// success or failure before the action finishes.
 /// </summary>
 [HarmonyPatch(
     typeof(PotionCmd),
@@ -22,20 +26,29 @@ namespace SpireLens.Core.Patches;
 public static class AlchemizePotionStatsPatch
 {
     [HarmonyPrefix]
-    public static void Prefix(Player player, out CardModel? __state)
+    public static void Prefix(
+        PotionModel potion,
+        Player player,
+        out PotionProcurementStatsSource __state)
     {
-        __state = RunTracker.CaptureAlchemizePotionSource(player);
+        __state = new PotionProcurementStatsSource(
+            RunTracker.CaptureAlchemizePotionSource(player),
+            RunTracker.TryCapturePetrifiedToadPotionProcurement(player, potion));
     }
 
     [HarmonyPostfix]
     public static void Postfix(
         Player player,
-        CardModel? __state,
+        PotionProcurementStatsSource __state,
         ref Task<PotionProcureResult> __result)
     {
         try
         {
-            if (__state == null || __result == null) return;
+            if ((__state.AlchemizeCard == null && !__state.IsPetrifiedToad)
+                || __result == null)
+            {
+                return;
+            }
             __result = ObserveAsync(__result, __state, player);
         }
         catch (Exception e)
@@ -46,13 +59,16 @@ public static class AlchemizePotionStatsPatch
 
     private static async Task<PotionProcureResult> ObserveAsync(
         Task<PotionProcureResult> inner,
-        CardModel sourceCard,
+        PotionProcurementStatsSource source,
         Player player)
     {
         var result = await inner.ConfigureAwait(false);
         try
         {
-            RunTracker.RecordAlchemizePotionResult(sourceCard, player, result);
+            if (source.AlchemizeCard != null)
+                RunTracker.RecordAlchemizePotionResult(source.AlchemizeCard, player, result);
+            if (source.IsPetrifiedToad)
+                RunTracker.RecordPetrifiedToadPotionResult(player, result);
         }
         catch (Exception e)
         {

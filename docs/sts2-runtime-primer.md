@@ -255,6 +255,12 @@ belt (currently a full belt or a `ShouldProcurePotion` blocker such as Sozu).
 Do not resolve the source after awaiting: `CardPlayFinished` can clear the
 current-card context as soon as Alchemize resumes.
 
+Petrified Toad is the only game model that directly procures a Potion Shaped
+Rock. Arm its owner at `CombatSetUp`, consume that marker only when the existing
+`PotionCmd.TryToProcure(PotionModel, Player, int)` patch sees the Rock request,
+then use the returned `PotionProcureResult`: `success` counts a potion given,
+`TooFull` counts a full-belt block, and `NotAllowed` is not a full-belt block.
+
 Run-level potion provenance has a separate identity path from Alchemize's card
 aggregate. `PotionReward.CreateIcon` is the visible concrete reward-offer
 boundary, while `MerchantPotionEntry.FillSlot` is the shop boundary where the

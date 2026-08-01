@@ -164,6 +164,8 @@ Fishing Rod also records average floor travel to the next qualifying normal
 combat and to each successful card upgrade.
 Potion Belt, Alchemical Coffer, and Phial Holster record the average number of
 potions held at combat start while each relic is owned.
+Petrified Toad records Potion Shaped Rocks successfully given and attempts
+blocked specifically by a full potion belt.
 
 Drain Power additionally tracks its observed discard-pile upgrades and later
 plays of the exact combat cards it upgraded, with held-turn and held-combat

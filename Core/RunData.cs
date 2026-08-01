@@ -1118,6 +1118,12 @@ public class RelicAggregate
     public int CombatStartPotionCountTotal { get; set; }
     public int CombatStartPotionCountSamples { get; set; }
 
+    // Petrified Toad's observed Potion Shaped Rock procurement outcomes.
+    // Only TooFull failures belong to the blocked-by-full-belt count;
+    // unrelated blockers such as NotAllowed remain excluded.
+    public int PetrifiedToadPotionsGiven { get; set; }
+    public int PetrifiedToadPotionsBlockedByFullBelt { get; set; }
+
     // Tiny Mailbox tracking. Offers are the exact PotionReward objects added
     // by its rest-heal callback and are counted once when selected or skipped,
     // after the game has populated their concrete potion. Fruit Juice is an

@@ -527,6 +527,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `screaming-flagon-hand-size-run.json`
   Adds Screaming Flagon's turn-end hand-size total plus zero-inclusive held
   turn and combat denominators.
+- `petrified-toad-relic-run.json`
+  Adds Petrified Toad's successful Potion Shaped Rocks and attempts rejected
+  specifically because the potion belt was full.
 
 Why these exist:
 

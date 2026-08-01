@@ -1750,6 +1750,7 @@ public static class RunTracker
             ResetCombatContextState();
             RecordPantographCombatStartForTrackedPlayerLocked(state);
             RecordPotionSlotRelicCombatStartForTrackedPlayerLocked(state);
+            ArmPetrifiedToadPotionProcurementForTrackedPlayerLocked(state);
             if (ShouldTrackCardStatsDuringCombatLocked())
             {
                 InitializeMetaPowerDeckEligibilityLocked(state);
@@ -2108,6 +2109,9 @@ public static class RunTracker
         target.TinyMailboxCampfiresNotRested += source.TinyMailboxCampfiresNotRested;
         target.CombatStartPotionCountTotal += source.CombatStartPotionCountTotal;
         target.CombatStartPotionCountSamples += source.CombatStartPotionCountSamples;
+        target.PetrifiedToadPotionsGiven += source.PetrifiedToadPotionsGiven;
+        target.PetrifiedToadPotionsBlockedByFullBelt +=
+            source.PetrifiedToadPotionsBlockedByFullBelt;
         target.RelicsAcquired += source.RelicsAcquired;
         target.CommonRelicsAcquired += source.CommonRelicsAcquired;
         target.UncommonRelicsAcquired += source.UncommonRelicsAcquired;
@@ -3767,6 +3771,79 @@ public static class RunTracker
             }
         }
     }
+
+    /// <summary>
+    /// Consume the combat-setup marker only for Petrified Toad's concrete
+    /// Potion Shaped Rock request. The shared potion command then supplies the
+    /// authoritative success or failure reason after its task resolves.
+    /// </summary>
+    internal static bool TryCapturePetrifiedToadPotionProcurement(
+        Player? player,
+        PotionModel? requestedPotion)
+    {
+        if (player == null || requestedPotion is not PotionShapedRock) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return false;
+                return _pendingCombat?.PendingPetrifiedToadPotionPlayers.Remove(player)
+                    == true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"TryCapturePetrifiedToadPotionProcurement failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    internal static void RecordPetrifiedToadPotionResult(
+        Player? player,
+        PotionProcureResult? result)
+    {
+        if (player == null || result == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player) || _pendingCombat == null) return;
+                var agg = GetOrCreatePendingRelicAggregateLocked(PetrifiedToadRelicId);
+                AccumulatePetrifiedToadPotionResult(
+                    agg,
+                    result.success,
+                    result.failureReason);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPetrifiedToadPotionResult failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void AccumulatePetrifiedToadPotionResult(
+        RelicAggregate agg,
+        bool success,
+        PotionProcureFailureReason failureReason)
+    {
+        if (success)
+        {
+            agg.PetrifiedToadPotionsGiven++;
+            return;
+        }
+
+        if (failureReason == PotionProcureFailureReason.TooFull)
+            agg.PetrifiedToadPotionsBlockedByFullBelt++;
+    }
+
+    internal static void RecordPetrifiedToadPotionResultForTest(
+        RelicAggregate agg,
+        bool success,
+        PotionProcureFailureReason failureReason)
+        => AccumulatePetrifiedToadPotionResult(agg, success, failureReason);
 
     /// <summary>
     /// Record the observed result returned by Alchemize's potion procurement.
@@ -6739,6 +6816,7 @@ public static class RunTracker
     private const string PotionBeltRelicId = "RELIC.POTION_BELT";
     private const string AlchemicalCofferRelicId = "RELIC.ALCHEMICAL_COFFER";
     private const string PhialHolsterRelicId = "RELIC.PHIAL_HOLSTER";
+    private const string PetrifiedToadRelicId = "RELIC.PETRIFIED_TOAD";
     private const string ShovelRelicId = "RELIC.SHOVEL";
     private const string TinyMailboxRelicId = "RELIC.TINY_MAILBOX";
     private const string LargeCapsuleRelicId = "RELIC.LARGE_CAPSULE";
@@ -12562,6 +12640,27 @@ public static class RunTracker
     {
         agg.CombatStartPotionCountTotal += Math.Max(0, potionsHeld);
         agg.CombatStartPotionCountSamples++;
+    }
+
+    /// <summary>
+    /// Arm one pending Potion Shaped Rock request for each tracked living
+    /// player who owns Petrified Toad at combat setup. The Toad is the only
+    /// game model that procures this potion type directly.
+    /// </summary>
+    private static void ArmPetrifiedToadPotionProcurementForTrackedPlayerLocked(
+        CombatState state)
+    {
+        if (_pendingCombat == null || state?.Players == null) return;
+
+        foreach (var player in state.Players)
+        {
+            if (!IsTrackedPlayer(player) || player?.Creature == null || player.Creature.IsDead)
+                continue;
+            if (player.Relics?.Any(relic => relic is PetrifiedToad) != true)
+                continue;
+
+            _pendingCombat.PendingPetrifiedToadPotionPlayers.Add(player);
+        }
     }
 
     /// <summary>
@@ -29810,6 +29909,8 @@ internal class PendingCombat
     public Dictionary<Player, int> PocketwatchCardCountTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> PocketwatchCardsPlayedThisTurn { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> PendingPetrifiedToadPotionPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<CardModel, int> NormalityTurnEndRecordedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
