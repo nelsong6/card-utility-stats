@@ -4532,7 +4532,7 @@ public static class RelicHoverShowPatch
             $"{absorbedPercent:F0}%");
         Row3(
             sb,
-            BlockLabel("block wasted"),
+            "block wasted",
             agg.AdditionalBlockWasted.ToString(),
             $"{wastedPercent:F0}%");
         Row3(sb, BlockLabel("avg block gained per turn"), FormatDecimal(blockPerTurn), "");
