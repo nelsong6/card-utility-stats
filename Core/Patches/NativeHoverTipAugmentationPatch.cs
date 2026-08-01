@@ -100,9 +100,6 @@ internal static class NativeStatsHoverTipStyler
     private static readonly Color BrandColor = new(0.408f, 0.408f, 0.408f, 1f);
     private static readonly Color ShadowColor = new(0f, 0f, 0f, 0.251f);
 
-    private static Font? _regularFont;
-    private static bool _fontLoadAttempted;
-
     public static void ApplyToLastTextTip(NHoverTipSet tipSet)
     {
         var container = tipSet._textHoverTipContainer;
@@ -150,8 +147,6 @@ internal static class NativeStatsHoverTipStyler
 
         if (header.GetNodeOrNull<Label>(BrandNodeName) != null) return;
 
-        LoadFontOnce();
-
         // The native hover-tip scene is a MarginContainer whose header is an
         // HBoxContainer. Preserve every native title setting and give the
         // header a separate expanding spacer; that pushes only the brand to
@@ -175,8 +170,7 @@ internal static class NativeStatsHoverTipStyler
         };
 
         brand.AddThemeColorOverride("font_color", BrandColor);
-        if (_regularFont != null)
-            brand.AddThemeFontOverride("font", _regularFont);
+        ApplyBrandFont(brand);
         brand.AddThemeFontSizeOverride("font_size", 14);
         brand.AddThemeColorOverride("font_shadow_color", ShadowColor);
         brand.AddThemeConstantOverride("shadow_offset_x", 3);
@@ -186,18 +180,25 @@ internal static class NativeStatsHoverTipStyler
         header.AddChild(brand);
     }
 
-    private static void LoadFontOnce()
+    private static void ApplyBrandFont(Label brand)
     {
-        if (_fontLoadAttempted) return;
-        _fontLoadAttempted = true;
-
         try
         {
-            _regularFont = ResourceLoader.Load<Font>(RegularFontPath);
+            // Do not retain a Godot resource wrapper across scene-cache
+            // unloads or Core hot reloads. The game may invalidate that
+            // wrapper while this orphan-tolerant assembly remains alive.
+            var font = ResourceLoader.Load<Font>(
+                RegularFontPath,
+                typeHint: null,
+                ResourceLoader.CacheMode.Reuse);
+            if (font != null && GodotObject.IsInstanceValid(font))
+                brand.AddThemeFontOverride("font", font);
         }
         catch (Exception e)
         {
-            CoreMain.LogDebug($"SpireLens brand font load failed: {e.Message}");
+            // Branding is supplemental. Inherit the native hover-tip font if
+            // the game's resource cache is between unload/reload phases.
+            CoreMain.LogDebug($"SpireLens brand font unavailable: {e.Message}");
         }
     }
 }
