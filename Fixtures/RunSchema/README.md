@@ -512,6 +512,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `potion-run-history.json`
   Adds ordered per-potion offer, acquisition, use, and held-at-run-end
   provenance for the potion gallery's current-run history view.
+- `potion-run-history-turns.json`
+  Adds combat-turn timing for potion lifecycle points that occur during
+  combat, allowing same-turn acquisitions and uses to share a timeline row.
 
 Why these exist:
 

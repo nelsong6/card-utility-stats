@@ -5150,7 +5150,9 @@ public class SchemaLoadingTests
         Assert.True(used.Acquired);
         Assert.True(used.Used);
         Assert.Equal(6, used.AcquiredFloor);
+        Assert.Null(used.AcquiredTurn);
         Assert.Equal(9, used.UsedFloor);
+        Assert.Null(used.UsedTurn);
         Assert.Equal("Elite combat", used.UsedLocationKind);
 
         var held = loaded.Data.PotionHistory[2];
@@ -5167,6 +5169,33 @@ public class SchemaLoadingTests
         Assert.NotNull(resumed);
         Assert.Equal(3, resumed!.PotionHistory.Count);
         Assert.Equal("Potion reward", resumed.PotionHistory[1].AcquisitionMethod);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsPotionRunHistoryTurnsFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("potion-run-history-turns.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var potion = Assert.Single(loaded.Data.PotionHistory);
+        Assert.Equal(2, potion.SeenTurn);
+        Assert.Equal(2, potion.AcquiredTurn);
+        Assert.Equal(4, potion.UsedTurn);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsPotionRunHistoryTurnsFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("potion-run-history-turns.json"));
+
+        Assert.NotNull(resumed);
+        var potion = Assert.Single(resumed!.PotionHistory);
+        Assert.Equal(2, potion.SeenTurn);
+        Assert.Equal(2, potion.AcquiredTurn);
+        Assert.Equal(4, potion.UsedTurn);
     }
 
     [Fact]

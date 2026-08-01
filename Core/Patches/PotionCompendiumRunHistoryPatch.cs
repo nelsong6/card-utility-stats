@@ -18,6 +18,15 @@ internal enum CompendiumPotionViewMode
     CurrentRun = 1,
 }
 
+internal enum PotionTimelineOccurrence
+{
+    SeenNotTaken = 0,
+    Acquired = 1,
+    Used = 2,
+    Discarded = 3,
+    HeldAtRunEnd = 4,
+}
+
 [HarmonyPatch(typeof(NPotionLab), "_Ready")]
 public static class PotionCompendiumHistoryReadyPatch
 {
@@ -261,26 +270,167 @@ internal static class PotionCompendiumHistoryUi
         var entries = RunTracker.GetEffectivePotionHistory(out var outcome)
             .OrderBy(entry => entry.Sequence)
             .ToList();
-        var timeline = new GridContainer
+        var root = new MarginContainer
         {
             Name = HistoryRootName,
-            Columns = 2,
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
             MouseFilter = Control.MouseFilterEnum.Pass,
         };
+        var connectorLayer = new Control
+        {
+            Name = "PotionLifecycleConnectors",
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+        };
+        var timeline = new GridContainer
+        {
+            Name = "PotionTimelineGrid",
+            Columns = 3,
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            MouseFilter = Control.MouseFilterEnum.Pass,
+        };
+        root.AddChild(connectorLayer);
+        root.AddChild(timeline);
+
         timeline.AddChild(NewColumnHeader("Seen, not taken"));
         timeline.AddChild(NewColumnHeader("Taken"));
+        timeline.AddChild(NewColumnHeader("Used"));
 
-        // Keep one grid row per global sequence instead of building two
-        // independent lists. The vertical axis therefore remains the run
-        // timeline, while each potion occupies exactly one horizontal lane.
+        var acquiredCells = new Dictionary<int, Control>();
+        var endpointCells = new Dictionary<int, Control>();
+        foreach (var row in BuildTimelineRows(entries, outcome))
+        {
+            timeline.AddChild(BuildTimelineCell(row.SeenNotTaken, outcome));
+
+            var acquiredCell = BuildTimelineCell(row.Acquired, outcome);
+            timeline.AddChild(acquiredCell);
+            if (row.Acquired != null)
+                acquiredCells[row.Acquired.Entry.Sequence] = acquiredCell;
+
+            var endpointCell = BuildTimelineCell(row.Endpoint, outcome);
+            timeline.AddChild(endpointCell);
+            if (row.Endpoint != null)
+                endpointCells[row.Endpoint.Entry.Sequence] = endpointCell;
+        }
+
+        AddLifecycleConnectors(
+            root,
+            connectorLayer,
+            acquiredCells,
+            endpointCells);
+        return root;
+    }
+
+    private static IReadOnlyList<PotionTimelineRow> BuildTimelineRows(
+        IReadOnlyList<PotionRunHistoryEntry> entries,
+        string outcome)
+    {
+        var rows = new List<PotionTimelineRow>();
         foreach (var entry in entries)
         {
-            timeline.AddChild(BuildTimelineCell(entry.Acquired ? null : entry, outcome));
-            timeline.AddChild(BuildTimelineCell(entry.Acquired ? entry : null, outcome));
+            if (!entry.Acquired)
+            {
+                var seen = NewTimelineItem(
+                    entry,
+                    PotionTimelineOccurrence.SeenNotTaken,
+                    entry.SeenFloor,
+                    entry.SeenLocationKind,
+                    entry.SeenLocationName,
+                    entry.SeenTurn);
+                rows.Add(new PotionTimelineRow(seen.Position, seen, null, null));
+                continue;
+            }
+
+            var acquired = NewTimelineItem(
+                entry,
+                PotionTimelineOccurrence.Acquired,
+                entry.AcquiredFloor,
+                entry.AcquiredLocationKind,
+                entry.AcquiredLocationName,
+                entry.AcquiredTurn);
+            var endpoint = BuildEndpointItem(entry, outcome);
+            if (endpoint != null && SameTimelineMoment(acquired.Position, endpoint.Position))
+            {
+                rows.Add(new PotionTimelineRow(acquired.Position, null, acquired, endpoint));
+            }
+            else
+            {
+                rows.Add(new PotionTimelineRow(acquired.Position, null, acquired, null));
+                if (endpoint != null)
+                    rows.Add(new PotionTimelineRow(endpoint.Position, null, null, endpoint));
+            }
         }
-        return timeline;
+
+        return rows
+            .OrderBy(row => row.Position.Floor ?? int.MaxValue)
+            .ThenBy(row => row.Position.Turn ?? int.MaxValue)
+            .ThenBy(row => row.Position.Sequence)
+            .ThenBy(row => row.Position.Phase)
+            .ToList();
     }
+
+    private static PotionTimelineItem? BuildEndpointItem(
+        PotionRunHistoryEntry entry,
+        string outcome)
+    {
+        if (entry.Used)
+        {
+            return NewTimelineItem(
+                entry,
+                PotionTimelineOccurrence.Used,
+                entry.UsedFloor,
+                entry.UsedLocationKind,
+                entry.UsedLocationName,
+                entry.UsedTurn);
+        }
+
+        if (entry.Discarded)
+        {
+            return NewTimelineItem(
+                entry,
+                PotionTimelineOccurrence.Discarded,
+                entry.DiscardedFloor,
+                entry.DiscardedLocationKind,
+                entry.DiscardedLocationName,
+                entry.DiscardedTurn);
+        }
+
+        if (!entry.HeldAtRunEnd && outcome == "in_progress") return null;
+        return NewTimelineItem(
+            entry,
+            PotionTimelineOccurrence.HeldAtRunEnd,
+            entry.HeldAtRunEndFloor,
+            "Run end",
+            null,
+            null);
+    }
+
+    private static PotionTimelineItem NewTimelineItem(
+        PotionRunHistoryEntry entry,
+        PotionTimelineOccurrence occurrence,
+        int? floor,
+        string? kind,
+        string? name,
+        int? turn)
+        => new(
+            entry,
+            occurrence,
+            new PotionTimelinePosition(
+                floor,
+                kind,
+                name,
+                turn,
+                entry.Sequence,
+                occurrence == PotionTimelineOccurrence.SeenNotTaken ? 0
+                    : occurrence == PotionTimelineOccurrence.Acquired ? 1
+                    : 2));
+
+    private static bool SameTimelineMoment(
+        PotionTimelinePosition left,
+        PotionTimelinePosition right)
+        => left.Floor == right.Floor
+            && left.Turn == right.Turn
+            && string.Equals(left.Kind, right.Kind, StringComparison.Ordinal)
+            && string.Equals(left.Name, right.Name, StringComparison.Ordinal);
 
     private static Label NewColumnHeader(string text)
         => new()
@@ -291,7 +441,7 @@ internal static class PotionCompendiumHistoryUi
             MouseFilter = Control.MouseFilterEnum.Ignore,
         };
 
-    private static Control BuildTimelineCell(PotionRunHistoryEntry? entry, string outcome)
+    private static Control BuildTimelineCell(PotionTimelineItem? item, string outcome)
     {
         var cell = new CenterContainer
         {
@@ -299,12 +449,75 @@ internal static class PotionCompendiumHistoryUi
             MouseFilter = Control.MouseFilterEnum.Pass,
         };
 
-        if (entry == null) return cell;
+        if (item == null) return cell;
 
-        var holder = CreateNativePotionHolder(entry, outcome);
+        var holder = CreateNativePotionHolder(item, outcome);
         if (holder != null)
             cell.AddChild(holder);
         return cell;
+    }
+
+    private static void AddLifecycleConnectors(
+        Control root,
+        Control connectorLayer,
+        IReadOnlyDictionary<int, Control> acquiredCells,
+        IReadOnlyDictionary<int, Control> endpointCells)
+    {
+        var connectors = acquiredCells
+            .Where(pair => endpointCells.ContainsKey(pair.Key))
+            .Select(pair => new PotionLifecycleConnector(
+                pair.Value,
+                endpointCells[pair.Key],
+                new Line2D
+                {
+                    Name = $"PotionLifecycle{pair.Key}",
+                    Width = 3f,
+                    DefaultColor = new Color(0.56f, 0.68f, 0.74f, 0.55f),
+                    Antialiased = true,
+                }))
+            .ToList();
+        foreach (var connector in connectors)
+            connectorLayer.AddChild(connector.Line);
+
+        void RefreshConnectors()
+        {
+            if (!GodotObject.IsInstanceValid(root)
+                || !GodotObject.IsInstanceValid(connectorLayer))
+            {
+                return;
+            }
+
+            var inverse = connectorLayer.GetGlobalTransform().AffineInverse();
+            foreach (var connector in connectors)
+            {
+                if (!GodotObject.IsInstanceValid(connector.AcquiredCell)
+                    || !GodotObject.IsInstanceValid(connector.EndpointCell)
+                    || !GodotObject.IsInstanceValid(connector.Line))
+                {
+                    continue;
+                }
+
+                var acquired = inverse * connector.AcquiredCell.GetGlobalRect().GetCenter();
+                var endpoint = inverse * connector.EndpointCell.GetGlobalRect().GetCenter();
+                if (Mathf.IsEqualApprox(acquired.Y, endpoint.Y))
+                {
+                    connector.Line.Points = [acquired, endpoint];
+                    continue;
+                }
+
+                var gutter = (acquired.X + endpoint.X) / 2f;
+                connector.Line.Points =
+                [
+                    acquired,
+                    new Vector2(gutter, acquired.Y),
+                    new Vector2(gutter, endpoint.Y),
+                    endpoint,
+                ];
+            }
+        }
+
+        root.Resized += RefreshConnectors;
+        Callable.From(RefreshConnectors).CallDeferred();
     }
 
     internal static bool TryBuildNativeHoverTip(
@@ -314,83 +527,105 @@ internal static class PotionCompendiumHistoryUi
         statsTip = default;
         if (!HolderHistory.TryGetValue(holder, out var context)) return false;
 
-        var entry = context.Entry;
-        var title = string.IsNullOrWhiteSpace(entry.DisplayName)
-            ? entry.PotionId
-            : entry.DisplayName;
         statsTip = StatsTooltip.CreateNativeTip(
-            title,
-            BuildTooltipBody(entry, context.Outcome));
+            BuildTooltipTitle(context.Entry),
+            BuildTooltipBody(context.Entry, context.Outcome, context.Occurrence));
         return true;
     }
 
     private static NLabPotionHolder? CreateNativePotionHolder(
-        PotionRunHistoryEntry entry,
+        PotionTimelineItem item,
         string outcome)
     {
         try
         {
             var potion = ModelDb.GetByIdOrNull<PotionModel>(
-                ModelId.Deserialize(entry.PotionId));
+                ModelId.Deserialize(item.Entry.PotionId));
             if (potion == null) return null;
 
             var holder = NLabPotionHolder.Create(
                 potion.ToMutable(),
                 ModelVisibility.Visible);
-            HolderHistory.Add(holder, new PotionHoverContext(entry, outcome));
+            HolderHistory.Add(
+                holder,
+                new PotionHoverContext(item.Entry, outcome, item.Occurrence));
             return holder;
         }
         catch (Exception e)
         {
             CoreMain.Logger.Error(
-                $"PotionCompendiumHistory could not create native holder for {entry.PotionId}: {e}");
+                $"PotionCompendiumHistory could not create native holder for {item.Entry.PotionId}: {e}");
             return null;
         }
     }
 
-    private static string BuildTooltipBody(PotionRunHistoryEntry entry, string outcome)
+    private static string BuildTooltipTitle(PotionRunHistoryEntry entry)
+    {
+        var name = string.IsNullOrWhiteSpace(entry.DisplayName)
+            ? entry.PotionId
+            : entry.DisplayName;
+        return $"{name} {entry.Sequence}";
+    }
+
+    private static string BuildTooltipBody(
+        PotionRunHistoryEntry entry,
+        string outcome,
+        PotionTimelineOccurrence occurrence)
     {
         var body = new StringBuilder();
-        if (!entry.Acquired)
+        if (occurrence == PotionTimelineOccurrence.SeenNotTaken)
         {
             AppendLocationRows(
                 body,
                 "Seen",
                 entry.SeenFloor,
                 entry.SeenLocationKind,
-                entry.SeenLocationName);
+                entry.SeenLocationName,
+                entry.SeenTurn);
             AppendTooltipRow(body, "Method", entry.AcquisitionMethod);
             AppendTooltipRow(body, "Outcome", "Not taken");
             return body.ToString().TrimEnd();
         }
 
-        AppendLocationRows(
-            body,
-            "Acquired",
-            entry.AcquiredFloor,
-            entry.AcquiredLocationKind,
-            entry.AcquiredLocationName);
-        AppendTooltipRow(body, "Method", entry.AcquisitionMethod);
-
-        if (entry.Used)
+        if (occurrence == PotionTimelineOccurrence.Acquired)
+        {
+            AppendLocationRows(
+                body,
+                "Acquired",
+                entry.AcquiredFloor,
+                entry.AcquiredLocationKind,
+                entry.AcquiredLocationName,
+                entry.AcquiredTurn);
+            AppendTooltipRow(body, "Method", entry.AcquisitionMethod);
+            if (!entry.Used
+                && !entry.Discarded
+                && !entry.HeldAtRunEnd
+                && outcome == "in_progress")
+            {
+                AppendTooltipRow(body, "Status", "Held now");
+            }
+        }
+        else if (occurrence == PotionTimelineOccurrence.Used)
         {
             AppendLocationRows(
                 body,
                 "Used",
                 entry.UsedFloor,
                 entry.UsedLocationKind,
-                entry.UsedLocationName);
+                entry.UsedLocationName,
+                entry.UsedTurn);
         }
-        else if (entry.Discarded)
+        else if (occurrence == PotionTimelineOccurrence.Discarded)
         {
             AppendLocationRows(
                 body,
                 "Discarded",
                 entry.DiscardedFloor,
                 entry.DiscardedLocationKind,
-                entry.DiscardedLocationName);
+                entry.DiscardedLocationName,
+                entry.DiscardedTurn);
         }
-        else if (entry.HeldAtRunEnd || outcome != "in_progress")
+        else
         {
             AppendTooltipRow(
                 body,
@@ -399,11 +634,6 @@ internal static class PotionCompendiumHistoryUi
                     ? $"Floor {entry.HeldAtRunEndFloor.Value}"
                     : "Final floor unknown");
         }
-        else
-        {
-            AppendTooltipRow(body, "Status", "Held now");
-        }
-
         return body.ToString().TrimEnd();
     }
 
@@ -420,7 +650,8 @@ internal static class PotionCompendiumHistoryUi
         string timingLabel,
         int? floor,
         string? kind,
-        string? name)
+        string? name,
+        int? turn)
     {
         var hasKind = !string.IsNullOrWhiteSpace(kind);
         var hasName = !string.IsNullOrWhiteSpace(name);
@@ -441,6 +672,9 @@ internal static class PotionCompendiumHistoryUi
         {
             AppendTooltipRow(body, "Location", hasName ? name! : kind!);
         }
+
+        if (turn.HasValue)
+            AppendTooltipRow(body, "Turn", turn.Value.ToString());
     }
 
     private static IEnumerable<NPotionLabCategory> GetCategories(NPotionLab lab)
@@ -536,5 +770,30 @@ internal static class PotionCompendiumHistoryUi
 
     private sealed record PotionHoverContext(
         PotionRunHistoryEntry Entry,
-        string Outcome);
+        string Outcome,
+        PotionTimelineOccurrence Occurrence);
+
+    private sealed record PotionTimelineItem(
+        PotionRunHistoryEntry Entry,
+        PotionTimelineOccurrence Occurrence,
+        PotionTimelinePosition Position);
+
+    private sealed record PotionTimelineRow(
+        PotionTimelinePosition Position,
+        PotionTimelineItem? SeenNotTaken,
+        PotionTimelineItem? Acquired,
+        PotionTimelineItem? Endpoint);
+
+    private sealed record PotionTimelinePosition(
+        int? Floor,
+        string? Kind,
+        string? Name,
+        int? Turn,
+        int Sequence,
+        int Phase);
+
+    private sealed record PotionLifecycleConnector(
+        Control AcquiredCell,
+        Control EndpointCell,
+        Line2D Line);
 }

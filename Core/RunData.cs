@@ -138,21 +138,25 @@ public class PotionRunHistoryEntry
     public int? SeenFloor { get; set; }
     public string? SeenLocationKind { get; set; }
     public string? SeenLocationName { get; set; }
+    public int? SeenTurn { get; set; }
 
     public bool Acquired { get; set; }
     public int? AcquiredFloor { get; set; }
     public string? AcquiredLocationKind { get; set; }
     public string? AcquiredLocationName { get; set; }
+    public int? AcquiredTurn { get; set; }
 
     public bool Used { get; set; }
     public int? UsedFloor { get; set; }
     public string? UsedLocationKind { get; set; }
     public string? UsedLocationName { get; set; }
+    public int? UsedTurn { get; set; }
 
     public bool Discarded { get; set; }
     public int? DiscardedFloor { get; set; }
     public string? DiscardedLocationKind { get; set; }
     public string? DiscardedLocationName { get; set; }
+    public int? DiscardedTurn { get; set; }
 
     public bool HeldAtRunEnd { get; set; }
     public int? HeldAtRunEndFloor { get; set; }

@@ -3292,7 +3292,7 @@ public static class RunTracker
                     }
                 }
 
-                var location = CapturePotionLocationLocked();
+                var location = CapturePotionLocationLocked(player);
                 var potionId = potion.Id.ToString();
                 var rebound = history
                     .LastOrDefault(e => !e.Acquired
@@ -3317,6 +3317,7 @@ public static class RunTracker
                     SeenFloor = location.Floor,
                     SeenLocationKind = location.Kind,
                     SeenLocationName = location.Name,
+                    SeenTurn = location.Turn,
                 };
                 history.Add(entry);
                 BindPotionSequence(offerSource, entry.Sequence);
@@ -3352,7 +3353,7 @@ public static class RunTracker
                 if (!IsTrackedPlayer(player)) return;
                 EnsureLazyCurrentRunLocked();
                 var history = GetMutablePotionHistoryLocked();
-                var location = CapturePotionLocationLocked();
+                var location = CapturePotionLocationLocked(player);
 
                 PotionRunHistoryEntry? entry = null;
                 if (TryGetPotionSequence(acquiredPotion, out var sequence)
@@ -3378,6 +3379,7 @@ public static class RunTracker
                         SeenFloor = location.Floor,
                         SeenLocationKind = location.Kind,
                         SeenLocationName = location.Name,
+                        SeenTurn = location.Turn,
                     };
                     history.Add(entry);
                 }
@@ -3388,6 +3390,7 @@ public static class RunTracker
                     entry.AcquiredFloor = location.Floor;
                     entry.AcquiredLocationKind = location.Kind;
                     entry.AcquiredLocationName = location.Name;
+                    entry.AcquiredTurn = location.Turn;
                     FinishPotionHistoryMutationLocked();
                 }
 
@@ -3426,7 +3429,7 @@ public static class RunTracker
                 if (!IsTrackedPlayer(player)) return;
                 EnsureLazyCurrentRunLocked();
                 var history = GetMutablePotionHistoryLocked();
-                var location = CapturePotionLocationLocked();
+                var location = CapturePotionLocationLocked(player);
                 PotionRunHistoryEntry? entry = null;
 
                 if (TryGetPotionSequence(potion, out var sequence))
@@ -3458,6 +3461,7 @@ public static class RunTracker
                     entry.UsedFloor = location.Floor;
                     entry.UsedLocationKind = location.Kind;
                     entry.UsedLocationName = location.Name;
+                    entry.UsedTurn = location.Turn;
                 }
                 else
                 {
@@ -3465,6 +3469,7 @@ public static class RunTracker
                     entry.DiscardedFloor = location.Floor;
                     entry.DiscardedLocationKind = location.Kind;
                     entry.DiscardedLocationName = location.Name;
+                    entry.DiscardedTurn = location.Turn;
                 }
 
                 BindPotionSequence(potion, entry.Sequence);
@@ -3537,15 +3542,23 @@ public static class RunTracker
         return "Relic or other effect";
     }
 
-    private static PotionRunLocation CapturePotionLocationLocked()
+    private static PotionRunLocation CapturePotionLocationLocked(Player? player)
     {
         try
         {
             var runState = RunManager.Instance?.State;
             var room = runState?.CurrentRoom;
             var floor = runState?.TotalFloor ?? _currentRun?.FloorReached;
+            var turn = CombatManager.Instance?.IsInProgress == true
+                ? player?.PlayerCombatState?.TurnNumber
+                : null;
+            if (turn <= 0) turn = null;
             if (room == null)
-                return new PotionRunLocation(floor, floor.GetValueOrDefault() <= 1 ? "Run start" : "Map", null);
+                return new PotionRunLocation(
+                    floor,
+                    floor.GetValueOrDefault() <= 1 ? "Run start" : "Map",
+                    null,
+                    turn);
 
             string kind = room.RoomType switch
             {
@@ -3575,11 +3588,15 @@ public static class RunTracker
                 catch { name = eventRoom.ModelId.ToString(); }
             }
 
-            return new PotionRunLocation(floor, kind, string.IsNullOrWhiteSpace(name) ? null : name);
+            return new PotionRunLocation(
+                floor,
+                kind,
+                string.IsNullOrWhiteSpace(name) ? null : name,
+                turn);
         }
         catch
         {
-            return new PotionRunLocation(_currentRun?.FloorReached, "Unknown", null);
+            return new PotionRunLocation(_currentRun?.FloorReached, "Unknown", null, null);
         }
     }
 
@@ -3614,18 +3631,22 @@ public static class RunTracker
             SeenFloor = source.SeenFloor,
             SeenLocationKind = source.SeenLocationKind,
             SeenLocationName = source.SeenLocationName,
+            SeenTurn = source.SeenTurn,
             Acquired = source.Acquired,
             AcquiredFloor = source.AcquiredFloor,
             AcquiredLocationKind = source.AcquiredLocationKind,
             AcquiredLocationName = source.AcquiredLocationName,
+            AcquiredTurn = source.AcquiredTurn,
             Used = source.Used,
             UsedFloor = source.UsedFloor,
             UsedLocationKind = source.UsedLocationKind,
             UsedLocationName = source.UsedLocationName,
+            UsedTurn = source.UsedTurn,
             Discarded = source.Discarded,
             DiscardedFloor = source.DiscardedFloor,
             DiscardedLocationKind = source.DiscardedLocationKind,
             DiscardedLocationName = source.DiscardedLocationName,
+            DiscardedTurn = source.DiscardedTurn,
             HeldAtRunEnd = source.HeldAtRunEnd,
             HeldAtRunEndFloor = source.HeldAtRunEndFloor,
         };
@@ -29032,7 +29053,8 @@ internal sealed class PendingForgottenSoulDamageAttribution
 internal readonly record struct PotionRunLocation(
     int? Floor,
     string Kind,
-    string? Name);
+    string? Name,
+    int? Turn);
 
 internal sealed record CardOrbEventSubscription(
     Action PassiveHandler,
