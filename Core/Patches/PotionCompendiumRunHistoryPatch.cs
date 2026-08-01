@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Text;
 using Godot;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Entities.UI;
+using MegaCrit.Sts2.Core.HoverTips;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Nodes.Screens.PotionLab;
 
@@ -74,6 +77,8 @@ internal static class PotionCompendiumHistoryUi
     private const string HistoryRootName = "SpireLensPotionRunHistory";
     private static readonly List<InjectedPotionSelector> Selectors = new();
     private static readonly List<PotionHistoryLayout> Layouts = new();
+    private static readonly ConditionalWeakTable<NLabPotionHolder, PotionHoverContext>
+        HolderHistory = new();
     private static CompendiumPotionViewMode _mode = CompendiumPotionViewMode.Gallery;
     private static bool _syncingControls;
 
@@ -256,113 +261,153 @@ internal static class PotionCompendiumHistoryUi
         var entries = RunTracker.GetEffectivePotionHistory(out var outcome)
             .OrderBy(entry => entry.Sequence)
             .ToList();
-        var timeline = new VBoxContainer
+        var timeline = new GridContainer
         {
             Name = HistoryRootName,
+            Columns = 2,
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
             MouseFilter = Control.MouseFilterEnum.Pass,
         };
-        timeline.AddChild(NewLabel("Current run potion timeline"));
+        timeline.AddChild(NewColumnHeader("Seen, not taken"));
+        timeline.AddChild(NewColumnHeader("Taken"));
 
-        if (outcome == "none")
+        // Keep one grid row per global sequence instead of building two
+        // independent lists. The vertical axis therefore remains the run
+        // timeline, while each potion occupies exactly one horizontal lane.
+        foreach (var entry in entries)
         {
-            timeline.AddChild(NewLabel("No active or just-completed run is available."));
-            return timeline;
-        }
-
-        if (entries.Count == 0)
-        {
-            timeline.AddChild(NewLabel("No potions have been seen in this run yet."));
-            return timeline;
-        }
-
-        for (var i = 0; i < entries.Count; i++)
-        {
-            timeline.AddChild(BuildTimelineEntry(entries[i], outcome));
-            if (i < entries.Count - 1)
-                timeline.AddChild(new HSeparator());
+            timeline.AddChild(BuildTimelineCell(entry.Acquired ? null : entry, outcome));
+            timeline.AddChild(BuildTimelineCell(entry.Acquired ? entry : null, outcome));
         }
         return timeline;
     }
 
-    private static Control BuildTimelineEntry(PotionRunHistoryEntry entry, string outcome)
+    private static Label NewColumnHeader(string text)
+        => new()
+        {
+            Text = text,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+        };
+
+    private static Control BuildTimelineCell(PotionRunHistoryEntry? entry, string outcome)
     {
-        var row = new HBoxContainer
+        var cell = new CenterContainer
         {
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
             MouseFilter = Control.MouseFilterEnum.Pass,
         };
 
-        var holder = CreateNativePotionHolder(entry.PotionId);
+        if (entry == null) return cell;
+
+        var holder = CreateNativePotionHolder(entry, outcome);
         if (holder != null)
-            row.AddChild(holder);
-
-        var details = new VBoxContainer
-        {
-            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-        };
-        row.AddChild(details);
-        details.AddChild(NewLabel(string.IsNullOrWhiteSpace(entry.DisplayName)
-            ? entry.PotionId
-            : entry.DisplayName));
-        details.AddChild(NewLabel(GetStatus(entry, outcome)));
-
-        if (!entry.Acquired)
-        {
-            details.AddChild(NewLabel(
-                $"Seen: {FormatLocation(entry.SeenFloor, entry.SeenLocationKind, entry.SeenLocationName)}"));
-            details.AddChild(NewLabel($"Method: {entry.AcquisitionMethod}"));
-            return row;
-        }
-
-        details.AddChild(NewLabel(
-            $"Acquired: {FormatLocation(entry.AcquiredFloor, entry.AcquiredLocationKind, entry.AcquiredLocationName)}"));
-        details.AddChild(NewLabel($"Method: {entry.AcquisitionMethod}"));
-
-        if (entry.Used)
-        {
-            details.AddChild(NewLabel(
-                $"Used: {FormatLocation(entry.UsedFloor, entry.UsedLocationKind, entry.UsedLocationName)}"));
-        }
-        else if (entry.Discarded)
-        {
-            details.AddChild(NewLabel(
-                $"Discarded: {FormatLocation(entry.DiscardedFloor, entry.DiscardedLocationKind, entry.DiscardedLocationName)}"));
-        }
-        else if (entry.HeldAtRunEnd)
-        {
-            details.AddChild(NewLabel(entry.HeldAtRunEndFloor.HasValue
-                ? $"Held at run end: Floor {entry.HeldAtRunEndFloor.Value}"
-                : "Held at run end"));
-        }
-
-        return row;
+            cell.AddChild(holder);
+        return cell;
     }
 
-    private static string GetStatus(PotionRunHistoryEntry entry, string outcome)
+    internal static bool TryBuildNativeHoverTip(
+        NLabPotionHolder holder,
+        out HoverTip statsTip)
     {
-        if (!entry.Acquired) return "Seen, not taken";
-        if (entry.Used) return "Used";
-        if (entry.Discarded) return "Discarded";
-        if (entry.HeldAtRunEnd || outcome != "in_progress") return "Held at run end";
-        return "Held now";
+        statsTip = default;
+        if (!HolderHistory.TryGetValue(holder, out var context)) return false;
+
+        var entry = context.Entry;
+        var title = string.IsNullOrWhiteSpace(entry.DisplayName)
+            ? entry.PotionId
+            : entry.DisplayName;
+        statsTip = StatsTooltip.CreateNativeTip(
+            title,
+            BuildTooltipBody(entry, context.Outcome));
+        return true;
     }
 
-    private static NLabPotionHolder? CreateNativePotionHolder(string potionId)
+    private static NLabPotionHolder? CreateNativePotionHolder(
+        PotionRunHistoryEntry entry,
+        string outcome)
     {
         try
         {
-            var potion = ModelDb.GetByIdOrNull<PotionModel>(ModelId.Deserialize(potionId));
-            return potion == null
-                ? null
-                : NLabPotionHolder.Create(potion.ToMutable(), ModelVisibility.Visible);
+            var potion = ModelDb.GetByIdOrNull<PotionModel>(
+                ModelId.Deserialize(entry.PotionId));
+            if (potion == null) return null;
+
+            var holder = NLabPotionHolder.Create(
+                potion.ToMutable(),
+                ModelVisibility.Visible);
+            HolderHistory.Add(holder, new PotionHoverContext(entry, outcome));
+            return holder;
         }
         catch (Exception e)
         {
-            CoreMain.Logger.Error($"PotionCompendiumHistory could not create native holder for {potionId}: {e}");
+            CoreMain.Logger.Error(
+                $"PotionCompendiumHistory could not create native holder for {entry.PotionId}: {e}");
             return null;
         }
+    }
+
+    private static string BuildTooltipBody(PotionRunHistoryEntry entry, string outcome)
+    {
+        var body = new StringBuilder();
+        if (!entry.Acquired)
+        {
+            AppendTooltipRow(
+                body,
+                "Seen",
+                FormatLocation(entry.SeenFloor, entry.SeenLocationKind, entry.SeenLocationName));
+            AppendTooltipRow(body, "Method", entry.AcquisitionMethod);
+            AppendTooltipRow(body, "Outcome", "Not taken");
+            return body.ToString().TrimEnd();
+        }
+
+        AppendTooltipRow(
+            body,
+            "Acquired",
+            FormatLocation(entry.AcquiredFloor, entry.AcquiredLocationKind, entry.AcquiredLocationName));
+        AppendTooltipRow(body, "Method", entry.AcquisitionMethod);
+
+        if (entry.Used)
+        {
+            AppendTooltipRow(
+                body,
+                "Used",
+                FormatLocation(entry.UsedFloor, entry.UsedLocationKind, entry.UsedLocationName));
+        }
+        else if (entry.Discarded)
+        {
+            AppendTooltipRow(
+                body,
+                "Discarded",
+                FormatLocation(
+                    entry.DiscardedFloor,
+                    entry.DiscardedLocationKind,
+                    entry.DiscardedLocationName));
+        }
+        else if (entry.HeldAtRunEnd || outcome != "in_progress")
+        {
+            AppendTooltipRow(
+                body,
+                "Held at run end",
+                entry.HeldAtRunEndFloor.HasValue
+                    ? $"Floor {entry.HeldAtRunEndFloor.Value}"
+                    : "Final floor unknown");
+        }
+        else
+        {
+            AppendTooltipRow(body, "Status", "Held now");
+        }
+
+        return body.ToString().TrimEnd();
+    }
+
+    private static void AppendTooltipRow(StringBuilder body, string label, string value)
+    {
+        body.Append(StatsTooltip.EscapeBbcode(label));
+        body.Append("  [b]");
+        body.Append(StatsTooltip.EscapeBbcode(value));
+        body.Append("[/b]\n");
     }
 
     private static string FormatLocation(int? floor, string? kind, string? name)
@@ -373,15 +418,6 @@ internal static class PotionCompendiumHistoryUi
         if (!string.IsNullOrWhiteSpace(name)) parts.Add(name!);
         return parts.Count == 0 ? "Unknown location" : string.Join(" · ", parts);
     }
-
-    private static Label NewLabel(string text)
-        => new()
-        {
-            Text = text,
-            AutowrapMode = TextServer.AutowrapMode.WordSmart,
-            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-        };
 
     private static IEnumerable<NPotionLabCategory> GetCategories(NPotionLab lab)
     {
@@ -473,4 +509,8 @@ internal static class PotionCompendiumHistoryUi
             if (GodotObject.IsInstanceValid(Category)) Category.Visible = Visible;
         }
     }
+
+    private sealed record PotionHoverContext(
+        PotionRunHistoryEntry Entry,
+        string Outcome);
 }

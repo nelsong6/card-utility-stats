@@ -8,6 +8,7 @@ using MegaCrit.Sts2.Core.Nodes.Cards.Holders;
 using MegaCrit.Sts2.Core.Nodes.Combat;
 using MegaCrit.Sts2.Core.Nodes.HoverTips;
 using MegaCrit.Sts2.Core.Nodes.Relics;
+using MegaCrit.Sts2.Core.Nodes.Screens.PotionLab;
 using MegaCrit.Sts2.Core.Nodes.Screens.RelicCollection;
 using MegaCrit.Sts2.Core.Nodes.Screens.RunHistoryScreen;
 
@@ -235,6 +236,11 @@ internal static class NativeStatsHoverTipFactory
 
             case NRelicCollectionEntry entry
                 when CompendiumRelicStatsContext.TryBuildNativeHoverTip(entry, out tip):
+                statsTip = tip;
+                return true;
+
+            case NLabPotionHolder holder
+                when PotionCompendiumHistoryUi.TryBuildNativeHoverTip(holder, out tip):
                 statsTip = tip;
                 return true;
 

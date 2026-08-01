@@ -56,11 +56,10 @@ window's Close button also closes it.
 The same modal includes **View current-run potion history**, which opens the
 game's Compendium → Potion Gallery directly in SpireLens's **Current run
 stats** mode. The potion gallery dropdown switches between the normal gallery
-and a vertical current-run timeline. Each entry uses the gallery's native
-hoverable potion holder and shows whether the potion was left behind, used,
-discarded, or held, along with its acquisition method and observed floor/room
-context. Potions still in the belt when the run ends receive a distinct
-**Held at run end** marker.
+and a two-column vertical timeline: potions seen but not taken on the left and
+potions taken on the right. Timeline entries are only the gallery's native
+hoverable potion holders; acquisition, use, discard, and held-at-run-end
+details appear in their ordinary hover tooltips.
 
 The optional, mutually exclusive relic-bar filters hide already-resolved relics
 while leaving them owned, functional, and visible on every other relic surface.
