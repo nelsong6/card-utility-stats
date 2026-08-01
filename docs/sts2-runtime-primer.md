@@ -604,6 +604,16 @@ The activation floor is the current run floor at that successful reward
 modification; subtract the relic's saved `FloorAddedToDeck` to report floors
 ascended before activation.
 
+Small Capsule constructs one unpopulated `RelicReward` and passes it to
+`RewardsCmd.OfferCustom` synchronously before its pickup callback's first
+await. Open a registration window around `SmallCapsule.AfterObtained`, bind
+only that exact reward in the shared `OfferCustom` hook, and preserve the weak
+marker in process-stable `AppDomain` data across Core reloads. The concrete
+relic is authoritative only after `RelicReward.Populate`; resolve that same
+entry as taken only after `OnSelect` returns true and exposes `ClaimedRelic`,
+or as skipped from `OnSkipped`. Do not infer either outcome from a later relic
+inventory comparison.
+
 Dowsing Rod itself only grants the Dowsing quest card. The card owns the saved
 `RoomsEntered` counter, updates it only for qualifying `?` room entries, and
 transforms into Abundance at five. Observe the `Dowsing.RoomsEntered` setter and

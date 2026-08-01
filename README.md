@@ -168,6 +168,9 @@ Petrified Toad records Potion Shaped Rocks successfully given and attempts
 blocked specifically by a full potion belt.
 Pumpkin Candle records its Ancient energy contribution, average combat-start
 charges, and campfire rekindles.
+Small Capsule records the exact relic rolled on its reward screen and whether
+that same reward was taken or left behind, with the relic remaining hoverable
+in the SpireLens tooltip.
 
 Drain Power additionally tracks its observed discard-pile upgrades and later
 plays of the exact combat cards it upgraded, with held-turn and held-combat

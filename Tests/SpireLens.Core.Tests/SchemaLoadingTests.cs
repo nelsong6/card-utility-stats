@@ -5398,6 +5398,43 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsSmallCapsuleRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("small-capsule-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertSmallCapsuleFixture(
+            loaded.Data.RelicAggregates["RELIC.SMALL_CAPSULE"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsSmallCapsuleRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("small-capsule-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertSmallCapsuleFixture(
+            resumed!.RelicAggregates["RELIC.SMALL_CAPSULE"]);
+    }
+
+    private static void AssertSmallCapsuleFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(2, relicAgg.RelicRewardChoices.Count);
+        Assert.Equal(1, relicAgg.RelicRewardChoices[0].ChoiceNumber);
+        Assert.Equal("RELIC.DATA_DISK", relicAgg.RelicRewardChoices[0].RelicId);
+        Assert.Equal("Data Disk", relicAgg.RelicRewardChoices[0].DisplayName);
+        Assert.Equal("taken", relicAgg.RelicRewardChoices[0].Outcome);
+        Assert.Equal(2, relicAgg.RelicRewardChoices[1].ChoiceNumber);
+        Assert.Equal(
+            "RELIC.BAG_OF_PREPARATION",
+            relicAgg.RelicRewardChoices[1].RelicId);
+        Assert.Equal("skipped", relicAgg.RelicRewardChoices[1].Outcome);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsSwordInTheStoneRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(

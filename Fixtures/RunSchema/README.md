@@ -533,6 +533,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `pumpkin-candle-relic-run.json`
   Adds Pumpkin Candle's generated Ancient energy, zero-inclusive combat-start
   charge samples, and selected Kindle campfire options.
+- `small-capsule-relic-run.json`
+  Adds Small Capsule's concrete rolled relic plus the terminal taken/skipped
+  outcome for that exact reward.
 
 Why these exist:
 

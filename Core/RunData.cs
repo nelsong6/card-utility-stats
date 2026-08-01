@@ -1157,6 +1157,11 @@ public class RelicAggregate
     // relics were obtained.
     public Dictionary<string, RelicGrantedAggregate> RelicsGranted { get; set; } = new();
 
+    // Ordered relic rewards created by Small Capsule. Each entry preserves
+    // the concrete relic rolled by the game and whether it was taken, skipped,
+    // or is still awaiting a decision.
+    public List<RelicRewardChoiceAggregate> RelicRewardChoices { get; set; } = new();
+
     // Total offered cards by rarity for relics that generate card-choice
     // screens. Used by Toolbox, White Star, and Prayer Wheel.
     public int CommonCardsOffered { get; set; }
@@ -1603,6 +1608,14 @@ public class RelicGrantedAggregate
     public string RelicId { get; set; } = "";
     public string DisplayName { get; set; } = "";
     public int Count { get; set; }
+}
+
+public class RelicRewardChoiceAggregate
+{
+    public int ChoiceNumber { get; set; }
+    public string RelicId { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public string Outcome { get; set; } = "pending";
 }
 
 public class RelicCardTransformationAggregate

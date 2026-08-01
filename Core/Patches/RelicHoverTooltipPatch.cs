@@ -1280,6 +1280,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is SmallCapsule)
+        {
+            title = "Small Capsule";
+            body = BuildSmallCapsuleBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is LargeCapsule)
         {
             title = "Large Capsule";
@@ -4366,6 +4373,49 @@ public static class RelicHoverShowPatch
                 : relic.DisplayName);
             var value = relic.Count == 1 ? displayName : $"{displayName} x{relic.Count}";
             TextValueRow(sb, "Obtained", value, "");
+        }
+
+        return sb.ToString();
+    }
+
+    private static string BuildSmallCapsuleBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var choices = (agg.RelicRewardChoices
+                ?? new List<RelicRewardChoiceAggregate>())
+            .Where(choice => choice != null)
+            .OrderBy(choice => choice.ChoiceNumber)
+            .ToList();
+
+        if (choices.Count == 0)
+        {
+            TextValueRow(sb, "Relic choice", "not rolled yet", "");
+            return sb.ToString();
+        }
+
+        foreach (var choice in choices)
+        {
+            var displayName = string.IsNullOrWhiteSpace(choice.DisplayName)
+                ? string.IsNullOrWhiteSpace(choice.RelicId)
+                    ? "Unknown relic"
+                    : RunTracker.FormatRelicIdForDisplay(choice.RelicId)
+                : choice.DisplayName;
+            var icon = StatConceptGlossary.RenderHintedInlineImage(
+                ResolveGrantedRelicIconPath(choice.RelicId),
+                displayName);
+            var outcome = choice.Outcome?.Trim().ToLowerInvariant() switch
+            {
+                "taken" => "taken",
+                "skipped" => "not taken",
+                _ => "not chosen yet",
+            };
+            DescribedIconFlowRow(
+                sb,
+                [],
+                [],
+                icon,
+                outcome,
+                $"{displayName} was offered by Small Capsule and was {outcome}.");
         }
 
         return sb.ToString();

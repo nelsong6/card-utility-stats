@@ -86,6 +86,8 @@ public static class RunTracker
         "SpireLens.PendingEggOfferAttributions";
     private const string WongosMysteryTicketRewardAttributionsAppDomainKey =
         "SpireLens.WongosMysteryTicketRewardAttributions";
+    private const string SmallCapsuleRewardAttributionsAppDomainKey =
+        "SpireLens.SmallCapsuleRewardAttributions";
     private const string WhiteStarRewardAttributionsAppDomainKey =
         "SpireLens.WhiteStarRewardAttributions";
     private const string PrayerWheelRewardAttributionsAppDomainKey =
@@ -119,6 +121,9 @@ public static class RunTracker
     private static readonly ConditionalWeakTable<object, Tuple<int>>
         _wongosMysteryTicketRewardAttributions =
             GetWongosMysteryTicketRewardAttributions();
+    private static readonly ConditionalWeakTable<object, Tuple<int>>
+        _smallCapsuleRewardAttributions =
+            GetSmallCapsuleRewardAttributions();
     private static readonly ConditionalWeakTable<object, Tuple<int>>
         _whiteStarRewardAttributions =
             GetWhiteStarRewardAttributions();
@@ -177,6 +182,7 @@ public static class RunTracker
     private static readonly Dictionary<CardReward, PendingPrayerWheelReward> _prayerWheelRewardCardsBeforeSelection =
         new(ReferenceEqualityComparer.Instance);
     private static Orrery? _orreryRewardRegistrationRelic;
+    private static SmallCapsule? _smallCapsuleRewardRegistrationRelic;
     private static readonly List<int> _silverCrucibleRestoreBatchScreenNumbers = new();
     private static int _silverCrucibleRestoreBatchDepth;
     private static readonly Dictionary<Player, PendingRegalPillowRestHeal> _pendingRegalPillowRestHeals = new(ReferenceEqualityComparer.Instance);
@@ -1220,6 +1226,7 @@ public static class RunTracker
         _whiteStarRewardRareCardsBeforeSelection.Clear();
         _prayerWheelRewardCardsBeforeSelection.Clear();
         _orreryRewardRegistrationRelic = null;
+        _smallCapsuleRewardRegistrationRelic = null;
         _silverCrucibleRestoreBatchScreenNumbers.Clear();
         _silverCrucibleRestoreBatchDepth = 0;
         _pendingRegalPillowRestHeals.Clear();
@@ -2124,6 +2131,7 @@ public static class RunTracker
         target.RareRelicsAcquired += source.RareRelicsAcquired;
         target.CampfiresNotDug += source.CampfiresNotDug;
         MergeRelicsGranted(target.RelicsGranted, source.RelicsGranted);
+        MergeRelicRewardChoices(target, source);
         target.CommonCardsOffered += source.CommonCardsOffered;
         target.UncommonCardsOffered += source.UncommonCardsOffered;
         target.RareCardsOffered += source.RareCardsOffered;
@@ -6826,6 +6834,7 @@ public static class RunTracker
     private const string PetrifiedToadRelicId = "RELIC.PETRIFIED_TOAD";
     private const string ShovelRelicId = "RELIC.SHOVEL";
     private const string TinyMailboxRelicId = "RELIC.TINY_MAILBOX";
+    private const string SmallCapsuleRelicId = "RELIC.SMALL_CAPSULE";
     private const string LargeCapsuleRelicId = "RELIC.LARGE_CAPSULE";
     private const string NeowsBonesRelicId = "RELIC.NEOWS_BONES";
     private const string BoundPhylacteryRelicId = "RELIC.BOUND_PHYLACTERY";
@@ -7007,6 +7016,23 @@ public static class RunTracker
         var created = new ConditionalWeakTable<object, Tuple<int>>();
         AppDomain.CurrentDomain.SetData(
             WongosMysteryTicketRewardAttributionsAppDomainKey,
+            created);
+        return created;
+    }
+
+    private static ConditionalWeakTable<object, Tuple<int>>
+        GetSmallCapsuleRewardAttributions()
+    {
+        if (AppDomain.CurrentDomain.GetData(
+                SmallCapsuleRewardAttributionsAppDomainKey)
+            is ConditionalWeakTable<object, Tuple<int>> existing)
+        {
+            return existing;
+        }
+
+        var created = new ConditionalWeakTable<object, Tuple<int>>();
+        AppDomain.CurrentDomain.SetData(
+            SmallCapsuleRewardAttributionsAppDomainKey,
             created);
         return created;
     }
@@ -10131,6 +10157,247 @@ public static class RunTracker
                 CoreMain.LogDebug($"RecordShovelRelicsAcquired failed: {e.Message}");
             }
         }
+    }
+
+    /// <summary>
+    /// Open the narrow synchronous registration window around Small Capsule's
+    /// pickup callback. It constructs one RelicReward and passes it to
+    /// RewardsCmd.OfferCustom before its first await.
+    /// </summary>
+    public static bool BeginSmallCapsuleRewardRegistration(SmallCapsule relic)
+    {
+        if (relic?.Owner == null) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(relic.Owner))
+                    return false;
+
+                _smallCapsuleRewardRegistrationRelic = relic;
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"BeginSmallCapsuleRewardRegistration failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    public static void EndSmallCapsuleRewardRegistration()
+    {
+        lock (_lock)
+        {
+            _smallCapsuleRewardRegistrationRelic = null;
+        }
+    }
+
+    /// <summary>
+    /// Bind only the RelicReward created by the active Small Capsule pickup.
+    /// The weak marker keeps the exact reward attributable across Core reloads
+    /// while its reward screen remains open.
+    /// </summary>
+    public static void RegisterSmallCapsuleCustomRewards(
+        Player player,
+        List<Reward> rewards)
+    {
+        if (player == null || rewards == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var relic = _smallCapsuleRewardRegistrationRelic;
+                if (relic?.Owner == null
+                    || !ReferenceEquals(relic.Owner, player)
+                    || !IsTrackedRelic(relic)
+                    || !IsTrackedPlayer(player))
+                {
+                    return;
+                }
+
+                var relicRewards = rewards
+                    .OfType<RelicReward>()
+                    .Where(reward => ReferenceEquals(reward.Player, player))
+                    .ToList();
+                if (rewards.Count != 1 || relicRewards.Count != 1)
+                {
+                    CoreMain.LogDebug(
+                        "RegisterSmallCapsuleCustomRewards expected one relic reward; "
+                        + $"observed {rewards.Count} rewards and {relicRewards.Count} relic rewards.");
+                    return;
+                }
+
+                var aggregate = GetOrCreateCurrentRunRelicAggregateLocked(
+                    SmallCapsuleRelicId);
+                var choiceNumber = (aggregate.RelicRewardChoices
+                        ?? new List<RelicRewardChoiceAggregate>())
+                    .Where(choice => choice != null)
+                    .Select(choice => choice.ChoiceNumber)
+                    .DefaultIfEmpty(0)
+                    .Max() + 1;
+                RecordSmallCapsuleRewardChoiceForTest(
+                    aggregate,
+                    choiceNumber,
+                    relicId: null,
+                    displayName: null,
+                    outcome: "pending");
+
+                var reward = relicRewards[0];
+                _smallCapsuleRewardAttributions.Remove(reward);
+                _smallCapsuleRewardAttributions.Add(
+                    reward,
+                    Tuple.Create(choiceNumber));
+
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RegisterSmallCapsuleCustomRewards failed: {e.Message}");
+            }
+        }
+    }
+
+    public static bool IsSmallCapsuleRelicReward(RelicReward reward)
+    {
+        if (reward == null) return false;
+
+        lock (_lock)
+        {
+            return _smallCapsuleRewardAttributions.TryGetValue(reward, out _);
+        }
+    }
+
+    public static void RecordSmallCapsuleRelicRewardOffered(RelicReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!RecordSmallCapsuleRelicRewardOfferedLocked(reward)) return;
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordSmallCapsuleRelicRewardOffered failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordSmallCapsuleRelicRewardClaimed(RelicReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_smallCapsuleRewardAttributions.TryGetValue(
+                        reward,
+                        out var attribution))
+                {
+                    return;
+                }
+
+                RecordSmallCapsuleRelicRewardOfferedLocked(reward);
+                var relic = reward.ClaimedRelic;
+                if (relic == null
+                    || reward.Player == null
+                    || !IsTrackedPlayer(reward.Player))
+                {
+                    return;
+                }
+
+                var aggregate = GetOrCreateCurrentRunRelicAggregateLocked(
+                    SmallCapsuleRelicId);
+                RecordSmallCapsuleRewardChoiceForTest(
+                    aggregate,
+                    attribution.Item1,
+                    relic.Id.ToString(),
+                    GetRelicDisplayName(relic),
+                    "taken");
+                _smallCapsuleRewardAttributions.Remove(reward);
+
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordSmallCapsuleRelicRewardClaimed failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordSmallCapsuleRelicRewardSkipped(RelicReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_smallCapsuleRewardAttributions.TryGetValue(
+                        reward,
+                        out var attribution))
+                {
+                    return;
+                }
+
+                RecordSmallCapsuleRelicRewardOfferedLocked(reward);
+                var relic = reward.Relic;
+                var aggregate = GetOrCreateCurrentRunRelicAggregateLocked(
+                    SmallCapsuleRelicId);
+                RecordSmallCapsuleRewardChoiceForTest(
+                    aggregate,
+                    attribution.Item1,
+                    relic?.Id.ToString(),
+                    relic == null ? null : GetRelicDisplayName(relic),
+                    "skipped");
+                _smallCapsuleRewardAttributions.Remove(reward);
+
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordSmallCapsuleRelicRewardSkipped failed: {e.Message}");
+            }
+        }
+    }
+
+    private static bool RecordSmallCapsuleRelicRewardOfferedLocked(
+        RelicReward reward)
+    {
+        if (!_smallCapsuleRewardAttributions.TryGetValue(
+                reward,
+                out var attribution))
+        {
+            return false;
+        }
+
+        var relic = reward.Relic;
+        if (relic == null || !IsTrackedPlayer(reward.Player)) return false;
+
+        var aggregate = GetOrCreateCurrentRunRelicAggregateLocked(
+            SmallCapsuleRelicId);
+        RecordSmallCapsuleRewardChoiceForTest(
+            aggregate,
+            attribution.Item1,
+            relic.Id.ToString(),
+            GetRelicDisplayName(relic),
+            "pending");
+        return true;
     }
 
     public static bool BeginLargeCapsulePickup(
@@ -17537,6 +17804,52 @@ public static class RunTracker
     {
         if (agg == null || string.IsNullOrWhiteSpace(relicId)) return;
         AddRelicGranted(agg.RelicsGranted, relicId, displayName ?? "", 1);
+    }
+
+    internal static void RecordSmallCapsuleRewardChoiceForTest(
+        RelicAggregate aggregate,
+        int choiceNumber,
+        string? relicId,
+        string? displayName,
+        string? outcome)
+    {
+        if (aggregate == null || choiceNumber < 1) return;
+
+        var normalizedOutcome = outcome?.Trim().ToLowerInvariant() switch
+        {
+            "taken" => "taken",
+            "skipped" => "skipped",
+            _ => "pending",
+        };
+        aggregate.RelicRewardChoices ??= new List<RelicRewardChoiceAggregate>();
+        var existing = aggregate.RelicRewardChoices.FirstOrDefault(choice =>
+            choice != null && choice.ChoiceNumber == choiceNumber);
+        if (existing == null)
+        {
+            existing = new RelicRewardChoiceAggregate
+            {
+                ChoiceNumber = choiceNumber,
+            };
+            aggregate.RelicRewardChoices.Add(existing);
+        }
+
+        if (!string.IsNullOrWhiteSpace(relicId))
+            existing.RelicId = relicId;
+        if (!string.IsNullOrWhiteSpace(displayName))
+            existing.DisplayName = displayName;
+        if (normalizedOutcome != "pending"
+            || string.IsNullOrWhiteSpace(existing.Outcome)
+            || string.Equals(
+                existing.Outcome,
+                "pending",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            existing.Outcome = normalizedOutcome;
+        }
+
+        aggregate.RelicRewardChoices.Sort((left, right) =>
+            (left?.ChoiceNumber ?? int.MaxValue).CompareTo(
+                right?.ChoiceNumber ?? int.MaxValue));
     }
 
     internal static void RecordPaelsWingRelicGainedForTest(
@@ -25632,6 +25945,35 @@ public static class RunTracker
             if (relic.Count <= 0) continue;
             var relicId = string.IsNullOrWhiteSpace(relic.RelicId) ? kvp.Key : relic.RelicId;
             AddRelicGranted(target, relicId, relic.DisplayName, relic.Count);
+        }
+    }
+
+    private static void MergeRelicRewardChoices(
+        RelicAggregate target,
+        RelicAggregate source)
+    {
+        if (source.RelicRewardChoices == null
+            || source.RelicRewardChoices.Count == 0)
+        {
+            return;
+        }
+
+        target.RelicRewardChoices ??= new List<RelicRewardChoiceAggregate>();
+        var nextChoiceNumber = target.RelicRewardChoices
+            .Where(choice => choice != null)
+            .Select(choice => choice.ChoiceNumber)
+            .DefaultIfEmpty(0)
+            .Max() + 1;
+        foreach (var choice in source.RelicRewardChoices
+                     .Where(choice => choice != null)
+                     .OrderBy(choice => choice.ChoiceNumber))
+        {
+            RecordSmallCapsuleRewardChoiceForTest(
+                target,
+                nextChoiceNumber++,
+                choice.RelicId,
+                choice.DisplayName,
+                choice.Outcome);
         }
     }
 
