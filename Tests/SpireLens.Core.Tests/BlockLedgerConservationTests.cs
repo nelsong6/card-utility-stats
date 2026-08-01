@@ -4,13 +4,10 @@ using Xunit;
 namespace SpireLens.Core.Tests;
 
 /// <summary>
-/// Pins the per-card block-ledger attribution (issue #6): absorbed damage is
-/// credited FIFO (oldest block first) as TotalBlockEffective, block cleared
-/// unused at end of turn is charged LIFO (newest survivor first) as
-/// TotalBlockWasted, and for every card-attributed chunk
-/// TotalBlockGained == TotalBlockEffective + TotalBlockWasted (the invariant the
-/// CardHover tooltip relies on — it divides absorbed% and wasted% by
-/// TotalBlockGained).
+/// Pins the source-owned block-ledger attribution (issue #6): absorbed damage
+/// is credited FIFO (oldest block first), block cleared unused at end of turn
+/// is charged LIFO (newest survivor first), and each card- or relic-owned chunk
+/// returns its outcomes only to that source.
 /// </summary>
 public class BlockLedgerConservationTests
 {
@@ -43,9 +40,9 @@ public class BlockLedgerConservationTests
     [Fact]
     public void UnattributedChunk_IsConsumedButCreditsNoCard()
     {
-        // A null cardInstanceId chunk models relic/innate block: it absorbs
-        // damage (removing it from the ledger) but must not mint a phantom
-        // aggregate for any card, nor credit TotalBlockGained.
+        // A chunk with no source models unknown/innate block: it absorbs damage
+        // (removing it from the ledger) but must not mint a phantom aggregate
+        // for any card, nor credit TotalBlockGained.
         var pending = RunTracker.RunBlockLedgerForTest(
             gains: new (string?, int)[] { (null, 4), ("CARD.DEFEND#1", 4) },
             blockedDamage: 6,
@@ -59,6 +56,28 @@ public class BlockLedgerConservationTests
         Assert.Equal(4, a.TotalBlockGained);
         // 6 blocked: null chunk eats 4 (FIFO first), card eats 2.
         Assert.Equal(2, a.TotalBlockEffective);
+    }
+
+    [Fact]
+    public void RelicOwnedChunk_CreditsOnlyThatRelicsEffectiveAndWastedBlock()
+    {
+        var pending = RunTracker.RunBlockLedgerWithSourcesForTest(
+            gains: new (string?, string?, int)[]
+            {
+                (null, "RELIC.ORNAMENTAL_FAN", 4),
+            },
+            blockedDamage: 3,
+            clearedUnusedBlock: 1);
+
+        Assert.Empty(pending.CombatAggregates);
+        var fan = pending.RelicAggregates["RELIC.ORNAMENTAL_FAN"];
+        Assert.Equal(4, fan.AdditionalBlockGained);
+        Assert.Equal(4, fan.OrnamentalFanRateBlockGained);
+        Assert.Equal(3, fan.AdditionalBlockEffective);
+        Assert.Equal(1, fan.AdditionalBlockWasted);
+        Assert.Equal(
+            fan.AdditionalBlockGained,
+            fan.AdditionalBlockEffective + fan.AdditionalBlockWasted);
     }
 
     [Fact]

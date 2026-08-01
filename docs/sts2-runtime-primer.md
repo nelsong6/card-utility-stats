@@ -396,9 +396,14 @@ The game has one block pool, not per-card block. SpireLens uses a provenance led
 
 The current mental model:
 
-- When a card grants block, add a `BlockChunk` with a source card instance and sequence.
-- When incoming damage consumes block, absorbed block is charged through the ledger in FIFO order.
-- When block clears/expires unused, wasted block is charged through surviving ledger chunks in LIFO order, matching the idea that later overfill was more likely redundant.
+- When a tracked source grants block, add a `BlockChunk` with exactly one
+  owner: a card instance or relic id. Truly unknown/innate block remains
+  ownerless.
+- When incoming damage consumes block, absorbed block is charged through the
+  ledger in FIFO order and returned to that chunk's card or relic aggregate.
+- When block clears/expires unused, wasted block is charged through surviving
+  ledger chunks in LIFO order and returned to that chunk's owner, matching the
+  idea that later overfill was more likely redundant.
 - Retain/prevent-clear effects must cancel pending clear attribution.
 
 Relevant hooks:
@@ -408,7 +413,8 @@ Relevant hooks:
 - `Hook.AfterBlockCleared` confirms clear and attributes waste,
 - `Hook.AfterPreventingBlockClear` cancels the armed clear.
 
-When changing block logic, be explicit that effective/wasted block is heuristic ledger attribution, not a game-native per-card truth.
+When changing block logic, be explicit that effective/wasted block is heuristic
+ledger attribution, not a game-native per-source truth.
 
 ## Draw Attribution
 
@@ -960,10 +966,14 @@ Count owner Attack plays at that callback, snapshot unused modulo charge from
 narrow outcome: power delta for Kunai/Shuriken, the resolved block-command
 result for Ornamental Fan, and the resolved single-target damage result for
 Kusarigama. Ornamental Fan's block command has a null `CardPlay`; recognize its
-single resulting history entry as relic-owned and exclude it from the generic
-current/recent-card fallback and card block ledger. Ornamental Fan preserves
-zero-charge turn ends as an explicit bucket in addition to the shared
-average-charge sample. Kusarigama only
+single resulting history entry as relic-owned, bypass the generic
+current/recent-card fallback, and append a relic-source block chunk. The shared
+FIFO-absorb/LIFO-waste ledger then credits effective and wasted block to
+Ornamental Fan alone. Use every held player turn and combat for its block-rate
+denominators, with a matching observation-era block numerator because its
+lifetime block total predates those denominators. Ornamental Fan preserves
+zero-charge turn ends as an explicit bucket in addition to the shared average
+charge sample. Kusarigama only
 activates when its threshold play can choose a hittable enemy; do not infer an
 activation from the counter alone.
 

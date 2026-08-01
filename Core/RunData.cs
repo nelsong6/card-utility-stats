@@ -755,6 +755,12 @@ public class RelicAggregate
     // Regalite, and Vambrace's extra block from its multiplier.
     public int AdditionalBlockGained { get; set; }
 
+    // Relic-owned block provenance outcomes. Ornamental Fan currently uses
+    // these to retain sole ownership of its block after the shared player
+    // pool later absorbs damage or expires unused.
+    public int AdditionalBlockEffective { get; set; }
+    public int AdditionalBlockWasted { get; set; }
+
     // Cloak Clasp held-period denominators. Turns include every player turn
     // where the relic was held, even when combat ended before its turn-end
     // callback or the player had no cards in hand.
@@ -1246,6 +1252,12 @@ public class RelicAggregate
     public int OrnamentalFanTurnsEndedAt2Charges { get; set; }
     public int OrnamentalFanTurnEndChargeTotal { get; set; }
     public int OrnamentalFanTurnEndChargeCount { get; set; }
+    // Held-period denominators and their matching observation-era numerator.
+    // AdditionalBlockGained predates these fields, so older lifetime block
+    // must not be divided by only newly observed turns/combats.
+    public int OrnamentalFanRateBlockGained { get; set; }
+    public int OrnamentalFanTurns { get; set; }
+    public int OrnamentalFanCombats { get; set; }
     public int ShurikenAttacksPlayed { get; set; }
     public int ShurikenTurnsEndedAt1Charge { get; set; }
     public int ShurikenTurnsEndedAt2Charges { get; set; }

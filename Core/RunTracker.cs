@@ -146,7 +146,7 @@ public static class RunTracker
     private static readonly List<Creature> _pendingKusarigamaDamageAttributions = new();
     private static readonly List<Creature> _pendingFestivePopperDamageAttributions = new();
     private static readonly List<Creature> _pendingOrnamentalFanBlockAttributions = new();
-    private static readonly List<Creature> _pendingOrnamentalFanBlockHistorySuppressions = new();
+    private static readonly List<Creature> _pendingOrnamentalFanBlockHistoryAttributions = new();
     private static readonly List<Creature> _pendingIntimidatingHelmetBlockAttributions = new();
     private static readonly List<Creature> _pendingDaughterOfTheWindBlockAttributions = new();
     private static readonly List<PendingDanseMacabreBlockAttribution> _pendingDanseMacabreBlockAttributions = new();
@@ -1171,7 +1171,7 @@ public static class RunTracker
         _pendingKusarigamaDamageAttributions.Clear();
         _pendingFestivePopperDamageAttributions.Clear();
         _pendingOrnamentalFanBlockAttributions.Clear();
-        _pendingOrnamentalFanBlockHistorySuppressions.Clear();
+        _pendingOrnamentalFanBlockHistoryAttributions.Clear();
         _pendingIntimidatingHelmetBlockAttributions.Clear();
         _pendingDaughterOfTheWindBlockAttributions.Clear();
         _pendingDanseMacabreBlockAttributions.Clear();
@@ -1813,6 +1813,7 @@ public static class RunTracker
         RecordEmberTeaActiveTurnForTrackedPlayerLocked();
         RecordRedSkullActivePeriodForTrackedPlayerLocked();
         RecordRippleBasinTurnForTrackedPlayerLocked();
+        RecordOrnamentalFanTurnForTrackedPlayerLocked();
         RecordReptileTrinketTurnForTrackedPlayerLocked();
         RecordRainbowRingTurnForTrackedPlayerLocked();
         RecordBeatingRemnantTurnForTrackedPlayerLocked();
@@ -1944,6 +1945,8 @@ public static class RunTracker
         target.PendulumCombatEndChargeTotal += source.PendulumCombatEndChargeTotal;
         target.PendulumCombatEndChargeCount += source.PendulumCombatEndChargeCount;
         target.AdditionalBlockGained += source.AdditionalBlockGained;
+        target.AdditionalBlockEffective += source.AdditionalBlockEffective;
+        target.AdditionalBlockWasted += source.AdditionalBlockWasted;
         target.CloakClaspTurns += source.CloakClaspTurns;
         target.CloakClaspCombats += source.CloakClaspCombats;
         target.PermafrostCombats += source.PermafrostCombats;
@@ -2176,6 +2179,9 @@ public static class RunTracker
         target.OrnamentalFanTurnsEndedAt2Charges += source.OrnamentalFanTurnsEndedAt2Charges;
         target.OrnamentalFanTurnEndChargeTotal += source.OrnamentalFanTurnEndChargeTotal;
         target.OrnamentalFanTurnEndChargeCount += source.OrnamentalFanTurnEndChargeCount;
+        target.OrnamentalFanRateBlockGained += source.OrnamentalFanRateBlockGained;
+        target.OrnamentalFanTurns += source.OrnamentalFanTurns;
+        target.OrnamentalFanCombats += source.OrnamentalFanCombats;
         target.ShurikenAttacksPlayed += source.ShurikenAttacksPlayed;
         target.ShurikenTurnsEndedAt1Charge += source.ShurikenTurnsEndedAt1Charge;
         target.ShurikenTurnsEndedAt2Charges += source.ShurikenTurnsEndedAt2Charges;
@@ -15799,10 +15805,10 @@ public static class RunTracker
                 if (!ConsumePendingCreatureAttribution(_pendingOrnamentalFanBlockAttributions, creature))
                     return false;
 
-                // Ornamental Fan invokes GainBlock with a null CardPlay. Mark the
-                // resulting history entry as relic-owned so the generic recent-card
-                // fallback cannot also credit the Attack that triggered the relic.
-                _pendingOrnamentalFanBlockHistorySuppressions.Add(creature);
+                // Ornamental Fan invokes GainBlock with a null CardPlay. Carry
+                // its ownership into the resulting history entry so the shared
+                // block ledger credits the relic rather than the triggering Attack.
+                _pendingOrnamentalFanBlockHistoryAttributions.Add(creature);
                 return true;
             }
             catch (Exception e)
@@ -15819,7 +15825,7 @@ public static class RunTracker
         lock (_lock)
         {
             ConsumePendingCreatureAttribution(_pendingOrnamentalFanBlockAttributions, creature);
-            ConsumePendingCreatureAttribution(_pendingOrnamentalFanBlockHistorySuppressions, creature);
+            ConsumePendingCreatureAttribution(_pendingOrnamentalFanBlockHistoryAttributions, creature);
         }
     }
 
@@ -15854,7 +15860,40 @@ public static class RunTracker
     internal static void RecordOrnamentalFanBlockGainedForTest(RelicAggregate agg, decimal amount)
     {
         if (agg == null || amount <= 0m) return;
-        agg.AdditionalBlockGained += (int)amount;
+        var gained = (int)amount;
+        agg.AdditionalBlockGained += gained;
+        agg.OrnamentalFanRateBlockGained += gained;
+    }
+
+    public static void RecordOrnamentalFanTurnStarted(Player player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                _pendingCombat ??= new PendingCombat();
+                RecordOrnamentalFanTurnForPlayerLocked(player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordOrnamentalFanTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordOrnamentalFanCombatForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.OrnamentalFanCombats += Math.Max(0, count);
+    }
+
+    internal static void RecordOrnamentalFanTurnForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.OrnamentalFanTurns += Math.Max(0, count);
     }
 
     internal static void RecordOrnamentalFanTurnEndChargeForTest(RelicAggregate agg, int charge)
@@ -16019,6 +16058,48 @@ public static class RunTracker
         _pendingCombat.OrnamentalFanTurnEndChargeRecordedTurns[player] = turnNumber;
         var agg = GetOrCreatePendingRelicAggregateLocked(OrnamentalFanRelicId);
         RecordOrnamentalFanTurnEndChargeForTest(agg, OrnamentalFanCharge(relic));
+    }
+
+    private static void RecordOrnamentalFanCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null || !TryGetOrnamentalFan(player, out _)) return;
+        if (!_pendingCombat.OrnamentalFanCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(OrnamentalFanRelicId);
+        RecordOrnamentalFanCombatForTest(agg);
+    }
+
+    private static void RecordOrnamentalFanTurnForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordOrnamentalFanTurnForPlayerLocked(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordOrnamentalFanTurnForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordOrnamentalFanTurnForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null || !TryGetOrnamentalFan(player, out _)) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.OrnamentalFanTurnCountedTurns.TryGetValue(player, out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.OrnamentalFanTurnCountedTurns[player] = turnNumber;
+        RecordOrnamentalFanCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(OrnamentalFanRelicId);
+        RecordOrnamentalFanTurnForTest(agg);
     }
 
     private static void RecordShurikenTurnEndChargeForPlayerLocked(Player player, int turnNumber)
@@ -22268,6 +22349,7 @@ public static class RunTracker
             RecordRegaliteCombatForPlayerLocked(player);
             RecordIntimidatingHelmetCombatForPlayerLocked(player);
             RecordDaughterOfTheWindCombatForPlayerLocked(player);
+            RecordOrnamentalFanCombatForPlayerLocked(player);
             RecordSturdyClampCombatForPlayerLocked(player);
             RecordBeatingRemnantCombatForPlayerLocked(player);
             RecordWhisperingEarringCombatForPlayerLocked(player);
@@ -27588,8 +27670,9 @@ public static class RunTracker
             bool isOrnamentalFanBlock = !isFrostOrbBlock
                 && entry.Receiver.IsPlayer
                 && ConsumePendingCreatureAttribution(
-                    _pendingOrnamentalFanBlockHistorySuppressions,
+                    _pendingOrnamentalFanBlockHistoryAttributions,
                     entry.Receiver);
+            string? relicId = isOrnamentalFanBlock ? OrnamentalFanRelicId : null;
             bool hasKnownNonCardSource = isFrostOrbBlock || isOrnamentalFanBlock;
             if (!hasKnownNonCardSource && entry.CardPlay?.Card != null)
             {
@@ -27624,7 +27707,7 @@ public static class RunTracker
 
             if (entry.Receiver.IsPlayer)
             {
-                AppendPlayerBlockChunkLocked(instanceId, entry.Amount);
+                AppendPlayerBlockChunkLocked(instanceId, relicId, entry.Amount);
                 ReconcilePlayerBlockLedgerLocked(entry.Receiver);
             }
         }
@@ -27739,13 +27822,17 @@ public static class RunTracker
         }
     }
 
-    private static void AppendPlayerBlockChunkLocked(string? cardInstanceId, int amount)
+    private static void AppendPlayerBlockChunkLocked(
+        string? cardInstanceId,
+        string? relicId,
+        int amount)
     {
         if (_pendingCombat == null || amount <= 0) return;
 
         _pendingCombat.PlayerBlockLedger.Add(new BlockChunk
         {
             CardInstanceId = cardInstanceId,
+            RelicId = relicId,
             Remaining = amount,
         });
     }
@@ -27768,6 +27855,11 @@ public static class RunTracker
             {
                 var agg = GetOrCreateAggregate(_pendingCombat, chunk.CardInstanceId);
                 agg.TotalBlockEffective += consumed;
+            }
+            else if (chunk.RelicId != null)
+            {
+                var agg = GetOrCreatePendingRelicAggregateLocked(chunk.RelicId);
+                agg.AdditionalBlockEffective += consumed;
             }
         }
 
@@ -27792,6 +27884,11 @@ public static class RunTracker
                 var agg = GetOrCreateAggregate(_pendingCombat, chunk.CardInstanceId);
                 agg.TotalBlockWasted += wasted;
             }
+            else if (chunk.RelicId != null)
+            {
+                var agg = GetOrCreatePendingRelicAggregateLocked(chunk.RelicId);
+                agg.AdditionalBlockWasted += wasted;
+            }
         }
 
         _pendingCombat.PlayerBlockLedger.RemoveAll(chunk => chunk.Remaining <= 0);
@@ -27803,7 +27900,7 @@ public static class RunTracker
     }
 
     /// <summary>
-    /// Test seam for the block-ledger attribution pipeline (issue #6). Runs the
+    /// Test seam for card-only block-ledger attribution (issue #6). Runs the
     /// real gain → absorb → clear sequence against a throwaway pending combat
     /// and returns it so the FIFO-absorb / LIFO-waste invariant can be pinned
     /// headlessly, without needing a live combat to feed BlockGainedEntry /
@@ -27814,6 +27911,15 @@ public static class RunTracker
         IEnumerable<(string? cardInstanceId, int amount)> gains,
         int blockedDamage,
         int clearedUnusedBlock)
+        => RunBlockLedgerWithSourcesForTest(
+            gains.Select(gain => (gain.cardInstanceId, relicId: (string?)null, gain.amount)),
+            blockedDamage,
+            clearedUnusedBlock);
+
+    internal static PendingCombat RunBlockLedgerWithSourcesForTest(
+        IEnumerable<(string? cardInstanceId, string? relicId, int amount)> gains,
+        int blockedDamage,
+        int clearedUnusedBlock)
     {
         lock (_lock)
         {
@@ -27822,17 +27928,22 @@ public static class RunTracker
             {
                 var scratch = new PendingCombat();
                 _pendingCombat = scratch;
-                foreach (var (cardInstanceId, amount) in gains)
+                foreach (var (cardInstanceId, relicId, amount) in gains)
                 {
-                    // Mirror the production block-gain pairing: a card-attributed
-                    // gain credits TotalBlockGained AND pushes a ledger chunk of
-                    // the same amount (see RecordBlockGainedEntry). Crediting it
-                    // here lets the conservation test assert the real invariant
-                    // gained == effective + wasted — the tooltip divides absorbed
-                    // and wasted percentages by TotalBlockGained.
+                    // Mirror the production block-gain pairing: the owner aggregate
+                    // receives the gain while the source-bearing ledger chunk later
+                    // receives its effective/wasted split.
                     if (cardInstanceId != null)
                         GetOrCreateAggregate(scratch, cardInstanceId).TotalBlockGained += amount;
-                    AppendPlayerBlockChunkLocked(cardInstanceId, amount);
+                    else if (relicId != null)
+                    {
+                        var relicAgg = GetOrCreatePendingRelicAggregateLocked(relicId);
+                        if (string.Equals(relicId, OrnamentalFanRelicId, StringComparison.Ordinal))
+                            RecordOrnamentalFanBlockGainedForTest(relicAgg, amount);
+                        else
+                            relicAgg.AdditionalBlockGained += amount;
+                    }
+                    AppendPlayerBlockChunkLocked(cardInstanceId, relicId, amount);
                 }
                 AttributeBlockedDamageLocked(blockedDamage);
                 AttributeUnusedBlockLocked(clearedUnusedBlock);
@@ -27858,7 +27969,10 @@ public static class RunTracker
         }
         else if (trackedBlock < actualBlock)
         {
-            AppendPlayerBlockChunkLocked(cardInstanceId: null, amount: actualBlock - trackedBlock);
+            AppendPlayerBlockChunkLocked(
+                cardInstanceId: null,
+                relicId: null,
+                amount: actualBlock - trackedBlock);
         }
     }
 
@@ -29384,6 +29498,10 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> KusarigamaTurnEndChargeRecordedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> OrnamentalFanCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> OrnamentalFanTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> OrnamentalFanTurnEndChargeRecordedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> ShurikenTurnEndChargeRecordedTurns { get; }
@@ -29548,8 +29666,8 @@ internal sealed class PendingToastyMittensActivation
 internal sealed class BlockChunk
 {
     public string? CardInstanceId { get; init; }
+    public string? RelicId { get; init; }
     public int Remaining { get; set; }
-    public bool CountsForCardStats => CardInstanceId != null;
 }
 
 internal sealed class PendingPowerChangeAttempt

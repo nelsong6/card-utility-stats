@@ -3735,6 +3735,46 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsOrnamentalFanBlockAttributionFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("ornamental-fan-block-attribution-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertOrnamentalFanBlockAttributionFixture(
+            loaded.Data.RelicAggregates["RELIC.ORNAMENTAL_FAN"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsOrnamentalFanBlockAttributionFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("ornamental-fan-block-attribution-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertOrnamentalFanBlockAttributionFixture(
+            resumed!.RelicAggregates["RELIC.ORNAMENTAL_FAN"]);
+    }
+
+    private static void AssertOrnamentalFanBlockAttributionFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(17, relicAgg.OrnamentalFanAttacksPlayed);
+        Assert.Equal(5, relicAgg.Activations);
+        Assert.Equal(20, relicAgg.AdditionalBlockGained);
+        Assert.Equal(14, relicAgg.AdditionalBlockEffective);
+        Assert.Equal(6, relicAgg.AdditionalBlockWasted);
+        Assert.Equal(20, relicAgg.OrnamentalFanRateBlockGained);
+        Assert.Equal(8, relicAgg.OrnamentalFanTurns);
+        Assert.Equal(3, relicAgg.OrnamentalFanCombats);
+        Assert.Equal(2, relicAgg.OrnamentalFanTurnsEndedAt0Charges);
+        Assert.Equal(3, relicAgg.OrnamentalFanTurnsEndedAt1Charge);
+        Assert.Equal(3, relicAgg.OrnamentalFanTurnsEndedAt2Charges);
+        Assert.Equal(9, relicAgg.OrnamentalFanTurnEndChargeTotal);
+        Assert.Equal(8, relicAgg.OrnamentalFanTurnEndChargeCount);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsPaperPhrogRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("paper-phrog-relic-run.json"));

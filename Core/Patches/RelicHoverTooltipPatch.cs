@@ -4509,14 +4509,34 @@ public static class RelicHoverShowPatch
     private static string BuildOrnamentalFanBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        var blockPerActivation = agg.Activations <= 0
+        var blockPerTurn = agg.OrnamentalFanTurns <= 0
             ? 0m
-            : (decimal)agg.AdditionalBlockGained / agg.Activations;
+            : (decimal)agg.OrnamentalFanRateBlockGained / agg.OrnamentalFanTurns;
+        var blockPerCombat = agg.OrnamentalFanCombats <= 0
+            ? 0m
+            : (decimal)agg.OrnamentalFanRateBlockGained / agg.OrnamentalFanCombats;
+        var absorbedPercent = agg.OrnamentalFanRateBlockGained <= 0
+            ? 0m
+            : 100m * agg.AdditionalBlockEffective / agg.OrnamentalFanRateBlockGained;
+        var wastedPercent = agg.OrnamentalFanRateBlockGained <= 0
+            ? 0m
+            : 100m * agg.AdditionalBlockWasted / agg.OrnamentalFanRateBlockGained;
 
         Row3(sb, "Attacks played", agg.OrnamentalFanAttacksPlayed.ToString(), "");
         RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
-        Row3(sb, BlockLabel("block gained per activation"), FormatDecimal(blockPerActivation), "");
+        Row3(
+            sb,
+            BlockLabel("block absorbed"),
+            agg.AdditionalBlockEffective.ToString(),
+            $"{absorbedPercent:F0}%");
+        Row3(
+            sb,
+            BlockLabel("block wasted"),
+            agg.AdditionalBlockWasted.ToString(),
+            $"{wastedPercent:F0}%");
+        Row3(sb, BlockLabel("avg block gained per turn"), FormatDecimal(blockPerTurn), "");
+        Row3(sb, BlockLabel("avg block gained per combat"), FormatDecimal(blockPerCombat), "");
         Row3(sb, "Turns ended at 0 charges", agg.OrnamentalFanTurnsEndedAt0Charges.ToString(), "");
         AppendTurnResetChargeRows(
             sb,

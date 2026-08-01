@@ -432,6 +432,9 @@ New fixtures added going forward do not need a `v*-` prefix.
   Ornamental Fan, and Shuriken, including observed damage/block/Strength
   outcomes and 1/2 charge turn-end buckets with average charge samples.
   Ornamental Fan additionally preserves turns that ended at 0 charges.
+- `ornamental-fan-block-attribution-run.json`
+  Adds Ornamental Fan's relic-owned effective/wasted block outcomes, held
+  turn/combat denominators, and matching observation-era block numerator.
 - `tuning-fork-relic-run.json`
   Adds Tuning Fork owner Skill-play count, trigger count, observed block
   gained, held combat/turn denominators, and turn-end charge buckets.

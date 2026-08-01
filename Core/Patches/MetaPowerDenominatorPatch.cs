@@ -17,5 +17,6 @@ internal static class HookAfterPlayerTurnStartMetaPowerStatsPatch
     {
         RunTracker.RecordMetaPowerTurnStarted(player);
         RunTracker.RecordStrikeDummyTurnStarted(player);
+        RunTracker.RecordOrnamentalFanTurnStarted(player);
     }
 }
