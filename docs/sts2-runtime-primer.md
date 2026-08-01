@@ -842,6 +842,13 @@ successfully. This captures the actual gain, including caps or other runtime
 changes, without counting relic restoration. Mango and Mango??? use separate
 relic aggregates even though they share the same presentation.
 
+Scroll Boxes generates two three-card bundles, awaits one bundle selection,
+then adds each selected card to the permanent deck. Snapshot physical deck
+references around the full `AfterObtained` task and persist only new references
+present after successful completion. This records the chosen bundle's observed
+cards, including the three-Claw exception and any final deck-add replacements,
+without treating generated-but-unchosen bundle cards as grants.
+
 Gnarled Hammer's `AfterObtained` awaits a deck selection, then synchronously
 calls `CardCmd.Enchant` with Sharp on each returned physical deck card. Snapshot
 the deck card references and their optional Sharp amounts before the callback,

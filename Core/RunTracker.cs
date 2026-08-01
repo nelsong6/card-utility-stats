@@ -6736,6 +6736,7 @@ public static class RunTracker
     private const string DowsingRodRelicId = "RELIC.DOWSING_ROD";
     private const string HeftyTabletRelicId = "RELIC.HEFTY_TABLET";
     private const string ArcaneScrollRelicId = "RELIC.ARCANE_SCROLL";
+    private const string ScrollBoxesRelicId = "RELIC.SCROLL_BOXES";
     private const string VambraceRelicId = "RELIC.VAMBRACE";
     private const string GamblingChipRelicId = "RELIC.GAMBLING_CHIP";
     private const string CentennialPuzzleRelicId = "RELIC.CENTENNIAL_PUZZLE";
@@ -11322,6 +11323,93 @@ public static class RunTracker
     {
         if (agg == null || string.IsNullOrWhiteSpace(cardId)) return;
         AddRelicCardGranted(agg.CardsGranted, cardId, displayName ?? "", 1);
+    }
+
+    public static bool BeginScrollBoxesPickup(
+        ScrollBoxes relic,
+        out Player? player,
+        out IReadOnlyCollection<CardModel>? deckBeforePickup)
+    {
+        player = null;
+        deckBeforePickup = null;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic)) return false;
+                if (!IsTrackedPlayer(relic.Owner)) return false;
+
+                player = relic.Owner;
+                deckBeforePickup = SnapshotDeckCards(player);
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"BeginScrollBoxesPickup failed: {e.Message}");
+                player = null;
+                deckBeforePickup = null;
+                return false;
+            }
+        }
+    }
+
+    public static void CompleteScrollBoxesPickup(
+        Player? player,
+        IReadOnlyCollection<CardModel>? deckBeforePickup,
+        bool succeeded)
+    {
+        if (player == null || deckBeforePickup == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!succeeded || !IsTrackedPlayer(player)) return;
+
+                var before = deckBeforePickup as HashSet<CardModel>
+                    ?? new HashSet<CardModel>(
+                        deckBeforePickup,
+                        ReferenceEqualityComparer.Instance);
+                var cardsReceived = NewDeckCardsSince(player, before);
+                if (cardsReceived.Count == 0) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(ScrollBoxesRelicId);
+                RecordScrollBoxesBundleForTest(
+                    agg,
+                    cardsReceived.Select(card =>
+                        (card.Id.ToString(), GetCardDisplayName(card))));
+
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"CompleteScrollBoxesPickup failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordScrollBoxesBundleForTest(
+        RelicAggregate agg,
+        IEnumerable<(string CardId, string DisplayName)>? cardsReceived)
+    {
+        if (agg == null || cardsReceived == null) return;
+
+        var cards = cardsReceived
+            .Where(card => !string.IsNullOrWhiteSpace(card.CardId))
+            .ToList();
+        if (cards.Count == 0) return;
+
+        agg.Activations += 1;
+        foreach (var card in cards)
+        {
+            AddRelicCardGranted(
+                agg.CardsGranted,
+                card.CardId,
+                card.DisplayName,
+                1);
+        }
     }
 
     private static IReadOnlyCollection<CardModel> SnapshotDeckCards(Player player)

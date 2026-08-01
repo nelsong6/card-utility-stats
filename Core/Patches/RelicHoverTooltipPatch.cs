@@ -1236,6 +1236,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is ScrollBoxes)
+        {
+            title = "Scroll Boxes";
+            body = BuildScrollBoxesBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is LargeCapsule)
         {
             title = "Large Capsule";
@@ -4083,6 +4090,45 @@ public static class RelicHoverShowPatch
                 : card.DisplayName);
             var value = card.Count == 1 ? displayName : $"{displayName} x{card.Count}";
             TextValueRow(sb, "Rare received", value, "");
+        }
+
+        return sb.ToString();
+    }
+
+    private static string BuildScrollBoxesBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var cards = agg.CardsGranted.Values
+            .Where(card => card.Count > 0)
+            .OrderByDescending(card => card.Count)
+            .ThenBy(card => card.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var cardsReceived = cards.Sum(card => Math.Max(0, card.Count));
+
+        Row3(
+            sb,
+            "Bundles chosen",
+            agg.Activations.ToString(),
+            "",
+            "Bundles chosen from Scroll Boxes.");
+        Row3(
+            sb,
+            "Cards received",
+            cardsReceived.ToString(),
+            "",
+            "Cards actually added to the permanent deck from the chosen bundle.");
+
+        foreach (var card in cards)
+        {
+            var displayName = StatsTooltip.EscapeBbcode(string.IsNullOrWhiteSpace(card.DisplayName)
+                ? RunTracker.FormatCardIdForDisplay(card.CardId)
+                : card.DisplayName);
+            var value = card.Count == 1 ? displayName : $"{displayName} x{card.Count}";
+            TextValueRow(
+                sb,
+                "Card received",
+                value,
+                "");
         }
 
         return sb.ToString();

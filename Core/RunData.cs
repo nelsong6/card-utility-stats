@@ -1449,7 +1449,8 @@ public class RelicAggregate
 
     // Specific cards granted by relic-owned effects. Used by Hefty Tablet to
     // show which rare card was picked from its pickup screen, Arcane Scroll to
-    // show the rare card it added, and Neow's Bones to show the curse it added.
+    // show the rare card it added, Scroll Boxes to show its chosen bundle, and
+    // Neow's Bones to show the curse it added.
     public Dictionary<string, RelicCardAggregate> CardsGranted { get; set; } = new();
 
     // Physical cards Pael's Tooth has actually returned to the deck. The list
