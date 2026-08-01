@@ -353,37 +353,42 @@ internal static class PotionCompendiumHistoryUi
         var body = new StringBuilder();
         if (!entry.Acquired)
         {
-            AppendTooltipRow(
+            AppendLocationRows(
                 body,
                 "Seen",
-                FormatLocation(entry.SeenFloor, entry.SeenLocationKind, entry.SeenLocationName));
+                entry.SeenFloor,
+                entry.SeenLocationKind,
+                entry.SeenLocationName);
             AppendTooltipRow(body, "Method", entry.AcquisitionMethod);
             AppendTooltipRow(body, "Outcome", "Not taken");
             return body.ToString().TrimEnd();
         }
 
-        AppendTooltipRow(
+        AppendLocationRows(
             body,
             "Acquired",
-            FormatLocation(entry.AcquiredFloor, entry.AcquiredLocationKind, entry.AcquiredLocationName));
+            entry.AcquiredFloor,
+            entry.AcquiredLocationKind,
+            entry.AcquiredLocationName);
         AppendTooltipRow(body, "Method", entry.AcquisitionMethod);
 
         if (entry.Used)
         {
-            AppendTooltipRow(
+            AppendLocationRows(
                 body,
                 "Used",
-                FormatLocation(entry.UsedFloor, entry.UsedLocationKind, entry.UsedLocationName));
+                entry.UsedFloor,
+                entry.UsedLocationKind,
+                entry.UsedLocationName);
         }
         else if (entry.Discarded)
         {
-            AppendTooltipRow(
+            AppendLocationRows(
                 body,
                 "Discarded",
-                FormatLocation(
-                    entry.DiscardedFloor,
-                    entry.DiscardedLocationKind,
-                    entry.DiscardedLocationName));
+                entry.DiscardedFloor,
+                entry.DiscardedLocationKind,
+                entry.DiscardedLocationName);
         }
         else if (entry.HeldAtRunEnd || outcome != "in_progress")
         {
@@ -410,13 +415,32 @@ internal static class PotionCompendiumHistoryUi
         body.Append("[/b]\n");
     }
 
-    private static string FormatLocation(int? floor, string? kind, string? name)
+    private static void AppendLocationRows(
+        StringBuilder body,
+        string timingLabel,
+        int? floor,
+        string? kind,
+        string? name)
     {
-        var parts = new List<string>();
-        if (floor.HasValue) parts.Add($"Floor {floor.Value}");
-        if (!string.IsNullOrWhiteSpace(kind)) parts.Add(kind!);
-        if (!string.IsNullOrWhiteSpace(name)) parts.Add(name!);
-        return parts.Count == 0 ? "Unknown location" : string.Join(" · ", parts);
+        var hasKind = !string.IsNullOrWhiteSpace(kind);
+        var hasName = !string.IsNullOrWhiteSpace(name);
+        AppendTooltipRow(
+            body,
+            timingLabel,
+            floor.HasValue
+                ? $"Floor {floor.Value}"
+                : hasKind || hasName
+                    ? "Floor unknown"
+                    : "Unknown location");
+
+        if (hasKind && hasName)
+        {
+            AppendTooltipRow(body, kind!, name!);
+        }
+        else if (hasKind || hasName)
+        {
+            AppendTooltipRow(body, "Location", hasName ? name! : kind!);
+        }
     }
 
     private static IEnumerable<NPotionLabCategory> GetCategories(NPotionLab lab)
