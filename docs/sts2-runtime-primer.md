@@ -538,6 +538,12 @@ This preserves activations when draw prevention yields no cards and avoids
 crediting Bag for a starting hand that Innate cards would already have made
 equally large.
 
+Ring of the Snake has the same `ModifyHandDraw(Player, decimal)` body and uses
+the same completed first-hand draw observer. Keep its pending counterfactual
+and relic aggregate separate from Bag of Preparation so a player holding both
+receives each relic's own marginal observed contribution rather than a pooled
+opening-hand total.
+
 Joss Paper is a mixed immediate/deferred exhaust counter. Its owner-specific
 `AfterCardExhausted` callback is the authoritative successful-exhaust count,
 but Ethereal cards are only folded into `CardsExhausted` at

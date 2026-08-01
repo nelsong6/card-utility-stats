@@ -323,6 +323,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is RingOfTheSnake)
+        {
+            title = "Ring of the Snake";
+            body = BuildRingOfTheSnakeBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is BagOfMarbles)
         {
             title = "Bag of Marbles";
@@ -1389,18 +1396,26 @@ public static class RelicHoverShowPatch
     }
 
     private static string BuildBagOfPreparationBodyBBCode(RelicAggregate agg)
+        => BuildOpeningHandDrawRelicBodyBBCode(agg, "Bag of Preparation");
+
+    private static string BuildRingOfTheSnakeBodyBBCode(RelicAggregate agg)
+        => BuildOpeningHandDrawRelicBodyBBCode(agg, "Ring of the Snake");
+
+    private static string BuildOpeningHandDrawRelicBodyBBCode(
+        RelicAggregate agg,
+        string relicName)
     {
         var sb = new StringBuilder();
         RelicActivationRow(
             sb,
             agg.Activations.ToString(),
-            "Activations — first-turn hand draws whose requested card count Bag of Preparation increased.");
+            $"Activations — first-turn hand draws whose requested card count {relicName} increased.");
         Row3(
             sb,
             "Cards drawn",
             agg.AdditionalCardsDrawn.ToString(),
             "",
-            "Cards drawn — first-turn cards that were actually drawn because of Bag of Preparation's added hand-draw count.");
+            $"Cards drawn — first-turn cards that were actually drawn because of {relicName}'s added hand-draw count.");
         return sb.ToString();
     }
 

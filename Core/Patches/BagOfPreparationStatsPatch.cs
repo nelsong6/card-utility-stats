@@ -46,8 +46,40 @@ public static class BagOfPreparationModifyHandDrawPatch
 }
 
 /// <summary>
+/// Ring of the Snake has the same owner/turn gate and hand-draw modifier shape
+/// as Bag of Preparation. Keep its observations in a separate relic aggregate.
+/// </summary>
+[HarmonyPatch(typeof(RingOfTheSnake), nameof(RingOfTheSnake.ModifyHandDraw))]
+public static class RingOfTheSnakeModifyHandDrawPatch
+{
+    [HarmonyPostfix]
+    public static void Postfix(
+        RingOfTheSnake __instance,
+        Player player,
+        decimal count,
+        decimal __result)
+    {
+        try
+        {
+            var added = __result - count;
+            if (added <= 0m) return;
+
+            RunTracker.RecordRingOfTheSnakeActivation(
+                __instance,
+                player,
+                (int)Math.Ceiling(added));
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RingOfTheSnakeModifyHandDrawPatch failed: {e.Message}");
+        }
+    }
+}
+
+/// <summary>
 /// Captures the completed hand-draw modifier chain so the eventual draw result
-/// can be compared with the same request without Bag of Preparation's delta.
+/// can be compared with the same request without each opening-hand relic's
+/// individual delta.
 /// </summary>
 [HarmonyPatch(typeof(Hook), nameof(Hook.ModifyHandDraw))]
 public static class HookModifyHandDrawBagOfPreparationPatch
@@ -58,6 +90,7 @@ public static class HookModifyHandDrawBagOfPreparationPatch
         try
         {
             RunTracker.FinalizeBagOfPreparationHandDraw(player, __result);
+            RunTracker.FinalizeRingOfTheSnakeHandDraw(player, __result);
         }
         catch (Exception e)
         {
@@ -68,9 +101,9 @@ public static class HookModifyHandDrawBagOfPreparationPatch
 
 /// <summary>
 /// Measures how many cards from the resolved first-turn hand draw exist only
-/// because of Bag of Preparation's contribution. Draw prevention, a short
+/// because of each opening-hand relic's contribution. Draw prevention, a short
 /// deck, the hand cap, and an already-larger Innate hand can reduce this below
-/// the relic's requested two cards.
+/// the relic's requested cards.
 /// </summary>
 [HarmonyPatch(
     typeof(CardPileCmd),
@@ -83,19 +116,30 @@ public static class BagOfPreparationCardPileDrawPatch
         decimal count,
         Player player,
         bool fromHandDraw,
-        out BagOfPreparationDrawObservation? __state)
+        out IReadOnlyList<OpeningHandDrawRelicObservation>? __state)
     {
         __state = null;
 
         try
         {
-            if (!RunTracker.TryConsumeBagOfPreparationDrawAttribution(
+            var pending = new List<(OpeningHandDrawRelicKind Kind, decimal Counterfactual)>();
+            if (RunTracker.TryConsumeBagOfPreparationDrawAttribution(
                     player,
                     fromHandDraw,
                     out var rawHandDrawWithoutBag))
             {
-                return;
+                pending.Add((OpeningHandDrawRelicKind.BagOfPreparation, rawHandDrawWithoutBag));
             }
+
+            if (RunTracker.TryConsumeRingOfTheSnakeDrawAttribution(
+                    player,
+                    fromHandDraw,
+                    out var rawHandDrawWithoutRing))
+            {
+                pending.Add((OpeningHandDrawRelicKind.RingOfTheSnake, rawHandDrawWithoutRing));
+            }
+
+            if (pending.Count == 0) return;
 
             var innateCount = PileType.Draw
                 .GetPile(player)
@@ -103,23 +147,28 @@ public static class BagOfPreparationCardPileDrawPatch
                 .Count(card =>
                     card.Keywords.Contains(CardKeyword.Innate)
                     && card.Enchantment?.ShouldStartAtBottomOfDrawPile != true);
-            var counterfactualDraw = Math.Min(
-                Math.Max(rawHandDrawWithoutBag, innateCount),
-                CardPile.MaxCardsInHand);
-            var cardsRequestedWithoutBag =
-                counterfactualDraw > 0m
-                    ? (int)Math.Ceiling(counterfactualDraw)
-                    : 0;
-            var cardsRequestedWithBag =
+            var cardsRequestedWithRelics =
                 count > 0m
                     ? (int)Math.Ceiling(count)
                     : 0;
-            var maximumBagContribution =
-                Math.Max(0, cardsRequestedWithBag - cardsRequestedWithoutBag);
-
-            __state = new BagOfPreparationDrawObservation(
-                cardsRequestedWithoutBag,
-                maximumBagContribution);
+            __state = pending
+                .Select(entry =>
+                {
+                    var counterfactualDraw = Math.Min(
+                        Math.Max(entry.Counterfactual, innateCount),
+                        CardPile.MaxCardsInHand);
+                    var cardsRequestedWithoutRelic =
+                        counterfactualDraw > 0m
+                            ? (int)Math.Ceiling(counterfactualDraw)
+                            : 0;
+                    return new OpeningHandDrawRelicObservation(
+                        entry.Kind,
+                        cardsRequestedWithoutRelic,
+                        Math.Max(
+                            0,
+                            cardsRequestedWithRelics - cardsRequestedWithoutRelic));
+                })
+                .ToArray();
         }
         catch (Exception e)
         {
@@ -129,26 +178,32 @@ public static class BagOfPreparationCardPileDrawPatch
 
     [HarmonyPostfix]
     public static void Postfix(
-        BagOfPreparationDrawObservation? __state,
+        IReadOnlyList<OpeningHandDrawRelicObservation>? __state,
         Task<IEnumerable<CardModel>> __result)
     {
-        if (__state == null || __result == null) return;
+        if (__state == null || __state.Count == 0 || __result == null) return;
         ObserveDrawResultAsync(__state, __result);
     }
 
     private static async void ObserveDrawResultAsync(
-        BagOfPreparationDrawObservation observation,
+        IReadOnlyList<OpeningHandDrawRelicObservation> observations,
         Task<IEnumerable<CardModel>> drawTask)
     {
         try
         {
             var cards = await drawTask.ConfigureAwait(false);
             var totalCardsDrawn = cards?.Count(card => card != null) ?? 0;
-            var cardsDrawnBecauseOfBag = CalculateObservedContributionForTest(
-                observation.CardsRequestedWithoutBag,
-                observation.MaximumBagContribution,
-                totalCardsDrawn);
-            RunTracker.RecordBagOfPreparationCardsDrawn(cardsDrawnBecauseOfBag);
+            foreach (var observation in observations)
+            {
+                var cardsDrawnBecauseOfRelic = CalculateObservedContributionForTest(
+                    observation.CardsRequestedWithoutRelic,
+                    observation.MaximumRelicContribution,
+                    totalCardsDrawn);
+                if (observation.Kind == OpeningHandDrawRelicKind.BagOfPreparation)
+                    RunTracker.RecordBagOfPreparationCardsDrawn(cardsDrawnBecauseOfRelic);
+                else
+                    RunTracker.RecordRingOfTheSnakeCardsDrawn(cardsDrawnBecauseOfRelic);
+            }
         }
         catch (Exception e)
         {
@@ -167,6 +222,13 @@ public static class BagOfPreparationCardPileDrawPatch
     }
 }
 
-public sealed record BagOfPreparationDrawObservation(
-    int CardsRequestedWithoutBag,
-    int MaximumBagContribution);
+public enum OpeningHandDrawRelicKind
+{
+    BagOfPreparation,
+    RingOfTheSnake,
+}
+
+public sealed record OpeningHandDrawRelicObservation(
+    OpeningHandDrawRelicKind Kind,
+    int CardsRequestedWithoutRelic,
+    int MaximumRelicContribution);

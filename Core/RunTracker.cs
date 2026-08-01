@@ -6586,6 +6586,7 @@ public static class RunTracker
     // -------- Relic stat recording --------
 
     private const string BagOfPreparationRelicId = "RELIC.BAG_OF_PREPARATION";
+    private const string RingOfTheSnakeRelicId = "RELIC.RING_OF_THE_SNAKE";
     private const string BagOfMarblesRelicId = "RELIC.BAG_OF_MARBLES";
     private const string RedMaskRelicId = "RELIC.RED_MASK";
     private const string UnsettlingLampRelicId = "RELIC.UNSETTLING_LAMP";
@@ -6968,6 +6969,44 @@ public static class RunTracker
         Player? player,
         int cardsRequested)
     {
+        RecordOpeningHandDrawRelicActivation(
+            relic,
+            player,
+            cardsRequested,
+            BagOfPreparationRelicId,
+            pending => pending.BagOfPreparationActivationCountedPlayers,
+            pending => pending.PendingBagOfPreparationDraws,
+            nameof(RecordBagOfPreparationActivation));
+    }
+
+    /// <summary>
+    /// Ring of the Snake uses the same first-turn hand-draw modifier contract
+    /// as Bag of Preparation, but records into its own relic aggregate.
+    /// </summary>
+    public static void RecordRingOfTheSnakeActivation(
+        RingOfTheSnake? relic,
+        Player? player,
+        int cardsRequested)
+    {
+        RecordOpeningHandDrawRelicActivation(
+            relic,
+            player,
+            cardsRequested,
+            RingOfTheSnakeRelicId,
+            pending => pending.RingOfTheSnakeActivationCountedPlayers,
+            pending => pending.PendingRingOfTheSnakeDraws,
+            nameof(RecordRingOfTheSnakeActivation));
+    }
+
+    private static void RecordOpeningHandDrawRelicActivation(
+        RelicModel? relic,
+        Player? player,
+        int cardsRequested,
+        string relicId,
+        Func<PendingCombat, HashSet<Player>> activationPlayers,
+        Func<PendingCombat, Dictionary<Player, PendingOpeningHandDrawRelicDraw>> pendingDraws,
+        string diagnosticName)
+    {
         if (relic?.Owner == null || player == null || cardsRequested <= 0) return;
 
         lock (_lock)
@@ -6978,16 +7017,19 @@ public static class RunTracker
                 if (!ReferenceEquals(relic.Owner, player)) return;
 
                 _pendingCombat ??= new PendingCombat();
-                if (!_pendingCombat.BagOfPreparationActivationCountedPlayers.Add(player)) return;
+                if (!activationPlayers(_pendingCombat).Add(player)) return;
 
-                var agg = GetOrCreatePendingRelicAggregateLocked(BagOfPreparationRelicId);
-                RecordBagOfPreparationStatsForTest(agg, activations: 1, cardsDrawn: 0);
-                _pendingCombat.PendingBagOfPreparationDraws[player] =
-                    new PendingBagOfPreparationDraw(cardsRequested);
+                var agg = GetOrCreatePendingRelicAggregateLocked(relicId);
+                AccumulateOpeningHandDrawRelicStats(
+                    agg,
+                    activations: 1,
+                    cardsDrawn: 0);
+                pendingDraws(_pendingCombat)[player] =
+                    new PendingOpeningHandDrawRelicDraw(cardsRequested);
             }
             catch (Exception e)
             {
-                CoreMain.LogDebug($"RecordBagOfPreparationActivation failed: {e.Message}");
+                CoreMain.LogDebug($"{diagnosticName} failed: {e.Message}");
             }
         }
     }
@@ -6998,6 +7040,28 @@ public static class RunTracker
     /// </summary>
     public static void FinalizeBagOfPreparationHandDraw(Player? player, decimal finalHandDraw)
     {
+        FinalizeOpeningHandDrawRelic(
+            player,
+            finalHandDraw,
+            pending => pending.PendingBagOfPreparationDraws,
+            nameof(FinalizeBagOfPreparationHandDraw));
+    }
+
+    public static void FinalizeRingOfTheSnakeHandDraw(Player? player, decimal finalHandDraw)
+    {
+        FinalizeOpeningHandDrawRelic(
+            player,
+            finalHandDraw,
+            pending => pending.PendingRingOfTheSnakeDraws,
+            nameof(FinalizeRingOfTheSnakeHandDraw));
+    }
+
+    private static void FinalizeOpeningHandDrawRelic(
+        Player? player,
+        decimal finalHandDraw,
+        Func<PendingCombat, Dictionary<Player, PendingOpeningHandDrawRelicDraw>> pendingDraws,
+        string diagnosticName)
+    {
         if (player == null) return;
 
         lock (_lock)
@@ -7005,15 +7069,15 @@ public static class RunTracker
             try
             {
                 if (_pendingCombat == null) return;
-                if (!_pendingCombat.PendingBagOfPreparationDraws.TryGetValue(player, out var pending)) return;
+                if (!pendingDraws(_pendingCombat).TryGetValue(player, out var pending)) return;
 
-                pending.RawHandDrawWithoutBag =
+                pending.RawHandDrawWithoutRelic =
                     Math.Max(0m, finalHandDraw - pending.CardsRequested);
                 pending.ModifierChainCompleted = true;
             }
             catch (Exception e)
             {
-                CoreMain.LogDebug($"FinalizeBagOfPreparationHandDraw failed: {e.Message}");
+                CoreMain.LogDebug($"{diagnosticName} failed: {e.Message}");
             }
         }
     }
@@ -7023,7 +7087,35 @@ public static class RunTracker
         bool fromHandDraw,
         out decimal rawHandDrawWithoutBag)
     {
-        rawHandDrawWithoutBag = 0m;
+        return TryConsumeOpeningHandDrawRelicAttribution(
+            player,
+            fromHandDraw,
+            pending => pending.PendingBagOfPreparationDraws,
+            nameof(TryConsumeBagOfPreparationDrawAttribution),
+            out rawHandDrawWithoutBag);
+    }
+
+    public static bool TryConsumeRingOfTheSnakeDrawAttribution(
+        Player? player,
+        bool fromHandDraw,
+        out decimal rawHandDrawWithoutRing)
+    {
+        return TryConsumeOpeningHandDrawRelicAttribution(
+            player,
+            fromHandDraw,
+            pending => pending.PendingRingOfTheSnakeDraws,
+            nameof(TryConsumeRingOfTheSnakeDrawAttribution),
+            out rawHandDrawWithoutRing);
+    }
+
+    private static bool TryConsumeOpeningHandDrawRelicAttribution(
+        Player? player,
+        bool fromHandDraw,
+        Func<PendingCombat, Dictionary<Player, PendingOpeningHandDrawRelicDraw>> pendingDraws,
+        string diagnosticName,
+        out decimal rawHandDrawWithoutRelic)
+    {
+        rawHandDrawWithoutRelic = 0m;
         if (player == null || !fromHandDraw) return false;
 
         lock (_lock)
@@ -7031,16 +7123,16 @@ public static class RunTracker
             try
             {
                 if (_pendingCombat == null) return false;
-                if (!_pendingCombat.PendingBagOfPreparationDraws.Remove(player, out var pending))
+                if (!pendingDraws(_pendingCombat).Remove(player, out var pending))
                     return false;
                 if (!pending.ModifierChainCompleted) return false;
 
-                rawHandDrawWithoutBag = pending.RawHandDrawWithoutBag;
+                rawHandDrawWithoutRelic = pending.RawHandDrawWithoutRelic;
                 return true;
             }
             catch (Exception e)
             {
-                CoreMain.LogDebug($"TryConsumeBagOfPreparationDrawAttribution failed: {e.Message}");
+                CoreMain.LogDebug($"{diagnosticName} failed: {e.Message}");
                 return false;
             }
         }
@@ -7048,26 +7140,57 @@ public static class RunTracker
 
     public static void RecordBagOfPreparationCardsDrawn(int cardsDrawn)
     {
+        RecordOpeningHandDrawRelicCardsDrawn(
+            BagOfPreparationRelicId,
+            cardsDrawn,
+            nameof(RecordBagOfPreparationCardsDrawn));
+    }
+
+    public static void RecordRingOfTheSnakeCardsDrawn(int cardsDrawn)
+    {
+        RecordOpeningHandDrawRelicCardsDrawn(
+            RingOfTheSnakeRelicId,
+            cardsDrawn,
+            nameof(RecordRingOfTheSnakeCardsDrawn));
+    }
+
+    private static void RecordOpeningHandDrawRelicCardsDrawn(
+        string relicId,
+        int cardsDrawn,
+        string diagnosticName)
+    {
         if (cardsDrawn <= 0) return;
 
         lock (_lock)
         {
             try
             {
-                var agg = GetOrCreatePendingRelicAggregateLocked(BagOfPreparationRelicId);
-                RecordBagOfPreparationStatsForTest(
+                var agg = GetOrCreatePendingRelicAggregateLocked(relicId);
+                AccumulateOpeningHandDrawRelicStats(
                     agg,
                     activations: 0,
                     cardsDrawn: cardsDrawn);
             }
             catch (Exception e)
             {
-                CoreMain.LogDebug($"RecordBagOfPreparationCardsDrawn failed: {e.Message}");
+                CoreMain.LogDebug($"{diagnosticName} failed: {e.Message}");
             }
         }
     }
 
     internal static void RecordBagOfPreparationStatsForTest(
+        RelicAggregate agg,
+        int activations,
+        int cardsDrawn)
+        => AccumulateOpeningHandDrawRelicStats(agg, activations, cardsDrawn);
+
+    internal static void RecordRingOfTheSnakeStatsForTest(
+        RelicAggregate agg,
+        int activations,
+        int cardsDrawn)
+        => AccumulateOpeningHandDrawRelicStats(agg, activations, cardsDrawn);
+
+    private static void AccumulateOpeningHandDrawRelicStats(
         RelicAggregate agg,
         int activations,
         int cardsDrawn)
@@ -28621,6 +28744,8 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> BagOfPreparationActivationCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> RingOfTheSnakeActivationCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> StrikeDummyCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> StrikeDummyTurnCountedTurns { get; }
@@ -28651,7 +28776,9 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<CardModel, int> NormalityTurnEndRecordedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
-    public Dictionary<Player, PendingBagOfPreparationDraw> PendingBagOfPreparationDraws { get; }
+    public Dictionary<Player, PendingOpeningHandDrawRelicDraw> PendingBagOfPreparationDraws { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, PendingOpeningHandDrawRelicDraw> PendingRingOfTheSnakeDraws { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> LetterOpenerCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
@@ -28898,15 +29025,15 @@ internal class PendingCombat
     public AttributionWindowRegistry Windows { get; } = new();
 }
 
-internal sealed class PendingBagOfPreparationDraw
+internal sealed class PendingOpeningHandDrawRelicDraw
 {
-    public PendingBagOfPreparationDraw(int cardsRequested)
+    public PendingOpeningHandDrawRelicDraw(int cardsRequested)
     {
         CardsRequested = Math.Max(0, cardsRequested);
     }
 
     public int CardsRequested { get; }
-    public decimal RawHandDrawWithoutBag { get; set; }
+    public decimal RawHandDrawWithoutRelic { get; set; }
     public bool ModifierChainCompleted { get; set; }
 }
 
