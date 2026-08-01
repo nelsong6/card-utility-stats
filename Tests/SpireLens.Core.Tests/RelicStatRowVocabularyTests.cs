@@ -241,7 +241,11 @@ public class RelicStatRowVocabularyTests
         Assert.Equal(
             expectedDenominators,
             string.Join(",", presentation.DenominatorConceptIds));
-        Assert.Contains(label, presentation.FullDescription);
+        Assert.Equal(label, presentation.FullDescription);
+        Assert.DoesNotContain(
+            "tracked for this relic",
+            presentation.FullDescription,
+            StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

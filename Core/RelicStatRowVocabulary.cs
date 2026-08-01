@@ -164,7 +164,7 @@ internal static class RelicStatRowVocabulary
             plainSuffix,
             imageMeanings);
         var description = string.IsNullOrWhiteSpace(fullDescription)
-            ? BuildDefaultDescription(descriptionText)
+            ? descriptionText.Trim()
             : fullDescription.Trim();
 
         var workingText = plainSuffix;
@@ -307,15 +307,6 @@ internal static class RelicStatRowVocabulary
         return NormalizeSpaces(string.Join(
             " ",
             missingMeanings.Append(originalPlainText)));
-    }
-
-    private static string BuildDefaultDescription(string descriptionText)
-    {
-        if (string.IsNullOrWhiteSpace(descriptionText))
-            return "This value is tracked for this relic.";
-
-        var withoutPeriod = descriptionText.Trim().TrimEnd('.');
-        return $"{withoutPeriod} — this value is tracked for this relic.";
     }
 
     private static void AddImageMeaning(ICollection<string> meanings, string image)
