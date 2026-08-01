@@ -713,7 +713,7 @@ per-combat and per-turn block denominators.
 
 `JugglingPower` already owns the exact turn-local progress needed for its live
 counter. `AfterApplied` seeds `attacksPlayedThisTurn` from owner Attack plays in
-combat history, `AfterCardPlayed` increments it for subsequent owner Attacks,
+combat history, `BeforeCardPlayed` increments it for subsequent owner Attacks,
 and `AfterSideTurnEnd` resets it. Surface that field through `DisplayAmount` and
 raise `DisplayAmountChanged` after each mutation; do not repurpose `Amount`,
 which remains Juggling's stack count and controls how many Attack copies it
@@ -1037,10 +1037,12 @@ earlier held turns, so mixing that total with only newly observed turns would
 inflate the average after an upgrade or hot reload.
 
 Pendulum advances its persistent turn counter from its owner-specific
-`AfterPlayerTurnStart` callback and can activate multiple times in a long
-combat—or not at all in a short one. Observe the actual draw-command result for
-its cards-drawn numerator, and count every combat where the relic was held as
-the per-combat denominator rather than using activations. Its public
+`BeforeHandDraw` callback and contributes its activation through
+`ModifyHandDraw`; it can activate multiple times in a long combat—or not at all
+in a short one. Compare the completed hand draw with the same request minus
+Pendulum's marginal modifier so Innate and hand-limit clamping do not create
+false credit. Count every combat where the relic was held as the per-combat
+denominator rather than using activations. Its public
 `TurnsSeen` counter is always modulo three, so snapshot that live 0/1/2 value
 once during combat promotion, before the pending aggregate is merged into the
 run, for combat-end charge buckets and averages.
@@ -1132,8 +1134,8 @@ bucket transition is complete when the activation occurs, no turn-end callback
 is needed and a combat-ending activation cannot be lost; the combat promotion
 boundary only reconciles a final held turn that missed the normal start hook.
 
-Toasty Mittens exhausts one selected draw-pile card and then applies Strength
-inside its async `BeforeHandDraw` callback. Keep an async-flow-local scope
+Toasty Mittens selects and exhausts one card from the populated hand and then
+applies Strength inside its async `AfterPlayerTurnStart` callback. Keep an async-flow-local scope
 around that callback. `CardCmd.Exhaust` writes `CardExhaustedEntry` only after
 the card reaches the exhaust pile and before dispatching nested exhaust hooks,
 so the first matching owner-card entry in the scope is the relic's confirmed

@@ -78,7 +78,7 @@ public static class RingOfTheSnakeModifyHandDrawPatch
 
 /// <summary>
 /// Captures the completed hand-draw modifier chain so the eventual draw result
-/// can be compared with the same request without each opening-hand relic's
+/// can be compared with the same request without each tracked relic's
 /// individual delta.
 /// </summary>
 [HarmonyPatch(typeof(Hook), nameof(Hook.ModifyHandDraw))]
@@ -91,6 +91,7 @@ public static class HookModifyHandDrawBagOfPreparationPatch
         {
             RunTracker.FinalizeBagOfPreparationHandDraw(player, __result);
             RunTracker.FinalizeRingOfTheSnakeHandDraw(player, __result);
+            RunTracker.FinalizePendulumHandDraw(player, __result);
         }
         catch (Exception e)
         {
@@ -137,6 +138,14 @@ public static class BagOfPreparationCardPileDrawPatch
                     out var rawHandDrawWithoutRing))
             {
                 pending.Add((OpeningHandDrawRelicKind.RingOfTheSnake, rawHandDrawWithoutRing));
+            }
+
+            if (RunTracker.TryConsumePendulumDrawAttribution(
+                    player,
+                    fromHandDraw,
+                    out var rawHandDrawWithoutPendulum))
+            {
+                pending.Add((OpeningHandDrawRelicKind.Pendulum, rawHandDrawWithoutPendulum));
             }
 
             if (pending.Count == 0) return;
@@ -205,9 +214,15 @@ public static class BagOfPreparationCardPileDrawPatch
                         observation.MaximumRelicContribution,
                         cardsDrawnBecauseOfRelic);
                 }
-                else
+                else if (observation.Kind == OpeningHandDrawRelicKind.RingOfTheSnake)
                 {
                     RunTracker.RecordRingOfTheSnakeDrawResult(
+                        observation.MaximumRelicContribution,
+                        cardsDrawnBecauseOfRelic);
+                }
+                else
+                {
+                    RunTracker.RecordPendulumDrawResult(
                         observation.MaximumRelicContribution,
                         cardsDrawnBecauseOfRelic);
                 }
@@ -234,6 +249,7 @@ public enum OpeningHandDrawRelicKind
 {
     BagOfPreparation,
     RingOfTheSnake,
+    Pendulum,
 }
 
 public sealed record OpeningHandDrawRelicObservation(

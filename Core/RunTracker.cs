@@ -142,7 +142,6 @@ public static class RunTracker
     private static bool _pendingPlayerBlockClearArmed;
     private static bool _pendingAkabekoVigorAttribution;
     private static readonly List<PendingRelicHealing> _pendingRelicHeals = new();
-    private static readonly List<Player> _pendingPendulumDrawAttributions = new();
     private static readonly List<Creature> _pendingParryingShieldDamageAttributions = new();
     private static readonly List<Creature> _pendingKusarigamaDamageAttributions = new();
     private static readonly List<Creature> _pendingFestivePopperDamageAttributions = new();
@@ -1167,7 +1166,6 @@ public static class RunTracker
         // PendingCombat.Windows and reset with a fresh PendingCombat.
         // DEFERRED (not ported this pass — keep their own reset):
         _pendingAkabekoVigorAttribution = false;
-        _pendingPendulumDrawAttributions.Clear();
         _pendingParryingShieldDamageAttributions.Clear();
         _pendingKusarigamaDamageAttributions.Clear();
         _pendingFestivePopperDamageAttributions.Clear();
@@ -7022,6 +7020,39 @@ public static class RunTracker
             nameof(RecordRingOfTheSnakeActivation));
     }
 
+    /// <summary>
+    /// Pendulum contributes to the ordinary hand-draw request whenever its
+    /// persistent turn counter wraps. Unlike opening-hand relics, it can
+    /// activate repeatedly in one combat, so each positive modifier is a new
+    /// activation and replaces only the pending observation for that draw.
+    /// </summary>
+    public static void RecordPendulumActivation(
+        Pendulum? relic,
+        Player? player,
+        int cardsRequested)
+    {
+        if (relic?.Owner == null || player == null || cardsRequested <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(player)) return;
+                if (!ReferenceEquals(relic.Owner, player)) return;
+
+                _pendingCombat ??= new PendingCombat();
+                var agg = GetOrCreatePendingRelicAggregateLocked(PendulumRelicId);
+                agg.Activations += 1;
+                _pendingCombat.PendingPendulumDraws[player] =
+                    new PendingOpeningHandDrawRelicDraw(cardsRequested);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPendulumActivation failed: {e.Message}");
+            }
+        }
+    }
+
     private static void RecordOpeningHandDrawRelicActivation(
         RelicModel? relic,
         Player? player,
@@ -7077,6 +7108,15 @@ public static class RunTracker
             nameof(FinalizeRingOfTheSnakeHandDraw));
     }
 
+    public static void FinalizePendulumHandDraw(Player? player, decimal finalHandDraw)
+    {
+        FinalizeOpeningHandDrawRelic(
+            player,
+            finalHandDraw,
+            pending => pending.PendingPendulumDraws,
+            nameof(FinalizePendulumHandDraw));
+    }
+
     private static void FinalizeOpeningHandDrawRelic(
         Player? player,
         decimal finalHandDraw,
@@ -7129,6 +7169,19 @@ public static class RunTracker
             out rawHandDrawWithoutRing);
     }
 
+    public static bool TryConsumePendulumDrawAttribution(
+        Player? player,
+        bool fromHandDraw,
+        out decimal rawHandDrawWithoutPendulum)
+    {
+        return TryConsumeOpeningHandDrawRelicAttribution(
+            player,
+            fromHandDraw,
+            pending => pending.PendingPendulumDraws,
+            nameof(TryConsumePendulumDrawAttribution),
+            out rawHandDrawWithoutPendulum);
+    }
+
     private static bool TryConsumeOpeningHandDrawRelicAttribution(
         Player? player,
         bool fromHandDraw,
@@ -7179,6 +7232,17 @@ public static class RunTracker
             cardsRequested,
             cardsDrawn,
             nameof(RecordRingOfTheSnakeDrawResult));
+    }
+
+    public static void RecordPendulumDrawResult(
+        int cardsRequested,
+        int cardsDrawn)
+    {
+        RecordOpeningHandDrawRelicDrawResult(
+            PendulumRelicId,
+            cardsRequested,
+            cardsDrawn,
+            nameof(RecordPendulumDrawResult));
     }
 
     private static void RecordOpeningHandDrawRelicDrawResult(
@@ -18496,65 +18560,6 @@ public static class RunTracker
         }
     }
 
-    /// <summary>
-    /// Record Pendulum's owner-specific every-N-turns activation. The actual
-    /// number of cards drawn is observed from the draw command result.
-    /// </summary>
-    public static void ArmPendulumAttribution(Player owner)
-    {
-        if (owner == null) return;
-
-        lock (_lock)
-        {
-            try
-            {
-                var agg = GetOrCreateRelicAggregateLocked(PendulumRelicId);
-                agg.Activations += 1;
-                _pendingPendulumDrawAttributions.Add(owner);
-            }
-            catch (Exception e)
-            {
-                CoreMain.LogDebug($"ArmPendulumAttribution failed: {e.Message}");
-            }
-        }
-    }
-
-    public static bool TryConsumePendulumDrawAttribution(Player player)
-    {
-        if (player == null) return false;
-
-        lock (_lock)
-        {
-            try
-            {
-                return ConsumePendingGremlinHornAttribution(_pendingPendulumDrawAttributions, player);
-            }
-            catch (Exception e)
-            {
-                CoreMain.LogDebug($"TryConsumePendulumDrawAttribution failed: {e.Message}");
-                return false;
-            }
-        }
-    }
-
-    public static void RecordPendulumCardsDrawn(int cardsDrawn)
-    {
-        if (cardsDrawn <= 0) return;
-
-        lock (_lock)
-        {
-            try
-            {
-                var agg = GetOrCreateRelicAggregateLocked(PendulumRelicId);
-                agg.AdditionalCardsDrawn += cardsDrawn;
-            }
-            catch (Exception e)
-            {
-                CoreMain.LogDebug($"RecordPendulumCardsDrawn failed: {e.Message}");
-            }
-        }
-    }
-
     internal static void RecordPendulumCombatForTest(RelicAggregate agg, int count = 1)
     {
         if (agg == null) return;
@@ -29130,6 +29135,8 @@ internal class PendingCombat
     public Dictionary<Player, PendingOpeningHandDrawRelicDraw> PendingBagOfPreparationDraws { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, PendingOpeningHandDrawRelicDraw> PendingRingOfTheSnakeDraws { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, PendingOpeningHandDrawRelicDraw> PendingPendulumDraws { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> LetterOpenerCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
