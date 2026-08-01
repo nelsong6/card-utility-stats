@@ -710,6 +710,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is ScreamingFlagon)
+        {
+            title = "Screaming Flagon";
+            body = BuildScreamingFlagonBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is BronzeScales)
         {
             title = "Bronze Scales";
@@ -2327,6 +2334,18 @@ public static class RelicHoverShowPatch
             agg,
             triggerDescription: "Combats triggered — the number of combats in which this relic activated.",
             averageLabel: "Damage per combat",
+            averageDenominator: agg.Activations);
+        return sb.ToString();
+    }
+
+    private static string BuildScreamingFlagonBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        AppendRelicDamageStats(
+            sb,
+            agg,
+            triggerDescription: "Activations — turns when the owner ended with an empty hand and Screaming Flagon fired.",
+            averageLabel: "Damage per activation",
             averageDenominator: agg.Activations);
         return sb.ToString();
     }

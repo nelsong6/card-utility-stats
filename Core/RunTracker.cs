@@ -145,6 +145,7 @@ public static class RunTracker
     private static readonly List<Creature> _pendingParryingShieldDamageAttributions = new();
     private static readonly List<Creature> _pendingKusarigamaDamageAttributions = new();
     private static readonly List<Creature> _pendingFestivePopperDamageAttributions = new();
+    private static readonly List<Creature> _pendingScreamingFlagonDamageAttributions = new();
     private static readonly List<Creature> _pendingOrnamentalFanBlockAttributions = new();
     private static readonly List<Creature> _pendingOrnamentalFanBlockHistoryAttributions = new();
     private static readonly List<Creature> _pendingIntimidatingHelmetBlockAttributions = new();
@@ -1172,6 +1173,7 @@ public static class RunTracker
         _pendingParryingShieldDamageAttributions.Clear();
         _pendingKusarigamaDamageAttributions.Clear();
         _pendingFestivePopperDamageAttributions.Clear();
+        _pendingScreamingFlagonDamageAttributions.Clear();
         _pendingOrnamentalFanBlockAttributions.Clear();
         _pendingOrnamentalFanBlockHistoryAttributions.Clear();
         _pendingIntimidatingHelmetBlockAttributions.Clear();
@@ -6655,6 +6657,7 @@ public static class RunTracker
     private const string PendulumRelicId = "RELIC.PENDULUM";
     private const string ParryingShieldRelicId = "RELIC.PARRYING_SHIELD";
     private const string FestivePopperRelicId = "RELIC.FESTIVE_POPPER";
+    private const string ScreamingFlagonRelicId = "RELIC.SCREAMING_FLAGON";
     private const string MercuryHourglassRelicId = "RELIC.MERCURY_HOURGLASS";
     private const string MrStrugglesRelicId = "RELIC.MR_STRUGGLES";
     private const string LostWispRelicId = "RELIC.LOST_WISP";
@@ -19147,6 +19150,29 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Record Screaming Flagon's owner-specific empty-hand activation. The
+    /// damage split is observed from the damage command result.
+    /// </summary>
+    public static void ArmScreamingFlagonAttribution(Creature dealer)
+    {
+        if (dealer == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(ScreamingFlagonRelicId);
+                agg.Activations += 1;
+                _pendingScreamingFlagonDamageAttributions.Add(dealer);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"ArmScreamingFlagonAttribution failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Record Mercury Hourglass's owner-specific turn-start activation. The
     /// damage split is observed from the damage command result. Activations are
     /// counted once per combat so damage-per-combat has the expected denominator.
@@ -19183,6 +19209,24 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"TryConsumeFestivePopperDamageAttribution failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    public static bool TryConsumeScreamingFlagonDamageAttribution(Creature dealer)
+    {
+        if (dealer == null) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                return ConsumePendingCreatureAttribution(_pendingScreamingFlagonDamageAttributions, dealer);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"TryConsumeScreamingFlagonDamageAttribution failed: {e.Message}");
                 return false;
             }
         }
@@ -19390,6 +19434,24 @@ public static class RunTracker
         }
     }
 
+    public static void RecordScreamingFlagonDamage(IEnumerable<DamageResult>? results)
+    {
+        if (results == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(ScreamingFlagonRelicId);
+                AddRelicDamageResultsLocked(agg, results);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordScreamingFlagonDamage failed: {e.Message}");
+            }
+        }
+    }
+
     public static void RecordLostWispDamage(IEnumerable<DamageResult>? results)
     {
         if (results == null) return;
@@ -19571,6 +19633,21 @@ public static class RunTracker
     }
 
     internal static void RecordFestivePopperDamageForTest(
+        RelicAggregate agg,
+        IEnumerable<(int BlockedDamage, int UnblockedDamage, int OverkillDamage, bool WasTargetKilled)> results)
+    {
+        foreach (var result in results)
+        {
+            AddRelicDamageResultPartsLocked(
+                agg,
+                result.BlockedDamage,
+                result.UnblockedDamage,
+                result.OverkillDamage,
+                result.WasTargetKilled);
+        }
+    }
+
+    internal static void RecordScreamingFlagonDamageForTest(
         RelicAggregate agg,
         IEnumerable<(int BlockedDamage, int UnblockedDamage, int OverkillDamage, bool WasTargetKilled)> results)
     {

@@ -806,6 +806,13 @@ Macabre card rather than assigning later power behavior to one physical copy.
 
 For relics that emit damage commands, prefer the relic-owned callback plus the resolved `CreatureCmd.Damage` result. Mercury Hourglass arms from `MercuryHourglass.AfterPlayerTurnStart`, records the actual multi-target damage split from the command result on each turn, and counts the combat once so damage per combat is not confused with damage per turn-start trigger.
 
+Screaming Flagon follows the same observed-result pattern from its owner-specific
+`BeforeSideTurnEnd` callback. Mirror the callback's participating-owner and
+empty-hand conditions, count that callback as one activation, and consume only
+the immediately emitted multi-target `DamageVar` command. Keep the activation
+when the resolved result is empty: the relic still fired even if there were no
+damageable targets.
+
 Lost Wisp uses the same observed-result pattern from
 `LostWisp.AfterCardPlayed`. Arm only when the callback receives an owner Power
 while combat is in progress, count that qualifying Power as the activation,

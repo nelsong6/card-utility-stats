@@ -158,6 +158,8 @@ Ornamental Fan additionally owns its gained, effective, and wasted block
 attribution, with zero-inclusive held-turn and held-combat averages.
 Lead Paperweight records its pickup floor, both concrete Colorless card
 options, and which option actually resulted in a permanent-deck addition.
+Screaming Flagon records every empty-hand activation and its observed AOE
+damage split, including blocked damage, overkill, kills, and targets hit.
 
 Drain Power additionally tracks its observed discard-pile upgrades and later
 plays of the exact combat cards it upgraded, with held-turn and held-combat
