@@ -233,7 +233,13 @@ jobs:
           $escapedChangeNote = $changeNote.Replace("\", "\\")
           $escapedChangeNote = $escapedChangeNote.Replace('"', '\"')
           $escapedChangeNote = $escapedChangeNote.Replace("`r", "")
-          $escapedChangeNote = $escapedChangeNote.Replace("`n", "\n")
+          # Keep real line-feed characters inside the quoted KeyValues value.
+          # Steam renders those as line breaks in the public changelog. A
+          # literal "\n" is displayed verbatim and collapses the entry into
+          # one paragraph.
+          if ($escapedChangeNote.Contains("\n")) {
+            throw "Workshop change notes contain a literal \\n sequence."
+          }
           $workshopConfig = Join-Path $PWD "workshop-item.vdf"
           @"
           "workshopitem"

@@ -75,6 +75,10 @@ title is used as a fallback. Maintenance-only pull requests can opt out by
 putting exactly `No player-facing changes.` in that section. Direct commits that
 were not associated with a pull request fall back to their commit subject.
 
+The Steam VDF keeps the notes' real line-feed characters inside the quoted
+`changenote` value. Do not replace them with a literal `\n`: Steam displays
+those two characters verbatim instead of creating a line break.
+
 The environment itself accepts deployments only from tags matching `v*`.
 
 Bootstrap or refresh that environment credential from a trusted Windows machine:
