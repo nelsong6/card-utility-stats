@@ -439,6 +439,31 @@ Forge:
 
 For UI, energy/star spent rows intentionally appear only when empirical variance exists or when the resource is otherwise interesting. Absence of a row usually means actual spend matched expected listed cost across plays.
 
+## Card-Sourced Orb Creation
+
+`OrbCmd.Channel` emits `OrbChanneledEntry` only after `OrbQueue.TryEnqueue`
+succeeds. Observe that entry through the established `CombatHistory.Add` hook
+while a tracked card play is still resolving, and require the orb owner to
+match the source card owner. This counts every orb that actually enters the
+queue—including repeated channels from cards such as Glacier—while excluding
+failed channels and orb creation from relic, turn-start, or other ownerless
+card contexts. Store the orb id on the event even when the current tooltip
+only needs the total, so later type breakdowns remain derivable.
+
+Retain the exact mutable orb reference with the physical source-card instance
+for the rest of combat. Subscribe that instance's native `PassiveActivated`
+and `EvokeActivated` events to credit its source card's orb-type bucket;
+`OrbQueue.RemoveCapacity` remains the non-evoke/fizzle boundary, while ordinary
+combat cleanup remains excluded. This is lineage attribution, not a widened
+"recent card" timing window, and it avoids introducing per-orb Harmony targets.
+
+Frost orbs call `CreatureCmd.GainBlock` with a null `CardPlay`. Their native
+activation event arms a one-shot window consumed by the already-established
+`Hook.AfterBlockGained` path. The intervening observed `BlockGainedEntry` goes
+to the Frost-orb bucket and bypasses the generic current/recent-card fallback.
+Otherwise a Glacier-created Frost orb can incorrectly add its block to
+Glacier—or to an unrelated recently completed card—as direct card block.
+
 ## Effects And Powers
 
 Power/effect attribution needs two layers:
@@ -749,6 +774,15 @@ while combat is in progress, count that qualifying Power as the activation,
 then consume the window at the immediately emitted decimal-plus-`ValueProp`
 multi-target `CreatureCmd.Damage` overload. The resolved results are
 authoritative for blocked damage, overkill, kills, and targets hit.
+
+Forgotten Soul owns `AfterCardExhausted` and flashes for every same-owner card
+exhaust, even when no hittable enemy remains. Count that callback as the
+activation, then keep a callback-scoped window around the exact single-target
+`DamageVar` overload it may emit. The resolved result is authoritative for
+dealt/blocked damage, kills, and targets hit; always disarm the window when the
+callback completes so a no-target activation cannot claim unrelated later
+damage. Use every player turn and combat where Forgotten Soul was held as the
+zero-inclusive damage-rate denominators.
 
 Gremlin Horn's `AfterDeath` callback still runs for the combat-ending enemy and
 flashes the relic, but `PlayerCmd.GainEnergy` and `CardPileCmd.Draw` suppress

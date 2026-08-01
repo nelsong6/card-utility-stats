@@ -668,6 +668,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is ForgottenSoul)
+        {
+            title = "Forgotten Soul";
+            body = BuildForgottenSoulBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is ParryingShield)
         {
             title = "Parrying Shield";
@@ -2223,6 +2230,29 @@ public static class RelicHoverShowPatch
         Row3(sb, "Kills", agg.Kills.ToString(), "");
         Row3(sb, "Targets hit", agg.TotalTargets.ToString(), "");
         Row3(sb, "Avg damage per Power", FormatDecimal(damagePerPower), "");
+        return sb.ToString();
+    }
+
+    private static string BuildForgottenSoulBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var damagePerTurn = agg.ForgottenSoulTurns <= 0
+            ? 0m
+            : (decimal)agg.TotalDamageDealt / agg.ForgottenSoulTurns;
+        var damagePerCombat = agg.ForgottenSoulCombats <= 0
+            ? 0m
+            : (decimal)agg.TotalDamageDealt / agg.ForgottenSoulCombats;
+
+        RelicActivationRow(
+            sb,
+            agg.Activations.ToString(),
+            "Activations — same-owner cards exhausted while Forgotten Soul was held.");
+        Row3(sb, "Damage dealt", agg.TotalDamageDealt.ToString(), "");
+        Row3(sb, "Damage blocked", agg.TotalDamageBlocked.ToString(), "");
+        Row3(sb, "Kills", agg.Kills.ToString(), "");
+        Row3(sb, "Targets hit", agg.TotalTargets.ToString(), "");
+        Row3(sb, "Avg damage dealt per turn", FormatDecimal(damagePerTurn), "");
+        Row3(sb, "Avg damage dealt per combat", FormatDecimal(damagePerCombat), "");
         return sb.ToString();
     }
 
@@ -4164,6 +4194,14 @@ public static class RelicHoverShowPatch
             }
 
             TextValueRow(sb, "Returned card", StatsTooltip.EscapeBbcode(displayName), "");
+            if (card.FloorsClimbed.HasValue)
+            {
+                Row3(
+                    sb,
+                    "Floors climbed",
+                    Math.Max(0, card.FloorsClimbed.Value).ToString(),
+                    "");
+            }
         }
 
         return sb.ToString();
@@ -4207,7 +4245,16 @@ public static class RelicHoverShowPatch
     private static string BuildStrikeDummyBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
+        var strikesPerTurn = agg.StrikeDummyTurns <= 0
+            ? 0m
+            : (decimal)agg.StrikeDummyRateStrikesPlayed / agg.StrikeDummyTurns;
+        var strikesPerCombat = agg.StrikeDummyCombats <= 0
+            ? 0m
+            : (decimal)agg.StrikeDummyRateStrikesPlayed / agg.StrikeDummyCombats;
+
         Row3(sb, "Strikes played", agg.StrikeDummyStrikesPlayed.ToString(), "");
+        Row3(sb, "Avg Strikes played per turn", FormatDecimal(strikesPerTurn), "");
+        Row3(sb, "Avg Strikes played per combat", FormatDecimal(strikesPerCombat), "");
         Row3(sb, "Base Strikes in deck", agg.StrikeDummyBaseStrikesInDeck.ToString(), "");
         Row3(sb, "Non-base Strike cards in deck", agg.StrikeDummyNonBaseStrikeCardsInDeck.ToString(), "");
         return sb.ToString();

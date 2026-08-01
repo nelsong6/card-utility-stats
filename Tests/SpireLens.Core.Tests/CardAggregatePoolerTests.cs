@@ -15,6 +15,7 @@ public class CardAggregatePoolerTests
             TotalEffective = 4,
             TotalBlocked = 1,
             TimesExhausted = 1,
+            TotalOrbsCreated = 2,
             TimesCardsDrawAttempted = 3,
             TimesCardsDrawBlocked = 2,
             TotalOstyHpAttackBonus = 7,
@@ -24,6 +25,13 @@ public class CardAggregatePoolerTests
             TimesReplayExtraPlanned = 2,
             TimesReplayExtraPlayed = 1,
             TimesReplayAttackNoDamage = 1,
+        };
+        first.OrbOutcomes["ORB.LIGHTNING"] = new CardOrbAggregate
+        {
+            OrbId = "ORB.LIGHTNING",
+            Created = 2,
+            PassiveActivations = 4,
+            Evokes = 1,
         };
         first.AppliedEffects["POWER.ARTIFACT"] = new AppliedEffectAggregate
         {
@@ -65,6 +73,7 @@ public class CardAggregatePoolerTests
             TotalEffective = 11,
             TotalBlocked = 2,
             TimesExhausted = 2,
+            TotalOrbsCreated = 3,
             TimesCardsDrawAttempted = 1,
             TimesCardsDrawBlocked = 1,
             TotalOstyHpAttackBonus = 11,
@@ -74,6 +83,14 @@ public class CardAggregatePoolerTests
             TimesReplayExtraPlanned = 3,
             TimesReplayExtraPlayed = 3,
             TimesReplayAttackNoDamage = 2,
+        };
+        second.OrbOutcomes["ORB.LIGHTNING"] = new CardOrbAggregate
+        {
+            OrbId = "ORB.LIGHTNING",
+            Created = 3,
+            PassiveActivations = 6,
+            Evokes = 2,
+            Fizzles = 1,
         };
         second.AppliedEffects["POWER.VULNERABLE"] = new AppliedEffectAggregate
         {
@@ -130,6 +147,11 @@ public class CardAggregatePoolerTests
         Assert.Equal(15, pooled.TotalEffective);
         Assert.Equal(3, pooled.TotalBlocked);
         Assert.Equal(3, pooled.TimesExhausted);
+        Assert.Equal(5, pooled.TotalOrbsCreated);
+        Assert.Equal(5, pooled.OrbOutcomes["ORB.LIGHTNING"].Created);
+        Assert.Equal(10, pooled.OrbOutcomes["ORB.LIGHTNING"].PassiveActivations);
+        Assert.Equal(3, pooled.OrbOutcomes["ORB.LIGHTNING"].Evokes);
+        Assert.Equal(1, pooled.OrbOutcomes["ORB.LIGHTNING"].Fizzles);
         Assert.Equal(4, pooled.TimesCardsDrawAttempted);
         Assert.Equal(3, pooled.TimesCardsDrawBlocked);
         Assert.Equal(18, pooled.TotalOstyHpAttackBonus);

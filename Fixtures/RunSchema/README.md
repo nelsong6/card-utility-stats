@@ -94,6 +94,10 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `armaments-card-run.json`
   Adds the count of successful card upgrades caused by each physical
   Armaments, including every hand card actually upgraded by Armaments+.
+- `card-orbs-created-run.json`
+  Adds successfully channeled orbs to the physical card aggregate, preserves
+  exact-orb lifecycle outcomes by type, and keeps Frost block separate from
+  the source card's direct block totals.
 - `jack-of-all-trades-card-run.json`
   Adds Jack of All Trades generated colorless-card totals, uncommon/rare and
   attack/skill/power splits, plus the numerator for average added-card cost.
@@ -206,7 +210,8 @@ New fixtures added going forward do not need a `v*-` prefix.
   specific relics gained from its completed sacrifice pairs.
 - `paels-tooth-relic-run.json`
   Adds Pael's Tooth returned-card history in observed return order, preserving
-  duplicate definitions, final display names, and post-return upgrade levels.
+  duplicate definitions, final display names, post-return upgrade levels, and
+  the floors climbed before each card was returned.
 - `paels-eye-relic-run.json`
   Adds Pael's Eye activation tracking plus counts of status and curse cards
   actually exhausted by its extra-turn callback, and combats where it was held
@@ -497,6 +502,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `prayer-wheel-relic-run.json`
   Adds Prayer Wheel's extra reward-screen count, terminal rejections, and
   generated and taken Common/Uncommon/Rare cards.
+- `forgotten-soul-relic-run.json`
+  Adds Forgotten Soul's same-owner exhaust activations, observed damage
+  outcomes, and zero-inclusive held turn/combat denominators.
 
 Why these exist:
 

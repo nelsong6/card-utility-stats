@@ -19,6 +19,7 @@ using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Afflictions;
 using MegaCrit.Sts2.Core.Models.Enchantments;
 using MegaCrit.Sts2.Core.Models.Cards;
+using MegaCrit.Sts2.Core.Models.Orbs;
 using MegaCrit.Sts2.Core.Models.Potions;
 using MegaCrit.Sts2.Core.Models.Powers;
 using MegaCrit.Sts2.Core.Models.Relics;
@@ -44,7 +45,7 @@ namespace SpireLens.Core;
 /// Current scope:
 ///   - per-instance card identity and run persistence
 ///   - combat-boundary aggregation into committed run data
-///   - attack, block, energy, draw, exhaust, and effect attribution
+///   - attack, block, energy, orb, draw, exhaust, and effect attribution
 ///   - case-specific downstream attribution such as poison tick damage
 /// </summary>
 public static class RunTracker
@@ -266,6 +267,10 @@ public static class RunTracker
         RunManager.Instance.RunStarted -= OnRunStarted;
         CombatManager.Instance.CombatSetUp -= OnCombatSetUp;
         CombatManager.Instance.CombatEnded -= OnCombatEnded;
+        lock (_lock)
+        {
+            UnsubscribeCardOrbEventsLocked();
+        }
         CoreMain.Logger.Info("SpireLens hooks unwired.");
     }
 
@@ -1295,6 +1300,7 @@ public static class RunTracker
 
         bool repairedDamageAggregates = repairAggregates && RepairOffensiveDamageAggregatesFromEvents(run);
 
+        UnsubscribeCardOrbEventsLocked();
         _pendingCombat = null;
         ResetCombatContextState();
         ResetRewardContextState();
@@ -1621,6 +1627,7 @@ public static class RunTracker
                 // RunStarted dispatch exactly when the first read failed.
                 GameStartTime = gameStartTime != 0 ? gameStartTime : null,
             };
+            UnsubscribeCardOrbEventsLocked();
             _pendingCombat = null;
 
             // Note: deck cards are NOT walked here. The RunStarted event
@@ -1681,6 +1688,7 @@ public static class RunTracker
 
             // Clear state so the next OnRunStarted sees a clean slate.
             _currentRun = null;
+            UnsubscribeCardOrbEventsLocked();
             _pendingCombat = null;
             ResetCombatContextState();
             ResetRewardContextState();
@@ -1698,6 +1706,7 @@ public static class RunTracker
             RuntimeOptionsProvider.Refresh();
             // Fresh pending buffer for this combat. Anything accumulated from a prior
             // combat that didn't get a CombatEnded (shouldn't happen but defensive) is dropped.
+            UnsubscribeCardOrbEventsLocked();
             _pendingCombat = new PendingCombat();
             ResetCombatContextState();
             RecordPantographCombatStartForTrackedPlayerLocked(state);
@@ -1742,6 +1751,7 @@ public static class RunTracker
             }
             _currentRun.UpdatedAt = Now();
 
+            UnsubscribeCardOrbEventsLocked();
             _pendingCombat = null;
             ResetCombatContextState();
             SaveCurrentRun();
@@ -1762,6 +1772,7 @@ public static class RunTracker
         RecordPocketwatchTurnForTrackedPlayerLocked();
         RecordPollinousCoreTurnForTrackedPlayerLocked();
         RecordJossPaperTurnForTrackedPlayerLocked();
+        RecordStrikeDummyTurnForTrackedPlayerLocked();
         RecordLetterOpenerTurnForTrackedPlayerLocked();
         RecordTuningForkTurnForTrackedPlayerLocked();
         RecordCloakClaspTurnForTrackedPlayerLocked();
@@ -1772,6 +1783,7 @@ public static class RunTracker
         RecordRainbowRingTurnForTrackedPlayerLocked();
         RecordBeatingRemnantTurnForTrackedPlayerLocked();
         RecordTungstenRodTurnForTrackedPlayerLocked();
+        RecordForgottenSoulTurnForTrackedPlayerLocked();
         RecordStoneCrackerTurnForTrackedPlayerLocked();
         RecordPaperPhrogTurnForTrackedPlayerLocked();
         RecordRazorToothTurnForTrackedPlayerLocked();
@@ -2012,6 +2024,8 @@ public static class RunTracker
         target.TotalDamageBlocked += source.TotalDamageBlocked;
         target.TotalDamageOverkill += source.TotalDamageOverkill;
         target.Kills += source.Kills;
+        target.ForgottenSoulTurns += source.ForgottenSoulTurns;
+        target.ForgottenSoulCombats += source.ForgottenSoulCombats;
         target.TotalTargets += source.TotalTargets;
         target.LetterOpenerSkillsPlayed += source.LetterOpenerSkillsPlayed;
         target.LetterOpenerCombats += source.LetterOpenerCombats;
@@ -2080,6 +2094,9 @@ public static class RunTracker
         target.CombatsWithoutActivation += source.CombatsWithoutActivation;
 
         target.StrikeDummyStrikesPlayed += source.StrikeDummyStrikesPlayed;
+        target.StrikeDummyRateStrikesPlayed += source.StrikeDummyRateStrikesPlayed;
+        target.StrikeDummyTurns += source.StrikeDummyTurns;
+        target.StrikeDummyCombats += source.StrikeDummyCombats;
         if (source.StrikeDummyBaseStrikesInDeck != 0 || target.StrikeDummyBaseStrikesInDeck == 0)
             target.StrikeDummyBaseStrikesInDeck = source.StrikeDummyBaseStrikesInDeck;
         if (source.StrikeDummyNonBaseStrikeCardsInDeck != 0 || target.StrikeDummyNonBaseStrikeCardsInDeck == 0)
@@ -2309,6 +2326,10 @@ public static class RunTracker
                 case BlockGainedEntry bge:
                     if (trackCardStats)
                         RecordBlockGainedEntry(bge);
+                    break;
+                case OrbChanneledEntry oce:
+                    if (trackCardStats)
+                        RecordOrbCreated(oce);
                     break;
                 case DamageReceivedEntry dre:
                     // Remember the result ref so the combat-ending capture
@@ -2858,6 +2879,306 @@ public static class RunTracker
                 CoreMain.LogDebug($"RecordStarsGained failed: {e.Message}");
             }
         }
+    }
+
+    /// <summary>
+    /// Attribute one successfully channeled orb to the card whose play is
+    /// currently resolving. OrbCmd emits OrbChanneledEntry only after
+    /// TryEnqueue succeeds, making this an observed result rather than a
+    /// count inferred from the card's printed channel commands.
+    /// </summary>
+    private static void RecordOrbCreated(OrbChanneledEntry entry)
+    {
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+
+                var causingPlay = FindCurrentlyResolvingCardPlay();
+                var sourceCard = causingPlay?.Card;
+                var orb = entry.Orb;
+                var orbOwner = orb?.Owner;
+                if (sourceCard == null || orb == null || orbOwner == null) return;
+                if (!IsTrackedCard(sourceCard) || !IsTrackedPlayer(orbOwner)) return;
+                if (!ReferenceEquals(sourceCard.Owner, orbOwner)) return;
+
+                _pendingCombat ??= new PendingCombat();
+                var instanceId = GetOrAssignInstanceId(sourceCard);
+                var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
+                var orbId = orb.Id.ToString();
+                agg.TotalOrbsCreated++;
+                GetOrCreateCardOrbAggregate(agg, orbId).Created++;
+                var firstRegistration =
+                    !_pendingCombat.CardSourceByOrb.ContainsKey(orb);
+                _pendingCombat.CardSourceByOrb[orb] = instanceId;
+                if (firstRegistration)
+                {
+                    Action passiveHandler =
+                        () => RecordCardSourcedOrbPassiveActivated(orb);
+                    Action<Creature[]> evokeHandler =
+                        _ => RecordCardSourcedOrbEvokeActivated(orb);
+                    orb.PassiveActivated += passiveHandler;
+                    orb.EvokeActivated += evokeHandler;
+                    _pendingCombat.CardOrbSubscriptions[orb] =
+                        new CardOrbEventSubscription(
+                            passiveHandler,
+                            evokeHandler);
+                }
+
+                _pendingCombat.CombatEvents.Add(new CardEvent
+                {
+                    T = Now(),
+                    Type = "orb_created",
+                    CardId = instanceId,
+                    OrbId = orbId,
+                });
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordOrbCreated failed: {e.Message}");
+            }
+        }
+    }
+
+    public static bool IsTrackedCardSourcedOrb(OrbModel? orb)
+    {
+        if (orb == null) return false;
+
+        lock (_lock)
+        {
+            return _pendingCombat?.CardSourceByOrb.ContainsKey(orb) == true;
+        }
+    }
+
+    private static void RecordCardSourcedOrbPassiveActivated(OrbModel? orb)
+    {
+        RecordCardSourcedOrbLifecycle(
+            orb,
+            "orb_passive",
+            outcome => outcome.PassiveActivations++);
+        if (orb is FrostOrb)
+            ArmFrostOrbBlockAttribution(orb);
+    }
+
+    private static void RecordCardSourcedOrbEvokeActivated(OrbModel? orb)
+    {
+        RecordCardSourcedOrbLifecycle(
+            orb,
+            "orb_evoked",
+            outcome => outcome.Evokes++);
+        if (orb is FrostOrb)
+            ArmFrostOrbBlockAttribution(orb);
+    }
+
+    public static void RecordCardSourcedOrbsFizzled(IEnumerable<OrbModel>? removedOrbs)
+    {
+        if (removedOrbs == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null) return;
+
+                foreach (var orb in removedOrbs)
+                {
+                    if (orb == null
+                        || !_pendingCombat.CardSourceByOrb.TryGetValue(
+                            orb,
+                            out var instanceId))
+                    {
+                        continue;
+                    }
+
+                    var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
+                    var orbId = orb.Id.ToString();
+                    GetOrCreateCardOrbAggregate(agg, orbId).Fizzles++;
+                    _pendingCombat.CombatEvents.Add(new CardEvent
+                    {
+                        T = Now(),
+                        Type = "orb_fizzled",
+                        CardId = instanceId,
+                        OrbId = orbId,
+                    });
+                    if (_pendingCombat.CardOrbSubscriptions.Remove(
+                            orb,
+                            out var subscription))
+                    {
+                        orb.PassiveActivated -= subscription.PassiveHandler;
+                        orb.EvokeActivated -= subscription.EvokeHandler;
+                    }
+                    _pendingCombat.CardSourceByOrb.Remove(orb);
+                }
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordCardSourcedOrbsFizzled failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void RecordCardSourcedOrbLifecycle(
+        OrbModel? orb,
+        string eventType,
+        Action<CardOrbAggregate> record)
+    {
+        if (orb == null || record == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null
+                    || !_pendingCombat.CardSourceByOrb.TryGetValue(
+                        orb,
+                        out var instanceId))
+                {
+                    return;
+                }
+
+                var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
+                var orbId = orb.Id.ToString();
+                record(GetOrCreateCardOrbAggregate(agg, orbId));
+                _pendingCombat.CombatEvents.Add(new CardEvent
+                {
+                    T = Now(),
+                    Type = eventType,
+                    CardId = instanceId,
+                    OrbId = orbId,
+                });
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordCardSourcedOrbLifecycle failed ({eventType}): {e.Message}");
+            }
+        }
+    }
+
+    private static CardOrbAggregate GetOrCreateCardOrbAggregate(
+        CardAggregate aggregate,
+        string orbId)
+    {
+        aggregate.OrbOutcomes ??= new Dictionary<string, CardOrbAggregate>();
+        if (!aggregate.OrbOutcomes.TryGetValue(orbId, out var outcome))
+        {
+            outcome = new CardOrbAggregate
+            {
+                OrbId = orbId,
+            };
+            aggregate.OrbOutcomes[orbId] = outcome;
+        }
+
+        if (string.IsNullOrWhiteSpace(outcome.OrbId))
+            outcome.OrbId = orbId;
+        return outcome;
+    }
+
+    private static void UnsubscribeCardOrbEventsLocked()
+    {
+        if (_pendingCombat == null) return;
+
+        foreach (var (orb, subscription) in
+                 _pendingCombat.CardOrbSubscriptions)
+        {
+            try
+            {
+                orb.PassiveActivated -= subscription.PassiveHandler;
+                orb.EvokeActivated -= subscription.EvokeHandler;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"UnsubscribeCardOrbEventsLocked failed: {e.Message}");
+            }
+        }
+
+        _pendingCombat.CardOrbSubscriptions.Clear();
+    }
+
+    /// <summary>
+    /// Arm a one-shot window from FrostOrb's native activation event. The
+    /// observed block history entry is orb output, not direct card block.
+    /// </summary>
+    private static void ArmFrostOrbBlockAttribution(OrbModel? orb)
+    {
+        var owner = orb?.Owner;
+        if (orb == null || owner == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(owner)) return;
+                if (CombatManager.Instance?.IsInProgress != true) return;
+
+                _pendingCombat ??= new PendingCombat();
+                _pendingCombat.ActiveFrostOrbBlockSources.Add(orb);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"ArmFrostOrbBlockAttribution failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void CompleteFrostOrbBlockAttribution(Creature? receiver)
+    {
+        if (receiver == null) return;
+
+        lock (_lock)
+        {
+            var active = _pendingCombat?.ActiveFrostOrbBlockSources;
+            if (active == null) return;
+
+            for (var i = 0; i < active.Count; i++)
+            {
+                var orb = active[i];
+                if (orb?.Owner?.Creature == null
+                    || !ReferenceEquals(orb.Owner.Creature, receiver))
+                {
+                    continue;
+                }
+
+                active.RemoveAt(i);
+                break;
+            }
+        }
+    }
+
+    private static bool TryRecordFrostOrbBlockLocked(BlockGainedEntry entry)
+    {
+        if (_pendingCombat == null || entry.CardPlay != null) return false;
+
+        var activeOrb = _pendingCombat.ActiveFrostOrbBlockSources
+            .FirstOrDefault(orb =>
+                orb?.Owner?.Creature != null
+                && ReferenceEquals(orb.Owner.Creature, entry.Receiver));
+        if (activeOrb == null) return false;
+
+        if (_pendingCombat.CardSourceByOrb.TryGetValue(
+                activeOrb,
+                out var instanceId))
+        {
+            var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
+            var orbId = activeOrb.Id.ToString();
+            GetOrCreateCardOrbAggregate(agg, orbId).BlockGained += entry.Amount;
+            _pendingCombat.CombatEvents.Add(new CardEvent
+            {
+                T = Now(),
+                Type = "orb_block_gained",
+                CardId = instanceId,
+                OrbId = orbId,
+                Blocked = entry.Amount,
+            });
+        }
+
+        // True means the entry is known orb output. Even without a card
+        // source, suppress direct/recent-card attribution.
+        return true;
     }
 
     /// <summary>
@@ -5832,6 +6153,7 @@ public static class RunTracker
     private const string MercuryHourglassRelicId = "RELIC.MERCURY_HOURGLASS";
     private const string MrStrugglesRelicId = "RELIC.MR_STRUGGLES";
     private const string LostWispRelicId = "RELIC.LOST_WISP";
+    private const string ForgottenSoulRelicId = "RELIC.FORGOTTEN_SOUL";
     private const string BronzeScalesRelicId = "RELIC.BRONZE_SCALES";
     private const string HornCleatRelicId = "RELIC.HORN_CLEAT";
     private const string CaptainsWheelRelicId = "RELIC.CAPTAINS_WHEEL";
@@ -7580,6 +7902,27 @@ public static class RunTracker
             {
                 CoreMain.LogDebug(
                     $"RecordTungstenRodTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordForgottenSoulTurnStarted(Player player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                if (CombatManager.Instance?.IsInProgress != true) return;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordForgottenSoulTurnForPlayerLocked(player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordForgottenSoulTurnStarted failed: {e.Message}");
             }
         }
     }
@@ -10655,24 +10998,33 @@ public static class RunTracker
     /// instance after upgrade and deck-add modifiers have finished. Route it
     /// through pending combat until the normal CombatEnded promotion.
     /// </summary>
-    public static void RecordPaelsToothCardReturned(CardModel cardReturned)
+    public static void RecordPaelsToothCardReturned(
+        PaelsTooth relic,
+        CardModel cardReturned)
     {
-        if (cardReturned == null) return;
+        if (relic == null || cardReturned == null) return;
 
         lock (_lock)
         {
             try
             {
+                if (!IsTrackedRelic(relic)) return;
                 if (!IsTrackedPlayer(cardReturned.Owner)) return;
                 if (_currentRun == null && _pendingCombat == null) return;
 
+                var pickupFloor = RelicFloorAddedToDeckIncludingRunStart(relic);
+                var returnFloor = CurrentRunFloorLocked();
+                var floorsClimbed = CalculatePaelsToothFloorsClimbed(
+                    pickupFloor,
+                    returnFloor);
                 var persistDirectlyToRun = _pendingCombat == null;
                 var agg = GetOrCreateRelicAggregateForCurrentContextLocked(PaelsToothRelicId);
                 RecordPaelsToothCardReturnedForTest(
                     agg,
                     GetCardIdForStats(cardReturned),
                     GetCardDisplayNameForStats(cardReturned),
-                    cardReturned.CurrentUpgradeLevel);
+                    cardReturned.CurrentUpgradeLevel,
+                    floorsClimbed);
                 if (persistDirectlyToRun)
                 {
                     RefreshCurrentRunMetadataLocked();
@@ -12976,6 +13328,7 @@ public static class RunTracker
             try
             {
                 RefreshStrikeDummyDeckCountsIfOwnedLocked();
+                RecordStrikeDummyTurnForTrackedPlayerLocked();
 
                 RelicAggregate? result = null;
                 if (_currentRun != null && _currentRun.RelicAggregates.TryGetValue(StrikeDummyRelicId, out var committed))
@@ -13774,6 +14127,19 @@ public static class RunTracker
     {
         if (agg == null) return;
         agg.StrikeDummyStrikesPlayed += 1;
+        agg.StrikeDummyRateStrikesPlayed += 1;
+    }
+
+    internal static void RecordStrikeDummyTurnForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.StrikeDummyTurns += Math.Max(0, count);
+    }
+
+    internal static void RecordStrikeDummyCombatForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.StrikeDummyCombats += Math.Max(0, count);
     }
 
     internal static void RecordOddlySmoothStoneBlockCardPlayedForTest(
@@ -15627,7 +15993,8 @@ public static class RunTracker
         RelicAggregate agg,
         string? cardId,
         string? displayName,
-        int upgradeLevel)
+        int upgradeLevel,
+        int? floorsClimbed = null)
     {
         if (agg == null || string.IsNullOrWhiteSpace(cardId)) return;
 
@@ -15646,7 +16013,18 @@ public static class RunTracker
             CardId = cardId,
             DisplayName = normalizedDisplayName,
             UpgradeLevel = normalizedUpgradeLevel,
+            FloorsClimbed = floorsClimbed.HasValue
+                ? Math.Max(0, floorsClimbed.Value)
+                : null,
         });
+    }
+
+    internal static int? CalculatePaelsToothFloorsClimbed(
+        int? pickupFloor,
+        int? returnFloor)
+    {
+        if (!pickupFloor.HasValue || !returnFloor.HasValue) return null;
+        return Math.Max(0, returnFloor.Value - pickupFloor.Value);
     }
 
     internal static void RecordNeowsBonesRelicObtainedForTest(
@@ -17674,6 +18052,89 @@ public static class RunTracker
         }
     }
 
+    /// <summary>
+    /// Count Forgotten Soul's exact same-owner exhaust callback and arm the
+    /// single-target damage command it may emit. The returned token remains
+    /// valid until the owner callback completes so a no-target activation can
+    /// be disarmed without claiming later unrelated damage.
+    /// </summary>
+    internal static PendingForgottenSoulDamageAttribution? ArmForgottenSoulAttribution(
+        ForgottenSoul? relic,
+        CardModel? exhaustedCard)
+    {
+        if (relic?.Owner?.Creature == null || exhaustedCard?.Owner == null)
+            return null;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic)) return null;
+                if (!ReferenceEquals(exhaustedCard.Owner, relic.Owner)) return null;
+                if (CombatManager.Instance?.IsInProgress != true) return null;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordForgottenSoulCombatForPlayerLocked(relic.Owner);
+                RecordForgottenSoulTurnForPlayerLocked(relic.Owner);
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(ForgottenSoulRelicId);
+                RecordForgottenSoulActivationForTest(agg);
+
+                var attribution = new PendingForgottenSoulDamageAttribution
+                {
+                    PendingCombat = _pendingCombat,
+                    Dealer = relic.Owner.Creature,
+                };
+                _pendingCombat.ForgottenSoulDamageAttributions.Add(attribution);
+                return attribution;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"ArmForgottenSoulAttribution failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+    internal static bool TryConsumeForgottenSoulDamageAttribution(Creature? dealer)
+    {
+        if (dealer == null) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null) return false;
+
+                for (var i = 0; i < _pendingCombat.ForgottenSoulDamageAttributions.Count; i++)
+                {
+                    var attribution = _pendingCombat.ForgottenSoulDamageAttributions[i];
+                    if (!ReferenceEquals(attribution.Dealer, dealer)) continue;
+
+                    _pendingCombat.ForgottenSoulDamageAttributions.RemoveAt(i);
+                    return true;
+                }
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"TryConsumeForgottenSoulDamageAttribution failed: {e.Message}");
+            }
+        }
+
+        return false;
+    }
+
+    internal static void DisarmForgottenSoulAttribution(
+        PendingForgottenSoulDamageAttribution? attribution)
+    {
+        if (attribution == null) return;
+
+        lock (_lock)
+        {
+            attribution.PendingCombat.ForgottenSoulDamageAttributions.Remove(attribution);
+        }
+    }
+
     public static void RecordFestivePopperDamage(IEnumerable<DamageResult>? results)
     {
         if (results == null) return;
@@ -17706,6 +18167,24 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordLostWispDamage failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordForgottenSoulDamage(IEnumerable<DamageResult>? results)
+    {
+        if (results == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(ForgottenSoulRelicId);
+                AddRelicDamageResultsLocked(agg, results);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordForgottenSoulDamage failed: {e.Message}");
             }
         }
     }
@@ -17912,6 +18391,45 @@ public static class RunTracker
                 result.OverkillDamage,
                 result.WasTargetKilled);
         }
+    }
+
+    internal static void RecordForgottenSoulActivationForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.Activations += Math.Max(0, count);
+    }
+
+    internal static void RecordForgottenSoulDamageForTest(
+        RelicAggregate agg,
+        IEnumerable<(int BlockedDamage, int UnblockedDamage, int OverkillDamage, bool WasTargetKilled)> results)
+    {
+        foreach (var result in results)
+        {
+            AddRelicDamageResultPartsLocked(
+                agg,
+                result.BlockedDamage,
+                result.UnblockedDamage,
+                result.OverkillDamage,
+                result.WasTargetKilled);
+        }
+    }
+
+    internal static void RecordForgottenSoulTurnForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.ForgottenSoulTurns += Math.Max(0, count);
+    }
+
+    internal static void RecordForgottenSoulCombatForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.ForgottenSoulCombats += Math.Max(0, count);
     }
 
     internal static void RecordBronzeScalesDamageForTest(
@@ -19971,8 +20489,10 @@ public static class RunTracker
         var owner = card.Owner;
         if (owner == null || !IsTrackedPlayer(owner) || !PlayerHasStrikeDummy(owner)) return;
 
+        RecordStrikeDummyTurnForPlayerLocked(owner);
         var agg = GetOrCreateRelicAggregateForCurrentContextLocked(StrikeDummyRelicId);
         agg.StrikeDummyStrikesPlayed += 1;
+        agg.StrikeDummyRateStrikesPlayed += 1;
     }
 
     private static void RecordOddlySmoothStoneBlockCardPlayedIfOwnedLocked(
@@ -20611,6 +21131,18 @@ public static class RunTracker
         }
     }
 
+    private static bool PlayerHasForgottenSoul(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is ForgottenSoul);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static bool PlayerHasRuinedHelmet(Player player)
     {
         try
@@ -20750,6 +21282,7 @@ public static class RunTracker
             var player = GetTrackedRunPlayerLocked();
             if (player == null) return;
 
+            RecordStrikeDummyCombatForPlayerLocked(player);
             RecordPermafrostCombatForPlayerLocked(player);
             RecordPocketwatchCombatForPlayerLocked(player);
             RecordPollinousCoreCombatForPlayerLocked(player);
@@ -20785,6 +21318,7 @@ public static class RunTracker
             RecordBeatingRemnantCombatForPlayerLocked(player);
             RecordWhisperingEarringCombatForPlayerLocked(player);
             RecordTungstenRodCombatForPlayerLocked(player);
+            RecordForgottenSoulCombatForPlayerLocked(player);
             RecordRuinedHelmetCombatForPlayerLocked(player);
             RecordMummifiedHandCombatForPlayerLocked(player);
             RecordBurningSticksCombatForPlayerLocked(player);
@@ -20795,6 +21329,71 @@ public static class RunTracker
         {
             CoreMain.LogDebug($"RecordHeldCombatRelicBaselinesForTrackedPlayerLocked failed: {e.Message}");
         }
+    }
+
+    private static void RecordStrikeDummyCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasStrikeDummy(player)) return;
+        if (!_pendingCombat.StrikeDummyCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(StrikeDummyRelicId);
+        RecordStrikeDummyCombatForTest(agg);
+    }
+
+    public static void RecordStrikeDummyTurnStarted(Player? player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                RecordStrikeDummyTurnForPlayerLocked(player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordStrikeDummyTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void RecordStrikeDummyTurnForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordStrikeDummyTurnForPlayerLocked(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug(
+                $"RecordStrikeDummyTurnForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordStrikeDummyTurnForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasStrikeDummy(player)) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.StrikeDummyTurnCountedTurns.TryGetValue(
+                player,
+                out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.StrikeDummyTurnCountedTurns[player] = turnNumber;
+        RecordStrikeDummyCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(StrikeDummyRelicId);
+        RecordStrikeDummyTurnForTest(agg);
     }
 
     private static void RecordPermafrostCombatForPlayerLocked(Player player)
@@ -21309,6 +21908,53 @@ public static class RunTracker
 
         var agg = GetOrCreatePendingRelicAggregateLocked(TungstenRodRelicId);
         RecordTungstenRodTurnForTest(agg);
+    }
+
+    private static void RecordForgottenSoulCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasForgottenSoul(player)) return;
+        if (!_pendingCombat.ForgottenSoulCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(ForgottenSoulRelicId);
+        RecordForgottenSoulCombatForTest(agg);
+    }
+
+    private static void RecordForgottenSoulTurnForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordForgottenSoulTurnForPlayerLocked(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug(
+                $"RecordForgottenSoulTurnForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordForgottenSoulTurnForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasForgottenSoul(player)) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.ForgottenSoulTurnCountedTurns.TryGetValue(
+                player,
+                out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.ForgottenSoulTurnCountedTurns[player] = turnNumber;
+        RecordForgottenSoulCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(ForgottenSoulRelicId);
+        RecordForgottenSoulTurnForTest(agg);
     }
 
     private static void RecordBeatingRemnantTurnForTrackedPlayerLocked()
@@ -23182,6 +23828,9 @@ public static class RunTracker
                 CardId = card.CardId,
                 DisplayName = card.DisplayName ?? "",
                 UpgradeLevel = Math.Max(0, card.UpgradeLevel),
+                FloorsClimbed = card.FloorsClimbed.HasValue
+                    ? Math.Max(0, card.FloorsClimbed.Value)
+                    : null,
             });
         }
     }
@@ -25958,11 +26607,12 @@ public static class RunTracker
             _pendingCombat ??= new PendingCombat();
 
             string? instanceId = null;
-            if (entry.CardPlay?.Card != null)
+            bool isFrostOrbBlock = TryRecordFrostOrbBlockLocked(entry);
+            if (!isFrostOrbBlock && entry.CardPlay?.Card != null)
             {
                 instanceId = GetOrAssignInstanceId(entry.CardPlay.Card);
             }
-            else if (entry.Receiver.IsPlayer)
+            else if (!isFrostOrbBlock && entry.Receiver.IsPlayer)
             {
                 var fallbackCard = FindLikelyBlockSourceCard(entry.Receiver);
                 if (fallbackCard != null)
@@ -25982,7 +26632,7 @@ public static class RunTracker
                     Blocked = entry.Amount,
                 });
             }
-            else if (entry.Receiver.IsPlayer)
+            else if (!isFrostOrbBlock && entry.Receiver.IsPlayer)
             {
                 var recvDesc = DescribeCreature(entry.Receiver);
                 CoreMain.LogDebug(
@@ -26616,6 +27266,9 @@ public static class RunTracker
         target.TotalStarsSpent += source.TotalStarsSpent;
         target.TotalStarsGenerated += source.TotalStarsGenerated;
         target.TotalForgeGenerated += source.TotalForgeGenerated;
+        target.TotalOrbsCreated += source.TotalOrbsCreated;
+        target.OrbOutcomes ??= new Dictionary<string, CardOrbAggregate>();
+        MergeCardOrbOutcomesInto(target.OrbOutcomes, source.OrbOutcomes);
         target.PotionsGained += source.PotionsGained;
         target.CommonPotionsGained += source.CommonPotionsGained;
         target.UncommonPotionsGained += source.UncommonPotionsGained;
@@ -26677,6 +27330,36 @@ public static class RunTracker
         MergeReplayExtraPlayReasonsInto(target.ReplayExtraPlayReasons, source.ReplayExtraPlayReasons);
         MergeReplayExtraPlayReasonsInto(target.ReplayAttackNoDamageReasons, source.ReplayAttackNoDamageReasons);
         MergeAppliedEffectsInto(target.AppliedEffects, source.AppliedEffects);
+    }
+
+    private static void MergeCardOrbOutcomesInto(
+        Dictionary<string, CardOrbAggregate> target,
+        Dictionary<string, CardOrbAggregate>? source)
+    {
+        if (source == null) return;
+
+        foreach (var (orbId, sourceOutcome) in source)
+        {
+            if (!target.TryGetValue(orbId, out var targetOutcome))
+            {
+                targetOutcome = new CardOrbAggregate
+                {
+                    OrbId = sourceOutcome.OrbId,
+                };
+                target[orbId] = targetOutcome;
+            }
+
+            if (string.IsNullOrWhiteSpace(targetOutcome.OrbId))
+                targetOutcome.OrbId = sourceOutcome.OrbId;
+            if (string.IsNullOrWhiteSpace(targetOutcome.OrbId))
+                targetOutcome.OrbId = orbId;
+
+            targetOutcome.Created += sourceOutcome.Created;
+            targetOutcome.PassiveActivations += sourceOutcome.PassiveActivations;
+            targetOutcome.Evokes += sourceOutcome.Evokes;
+            targetOutcome.Fizzles += sourceOutcome.Fizzles;
+            targetOutcome.BlockGained += sourceOutcome.BlockGained;
+        }
     }
 
     private static void MergeMetaStatsInto(RunMetaStats target, RunMetaStats? source)
@@ -27401,6 +28084,16 @@ internal sealed class PendingDarkEmbraceDraw
     public required string DisplayName { get; init; }
 }
 
+internal sealed class PendingForgottenSoulDamageAttribution
+{
+    public required PendingCombat PendingCombat { get; init; }
+    public required Creature Dealer { get; init; }
+}
+
+internal sealed record CardOrbEventSubscription(
+    Action PassiveHandler,
+    Action<Creature[]> EvokeHandler);
+
 /// <summary>
 /// Holds per-combat stats and events while a combat is in progress.
 /// Discarded if the combat doesn't finish cleanly; promoted into the run on CombatEnded.
@@ -27424,11 +28117,20 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Creature, PendingPoisonTick> PendingPoisonTicks { get; }
         = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<OrbModel, string> CardSourceByOrb { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<OrbModel, CardOrbEventSubscription> CardOrbSubscriptions { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public List<OrbModel> ActiveFrostOrbBlockSources { get; } = new();
     public Dictionary<Player, PendingBrilliantScarfDiscount> BrilliantScarfDiscountOffers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> PermafrostCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> BagOfPreparationActivationCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> StrikeDummyCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> StrikeDummyTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> PocketwatchCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
@@ -27510,6 +28212,12 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> TungstenRodTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> ForgottenSoulCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> ForgottenSoulTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public List<PendingForgottenSoulDamageAttribution> ForgottenSoulDamageAttributions { get; }
+        = new();
     public HashSet<Player> ArtOfWarCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> ArtOfWarTurnCountedTurns { get; }

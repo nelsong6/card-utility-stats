@@ -156,6 +156,13 @@ public class CardAggregate
     // current cards use whole numbers.
     public decimal TotalForgeGenerated { get; set; }
 
+    // Orbs successfully channeled while this card was resolving. The game
+    // emits OrbChanneledEntry only after the orb actually enters the queue,
+    // so full-slot evocations, capacity changes, and failed channels remain
+    // observed outcomes rather than being inferred from card text.
+    public int TotalOrbsCreated { get; set; }
+    public Dictionary<string, CardOrbAggregate> OrbOutcomes { get; set; } = new();
+
     // Potion procurement outcomes caused by this card. Alchemize is the
     // first card using these fields: gained counts only successful observed
     // procure results, rarity buckets use the potion actually returned by
@@ -386,6 +393,23 @@ public class CardAggregate
     public MegaCrit.Sts2.Core.Saves.Runs.SerializableCard? RemovedSnapshot { get; set; }
 
     // M3c: Draw count attribution. Null until M3c.
+}
+
+/// <summary>
+/// Lifecycle outcomes for exact orb instances created by one physical card,
+/// grouped by orb definition for compact persistence and display.
+/// </summary>
+public class CardOrbAggregate
+{
+    public string OrbId { get; set; } = "";
+    public int Created { get; set; }
+    public int PassiveActivations { get; set; }
+    public int Evokes { get; set; }
+    public int Fizzles { get; set; }
+
+    // Observed block created by this orb type. This remains separate from the
+    // originating card's direct block totals and provenance ledger.
+    public int BlockGained { get; set; }
 }
 
 public class RunMetaStats
@@ -960,15 +984,22 @@ public class RelicAggregate
     public int TotalDamageAttempted { get; set; }
 
     // Relic damage outcome split. Used by relics such as Parrying Shield,
-    // Festive Popper, and Mercury Hourglass when their strikes actually
-    // resolve through the game's damage command.
+    // Festive Popper, Mercury Hourglass, and Forgotten Soul when their strikes
+    // actually resolve through the game's damage command.
     public int TotalDamageDealt { get; set; }
     public int TotalDamageBlocked { get; set; }
     public int TotalDamageOverkill { get; set; }
     public int Kills { get; set; }
 
+    // Forgotten Soul held-period denominators. Activations count every
+    // same-owner card exhaust callback, including a callback with no hittable
+    // enemy; damage and targets come only from the resolved damage command.
+    public int ForgottenSoulTurns { get; set; }
+    public int ForgottenSoulCombats { get; set; }
+
     // Total targets included in those attempted relic-damage payloads. Used by
-    // Letter Opener, Parrying Shield, Festive Popper, and Mercury Hourglass.
+    // Letter Opener, Parrying Shield, Festive Popper, Mercury Hourglass, and
+    // Forgotten Soul.
     public int TotalTargets { get; set; }
 
     // Letter Opener tracking. TotalDamageAttempted stores the attempted AoE
@@ -1084,8 +1115,13 @@ public class RelicAggregate
     public int CombatsWithoutActivation { get; set; }
 
     // Strike Dummy tracking. StrikesPlayed is cumulative since the relic was
-    // picked up; deck counts are current permanent-deck snapshots.
+    // picked up; RateStrikesPlayed is the matching observation-era numerator
+    // for the held turn/combat denominators so older lifetime totals do not
+    // manufacture rates. Deck counts are current permanent-deck snapshots.
     public int StrikeDummyStrikesPlayed { get; set; }
+    public int StrikeDummyRateStrikesPlayed { get; set; }
+    public int StrikeDummyTurns { get; set; }
+    public int StrikeDummyCombats { get; set; }
     public int StrikeDummyBaseStrikesInDeck { get; set; }
     public int StrikeDummyNonBaseStrikeCardsInDeck { get; set; }
 
@@ -1373,7 +1409,8 @@ public class RelicAggregate
 
     // Physical cards Pael's Tooth has actually returned to the deck. The list
     // preserves observed return order, duplicate definitions, the final title,
-    // and the post-return upgrade level of each new deck instance.
+    // the post-return upgrade level, and the number of floors climbed since
+    // the relic removed the cards on pickup.
     public List<RelicCardReturnAggregate> CardsReturned { get; set; } = new();
 
     // Times a relic-owned card choice was skipped. Used by Hefty Tablet.
@@ -1415,6 +1452,7 @@ public class RelicCardReturnAggregate
     public string CardId { get; set; } = "";
     public string DisplayName { get; set; } = "";
     public int UpgradeLevel { get; set; }
+    public int? FloorsClimbed { get; set; }
 }
 
 public class RelicCardRewardScreenAggregate
@@ -1499,7 +1537,7 @@ public readonly record struct CardRewardCategoryObservation(string Key, string D
 public class CardEvent
 {
     public string T { get; set; } = "";          // ISO-8601 UTC timestamp
-    public string Type { get; set; } = "";       // "card_played" | "damage_received" | "energy_gained" | "stars_gained" | "forge_gained"
+    public string Type { get; set; } = "";       // "card_played" | "damage_received" | "energy_gained" | "stars_gained" | "forge_gained" | "orb_created" | "orb_passive" | "orb_evoked" | "orb_fizzled" | "orb_block_gained"
     public string CardId { get; set; } = "";
 
     // card_played fields
@@ -1509,6 +1547,7 @@ public class CardEvent
     public int? StarsSpent { get; set; }         // actual stars paid for this play
     public int? StarsGained { get; set; }        // actual stars added while this card was resolving
     public decimal? ForgeGained { get; set; }    // actual forge added while this card was resolving
+    public string? OrbId { get; set; }            // successfully channeled orb definition id
 
     // card_upgraded fields (and general-purpose: Floor also stamped on
     // other event types when useful). UpgradeLevel is the NEW level AFTER

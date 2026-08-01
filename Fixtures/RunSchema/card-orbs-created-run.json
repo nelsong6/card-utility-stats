@@ -1,0 +1,74 @@
+{
+  "run_id": "card-orbs-created-fixture",
+  "started_at": "2026-07-31T08:00:00Z",
+  "updated_at": "2026-07-31T08:18:00Z",
+  "character": "DEFECT",
+  "ascension": 7,
+  "floor_reached": 14,
+  "outcome": "in_progress",
+  "game_start_time": 1785484800,
+  "aggregates": {
+    "CARD.GLACIER#1": {
+      "combats_in_deck": 3,
+      "plays": 3,
+      "times_drawn": 5,
+      "total_orbs_created": 6,
+      "orb_outcomes": {
+        "ORB.FROST": {
+          "orb_id": "ORB.FROST",
+          "created": 6,
+          "passive_activations": 9,
+          "evokes": 4,
+          "fizzles": 1,
+          "block_gained": 28
+        }
+      },
+      "floor_added": 4,
+      "initial_upgrade_level": 0
+    }
+  },
+  "events": [
+    {
+      "t": "2026-07-31T08:12:00Z",
+      "type": "orb_created",
+      "card_id": "CARD.GLACIER#1",
+      "orb_id": "ORB.FROST"
+    },
+    {
+      "t": "2026-07-31T08:13:00Z",
+      "type": "orb_passive",
+      "card_id": "CARD.GLACIER#1",
+      "orb_id": "ORB.FROST"
+    },
+    {
+      "t": "2026-07-31T08:14:00Z",
+      "type": "orb_evoked",
+      "card_id": "CARD.GLACIER#1",
+      "orb_id": "ORB.FROST"
+    },
+    {
+      "t": "2026-07-31T08:15:00Z",
+      "type": "orb_fizzled",
+      "card_id": "CARD.GLACIER#1",
+      "orb_id": "ORB.FROST"
+    },
+    {
+      "t": "2026-07-31T08:16:00Z",
+      "type": "orb_block_gained",
+      "card_id": "CARD.GLACIER#1",
+      "orb_id": "ORB.FROST",
+      "blocked": 28
+    }
+  ],
+  "relic_aggregates": {},
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.GLACIER": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.GLACIER": 1
+  }
+}

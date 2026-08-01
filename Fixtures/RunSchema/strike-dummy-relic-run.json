@@ -15,6 +15,9 @@
   "relic_aggregates": {
     "RELIC.STRIKE_DUMMY": {
       "strike_dummy_strikes_played": 8,
+      "strike_dummy_rate_strikes_played": 6,
+      "strike_dummy_turns": 4,
+      "strike_dummy_combats": 2,
       "strike_dummy_base_strikes_in_deck": 4,
       "strike_dummy_non_base_strike_cards_in_deck": 3
     }

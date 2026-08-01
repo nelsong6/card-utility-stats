@@ -2111,6 +2111,9 @@ public class SchemaLoadingTests
         Assert.True(loaded!.SupportsResume);
         var relicAgg = loaded.Data.RelicAggregates["RELIC.STRIKE_DUMMY"];
         Assert.Equal(8, relicAgg.StrikeDummyStrikesPlayed);
+        Assert.Equal(6, relicAgg.StrikeDummyRateStrikesPlayed);
+        Assert.Equal(4, relicAgg.StrikeDummyTurns);
+        Assert.Equal(2, relicAgg.StrikeDummyCombats);
         Assert.Equal(4, relicAgg.StrikeDummyBaseStrikesInDeck);
         Assert.Equal(3, relicAgg.StrikeDummyNonBaseStrikeCardsInDeck);
     }
@@ -2123,6 +2126,9 @@ public class SchemaLoadingTests
         Assert.NotNull(resumed);
         var relicAgg = resumed!.RelicAggregates["RELIC.STRIKE_DUMMY"];
         Assert.Equal(8, relicAgg.StrikeDummyStrikesPlayed);
+        Assert.Equal(6, relicAgg.StrikeDummyRateStrikesPlayed);
+        Assert.Equal(4, relicAgg.StrikeDummyTurns);
+        Assert.Equal(2, relicAgg.StrikeDummyCombats);
         Assert.Equal(4, relicAgg.StrikeDummyBaseStrikesInDeck);
         Assert.Equal(3, relicAgg.StrikeDummyNonBaseStrikeCardsInDeck);
     }
@@ -4796,20 +4802,22 @@ public class SchemaLoadingTests
     {
         Assert.Collection(
             relicAgg.CardsReturned,
-            card => AssertPaelsToothCard(card, "CARD.STRIKE_KIN", "Strike+", 1),
-            card => AssertPaelsToothCard(card, "CARD.POMMEL_STRIKE", "Pommel Strike++", 2),
-            card => AssertPaelsToothCard(card, "CARD.STRIKE_KIN", "Strike++", 2));
+            card => AssertPaelsToothCard(card, "CARD.STRIKE_KIN", "Strike+", 1, 1),
+            card => AssertPaelsToothCard(card, "CARD.POMMEL_STRIKE", "Pommel Strike++", 2, 2),
+            card => AssertPaelsToothCard(card, "CARD.STRIKE_KIN", "Strike++", 2, 3));
     }
 
     private static void AssertPaelsToothCard(
         RelicCardReturnAggregate card,
         string cardId,
         string displayName,
-        int upgradeLevel)
+        int upgradeLevel,
+        int floorsClimbed)
     {
         Assert.Equal(cardId, card.CardId);
         Assert.Equal(displayName, card.DisplayName);
         Assert.Equal(upgradeLevel, card.UpgradeLevel);
+        Assert.Equal(floorsClimbed, card.FloorsClimbed);
     }
 
     private static void AssertSilverCrucibleFixture(RelicAggregate relicAgg)
@@ -5041,5 +5049,84 @@ public class SchemaLoadingTests
         Assert.Equal(
             9,
             resumed!.Aggregates["CARD.ARMAMENTS#1"].ArmamentsCardsUpgraded);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsForgottenSoulRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("forgotten-soul-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertForgottenSoulFixture(
+            loaded.Data.RelicAggregates["RELIC.FORGOTTEN_SOUL"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsForgottenSoulRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("forgotten-soul-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertForgottenSoulFixture(
+            resumed!.RelicAggregates["RELIC.FORGOTTEN_SOUL"]);
+    }
+
+    private static void AssertForgottenSoulFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(6, relicAgg.Activations);
+        Assert.Equal(24, relicAgg.TotalDamageAttempted);
+        Assert.Equal(17, relicAgg.TotalDamageDealt);
+        Assert.Equal(4, relicAgg.TotalDamageBlocked);
+        Assert.Equal(3, relicAgg.TotalDamageOverkill);
+        Assert.Equal(2, relicAgg.Kills);
+        Assert.Equal(6, relicAgg.TotalTargets);
+        Assert.Equal(8, relicAgg.ForgottenSoulTurns);
+        Assert.Equal(3, relicAgg.ForgottenSoulCombats);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsCardOrbsCreatedFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("card-orbs-created-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertCardOrbLifecycleFixture(
+            loaded.Data.Aggregates["CARD.GLACIER#1"]);
+        Assert.Equal("ORB.FROST", loaded.Data.Events[0].OrbId);
+        Assert.Contains(loaded.Data.Events, entry => entry.Type == "orb_passive");
+        Assert.Contains(loaded.Data.Events, entry => entry.Type == "orb_evoked");
+        Assert.Contains(loaded.Data.Events, entry => entry.Type == "orb_fizzled");
+        Assert.Contains(
+            loaded.Data.Events,
+            entry => entry.Type == "orb_block_gained" && entry.Blocked == 28);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsCardOrbsCreatedFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("card-orbs-created-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertCardOrbLifecycleFixture(
+            resumed!.Aggregates["CARD.GLACIER#1"]);
+        Assert.Equal("ORB.FROST", resumed.Events[0].OrbId);
+    }
+
+    private static void AssertCardOrbLifecycleFixture(CardAggregate aggregate)
+    {
+        Assert.Equal(6, aggregate.TotalOrbsCreated);
+        var frost = aggregate.OrbOutcomes["ORB.FROST"];
+        Assert.Equal("ORB.FROST", frost.OrbId);
+        Assert.Equal(6, frost.Created);
+        Assert.Equal(9, frost.PassiveActivations);
+        Assert.Equal(4, frost.Evokes);
+        Assert.Equal(1, frost.Fizzles);
+        Assert.Equal(28, frost.BlockGained);
     }
 }

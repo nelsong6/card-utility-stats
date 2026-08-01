@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: read
 
 jobs:
   build:
@@ -19,6 +20,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -57,6 +60,17 @@ jobs:
           Compress-Archive -Path "build_staging/SpireLens" -DestinationPath "SpireLens.zip" -Force
           Write-Host "Mod successfully packaged into SpireLens.zip"
 
+      - name: Build shared release notes
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ./scripts/build-release-notes.ps1 `
+            -Repository $env:GITHUB_REPOSITORY `
+            -CurrentTag $env:GITHUB_REF_NAME `
+            -OutputPath "release-notes.md"
+
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -64,11 +78,20 @@ jobs:
           path: SpireLens.zip
           if-no-files-found: error
 
+      - name: Upload release notes
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpireLens-Release-Notes
+          path: release-notes.md
+          if-no-files-found: error
+
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: SpireLens.zip
+          body_path: release-notes.md
           draft: false
           prerelease: false
         env:
@@ -93,6 +116,12 @@ jobs:
         with:
           name: SpireLens-Package
           path: workshop_artifact
+
+      - name: Download release notes
+        uses: actions/download-artifact@v4
+        with:
+          name: SpireLens-Release-Notes
+          path: release_notes
 
       - name: Validate tagged package
         shell: pwsh
@@ -191,6 +220,20 @@ jobs:
           Write-Output "::add-mask::$env:STEAM_USERNAME"
           $contentRoot = (Resolve-Path (Join-Path $PWD "workshop_content")).Path
           $escapedContentRoot = $contentRoot.Replace("\", "\\")
+          $releaseNotesPath = Join-Path $PWD "release_notes/release-notes.md"
+          if (-not (Test-Path -LiteralPath $releaseNotesPath)) {
+            throw "The shared release notes artifact is missing."
+          }
+
+          $changeNote = (Get-Content -Raw -LiteralPath $releaseNotesPath).Trim()
+          if ([string]::IsNullOrWhiteSpace($changeNote)) {
+            throw "The shared release notes artifact is empty."
+          }
+
+          $escapedChangeNote = $changeNote.Replace("\", "\\")
+          $escapedChangeNote = $escapedChangeNote.Replace('"', '\"')
+          $escapedChangeNote = $escapedChangeNote.Replace("`r", "")
+          $escapedChangeNote = $escapedChangeNote.Replace("`n", "\n")
           $workshopConfig = Join-Path $PWD "workshop-item.vdf"
           @"
           "workshopitem"
@@ -198,7 +241,7 @@ jobs:
               "appid"            "2868840"
               "publishedfileid"  "3774710835"
               "contentfolder"    "$escapedContentRoot"
-              "changenote"       "SpireLens $env:GITHUB_REF_NAME"
+              "changenote"       "$escapedChangeNote"
           }
           "@ | Set-Content -LiteralPath $workshopConfig -Encoding utf8
 

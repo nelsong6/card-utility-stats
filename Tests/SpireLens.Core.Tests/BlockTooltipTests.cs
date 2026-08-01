@@ -39,6 +39,10 @@ public class BlockTooltipTests
         typeof(CardHoverShowPatch).GetMethod("AppendCardDrawStats", BindingFlags.NonPublic | BindingFlags.Static)
         ?? throw new InvalidOperationException("AppendCardDrawStats not found.");
 
+    private static readonly MethodInfo AppendOrbCreationStatsMethod =
+        typeof(CardHoverShowPatch).GetMethod("AppendOrbCreationStats", BindingFlags.NonPublic | BindingFlags.Static)
+        ?? throw new InvalidOperationException("AppendOrbCreationStats not found.");
+
     [Fact]
     public void GetBlockStatLabel_UsesShieldIcon()
     {
@@ -203,6 +207,68 @@ public class BlockTooltipTests
         Assert.Contains("Forge gained", text);
         Assert.DoesNotContain("[img=16x16]", text);
         Assert.Contains("[b]6[/b]", text);
+    }
+
+    [Trait("Category", "RequiresLiveGame")]
+    [Fact]
+    public void AppendCompactBody_ShowsObservedOrbsCreated()
+    {
+        var cardModel = CreateCardModel(CardType.Skill);
+        var agg = new CardAggregate
+        {
+            Plays = 2,
+            TimesDrawn = 3,
+            TotalOrbsCreated = 4,
+        };
+
+        var sb = new StringBuilder();
+        _ = AppendCompactBodyMethod.Invoke(null, new object?[] { sb, cardModel, agg });
+        var text = sb.ToString();
+
+        Assert.Contains("Orbs created", text);
+        Assert.Contains("[b]4[/b]", text);
+    }
+
+    [Fact]
+    public void AppendOrbCreationStats_ShowsLifecycleAndSeparateFrostBlockIcons()
+    {
+        var agg = new CardAggregate
+        {
+            TotalOrbsCreated = 2,
+        };
+        agg.OrbOutcomes["ORB.FROST"] = new CardOrbAggregate
+        {
+            OrbId = "ORB.FROST",
+            Created = 2,
+            PassiveActivations = 5,
+            Evokes = 1,
+            Fizzles = 0,
+            BlockGained = 17,
+        };
+
+        var sb = new StringBuilder();
+        _ = AppendOrbCreationStatsMethod.Invoke(
+            null,
+            new object?[] { sb, agg, false });
+        var text = sb.ToString();
+
+        Assert.Contains(
+            "[img=16x16]res://images/orbs/frost.png[/img] created",
+            text);
+        Assert.Contains(
+            "[img=16x16]res://images/orbs/frost.png[/img] passive activations",
+            text);
+        Assert.Contains(
+            "[img=16x16]res://images/orbs/frost.png[/img] evoked",
+            text);
+        Assert.Contains(
+            "[img=16x16]res://images/orbs/frost.png[/img] fizzled",
+            text);
+        Assert.Contains(
+            "[img=16x16]res://images/orbs/frost.png[/img] "
+            + "[img=16x16]res://images/ui/combat/block.png[/img]",
+            text);
+        Assert.Contains("[b]17[/b]", text);
     }
 
     [Fact]

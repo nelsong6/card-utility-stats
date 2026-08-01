@@ -18,17 +18,20 @@
         {
           "card_id": "CARD.STRIKE_KIN",
           "display_name": "Strike+",
-          "upgrade_level": 1
+          "upgrade_level": 1,
+          "floors_climbed": 1
         },
         {
           "card_id": "CARD.POMMEL_STRIKE",
           "display_name": "Pommel Strike++",
-          "upgrade_level": 2
+          "upgrade_level": 2,
+          "floors_climbed": 2
         },
         {
           "card_id": "CARD.STRIKE_KIN",
           "display_name": "Strike++",
-          "upgrade_level": 2
+          "upgrade_level": 2,
+          "floors_climbed": 3
         }
       ]
     }

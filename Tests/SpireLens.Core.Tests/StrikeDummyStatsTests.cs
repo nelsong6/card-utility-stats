@@ -34,6 +34,9 @@ public class StrikeDummyStatsTests
         var agg = new RelicAggregate();
 
         Assert.Equal(0, agg.StrikeDummyStrikesPlayed);
+        Assert.Equal(0, agg.StrikeDummyRateStrikesPlayed);
+        Assert.Equal(0, agg.StrikeDummyTurns);
+        Assert.Equal(0, agg.StrikeDummyCombats);
         Assert.Equal(0, agg.StrikeDummyBaseStrikesInDeck);
         Assert.Equal(0, agg.StrikeDummyNonBaseStrikeCardsInDeck);
     }
@@ -45,6 +48,9 @@ public class StrikeDummyStatsTests
         run.RelicAggregates[StrikeDummyRelicId] = new RelicAggregate
         {
             StrikeDummyStrikesPlayed = 8,
+            StrikeDummyRateStrikesPlayed = 6,
+            StrikeDummyTurns = 4,
+            StrikeDummyCombats = 2,
             StrikeDummyBaseStrikesInDeck = 4,
             StrikeDummyNonBaseStrikeCardsInDeck = 3,
         };
@@ -52,6 +58,9 @@ public class StrikeDummyStatsTests
         var json = JsonSerializer.Serialize(run, SerializerOptions);
 
         Assert.Contains("strike_dummy_strikes_played", json);
+        Assert.Contains("strike_dummy_rate_strikes_played", json);
+        Assert.Contains("strike_dummy_turns", json);
+        Assert.Contains("strike_dummy_combats", json);
         Assert.Contains("strike_dummy_base_strikes_in_deck", json);
         Assert.Contains("strike_dummy_non_base_strike_cards_in_deck", json);
 
@@ -60,6 +69,9 @@ public class StrikeDummyStatsTests
         Assert.NotNull(restored);
         var restoredAgg = restored!.RelicAggregates[StrikeDummyRelicId];
         Assert.Equal(8, restoredAgg.StrikeDummyStrikesPlayed);
+        Assert.Equal(6, restoredAgg.StrikeDummyRateStrikesPlayed);
+        Assert.Equal(4, restoredAgg.StrikeDummyTurns);
+        Assert.Equal(2, restoredAgg.StrikeDummyCombats);
         Assert.Equal(4, restoredAgg.StrikeDummyBaseStrikesInDeck);
         Assert.Equal(3, restoredAgg.StrikeDummyNonBaseStrikeCardsInDeck);
     }
@@ -71,12 +83,43 @@ public class StrikeDummyStatsTests
 
         RunTracker.RecordStrikeDummyStrikePlayedForTest(agg);
         RunTracker.RecordStrikeDummyStrikePlayedForTest(agg);
+        RunTracker.RecordStrikeDummyTurnForTest(agg, 4);
+        RunTracker.RecordStrikeDummyCombatForTest(agg, 2);
         RunTracker.SetStrikeDummyDeckCountsForTest(agg, 4, 3);
         RunTracker.SetStrikeDummyDeckCountsForTest(agg, -1, -2);
 
         Assert.Equal(2, agg.StrikeDummyStrikesPlayed);
+        Assert.Equal(2, agg.StrikeDummyRateStrikesPlayed);
+        Assert.Equal(4, agg.StrikeDummyTurns);
+        Assert.Equal(2, agg.StrikeDummyCombats);
         Assert.Equal(0, agg.StrikeDummyBaseStrikesInDeck);
         Assert.Equal(0, agg.StrikeDummyNonBaseStrikeCardsInDeck);
+    }
+
+    [Fact]
+    public void MergeRelicAggregateInto_AccumulatesStrikeDummyRateFields()
+    {
+        var target = new RelicAggregate
+        {
+            StrikeDummyStrikesPlayed = 5,
+            StrikeDummyRateStrikesPlayed = 3,
+            StrikeDummyTurns = 2,
+            StrikeDummyCombats = 1,
+        };
+        var source = new RelicAggregate
+        {
+            StrikeDummyStrikesPlayed = 4,
+            StrikeDummyRateStrikesPlayed = 4,
+            StrikeDummyTurns = 3,
+            StrikeDummyCombats = 2,
+        };
+
+        RunTracker.MergeRelicAggregateInto(target, source);
+
+        Assert.Equal(9, target.StrikeDummyStrikesPlayed);
+        Assert.Equal(7, target.StrikeDummyRateStrikesPlayed);
+        Assert.Equal(5, target.StrikeDummyTurns);
+        Assert.Equal(3, target.StrikeDummyCombats);
     }
 
     [Fact]
@@ -105,6 +148,9 @@ public class StrikeDummyStatsTests
         var agg = new RelicAggregate
         {
             StrikeDummyStrikesPlayed = 8,
+            StrikeDummyRateStrikesPlayed = 8,
+            StrikeDummyTurns = 3,
+            StrikeDummyCombats = 2,
             StrikeDummyBaseStrikesInDeck = 4,
             StrikeDummyNonBaseStrikeCardsInDeck = 3,
         };
@@ -113,9 +159,12 @@ public class StrikeDummyStatsTests
             ?? throw new InvalidOperationException("BuildStrikeDummyBodyBBCode returned null."));
 
         Assert.Contains("Strikes played", body);
+        Assert.Contains("Avg Strikes played per turn", body);
+        Assert.Contains("Avg Strikes played per combat", body);
         Assert.Contains("Base Strikes in deck", body);
         Assert.Contains("Non-base Strike cards in deck", body);
         Assert.Contains("[b]8[/b]", body);
+        Assert.Contains("[b]2.67[/b]", body);
         Assert.Contains("[b]4[/b]", body);
         Assert.Contains("[b]3[/b]", body);
     }

@@ -63,8 +63,17 @@ The job:
 2. validates the package allowlist;
 3. restores an isolated SteamCMD login from the protected `steam-workshop`
    GitHub environment;
-4. uploads only content and a change note, leaving page-managed metadata alone;
-5. serializes uploads so two tags cannot update the item concurrently.
+4. builds one set of player-facing notes and uses it for both the GitHub
+   release and Workshop change note;
+5. uploads only content and a change note, leaving page-managed metadata alone;
+6. serializes uploads so two tags cannot update the item concurrently.
+
+Release notes come from every merged pull request between the previous tag and
+the new tag. Put player-facing bullets in the pull request's
+`## Workshop notes` section. If the section is absent or empty, the pull request
+title is used as a fallback. Maintenance-only pull requests can opt out by
+putting exactly `No player-facing changes.` in that section. Direct commits that
+were not associated with a pull request fall back to their commit subject.
 
 The environment itself accepts deployments only from tags matching `v*`.
 

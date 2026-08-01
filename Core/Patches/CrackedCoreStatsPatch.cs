@@ -183,7 +183,8 @@ public static class StartingRelicOrbFizzleStatsPatch
         __state = __instance.Orbs
             .Where(orb =>
                 RunTracker.IsTrackedCrackedCoreStartingOrb(orb)
-                || RunTracker.IsTrackedSymbioticVirusStartingOrb(orb))
+                || RunTracker.IsTrackedSymbioticVirusStartingOrb(orb)
+                || RunTracker.IsTrackedCardSourcedOrb(orb))
             .ToList();
     }
 
@@ -201,6 +202,7 @@ public static class StartingRelicOrbFizzleStatsPatch
                 .ToList();
             RunTracker.RecordCrackedCoreStartingOrbsFizzled(removedOrbs);
             RunTracker.RecordSymbioticVirusStartingOrbsFizzled(removedOrbs);
+            RunTracker.RecordCardSourcedOrbsFizzled(removedOrbs);
         }
         catch (Exception e)
         {
