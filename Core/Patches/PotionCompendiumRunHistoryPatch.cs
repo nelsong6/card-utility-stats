@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Godot;
 using HarmonyLib;
+using MegaCrit.Sts2.Core.Entities.UI;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Nodes.Screens.PotionLab;
 
@@ -69,9 +70,9 @@ public static class PotionCompendiumHistoryClearPatch
 
 internal static class PotionCompendiumHistoryUi
 {
-    private const string PanelName = "SpireLensPotionViewPanel";
+    private const string SelectorName = "SpireLensPotionViewPanel";
     private const string HistoryRootName = "SpireLensPotionRunHistory";
-    private static readonly List<InjectedPotionPanel> Panels = new();
+    private static readonly List<InjectedPotionSelector> Selectors = new();
     private static readonly List<PotionHistoryLayout> Layouts = new();
     private static CompendiumPotionViewMode _mode = CompendiumPotionViewMode.Gallery;
     private static bool _syncingControls;
@@ -81,20 +82,20 @@ internal static class PotionCompendiumHistoryUi
         if (lab == null || !GodotObject.IsInstanceValid(lab)) return;
         CleanupInvalid();
 
-        var existing = Panels.FirstOrDefault(panel => panel.IsFor(lab));
+        var existing = Selectors.FirstOrDefault(selector => selector.IsFor(lab));
         if (existing != null)
         {
-            SyncPanel(existing);
+            SyncSelector(existing);
             ApplyLayout(lab);
             return;
         }
 
-        RemoveNamedChild(lab, PanelName);
-        var panel = BuildPanel();
-        lab.AddChild(panel.Root);
-        var injected = panel with { Lab = lab };
-        Panels.Add(injected);
-        SyncPanel(injected);
+        RemoveNamedChild(lab, SelectorName);
+        var selector = BuildSelector();
+        lab.AddChild(selector.Root);
+        var injected = selector with { Lab = lab };
+        Selectors.Add(injected);
+        SyncSelector(injected);
         ApplyLayout(lab);
         CoreMain.Logger.Info("PotionCompendiumHistory: injected view dropdown");
     }
@@ -117,7 +118,7 @@ internal static class PotionCompendiumHistoryUi
     public static void SelectCurrentRunMode()
     {
         _mode = CompendiumPotionViewMode.CurrentRun;
-        SyncAllPanels();
+        SyncAllSelectors();
         ApplyToActiveLabs();
     }
 
@@ -127,9 +128,9 @@ internal static class PotionCompendiumHistoryUi
             layout.Restore();
         Layouts.Clear();
 
-        foreach (var panel in Panels.ToArray())
-            panel.QueueFree();
-        Panels.Clear();
+        foreach (var selector in Selectors.ToArray())
+            selector.QueueFree();
+        Selectors.Clear();
     }
 
     public static void ApplyLayout(NPotionLab? lab)
@@ -153,42 +154,16 @@ internal static class PotionCompendiumHistoryUi
         }
     }
 
-    private static InjectedPotionPanel BuildPanel()
+    private static InjectedPotionSelector BuildSelector()
     {
-        var root = new PanelContainer
+        var root = new VBoxContainer
         {
-            Name = PanelName,
+            Name = SelectorName,
             Position = new Vector2(34f, 126f),
             CustomMinimumSize = new Vector2(218f, 0f),
             ZIndex = 200,
-            MouseFilter = Control.MouseFilterEnum.Stop,
+            MouseFilter = Control.MouseFilterEnum.Pass,
         };
-        root.AddThemeStyleboxOverride("panel", new StyleBoxFlat
-        {
-            BgColor = new Color(0.055f, 0.049f, 0.043f, 0.84f),
-            BorderColor = new Color(0.56f, 0.46f, 0.25f, 0.72f),
-            BorderWidthLeft = 1,
-            BorderWidthRight = 1,
-            BorderWidthTop = 1,
-            BorderWidthBottom = 1,
-            ContentMarginLeft = 10,
-            ContentMarginRight = 10,
-            ContentMarginTop = 8,
-            ContentMarginBottom = 8,
-            CornerRadiusTopLeft = 4,
-            CornerRadiusTopRight = 4,
-            CornerRadiusBottomLeft = 4,
-            CornerRadiusBottomRight = 4,
-        });
-
-        var contents = new VBoxContainer();
-        contents.AddThemeConstantOverride("separation", 6);
-        root.AddChild(contents);
-        contents.AddChild(NewLabel(
-            "SpireLens potion view",
-            16,
-            new Color(0.918f, 0.745f, 0.318f)));
-        contents.AddChild(NewLabel("Mode", 13, new Color(0.78f, 0.73f, 0.64f)));
 
         var dropdown = new OptionButton
         {
@@ -201,17 +176,9 @@ internal static class PotionCompendiumHistoryUi
         dropdown.Connect(
             OptionButton.SignalName.ItemSelected,
             Callable.From<long>(index => OnModeSelected(dropdown, index)));
-        contents.AddChild(dropdown);
+        root.AddChild(dropdown);
 
-        var hint = NewLabel(
-            "See offers left behind and the lifecycle of every potion taken this run.",
-            12,
-            new Color(0.82f, 0.78f, 0.68f));
-        hint.Name = "CurrentRunHint";
-        hint.Visible = false;
-        contents.AddChild(hint);
-
-        return new InjectedPotionPanel(null, root, dropdown, hint);
+        return new InjectedPotionSelector(null, root, dropdown);
     }
 
     private static void OnModeSelected(OptionButton dropdown, long selectedIndex)
@@ -222,32 +189,29 @@ internal static class PotionCompendiumHistoryUi
             ? (CompendiumPotionViewMode)selectedId
             : CompendiumPotionViewMode.Gallery;
 
-        SyncAllPanels();
+        SyncAllSelectors();
         ApplyToActiveLabs();
     }
 
-    private static void SyncAllPanels()
+    private static void SyncAllSelectors()
     {
         CleanupInvalid();
-        foreach (var panel in Panels)
-            SyncPanel(panel);
+        foreach (var selector in Selectors)
+            SyncSelector(selector);
     }
 
-    private static void SyncPanel(InjectedPotionPanel panel)
+    private static void SyncSelector(InjectedPotionSelector selector)
     {
-        if (!panel.IsValid) return;
+        if (!selector.IsValid) return;
         _syncingControls = true;
         try
         {
-            for (var i = 0; i < panel.Dropdown.ItemCount; i++)
+            for (var i = 0; i < selector.Dropdown.ItemCount; i++)
             {
-                if (panel.Dropdown.GetItemId(i) == (int)_mode)
-                {
-                    panel.Dropdown.Select(i);
-                    break;
-                }
+                if (selector.Dropdown.GetItemId(i) != (int)_mode) continue;
+                selector.Dropdown.Select(i);
+                break;
             }
-            panel.CurrentRunHint.Visible = _mode == CompendiumPotionViewMode.CurrentRun;
         }
         finally
         {
@@ -278,7 +242,7 @@ internal static class PotionCompendiumHistoryUi
         foreach (var category in categories)
             category.Visible = false;
 
-        var root = BuildHistoryRoot();
+        var root = BuildTimeline();
         host.AddChild(root);
         var firstIndex = categories.Count > 0
             ? categories.Min(category => category.GetIndex())
@@ -287,199 +251,118 @@ internal static class PotionCompendiumHistoryUi
         Layouts.Add(new PotionHistoryLayout(lab, root, categoryStates));
     }
 
-    private static Control BuildHistoryRoot()
+    private static Control BuildTimeline()
     {
         var entries = RunTracker.GetEffectivePotionHistory(out var outcome)
             .OrderBy(entry => entry.Sequence)
             .ToList();
-        var root = new VBoxContainer
+        var timeline = new VBoxContainer
         {
             Name = HistoryRootName,
-            CustomMinimumSize = new Vector2(1120f, 0f),
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
             MouseFilter = Control.MouseFilterEnum.Pass,
         };
-        root.AddThemeConstantOverride("separation", 14);
-
-        var title = NewLabel("Current run potion history", 25, new Color(0.94f, 0.82f, 0.5f));
-        title.HorizontalAlignment = HorizontalAlignment.Center;
-        root.AddChild(title);
+        timeline.AddChild(NewLabel("Current run potion timeline"));
 
         if (outcome == "none")
         {
-            var noRun = NewLabel("No active or just-completed run is available.", 18, Colors.LightGray);
-            noRun.HorizontalAlignment = HorizontalAlignment.Center;
-            root.AddChild(noRun);
-            return root;
+            timeline.AddChild(NewLabel("No active or just-completed run is available."));
+            return timeline;
         }
 
         if (entries.Count == 0)
         {
-            var empty = NewLabel("No potion offers or acquisitions have been recorded in this run yet.", 18, Colors.LightGray);
-            empty.HorizontalAlignment = HorizontalAlignment.Center;
-            root.AddChild(empty);
-            return root;
+            timeline.AddChild(NewLabel("No potions have been seen in this run yet."));
+            return timeline;
         }
 
-        var lanes = new HBoxContainer
+        for (var i = 0; i < entries.Count; i++)
         {
-            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
-            Alignment = BoxContainer.AlignmentMode.Center,
-        };
-        lanes.AddThemeConstantOverride("separation", 24);
-        root.AddChild(lanes);
-
-        var notTaken = entries.Where(entry => !entry.Acquired).ToList();
-        var taken = entries.Where(entry => entry.Acquired).ToList();
-        lanes.AddChild(BuildLane("Seen, not taken", notTaken, outcome, leftLane: true));
-        lanes.AddChild(BuildLane("Taken / used", taken, outcome, leftLane: false));
-        return root;
-    }
-
-    private static Control BuildLane(
-        string title,
-        IReadOnlyCollection<PotionRunHistoryEntry> entries,
-        string outcome,
-        bool leftLane)
-    {
-        var panel = new PanelContainer
-        {
-            CustomMinimumSize = new Vector2(530f, 0f),
-            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
-            SizeFlagsVertical = Control.SizeFlags.ShrinkBegin,
-        };
-        panel.AddThemeStyleboxOverride("panel", new StyleBoxFlat
-        {
-            BgColor = leftLane
-                ? new Color(0.12f, 0.09f, 0.08f, 0.78f)
-                : new Color(0.07f, 0.11f, 0.13f, 0.82f),
-            BorderColor = leftLane
-                ? new Color(0.45f, 0.31f, 0.24f, 0.8f)
-                : new Color(0.24f, 0.5f, 0.58f, 0.82f),
-            BorderWidthLeft = 1,
-            BorderWidthRight = 1,
-            BorderWidthTop = 1,
-            BorderWidthBottom = 1,
-            ContentMarginLeft = 12,
-            ContentMarginRight = 12,
-            ContentMarginTop = 12,
-            ContentMarginBottom = 12,
-            CornerRadiusTopLeft = 5,
-            CornerRadiusTopRight = 5,
-            CornerRadiusBottomLeft = 5,
-            CornerRadiusBottomRight = 5,
-        });
-
-        var list = new VBoxContainer();
-        list.AddThemeConstantOverride("separation", 10);
-        panel.AddChild(list);
-        var header = NewLabel($"{title}  ·  {entries.Count}", 20, Colors.White);
-        header.HorizontalAlignment = HorizontalAlignment.Center;
-        list.AddChild(header);
-
-        if (entries.Count == 0)
-        {
-            var empty = NewLabel("None", 16, new Color(0.65f, 0.65f, 0.65f));
-            empty.HorizontalAlignment = HorizontalAlignment.Center;
-            list.AddChild(empty);
-            return panel;
+            timeline.AddChild(BuildTimelineEntry(entries[i], outcome));
+            if (i < entries.Count - 1)
+                timeline.AddChild(new HSeparator());
         }
-
-        foreach (var entry in entries)
-            list.AddChild(BuildPotionRow(entry, outcome, leftLane));
-        return panel;
+        return timeline;
     }
 
-    private static Control BuildPotionRow(
-        PotionRunHistoryEntry entry,
-        string outcome,
-        bool leftLane)
+    private static Control BuildTimelineEntry(PotionRunHistoryEntry entry, string outcome)
     {
-        var row = new PanelContainer
+        var row = new HBoxContainer
         {
-            CustomMinimumSize = new Vector2(0f, 92f),
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            MouseFilter = Control.MouseFilterEnum.Pass,
         };
-        row.AddThemeStyleboxOverride("panel", new StyleBoxFlat
-        {
-            BgColor = new Color(0.035f, 0.035f, 0.04f, 0.66f),
-            ContentMarginLeft = 10,
-            ContentMarginRight = 10,
-            ContentMarginTop = 8,
-            ContentMarginBottom = 8,
-            CornerRadiusTopLeft = 4,
-            CornerRadiusTopRight = 4,
-            CornerRadiusBottomLeft = 4,
-            CornerRadiusBottomRight = 4,
-        });
 
-        var contents = new HBoxContainer();
-        contents.AddThemeConstantOverride("separation", 12);
-        row.AddChild(contents);
+        var holder = CreateNativePotionHolder(entry.PotionId);
+        if (holder != null)
+            row.AddChild(holder);
 
-        var icon = new TextureRect
+        var details = new VBoxContainer
         {
-            Texture = GetPotionTexture(entry.PotionId),
-            CustomMinimumSize = new Vector2(64f, 64f),
-            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
-            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
             MouseFilter = Control.MouseFilterEnum.Ignore,
         };
-        contents.AddChild(icon);
+        row.AddChild(details);
+        details.AddChild(NewLabel(string.IsNullOrWhiteSpace(entry.DisplayName)
+            ? entry.PotionId
+            : entry.DisplayName));
+        details.AddChild(NewLabel(GetStatus(entry, outcome)));
 
-        var text = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
-        text.AddThemeConstantOverride("separation", 2);
-        contents.AddChild(text);
-        text.AddChild(NewLabel(
-            string.IsNullOrWhiteSpace(entry.DisplayName) ? entry.PotionId : entry.DisplayName,
-            18,
-            Colors.White));
-
-        if (leftLane)
+        if (!entry.Acquired)
         {
-            text.AddChild(NewLabel(
-                $"Seen {FormatLocation(entry.SeenFloor, entry.SeenLocationKind, entry.SeenLocationName)}",
-                14,
-                new Color(0.83f, 0.76f, 0.68f)));
-            text.AddChild(NewLabel(
-                $"Not taken · {entry.AcquisitionMethod}",
-                14,
-                new Color(0.72f, 0.62f, 0.58f)));
+            details.AddChild(NewLabel(
+                $"Seen: {FormatLocation(entry.SeenFloor, entry.SeenLocationKind, entry.SeenLocationName)}"));
+            details.AddChild(NewLabel($"Method: {entry.AcquisitionMethod}"));
             return row;
         }
 
-        text.AddChild(NewLabel(
-            $"Acquired {FormatLocation(entry.AcquiredFloor, entry.AcquiredLocationKind, entry.AcquiredLocationName)} · {entry.AcquisitionMethod}",
-            14,
-            new Color(0.72f, 0.82f, 0.84f)));
+        details.AddChild(NewLabel(
+            $"Acquired: {FormatLocation(entry.AcquiredFloor, entry.AcquiredLocationKind, entry.AcquiredLocationName)}"));
+        details.AddChild(NewLabel($"Method: {entry.AcquisitionMethod}"));
 
-        string status;
-        Color statusColor;
         if (entry.Used)
         {
-            status = $"Used {FormatLocation(entry.UsedFloor, entry.UsedLocationKind, entry.UsedLocationName)}";
-            statusColor = new Color(0.45f, 0.85f, 0.92f);
+            details.AddChild(NewLabel(
+                $"Used: {FormatLocation(entry.UsedFloor, entry.UsedLocationKind, entry.UsedLocationName)}"));
         }
         else if (entry.Discarded)
         {
-            status = $"Discarded {FormatLocation(entry.DiscardedFloor, entry.DiscardedLocationKind, entry.DiscardedLocationName)}";
-            statusColor = new Color(0.86f, 0.58f, 0.48f);
+            details.AddChild(NewLabel(
+                $"Discarded: {FormatLocation(entry.DiscardedFloor, entry.DiscardedLocationKind, entry.DiscardedLocationName)}"));
         }
         else if (entry.HeldAtRunEnd)
         {
-            status = entry.HeldAtRunEndFloor.HasValue
-                ? $"HELD AT RUN END · Floor {entry.HeldAtRunEndFloor.Value}"
-                : "HELD AT RUN END";
-            statusColor = new Color(0.95f, 0.76f, 0.3f);
-        }
-        else
-        {
-            status = outcome == "in_progress" ? "HELD NOW" : "HELD AT RUN END";
-            statusColor = new Color(0.95f, 0.76f, 0.3f);
+            details.AddChild(NewLabel(entry.HeldAtRunEndFloor.HasValue
+                ? $"Held at run end: Floor {entry.HeldAtRunEndFloor.Value}"
+                : "Held at run end"));
         }
 
-        text.AddChild(NewLabel(status, 14, statusColor));
         return row;
+    }
+
+    private static string GetStatus(PotionRunHistoryEntry entry, string outcome)
+    {
+        if (!entry.Acquired) return "Seen, not taken";
+        if (entry.Used) return "Used";
+        if (entry.Discarded) return "Discarded";
+        if (entry.HeldAtRunEnd || outcome != "in_progress") return "Held at run end";
+        return "Held now";
+    }
+
+    private static NLabPotionHolder? CreateNativePotionHolder(string potionId)
+    {
+        try
+        {
+            var potion = ModelDb.GetByIdOrNull<PotionModel>(ModelId.Deserialize(potionId));
+            return potion == null
+                ? null
+                : NLabPotionHolder.Create(potion.ToMutable(), ModelVisibility.Visible);
+        }
+        catch (Exception e)
+        {
+            CoreMain.Logger.Error($"PotionCompendiumHistory could not create native holder for {potionId}: {e}");
+            return null;
+        }
     }
 
     private static string FormatLocation(int? floor, string? kind, string? name)
@@ -488,36 +371,17 @@ internal static class PotionCompendiumHistoryUi
         if (floor.HasValue) parts.Add($"Floor {floor.Value}");
         if (!string.IsNullOrWhiteSpace(kind)) parts.Add(kind!);
         if (!string.IsNullOrWhiteSpace(name)) parts.Add(name!);
-        return parts.Count == 0 ? "at an unknown location" : string.Join(" · ", parts);
+        return parts.Count == 0 ? "Unknown location" : string.Join(" · ", parts);
     }
 
-    private static Texture2D? GetPotionTexture(string potionId)
-    {
-        try
-        {
-            return ModelDb
-                .GetByIdOrNull<PotionModel>(ModelId.Deserialize(potionId))
-                ?.Image;
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    private static Label NewLabel(string text, int fontSize, Color color)
-    {
-        var label = new Label
+    private static Label NewLabel(string text)
+        => new()
         {
             Text = text,
             AutowrapMode = TextServer.AutowrapMode.WordSmart,
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
             MouseFilter = Control.MouseFilterEnum.Ignore,
         };
-        label.AddThemeFontSizeOverride("font_size", fontSize);
-        label.AddThemeColorOverride("font_color", color);
-        return label;
-    }
 
     private static IEnumerable<NPotionLabCategory> GetCategories(NPotionLab lab)
     {
@@ -551,17 +415,16 @@ internal static class PotionCompendiumHistoryUi
 
     private static void CleanupInvalid()
     {
-        for (var i = Panels.Count - 1; i >= 0; i--)
-            if (!Panels[i].IsValid) Panels.RemoveAt(i);
+        for (var i = Selectors.Count - 1; i >= 0; i--)
+            if (!Selectors[i].IsValid) Selectors.RemoveAt(i);
         for (var i = Layouts.Count - 1; i >= 0; i--)
             if (!Layouts[i].IsValid) Layouts.RemoveAt(i);
     }
 
-    private sealed record InjectedPotionPanel(
+    private sealed record InjectedPotionSelector(
         NPotionLab? Lab,
-        PanelContainer Root,
-        OptionButton Dropdown,
-        Label CurrentRunHint)
+        VBoxContainer Root,
+        OptionButton Dropdown)
     {
         public bool IsValid => Lab != null
             && GodotObject.IsInstanceValid(Lab)
