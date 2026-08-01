@@ -44,6 +44,7 @@ public class StatConceptGlossaryTests
                 "healing_gained",
                 "healing_wasted",
                 "information",
+                "kill",
                 "max_hp",
                 "max_hp_gained",
                 "nimble",
@@ -143,6 +144,7 @@ public class StatConceptGlossaryTests
         var healingGained = StatConceptGlossary.RenderHintedGlyph("healing_gained");
         var healingWasted = StatConceptGlossary.RenderHintedGlyph("healing_wasted");
         var informationConcept = StatConceptGlossary.RenderHintedGlyph("information");
+        var kill = StatConceptGlossary.RenderHintedGlyph("kill");
         var nimble = StatConceptGlossary.RenderHintedGlyph("nimble");
         var offered = StatConceptGlossary.RenderHintedGlyph("offered");
         var summon = StatConceptGlossary.RenderHintedGlyph("osty_summon_gained");
@@ -187,6 +189,7 @@ public class StatConceptGlossaryTests
             healingGained,
             healingWasted,
             informationConcept,
+            kill,
             nimble,
             offered,
             summon,
@@ -292,6 +295,8 @@ public class StatConceptGlossaryTests
         Assert.Contains(
             "user://SpireLens/generated-icons/information-",
             informationConcept);
+        Assert.Contains("[hint=\"Kill:", kill);
+        Assert.Contains("res://images/ui/emote/skull.png", kill);
         Assert.Contains("[hint=\"Nimble:", nimble);
         Assert.Contains("res://images/enchantments/nimble.png", nimble);
         Assert.Contains("[hint=\"Offered:", offered);

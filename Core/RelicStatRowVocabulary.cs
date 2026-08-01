@@ -109,6 +109,7 @@ internal static class RelicStatRowVocabulary
         Rule("floor", @"\bfloors?\b", true),
         Rule("gold_gained", @"\bgold\s+gained\b"),
         Rule("gold", @"\bgold\b"),
+        Rule("kill", @"\b(?:kills?|killed|slain)\b"),
         Rule("potion_gained", @"\bpotions?\s+gained\b"),
         Rule("potion", @"\bpotions?\b"),
         Rule("power", @"\bpowers?\b"),

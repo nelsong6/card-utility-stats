@@ -358,6 +358,16 @@
         "description": "Hover this symbol beside a stat to read the row's full description."
       }
     },
+    "kill": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/ui/emote/skull.png"
+      },
+      "help": {
+        "label": "Kill",
+        "description": "An enemy killed by the tracked card, relic, or effect."
+      }
+    },
     "max_hp": {
       "display": {
         "type": "game_resource",

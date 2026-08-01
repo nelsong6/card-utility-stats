@@ -197,6 +197,11 @@ public class RelicStatRowVocabularyTests
         "gold_gained",
         "")]
     [InlineData(
+        "Kills",
+        "",
+        "kill",
+        "")]
+    [InlineData(
         "Relic gained",
         "",
         "relic_gained",
