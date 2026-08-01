@@ -130,6 +130,9 @@ public class StatConceptGlossaryTests
         var card = StatConceptGlossary.RenderHintedGlyph("card");
         var rareCard = StatConceptGlossary.RenderHintedGlyph("card_rare");
         var uncommonCard = StatConceptGlossary.RenderHintedGlyph("card_uncommon");
+        var commonPotion = StatConceptGlossary.RenderHintedGlyph("potion_common");
+        var rarePotion = StatConceptGlossary.RenderHintedGlyph("potion_rare");
+        var uncommonPotion = StatConceptGlossary.RenderHintedGlyph("potion_uncommon");
         var charge = StatConceptGlossary.RenderHintedGlyph("charge");
         var combat = StatConceptGlossary.RenderHintedGlyph("combat");
         var dexterityGained = StatConceptGlossary.RenderHintedGlyph("dexterity_gained");
@@ -171,6 +174,9 @@ public class StatConceptGlossaryTests
             card,
             rareCard,
             uncommonCard,
+            commonPotion,
+            rarePotion,
+            uncommonPotion,
             charge,
             combat,
             dexterityGained,
@@ -234,6 +240,15 @@ public class StatConceptGlossaryTests
         Assert.Contains("color=#EFC850", rareCard);
         Assert.Contains("[hint=\"Uncommon card:", uncommonCard);
         Assert.Contains("color=#87CEEB", uncommonCard);
+        Assert.Contains("[hint=\"Common potion:", commonPotion);
+        Assert.Contains("potion_icon.png", commonPotion);
+        Assert.Contains("color=#B5B5B5", commonPotion);
+        Assert.Contains("[hint=\"Rare potion:", rarePotion);
+        Assert.Contains("potion_icon.png", rarePotion);
+        Assert.Contains("color=#EFC850", rarePotion);
+        Assert.Contains("[hint=\"Uncommon potion:", uncommonPotion);
+        Assert.Contains("potion_icon.png", uncommonPotion);
+        Assert.Contains("color=#87CEEB", uncommonPotion);
         Assert.Contains("[hint=\"Charge:", charge);
         Assert.Contains(
             "user://SpireLens/generated-icons/charge-",

@@ -90,6 +90,9 @@ public class WhiteBeastStatueStatsTests
         Assert.Contains("common potions", body);
         Assert.Contains("uncommon potions", body);
         Assert.Contains("rare potions", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("potion_common"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("potion_uncommon"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("potion_rare"), body);
         Assert.Contains("[b]2[/b]", body);
         Assert.Contains("[b]1[/b]", body);
     }

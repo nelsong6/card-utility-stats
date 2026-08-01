@@ -422,7 +422,8 @@
     "potion_common": {
       "display": {
         "type": "game_resource",
-        "path": "res://images/packed/sprite_fonts/potion_icon.png"
+        "path": "res://images/packed/sprite_fonts/potion_icon.png",
+        "modulate": "#B5B5B5"
       },
       "help": {
         "label": "Common potion",

@@ -167,6 +167,21 @@ public class RelicStatRowVocabularyTests
         "potion_gained",
         "")]
     [InlineData(
+        "Common potions",
+        "",
+        "potion_common",
+        "")]
+    [InlineData(
+        "Uncommon potions",
+        "",
+        "potion_uncommon",
+        "")]
+    [InlineData(
+        "Rare potions",
+        "",
+        "potion_rare",
+        "")]
+    [InlineData(
         "Total block gained",
         "Total",
         "block_gained",
