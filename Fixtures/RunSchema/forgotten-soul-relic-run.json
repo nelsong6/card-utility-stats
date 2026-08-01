@@ -1,0 +1,37 @@
+{
+  "run_id": "fixture-forgotten-soul-relic",
+  "started_at": "2026-07-31T08:00:00Z",
+  "updated_at": "2026-07-31T08:20:00Z",
+  "character": "NECROBINDER",
+  "ascension": 4,
+  "floor_reached": 9,
+  "outcome": "in_progress",
+  "aggregates": {
+    "CARD.STRIKE_NECROBINDER#1": {
+      "plays": 1
+    }
+  },
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.FORGOTTEN_SOUL": {
+      "activations": 6,
+      "total_damage_attempted": 24,
+      "total_damage_dealt": 17,
+      "total_damage_blocked": 4,
+      "total_damage_overkill": 3,
+      "kills": 2,
+      "total_targets": 6,
+      "forgotten_soul_turns": 8,
+      "forgotten_soul_combats": 3
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.STRIKE_NECROBINDER": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.STRIKE_NECROBINDER": 1
+  }
+}

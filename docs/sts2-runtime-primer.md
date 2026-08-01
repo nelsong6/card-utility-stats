@@ -775,6 +775,15 @@ then consume the window at the immediately emitted decimal-plus-`ValueProp`
 multi-target `CreatureCmd.Damage` overload. The resolved results are
 authoritative for blocked damage, overkill, kills, and targets hit.
 
+Forgotten Soul owns `AfterCardExhausted` and flashes for every same-owner card
+exhaust, even when no hittable enemy remains. Count that callback as the
+activation, then keep a callback-scoped window around the exact single-target
+`DamageVar` overload it may emit. The resolved result is authoritative for
+dealt/blocked damage, kills, and targets hit; always disarm the window when the
+callback completes so a no-target activation cannot claim unrelated later
+damage. Use every player turn and combat where Forgotten Soul was held as the
+zero-inclusive damage-rate denominators.
+
 Gremlin Horn's `AfterDeath` callback still runs for the combat-ending enemy and
 flashes the relic, but `PlayerCmd.GainEnergy` and `CardPileCmd.Draw` suppress
 their outcomes once combat is over or ending. Exclude that callback before

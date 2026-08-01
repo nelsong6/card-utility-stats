@@ -984,15 +984,22 @@ public class RelicAggregate
     public int TotalDamageAttempted { get; set; }
 
     // Relic damage outcome split. Used by relics such as Parrying Shield,
-    // Festive Popper, and Mercury Hourglass when their strikes actually
-    // resolve through the game's damage command.
+    // Festive Popper, Mercury Hourglass, and Forgotten Soul when their strikes
+    // actually resolve through the game's damage command.
     public int TotalDamageDealt { get; set; }
     public int TotalDamageBlocked { get; set; }
     public int TotalDamageOverkill { get; set; }
     public int Kills { get; set; }
 
+    // Forgotten Soul held-period denominators. Activations count every
+    // same-owner card exhaust callback, including a callback with no hittable
+    // enemy; damage and targets come only from the resolved damage command.
+    public int ForgottenSoulTurns { get; set; }
+    public int ForgottenSoulCombats { get; set; }
+
     // Total targets included in those attempted relic-damage payloads. Used by
-    // Letter Opener, Parrying Shield, Festive Popper, and Mercury Hourglass.
+    // Letter Opener, Parrying Shield, Festive Popper, Mercury Hourglass, and
+    // Forgotten Soul.
     public int TotalTargets { get; set; }
 
     // Letter Opener tracking. TotalDamageAttempted stores the attempted AoE

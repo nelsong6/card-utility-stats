@@ -5052,6 +5052,42 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsForgottenSoulRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("forgotten-soul-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertForgottenSoulFixture(
+            loaded.Data.RelicAggregates["RELIC.FORGOTTEN_SOUL"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsForgottenSoulRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("forgotten-soul-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertForgottenSoulFixture(
+            resumed!.RelicAggregates["RELIC.FORGOTTEN_SOUL"]);
+    }
+
+    private static void AssertForgottenSoulFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(6, relicAgg.Activations);
+        Assert.Equal(24, relicAgg.TotalDamageAttempted);
+        Assert.Equal(17, relicAgg.TotalDamageDealt);
+        Assert.Equal(4, relicAgg.TotalDamageBlocked);
+        Assert.Equal(3, relicAgg.TotalDamageOverkill);
+        Assert.Equal(2, relicAgg.Kills);
+        Assert.Equal(6, relicAgg.TotalTargets);
+        Assert.Equal(8, relicAgg.ForgottenSoulTurns);
+        Assert.Equal(3, relicAgg.ForgottenSoulCombats);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsCardOrbsCreatedFixture()
     {
         var loaded = RunStorage.LoadHistorical(

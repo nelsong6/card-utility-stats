@@ -502,6 +502,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `prayer-wheel-relic-run.json`
   Adds Prayer Wheel's extra reward-screen count, terminal rejections, and
   generated and taken Common/Uncommon/Rare cards.
+- `forgotten-soul-relic-run.json`
+  Adds Forgotten Soul's same-owner exhaust activations, observed damage
+  outcomes, and zero-inclusive held turn/combat denominators.
 
 Why these exist:
 

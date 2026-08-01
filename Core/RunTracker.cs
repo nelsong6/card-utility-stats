@@ -1783,6 +1783,7 @@ public static class RunTracker
         RecordRainbowRingTurnForTrackedPlayerLocked();
         RecordBeatingRemnantTurnForTrackedPlayerLocked();
         RecordTungstenRodTurnForTrackedPlayerLocked();
+        RecordForgottenSoulTurnForTrackedPlayerLocked();
         RecordStoneCrackerTurnForTrackedPlayerLocked();
         RecordPaperPhrogTurnForTrackedPlayerLocked();
         RecordRazorToothTurnForTrackedPlayerLocked();
@@ -2023,6 +2024,8 @@ public static class RunTracker
         target.TotalDamageBlocked += source.TotalDamageBlocked;
         target.TotalDamageOverkill += source.TotalDamageOverkill;
         target.Kills += source.Kills;
+        target.ForgottenSoulTurns += source.ForgottenSoulTurns;
+        target.ForgottenSoulCombats += source.ForgottenSoulCombats;
         target.TotalTargets += source.TotalTargets;
         target.LetterOpenerSkillsPlayed += source.LetterOpenerSkillsPlayed;
         target.LetterOpenerCombats += source.LetterOpenerCombats;
@@ -6150,6 +6153,7 @@ public static class RunTracker
     private const string MercuryHourglassRelicId = "RELIC.MERCURY_HOURGLASS";
     private const string MrStrugglesRelicId = "RELIC.MR_STRUGGLES";
     private const string LostWispRelicId = "RELIC.LOST_WISP";
+    private const string ForgottenSoulRelicId = "RELIC.FORGOTTEN_SOUL";
     private const string BronzeScalesRelicId = "RELIC.BRONZE_SCALES";
     private const string HornCleatRelicId = "RELIC.HORN_CLEAT";
     private const string CaptainsWheelRelicId = "RELIC.CAPTAINS_WHEEL";
@@ -7898,6 +7902,27 @@ public static class RunTracker
             {
                 CoreMain.LogDebug(
                     $"RecordTungstenRodTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordForgottenSoulTurnStarted(Player player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                if (CombatManager.Instance?.IsInProgress != true) return;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordForgottenSoulTurnForPlayerLocked(player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordForgottenSoulTurnStarted failed: {e.Message}");
             }
         }
     }
@@ -18027,6 +18052,89 @@ public static class RunTracker
         }
     }
 
+    /// <summary>
+    /// Count Forgotten Soul's exact same-owner exhaust callback and arm the
+    /// single-target damage command it may emit. The returned token remains
+    /// valid until the owner callback completes so a no-target activation can
+    /// be disarmed without claiming later unrelated damage.
+    /// </summary>
+    internal static PendingForgottenSoulDamageAttribution? ArmForgottenSoulAttribution(
+        ForgottenSoul? relic,
+        CardModel? exhaustedCard)
+    {
+        if (relic?.Owner?.Creature == null || exhaustedCard?.Owner == null)
+            return null;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic)) return null;
+                if (!ReferenceEquals(exhaustedCard.Owner, relic.Owner)) return null;
+                if (CombatManager.Instance?.IsInProgress != true) return null;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordForgottenSoulCombatForPlayerLocked(relic.Owner);
+                RecordForgottenSoulTurnForPlayerLocked(relic.Owner);
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(ForgottenSoulRelicId);
+                RecordForgottenSoulActivationForTest(agg);
+
+                var attribution = new PendingForgottenSoulDamageAttribution
+                {
+                    PendingCombat = _pendingCombat,
+                    Dealer = relic.Owner.Creature,
+                };
+                _pendingCombat.ForgottenSoulDamageAttributions.Add(attribution);
+                return attribution;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"ArmForgottenSoulAttribution failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+    internal static bool TryConsumeForgottenSoulDamageAttribution(Creature? dealer)
+    {
+        if (dealer == null) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null) return false;
+
+                for (var i = 0; i < _pendingCombat.ForgottenSoulDamageAttributions.Count; i++)
+                {
+                    var attribution = _pendingCombat.ForgottenSoulDamageAttributions[i];
+                    if (!ReferenceEquals(attribution.Dealer, dealer)) continue;
+
+                    _pendingCombat.ForgottenSoulDamageAttributions.RemoveAt(i);
+                    return true;
+                }
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"TryConsumeForgottenSoulDamageAttribution failed: {e.Message}");
+            }
+        }
+
+        return false;
+    }
+
+    internal static void DisarmForgottenSoulAttribution(
+        PendingForgottenSoulDamageAttribution? attribution)
+    {
+        if (attribution == null) return;
+
+        lock (_lock)
+        {
+            attribution.PendingCombat.ForgottenSoulDamageAttributions.Remove(attribution);
+        }
+    }
+
     public static void RecordFestivePopperDamage(IEnumerable<DamageResult>? results)
     {
         if (results == null) return;
@@ -18059,6 +18167,24 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordLostWispDamage failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordForgottenSoulDamage(IEnumerable<DamageResult>? results)
+    {
+        if (results == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(ForgottenSoulRelicId);
+                AddRelicDamageResultsLocked(agg, results);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordForgottenSoulDamage failed: {e.Message}");
             }
         }
     }
@@ -18265,6 +18391,45 @@ public static class RunTracker
                 result.OverkillDamage,
                 result.WasTargetKilled);
         }
+    }
+
+    internal static void RecordForgottenSoulActivationForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.Activations += Math.Max(0, count);
+    }
+
+    internal static void RecordForgottenSoulDamageForTest(
+        RelicAggregate agg,
+        IEnumerable<(int BlockedDamage, int UnblockedDamage, int OverkillDamage, bool WasTargetKilled)> results)
+    {
+        foreach (var result in results)
+        {
+            AddRelicDamageResultPartsLocked(
+                agg,
+                result.BlockedDamage,
+                result.UnblockedDamage,
+                result.OverkillDamage,
+                result.WasTargetKilled);
+        }
+    }
+
+    internal static void RecordForgottenSoulTurnForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.ForgottenSoulTurns += Math.Max(0, count);
+    }
+
+    internal static void RecordForgottenSoulCombatForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.ForgottenSoulCombats += Math.Max(0, count);
     }
 
     internal static void RecordBronzeScalesDamageForTest(
@@ -20966,6 +21131,18 @@ public static class RunTracker
         }
     }
 
+    private static bool PlayerHasForgottenSoul(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is ForgottenSoul);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static bool PlayerHasRuinedHelmet(Player player)
     {
         try
@@ -21141,6 +21318,7 @@ public static class RunTracker
             RecordBeatingRemnantCombatForPlayerLocked(player);
             RecordWhisperingEarringCombatForPlayerLocked(player);
             RecordTungstenRodCombatForPlayerLocked(player);
+            RecordForgottenSoulCombatForPlayerLocked(player);
             RecordRuinedHelmetCombatForPlayerLocked(player);
             RecordMummifiedHandCombatForPlayerLocked(player);
             RecordBurningSticksCombatForPlayerLocked(player);
@@ -21730,6 +21908,53 @@ public static class RunTracker
 
         var agg = GetOrCreatePendingRelicAggregateLocked(TungstenRodRelicId);
         RecordTungstenRodTurnForTest(agg);
+    }
+
+    private static void RecordForgottenSoulCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasForgottenSoul(player)) return;
+        if (!_pendingCombat.ForgottenSoulCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(ForgottenSoulRelicId);
+        RecordForgottenSoulCombatForTest(agg);
+    }
+
+    private static void RecordForgottenSoulTurnForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordForgottenSoulTurnForPlayerLocked(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug(
+                $"RecordForgottenSoulTurnForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordForgottenSoulTurnForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasForgottenSoul(player)) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.ForgottenSoulTurnCountedTurns.TryGetValue(
+                player,
+                out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.ForgottenSoulTurnCountedTurns[player] = turnNumber;
+        RecordForgottenSoulCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(ForgottenSoulRelicId);
+        RecordForgottenSoulTurnForTest(agg);
     }
 
     private static void RecordBeatingRemnantTurnForTrackedPlayerLocked()
@@ -27859,6 +28084,12 @@ internal sealed class PendingDarkEmbraceDraw
     public required string DisplayName { get; init; }
 }
 
+internal sealed class PendingForgottenSoulDamageAttribution
+{
+    public required PendingCombat PendingCombat { get; init; }
+    public required Creature Dealer { get; init; }
+}
+
 internal sealed record CardOrbEventSubscription(
     Action PassiveHandler,
     Action<Creature[]> EvokeHandler);
@@ -27981,6 +28212,12 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> TungstenRodTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> ForgottenSoulCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> ForgottenSoulTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public List<PendingForgottenSoulDamageAttribution> ForgottenSoulDamageAttributions { get; }
+        = new();
     public HashSet<Player> ArtOfWarCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> ArtOfWarTurnCountedTurns { get; }
