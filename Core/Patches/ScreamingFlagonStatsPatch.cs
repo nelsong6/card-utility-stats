@@ -21,17 +21,26 @@ namespace SpireLens.Core.Patches;
 public static class ScreamingFlagonBeforeSideTurnEndPatch
 {
     [HarmonyPrefix]
-    public static void Prefix(ScreamingFlagon __instance, IEnumerable<Creature> participants)
+    public static void Prefix(
+        ScreamingFlagon __instance,
+        CombatSide side,
+        IEnumerable<Creature> participants)
     {
         try
         {
             if (__instance?.Owner == null || participants == null) return;
             if (!RunTracker.IsTrackedRelic(__instance)) return;
+            if (side != CombatSide.Player) return;
 
             var ownerCreature = __instance.Owner.Creature;
             if (ownerCreature == null) return;
             if (!participants.Contains(ownerCreature)) return;
-            if (!PileType.Hand.GetPile(__instance.Owner).IsEmpty) return;
+
+            var hand = PileType.Hand.GetPile(__instance.Owner);
+            RunTracker.RecordScreamingFlagonTurnEnded(
+                __instance.Owner,
+                hand.Cards.Count);
+            if (!hand.IsEmpty) return;
 
             RunTracker.ArmScreamingFlagonAttribution(ownerCreature);
         }

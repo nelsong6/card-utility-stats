@@ -824,7 +824,10 @@ Screaming Flagon follows the same observed-result pattern from its owner-specifi
 empty-hand conditions, count that callback as one activation, and consume only
 the immediately emitted multi-target `DamageVar` command. Keep the activation
 when the resolved result is empty: the relic still fired even if there were no
-damageable targets.
+damageable targets. That same callback is also the authoritative hand-size
+snapshot before the empty-hand check: record every player-side invocation,
+including non-empty hands, and reconcile a combat-ending turn at pending-combat
+promotion. Held turns and combats are zero-inclusive denominators.
 
 Lost Wisp uses the same observed-result pattern from
 `LostWisp.AfterCardPlayed`. Arm only when the callback receives an owner Power

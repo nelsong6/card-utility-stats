@@ -524,6 +524,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `potion-slot-relic-combat-start-run.json`
   Adds zero-inclusive combat-start potion-count totals and samples for Potion
   Belt, Alchemical Coffer, and Phial Holster.
+- `screaming-flagon-hand-size-run.json`
+  Adds Screaming Flagon's turn-end hand-size total plus zero-inclusive held
+  turn and combat denominators.
 
 Why these exist:
 

@@ -158,8 +158,8 @@ Ornamental Fan additionally owns its gained, effective, and wasted block
 attribution, with zero-inclusive held-turn and held-combat averages.
 Lead Paperweight records its pickup floor, both concrete Colorless card
 options, and which option actually resulted in a permanent-deck addition.
-Screaming Flagon records every empty-hand activation and its observed AOE
-damage split, including blocked damage, overkill, kills, and targets hit.
+Screaming Flagon records every empty-hand activation, its observed AOE damage
+split, and average turn-end hand size per held turn and combat.
 Fishing Rod also records average floor travel to the next qualifying normal
 combat and to each successful card upgrade.
 Potion Belt, Alchemical Coffer, and Phial Holster record the average number of

@@ -1060,6 +1060,13 @@ public class RelicAggregate
     public int TotalDamageOverkill { get; set; }
     public int Kills { get; set; }
 
+    // Screaming Flagon held-period observations. Hand-size total samples the
+    // owner's actual hand at each player turn end, including empty hands.
+    // Turns and combats are zero-inclusive denominators for its averages.
+    public int ScreamingFlagonTurnEndHandSizeTotal { get; set; }
+    public int ScreamingFlagonTurns { get; set; }
+    public int ScreamingFlagonCombats { get; set; }
+
     // Forgotten Soul held-period denominators. Activations count every
     // same-owner card exhaust callback, including a callback with no hittable
     // enemy; damage and targets come only from the resolved damage command.

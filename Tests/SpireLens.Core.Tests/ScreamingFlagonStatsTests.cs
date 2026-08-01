@@ -58,6 +58,9 @@ public class ScreamingFlagonStatsTests
             TotalDamageOverkill = 8,
             TotalTargets = 5,
             Kills = 2,
+            ScreamingFlagonTurnEndHandSizeTotal = 13,
+            ScreamingFlagonTurns = 5,
+            ScreamingFlagonCombats = 2,
         };
 
         var json = JsonSerializer.Serialize(run, SerializerOptions);
@@ -72,6 +75,47 @@ public class ScreamingFlagonStatsTests
         Assert.Equal(8, agg.TotalDamageOverkill);
         Assert.Equal(5, agg.TotalTargets);
         Assert.Equal(2, agg.Kills);
+        Assert.Equal(13, agg.ScreamingFlagonTurnEndHandSizeTotal);
+        Assert.Equal(5, agg.ScreamingFlagonTurns);
+        Assert.Equal(2, agg.ScreamingFlagonCombats);
+    }
+
+    [Fact]
+    public void RelicAggregate_ScreamingFlagonTurnEndHandSizes_IncludeEmptyHands()
+    {
+        var agg = new RelicAggregate();
+
+        RunTracker.RecordScreamingFlagonTurnForTest(agg, 4);
+        RunTracker.RecordScreamingFlagonTurnForTest(agg, 0);
+        RunTracker.RecordScreamingFlagonTurnForTest(agg, 1);
+        RunTracker.RecordScreamingFlagonCombatForTest(agg, 2);
+
+        Assert.Equal(5, agg.ScreamingFlagonTurnEndHandSizeTotal);
+        Assert.Equal(3, agg.ScreamingFlagonTurns);
+        Assert.Equal(2, agg.ScreamingFlagonCombats);
+    }
+
+    [Fact]
+    public void MergeRelicAggregateInto_ScreamingFlagonHandSizeFields_Accumulate()
+    {
+        var target = new RelicAggregate
+        {
+            ScreamingFlagonTurnEndHandSizeTotal = 5,
+            ScreamingFlagonTurns = 2,
+            ScreamingFlagonCombats = 1,
+        };
+        var source = new RelicAggregate
+        {
+            ScreamingFlagonTurnEndHandSizeTotal = 8,
+            ScreamingFlagonTurns = 3,
+            ScreamingFlagonCombats = 1,
+        };
+
+        RunTracker.MergeRelicAggregateInto(target, source);
+
+        Assert.Equal(13, target.ScreamingFlagonTurnEndHandSizeTotal);
+        Assert.Equal(5, target.ScreamingFlagonTurns);
+        Assert.Equal(2, target.ScreamingFlagonCombats);
     }
 
     [Fact]
@@ -106,6 +150,9 @@ public class ScreamingFlagonStatsTests
             TotalDamageOverkill = 8,
             TotalTargets = 5,
             Kills = 2,
+            ScreamingFlagonTurnEndHandSizeTotal = 13,
+            ScreamingFlagonTurns = 5,
+            ScreamingFlagonCombats = 2,
         });
 
         Assert.Contains("Activations", body);
@@ -117,6 +164,10 @@ public class ScreamingFlagonStatsTests
         Assert.Contains("Targets hit", body);
         Assert.Contains("Damage per activation", body);
         Assert.Contains("[b]18.33[/b]", body);
+        Assert.Contains("turn end per turn", body);
+        Assert.Contains("turn end per combat", body);
+        Assert.Contains("[b]2.6[/b]", body);
+        Assert.Contains("[b]6.5[/b]", body);
     }
 
     [Fact]

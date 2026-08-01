@@ -2362,12 +2362,32 @@ public static class RelicHoverShowPatch
     private static string BuildScreamingFlagonBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
+        var averageCardsHeldPerTurn = agg.ScreamingFlagonTurns <= 0
+            ? 0m
+            : (decimal)agg.ScreamingFlagonTurnEndHandSizeTotal
+                / agg.ScreamingFlagonTurns;
+        var averageCardsHeldPerCombat = agg.ScreamingFlagonCombats <= 0
+            ? 0m
+            : (decimal)agg.ScreamingFlagonTurnEndHandSizeTotal
+                / agg.ScreamingFlagonCombats;
         AppendRelicDamageStats(
             sb,
             agg,
             triggerDescription: "Activations — turns when the owner ended with an empty hand and Screaming Flagon fired.",
             averageLabel: "Damage per activation",
             averageDenominator: agg.Activations);
+        Row3(
+            sb,
+            "Avg cards held in hand at turn end per turn",
+            FormatDecimal(averageCardsHeldPerTurn),
+            "",
+            "Average number of cards held in hand at turn end per turn while Screaming Flagon was owned.");
+        Row3(
+            sb,
+            "Avg cards held in hand at turn end per combat",
+            FormatDecimal(averageCardsHeldPerCombat),
+            "",
+            "Average number of cards held in hand at turn end per combat while Screaming Flagon was owned.");
         return sb.ToString();
     }
 

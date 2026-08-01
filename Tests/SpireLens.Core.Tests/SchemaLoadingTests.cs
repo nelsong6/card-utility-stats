@@ -5307,6 +5307,37 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsScreamingFlagonHandSizeFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("screaming-flagon-hand-size-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertScreamingFlagonHandSizeFixture(
+            loaded.Data.RelicAggregates["RELIC.SCREAMING_FLAGON"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsScreamingFlagonHandSizeFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("screaming-flagon-hand-size-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertScreamingFlagonHandSizeFixture(
+            resumed!.RelicAggregates["RELIC.SCREAMING_FLAGON"]);
+    }
+
+    private static void AssertScreamingFlagonHandSizeFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(2, relicAgg.Activations);
+        Assert.Equal(13, relicAgg.ScreamingFlagonTurnEndHandSizeTotal);
+        Assert.Equal(5, relicAgg.ScreamingFlagonTurns);
+        Assert.Equal(2, relicAgg.ScreamingFlagonCombats);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsSwordInTheStoneRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(

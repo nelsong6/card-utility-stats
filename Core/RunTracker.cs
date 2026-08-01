@@ -1825,6 +1825,7 @@ public static class RunTracker
         RecordBeatingRemnantTurnForTrackedPlayerLocked();
         RecordTungstenRodTurnForTrackedPlayerLocked();
         RecordForgottenSoulTurnForTrackedPlayerLocked();
+        RecordScreamingFlagonTurnForTrackedPlayerLocked();
         RecordStoneCrackerTurnForTrackedPlayerLocked();
         RecordPaperPhrogTurnForTrackedPlayerLocked();
         RecordRazorToothTurnForTrackedPlayerLocked();
@@ -2072,6 +2073,10 @@ public static class RunTracker
         target.TotalDamageBlocked += source.TotalDamageBlocked;
         target.TotalDamageOverkill += source.TotalDamageOverkill;
         target.Kills += source.Kills;
+        target.ScreamingFlagonTurnEndHandSizeTotal +=
+            source.ScreamingFlagonTurnEndHandSizeTotal;
+        target.ScreamingFlagonTurns += source.ScreamingFlagonTurns;
+        target.ScreamingFlagonCombats += source.ScreamingFlagonCombats;
         target.ForgottenSoulTurns += source.ForgottenSoulTurns;
         target.ForgottenSoulCombats += source.ForgottenSoulCombats;
         target.TotalTargets += source.TotalTargets;
@@ -19289,6 +19294,28 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Record the owner's actual hand size at Screaming Flagon's player-turn
+    /// end callback, before the relic evaluates its empty-hand condition.
+    /// </summary>
+    public static void RecordScreamingFlagonTurnEnded(Player? player, int cardsHeld)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                RecordScreamingFlagonTurnForPlayerLocked(player, cardsHeld);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordScreamingFlagonTurnEnded failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Record Mercury Hourglass's owner-specific turn-start activation. The
     /// damage split is observed from the damage command result. Activations are
     /// counted once per combat so damage-per-combat has the expected denominator.
@@ -19776,6 +19803,21 @@ public static class RunTracker
                 result.OverkillDamage,
                 result.WasTargetKilled);
         }
+    }
+
+    internal static void RecordScreamingFlagonTurnForTest(
+        RelicAggregate agg,
+        int cardsHeld)
+    {
+        agg.ScreamingFlagonTurnEndHandSizeTotal += Math.Max(0, cardsHeld);
+        agg.ScreamingFlagonTurns += 1;
+    }
+
+    internal static void RecordScreamingFlagonCombatForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        agg.ScreamingFlagonCombats += Math.Max(0, count);
     }
 
     internal static void RecordMercuryHourglassDamageForTest(
@@ -22578,6 +22620,18 @@ public static class RunTracker
         }
     }
 
+    private static bool PlayerHasScreamingFlagon(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is ScreamingFlagon);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static bool PlayerHasRuinedHelmet(Player player)
     {
         try
@@ -22755,6 +22809,7 @@ public static class RunTracker
             RecordWhisperingEarringCombatForPlayerLocked(player);
             RecordTungstenRodCombatForPlayerLocked(player);
             RecordForgottenSoulCombatForPlayerLocked(player);
+            RecordScreamingFlagonCombatForPlayerLocked(player);
             RecordRuinedHelmetCombatForPlayerLocked(player);
             RecordMummifiedHandCombatForPlayerLocked(player);
             RecordBurningSticksCombatForPlayerLocked(player);
@@ -23391,6 +23446,57 @@ public static class RunTracker
 
         var agg = GetOrCreatePendingRelicAggregateLocked(ForgottenSoulRelicId);
         RecordForgottenSoulTurnForTest(agg);
+    }
+
+    private static void RecordScreamingFlagonCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasScreamingFlagon(player)) return;
+        if (!_pendingCombat.ScreamingFlagonCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(ScreamingFlagonRelicId);
+        RecordScreamingFlagonCombatForTest(agg);
+    }
+
+    private static void RecordScreamingFlagonTurnForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+
+            var cardsHeld = PileType.Hand.GetPile(player).Cards.Count;
+            RecordScreamingFlagonTurnForPlayerLocked(player, cardsHeld);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug(
+                $"RecordScreamingFlagonTurnForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordScreamingFlagonTurnForPlayerLocked(
+        Player player,
+        int cardsHeld)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasScreamingFlagon(player)) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.ScreamingFlagonTurnCountedTurns.TryGetValue(
+                player,
+                out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.ScreamingFlagonTurnCountedTurns[player] = turnNumber;
+        RecordScreamingFlagonCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(ScreamingFlagonRelicId);
+        RecordScreamingFlagonTurnForTest(agg, cardsHeld);
     }
 
     private static void RecordBeatingRemnantTurnForTrackedPlayerLocked()
@@ -29768,6 +29874,10 @@ internal class PendingCombat
     public HashSet<Player> ForgottenSoulCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> ForgottenSoulTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> ScreamingFlagonCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> ScreamingFlagonTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public List<PendingForgottenSoulDamageAttribution> ForgottenSoulDamageAttributions { get; }
         = new();
