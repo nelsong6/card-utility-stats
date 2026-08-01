@@ -895,6 +895,11 @@ public class RelicAggregate
     public int? FloorAcquired { get; set; }
     public int? FloorActivated { get; set; }
 
+    // Ordered Elite victories recorded while Sword in the Stone was owned.
+    // The history survives its replacement by Sword of Jade so the transformed
+    // relic can continue presenting the original acquisition/progression story.
+    public List<SwordInTheStoneEliteSlainAggregate> SwordInTheStoneElitesSlain { get; set; } = new();
+
     // Total observed maximum HP gained by pickup max-HP relics and Chosen Cheese.
     public decimal MaxHpGained { get; set; }
 
@@ -1559,6 +1564,13 @@ public class RelicMaxHpActivationAggregate
 {
     public decimal StartingHp { get; set; }
     public decimal ResultingHp { get; set; }
+}
+
+public class SwordInTheStoneEliteSlainAggregate
+{
+    public int Floor { get; set; }
+    public string EncounterId { get; set; } = "";
+    public string DisplayName { get; set; } = "";
 }
 
 public class WingedBootsDestinationAggregate

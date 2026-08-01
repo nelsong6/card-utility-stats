@@ -622,6 +622,17 @@ its display name; later completed plays can then be attributed to the exact
 physical cards across combats and hot reloads. Use every player turn and combat
 where War Hammer was held as the zero-inclusive play-rate denominators.
 
+Sword in the Stone (`SwordOfStone`) advances in its owner-specific
+`AfterCombatVictory(CombatRoom)` callback and replaces itself with Sword of
+Jade after the fifth Elite. Capture the Elite encounter title/id and run floor
+before the callback, then persist the kill only after its returned task
+completes successfully so a failed replacement is not recorded as progression.
+Keep both relic forms under the original `RELIC.SWORD_OF_STONE` stats identity.
+Sword of Jade's `AfterRoomEntered(AbstractRoom)` applies Strength on combat-room
+entry; measure the owner's Strength before and after that completed callback so
+the shared aggregate records the observed gain rather than its listed base
+value.
+
 Molten Egg, Toxic Egg, and Frozen Egg share `EggRelicHelper.UpgradeValidCards`
 for both late card-reward modification and merchant inventory modification.
 For each matching upgradable option, that helper calls the two-argument

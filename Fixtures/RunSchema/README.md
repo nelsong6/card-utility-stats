@@ -396,6 +396,10 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds War Hammer's Elite-victory activations, observed permanent-deck
   upgrades, stable upgraded-card instance IDs, later upgraded-card plays, and
   held turn/combat denominators.
+- `sword-in-the-stone-relic-run.json`
+  Adds Sword in the Stone's acquisition floor, ordered Elite-victory history,
+  and the observed Strength activations/gains retained after Sword of Jade
+  replaces it.
 - `egg-relic-offers-run.json`
   Adds Molten, Toxic, and Frozen Egg tracking: every matching choosable card
   option the egg actually upgraded across rewards, shops, and other offers,

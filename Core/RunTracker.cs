@@ -2016,6 +2016,7 @@ public static class RunTracker
             target.FloorAcquired = source.FloorAcquired;
         if (source.FloorActivated.HasValue)
             target.FloorActivated = source.FloorActivated;
+        MergeSwordInTheStoneElitesSlain(target, source);
         target.MaxHpGained += source.MaxHpGained;
         MergeRelicMaxHpActivations(target, source);
         if (source.OriginalMaxHp.HasValue && !target.OriginalMaxHp.HasValue)
@@ -6652,6 +6653,7 @@ public static class RunTracker
     private const string StoneCrackerRelicId = "RELIC.STONE_CRACKER";
     private const string RazorToothRelicId = "RELIC.RAZOR_TOOTH";
     private const string WarHammerRelicId = "RELIC.WAR_HAMMER";
+    private const string SwordOfStoneRelicId = "RELIC.SWORD_OF_STONE";
     private const string WhetstoneRelicId = "RELIC.WHETSTONE";
     private const string YummyCookieRelicId = "RELIC.YUMMY_COOKIE";
     private const string WarPaintRelicId = "RELIC.WAR_PAINT";
@@ -12762,6 +12764,199 @@ public static class RunTracker
                 CoreMain.LogDebug($"RecordWarHammerTurnStarted failed: {e.Message}");
             }
         }
+    }
+
+    public static void RecordSwordOfStoneObtained(RelicModel relic, Player player)
+    {
+        if (relic is not SwordOfStone || player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ReferenceEquals(relic.Owner, player)
+                    || !IsTrackedRelic(relic)
+                    || !IsTrackedPlayer(player))
+                {
+                    return;
+                }
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(SwordOfStoneRelicId);
+                RecordRelicFloorAcquiredForTest(
+                    agg,
+                    RelicFloorAddedToDeck(relic) ?? CurrentRunFloorLocked());
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordSwordOfStoneObtained failed: {e.Message}");
+            }
+        }
+    }
+
+    public static bool BeginSwordOfStoneEliteVictory(
+        SwordOfStone relic,
+        CombatRoom room,
+        out int? floorAcquired,
+        out int floor,
+        out string encounterId,
+        out string displayName)
+    {
+        floorAcquired = null;
+        floor = 0;
+        encounterId = "";
+        displayName = "";
+        if (relic?.Owner == null || room == null || room.RoomType != RoomType.Elite)
+            return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(relic.Owner))
+                    return false;
+
+                _pendingCombat ??= new PendingCombat();
+                floorAcquired = RelicFloorAddedToDeck(relic) ?? CurrentRunFloorLocked();
+                floor = room.CombatState?.RunState?.TotalFloor
+                    ?? CurrentRunFloorLocked()
+                    ?? 0;
+                encounterId = room.Encounter?.Id.ToString() ?? room.ModelId.ToString();
+                try
+                {
+                    displayName = room.Encounter?.Title.GetFormattedText() ?? "";
+                }
+                catch
+                {
+                    displayName = "";
+                }
+
+                if (string.IsNullOrWhiteSpace(displayName))
+                    displayName = encounterId;
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"BeginSwordOfStoneEliteVictory failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    public static void CompleteSwordOfStoneEliteVictory(
+        int? floorAcquired,
+        int floor,
+        string encounterId,
+        string displayName,
+        bool succeeded)
+    {
+        if (!succeeded) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreatePendingRelicAggregateLocked(SwordOfStoneRelicId);
+                RecordRelicFloorAcquiredForTest(agg, floorAcquired);
+                RecordSwordOfStoneEliteSlainForTest(
+                    agg,
+                    floor,
+                    encounterId,
+                    displayName);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"CompleteSwordOfStoneEliteVictory failed: {e.Message}");
+            }
+        }
+    }
+
+    public static bool BeginSwordOfJadeStrengthGain(
+        SwordOfJade relic,
+        AbstractRoom room,
+        out Creature? ownerCreature,
+        out decimal strengthBefore)
+    {
+        ownerCreature = null;
+        strengthBefore = 0m;
+        if (relic?.Owner?.Creature == null || room is not CombatRoom) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(relic.Owner))
+                    return false;
+
+                _pendingCombat ??= new PendingCombat();
+                ownerCreature = relic.Owner.Creature;
+                strengthBefore = CurrentStrength(ownerCreature);
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"BeginSwordOfJadeStrengthGain failed: {e.Message}");
+                ownerCreature = null;
+                strengthBefore = 0m;
+                return false;
+            }
+        }
+    }
+
+    public static void CompleteSwordOfJadeStrengthGain(
+        Creature? ownerCreature,
+        decimal strengthBefore,
+        bool succeeded)
+    {
+        if (!succeeded || ownerCreature?.Player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(ownerCreature.Player)) return;
+
+                var strengthGained = Math.Max(
+                    0m,
+                    CurrentStrength(ownerCreature) - strengthBefore);
+                if (strengthGained <= 0m) return;
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(SwordOfStoneRelicId);
+                RecordSwordOfJadeStrengthGainForTest(agg, strengthGained);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"CompleteSwordOfJadeStrengthGain failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordSwordOfStoneEliteSlainForTest(
+        RelicAggregate agg,
+        int floor,
+        string? encounterId,
+        string? displayName)
+    {
+        if (agg == null || floor <= 0) return;
+
+        agg.SwordInTheStoneElitesSlain ??= new List<SwordInTheStoneEliteSlainAggregate>();
+        agg.SwordInTheStoneElitesSlain.Add(new SwordInTheStoneEliteSlainAggregate
+        {
+            Floor = floor,
+            EncounterId = encounterId ?? "",
+            DisplayName = string.IsNullOrWhiteSpace(displayName)
+                ? encounterId ?? "Unknown Elite"
+                : displayName,
+        });
+    }
+
+    internal static void RecordSwordOfJadeStrengthGainForTest(
+        RelicAggregate agg,
+        decimal strengthGained)
+    {
+        if (agg == null || strengthGained <= 0m) return;
+        agg.Activations += 1;
+        agg.StrengthAdded += strengthGained;
     }
 
     /// <summary>
@@ -24463,6 +24658,29 @@ public static class RunTracker
             };
             target.TriBoomerangInstinctCards.Add(added);
             byInstanceId[added.CardInstanceId] = added;
+        }
+    }
+
+    private static void MergeSwordInTheStoneElitesSlain(
+        RelicAggregate target,
+        RelicAggregate source)
+    {
+        if (source.SwordInTheStoneElitesSlain == null
+            || source.SwordInTheStoneElitesSlain.Count == 0)
+        {
+            return;
+        }
+
+        target.SwordInTheStoneElitesSlain ??= new List<SwordInTheStoneEliteSlainAggregate>();
+        foreach (var elite in source.SwordInTheStoneElitesSlain)
+        {
+            if (elite == null || elite.Floor <= 0) continue;
+            target.SwordInTheStoneElitesSlain.Add(new SwordInTheStoneEliteSlainAggregate
+            {
+                Floor = elite.Floor,
+                EncounterId = elite.EncounterId ?? "",
+                DisplayName = elite.DisplayName ?? "",
+            });
         }
     }
 

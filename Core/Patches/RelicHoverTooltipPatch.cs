@@ -192,6 +192,9 @@ public static class RelicHoverShowPatch
         if (relicModel is Storybook)
             return "RELIC.STORYBOOK";
 
+        if (relicModel is SwordOfStone or SwordOfJade)
+            return "RELIC.SWORD_OF_STONE";
+
         return relicModel.Id.ToString();
     }
 
@@ -595,6 +598,17 @@ public static class RelicHoverShowPatch
         {
             title = "Ruined Helmet";
             body = BuildRuinedHelmetBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is SwordOfStone or SwordOfJade)
+        {
+            title = relicModel is SwordOfJade ? "Sword of Jade" : "Sword in the Stone";
+            body = BuildSwordInTheStoneBodyBBCode(
+                agg,
+                relicModel is SwordOfStone
+                    ? RelicFloorAddedToDeck(relicModel)
+                    : null);
             return true;
         }
 
@@ -4560,6 +4574,75 @@ public static class RelicHoverShowPatch
             "");
         Row3(sb, "Avg strength gained per combat", FormatDecimal(strengthPerCombat), "");
         return sb.ToString();
+    }
+
+    private static string BuildSwordInTheStoneBodyBBCode(
+        RelicAggregate agg,
+        int? floorAcquiredFallback = null)
+    {
+        var sb = new StringBuilder();
+        var elites = (agg.SwordInTheStoneElitesSlain
+                      ?? new List<SwordInTheStoneEliteSlainAggregate>())
+            .Where(elite => elite != null && elite.Floor > 0)
+            .ToList();
+        var averageFloorsPerElite = CalculateAverageFloorsPerElite(elites);
+        var averageStrengthPerActivation = agg.Activations <= 0
+            ? 0m
+            : agg.StrengthAdded / agg.Activations;
+
+        Row3(
+            sb,
+            "Floor acquired",
+            FormatFloor(agg.FloorAcquired ?? floorAcquiredFallback),
+            "");
+        Row3(sb, "Elites slain", elites.Count.ToString(), "");
+        Row3(
+            sb,
+            "Avg floors per elite",
+            FormatDecimal(averageFloorsPerElite),
+            "",
+            "Average floors ascended between consecutive Elite victories recorded by Sword in the Stone.");
+
+        foreach (var elite in elites)
+        {
+            var displayName = StatsTooltip.EscapeBbcode(
+                string.IsNullOrWhiteSpace(elite.DisplayName)
+                    ? elite.EncounterId
+                    : elite.DisplayName);
+            TextValueRow(
+                sb,
+                "Elite slain",
+                $"{displayName} — floor {FormatFloor(elite.Floor)}",
+                "");
+        }
+
+        Row3(sb, "Strength activations", agg.Activations.ToString(), "");
+        Row3(sb, "Strength gained", FormatDecimal(agg.StrengthAdded), "");
+        Row3(
+            sb,
+            "Avg strength gained per activation",
+            FormatDecimal(averageStrengthPerActivation),
+            "");
+        return sb.ToString();
+    }
+
+    internal static decimal CalculateAverageFloorsPerElite(
+        IReadOnlyList<SwordInTheStoneEliteSlainAggregate>? elites)
+    {
+        if (elites == null || elites.Count < 2) return 0m;
+
+        var floorGapTotal = 0;
+        var floorGapCount = 0;
+        for (var i = 1; i < elites.Count; i++)
+        {
+            if (elites[i - 1].Floor <= 0 || elites[i].Floor <= 0) continue;
+            floorGapTotal += Math.Max(0, elites[i].Floor - elites[i - 1].Floor);
+            floorGapCount += 1;
+        }
+
+        return floorGapCount == 0
+            ? 0m
+            : (decimal)floorGapTotal / floorGapCount;
     }
 
     private static void AppendTurnResetChargeRows(

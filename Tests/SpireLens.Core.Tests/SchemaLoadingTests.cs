@@ -5168,4 +5168,39 @@ public class SchemaLoadingTests
         Assert.Equal(3, resumed!.PotionHistory.Count);
         Assert.Equal("Potion reward", resumed.PotionHistory[1].AcquisitionMethod);
     }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsSwordInTheStoneRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("sword-in-the-stone-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertSwordInTheStoneFixture(
+            loaded.Data.RelicAggregates["RELIC.SWORD_OF_STONE"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsSwordInTheStoneRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("sword-in-the-stone-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertSwordInTheStoneFixture(
+            resumed!.RelicAggregates["RELIC.SWORD_OF_STONE"]);
+    }
+
+    private static void AssertSwordInTheStoneFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(8, relicAgg.FloorAcquired);
+        Assert.Equal(3, relicAgg.SwordInTheStoneElitesSlain.Count);
+        Assert.Equal(12, relicAgg.SwordInTheStoneElitesSlain[0].Floor);
+        Assert.Equal("Gremlin Nob", relicAgg.SwordInTheStoneElitesSlain[0].DisplayName);
+        Assert.Equal(23, relicAgg.SwordInTheStoneElitesSlain[2].Floor);
+        Assert.Equal("ENCOUNTER.GREMLIN_LEADER", relicAgg.SwordInTheStoneElitesSlain[2].EncounterId);
+        Assert.Equal(2, relicAgg.Activations);
+        Assert.Equal(6, relicAgg.StrengthAdded);
+    }
 }
