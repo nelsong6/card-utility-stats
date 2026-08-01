@@ -1749,6 +1749,7 @@ public static class RunTracker
             _pendingCombat = new PendingCombat();
             ResetCombatContextState();
             RecordPantographCombatStartForTrackedPlayerLocked(state);
+            RecordPotionSlotRelicCombatStartForTrackedPlayerLocked(state);
             if (ShouldTrackCardStatsDuringCombatLocked())
             {
                 InitializeMetaPowerDeckEligibilityLocked(state);
@@ -2100,6 +2101,8 @@ public static class RunTracker
         target.TinyMailboxRarePotionsOffered += source.TinyMailboxRarePotionsOffered;
         target.TinyMailboxFruitJuicesOffered += source.TinyMailboxFruitJuicesOffered;
         target.TinyMailboxCampfiresNotRested += source.TinyMailboxCampfiresNotRested;
+        target.CombatStartPotionCountTotal += source.CombatStartPotionCountTotal;
+        target.CombatStartPotionCountSamples += source.CombatStartPotionCountSamples;
         target.RelicsAcquired += source.RelicsAcquired;
         target.CommonRelicsAcquired += source.CommonRelicsAcquired;
         target.UncommonRelicsAcquired += source.UncommonRelicsAcquired;
@@ -6728,6 +6731,9 @@ public static class RunTracker
     private const string LeafyPoulticeRelicId = "RELIC.LEAFY_POULTICE";
     private const string RegalPillowRelicId = "RELIC.REGAL_PILLOW";
     private const string WhiteBeastStatueRelicId = "RELIC.WHITE_BEAST_STATUE";
+    private const string PotionBeltRelicId = "RELIC.POTION_BELT";
+    private const string AlchemicalCofferRelicId = "RELIC.ALCHEMICAL_COFFER";
+    private const string PhialHolsterRelicId = "RELIC.PHIAL_HOLSTER";
     private const string ShovelRelicId = "RELIC.SHOVEL";
     private const string TinyMailboxRelicId = "RELIC.TINY_MAILBOX";
     private const string LargeCapsuleRelicId = "RELIC.LARGE_CAPSULE";
@@ -12507,6 +12513,50 @@ public static class RunTracker
             decimal attemptedHealing = pantograph.DynamicVars?.Heal?.BaseValue ?? 0m;
             RecordPantographTrigger(player.Creature, attemptedHealing);
         }
+    }
+
+    /// <summary>
+    /// Snapshot the actual number of potions held at combat setup for every
+    /// owned relic that increases potion capacity. Each relic receives its own
+    /// zero-inclusive sample so its average covers only its held combats.
+    /// </summary>
+    private static void RecordPotionSlotRelicCombatStartForTrackedPlayerLocked(
+        CombatState state)
+    {
+        if (_pendingCombat == null || state?.Players == null) return;
+
+        foreach (var player in state.Players)
+        {
+            if (!IsTrackedPlayer(player) || player?.Creature == null || player.Creature.IsDead)
+                continue;
+
+            var potionsHeld = player.Potions?.Count() ?? 0;
+            foreach (var relic in player.Relics)
+            {
+                if (!IsTrackedRelic(relic)) continue;
+
+                var relicId = relic switch
+                {
+                    PotionBelt => PotionBeltRelicId,
+                    AlchemicalCoffer => AlchemicalCofferRelicId,
+                    PhialHolster => PhialHolsterRelicId,
+                    _ => null,
+                };
+                if (relicId == null) continue;
+
+                RecordPotionSlotRelicCombatStartForTest(
+                    GetOrCreatePendingRelicAggregateLocked(relicId),
+                    potionsHeld);
+            }
+        }
+    }
+
+    internal static void RecordPotionSlotRelicCombatStartForTest(
+        RelicAggregate agg,
+        int potionsHeld)
+    {
+        agg.CombatStartPotionCountTotal += Math.Max(0, potionsHeld);
+        agg.CombatStartPotionCountSamples++;
     }
 
     /// <summary>

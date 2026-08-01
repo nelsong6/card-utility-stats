@@ -521,6 +521,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `potion-run-history-turns.json`
   Adds combat-turn timing for potion lifecycle points that occur during
   combat, allowing same-turn acquisitions and uses to share a timeline row.
+- `potion-slot-relic-combat-start-run.json`
+  Adds zero-inclusive combat-start potion-count totals and samples for Potion
+  Belt, Alchemical Coffer, and Phial Holster.
 
 Why these exist:
 

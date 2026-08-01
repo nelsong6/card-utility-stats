@@ -5271,6 +5271,42 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsPotionSlotRelicCombatStartFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("potion-slot-relic-combat-start-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertPotionSlotRelicCombatStartFixture(loaded.Data);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsPotionSlotRelicCombatStartFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("potion-slot-relic-combat-start-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertPotionSlotRelicCombatStartFixture(resumed!);
+    }
+
+    private static void AssertPotionSlotRelicCombatStartFixture(RunData run)
+    {
+        var belt = run.RelicAggregates["RELIC.POTION_BELT"];
+        Assert.Equal(7, belt.CombatStartPotionCountTotal);
+        Assert.Equal(4, belt.CombatStartPotionCountSamples);
+
+        var coffer = run.RelicAggregates["RELIC.ALCHEMICAL_COFFER"];
+        Assert.Equal(4, coffer.CombatStartPotionCountTotal);
+        Assert.Equal(3, coffer.CombatStartPotionCountSamples);
+
+        var holster = run.RelicAggregates["RELIC.PHIAL_HOLSTER"];
+        Assert.Equal(9, holster.CombatStartPotionCountTotal);
+        Assert.Equal(5, holster.CombatStartPotionCountSamples);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsSwordInTheStoneRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(

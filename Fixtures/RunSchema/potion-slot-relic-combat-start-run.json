@@ -1,0 +1,36 @@
+{
+  "run_id": "potion-slot-relic-combat-start-fixture",
+  "started_at": "2026-08-01T19:00:00Z",
+  "updated_at": "2026-08-01T19:20:00Z",
+  "outcome": "in_progress",
+  "floor_reached": 18,
+  "aggregates": {
+    "CARD.STRIKE_IRONCLAD#1": {
+      "initial_upgrade_level": 0
+    }
+  },
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.POTION_BELT": {
+      "combat_start_potion_count_total": 7,
+      "combat_start_potion_count_samples": 4
+    },
+    "RELIC.ALCHEMICAL_COFFER": {
+      "combat_start_potion_count_total": 4,
+      "combat_start_potion_count_samples": 3
+    },
+    "RELIC.PHIAL_HOLSTER": {
+      "combat_start_potion_count_total": 9,
+      "combat_start_potion_count_samples": 5
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.STRIKE_IRONCLAD": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.STRIKE_IRONCLAD": 1
+  }
+}

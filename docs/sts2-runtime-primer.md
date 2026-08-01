@@ -96,6 +96,10 @@ SpireLens persistence is combat-boundary based.
 - `CombatSetUp` fires before `Hook.BeforeCombatStart`. Glory's two consecutive
   boss rooms each receive their own setup/start/end lifecycle; combat-start
   relic attribution must therefore count them as separate activations.
+- Potion Belt, Alchemical Coffer, and Phial Holster are the complete set of
+  relic models that mutate potion-slot capacity. Their held-period stat takes
+  one zero-inclusive `Player.Potions.Count()` snapshot at `CombatSetUp` and
+  writes it to each applicable owned relic's pending combat aggregate.
 - During combat, live observations accumulate in `_pendingCombat`.
 - `ICombatState.RoundNumber == 1` spans the entire first round: the player's
   first side (including extra player turns) and the enemy's first side. It

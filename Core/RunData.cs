@@ -1105,6 +1105,12 @@ public class RelicAggregate
     public int RarePotionsGained { get; set; }
     public int PotionsSkipped { get; set; }
 
+    // Potion-slot relic held-period observations. The total includes zero-potion
+    // starts, and samples counts every combat where the individual relic was
+    // owned. Used by Potion Belt, Alchemical Coffer, and Phial Holster.
+    public int CombatStartPotionCountTotal { get; set; }
+    public int CombatStartPotionCountSamples { get; set; }
+
     // Tiny Mailbox tracking. Offers are the exact PotionReward objects added
     // by its rest-heal callback and are counted once when selected or skipped,
     // after the game has populated their concrete potion. Fruit Juice is an

@@ -1401,6 +1401,27 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is PotionBelt)
+        {
+            title = "Potion Belt";
+            body = BuildPotionSlotRelicBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is AlchemicalCoffer)
+        {
+            title = "Alchemical Coffer";
+            body = BuildPotionSlotRelicBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is PhialHolster)
+        {
+            title = "Phial Holster";
+            body = BuildPotionSlotRelicBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is Shovel)
         {
             title = "Shovel";
@@ -5147,6 +5168,22 @@ public static class RelicHoverShowPatch
         Row3(sb, "common potions", agg.CommonPotionsGained.ToString(), "");
         Row3(sb, "uncommon potions", agg.UncommonPotionsGained.ToString(), "");
         Row3(sb, "rare potions", agg.RarePotionsGained.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildPotionSlotRelicBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var averagePotionsHeld = agg.CombatStartPotionCountSamples <= 0
+            ? 0m
+            : (decimal)agg.CombatStartPotionCountTotal
+                / agg.CombatStartPotionCountSamples;
+        Row3(
+            sb,
+            "Avg potions held at combat start",
+            FormatDecimal(averagePotionsHeld),
+            "",
+            "Average number of potions held at combat start while this relic was owned.");
         return sb.ToString();
     }
 
