@@ -1451,8 +1451,8 @@ public class RelicAggregate
     public int WingCharmUncommonSwiftCardsOffered { get; set; }
     public int WingCharmRareSwiftCardsOffered { get; set; }
 
-    // Ordered card-reward offers modified by Silver Crucible. Each screen is
-    // keyed by the relic's own one-based use number (1-3), while Cards keeps
+    // Ordered relic-owned card-choice offers. Silver Crucible uses its
+    // one-based use number (1-3); Lead Paperweight uses screen 1. Cards keeps
     // the visible left-to-right option order and, once resolved, explicit
     // taken/not-taken outcomes. A list is required because duplicate card
     // definitions can be offered and must remain distinct observations.
@@ -1470,7 +1470,8 @@ public class RelicAggregate
 
     // Specific cards granted by relic-owned effects. Used by Hefty Tablet to
     // show which rare card was picked from its pickup screen, Arcane Scroll to
-    // show the rare card it added, Scroll Boxes to show its chosen bundle, and
+    // show the rare card it added, Scroll Boxes to show its chosen bundle,
+    // Lead Paperweight to preserve the final card that reached the deck, and
     // Neow's Bones to show the curse it added.
     public Dictionary<string, RelicCardAggregate> CardsGranted { get; set; } = new();
 
@@ -1480,7 +1481,8 @@ public class RelicAggregate
     // the relic removed the cards on pickup.
     public List<RelicCardReturnAggregate> CardsReturned { get; set; } = new();
 
-    // Times a relic-owned card choice was skipped. Used by Hefty Tablet.
+    // Times a relic-owned card choice was skipped. Used by Hefty Tablet and
+    // Lead Paperweight.
     public int CardChoicesSkipped { get; set; }
 
     // Actual card transformations caused by relic-owned effects. Used by Leafy

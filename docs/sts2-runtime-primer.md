@@ -866,6 +866,15 @@ present after successful completion. This records the chosen bundle's observed
 cards, including the three-Claw exception and any final deck-add replacements,
 without treating generated-but-unchosen bundle cards as grants.
 
+Lead Paperweight creates two concrete Colorless options inside its
+owner-specific `AfterObtained` callback, then awaits the shared
+`CardSelectCmd.FromChooseACardScreen` command with a real skip option. Arm the
+choice from that relic callback, capture the exact option list at the selector,
+and wait for the full pickup callback before resolving the outcome against new
+physical permanent-deck references. Mark an option taken only when the chosen
+card actually produces a deck addition; preserve a null selection as a true
+skip rather than treating selection intent as acquisition.
+
 Gnarled Hammer's `AfterObtained` awaits a deck selection, then synchronously
 calls `CardCmd.Enchant` with Sharp on each returned physical deck card. Snapshot
 the deck card references and their optional Sharp amounts before the callback,

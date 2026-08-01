@@ -162,6 +162,8 @@ public static class RunTracker
     private static int _pendingWhiteBeastPotionRewards;
     private static int _pendingToolboxOfferScreens;
     private static readonly List<Player> _pendingHeftyTabletChoicePlayers = new();
+    private static readonly Dictionary<Player, PendingLeadPaperweightChoice>
+        _pendingLeadPaperweightChoices = new(ReferenceEqualityComparer.Instance);
     private static readonly HashSet<PotionReward> _whiteBeastPotionRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, PendingPaelSacrificeReward> _paelSacrificeRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, PendingFresnelLensReward> _fresnelLensRewards = new(ReferenceEqualityComparer.Instance);
@@ -1206,6 +1208,7 @@ public static class RunTracker
     private static void ResetRewardContextState()
     {
         _pendingHeftyTabletChoicePlayers.Clear();
+        _pendingLeadPaperweightChoices.Clear();
         _paelSacrificeRewards.Clear();
         _fresnelLensRewards.Clear();
         _silkenTressRewards.Clear();
@@ -6764,6 +6767,7 @@ public static class RunTracker
     private const string JuzuBraceletRelicId = "RELIC.JUZU_BRACELET";
     private const string DowsingRodRelicId = "RELIC.DOWSING_ROD";
     private const string HeftyTabletRelicId = "RELIC.HEFTY_TABLET";
+    private const string LeadPaperweightRelicId = "RELIC.LEAD_PAPERWEIGHT";
     private const string ArcaneScrollRelicId = "RELIC.ARCANE_SCROLL";
     private const string ScrollBoxesRelicId = "RELIC.SCROLL_BOXES";
     private const string VambraceRelicId = "RELIC.VAMBRACE";
@@ -11344,6 +11348,204 @@ public static class RunTracker
         }
 
         AddRelicCardGranted(agg.CardsGranted, cardId, displayName ?? "", 1);
+    }
+
+    /// <summary>
+    /// Begin Lead Paperweight's owner-specific pickup choice. The deck
+    /// snapshot lets completion confirm that the chosen option really reached
+    /// the permanent deck after all add modifiers and blockers ran.
+    /// </summary>
+    public static bool BeginLeadPaperweightChoice(
+        LeadPaperweight relic,
+        out Player? player)
+    {
+        player = null;
+        if (relic?.Owner == null) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(relic.Owner))
+                    return false;
+
+                player = relic.Owner;
+                _pendingLeadPaperweightChoices[player] = new PendingLeadPaperweightChoice
+                {
+                    Player = player,
+                    Floor = RelicFloorAddedToDeck(relic) ?? CurrentRunFloorLocked(),
+                    DeckBeforeChoice = new HashSet<CardModel>(
+                        SnapshotDeckCards(player),
+                        ReferenceEqualityComparer.Instance),
+                };
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"BeginLeadPaperweightChoice failed: {e.Message}");
+                player = null;
+                return false;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Capture the concrete options at the shared choose-card command. The
+    /// owner-specific pickup window prevents unrelated card selections from
+    /// entering Lead Paperweight's ledger.
+    /// </summary>
+    public static bool CaptureLeadPaperweightOptions(
+        Player player,
+        IReadOnlyList<CardModel> cards,
+        bool canSkip)
+    {
+        if (player == null || cards == null || cards.Count == 0 || !canSkip)
+            return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_pendingLeadPaperweightChoices.TryGetValue(player, out var pending))
+                    return false;
+                if (pending.Options.Count > 0) return false;
+
+                foreach (var card in cards)
+                {
+                    if (card == null) continue;
+                    pending.Options.Add(new PendingLeadPaperweightOption
+                    {
+                        Card = card,
+                        CardId = GetCardIdForStats(card),
+                        DisplayName = GetCardDisplayNameForStats(card),
+                        UpgradeLevel = Math.Max(0, card.CurrentUpgradeLevel),
+                    });
+                }
+
+                return pending.Options.Count > 0;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"CaptureLeadPaperweightOptions failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    public static void RecordLeadPaperweightSelection(
+        Player player,
+        CardModel? selectedCard)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_pendingLeadPaperweightChoices.TryGetValue(player, out var pending))
+                    return;
+
+                pending.SelectionResolved = true;
+                pending.SelectedCard = selectedCard;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordLeadPaperweightSelection failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void CompleteLeadPaperweightChoice(Player player, bool succeeded)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_pendingLeadPaperweightChoices.Remove(player, out var pending))
+                    return;
+                if (!succeeded || !IsTrackedPlayer(player)) return;
+
+                CardModel? receivedCard = null;
+                if (pending.SelectedCard != null)
+                {
+                    var addedCards = NewDeckCardsSince(player, pending.DeckBeforeChoice);
+                    receivedCard = addedCards.FirstOrDefault(card =>
+                            ReferenceEquals(card, pending.SelectedCard))
+                        ?? addedCards.FirstOrDefault(card =>
+                            string.Equals(
+                                GetCardIdForStats(card),
+                                GetCardIdForStats(pending.SelectedCard),
+                                StringComparison.Ordinal))
+                        ?? addedCards.FirstOrDefault();
+                }
+
+                var received = receivedCard != null;
+                var optionRows = pending.Options.Select(option =>
+                    new RelicCardRewardOptionAggregate
+                    {
+                        CardId = option.CardId,
+                        DisplayName = option.DisplayName,
+                        UpgradeLevel = option.UpgradeLevel,
+                        Taken = received
+                            && pending.SelectedCard != null
+                            && ReferenceEquals(option.Card, pending.SelectedCard),
+                    }).ToList();
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(LeadPaperweightRelicId);
+                RecordLeadPaperweightChoiceForTest(
+                    agg,
+                    pending.Floor,
+                    optionRows,
+                    receivedCard == null ? null : GetCardIdForStats(receivedCard),
+                    receivedCard == null ? null : GetCardDisplayNameForStats(receivedCard),
+                    pending.SelectionResolved && pending.SelectedCard == null);
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"CompleteLeadPaperweightChoice failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordLeadPaperweightChoiceForTest(
+        RelicAggregate agg,
+        int? floor,
+        IEnumerable<RelicCardRewardOptionAggregate>? options,
+        string? receivedCardId,
+        string? receivedDisplayName,
+        bool skipped)
+    {
+        if (agg == null) return;
+
+        RecordRelicFloorAcquiredForTest(agg, floor);
+        RecordRelicCardRewardScreenForTest(
+            agg,
+            new RelicCardRewardScreenAggregate
+            {
+                ScreenNumber = 1,
+                Floor = floor,
+                Resolved = true,
+                Cards = (options ?? Array.Empty<RelicCardRewardOptionAggregate>())
+                    .Where(card => card != null)
+                    .ToList(),
+            });
+
+        if (!string.IsNullOrWhiteSpace(receivedCardId))
+        {
+            AddRelicCardGranted(
+                agg.CardsGranted,
+                receivedCardId,
+                receivedDisplayName ?? "",
+                1);
+        }
+        else if (skipped)
+        {
+            agg.CardChoicesSkipped += 1;
+        }
     }
 
     public static bool BeginArcaneScrollPickup(
@@ -20803,7 +21005,7 @@ public static class RunTracker
         }
     }
 
-    internal static void RecordSilverCrucibleRewardForTest(
+    internal static void RecordRelicCardRewardScreenForTest(
         RelicAggregate agg,
         RelicCardRewardScreenAggregate screen)
     {
@@ -20837,6 +21039,11 @@ public static class RunTracker
         agg.CardRewardScreens.Sort((left, right) =>
             (left?.ScreenNumber ?? int.MaxValue).CompareTo(right?.ScreenNumber ?? int.MaxValue));
     }
+
+    internal static void RecordSilverCrucibleRewardForTest(
+        RelicAggregate agg,
+        RelicCardRewardScreenAggregate screen)
+        => RecordRelicCardRewardScreenForTest(agg, screen);
 
     private static void CaptureSilverCrucibleRewardOptionsLocked(
         PendingSilverCrucibleReward pending,
@@ -24809,7 +25016,7 @@ public static class RunTracker
         if (source.CardRewardScreens == null || source.CardRewardScreens.Count == 0) return;
 
         foreach (var screen in source.CardRewardScreens)
-            RecordSilverCrucibleRewardForTest(target, screen);
+            RecordRelicCardRewardScreenForTest(target, screen);
     }
 
     private static void MergeOrreryRewards(RelicAggregate target, RelicAggregate source)
@@ -29077,6 +29284,24 @@ internal sealed class PendingSilkenTressReward
     }
 
     public IReadOnlyList<PendingSilkenTressOption> Options { get; }
+}
+
+internal sealed class PendingLeadPaperweightChoice
+{
+    public required Player Player { get; init; }
+    public int? Floor { get; init; }
+    public required HashSet<CardModel> DeckBeforeChoice { get; init; }
+    public List<PendingLeadPaperweightOption> Options { get; } = new();
+    public bool SelectionResolved { get; set; }
+    public CardModel? SelectedCard { get; set; }
+}
+
+internal sealed class PendingLeadPaperweightOption
+{
+    public required CardModel Card { get; init; }
+    public string CardId { get; init; } = "";
+    public string DisplayName { get; init; } = "";
+    public int UpgradeLevel { get; init; }
 }
 
 internal sealed class PendingSilverCrucibleReward

@@ -794,6 +794,15 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is LeadPaperweight)
+        {
+            title = "Lead Paperweight";
+            body = BuildLeadPaperweightBodyBBCode(
+                agg,
+                RelicFloorAddedToDeck(relicModel));
+            return true;
+        }
+
         if (relicModel is SilverCrucible)
         {
             title = "Silver Crucible";
@@ -2623,6 +2632,53 @@ public static class RelicHoverShowPatch
             $"Upgraded {rarityText}{pluralCardType} {action}.");
     }
 
+    private static string BuildLeadPaperweightBodyBBCode(
+        RelicAggregate agg,
+        int? floorAcquiredFallback = null)
+    {
+        var sb = new StringBuilder();
+        Row3(
+            sb,
+            "Floor acquired",
+            FormatFloor(agg.FloorAcquired ?? floorAcquiredFallback),
+            "");
+
+        var screen = (agg.CardRewardScreens
+                ?? new List<RelicCardRewardScreenAggregate>())
+            .LastOrDefault(candidate =>
+                candidate != null && candidate.ScreenNumber == 1);
+        if (screen == null)
+        {
+            TextValueRow(sb, "Card choice", "not recorded", "");
+            return sb.ToString();
+        }
+
+        var cards = screen.Cards ?? new List<RelicCardRewardOptionAggregate>();
+        if (cards.Count == 0)
+        {
+            TextValueRow(sb, "Card choice", "no cards offered", "");
+            return sb.ToString();
+        }
+
+        foreach (var card in cards)
+        {
+            if (card == null) continue;
+
+            var displayName = !string.IsNullOrWhiteSpace(card.DisplayName)
+                ? card.DisplayName
+                : !string.IsNullOrWhiteSpace(card.CardId)
+                    ? RunTracker.FormatCardIdForDisplay(card.CardId)
+                    : "Unknown card";
+            AppendRelicCardChoiceRow(
+                sb,
+                "Lead Paperweight",
+                StatsTooltip.EscapeBbcode(displayName),
+                !screen.Resolved ? "pending" : card.Taken ? "taken" : "not taken");
+        }
+
+        return sb.ToString();
+    }
+
     private static string BuildSilverCrucibleBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
@@ -2660,8 +2716,9 @@ public static class RelicHoverShowPatch
                     : !string.IsNullOrWhiteSpace(card.CardId)
                         ? RunTracker.FormatCardIdForDisplay(card.CardId)
                         : "Unknown card";
-                AppendSilverCrucibleCardRow(
+                AppendRelicCardChoiceRow(
                     sb,
+                    "Silver Crucible",
                     StatsTooltip.EscapeBbcode(displayName),
                     !screen.Resolved ? "pending" : card.Taken ? "taken" : "not taken");
             }
@@ -2670,8 +2727,9 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
-    private static void AppendSilverCrucibleCardRow(
+    private static void AppendRelicCardChoiceRow(
         StringBuilder sb,
+        string relicName,
         string displayName,
         string outcome)
     {
@@ -2681,7 +2739,7 @@ public static class RelicHoverShowPatch
             [],
             $"[b]{displayName}[/b]",
             outcome,
-            $"This card was offered by Silver Crucible and was {outcome}.");
+            $"This card was offered by {relicName} and was {outcome}.");
     }
 
     private static string BuildOrreryBodyBBCode(RelicAggregate agg)
