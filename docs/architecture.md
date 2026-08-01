@@ -38,6 +38,9 @@ For the stable Slay the Spire 2 runtime mental model behind the hook choices her
 - Combat history entries and selected hook patches feed into the tracker.
 - During combat, observations accumulate in `_pendingCombat`.
 - On combat end, `_pendingCombat` is promoted into the committed run aggregates and saved.
+- Potion history uses the same boundary: offers/acquisitions outside combat
+  save immediately, while combat-time acquisitions and uses update a pending
+  history snapshot that is merged only when the combat resolves.
 
 This combat-boundary rule is important:
 
@@ -94,6 +97,8 @@ When attribution is not naturally one-card-to-one-outcome, the code prefers:
 
 - [Core/Patches/ViewStatsInjectorPatch.cs](../Core/Patches/ViewStatsInjectorPatch.cs) injects the deck-view shortcut for the global SpireLens options menu.
 - [Core/SpireLensOptionsMenu.cs](../Core/SpireLensOptionsMenu.cs) owns the modal, screen-independent checkbox window and its keyboard/gamepad shortcuts. Its highlighted row is independent of Godot GUI focus so the underlying game selection remains untouched while the modal intercepts input.
+- [Core/Patches/PotionCompendiumRunHistoryPatch.cs](../Core/Patches/PotionCompendiumRunHistoryPatch.cs) adds the potion-gallery mode dropdown and replaces the rarity galleries with the two-lane current-run history when selected.
+- [Core/Patches/PotionRunHistoryTrackingPatch.cs](../Core/Patches/PotionRunHistoryTrackingPatch.cs) observes visible reward/shop offers plus final belt insertion, use, and discard outcomes.
 - [Core/Patches/RelicBarFilterPatch.cs](../Core/Patches/RelicBarFilterPatch.cs) optionally hides classified, already-resolved relics from the standard in-run relic bar without changing ownership, effects, or any other relic surface, then rewires top-bar controller navigation across the remaining visible relics.
 - [Core/RelicClassificationStore.cs](../Core/RelicClassificationStore.cs) loads the embedded combat/non-combat JSON, normalizes it against the current game relic database, persists the editable AppData copy, and applies compendium changes immediately.
 - [Core/Patches/RelicCompendiumClassificationPatch.cs](../Core/Patches/RelicCompendiumClassificationPatch.cs) turns compendium mouse/controller presses into classification toggles while edit mode is active and renders the classification badges.

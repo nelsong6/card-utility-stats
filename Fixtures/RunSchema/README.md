@@ -505,6 +505,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `forgotten-soul-relic-run.json`
   Adds Forgotten Soul's same-owner exhaust activations, observed damage
   outcomes, and zero-inclusive held turn/combat denominators.
+- `potion-run-history.json`
+  Adds ordered per-potion offer, acquisition, use, and held-at-run-end
+  provenance for the potion gallery's current-run history view.
 
 Why these exist:
 

@@ -53,6 +53,15 @@ the highlighted option. Any other non-direction controller button closes the
 menu. Mouse selection remains fully supported; Escape, Left Shift, or the
 window's Close button also closes it.
 
+The same modal includes **View current-run potion history**, which opens the
+game's Compendium → Potion Gallery directly in SpireLens's **Current run
+stats** mode. The potion gallery dropdown switches between the normal gallery
+and a two-lane chronological run view: potion offers seen but not taken on the
+left, and potions taken, used, discarded, or still held on the right. Each
+entry keeps its acquisition method and observed floor/room context; potions
+still in the belt when the run ends receive a distinct **Held at run end**
+marker.
+
 The optional, mutually exclusive relic-bar filters hide already-resolved relics
 while leaving them owned, functional, and visible on every other relic surface.
 The contextual mode filters during combat and combat pile overlays but restores
@@ -158,7 +167,7 @@ Run outcome detection (win/loss/abandoned) is implemented ([#10](https://github.
 
 ## Storage
 
-Per-run JSON files at `%APPDATA%/SlayTheSpire2/SpireLens/runs/<run-id>.json` (Godot's `user://` path). Contains both aggregated stats (fast for UI) and a full event log (one entry per card-played / damage-received / card-upgraded / block-gained / card-removed event, for future analysis). The on-disk shape evolves additively and is detected structurally on load: files containing `instance_numbers_by_def` or `def_counters` use the per-instance shape, while older pooled-shape files lack both fields. Pooled-shape files are history-only; per-instance files remain resumable under the current loader. Session preferences are stored in the BaseLib-backed mod configuration.
+Per-run JSON files at `%APPDATA%/SlayTheSpire2/SpireLens/runs/<run-id>.json` (Godot's `user://` path). Contains aggregated stats (fast for UI), ordered potion provenance, and a full event log (one entry per card-played / damage-received / card-upgraded / block-gained / card-removed event, for future analysis). The on-disk shape evolves additively and is detected structurally on load: files containing `instance_numbers_by_def` or `def_counters` use the per-instance shape, while older pooled-shape files lack both fields. Pooled-shape files are history-only; per-instance files remain resumable under the current loader. Session preferences are stored in the BaseLib-backed mod configuration.
 
 ## Requirements
 

@@ -48,6 +48,15 @@ public class RunData
     public Dictionary<string, RelicAggregate> RelicAggregates { get; set; } = new();
 
     /// <summary>
+    /// Chronological potion provenance for this run. A record begins when a
+    /// potion is visibly offered or successfully enters the belt, then keeps
+    /// the observed acquisition, use/discard, or held-at-run-end outcome for
+    /// that same potion. Sequence is monotonic within the run so duplicate
+    /// potion definitions remain separate history entries.
+    /// </summary>
+    public List<PotionRunHistoryEntry> PotionHistory { get; set; } = new();
+
+    /// <summary>
     /// Ordered provenance for the portion of the player's gold balance that
     /// still matters to source attribution. Old Coin seeds the first tracked
     /// chunk; ordinary balance before and after it is represented by chunks
@@ -112,6 +121,41 @@ public class RunData
     // _pendingCombat is null outside of active combat. See git history
     // on 2026-04-20 for the full PendingCombatSnapshot approach if we
     // ever decide to re-enable mid-combat persistence.)
+}
+
+/// <summary>
+/// One potion offer/acquisition lifecycle in a run. Location fields are
+/// deliberately additive and presentation-neutral: the gallery can render a
+/// compact floor/kind/name label without needing the live room object later.
+/// </summary>
+public class PotionRunHistoryEntry
+{
+    public int Sequence { get; set; }
+    public string PotionId { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public string AcquisitionMethod { get; set; } = "";
+
+    public int? SeenFloor { get; set; }
+    public string? SeenLocationKind { get; set; }
+    public string? SeenLocationName { get; set; }
+
+    public bool Acquired { get; set; }
+    public int? AcquiredFloor { get; set; }
+    public string? AcquiredLocationKind { get; set; }
+    public string? AcquiredLocationName { get; set; }
+
+    public bool Used { get; set; }
+    public int? UsedFloor { get; set; }
+    public string? UsedLocationKind { get; set; }
+    public string? UsedLocationName { get; set; }
+
+    public bool Discarded { get; set; }
+    public int? DiscardedFloor { get; set; }
+    public string? DiscardedLocationKind { get; set; }
+    public string? DiscardedLocationName { get; set; }
+
+    public bool HeldAtRunEnd { get; set; }
+    public int? HeldAtRunEndFloor { get; set; }
 }
 
 /// <summary>Aggregated per-card attribution stats for this run.</summary>

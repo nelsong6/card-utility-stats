@@ -94,6 +94,8 @@ public static class RunTracker
         "SpireLens.TinyMailboxRewardAttributions";
     private const string TinyMailboxOfferRecordedAttributionsAppDomainKey =
         "SpireLens.TinyMailboxOfferRecordedAttributions";
+    private const string PotionHistorySequencesAppDomainKey =
+        "SpireLens.PotionHistorySequences";
 
     private static readonly object _lock = new();
 
@@ -129,6 +131,8 @@ public static class RunTracker
     private static readonly ConditionalWeakTable<object, Tuple<int>>
         _tinyMailboxOfferRecordedAttributions =
             GetTinyMailboxOfferRecordedAttributions();
+    private static readonly ConditionalWeakTable<object, Tuple<int>>
+        _potionHistorySequences = GetPotionHistorySequences();
     private static readonly List<PendingPowerChangeAttempt> _pendingPowerChangeAttempts = new();
     private static readonly List<PendingUnsettlingLampDebuff> _pendingUnsettlingLampDebuffs = new();
     private static readonly System.Threading.AsyncLocal<EnemyStatusSourceFrame?> _enemyStatusSourceFrame = new();
@@ -320,6 +324,28 @@ public static class RunTracker
         {
             if (_currentRun == null) return null;
             return System.Text.Json.JsonSerializer.Serialize(_currentRun, RunStorage.Options);
+        }
+    }
+
+    /// <summary>
+    /// Read-only merged potion history for the gallery. Mid-combat potion
+    /// changes come from the pending snapshot and remain unsaved until combat
+    /// promotion, matching every other combat-boundary stat.
+    /// </summary>
+    public static IReadOnlyList<PotionRunHistoryEntry> GetEffectivePotionHistory(
+        out string outcome)
+    {
+        lock (_lock)
+        {
+            var run = _currentRun ?? _lastEndedRun;
+            outcome = run?.Outcome ?? "none";
+            if (run == null) return Array.Empty<PotionRunHistoryEntry>();
+
+            var source = ReferenceEquals(run, _currentRun)
+                && _pendingCombat?.PotionHistory != null
+                    ? _pendingCombat.PotionHistory
+                    : run.PotionHistory;
+            return ClonePotionHistory(source);
         }
     }
 
@@ -1339,6 +1365,8 @@ public static class RunTracker
 
         int deckCards = 0;
         var player = runState?.Players.FirstOrDefault();
+        bool potionHistoryChanged = RebindLivePotionHistoryLocked(
+            runState?.Players.FirstOrDefault(IsTrackedPlayer));
         if (player?.Deck != null)
         {
             foreach (var card in player.Deck.Cards)
@@ -1434,7 +1462,8 @@ public static class RunTracker
             || strikeDummyDeckCountsChanged
             || miniatureCannonDeckCountsChanged
             || dowsingRoomsChanged
-            || paelsClawSnapshotChanged)
+            || paelsClawSnapshotChanged
+            || potionHistoryChanged)
         {
             SaveCurrentRun();
         }
@@ -1630,6 +1659,9 @@ public static class RunTracker
             UnsubscribeCardOrbEventsLocked();
             _pendingCombat = null;
 
+            RebindLivePotionHistoryLocked(
+                runState.Players.FirstOrDefault(IsTrackedPlayer));
+
             // Note: deck cards are NOT walked here. The RunStarted event
             // fires before the game finishes populating player.Deck.Cards
             // on fresh runs, so walking now would miss the starters. Instead
@@ -1680,6 +1712,8 @@ public static class RunTracker
             {
                 _currentRun.FloorReached = runState.TotalFloor;
             }
+
+            MarkPotionsHeldAtRunEndLocked(_currentRun.FloorReached);
 
             CoreMain.Logger.Info($"RunEnded: {_currentRun.RunId} outcome={outcome} floor={_currentRun.FloorReached}");
             SaveCurrentRun();
@@ -1820,6 +1854,9 @@ public static class RunTracker
             MergeAggregateInto(runAgg, combatAgg);
         }
         run.Events.AddRange(pending.CombatEvents);
+
+        if (pending.PotionHistory != null)
+            run.PotionHistory = ClonePotionHistory(pending.PotionHistory);
 
         foreach (var (relicId, pendingRelicAgg) in pending.RelicAggregates)
         {
@@ -3219,6 +3256,442 @@ public static class RunTracker
             {
                 CoreMain.LogDebug($"RecordForgeGranted failed: {e.Message}");
             }
+        }
+    }
+
+    /// <summary>
+    /// Record a concrete potion that was presented in a reward or shop. The
+    /// runtime source object and potion model both bind to the persisted
+    /// sequence through an AppDomain-owned weak table, so an open offer keeps
+    /// its identity across Core hot reloads without retaining skipped offers.
+    /// </summary>
+    public static void RecordPotionOffer(
+        object? offerSource,
+        PotionModel? potion,
+        Player? player,
+        string acquisitionMethod)
+    {
+        if (offerSource == null || potion == null || player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                EnsureLazyCurrentRunLocked();
+                var history = GetMutablePotionHistoryLocked();
+
+                if (TryGetPotionSequence(offerSource, out var existingSequence))
+                {
+                    var existing = history.FirstOrDefault(e => e.Sequence == existingSequence);
+                    if (existing != null)
+                    {
+                        BindPotionSequence(potion, existing.Sequence);
+                        return;
+                    }
+                }
+
+                var location = CapturePotionLocationLocked();
+                var potionId = potion.Id.ToString();
+                var rebound = history
+                    .LastOrDefault(e => !e.Acquired
+                        && e.PotionId == potionId
+                        && e.AcquisitionMethod == acquisitionMethod
+                        && e.SeenFloor == location.Floor
+                        && e.SeenLocationKind == location.Kind
+                        && e.SeenLocationName == location.Name);
+                if (rebound != null)
+                {
+                    BindPotionSequence(offerSource, rebound.Sequence);
+                    BindPotionSequence(potion, rebound.Sequence);
+                    return;
+                }
+
+                var entry = new PotionRunHistoryEntry
+                {
+                    Sequence = NextPotionHistorySequence(history),
+                    PotionId = potionId,
+                    DisplayName = GetPotionDisplayName(potion),
+                    AcquisitionMethod = acquisitionMethod,
+                    SeenFloor = location.Floor,
+                    SeenLocationKind = location.Kind,
+                    SeenLocationName = location.Name,
+                };
+                history.Add(entry);
+                BindPotionSequence(offerSource, entry.Sequence);
+                BindPotionSequence(potion, entry.Sequence);
+                FinishPotionHistoryMutationLocked();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPotionOffer failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record the final observed belt insertion. Player.AddPotionInternal's
+    /// successful result is authoritative; full-belt and blocker failures do
+    /// not move a seen offer into the taken lane.
+    /// </summary>
+    public static void RecordPotionAcquired(
+        Player? player,
+        PotionModel? requestedPotion,
+        PotionProcureResult? result)
+    {
+        if (player == null || result?.success != true) return;
+        if (player.RunState is NullRunState) return;
+        var acquiredPotion = result.potion ?? requestedPotion;
+        if (acquiredPotion == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                EnsureLazyCurrentRunLocked();
+                var history = GetMutablePotionHistoryLocked();
+                var location = CapturePotionLocationLocked();
+
+                PotionRunHistoryEntry? entry = null;
+                if (TryGetPotionSequence(acquiredPotion, out var sequence)
+                    || requestedPotion != null
+                       && TryGetPotionSequence(requestedPotion, out sequence))
+                {
+                    entry = history.FirstOrDefault(e => e.Sequence == sequence);
+                }
+
+                var potionId = acquiredPotion.Id.ToString();
+                entry ??= history.LastOrDefault(e => !e.Acquired
+                    && e.PotionId == potionId
+                    && e.SeenFloor == location.Floor);
+
+                if (entry == null)
+                {
+                    entry = new PotionRunHistoryEntry
+                    {
+                        Sequence = NextPotionHistorySequence(history),
+                        PotionId = potionId,
+                        DisplayName = GetPotionDisplayName(acquiredPotion),
+                        AcquisitionMethod = InferDirectPotionAcquisitionMethodLocked(player),
+                        SeenFloor = location.Floor,
+                        SeenLocationKind = location.Kind,
+                        SeenLocationName = location.Name,
+                    };
+                    history.Add(entry);
+                }
+
+                if (!entry.Acquired)
+                {
+                    entry.Acquired = true;
+                    entry.AcquiredFloor = location.Floor;
+                    entry.AcquiredLocationKind = location.Kind;
+                    entry.AcquiredLocationName = location.Name;
+                    FinishPotionHistoryMutationLocked();
+                }
+
+                BindPotionSequence(acquiredPotion, entry.Sequence);
+                if (requestedPotion != null)
+                    BindPotionSequence(requestedPotion, entry.Sequence);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPotionAcquired failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordPotionUsed(Player? player, PotionModel? potion)
+    {
+        RecordPotionDisposition(player, potion, used: true);
+    }
+
+    public static void RecordPotionDiscarded(Player? player, PotionModel? potion)
+    {
+        RecordPotionDisposition(player, potion, used: false);
+    }
+
+    private static void RecordPotionDisposition(
+        Player? player,
+        PotionModel? potion,
+        bool used)
+    {
+        if (player == null || potion == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                EnsureLazyCurrentRunLocked();
+                var history = GetMutablePotionHistoryLocked();
+                var location = CapturePotionLocationLocked();
+                PotionRunHistoryEntry? entry = null;
+
+                if (TryGetPotionSequence(potion, out var sequence))
+                    entry = history.FirstOrDefault(e => e.Sequence == sequence);
+
+                var potionId = potion.Id.ToString();
+                entry ??= history.FirstOrDefault(e => e.Acquired
+                    && e.PotionId == potionId
+                    && !e.Used
+                    && !e.Discarded);
+
+                if (entry == null)
+                {
+                    entry = new PotionRunHistoryEntry
+                    {
+                        Sequence = NextPotionHistorySequence(history),
+                        PotionId = potionId,
+                        DisplayName = GetPotionDisplayName(potion),
+                        AcquisitionMethod = "Prior acquisition",
+                        Acquired = true,
+                    };
+                    history.Add(entry);
+                }
+
+                if (entry.Used || entry.Discarded) return;
+                if (used)
+                {
+                    entry.Used = true;
+                    entry.UsedFloor = location.Floor;
+                    entry.UsedLocationKind = location.Kind;
+                    entry.UsedLocationName = location.Name;
+                }
+                else
+                {
+                    entry.Discarded = true;
+                    entry.DiscardedFloor = location.Floor;
+                    entry.DiscardedLocationKind = location.Kind;
+                    entry.DiscardedLocationName = location.Name;
+                }
+
+                BindPotionSequence(potion, entry.Sequence);
+                FinishPotionHistoryMutationLocked();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPotionDisposition failed: {e.Message}");
+            }
+        }
+    }
+
+    private static List<PotionRunHistoryEntry> GetMutablePotionHistoryLocked()
+    {
+        EnsureLazyCurrentRunLocked();
+        _currentRun.PotionHistory ??= new List<PotionRunHistoryEntry>();
+        if (_pendingCombat == null) return _currentRun.PotionHistory;
+
+        _pendingCombat.PotionHistory ??= ClonePotionHistory(_currentRun.PotionHistory);
+        return _pendingCombat.PotionHistory;
+    }
+
+    private static void FinishPotionHistoryMutationLocked()
+    {
+        if (_currentRun == null) return;
+        _currentRun.UpdatedAt = Now();
+        RefreshCurrentRunMetadataLocked();
+        if (_pendingCombat == null)
+            SaveCurrentRun();
+    }
+
+    private static int NextPotionHistorySequence(
+        IReadOnlyCollection<PotionRunHistoryEntry> history)
+        => history.Count == 0 ? 1 : history.Max(e => e.Sequence) + 1;
+
+    private static bool TryGetPotionSequence(object key, out int sequence)
+    {
+        if (_potionHistorySequences.TryGetValue(key, out var value))
+        {
+            sequence = value.Item1;
+            return true;
+        }
+
+        sequence = 0;
+        return false;
+    }
+
+    private static void BindPotionSequence(object key, int sequence)
+    {
+        _potionHistorySequences.Remove(key);
+        _potionHistorySequences.Add(key, Tuple.Create(sequence));
+    }
+
+    private static string InferDirectPotionAcquisitionMethodLocked(Player player)
+    {
+        var currentCard = _currentPlayerCardPlay?.Card;
+        if (currentCard != null
+            && (currentCard.Owner == null || ReferenceEquals(currentCard.Owner, player)))
+        {
+            return $"Card — {GetCardDisplayName(currentCard)}";
+        }
+
+        var runState = RunManager.Instance?.State;
+        if ((runState?.TotalFloor ?? 0) <= 1 && runState?.CurrentRoom == null)
+            return "Starting potion";
+        if (CombatManager.Instance?.IsInProgress == true)
+            return "Combat effect";
+        if (runState?.CurrentRoom is EventRoom)
+            return "Event";
+        return "Relic or other effect";
+    }
+
+    private static PotionRunLocation CapturePotionLocationLocked()
+    {
+        try
+        {
+            var runState = RunManager.Instance?.State;
+            var room = runState?.CurrentRoom;
+            var floor = runState?.TotalFloor ?? _currentRun?.FloorReached;
+            if (room == null)
+                return new PotionRunLocation(floor, floor.GetValueOrDefault() <= 1 ? "Run start" : "Map", null);
+
+            string kind = room.RoomType switch
+            {
+                RoomType.Monster => "Combat",
+                RoomType.Elite => "Elite combat",
+                RoomType.Boss => "Boss combat",
+                RoomType.Treasure => "Treasure",
+                RoomType.Shop => "Shop",
+                RoomType.Event => "Event",
+                RoomType.RestSite => "Rest site",
+                _ => room.RoomType.ToString(),
+            };
+
+            string? name = null;
+            if (room is CombatRoom combatRoom)
+            {
+                try { name = combatRoom.Encounter?.Title.GetFormattedText(); }
+                catch { name = combatRoom.ModelId.ToString(); }
+            }
+            else if (room is EventRoom eventRoom)
+            {
+                try
+                {
+                    name = (eventRoom.LocalMutableEvent ?? eventRoom.CanonicalEvent)
+                        ?.Title.GetFormattedText();
+                }
+                catch { name = eventRoom.ModelId.ToString(); }
+            }
+
+            return new PotionRunLocation(floor, kind, string.IsNullOrWhiteSpace(name) ? null : name);
+        }
+        catch
+        {
+            return new PotionRunLocation(_currentRun?.FloorReached, "Unknown", null);
+        }
+    }
+
+    private static string GetPotionDisplayName(PotionModel potion)
+    {
+        try
+        {
+            var title = potion.Title.GetFormattedText();
+            if (!string.IsNullOrWhiteSpace(title)) return title;
+        }
+        catch { }
+        try
+        {
+            var title = potion.Title.GetRawText();
+            if (!string.IsNullOrWhiteSpace(title)) return title;
+        }
+        catch { }
+        return potion.Id.Entry;
+    }
+
+    private static List<PotionRunHistoryEntry> ClonePotionHistory(
+        IEnumerable<PotionRunHistoryEntry>? source)
+        => source?.Select(ClonePotionHistoryEntry).ToList() ?? new List<PotionRunHistoryEntry>();
+
+    private static PotionRunHistoryEntry ClonePotionHistoryEntry(PotionRunHistoryEntry source)
+        => new()
+        {
+            Sequence = source.Sequence,
+            PotionId = source.PotionId,
+            DisplayName = source.DisplayName,
+            AcquisitionMethod = source.AcquisitionMethod,
+            SeenFloor = source.SeenFloor,
+            SeenLocationKind = source.SeenLocationKind,
+            SeenLocationName = source.SeenLocationName,
+            Acquired = source.Acquired,
+            AcquiredFloor = source.AcquiredFloor,
+            AcquiredLocationKind = source.AcquiredLocationKind,
+            AcquiredLocationName = source.AcquiredLocationName,
+            Used = source.Used,
+            UsedFloor = source.UsedFloor,
+            UsedLocationKind = source.UsedLocationKind,
+            UsedLocationName = source.UsedLocationName,
+            Discarded = source.Discarded,
+            DiscardedFloor = source.DiscardedFloor,
+            DiscardedLocationKind = source.DiscardedLocationKind,
+            DiscardedLocationName = source.DiscardedLocationName,
+            HeldAtRunEnd = source.HeldAtRunEnd,
+            HeldAtRunEndFloor = source.HeldAtRunEndFloor,
+        };
+
+    private static bool RebindLivePotionHistoryLocked(Player? player)
+    {
+        if (_currentRun == null || player == null || !IsTrackedPlayer(player)) return false;
+        _currentRun.PotionHistory ??= new List<PotionRunHistoryEntry>();
+        var changed = false;
+        var candidates = _currentRun.PotionHistory
+            .Where(e => e.Acquired
+                && !e.Used
+                && !e.Discarded
+                && !e.HeldAtRunEnd)
+            .OrderBy(e => e.Sequence)
+            .ToList();
+
+        foreach (var potion in player.Potions)
+        {
+            if (potion == null) continue;
+            var potionId = potion.Id.ToString();
+            var entry = candidates.FirstOrDefault(e => e.PotionId == potionId);
+            if (entry != null)
+            {
+                candidates.Remove(entry);
+                BindPotionSequence(potion, entry.Sequence);
+                continue;
+            }
+
+            var floor = CurrentRunFloorLocked();
+            var isRunStart = floor.GetValueOrDefault() <= 1;
+            entry = new PotionRunHistoryEntry
+            {
+                Sequence = NextPotionHistorySequence(_currentRun.PotionHistory),
+                PotionId = potionId,
+                DisplayName = GetPotionDisplayName(potion),
+                AcquisitionMethod = isRunStart
+                    ? "Starting potion"
+                    : "Present when tracking began",
+                SeenFloor = isRunStart ? floor : null,
+                SeenLocationKind = isRunStart ? "Run start" : null,
+                Acquired = true,
+                AcquiredFloor = isRunStart ? floor : null,
+                AcquiredLocationKind = isRunStart ? "Run start" : null,
+            };
+            _currentRun.PotionHistory.Add(entry);
+            BindPotionSequence(potion, entry.Sequence);
+            changed = true;
+        }
+
+        return changed;
+    }
+
+    private static void MarkPotionsHeldAtRunEndLocked(int? floor)
+    {
+        if (_currentRun?.PotionHistory == null) return;
+        foreach (var entry in _currentRun.PotionHistory)
+        {
+            if (!entry.Acquired
+                || entry.Used
+                || entry.Discarded)
+            {
+                continue;
+            }
+
+            entry.HeldAtRunEnd = true;
+            entry.HeldAtRunEndFloor = floor;
         }
     }
 
@@ -6468,6 +6941,20 @@ public static class RunTracker
         AppDomain.CurrentDomain.SetData(
             TinyMailboxOfferRecordedAttributionsAppDomainKey,
             created);
+        return created;
+    }
+
+    private static ConditionalWeakTable<object, Tuple<int>>
+        GetPotionHistorySequences()
+    {
+        if (AppDomain.CurrentDomain.GetData(PotionHistorySequencesAppDomainKey)
+            is ConditionalWeakTable<object, Tuple<int>> existing)
+        {
+            return existing;
+        }
+
+        var created = new ConditionalWeakTable<object, Tuple<int>>();
+        AppDomain.CurrentDomain.SetData(PotionHistorySequencesAppDomainKey, created);
         return created;
     }
 
@@ -28090,6 +28577,11 @@ internal sealed class PendingForgottenSoulDamageAttribution
     public required Creature Dealer { get; init; }
 }
 
+internal readonly record struct PotionRunLocation(
+    int? Floor,
+    string Kind,
+    string? Name);
+
 internal sealed record CardOrbEventSubscription(
     Action PassiveHandler,
     Action<Creature[]> EvokeHandler);
@@ -28103,6 +28595,7 @@ internal class PendingCombat
     public int EtherealCardsPlayed { get; set; }
     public Dictionary<string, CardAggregate> CombatAggregates { get; } = new();
     public List<CardEvent> CombatEvents { get; } = new();
+    public List<PotionRunHistoryEntry>? PotionHistory { get; set; }
     public Dictionary<string, RelicAggregate> RelicAggregates { get; } = new();
     public Dictionary<string, EnemyAggregate> EnemyAggregates { get; } = new();
     public List<BlockChunk> PlayerBlockLedger { get; } = new();

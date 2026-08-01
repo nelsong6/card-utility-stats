@@ -145,6 +145,7 @@ public static class CoreMain
         Patches.RelicBarFilterPatch.InitializeHooks();
         Patches.RelicBarFilterPatch.RefreshAll("core initialized");
         Patches.RelicCompendiumFilterUi.ReinjectIntoActiveCollections();
+        Patches.PotionCompendiumHistoryUi.ReinjectIntoActiveLabs();
 
         // Visible confirmation on screen so hot reload has immediate feedback.
         // Kept in Core (not Loader) so toast text/style can be tweaked and
@@ -195,6 +196,9 @@ public static class CoreMain
 
         try { RelicCompendiumFilterUi.TeardownInjectedUI(); }
         catch (Exception e) { Logger.Error($"Shutdown: relic compendium filter teardown failed: {e}"); }
+
+        try { PotionCompendiumHistoryUi.TeardownInjectedUi(); }
+        catch (Exception e) { Logger.Error($"Shutdown: potion compendium history teardown failed: {e}"); }
 
         try { RunTracker.TeardownHooks(); }
         catch (Exception e) { Logger.Error($"Shutdown: TeardownHooks failed: {e}"); }

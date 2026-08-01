@@ -1,0 +1,62 @@
+{
+  "run_id": "fixture-potion-run-history",
+  "started_at": "2026-07-31T18:00:00.0000000Z",
+  "updated_at": "2026-07-31T19:00:00.0000000Z",
+  "ended_at": "2026-07-31T19:00:00.0000000Z",
+  "character": "CHARACTER.IRONCLAD",
+  "ascension": 3,
+  "floor_reached": 12,
+  "outcome": "win",
+  "game_start_time": 1785520800,
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {},
+  "potion_history": [
+    {
+      "sequence": 1,
+      "potion_id": "POTION.FIRE_POTION",
+      "display_name": "Fire Potion",
+      "acquisition_method": "Shop",
+      "seen_floor": 4,
+      "seen_location_kind": "Shop",
+      "acquired": false,
+      "held_at_run_end": false
+    },
+    {
+      "sequence": 2,
+      "potion_id": "POTION.SWIFT_POTION",
+      "display_name": "Swift Potion",
+      "acquisition_method": "Potion reward",
+      "seen_floor": 6,
+      "seen_location_kind": "Combat",
+      "seen_location_name": "Cultist",
+      "acquired": true,
+      "acquired_floor": 6,
+      "acquired_location_kind": "Combat",
+      "acquired_location_name": "Cultist",
+      "used": true,
+      "used_floor": 9,
+      "used_location_kind": "Elite combat",
+      "used_location_name": "Gremlin Nob",
+      "held_at_run_end": false
+    },
+    {
+      "sequence": 3,
+      "potion_id": "POTION.BLOOD_POTION",
+      "display_name": "Blood Potion",
+      "acquisition_method": "Starting potion",
+      "seen_floor": 1,
+      "seen_location_kind": "Run start",
+      "acquired": true,
+      "acquired_floor": 1,
+      "acquired_location_kind": "Run start",
+      "held_at_run_end": true,
+      "held_at_run_end_floor": 12
+    }
+  ],
+  "gold_attribution_ledger": [],
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

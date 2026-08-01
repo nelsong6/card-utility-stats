@@ -5129,4 +5129,43 @@ public class SchemaLoadingTests
         Assert.Equal(1, frost.Fizzles);
         Assert.Equal(28, frost.BlockGained);
     }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsPotionRunHistoryFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("potion-run-history.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.Equal(3, loaded.Data.PotionHistory.Count);
+
+        var notTaken = loaded.Data.PotionHistory[0];
+        Assert.Equal("POTION.FIRE_POTION", notTaken.PotionId);
+        Assert.Equal("Shop", notTaken.AcquisitionMethod);
+        Assert.False(notTaken.Acquired);
+        Assert.Equal(4, notTaken.SeenFloor);
+
+        var used = loaded.Data.PotionHistory[1];
+        Assert.True(used.Acquired);
+        Assert.True(used.Used);
+        Assert.Equal(6, used.AcquiredFloor);
+        Assert.Equal(9, used.UsedFloor);
+        Assert.Equal("Elite combat", used.UsedLocationKind);
+
+        var held = loaded.Data.PotionHistory[2];
+        Assert.True(held.HeldAtRunEnd);
+        Assert.Equal(12, held.HeldAtRunEndFloor);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsPotionRunHistoryFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("potion-run-history.json"));
+
+        Assert.NotNull(resumed);
+        Assert.Equal(3, resumed!.PotionHistory.Count);
+        Assert.Equal("Potion reward", resumed.PotionHistory[1].AcquisitionMethod);
+    }
 }

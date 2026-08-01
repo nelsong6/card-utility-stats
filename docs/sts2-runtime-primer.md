@@ -251,6 +251,19 @@ belt (currently a full belt or a `ShouldProcurePotion` blocker such as Sozu).
 Do not resolve the source after awaiting: `CardPlayFinished` can clear the
 current-card context as soon as Alchemize resumes.
 
+Run-level potion provenance has a separate identity path from Alchemize's card
+aggregate. `PotionReward.CreateIcon` is the visible concrete reward-offer
+boundary, while `MerchantPotionEntry.FillSlot` is the shop boundary where the
+game has selected and marked the stocked potion as seen. A successful
+`Player.AddPotionInternal` result is the final belt-insertion truth; failed
+reward clicks and full-belt/blocker failures leave the offer in the not-taken
+lane. `Player.RemoveUsedPotionInternal` and `Player.DiscardPotionInternal`
+confirm the two terminal belt removals. Bind the mutable potion reference to a
+monotonic run sequence so duplicate definitions remain separate, and rebuild
+bindings from live belt order after Continue/hot reload. Potion mutations that
+happen in combat belong in the pending-combat history snapshot; their merged
+gallery view is immediate, but they are not persisted until promotion.
+
 Jack of All Trades selects distinct cards from the unlocked colorless combat
 pool, then awaits `CardPileCmd.AddGeneratedCardToCombat` once for each selected
 card. Capture the currently resolving physical Jack before each async command,
