@@ -936,6 +936,13 @@ public class RelicAggregate
     public decimal TotalHealingLost { get; set; }
     public Dictionary<string, HealingLostReasonAggregate> HealingLostReasons { get; set; } = new();
 
+    // Meat on the Bone snapshots the owner's HP immediately before each
+    // qualifying combat-end heal. The percentage total stores one normalized
+    // percentage per trigger so max-HP changes do not distort the average.
+    public decimal MeatOnTheBonePreTriggerHpMissingTotal { get; set; }
+    public decimal MeatOnTheBonePreTriggerHpPercentTotal { get; set; }
+    public int MeatOnTheBonePreTriggerHpSamples { get; set; }
+
     // Relic lifecycle floor snapshots. Used by one-shot relics such as Lizard
     // Tail and Wongo's Mystery Ticket to show where they were acquired and
     // where their effect activated.

@@ -1,0 +1,27 @@
+{
+  "run_id": "meat-on-the-bone-pre-trigger-hp-fixture",
+  "started_at": "2026-08-02T19:00:00Z",
+  "updated_at": "2026-08-02T19:20:00Z",
+  "character": "CHAR.IRONCLAD",
+  "ascension": 8,
+  "floor_reached": 28,
+  "outcome": "in_progress",
+  "game_start_time": 1785722400,
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.MEAT_ON_THE_BONE": {
+      "activations": 2,
+      "total_healing_attempted": 24,
+      "total_healing_restored": 19,
+      "total_healing_lost": 5,
+      "meat_on_the_bone_pre_trigger_hp_missing_total": 110,
+      "meat_on_the_bone_pre_trigger_hp_percent_total": 77.5,
+      "meat_on_the_bone_pre_trigger_hp_samples": 2
+    }
+  },
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

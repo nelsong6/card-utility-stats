@@ -559,6 +559,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `music-box-relic-run.json`
   Adds Musical Box's successfully created Attacks, Common/Uncommon/Rare splits,
   Ethereal exhausts, and zero-inclusive held turn/combat denominators.
+- `meat-on-the-bone-pre-trigger-hp-run.json`
+  Adds Meat on the Bone's qualifying combat-end HP deficit, normalized HP
+  percentage, and matching pre-trigger sample count.
 
 Why these exist:
 

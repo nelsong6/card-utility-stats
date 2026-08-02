@@ -2033,6 +2033,12 @@ public static class RunTracker
         target.TotalHealingRestored += source.TotalHealingRestored;
         target.TotalHealingLost += source.TotalHealingLost;
         MergeHealingLostReasonsInto(target, source);
+        target.MeatOnTheBonePreTriggerHpMissingTotal +=
+            source.MeatOnTheBonePreTriggerHpMissingTotal;
+        target.MeatOnTheBonePreTriggerHpPercentTotal +=
+            source.MeatOnTheBonePreTriggerHpPercentTotal;
+        target.MeatOnTheBonePreTriggerHpSamples +=
+            source.MeatOnTheBonePreTriggerHpSamples;
         if (source.FloorAcquired.HasValue && !target.FloorAcquired.HasValue)
             target.FloorAcquired = source.FloorAcquired;
         if (source.FloorActivated.HasValue)
@@ -13298,7 +13304,23 @@ public static class RunTracker
             MeatOnTheBoneRelicId,
             healedCreature,
             attemptedHealing,
-            nameof(RecordMeatOnTheBoneTrigger));
+            nameof(RecordMeatOnTheBoneTrigger),
+            configureAggregate: agg => RecordMeatOnTheBonePreTriggerHpForTest(
+                agg,
+                healedCreature.CurrentHp,
+                healedCreature.MaxHp));
+    }
+
+    internal static void RecordMeatOnTheBonePreTriggerHpForTest(
+        RelicAggregate agg,
+        decimal currentHp,
+        decimal maxHp)
+    {
+        if (agg == null || maxHp <= 0m) return;
+
+        agg.MeatOnTheBonePreTriggerHpMissingTotal += Math.Max(0m, maxHp - currentHp);
+        agg.MeatOnTheBonePreTriggerHpPercentTotal += 100m * currentHp / maxHp;
+        agg.MeatOnTheBonePreTriggerHpSamples++;
     }
 
     /// <summary>

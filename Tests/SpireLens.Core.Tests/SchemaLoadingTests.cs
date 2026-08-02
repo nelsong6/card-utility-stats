@@ -5706,4 +5706,35 @@ public class SchemaLoadingTests
         Assert.Equal(5, relicAgg.MusicBoxTurns);
         Assert.Equal(2, relicAgg.MusicBoxCombats);
     }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsMeatOnTheBonePreTriggerHpFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("meat-on-the-bone-pre-trigger-hp-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertMeatOnTheBonePreTriggerHpFixture(
+            loaded.Data.RelicAggregates["RELIC.MEAT_ON_THE_BONE"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsMeatOnTheBonePreTriggerHpFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("meat-on-the-bone-pre-trigger-hp-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertMeatOnTheBonePreTriggerHpFixture(
+            resumed!.RelicAggregates["RELIC.MEAT_ON_THE_BONE"]);
+    }
+
+    private static void AssertMeatOnTheBonePreTriggerHpFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(2, relicAgg.Activations);
+        Assert.Equal(110m, relicAgg.MeatOnTheBonePreTriggerHpMissingTotal);
+        Assert.Equal(77.5m, relicAgg.MeatOnTheBonePreTriggerHpPercentTotal);
+        Assert.Equal(2, relicAgg.MeatOnTheBonePreTriggerHpSamples);
+    }
 }
