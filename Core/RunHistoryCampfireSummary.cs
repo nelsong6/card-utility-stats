@@ -8,6 +8,7 @@ using MegaCrit.Sts2.Core.HoverTips;
 using MegaCrit.Sts2.Core.Localization;
 using MegaCrit.Sts2.Core.Map;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Nodes.CommonUi;
 using MegaCrit.Sts2.Core.Nodes.HoverTips;
 using MegaCrit.Sts2.Core.Nodes.Screens.RunHistoryScreen;
 using MegaCrit.Sts2.Core.Rooms;
@@ -24,6 +25,20 @@ internal sealed record RunHistoryCampfireEntry(
     IReadOnlyList<string> ChoiceIds,
     PlayerMapPointHistoryEntry PlayerEntry);
 
+internal sealed class RunHistoryCampfireButton : Button
+{
+    public string StatsBody { get; set; } = string.Empty;
+
+    public bool TryBuildStatsTip(out HoverTip tip)
+    {
+        tip = default;
+        if (string.IsNullOrWhiteSpace(StatsBody)) return false;
+
+        tip = StatsTooltip.CreateNativeTip("Campfires", StatsBody);
+        return true;
+    }
+}
+
 /// <summary>
 /// Adds one compact campfire-history entry beneath the stock act rows. The
 /// game's run-history file already records each selected player's exact rest
@@ -37,9 +52,10 @@ internal static class RunHistoryCampfireSummary
     private const float IconSize = 64f;
 
     private static HBoxContainer? _row;
-    private static Button? _button;
+    private static RunHistoryCampfireButton? _button;
     private static Action? _showHandler;
-    private static Action? _hideHandler;
+    private static Action? _mouseExitHandler;
+    private static Action? _focusExitHandler;
 
     public static void Refresh(
         NRunHistory runHistory,
@@ -85,13 +101,14 @@ internal static class RunHistoryCampfireSummary
             megaTitle.SetTextAutoSize("Campfires");
         row.AddChild(title);
 
-        var button = new Button
+        var button = new RunHistoryCampfireButton
         {
             Name = "CampfireHistory",
             Flat = true,
             FocusMode = Control.FocusModeEnum.All,
             MouseDefaultCursorShape = Control.CursorShape.PointingHand,
             CustomMinimumSize = new Vector2(IconSize, IconSize),
+            StatsBody = BuildBodyBBCode(entries),
         };
         var icon = new TextureRect
         {
@@ -106,13 +123,14 @@ internal static class RunHistoryCampfireSummary
         row.AddChild(button);
         acts.AddChild(row);
 
-        var body = BuildBodyBBCode(entries);
-        _showHandler = () => ShowTooltip(button, body);
-        _hideHandler = () => HideTooltipIfInactive(button);
+        StatsTooltipPinManager.Attach(button);
+        _showHandler = () => ShowTooltip(button);
+        _mouseExitHandler = () => HideTooltipOnMouseExit(button);
+        _focusExitHandler = () => HideTooltip(button);
         button.MouseEntered += _showHandler;
         button.FocusEntered += _showHandler;
-        button.MouseExited += _hideHandler;
-        button.FocusExited += _hideHandler;
+        button.MouseExited += _mouseExitHandler;
+        button.FocusExited += _focusExitHandler;
 
         _row = row;
         _button = button;
@@ -551,12 +569,16 @@ internal static class RunHistoryCampfireSummary
         return HumanizeChoiceId(choiceId);
     }
 
-    private static void ShowTooltip(Button button, string body)
+    internal static void ShowTooltip(RunHistoryCampfireButton button)
     {
-        if (!IsLive(button)) return;
+        if (!IsLive(button)
+            || !ViewStatsInjectorPatch.StatsVisibilityEnabled
+            || !button.TryBuildStatsTip(out var tip))
+        {
+            return;
+        }
 
         NHoverTipSet.Remove(button);
-        var tip = StatsTooltip.CreateNativeTip("Campfires", body);
         var tipSet = NHoverTipSet.CreateAndShow(
             button,
             tip,
@@ -565,10 +587,26 @@ internal static class RunHistoryCampfireSummary
             NativeStatsHoverTipStyler.ApplyToLastTextTip(tipSet);
     }
 
-    private static void HideTooltipIfInactive(Button button)
+    private static void HideTooltipOnMouseExit(
+        RunHistoryCampfireButton button)
     {
         if (!IsLive(button)) return;
-        if (!button.IsHovered() && !button.HasFocus())
+
+        // A mouse click leaves ordinary Godot button focus behind. That must
+        // not turn a transient hover tip into a de facto pin. Preserve the
+        // tip only when controller navigation is actively using that focus.
+        if (NControllerManager.Instance?.IsUsingDirectionalNavigation == true
+            && button.HasFocus())
+        {
+            return;
+        }
+
+        HideTooltip(button);
+    }
+
+    private static void HideTooltip(RunHistoryCampfireButton button)
+    {
+        if (IsLive(button))
             NHoverTipSet.Remove(button);
     }
 
@@ -583,10 +621,14 @@ internal static class RunHistoryCampfireSummary
                 _button.FocusEntered -= _showHandler;
             }
 
-            if (_hideHandler != null)
+            if (_mouseExitHandler != null)
             {
-                _button!.MouseExited -= _hideHandler;
-                _button.FocusExited -= _hideHandler;
+                _button!.MouseExited -= _mouseExitHandler;
+            }
+
+            if (_focusExitHandler != null)
+            {
+                _button!.FocusExited -= _focusExitHandler;
             }
         }
 
@@ -599,7 +641,8 @@ internal static class RunHistoryCampfireSummary
         _row = null;
         _button = null;
         _showHandler = null;
-        _hideHandler = null;
+        _mouseExitHandler = null;
+        _focusExitHandler = null;
     }
 
     private static NRunHistory? FindRunHistory(Node node)

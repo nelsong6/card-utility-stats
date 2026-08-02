@@ -77,10 +77,10 @@ already-resolved max-HP relics, permanent inventory upgrades, card-reward
 upgrades, and other relics whose effects do not need combat-bar attention.
 
 Right-click an owned relic, a card in a passive pile view, a compendium relic,
-or a card or relic in run history with SpireLens stats to pin its complete
-native tooltip set. The game's compact top-panel lock icon appears on the pinned
-item, and the tooltip remains visible and mouse-interactive after the pointer
-leaves it. Right-clicking the locked item again always unlocks it. Pointer
+a card or relic in run history, or the run-history Campfires summary to pin its
+complete native tooltip set. The game's compact top-panel lock icon appears on
+the pinned item, and the tooltip remains visible and mouse-interactive after the
+pointer leaves it. Right-clicking the locked item again always unlocks it. Pointer
 movement is allowed so inline help can be inspected. Pinned SpireLens panels
 also expose a **Copy** button that captures the rendered stats panel and places
 it directly on the Windows image clipboard without a temporary file or

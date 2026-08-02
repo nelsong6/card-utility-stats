@@ -14,8 +14,9 @@ using MegaCrit.Sts2.Core.Nodes.Screens.RunHistoryScreen;
 namespace SpireLens.Core.Patches;
 
 /// <summary>
-/// Pins one card or relic tooltip set at a time. The pinned set uses a
-/// dedicated native owner so the game's ordinary OnUnfocus/Remove lifecycle
+/// Pins one card, relic, or campfire-summary tooltip set at a time. The
+/// pinned set uses a dedicated native owner so the game's ordinary
+/// OnUnfocus/Remove lifecycle
 /// can run unchanged without dismissing it.
 /// </summary>
 internal static class StatsTooltipPinManager
@@ -102,6 +103,12 @@ internal static class StatsTooltipPinManager
     {
         if (entry != null)
             AttachTarget(entry, subscribeToGuiInput: true);
+    }
+
+    public static void Attach(RunHistoryCampfireButton? button)
+    {
+        if (button != null)
+            AttachTarget(button, subscribeToGuiInput: true);
     }
 
     public static void AttachRunHistoryTargets(NRunHistory? runHistory)
@@ -286,7 +293,8 @@ internal static class StatsTooltipPinManager
             && owner is not NRelicCollectionEntry
             && owner is not NCardHolder
             && owner is not NDeckHistoryEntry
-            && owner is not NRelicBasicHolder)
+            && owner is not NRelicBasicHolder
+            && owner is not RunHistoryCampfireButton)
         {
             return false;
         }
@@ -667,6 +675,9 @@ internal static class StatsTooltipPinManager
             case NRelicBasicHolder holder:
                 return RunHistoryStatsContext.TryBuildNativeRelicHoverTip(holder, out tip);
 
+            case RunHistoryCampfireButton button:
+                return button.TryBuildStatsTip(out tip);
+
             default:
                 tip = default;
                 return false;
@@ -700,6 +711,14 @@ internal static class StatsTooltipPinManager
                 nativeHoverTips = holder.Relic.Model.HoverTips;
                 return true;
 
+            case RunHistoryCampfireButton:
+                // The campfire summary has no stock tooltip page. The pin
+                // surrogate receives its SpireLens page through
+                // NativeStatsHoverTipFactory, just like appended card/relic
+                // stats, so the native sequence intentionally starts empty.
+                nativeHoverTips = Array.Empty<IHoverTip>();
+                return true;
+
             default:
                 nativeHoverTips = null!;
                 return false;
@@ -728,6 +747,12 @@ internal static class StatsTooltipPinManager
 
             case NRelicBasicHolder holder:
                 tipSet.SetAlignmentForRelic(holder.Relic);
+                break;
+
+            case RunHistoryCampfireButton button:
+                tipSet.SetAlignment(
+                    button,
+                    HoverTip.GetHoverTipAlignment(button));
                 break;
         }
     }
@@ -768,6 +793,10 @@ internal static class StatsTooltipPinManager
                 NHoverTipSet.CreateAndShow(target, nativeHoverTips)
                     ?.SetAlignmentForRelic(holder.Relic);
                 break;
+
+            case RunHistoryCampfireButton button:
+                RunHistoryCampfireSummary.ShowTooltip(button);
+                break;
         }
     }
 
@@ -785,6 +814,7 @@ internal static class StatsTooltipPinManager
                 => entry.Card.Id.ToString(),
             NRelicBasicHolder holder when IsLive(holder.Relic)
                 => holder.Relic.Model.Id.ToString(),
+            RunHistoryCampfireButton => "run-history-campfires",
             _ => target.Name,
         };
     }
