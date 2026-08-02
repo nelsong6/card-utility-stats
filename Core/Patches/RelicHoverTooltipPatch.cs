@@ -3946,10 +3946,18 @@ public static class RelicHoverShowPatch
     private static string BuildMeatOnTheBoneBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        var averageHpBelowHalf = agg.MeatOnTheBonePreTriggerHpBelowHalfSamples <= 0
+        // The short-lived previous shape stored a positive magnitude below
+        // half. Fold it in as a negative signed value so existing runs keep
+        // their captured samples under the corrected presentation.
+        var relativeToHalfSamples =
+            agg.MeatOnTheBonePreTriggerHpRelativeToHalfSamples
+            + agg.MeatOnTheBonePreTriggerHpBelowHalfSamples;
+        var relativeToHalfTotal =
+            agg.MeatOnTheBonePreTriggerHpRelativeToHalfTotal
+            - agg.MeatOnTheBonePreTriggerHpBelowHalfTotal;
+        var averageHpRelativeToHalf = relativeToHalfSamples <= 0
             ? 0m
-            : agg.MeatOnTheBonePreTriggerHpBelowHalfTotal
-                / agg.MeatOnTheBonePreTriggerHpBelowHalfSamples;
+            : relativeToHalfTotal / relativeToHalfSamples;
         var averageHpPercent = agg.MeatOnTheBonePreTriggerHpSamples <= 0
             ? 0m
             : agg.MeatOnTheBonePreTriggerHpPercentTotal
@@ -3959,10 +3967,10 @@ public static class RelicHoverShowPatch
         AppendHealingStats(sb, agg);
         Row3(
             sb,
-            "Avg HP below 50% before trigger",
-            FormatDecimal(averageHpBelowHalf),
+            "Avg HP relative to 50% before trigger",
+            FormatSignedDecimal(averageHpRelativeToHalf),
             "",
-            "Average raw HP-point distance below 50% of maximum HP at combat end, immediately before Meat on the Bone triggered.");
+            "Average raw HP-point difference from 50% of maximum HP at combat end, immediately before Meat on the Bone triggered. Negative is below 50%; positive is above 50%.");
         Row3(
             sb,
             "Avg HP before trigger",
@@ -6026,6 +6034,12 @@ public static class RelicHoverShowPatch
         return decimal.Truncate(value) == value
             ? value.ToString("0")
             : value.ToString("0.##");
+    }
+
+    private static string FormatSignedDecimal(decimal value)
+    {
+        var formatted = FormatDecimal(value);
+        return value > 0m ? $"+{formatted}" : formatted;
     }
 
     private static string FormatFloor(int? floor)

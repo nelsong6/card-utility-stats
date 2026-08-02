@@ -15,8 +15,8 @@
       "total_healing_attempted": 24,
       "total_healing_restored": 19,
       "total_healing_lost": 5,
-      "meat_on_the_bone_pre_trigger_hp_below_half_total": 20,
-      "meat_on_the_bone_pre_trigger_hp_below_half_samples": 2,
+      "meat_on_the_bone_pre_trigger_hp_relative_to_half_total": -20,
+      "meat_on_the_bone_pre_trigger_hp_relative_to_half_samples": 2,
       "meat_on_the_bone_pre_trigger_hp_percent_total": 77.5,
       "meat_on_the_bone_pre_trigger_hp_samples": 2
     }

@@ -941,12 +941,18 @@ public class RelicAggregate
     // short-lived build remain loadable; new observations do not update it.
     public decimal MeatOnTheBonePreTriggerHpMissingTotal { get; set; }
 
-    // Meat on the Bone snapshots the owner's HP immediately before each
-    // qualifying combat-end heal. Below-half is the raw HP-point distance
-    // from exactly 50% max HP. It has its own observation-era sample count so
-    // the legacy max-HP numerator above cannot distort the corrected average.
+    // Legacy positive-magnitude distance below 50% from the second
+    // pre-trigger HP implementation. Retained so runs written by that
+    // short-lived build can be projected into the signed relative-to-half
+    // stat; new observations do not update these fields.
     public decimal MeatOnTheBonePreTriggerHpBelowHalfTotal { get; set; }
     public int MeatOnTheBonePreTriggerHpBelowHalfSamples { get; set; }
+
+    // Signed raw HP-point difference from exactly 50% max HP immediately
+    // before a qualifying Meat on the Bone trigger. Negative is below half,
+    // positive is above half, and zero is exactly half.
+    public decimal MeatOnTheBonePreTriggerHpRelativeToHalfTotal { get; set; }
+    public int MeatOnTheBonePreTriggerHpRelativeToHalfSamples { get; set; }
 
     // The percentage total stores one normalized percentage per trigger so
     // max-HP changes do not distort the average.

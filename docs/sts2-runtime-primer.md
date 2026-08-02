@@ -1725,11 +1725,12 @@ owner-specific `AfterCombatVictoryEarly` callback. Mirror the game's integer
 threshold calculation (`current HP <= int(max HP * threshold percent)`), arm
 the shared relic-healing ledger only when that condition is true, and finalize
 after the callback's returned task completes. Its pre-trigger health stats use
-the same prefix snapshot: accumulate the raw `(max HP * 0.5) - current HP`
-distance below exactly 50% and one `current HP / max HP` percentage per
-qualifying trigger. Average those per-trigger percentages directly so max-HP
-changes during the run do not bias the result toward combats with a larger
-health pool.
+the same prefix snapshot: accumulate the signed raw
+`current HP - (max HP * 0.5)` difference from exactly 50% and one
+`current HP / max HP` percentage per qualifying trigger. Negative differences
+are below half and positive differences are above half. Average the per-trigger
+percentages directly so max-HP changes during the run do not bias the result
+toward combats with a larger health pool.
 
 Good hook surfaces already proven useful:
 

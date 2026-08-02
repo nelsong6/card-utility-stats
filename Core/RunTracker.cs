@@ -2039,6 +2039,10 @@ public static class RunTracker
             source.MeatOnTheBonePreTriggerHpBelowHalfTotal;
         target.MeatOnTheBonePreTriggerHpBelowHalfSamples +=
             source.MeatOnTheBonePreTriggerHpBelowHalfSamples;
+        target.MeatOnTheBonePreTriggerHpRelativeToHalfTotal +=
+            source.MeatOnTheBonePreTriggerHpRelativeToHalfTotal;
+        target.MeatOnTheBonePreTriggerHpRelativeToHalfSamples +=
+            source.MeatOnTheBonePreTriggerHpRelativeToHalfSamples;
         target.MeatOnTheBonePreTriggerHpPercentTotal +=
             source.MeatOnTheBonePreTriggerHpPercentTotal;
         target.MeatOnTheBonePreTriggerHpSamples +=
@@ -13330,10 +13334,9 @@ public static class RunTracker
     {
         if (agg == null || maxHp <= 0m) return;
 
-        agg.MeatOnTheBonePreTriggerHpBelowHalfTotal += Math.Max(
-            0m,
-            maxHp * 0.5m - currentHp);
-        agg.MeatOnTheBonePreTriggerHpBelowHalfSamples++;
+        agg.MeatOnTheBonePreTriggerHpRelativeToHalfTotal +=
+            currentHp - maxHp * 0.5m;
+        agg.MeatOnTheBonePreTriggerHpRelativeToHalfSamples++;
         agg.MeatOnTheBonePreTriggerHpPercentTotal += 100m * currentHp / maxHp;
         agg.MeatOnTheBonePreTriggerHpSamples++;
     }

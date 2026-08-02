@@ -5733,8 +5733,8 @@ public class SchemaLoadingTests
     private static void AssertMeatOnTheBonePreTriggerHpFixture(RelicAggregate relicAgg)
     {
         Assert.Equal(2, relicAgg.Activations);
-        Assert.Equal(20m, relicAgg.MeatOnTheBonePreTriggerHpBelowHalfTotal);
-        Assert.Equal(2, relicAgg.MeatOnTheBonePreTriggerHpBelowHalfSamples);
+        Assert.Equal(-20m, relicAgg.MeatOnTheBonePreTriggerHpRelativeToHalfTotal);
+        Assert.Equal(2, relicAgg.MeatOnTheBonePreTriggerHpRelativeToHalfSamples);
         Assert.Equal(77.5m, relicAgg.MeatOnTheBonePreTriggerHpPercentTotal);
         Assert.Equal(2, relicAgg.MeatOnTheBonePreTriggerHpSamples);
     }
