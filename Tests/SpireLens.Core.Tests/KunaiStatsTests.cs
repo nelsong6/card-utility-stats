@@ -15,6 +15,11 @@ public class KunaiStatsTests
     private static readonly MethodInfo BuildKunaiBodyMethod =
         typeof(RelicHoverShowPatch).GetMethod("BuildKunaiBodyBBCode", BindingFlags.NonPublic | BindingFlags.Static)
         ?? throw new InvalidOperationException("BuildKunaiBodyBBCode not found.");
+    private static readonly MethodInfo BuildKunaiLiveBodyMethod =
+        typeof(RelicHoverShowPatch).GetMethod(
+            "BuildKunaiBodyBBCodeWithLiveActivations",
+            BindingFlags.NonPublic | BindingFlags.Static)
+        ?? throw new InvalidOperationException("BuildKunaiBodyBBCodeWithLiveActivations not found.");
 
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
@@ -169,6 +174,25 @@ public class KunaiStatsTests
         Assert.Contains("Turns ended at 2 charges", body);
         Assert.Contains("Avg charge at turn end", body);
         Assert.Equal(6, CountOccurrences(body, "[b]0[/b]"));
+    }
+
+    [Fact]
+    public void RelicTooltip_Kunai_ShowsLiveActivationRowsInCombat()
+    {
+        var body = (string)(BuildKunaiLiveBodyMethod.Invoke(
+            null,
+            new object?[]
+            {
+                new RelicAggregate(),
+                new RelicLiveActivationCounts(ThisTurn: 3, ThisCombat: 7),
+            }) ?? throw new InvalidOperationException("BuildKunaiBodyBBCodeWithLiveActivations returned null."));
+
+        Assert.Contains("this turn", body);
+        Assert.Contains("this combat", body);
+        Assert.Contains("Times activated this turn", body);
+        Assert.Contains("Times activated this combat", body);
+        Assert.Contains("[b]3[/b]", body);
+        Assert.Contains("[b]7[/b]", body);
     }
 
     [Fact]

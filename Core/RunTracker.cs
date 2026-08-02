@@ -22831,6 +22831,21 @@ public static class RunTracker
         }
     }
 
+    public static int? GetRelicActivationsThisCombat(string relicId)
+    {
+        if (string.IsNullOrWhiteSpace(relicId)) return null;
+
+        lock (_lock)
+        {
+            if (_pendingCombat == null || CombatManager.Instance?.IsInProgress != true)
+                return null;
+
+            return _pendingCombat.RelicAggregates.TryGetValue(relicId, out var aggregate)
+                ? Math.Max(0, aggregate.Activations)
+                : 0;
+        }
+    }
+
     internal static RelicAggregate? GetLastEndedRelicAggregate(string relicId)
     {
         lock (_lock)

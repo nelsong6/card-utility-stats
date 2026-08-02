@@ -141,7 +141,7 @@ public class SwordInTheStoneStatsTests
         Assert.Contains("Gremlin Leader", body);
         Assert.Contains("Strength activations", body);
         Assert.Contains("Strength gained", body);
-        Assert.Contains("Avg strength gained per activation", body);
+        Assert.DoesNotContain("Avg strength gained per activation", body);
         Assert.Contains("[b]5.5[/b]", body);
     }
 

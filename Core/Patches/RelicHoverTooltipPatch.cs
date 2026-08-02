@@ -20,6 +20,10 @@ internal readonly record struct LetterOpenerRates(
     decimal TargetsPerActivation,
     decimal DamagePerSkillPlayed);
 
+internal readonly record struct RelicLiveActivationCounts(
+    int ThisTurn,
+    int ThisCombat);
+
 /// <summary>
 /// Builds the native SpireLens hover-tip entry for an owned relic.
 /// NHoverTipSet owns the rendered node and its complete lifecycle.
@@ -61,6 +65,12 @@ public static class RelicHoverShowPatch
         AccessTools.Field(typeof(RainbowRing), "_powersPlayedThisTurn");
     private static readonly System.Reflection.FieldInfo? RainbowRingSkillsPlayedThisTurnField =
         AccessTools.Field(typeof(RainbowRing), "_skillsPlayedThisTurn");
+    private static readonly System.Reflection.FieldInfo? KunaiAttacksPlayedThisTurnField =
+        AccessTools.Field(typeof(Kunai), "_attacksPlayedThisTurn");
+    private static readonly System.Reflection.FieldInfo? OrnamentalFanAttacksPlayedThisTurnField =
+        AccessTools.Field(typeof(OrnamentalFan), "_attacksPlayedThisTurn");
+    private static readonly System.Reflection.FieldInfo? ShurikenAttacksPlayedThisTurnField =
+        AccessTools.Field(typeof(Shuriken), "_attacksPlayedThisTurn");
 
     internal static bool TryBuildNativeHoverTip(
         NRelicInventoryHolder holder,
@@ -164,7 +174,11 @@ public static class RelicHoverShowPatch
 
         floorCount ??= RunTracker.GetCurrentFloorForRateStats();
 
-        var built = TryBuildBodyBBCode(
+        var liveActivationCounts = useEndedRun
+            ? null
+            : GetLiveAttackChargeRelicActivationCounts(relicModel, relicId);
+
+        var built = TryBuildBodyBBCodeWithLiveActivationCounts(
             relicModel,
             aggregate ?? new RelicAggregate(),
             floorCount,
@@ -172,6 +186,7 @@ public static class RelicHoverShowPatch
             cursedPearlCurseAgg,
             neowsBonesCurseAggs,
             storybookBrightestFlameAgg,
+            liveActivationCounts,
             out title,
             out body);
 
@@ -258,6 +273,39 @@ public static class RelicHoverShowPatch
         return false;
     }
 
+    private static RelicLiveActivationCounts? GetLiveAttackChargeRelicActivationCounts(
+        RelicModel relicModel,
+        string relicId)
+    {
+        try
+        {
+            if (relicModel?.Owner == null) return null;
+
+            var activationsThisCombat = RunTracker.GetRelicActivationsThisCombat(relicId);
+            if (!activationsThisCombat.HasValue) return null;
+
+            var attacksPlayedThisTurnField = relicModel switch
+            {
+                Kunai => KunaiAttacksPlayedThisTurnField,
+                OrnamentalFan => OrnamentalFanAttacksPlayedThisTurnField,
+                Shuriken => ShurikenAttacksPlayedThisTurnField,
+                _ => null,
+            };
+            if (attacksPlayedThisTurnField?.GetValue(relicModel) is not int attacksPlayedThisTurn)
+                return null;
+
+            var attacksPerActivation = Math.Max(1, relicModel.DynamicVars.Cards.IntValue);
+            return new RelicLiveActivationCounts(
+                Math.Max(0, attacksPlayedThisTurn) / attacksPerActivation,
+                Math.Max(0, activationsThisCombat.Value));
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"GetLiveAttackChargeRelicActivationCounts failed: {e.Message}");
+            return null;
+        }
+    }
+
     internal static bool TryBuildBodyBBCode(
         RelicModel relicModel,
         RelicAggregate agg,
@@ -328,6 +376,31 @@ public static class RelicHoverShowPatch
         CardAggregate? cursedPearlCurseAgg,
         IReadOnlyDictionary<string, CardAggregate>? neowsBonesCurseAggs,
         CardAggregate? storybookBrightestFlameAgg,
+        out string title,
+        out string body)
+    {
+        return TryBuildBodyBBCodeWithLiveActivationCounts(
+            relicModel,
+            agg,
+            floorCount,
+            bloodSoakedRoseCurseAgg,
+            cursedPearlCurseAgg,
+            neowsBonesCurseAggs,
+            storybookBrightestFlameAgg,
+            null,
+            out title,
+            out body);
+    }
+
+    private static bool TryBuildBodyBBCodeWithLiveActivationCounts(
+        RelicModel relicModel,
+        RelicAggregate agg,
+        int? floorCount,
+        CardAggregate? bloodSoakedRoseCurseAgg,
+        CardAggregate? cursedPearlCurseAgg,
+        IReadOnlyDictionary<string, CardAggregate>? neowsBonesCurseAggs,
+        CardAggregate? storybookBrightestFlameAgg,
+        RelicLiveActivationCounts? liveActivationCounts,
         out string title,
         out string body)
     {
@@ -585,7 +658,7 @@ public static class RelicHoverShowPatch
         if (relicModel is Kunai)
         {
             title = "Kunai";
-            body = BuildKunaiBodyBBCode(agg);
+            body = BuildKunaiBodyBBCodeWithLiveActivations(agg, liveActivationCounts);
             return true;
         }
 
@@ -599,14 +672,14 @@ public static class RelicHoverShowPatch
         if (relicModel is OrnamentalFan)
         {
             title = "Ornamental Fan";
-            body = BuildOrnamentalFanBodyBBCode(agg);
+            body = BuildOrnamentalFanBodyBBCodeWithLiveActivations(agg, liveActivationCounts);
             return true;
         }
 
         if (relicModel is Shuriken)
         {
             title = "Shuriken";
-            body = BuildShurikenBodyBBCode(agg);
+            body = BuildShurikenBodyBBCodeWithLiveActivations(agg, liveActivationCounts);
             return true;
         }
 
@@ -1870,9 +1943,6 @@ public static class RelicHoverShowPatch
     private static string BuildTuningForkBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        var blockPerActivation = agg.Activations <= 0
-            ? 0m
-            : (decimal)agg.AdditionalBlockGained / agg.Activations;
         var skillsPerCombat = agg.TuningForkCombats <= 0
             ? 0m
             : (decimal)agg.TuningForkSkillsPlayed / agg.TuningForkCombats;
@@ -1886,7 +1956,6 @@ public static class RelicHoverShowPatch
         Row3(sb, "Skills played", agg.TuningForkSkillsPlayed.ToString(), "");
         RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
-        Row3(sb, BlockLabel("block gained per activation"), FormatDecimal(blockPerActivation), "");
         Row3(sb, "Avg skills played per combat", FormatDecimal(skillsPerCombat), "");
         Row3(sb, "Avg skills played per turn", FormatDecimal(skillsPerTurn), "");
         Row3(sb, "Turns ended on 8 charges", agg.TuningForkTurnsEndedOn8Charges.ToString(), "");
@@ -1898,9 +1967,6 @@ public static class RelicHoverShowPatch
     private static string BuildRippleBasinBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        var blockPerActivation = agg.Activations <= 0
-            ? 0m
-            : (decimal)agg.AdditionalBlockGained / agg.Activations;
         var blockPerTurn = agg.RippleBasinTurns <= 0
             ? 0m
             : (decimal)agg.AdditionalBlockGained / agg.RippleBasinTurns;
@@ -1910,7 +1976,6 @@ public static class RelicHoverShowPatch
 
         RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
-        Row3(sb, BlockLabel("block gained per activation"), FormatDecimal(blockPerActivation), "");
         Row3(sb, BlockLabel("avg block gained per turn"), FormatDecimal(blockPerTurn), "");
         Row3(sb, BlockLabel("avg block gained per combat"), FormatDecimal(blockPerCombat), "");
         return sb.ToString();
@@ -4937,6 +5002,11 @@ public static class RelicHoverShowPatch
     }
 
     private static string BuildKunaiBodyBBCode(RelicAggregate agg)
+        => BuildKunaiBodyBBCodeWithLiveActivations(agg, null);
+
+    private static string BuildKunaiBodyBBCodeWithLiveActivations(
+        RelicAggregate agg,
+        RelicLiveActivationCounts? liveActivationCounts)
     {
         var sb = new StringBuilder();
         var averageEndCharge = agg.KunaiTurnEndChargeCount <= 0
@@ -4945,6 +5015,7 @@ public static class RelicHoverShowPatch
 
         Row3(sb, "Attacks played", agg.KunaiAttacksPlayed.ToString(), "");
         RelicActivationRow(sb, agg.Activations.ToString());
+        AppendLiveActivationRows(sb, liveActivationCounts);
         Row3(sb, "Dexterity gained", agg.KunaiDexterityGained.ToString(), "");
         Row3(sb, "Turns ended at 1 charge", agg.KunaiTurnsEndedAt1Charge.ToString(), "");
         Row3(sb, "Turns ended at 2 charges", agg.KunaiTurnsEndedAt2Charges.ToString(), "");
@@ -4979,6 +5050,11 @@ public static class RelicHoverShowPatch
     }
 
     private static string BuildOrnamentalFanBodyBBCode(RelicAggregate agg)
+        => BuildOrnamentalFanBodyBBCodeWithLiveActivations(agg, null);
+
+    private static string BuildOrnamentalFanBodyBBCodeWithLiveActivations(
+        RelicAggregate agg,
+        RelicLiveActivationCounts? liveActivationCounts)
     {
         var sb = new StringBuilder();
         var blockPerTurn = agg.OrnamentalFanTurns <= 0
@@ -4996,6 +5072,7 @@ public static class RelicHoverShowPatch
 
         Row3(sb, "Attacks played", agg.OrnamentalFanAttacksPlayed.ToString(), "");
         RelicActivationRow(sb, agg.Activations.ToString());
+        AppendLiveActivationRows(sb, liveActivationCounts);
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
         Row3(
             sb,
@@ -5020,16 +5097,18 @@ public static class RelicHoverShowPatch
     }
 
     private static string BuildShurikenBodyBBCode(RelicAggregate agg)
+        => BuildShurikenBodyBBCodeWithLiveActivations(agg, null);
+
+    private static string BuildShurikenBodyBBCodeWithLiveActivations(
+        RelicAggregate agg,
+        RelicLiveActivationCounts? liveActivationCounts)
     {
         var sb = new StringBuilder();
-        var strengthPerActivation = agg.Activations <= 0
-            ? 0m
-            : agg.StrengthAdded / agg.Activations;
 
         Row3(sb, "Attacks played", agg.ShurikenAttacksPlayed.ToString(), "");
         RelicActivationRow(sb, agg.Activations.ToString());
+        AppendLiveActivationRows(sb, liveActivationCounts);
         Row3(sb, "Strength gained", FormatDecimal(agg.StrengthAdded), "");
-        Row3(sb, "Strength gained per activation", FormatDecimal(strengthPerActivation), "");
         AppendTurnResetChargeRows(
             sb,
             agg.ShurikenTurnsEndedAt1Charge,
@@ -5078,10 +5157,6 @@ public static class RelicHoverShowPatch
             .Where(elite => elite != null && elite.Floor > 0)
             .ToList();
         var averageFloorsPerElite = CalculateAverageFloorsPerElite(elites);
-        var averageStrengthPerActivation = agg.Activations <= 0
-            ? 0m
-            : agg.StrengthAdded / agg.Activations;
-
         Row3(
             sb,
             "Floor acquired",
@@ -5110,11 +5185,6 @@ public static class RelicHoverShowPatch
 
         Row3(sb, "Strength activations", agg.Activations.ToString(), "");
         Row3(sb, "Strength gained", FormatDecimal(agg.StrengthAdded), "");
-        Row3(
-            sb,
-            "Avg strength gained per activation",
-            FormatDecimal(averageStrengthPerActivation),
-            "");
         return sb.ToString();
     }
 
@@ -6001,6 +6071,28 @@ public static class RelicHoverShowPatch
             "activation",
             value,
             fullDescription);
+    }
+
+    private static void AppendLiveActivationRows(
+        StringBuilder sb,
+        RelicLiveActivationCounts? liveActivationCounts)
+    {
+        if (!liveActivationCounts.HasValue) return;
+
+        DescribedIconRow(
+            sb,
+            ["activation"],
+            [],
+            "this turn",
+            liveActivationCounts.Value.ThisTurn.ToString(),
+            "Times activated this turn — activations since the current player turn began.");
+        DescribedIconRow(
+            sb,
+            ["activation"],
+            [],
+            "this combat",
+            liveActivationCounts.Value.ThisCombat.ToString(),
+            "Times activated this combat — activations since the current combat began.");
     }
 
     private static void DescribedIconRow(

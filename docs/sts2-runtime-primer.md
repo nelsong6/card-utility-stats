@@ -1086,6 +1086,12 @@ charge sample. Kusarigama only
 activates when its threshold play can choose a hittable enemy; do not infer an
 activation from the counter alone.
 
+For the owned-relic tooltip, Kunai, Ornamental Fan, and Shuriken expose their
+private cumulative `_attacksPlayedThisTurn` counters. Divide that value by the
+live Cards threshold for exact activations this turn; read activations this
+combat only from the current pending relic aggregate, never from the merged
+lifetime aggregate.
+
 Razor Tooth upgrades eligible Attack and Skill cards synchronously inside its
 owner-specific `AfterCardPlayed` callback, after the finished card-play history
 entry has already been emitted. Combat history has no upgrade entry for this

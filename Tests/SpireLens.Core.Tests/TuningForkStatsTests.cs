@@ -167,7 +167,7 @@ public class TuningForkStatsTests
         Assert.Contains("[hint=\"Block gained:", body);
         Assert.Contains("[hint=\"Activation:", body);
         Assert.Contains("block gained", body);
-        Assert.Contains("block gained per activation", body);
+        Assert.DoesNotContain("block gained per activation", body);
         Assert.Contains("Avg skills played per combat", body);
         Assert.Contains("Avg skills played per turn", body);
         Assert.Contains("Turns ended on 8 charges", body);
@@ -176,7 +176,6 @@ public class TuningForkStatsTests
         Assert.Contains("[b]27[/b]", body);
         Assert.Contains("[b]3[/b]", body);
         Assert.Contains("[b]18[/b]", body);
-        Assert.Contains("[b]6[/b]", body);
         Assert.Contains("[b]13.5[/b]", body);
         Assert.Contains("[b]3.86[/b]", body);
         Assert.Contains("[b]2[/b]", body);
@@ -192,13 +191,13 @@ public class TuningForkStatsTests
         Assert.Contains("Activations", body);
         Assert.Contains("Skills played", body);
         Assert.Contains("block gained", body);
-        Assert.Contains("block gained per activation", body);
+        Assert.DoesNotContain("block gained per activation", body);
         Assert.Contains("Avg skills played per combat", body);
         Assert.Contains("Avg skills played per turn", body);
         Assert.Contains("Turns ended on 8 charges", body);
         Assert.Contains("Turns ended on 9 charges", body);
         Assert.Contains("Avg charge at turn end", body);
-        Assert.Equal(9, CountOccurrences(body, "[b]0[/b]"));
+        Assert.Equal(8, CountOccurrences(body, "[b]0[/b]"));
     }
 
     [Fact]

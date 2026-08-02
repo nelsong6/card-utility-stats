@@ -19,6 +19,10 @@ public class UnlimitedAttackChargeRelicStatsTests
     private static readonly MethodInfo BuildKusarigamaBodyMethod = GetBuilder("BuildKusarigamaBodyBBCode");
     private static readonly MethodInfo BuildOrnamentalFanBodyMethod = GetBuilder("BuildOrnamentalFanBodyBBCode");
     private static readonly MethodInfo BuildShurikenBodyMethod = GetBuilder("BuildShurikenBodyBBCode");
+    private static readonly MethodInfo BuildOrnamentalFanLiveBodyMethod =
+        GetBuilder("BuildOrnamentalFanBodyBBCodeWithLiveActivations");
+    private static readonly MethodInfo BuildShurikenLiveBodyMethod =
+        GetBuilder("BuildShurikenBodyBBCodeWithLiveActivations");
 
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
@@ -375,11 +379,34 @@ public class UnlimitedAttackChargeRelicStatsTests
         Assert.Contains("Attacks played", shurikenBody);
         Assert.Contains("Activations", shurikenBody);
         Assert.Contains("Strength gained", shurikenBody);
-        Assert.Contains("Strength gained per activation", shurikenBody);
+        Assert.DoesNotContain("Strength gained per activation", shurikenBody);
         Assert.Contains("Turns ended at 1 charge", shurikenBody);
         Assert.Contains("Turns ended at 2 charges", shurikenBody);
         Assert.Contains("Avg charge at turn end", shurikenBody);
-        Assert.Contains("[b]1.25[/b]", shurikenBody);
+    }
+
+    [Fact]
+    public void RelicTooltips_OrnamentalFanAndShuriken_ShowLiveActivationRowsInCombat()
+    {
+        var liveCounts = new RelicLiveActivationCounts(ThisTurn: 2, ThisCombat: 5);
+        var ornamentalFanBody = BuildLiveBody(
+            BuildOrnamentalFanLiveBodyMethod,
+            new RelicAggregate(),
+            liveCounts);
+        var shurikenBody = BuildLiveBody(
+            BuildShurikenLiveBodyMethod,
+            new RelicAggregate(),
+            liveCounts);
+
+        foreach (var body in new[] { ornamentalFanBody, shurikenBody })
+        {
+            Assert.Contains("this turn", body);
+            Assert.Contains("this combat", body);
+            Assert.Contains("Times activated this turn", body);
+            Assert.Contains("Times activated this combat", body);
+            Assert.Contains("[b]2[/b]", body);
+            Assert.Contains("[b]5[/b]", body);
+        }
     }
 
     [Fact]
@@ -434,7 +461,7 @@ public class UnlimitedAttackChargeRelicStatsTests
         Assert.DoesNotContain("block gained per activation", ornamentalFanBody);
         Assert.Contains("Avg charge at turn end", ornamentalFanBody);
         Assert.Contains("[b]0[/b]", ornamentalFanBody);
-        Assert.Contains("Strength gained per activation", shurikenBody);
+        Assert.DoesNotContain("Strength gained per activation", shurikenBody);
         Assert.Contains("Avg charge at turn end", shurikenBody);
         Assert.Contains("[b]0[/b]", shurikenBody);
     }
@@ -589,5 +616,12 @@ public class UnlimitedAttackChargeRelicStatsTests
 
     private static string BuildBody(MethodInfo builder, RelicAggregate agg)
         => (string)(builder.Invoke(null, new object?[] { agg })
+            ?? throw new InvalidOperationException($"{builder.Name} returned null."));
+
+    private static string BuildLiveBody(
+        MethodInfo builder,
+        RelicAggregate agg,
+        RelicLiveActivationCounts liveCounts)
+        => (string)(builder.Invoke(null, new object?[] { agg, liveCounts })
             ?? throw new InvalidOperationException($"{builder.Name} returned null."));
 }
