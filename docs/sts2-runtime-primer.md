@@ -285,6 +285,15 @@ the mutable potion reference. This supports another player as the target,
 records zero when used at full HP, respects heal clamping and prevention, and
 excludes unrelated healing from later generic potion hooks.
 
+Swift Potion calls the public four-argument `CardPileCmd.Draw` overload once
+from its potion-owned branching choice context. Require the exact Swift Potion
+as both that context's `Source` and `LastInvolvedModel`, then claim the first
+non-hand draw on that context so nested draw effects cannot replace its result.
+The cards returned by the completed draw task are the observed value; the
+nonnegative difference between the requested count and that returned count is
+the potion's blocked draws, matching opening-hand relic semantics for No Draw,
+hand capacity, and pile exhaustion.
+
 Explosive Ampoule's protected `OnUse` callback snapshots the hittable enemies,
 waits for its VFX, then calls the final multi-target `CreatureCmd.Damage`
 overload. Its branching `PlayerChoiceContext` still has the exact ampoule as

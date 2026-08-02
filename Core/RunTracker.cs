@@ -3493,6 +3493,53 @@ public static class RunTracker
         entry.HpGained = Math.Max(0, currentHp - initialHp);
     }
 
+    public static void RecordSwiftPotionDraw(
+        SwiftPotion? potion,
+        int cardsRequested,
+        IEnumerable<CardModel>? cards)
+    {
+        if (potion?.Owner == null || cards == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(potion.Owner)) return;
+
+                EnsureLazyCurrentRunLocked();
+                var history = GetMutablePotionHistoryLocked();
+                if (!TryGetPotionSequence(potion, out var sequence)) return;
+                var entry = history.FirstOrDefault(candidate =>
+                    candidate.Sequence == sequence);
+                if (entry == null) return;
+
+                var cardsDrawn = cards.Count(card => card != null);
+                RecordPotionCardDrawForTest(
+                    entry,
+                    cardsRequested,
+                    cardsDrawn);
+                FinishPotionHistoryMutationLocked();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordSwiftPotionDraw failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordPotionCardDrawForTest(
+        PotionRunHistoryEntry entry,
+        int cardsRequested,
+        int cardsDrawn)
+    {
+        if (entry == null) return;
+
+        var observed = Math.Max(0, cardsDrawn);
+        entry.CardsDrawn = observed;
+        entry.CardDrawsBlocked = Math.Max(0, cardsRequested - observed);
+    }
+
     public static void RecordExplosiveAmpouleDamage(
         ExplosiveAmpoule? potion,
         IEnumerable<DamageResult>? results)
@@ -3801,6 +3848,8 @@ public static class RunTracker
             UsedLocationName = source.UsedLocationName,
             UsedTurn = source.UsedTurn,
             HpGained = source.HpGained,
+            CardsDrawn = source.CardsDrawn,
+            CardDrawsBlocked = source.CardDrawsBlocked,
             DamageAttempted = source.DamageAttempted,
             DamageDealt = source.DamageDealt,
             DamageBlocked = source.DamageBlocked,

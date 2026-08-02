@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
+using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Potions;
@@ -162,6 +163,77 @@ public class PotionRunHistoryTooltipTests
 
         Assert.DoesNotContain("HP gained", acquiredBody);
         Assert.Contains("HP gained  [b]12[/b]", usedBody);
+    }
+
+    [Fact]
+    public void SwiftPotionDrawPatch_TargetsObservedDrawCommand()
+    {
+        var target = typeof(CardPileCmd).GetMethod(
+            nameof(CardPileCmd.Draw),
+            BindingFlags.Public | BindingFlags.Static,
+            binder: null,
+            types:
+            [
+                typeof(PlayerChoiceContext),
+                typeof(decimal),
+                typeof(Player),
+                typeof(bool),
+            ],
+            modifiers: null);
+
+        Assert.NotNull(target);
+        Assert.Equal(
+            typeof(Task<IEnumerable<CardModel>>),
+            target!.ReturnType);
+    }
+
+    [Fact]
+    public void SwiftPotionDraw_RecordsObservedCardsAndBlockedShortfall()
+    {
+        var partial = new PotionRunHistoryEntry();
+        var prevented = new PotionRunHistoryEntry();
+
+        RunTracker.RecordPotionCardDrawForTest(
+            partial,
+            cardsRequested: 3,
+            cardsDrawn: 2);
+        RunTracker.RecordPotionCardDrawForTest(
+            prevented,
+            cardsRequested: 3,
+            cardsDrawn: 0);
+
+        Assert.Equal(2, partial.CardsDrawn);
+        Assert.Equal(1, partial.CardDrawsBlocked);
+        Assert.Equal(0, prevented.CardsDrawn);
+        Assert.Equal(3, prevented.CardDrawsBlocked);
+    }
+
+    [Fact]
+    public void SwiftPotionUsedTooltip_ShowsDrawRowsOnlyAtUse()
+    {
+        var entry = new PotionRunHistoryEntry
+        {
+            PotionId = "POTION.SWIFT_POTION",
+            DisplayName = "Swift Potion",
+            Acquired = true,
+            Used = true,
+            UsedFloor = 8,
+            CardsDrawn = 2,
+            CardDrawsBlocked = 1,
+        };
+
+        var acquiredBody = BuildBody(
+            entry,
+            "in_progress",
+            PotionTimelineOccurrence.Acquired);
+        var usedBody = BuildBody(
+            entry,
+            "in_progress",
+            PotionTimelineOccurrence.Used);
+
+        Assert.DoesNotContain("Cards drawn", acquiredBody);
+        Assert.Contains("Cards drawn  [b]2[/b]", usedBody);
+        Assert.Contains("Card draws blocked  [b]1[/b]", usedBody);
     }
 
     [Fact]

@@ -155,6 +155,124 @@ public static class BloodPotionHistoryHealingPatch
 }
 
 /// <summary>
+/// Swift Potion owns one non-hand draw on its branching choice context. The
+/// returned card collection is the observed outcome; the shortfall from the
+/// requested count is retained as blocked draw value.
+/// </summary>
+[HarmonyPatch(
+    typeof(CardPileCmd),
+    nameof(CardPileCmd.Draw),
+    new[]
+    {
+        typeof(PlayerChoiceContext),
+        typeof(decimal),
+        typeof(Player),
+        typeof(bool),
+    })]
+public static class SwiftPotionHistoryDrawPatch
+{
+    private static readonly HashSet<PlayerChoiceContext> ClaimedContexts =
+        new(ReferenceEqualityComparer.Instance);
+
+    [HarmonyPrefix]
+    public static void Prefix(
+        PlayerChoiceContext choiceContext,
+        decimal count,
+        Player player,
+        bool fromHandDraw,
+        out SwiftPotionDrawState? __state)
+    {
+        __state = null;
+
+        try
+        {
+            if (fromHandDraw || player == null) return;
+            if (choiceContext is not BranchingPlayerChoiceContext
+                {
+                    Source: SwiftPotion potion,
+                    LastInvolvedModel: SwiftPotion involvedPotion,
+                })
+                return;
+            if (!ReferenceEquals(potion, involvedPotion)) return;
+
+            lock (ClaimedContexts)
+            {
+                if (!ClaimedContexts.Add(choiceContext)) return;
+            }
+
+            __state = new SwiftPotionDrawState(
+                potion,
+                choiceContext,
+                count > 0m ? (int)Math.Ceiling(count) : 0);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug(
+                $"SwiftPotionHistoryDrawPatch.Prefix failed: {e.Message}");
+        }
+    }
+
+    [HarmonyPostfix]
+    public static void Postfix(
+        SwiftPotionDrawState? __state,
+        Task<IEnumerable<CardModel>> __result)
+    {
+        if (__state == null) return;
+        if (__result == null)
+        {
+            ReleaseContext(__state.Context);
+            return;
+        }
+
+        ObserveDrawAsync(__state, __result);
+    }
+
+    [HarmonyFinalizer]
+    public static Exception? Finalizer(
+        Exception? __exception,
+        SwiftPotionDrawState? __state)
+    {
+        if (__exception != null && __state != null)
+            ReleaseContext(__state.Context);
+        return __exception;
+    }
+
+    private static async void ObserveDrawAsync(
+        SwiftPotionDrawState state,
+        Task<IEnumerable<CardModel>> inner)
+    {
+        try
+        {
+            var cards = await inner.ConfigureAwait(false);
+            RunTracker.RecordSwiftPotionDraw(
+                state.Potion,
+                state.CardsRequested,
+                cards);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug(
+                $"SwiftPotionHistoryDrawPatch.ObserveDrawAsync failed: {e.Message}");
+        }
+        finally
+        {
+            ReleaseContext(state.Context);
+        }
+    }
+
+    private static void ReleaseContext(PlayerChoiceContext context)
+    {
+        lock (ClaimedContexts)
+            ClaimedContexts.Remove(context);
+    }
+
+    public sealed record SwiftPotionDrawState(
+        SwiftPotion Potion,
+        PlayerChoiceContext Context,
+        int CardsRequested);
+}
+
+/// <summary>
 /// Explosive Ampoule passes its branching choice context into one multi-target
 /// damage command while the potion remains the last involved model. That
 /// context identifies the exact potion without a dealer-wide attribution

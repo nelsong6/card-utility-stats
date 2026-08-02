@@ -64,7 +64,8 @@ entries remain the gallery's native hoverable potion holders; acquisition,
 use, discard, and held-at-run-end details appear in their ordinary hover
 tooltips. A used Blood Potion additionally reports the current HP it actually
 restored. A used Explosive Ampoule reports its observed damage attempted,
-damage dealt, damage blocked, overkill, kills, and targets hit.
+damage dealt, damage blocked, overkill, kills, and targets hit. A used Swift
+Potion reports cards actually drawn and card draws blocked.
 
 The optional, mutually exclusive relic-bar filters hide already-resolved relics
 while leaving them owned, functional, and visible on every other relic surface.

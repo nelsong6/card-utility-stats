@@ -665,6 +665,17 @@ internal static class PotionCompendiumHistoryUi
                     "HP gained",
                     Math.Max(0, entry.HpGained.Value).ToString());
             }
+            if (entry.CardsDrawn.HasValue)
+            {
+                AppendTooltipRow(
+                    body,
+                    "Cards drawn",
+                    Math.Max(0, entry.CardsDrawn.Value).ToString());
+                AppendTooltipRow(
+                    body,
+                    "Card draws blocked",
+                    Math.Max(0, entry.CardDrawsBlocked ?? 0).ToString());
+            }
             if (entry.DamageAttempted.HasValue)
             {
                 AppendTooltipRow(

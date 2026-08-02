@@ -5301,6 +5301,37 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsSwiftPotionRunHistoryFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("swift-potion-run-history.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertSwiftPotionHistoryFixture(loaded.Data);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsSwiftPotionRunHistoryFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("swift-potion-run-history.json"));
+
+        Assert.NotNull(resumed);
+        AssertSwiftPotionHistoryFixture(resumed!);
+    }
+
+    private static void AssertSwiftPotionHistoryFixture(RunData run)
+    {
+        var potion = Assert.Single(run.PotionHistory);
+        Assert.Equal("POTION.SWIFT_POTION", potion.PotionId);
+        Assert.True(potion.Used);
+        Assert.Equal(2, potion.UsedTurn);
+        Assert.Equal(2, potion.CardsDrawn);
+        Assert.Equal(1, potion.CardDrawsBlocked);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsExplosiveAmpouleRunHistoryFixture()
     {
         var loaded = RunStorage.LoadHistorical(

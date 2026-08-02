@@ -524,6 +524,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `blood-potion-run-history.json`
   Adds Blood Potion's observed current-HP restoration to its exact used
   potion-history entry.
+- `swift-potion-run-history.json`
+  Adds Swift Potion's observed cards drawn and unfulfilled card draws to its
+  exact used potion-history entry.
 - `explosive-ampoule-run-history.json`
   Adds Explosive Ampoule's observed attempted, effective, blocked, and
   overkill damage plus kills and targets hit to its exact used potion-history

@@ -157,6 +157,12 @@ public class PotionRunHistoryEntry
     // Blood Potion is the first potion to populate this outcome.
     public int? HpGained { get; set; }
 
+    // Observed cards returned by a potion-owned draw command and the
+    // unfulfilled portion of that request. Nullable fields distinguish older
+    // history entries from newly observed zero outcomes.
+    public int? CardsDrawn { get; set; }
+    public int? CardDrawsBlocked { get; set; }
+
     // Observed results from a potion-owned damage command. Nullable fields
     // distinguish older history entries from newly observed zero outcomes.
     // Explosive Ampoule is the first potion to populate this outcome set.
