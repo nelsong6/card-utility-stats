@@ -365,6 +365,7 @@ public static class CardHoverShowPatch
         AppendAlchemizePotionStats(sb, cardModel, agg, compact: false);
         AppendJackOfAllTradesStats(sb, cardModel, agg, compact: false);
         AppendDiscoveryStats(sb, cardModel, agg, compact: false);
+        AppendAllForOneStats(sb, cardModel, agg, compact: false);
         AppendArmamentsStats(sb, cardModel, agg);
         AppendDrainPowerStats(sb, cardModel, agg, compact: false);
         AppendUnrelentingFreeAttackStats(sb, cardModel, metaStats, compact: false);
@@ -585,6 +586,7 @@ public static class CardHoverShowPatch
         AppendAlchemizePotionStats(sb, cardModel, agg, compact: true);
         AppendJackOfAllTradesStats(sb, cardModel, agg, compact: true);
         AppendDiscoveryStats(sb, cardModel, agg, compact: true);
+        AppendAllForOneStats(sb, cardModel, agg, compact: true);
         AppendArmamentsStats(sb, cardModel, agg);
         AppendDrainPowerStats(sb, cardModel, agg, compact: true);
         AppendUnrelentingFreeAttackStats(sb, cardModel, metaStats, compact: true);
@@ -1124,6 +1126,31 @@ public static class CardHoverShowPatch
             GetEnergyStatLabel("avg discount of picked card"),
             FormatDecimal(averageDiscount),
             "");
+    }
+
+    private static void AppendAllForOneStats(
+        StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel card,
+        CardAggregate agg,
+        bool compact)
+    {
+        if (card is not AllForOne && !IsCardId(card, "CARD.ALL_FOR_ONE")) return;
+
+        Row3(
+            sb,
+            "0-cost cards returned",
+            agg.AllForOneZeroCostCardsReturned.ToString(),
+            "");
+        if (compact) return;
+
+        var returnedPerPlay = agg.Plays <= 0
+            ? 0m
+            : (decimal)agg.AllForOneZeroCostCardsReturned / agg.Plays;
+        var returnedPerCombat = agg.CombatsInDeck <= 0
+            ? 0m
+            : (decimal)agg.AllForOneZeroCostCardsReturned / agg.CombatsInDeck;
+        Row3(sb, "Avg returned per play", FormatDecimal(returnedPerPlay), "");
+        Row3(sb, "Avg returned per combat", FormatDecimal(returnedPerCombat), "");
     }
 
     private static void AppendDrainPowerStats(

@@ -850,6 +850,15 @@ upgrade only when the exact callback-selected card reaches
 `CardModel.UpgradeInternal`. Persist both shared outcomes under
 `POWER.AGGRESSION` and project them on every Aggression card.
 
+All for One selects effective zero-cost non-X Attacks, Skills, and Powers from
+its owner's discard pile, then sequentially awaits their movement to Hand.
+Count returns from the established `Hook.AfterCardChangedPiles` final-result
+boundary only when the currently resolving card is All for One, the owner
+matches, and the exact card moved from Discard into Hand while still matching
+the game's cost/type filter. This keeps hand-full redirects and failed moves
+out of the total. Use the physical All for One's ordinary `Plays` and
+`CombatsInDeck` fields for its per-play and zero-inclusive per-combat averages.
+
 `RupturePower` has two payoff boundaries. Qualifying self-damage outside the
 currently resolving owner card applies Strength immediately from
 `AfterDamageReceived`; damage caused during an owner card play is accumulated

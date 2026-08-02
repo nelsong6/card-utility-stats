@@ -29494,6 +29494,8 @@ public static class RunTracker
             {
                 if (!ShouldTrackCardStatsDuringCombatLocked()) return;
 
+                RecordAllForOneReturnedCardLocked(card, oldPile);
+
                 if (_pendingMakeItSoSummons.Count > 0
                     && card is MakeItSo
                     && oldPile != PileType.Hand)
@@ -29527,6 +29529,61 @@ public static class RunTracker
                 CoreMain.LogDebug($"RecordCardChangedPiles failed: {e.Message}");
             }
         }
+    }
+
+    private static void RecordAllForOneReturnedCardLocked(
+        CardModel card,
+        PileType oldPile)
+    {
+        var causingPlay = FindCurrentlyResolvingCardPlay();
+        var sourceCard = causingPlay?.Card;
+        if (sourceCard is not AllForOne) return;
+
+        var effectiveEnergyCost = card.EnergyCost.CostsX
+            ? 0
+            : card.EnergyCost.GetWithModifiers(CostModifiers.All);
+        if (!AllForOneReturnQualifiesForTest(
+                true,
+                oldPile,
+                card.Pile?.Type,
+                effectiveEnergyCost,
+                card.EnergyCost.CostsX,
+                card.Type,
+                ReferenceEquals(card.Owner, sourceCard.Owner)))
+        {
+            return;
+        }
+
+        _pendingCombat ??= new PendingCombat();
+        var sourceId = GetOrAssignInstanceId(sourceCard);
+        var agg = GetOrCreateAggregate(_pendingCombat, sourceId);
+        RecordAllForOneReturnForTest(agg);
+    }
+
+    internal static bool AllForOneReturnQualifiesForTest(
+        bool sourceIsAllForOne,
+        PileType oldPile,
+        PileType? newPile,
+        int effectiveEnergyCost,
+        bool costsX,
+        CardType cardType,
+        bool sameOwner)
+    {
+        return sourceIsAllForOne
+            && oldPile == PileType.Discard
+            && newPile == PileType.Hand
+            && effectiveEnergyCost == 0
+            && !costsX
+            && cardType is CardType.Attack or CardType.Skill or CardType.Power
+            && sameOwner;
+    }
+
+    internal static void RecordAllForOneReturnForTest(
+        CardAggregate agg,
+        int count = 1)
+    {
+        if (agg == null || count <= 0) return;
+        agg.AllForOneZeroCostCardsReturned += count;
     }
 
     private static void RecordBlockedDrawAttemptLocked(
@@ -30678,6 +30735,7 @@ public static class RunTracker
         target.DiscoverySkillsPicked += source.DiscoverySkillsPicked;
         target.DiscoveryPowersPicked += source.DiscoveryPowersPicked;
         target.DiscoveryEnergyDiscountTotal += source.DiscoveryEnergyDiscountTotal;
+        target.AllForOneZeroCostCardsReturned += source.AllForOneZeroCostCardsReturned;
         target.ArmamentsCardsUpgraded += source.ArmamentsCardsUpgraded;
         target.DrainPowerCardsUpgraded += source.DrainPowerCardsUpgraded;
         target.DrainPowerTurnsInDeck += source.DrainPowerTurnsInDeck;

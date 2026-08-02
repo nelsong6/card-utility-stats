@@ -274,6 +274,11 @@ public class CardAggregate
     public int DiscoveryPowersPicked { get; set; }
     public int DiscoveryEnergyDiscountTotal { get; set; }
 
+    // All for One outcomes. Counts only zero-cost non-X Attack/Skill/Power
+    // cards observed moving from Discard into Hand while this physical All
+    // for One is resolving. CombatsInDeck and Plays provide its averages.
+    public int AllForOneZeroCostCardsReturned { get; set; }
+
     // Armaments outcomes. Counts successful UpgradeInternal calls observed
     // while this physical Armaments is resolving. Armaments+ may add several
     // upgrades in one play; cards that were already fully upgraded never

@@ -563,6 +563,18 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsAllForOneCardFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("all-for-one-card-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        AssertAllForOneFixture(loaded.Data.Aggregates["CARD.ALL_FOR_ONE#1"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsJugglingPowerFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("juggling-power-run.json"));
@@ -1452,6 +1464,15 @@ public class SchemaLoadingTests
 
         Assert.NotNull(resumed);
         AssertDrainPowerFixture(resumed!.Aggregates["CARD.DRAIN_POWER#1"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsAllForOneCardFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("all-for-one-card-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertAllForOneFixture(resumed!.Aggregates["CARD.ALL_FOR_ONE#1"]);
     }
 
     [Fact]
@@ -4560,6 +4581,13 @@ public class SchemaLoadingTests
         Assert.Equal(8, cardAgg.DrainPowerCardsUpgraded);
         Assert.Equal(6, cardAgg.DrainPowerTurnsInDeck);
         Assert.Equal(9, cardAgg.DrainPowerUpgradedCardPlays);
+    }
+
+    private static void AssertAllForOneFixture(CardAggregate cardAgg)
+    {
+        Assert.Equal(4, cardAgg.CombatsInDeck);
+        Assert.Equal(6, cardAgg.Plays);
+        Assert.Equal(12, cardAgg.AllForOneZeroCostCardsReturned);
     }
 
     private static void AssertJugglingPowerFixture(PowerAggregate powerAgg)
