@@ -1611,7 +1611,13 @@ Important surfaces:
   right-button press/release latch until the physical button is released, so
   the later holder callback cannot repin on the same dispatch even when Godot
   supplies `_Input` and `_GuiInput` with different managed wrappers for that
-  one native event. Do not correlate those phases with
+  one native event. The pinned stats page's **Copy** button is the sole click
+  exception: the global input pass preserves the pin when the press lands in
+  that button, then the button hides through a completed render frame while
+  `StatsImageCapture` crops the panel from the viewport texture. The resulting
+  RGBA image is converted entirely in process to a bottom-up Windows DIB and
+  transferred to the OS clipboard; no temporary file, process, or companion
+  service participates. Do not correlate input phases with
   `GodotObject.GetInstanceId()`.
 - Run-history pinning attaches to both the existing card/relic rows and the
   native card/relic containers. Those containers survive multiplayer player

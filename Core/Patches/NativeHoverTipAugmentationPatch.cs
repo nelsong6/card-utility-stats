@@ -126,13 +126,16 @@ internal static class NativeStatsHoverTipStyler
 
     public static RichTextLabel? GetLastStatsDescription(NHoverTipSet tipSet)
     {
+        return GetLastStatsControl(tipSet)
+            ?.GetNodeOrNull<RichTextLabel>("%Description");
+    }
+
+    public static Control? GetLastStatsControl(NHoverTipSet tipSet)
+    {
         var container = tipSet._textHoverTipContainer;
         if (container == null || container.GetChildCount() == 0) return null;
 
-        if (container.GetChild(container.GetChildCount() - 1) is not Control statsTip)
-            return null;
-
-        return statsTip.GetNodeOrNull<RichTextLabel>("%Description");
+        return container.GetChild(container.GetChildCount() - 1) as Control;
     }
 
     private static void AddBrand(Control statsTip)

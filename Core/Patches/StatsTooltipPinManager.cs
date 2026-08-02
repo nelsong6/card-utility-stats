@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Godot;
 using MegaCrit.Sts2.Core.HoverTips;
 using MegaCrit.Sts2.Core.Nodes.Cards;
@@ -24,6 +25,9 @@ internal static class StatsTooltipPinManager
     private const string LockIconPath =
         "res://images/ui/top_panel/reminder_lock.png";
     private const string HintOwnerNodeName = "SpireLensPinnedStatsHintOwner";
+    private const string CopyImageButtonNodeName = "SpireLensCopyStatsImageButton";
+    private const string CopyImageButtonText = "Copy";
+    private const float CopyFeedbackDurationSeconds = 1.25f;
     private const float LockIconWidth = 24f;
     private const float LockIconHeight = 28f;
     private const float LockIconRightInset = 3f;
@@ -74,7 +78,12 @@ internal static class StatsTooltipPinManager
     private static Control? _pinnedTarget;
     private static Control? _pinOwner;
     private static NHoverTipSet? _pinnedTipSet;
+    private static Control? _pinnedStatsControl;
     private static RichTextLabel? _pinnedStatsDescription;
+    private static Button? _copyImageButton;
+    private static Action? _copyImageButtonHandler;
+    private static int _copyImageGeneration;
+    private static bool _copyImageInProgress;
     private static Control? _hintOwner;
     private static Control? _lockIconHost;
     private static string? _visibleHintText;
@@ -218,6 +227,13 @@ internal static class StatsTooltipPinManager
         {
             _suppressRightPressUntilRelease = false;
         }
+
+        // The copy control is the only actionable child of a pinned tooltip.
+        // Preserve the pin through its press so Godot can deliver the later
+        // release and Pressed signal to the button. Every other click keeps
+        // the ordinary dismiss-and-continue behavior below.
+        if (IsCopyImageButtonPress(inputEvent))
+            return;
 
         if (_pinnedTarget == null || !IsDismissAction(inputEvent))
             return;
@@ -422,8 +438,11 @@ internal static class StatsTooltipPinManager
 
             _pinnedTipSet = tipSet;
             AlignPinnedTipSet(target, tipSet);
+            _pinnedStatsControl =
+                NativeStatsHoverTipStyler.GetLastStatsControl(tipSet);
             _pinnedStatsDescription =
                 NativeStatsHoverTipStyler.GetLastStatsDescription(tipSet);
+            AttachCopyImageButton();
             AddLockIcon(target);
             CoreMain.LogDebug(
                 $"Pinned stats tooltip: {GetTargetDebugId(target)}");
@@ -439,10 +458,12 @@ internal static class StatsTooltipPinManager
     {
         var target = _pinnedTarget;
         var pinOwner = _pinOwner;
+        DetachCopyImageButton();
 
         _pinnedTarget = null;
         _pinOwner = null;
         _pinnedTipSet = null;
+        _pinnedStatsControl = null;
         _pinnedStatsDescription = null;
         _pinnedCardModel = null;
         ClearHintPopup();
@@ -465,6 +486,166 @@ internal static class StatsTooltipPinManager
         }
 
         RestoreOrdinaryHover(target);
+    }
+
+    private static void AttachCopyImageButton()
+    {
+        DetachCopyImageButton();
+        if (!IsLive(_pinnedStatsControl)) return;
+
+        var title = _pinnedStatsControl!
+            .GetNodeOrNull<Control>("%Title");
+        if (title?.GetParent() is not HBoxContainer header)
+        {
+            CoreMain.LogDebug(
+                "Stats image copy button skipped: tooltip title header was not found.");
+            return;
+        }
+
+        var button = new Button
+        {
+            Name = CopyImageButtonNodeName,
+            Text = CopyImageButtonText,
+            Flat = true,
+            FocusMode = Control.FocusModeEnum.None,
+            MouseFilter = Control.MouseFilterEnum.Stop,
+            CustomMinimumSize = new Vector2(68f, 28f),
+            SizeFlagsHorizontal = Control.SizeFlags.ShrinkEnd,
+            SizeFlagsVertical = Control.SizeFlags.ShrinkCenter,
+        };
+        button.AddThemeFontSizeOverride("font_size", 14);
+        button.AddThemeColorOverride("font_color", Color.FromHtml("#94A0AE"));
+        button.AddThemeColorOverride("font_hover_color", Color.FromHtml("#E8EDF4"));
+        button.AddThemeColorOverride("font_pressed_color", Color.FromHtml("#A9BCEB"));
+        button.AddThemeColorOverride("font_disabled_color", Color.FromHtml("#94A0AE"));
+
+        Action handler = OnCopyImageButtonPressed;
+        button.Pressed += handler;
+        header.AddChild(button);
+
+        _copyImageButton = button;
+        _copyImageButtonHandler = handler;
+        _copyImageGeneration++;
+        _copyImageInProgress = false;
+    }
+
+    private static void DetachCopyImageButton()
+    {
+        _copyImageGeneration++;
+        _copyImageInProgress = false;
+
+        var button = _copyImageButton;
+        var handler = _copyImageButtonHandler;
+        _copyImageButton = null;
+        _copyImageButtonHandler = null;
+
+        if (IsLive(button) && handler != null)
+            button!.Pressed -= handler;
+    }
+
+    private static void OnCopyImageButtonPressed()
+    {
+        if (_copyImageInProgress) return;
+        _ = CopyPinnedStatsImageAsync();
+    }
+
+    private static async Task CopyPinnedStatsImageAsync()
+    {
+        if (_copyImageInProgress
+            || !IsLive(_copyImageButton)
+            || !IsLive(_pinnedStatsControl))
+        {
+            return;
+        }
+
+        var generation = _copyImageGeneration;
+        var button = _copyImageButton!;
+        var statsControl = _pinnedStatsControl!;
+        var copied = false;
+        var feedback = "Copy failed";
+        _copyImageInProgress = true;
+        button.Disabled = true;
+        button.Visible = false;
+
+        try
+        {
+            // Wait until the next completed draw so the hidden button is not
+            // present in the viewport texture being captured.
+            await statsControl.ToSignal(
+                RenderingServer.Singleton,
+                RenderingServer.SignalName.FramePostDraw);
+            if (generation != _copyImageGeneration
+                || !IsLive(statsControl))
+            {
+                return;
+            }
+
+            if (!StatsImageCapture.TryCapture(
+                    statsControl,
+                    out var image,
+                    out var captureError))
+            {
+                CoreMain.Logger.Error(
+                    $"Stats image capture failed: {captureError}");
+                feedback = "Capture failed";
+                return;
+            }
+
+            using (image)
+            {
+                if (!WindowsImageClipboard.TrySetImage(
+                        image,
+                        out var clipboardError))
+                {
+                    CoreMain.Logger.Error(
+                        $"Stats image clipboard write failed: {clipboardError}");
+                    return;
+                }
+            }
+
+            copied = true;
+            feedback = "Copied";
+        }
+        catch (Exception exception)
+        {
+            CoreMain.Logger.Error(
+                $"Stats image copy failed: {exception}");
+        }
+        finally
+        {
+            if (generation == _copyImageGeneration && IsLive(button))
+            {
+                button.Text = feedback;
+                button.Visible = true;
+                button.Disabled = false;
+            }
+
+            if (generation == _copyImageGeneration)
+                _copyImageInProgress = false;
+        }
+
+        if (!copied
+            || generation != _copyImageGeneration
+            || !IsLive(button))
+        {
+            return;
+        }
+
+        try
+        {
+            var tree = button.GetTree();
+            if (tree == null) return;
+
+            var timer = tree.CreateTimer(CopyFeedbackDurationSeconds);
+            await button.ToSignal(timer, SceneTreeTimer.SignalName.Timeout);
+            if (generation == _copyImageGeneration && IsLive(button))
+                button.Text = CopyImageButtonText;
+        }
+        catch (Exception exception)
+        {
+            CoreMain.LogDebug(
+                $"Stats image copy feedback reset skipped: {exception.Message}");
+        }
     }
 
     private static bool TryBuildStatsTip(Control target, out HoverTip tip)
@@ -884,6 +1065,19 @@ internal static class StatsTooltipPinManager
             ButtonIndex: MouseButton.Right,
             Pressed: false,
         };
+
+    private static bool IsCopyImageButtonPress(InputEvent inputEvent)
+    {
+        return inputEvent is InputEventMouseButton
+            {
+                ButtonIndex: MouseButton.Left,
+                Pressed: true,
+            } mouseButton
+            && IsLive(_copyImageButton)
+            && _copyImageButton!.Visible
+            && !_copyImageButton.Disabled
+            && _copyImageButton.GetGlobalRect().HasPoint(mouseButton.Position);
+    }
 
     private static bool IsLive(GodotObject? instance)
         => instance != null && GodotObject.IsInstanceValid(instance);
