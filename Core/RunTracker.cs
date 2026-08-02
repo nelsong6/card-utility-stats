@@ -1828,6 +1828,7 @@ public static class RunTracker
         RecordEmberTeaActiveTurnForTrackedPlayerLocked();
         RecordRedSkullActivePeriodForTrackedPlayerLocked();
         RecordRippleBasinTurnForTrackedPlayerLocked();
+        RecordThreeAttackScalingRelicsTurnForTrackedPlayerLocked();
         RecordOrnamentalFanTurnForTrackedPlayerLocked();
         RecordReptileTrinketTurnForTrackedPlayerLocked();
         RecordRainbowRingTurnForTrackedPlayerLocked();
@@ -2220,6 +2221,9 @@ public static class RunTracker
         target.ShurikenTurnsEndedAt2Charges += source.ShurikenTurnsEndedAt2Charges;
         target.ShurikenTurnEndChargeTotal += source.ShurikenTurnEndChargeTotal;
         target.ShurikenTurnEndChargeCount += source.ShurikenTurnEndChargeCount;
+        target.ThreeAttackScalingRateActivations += source.ThreeAttackScalingRateActivations;
+        target.ThreeAttackScalingTurns += source.ThreeAttackScalingTurns;
+        target.ThreeAttackScalingCombats += source.ThreeAttackScalingCombats;
         target.PaperPhrogDamageAdded += source.PaperPhrogDamageAdded;
         target.PaperPhrogEnhancedAttacks += source.PaperPhrogEnhancedAttacks;
         target.PaperPhrogCombats += source.PaperPhrogCombats;
@@ -16813,6 +16817,7 @@ public static class RunTracker
     {
         if (agg == null) return;
         agg.Activations += 1;
+        RecordThreeAttackScalingRateActivationForTest(agg);
         agg.KunaiDexterityGained += Math.Max(0, dexterityGained);
     }
 
@@ -17193,6 +17198,7 @@ public static class RunTracker
     {
         if (agg == null) return;
         agg.Activations += 1;
+        RecordThreeAttackScalingRateActivationForTest(agg);
         agg.StrengthAdded += Math.Max(0m, strengthGained);
     }
 
@@ -17325,6 +17331,144 @@ public static class RunTracker
         _pendingCombat.ShurikenTurnEndChargeRecordedTurns[player] = turnNumber;
         var agg = GetOrCreatePendingRelicAggregateLocked(ShurikenRelicId);
         RecordShurikenTurnEndChargeForTest(agg, ShurikenCharge(relic));
+    }
+
+    /// <summary>
+    /// Count the shared zero-inclusive rate window for Kunai and Shuriken.
+    /// Both relics deliberately use the same persisted fields and lifecycle
+    /// helpers so their activation averages cannot drift independently.
+    /// </summary>
+    public static void RecordThreeAttackScalingRelicsTurnStarted(Player player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                _pendingCombat ??= new PendingCombat();
+                RecordThreeAttackScalingRelicsTurnForPlayerLocked(player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordThreeAttackScalingRelicsTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordThreeAttackScalingRateActivationForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.ThreeAttackScalingRateActivations += Math.Max(0, count);
+    }
+
+    internal static void RecordThreeAttackScalingTurnForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.ThreeAttackScalingTurns += Math.Max(0, count);
+    }
+
+    internal static void RecordThreeAttackScalingCombatForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.ThreeAttackScalingCombats += Math.Max(0, count);
+    }
+
+    private static void RecordThreeAttackScalingRelicsTurnForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordThreeAttackScalingRelicsTurnForPlayerLocked(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug(
+                $"RecordThreeAttackScalingRelicsTurnForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordThreeAttackScalingRelicsTurnForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+
+        if (TryGetKunai(player, out _))
+        {
+            RecordThreeAttackScalingRelicTurnLocked(
+                player,
+                turnNumber,
+                KunaiRelicId,
+                _pendingCombat.KunaiRateTurnCountedTurns);
+        }
+
+        if (TryGetShuriken(player, out _))
+        {
+            RecordThreeAttackScalingRelicTurnLocked(
+                player,
+                turnNumber,
+                ShurikenRelicId,
+                _pendingCombat.ShurikenRateTurnCountedTurns);
+        }
+    }
+
+    private static void RecordThreeAttackScalingRelicTurnLocked(
+        Player player,
+        int turnNumber,
+        string relicId,
+        Dictionary<Player, int> countedTurns)
+    {
+        if (countedTurns.TryGetValue(player, out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        countedTurns[player] = turnNumber;
+        var agg = GetOrCreatePendingRelicAggregateLocked(relicId);
+        RecordThreeAttackScalingTurnForTest(agg);
+    }
+
+    private static void RecordThreeAttackScalingRelicsCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+
+        if (TryGetKunai(player, out _))
+        {
+            RecordThreeAttackScalingRelicCombatLocked(
+                player,
+                KunaiRelicId,
+                _pendingCombat.KunaiRateCombatCountedPlayers);
+        }
+
+        if (TryGetShuriken(player, out _))
+        {
+            RecordThreeAttackScalingRelicCombatLocked(
+                player,
+                ShurikenRelicId,
+                _pendingCombat.ShurikenRateCombatCountedPlayers);
+        }
+    }
+
+    private static void RecordThreeAttackScalingRelicCombatLocked(
+        Player player,
+        string relicId,
+        HashSet<Player> countedPlayers)
+    {
+        if (!countedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(relicId);
+        RecordThreeAttackScalingCombatForTest(agg);
     }
 
     public static void RecordPaperPhrogVulnerableBonus(
@@ -24047,6 +24191,7 @@ public static class RunTracker
             RecordMusicBoxCombatForPlayerLocked(player);
             RecordIntimidatingHelmetCombatForPlayerLocked(player);
             RecordDaughterOfTheWindCombatForPlayerLocked(player);
+            RecordThreeAttackScalingRelicsCombatForPlayerLocked(player);
             RecordOrnamentalFanCombatForPlayerLocked(player);
             RecordSturdyClampCombatForPlayerLocked(player);
             RecordBeatingRemnantCombatForPlayerLocked(player);
@@ -31498,6 +31643,10 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> KunaiTurnEndChargeRecordedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> KunaiRateCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> KunaiRateTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> KusarigamaTurnEndChargeRecordedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> OrnamentalFanCombatCountedPlayers { get; }
@@ -31507,6 +31656,10 @@ internal class PendingCombat
     public Dictionary<Player, int> OrnamentalFanTurnEndChargeRecordedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> ShurikenTurnEndChargeRecordedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> ShurikenRateCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> ShurikenRateTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> GamblingChipDiscardAttributionPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

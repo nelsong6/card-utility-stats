@@ -3767,6 +3767,46 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsThreeAttackScalingRatesFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("three-attack-scaling-rates-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertThreeAttackScalingRatesFixture(loaded.Data);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsThreeAttackScalingRatesFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("three-attack-scaling-rates-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertThreeAttackScalingRatesFixture(resumed!);
+    }
+
+    private static void AssertThreeAttackScalingRatesFixture(RunData run)
+    {
+        var kunai = run.RelicAggregates["RELIC.KUNAI"];
+        Assert.Equal(20, kunai.KunaiAttacksPlayed);
+        Assert.Equal(6, kunai.Activations);
+        Assert.Equal(6, kunai.KunaiDexterityGained);
+        Assert.Equal(4, kunai.ThreeAttackScalingRateActivations);
+        Assert.Equal(6, kunai.ThreeAttackScalingTurns);
+        Assert.Equal(2, kunai.ThreeAttackScalingCombats);
+
+        var shuriken = run.RelicAggregates["RELIC.SHURIKEN"];
+        Assert.Equal(20, shuriken.ShurikenAttacksPlayed);
+        Assert.Equal(6, shuriken.Activations);
+        Assert.Equal(6m, shuriken.StrengthAdded);
+        Assert.Equal(4, shuriken.ThreeAttackScalingRateActivations);
+        Assert.Equal(6, shuriken.ThreeAttackScalingTurns);
+        Assert.Equal(2, shuriken.ThreeAttackScalingCombats);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsOrnamentalFanBlockAttributionFixture()
     {
         var loaded = RunStorage.LoadHistorical(

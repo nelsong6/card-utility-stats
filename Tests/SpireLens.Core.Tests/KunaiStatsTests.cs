@@ -39,6 +39,9 @@ public class KunaiStatsTests
         Assert.Equal(0, agg.KunaiTurnsEndedAt2Charges);
         Assert.Equal(0, agg.KunaiTurnEndChargeTotal);
         Assert.Equal(0, agg.KunaiTurnEndChargeCount);
+        Assert.Equal(0, agg.ThreeAttackScalingRateActivations);
+        Assert.Equal(0, agg.ThreeAttackScalingTurns);
+        Assert.Equal(0, agg.ThreeAttackScalingCombats);
     }
 
     [Fact]
@@ -95,6 +98,7 @@ public class KunaiStatsTests
 
         Assert.Equal(14, agg.KunaiAttacksPlayed);
         Assert.Equal(2, agg.Activations);
+        Assert.Equal(2, agg.ThreeAttackScalingRateActivations);
         Assert.Equal(4, agg.KunaiDexterityGained);
         Assert.Equal(1, agg.KunaiTurnsEndedAt1Charge);
         Assert.Equal(2, agg.KunaiTurnsEndedAt2Charges);
@@ -147,11 +151,17 @@ public class KunaiStatsTests
             KunaiTurnsEndedAt2Charges = 3,
             KunaiTurnEndChargeTotal = 11,
             KunaiTurnEndChargeCount = 7,
+            ThreeAttackScalingRateActivations = 4,
+            ThreeAttackScalingTurns = 7,
+            ThreeAttackScalingCombats = 3,
         });
 
         Assert.Contains("Attacks played", body);
         Assert.Contains("Activations", body);
         Assert.Contains("Dexterity gained", body);
+        Assert.Contains("Avg activations per turn", body);
+        Assert.Contains("Avg activations per combat", body);
+        Assert.Contains("Turns ended at 0 charges", body);
         Assert.Contains("Turns ended at 1 charge", body);
         Assert.Contains("Turns ended at 2 charges", body);
         Assert.Contains("Avg charge at turn end", body);
@@ -170,10 +180,13 @@ public class KunaiStatsTests
         Assert.Contains("Attacks played", body);
         Assert.Contains("Activations", body);
         Assert.Contains("Dexterity gained", body);
+        Assert.Contains("Avg activations per turn", body);
+        Assert.Contains("Avg activations per combat", body);
+        Assert.Contains("Turns ended at 0 charges", body);
         Assert.Contains("Turns ended at 1 charge", body);
         Assert.Contains("Turns ended at 2 charges", body);
         Assert.Contains("Avg charge at turn end", body);
-        Assert.Equal(6, CountOccurrences(body, "[b]0[/b]"));
+        Assert.Equal(9, CountOccurrences(body, "[b]0[/b]"));
     }
 
     [Fact]
@@ -225,6 +238,9 @@ public class KunaiStatsTests
         Assert.Equal(0, agg.KunaiTurnsEndedAt2Charges);
         Assert.Equal(0, agg.KunaiTurnEndChargeTotal);
         Assert.Equal(0, agg.KunaiTurnEndChargeCount);
+        Assert.Equal(0, agg.ThreeAttackScalingRateActivations);
+        Assert.Equal(0, agg.ThreeAttackScalingTurns);
+        Assert.Equal(0, agg.ThreeAttackScalingCombats);
     }
 
     private static string BuildBody(RelicAggregate agg)

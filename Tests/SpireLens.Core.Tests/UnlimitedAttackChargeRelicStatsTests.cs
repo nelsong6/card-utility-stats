@@ -53,6 +53,9 @@ public class UnlimitedAttackChargeRelicStatsTests
         Assert.Equal(0, agg.ShurikenTurnsEndedAt2Charges);
         Assert.Equal(0, agg.ShurikenTurnEndChargeTotal);
         Assert.Equal(0, agg.ShurikenTurnEndChargeCount);
+        Assert.Equal(0, agg.ThreeAttackScalingRateActivations);
+        Assert.Equal(0, agg.ThreeAttackScalingTurns);
+        Assert.Equal(0, agg.ThreeAttackScalingCombats);
 
         Assert.Equal(0, agg.Activations);
         Assert.Equal(0, agg.TotalDamageAttempted);
@@ -172,6 +175,7 @@ public class UnlimitedAttackChargeRelicStatsTests
 
         Assert.Equal(11, shuriken.ShurikenAttacksPlayed);
         Assert.Equal(3, shuriken.Activations);
+        Assert.Equal(3, shuriken.ThreeAttackScalingRateActivations);
         Assert.Equal(3m, shuriken.StrengthAdded);
         Assert.Equal(1, shuriken.ShurikenTurnsEndedAt1Charge);
         Assert.Equal(2, shuriken.ShurikenTurnsEndedAt2Charges);
@@ -286,6 +290,9 @@ public class UnlimitedAttackChargeRelicStatsTests
             ShurikenTurnsEndedAt2Charges = 2,
             ShurikenTurnEndChargeTotal = 5,
             ShurikenTurnEndChargeCount = 4,
+            ThreeAttackScalingRateActivations = 3,
+            ThreeAttackScalingTurns = 4,
+            ThreeAttackScalingCombats = 2,
         });
 
         Assert.Equal(17, shuriken.ShurikenAttacksPlayed);
@@ -295,6 +302,9 @@ public class UnlimitedAttackChargeRelicStatsTests
         Assert.Equal(2, shuriken.ShurikenTurnsEndedAt2Charges);
         Assert.Equal(6, shuriken.ShurikenTurnEndChargeTotal);
         Assert.Equal(6, shuriken.ShurikenTurnEndChargeCount);
+        Assert.Equal(3, shuriken.ThreeAttackScalingRateActivations);
+        Assert.Equal(4, shuriken.ThreeAttackScalingTurns);
+        Assert.Equal(2, shuriken.ThreeAttackScalingCombats);
     }
 
     [Fact]
@@ -375,6 +385,9 @@ public class UnlimitedAttackChargeRelicStatsTests
             ShurikenTurnsEndedAt2Charges = 2,
             ShurikenTurnEndChargeTotal = 5,
             ShurikenTurnEndChargeCount = 4,
+            ThreeAttackScalingRateActivations = 3,
+            ThreeAttackScalingTurns = 4,
+            ThreeAttackScalingCombats = 2,
         });
         Assert.Contains("Attacks played", shurikenBody);
         Assert.Contains(
@@ -382,6 +395,9 @@ public class UnlimitedAttackChargeRelicStatsTests
             shurikenBody);
         Assert.Contains("Activations", shurikenBody);
         Assert.Contains("Strength gained", shurikenBody);
+        Assert.Contains("Avg activations per turn", shurikenBody);
+        Assert.Contains("Avg activations per combat", shurikenBody);
+        Assert.Contains("Turns ended at 0 charges", shurikenBody);
         Assert.DoesNotContain("Strength gained per activation", shurikenBody);
         Assert.Contains("Turns ended at 1 charge", shurikenBody);
         Assert.Contains("Turns ended at 2 charges", shurikenBody);

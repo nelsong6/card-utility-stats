@@ -24,6 +24,18 @@ internal readonly record struct RelicLiveActivationCounts(
     int ThisTurn,
     int ThisCombat);
 
+internal readonly record struct ThreeAttackScalingRelicStats(
+    int AttacksPlayed,
+    int Activations,
+    decimal AttributeGained,
+    int RateActivations,
+    int Turns,
+    int Combats,
+    int TurnsEndedAt1Charge,
+    int TurnsEndedAt2Charges,
+    int TurnEndChargeTotal,
+    int TurnEndChargeCount);
+
 /// <summary>
 /// Builds the native SpireLens hover-tip entry for an owned relic.
 /// NHoverTipSet owns the rendered node and its complete lifecycle.
@@ -5037,24 +5049,20 @@ public static class RelicHoverShowPatch
         RelicAggregate agg,
         RelicLiveActivationCounts? liveActivationCounts)
     {
-        var sb = new StringBuilder();
-        var averageEndCharge = agg.KunaiTurnEndChargeCount <= 0
-            ? 0m
-            : (decimal)agg.KunaiTurnEndChargeTotal / agg.KunaiTurnEndChargeCount;
-
-        Row3(
-            sb,
-            "Attacks played",
-            agg.KunaiAttacksPlayed.ToString(),
-            "",
-            AttacksPlayedDescription);
-        RelicActivationRow(sb, agg.Activations.ToString());
-        AppendLiveActivationRows(sb, liveActivationCounts);
-        Row3(sb, "Dexterity gained", agg.KunaiDexterityGained.ToString(), "");
-        Row3(sb, "Turns ended at 1 charge", agg.KunaiTurnsEndedAt1Charge.ToString(), "");
-        Row3(sb, "Turns ended at 2 charges", agg.KunaiTurnsEndedAt2Charges.ToString(), "");
-        Row3(sb, "Avg charge at turn end", FormatDecimal(averageEndCharge), "");
-        return sb.ToString();
+        return BuildThreeAttackScalingRelicBodyBBCode(
+            new ThreeAttackScalingRelicStats(
+                agg.KunaiAttacksPlayed,
+                agg.Activations,
+                agg.KunaiDexterityGained,
+                agg.ThreeAttackScalingRateActivations,
+                agg.ThreeAttackScalingTurns,
+                agg.ThreeAttackScalingCombats,
+                agg.KunaiTurnsEndedAt1Charge,
+                agg.KunaiTurnsEndedAt2Charges,
+                agg.KunaiTurnEndChargeTotal,
+                agg.KunaiTurnEndChargeCount),
+            "Dexterity gained",
+            liveActivationCounts);
     }
 
     private static string BuildKusarigamaBodyBBCode(RelicAggregate agg)
@@ -5147,23 +5155,73 @@ public static class RelicHoverShowPatch
         RelicAggregate agg,
         RelicLiveActivationCounts? liveActivationCounts)
     {
+        return BuildThreeAttackScalingRelicBodyBBCode(
+            new ThreeAttackScalingRelicStats(
+                agg.ShurikenAttacksPlayed,
+                agg.Activations,
+                agg.StrengthAdded,
+                agg.ThreeAttackScalingRateActivations,
+                agg.ThreeAttackScalingTurns,
+                agg.ThreeAttackScalingCombats,
+                agg.ShurikenTurnsEndedAt1Charge,
+                agg.ShurikenTurnsEndedAt2Charges,
+                agg.ShurikenTurnEndChargeTotal,
+                agg.ShurikenTurnEndChargeCount),
+            "Strength gained",
+            liveActivationCounts);
+    }
+
+    private static string BuildThreeAttackScalingRelicBodyBBCode(
+        ThreeAttackScalingRelicStats stats,
+        string attributeLabel,
+        RelicLiveActivationCounts? liveActivationCounts)
+    {
         var sb = new StringBuilder();
+        var activationsPerTurn = stats.Turns <= 0
+            ? 0m
+            : (decimal)stats.RateActivations / stats.Turns;
+        var activationsPerCombat = stats.Combats <= 0
+            ? 0m
+            : (decimal)stats.RateActivations / stats.Combats;
+        var turnsEndedAt0Charges = Math.Max(
+            0,
+            stats.TurnEndChargeCount
+            - stats.TurnsEndedAt1Charge
+            - stats.TurnsEndedAt2Charges);
 
         Row3(
             sb,
             "Attacks played",
-            agg.ShurikenAttacksPlayed.ToString(),
+            stats.AttacksPlayed.ToString(),
             "",
             AttacksPlayedDescription);
-        RelicActivationRow(sb, agg.Activations.ToString());
+        RelicActivationRow(sb, stats.Activations.ToString());
         AppendLiveActivationRows(sb, liveActivationCounts);
-        Row3(sb, "Strength gained", FormatDecimal(agg.StrengthAdded), "");
+        Row3(
+            sb,
+            attributeLabel,
+            FormatDecimal(stats.AttributeGained),
+            "",
+            $"{attributeLabel} — the actual amount added by this relic.");
+        Row3(
+            sb,
+            "Avg activations per turn",
+            FormatDecimal(activationsPerTurn),
+            "",
+            "Average activations per turn — observed activations divided by player turns in which this relic was held during the same tracking window.");
+        Row3(
+            sb,
+            "Avg activations per combat",
+            FormatDecimal(activationsPerCombat),
+            "",
+            "Average activations per combat — observed activations divided by combats in which this relic was held during the same tracking window.");
+        Row3(sb, "Turns ended at 0 charges", turnsEndedAt0Charges.ToString(), "");
         AppendTurnResetChargeRows(
             sb,
-            agg.ShurikenTurnsEndedAt1Charge,
-            agg.ShurikenTurnsEndedAt2Charges,
-            agg.ShurikenTurnEndChargeTotal,
-            agg.ShurikenTurnEndChargeCount);
+            stats.TurnsEndedAt1Charge,
+            stats.TurnsEndedAt2Charges,
+            stats.TurnEndChargeTotal,
+            stats.TurnEndChargeCount);
         return sb.ToString();
     }
 

@@ -435,6 +435,10 @@ New fixtures added going forward do not need a `v*-` prefix.
   Ornamental Fan, and Shuriken, including observed damage/block/Strength
   outcomes and 1/2 charge turn-end buckets with average charge samples.
   Ornamental Fan additionally preserves turns that ended at 0 charges.
+- `three-attack-scaling-rates-run.json`
+  Adds the shared Kunai/Shuriken activation-rate window: matching observed
+  activations plus zero-inclusive held turn and combat denominators. Both
+  relic aggregates deliberately use the same persisted rate fields.
 - `ornamental-fan-block-attribution-run.json`
   Adds Ornamental Fan's relic-owned effective/wasted block outcomes, held
   turn/combat denominators, and matching observation-era block numerator.

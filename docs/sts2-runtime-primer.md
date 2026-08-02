@@ -1092,6 +1092,15 @@ live Cards threshold for exact activations this turn; read activations this
 combat only from the current pending relic aggregate, never from the merged
 lifetime aggregate.
 
+Kunai and Shuriken deliberately share one three-Attack scaling presentation
+and one persisted activation-rate window. Their owner callbacks still observe
+different outcomes—Dexterity for Kunai and Strength for Shuriken—but both
+increment the same per-relic `ThreeAttackScalingRateActivations`, held-turn,
+and held-combat fields. Those denominators include periods with zero
+activations and must remain paired with the matching observation-era numerator;
+do not divide their older lifetime `Activations` totals by the newer rate
+window.
+
 Razor Tooth upgrades eligible Attack and Skill cards synchronously inside its
 owner-specific `AfterCardPlayed` callback, after the finished card-play history
 entry has already been emitted. Combat history has no upgrade entry for this

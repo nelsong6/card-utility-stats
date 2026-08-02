@@ -1337,6 +1337,15 @@ public class RelicAggregate
     public int ShurikenTurnEndChargeTotal { get; set; }
     public int ShurikenTurnEndChargeCount { get; set; }
 
+    // Kunai and Shuriken share one canonical three-Attack scaling contract.
+    // These matching observation-era counters back their activation-rate rows;
+    // lifetime Activations predates these denominators in existing run files.
+    // RelicAggregate is already keyed by relic id, so both relics deliberately
+    // use these same fields instead of parallel Kunai/Shuriken rate fields.
+    public int ThreeAttackScalingRateActivations { get; set; }
+    public int ThreeAttackScalingTurns { get; set; }
+    public int ThreeAttackScalingCombats { get; set; }
+
     // Paper Phrog tracking. Damage added is the actual current damage amount
     // multiplied by Paper Phrog's extra Vulnerable multiplier. Enhanced attacks
     // count each real damage activation where the relic increased Vulnerable.

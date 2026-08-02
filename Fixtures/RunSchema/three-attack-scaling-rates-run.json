@@ -1,0 +1,42 @@
+{
+  "run_id": "three-attack-scaling-rates-fixture",
+  "started_at": "2026-08-02T18:00:00Z",
+  "updated_at": "2026-08-02T18:20:00Z",
+  "character": "CHAR.SILENT",
+  "ascension": 7,
+  "floor_reached": 24,
+  "outcome": "in_progress",
+  "game_start_time": 1785718800,
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.KUNAI": {
+      "kunai_attacks_played": 20,
+      "activations": 6,
+      "kunai_dexterity_gained": 6,
+      "kunai_turns_ended_at1_charge": 2,
+      "kunai_turns_ended_at2_charges": 3,
+      "kunai_turn_end_charge_total": 8,
+      "kunai_turn_end_charge_count": 8,
+      "three_attack_scaling_rate_activations": 4,
+      "three_attack_scaling_turns": 6,
+      "three_attack_scaling_combats": 2
+    },
+    "RELIC.SHURIKEN": {
+      "shuriken_attacks_played": 20,
+      "activations": 6,
+      "strength_added": 6,
+      "shuriken_turns_ended_at1_charge": 2,
+      "shuriken_turns_ended_at2_charges": 3,
+      "shuriken_turn_end_charge_total": 8,
+      "shuriken_turn_end_charge_count": 8,
+      "three_attack_scaling_rate_activations": 4,
+      "three_attack_scaling_turns": 6,
+      "three_attack_scaling_combats": 2
+    }
+  },
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}
