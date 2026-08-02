@@ -65,7 +65,8 @@ use, discard, and held-at-run-end details appear in their ordinary hover
 tooltips. A used Blood Potion additionally reports the current HP it actually
 restored. A used Explosive Ampoule reports its observed damage attempted,
 damage dealt, damage blocked, overkill, kills, and targets hit. A used Swift
-Potion reports cards actually drawn and card draws blocked.
+Potion reports cards actually drawn and card draws blocked. A used Fortifier
+reports observed block gained, absorbed, and wasted.
 
 The optional, mutually exclusive relic-bar filters hide already-resolved relics
 while leaving them owned, functional, and visible on every other relic surface.

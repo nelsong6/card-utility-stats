@@ -5332,6 +5332,38 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsFortifierPotionRunHistoryFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("fortifier-potion-run-history.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertFortifierPotionHistoryFixture(loaded.Data);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsFortifierPotionRunHistoryFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("fortifier-potion-run-history.json"));
+
+        Assert.NotNull(resumed);
+        AssertFortifierPotionHistoryFixture(resumed!);
+    }
+
+    private static void AssertFortifierPotionHistoryFixture(RunData run)
+    {
+        var potion = Assert.Single(run.PotionHistory);
+        Assert.Equal("POTION.FORTIFIER", potion.PotionId);
+        Assert.True(potion.Used);
+        Assert.Equal(2, potion.UsedTurn);
+        Assert.Equal(12, potion.BlockGained);
+        Assert.Equal(8, potion.BlockEffective);
+        Assert.Equal(4, potion.BlockWasted);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsExplosiveAmpouleRunHistoryFixture()
     {
         var loaded = RunStorage.LoadHistorical(

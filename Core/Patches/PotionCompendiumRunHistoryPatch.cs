@@ -676,6 +676,21 @@ internal static class PotionCompendiumHistoryUi
                     "Card draws blocked",
                     Math.Max(0, entry.CardDrawsBlocked ?? 0).ToString());
             }
+            if (entry.BlockGained.HasValue)
+            {
+                AppendTooltipRow(
+                    body,
+                    "Block gained",
+                    Math.Max(0, entry.BlockGained.Value).ToString());
+                AppendTooltipRow(
+                    body,
+                    "Block absorbed",
+                    Math.Max(0, entry.BlockEffective ?? 0).ToString());
+                AppendTooltipRow(
+                    body,
+                    "Block wasted",
+                    Math.Max(0, entry.BlockWasted ?? 0).ToString());
+            }
             if (entry.DamageAttempted.HasValue)
             {
                 AppendTooltipRow(

@@ -163,6 +163,13 @@ public class PotionRunHistoryEntry
     public int? CardsDrawn { get; set; }
     public int? CardDrawsBlocked { get; set; }
 
+    // Block granted by a potion and its later shared-pool outcomes. Effective
+    // and wasted attribution use the same FIFO/LIFO contributor ledger as
+    // cards and relics.
+    public int? BlockGained { get; set; }
+    public int? BlockEffective { get; set; }
+    public int? BlockWasted { get; set; }
+
     // Observed results from a potion-owned damage command. Nullable fields
     // distinguish older history entries from newly observed zero outcomes.
     // Explosive Ampoule is the first potion to populate this outcome set.

@@ -294,6 +294,17 @@ nonnegative difference between the requested count and that returned count is
 the potion's blocked draws, matching opening-hand relic semantics for No Draw,
 hand capacity, and pile exhaustion.
 
+Fortifier's protected `OnUse` computes its grant from the target's current
+block, then calls the final decimal/`ValueProp` `CreatureCmd.GainBlock`
+overload without passing its potion choice context. Arm only across the direct
+synchronous call from `OnUse`, and keep an async-local stack for every nested
+gain-block command until its task completes. The active Fortifier frame at the
+game's `BlockGainedEntry` is the exact source of the post-modifier amount and a
+potion-owned `BlockChunk`. That chunk shares the normal FIFO absorbed / LIFO
+wasted ledger semantics. If a tracked owner targets a co-op partner, retain the
+observed gain on the potion but do not mix the partner's block pool into the
+tracked player's effective/wasted ledger.
+
 Explosive Ampoule's protected `OnUse` callback snapshots the hittable enemies,
 waits for its VFX, then calls the final multi-target `CreatureCmd.Damage`
 overload. Its branching `PlayerChoiceContext` still has the exact ampoule as

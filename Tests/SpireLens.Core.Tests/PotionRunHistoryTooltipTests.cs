@@ -237,6 +237,77 @@ public class PotionRunHistoryTooltipTests
     }
 
     [Fact]
+    public void FortifierBlockPatches_TargetPotionUseAndFinalGainBlockCommand()
+    {
+        var useTarget = typeof(Fortifier).GetMethod(
+            "OnUse",
+            BindingFlags.NonPublic | BindingFlags.Instance,
+            binder: null,
+            types: [typeof(PlayerChoiceContext), typeof(Creature)],
+            modifiers: null);
+        var blockTarget = typeof(CreatureCmd).GetMethod(
+            nameof(CreatureCmd.GainBlock),
+            BindingFlags.Public | BindingFlags.Static,
+            binder: null,
+            types:
+            [
+                typeof(Creature),
+                typeof(decimal),
+                typeof(ValueProp),
+                typeof(CardPlay),
+                typeof(bool),
+            ],
+            modifiers: null);
+
+        Assert.NotNull(useTarget);
+        Assert.Equal(typeof(Task), useTarget!.ReturnType);
+        Assert.NotNull(blockTarget);
+        Assert.Equal(typeof(Task<decimal>), blockTarget!.ReturnType);
+    }
+
+    [Fact]
+    public void FortifierBlockGain_RecordsObservedAmountAndZeroOutcomes()
+    {
+        var entry = new PotionRunHistoryEntry();
+
+        RunTracker.RecordPotionBlockGainForTest(entry, blockGained: 12);
+
+        Assert.Equal(12, entry.BlockGained);
+        Assert.Equal(0, entry.BlockEffective);
+        Assert.Equal(0, entry.BlockWasted);
+    }
+
+    [Fact]
+    public void FortifierUsedTooltip_ShowsBlockRowsOnlyAtUse()
+    {
+        var entry = new PotionRunHistoryEntry
+        {
+            PotionId = "POTION.FORTIFIER",
+            DisplayName = "Fortifier",
+            Acquired = true,
+            Used = true,
+            UsedFloor = 8,
+            BlockGained = 12,
+            BlockEffective = 8,
+            BlockWasted = 4,
+        };
+
+        var acquiredBody = BuildBody(
+            entry,
+            "in_progress",
+            PotionTimelineOccurrence.Acquired);
+        var usedBody = BuildBody(
+            entry,
+            "in_progress",
+            PotionTimelineOccurrence.Used);
+
+        Assert.DoesNotContain("Block gained", acquiredBody);
+        Assert.Contains("Block gained  [b]12[/b]", usedBody);
+        Assert.Contains("Block absorbed  [b]8[/b]", usedBody);
+        Assert.Contains("Block wasted  [b]4[/b]", usedBody);
+    }
+
+    [Fact]
     public void ExplosiveAmpouleDamagePatch_TargetsFinalMultiTargetDamageCommand()
     {
         var target = typeof(CreatureCmd).GetMethod(

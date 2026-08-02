@@ -81,6 +81,33 @@ public class BlockLedgerConservationTests
     }
 
     [Fact]
+    public void PotionOwnedChunk_CreditsExactPotionEffectiveAndWastedBlock()
+    {
+        var potion = new PotionRunHistoryEntry
+        {
+            Sequence = 7,
+            PotionId = "POTION.FORTIFIER",
+            DisplayName = "Fortifier",
+            Used = true,
+        };
+
+        var pending = RunTracker.RunBlockLedgerWithPotionSourceForTest(
+            potion,
+            amount: 12,
+            blockedDamage: 8,
+            clearedUnusedBlock: 4);
+
+        var tracked = Assert.Single(pending.PotionHistory!);
+        Assert.Equal(12, tracked.BlockGained);
+        Assert.Equal(8, tracked.BlockEffective);
+        Assert.Equal(4, tracked.BlockWasted);
+        Assert.Equal(
+            tracked.BlockGained,
+            tracked.BlockEffective + tracked.BlockWasted);
+        Assert.Empty(pending.PlayerBlockLedger);
+    }
+
+    [Fact]
     public void AllBlockClearedUnused_EachCardFullyWasted()
     {
         // No damage taken; the whole turn's block is cleared unused. With the

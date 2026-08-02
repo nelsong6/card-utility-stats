@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Commands;
@@ -271,6 +272,235 @@ public static class SwiftPotionHistoryDrawPatch
         PlayerChoiceContext Context,
         int CardsRequested);
 }
+
+/// <summary>
+/// Fortifier does not pass its choice context into GainBlock. Keep its exact
+/// direct call identifiable across the command's awaits so the observed block
+/// history entry can own a potion-ledger chunk.
+/// </summary>
+[HarmonyPatch]
+public static class FortifierHistoryUsePatch
+{
+    private static MethodBase? TargetMethod()
+        => AccessTools.Method(
+            typeof(Fortifier),
+            "OnUse",
+            [typeof(PlayerChoiceContext), typeof(Creature)]);
+
+    [HarmonyPrefix]
+    public static void Prefix(
+        Fortifier __instance,
+        Creature target,
+        out FortifierUseFrame? __state)
+    {
+        __state = null;
+
+        try
+        {
+            if (__instance?.Owner == null || target == null) return;
+            __state = FortifierBlockFrameTracker.BeginUse(__instance, target);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug(
+                $"FortifierHistoryUsePatch.Prefix failed: {e.Message}");
+        }
+    }
+
+    [HarmonyPostfix]
+    public static void Postfix(FortifierUseFrame? __state)
+    {
+        if (__state != null)
+            FortifierBlockFrameTracker.EndUse(__state);
+    }
+
+    [HarmonyFinalizer]
+    public static Exception? Finalizer(
+        Exception? __exception,
+        FortifierUseFrame? __state)
+    {
+        if (__exception != null && __state != null)
+            FortifierBlockFrameTracker.EndUse(__state);
+        return __exception;
+    }
+}
+
+[HarmonyPatch(
+    typeof(CreatureCmd),
+    nameof(CreatureCmd.GainBlock),
+    new[]
+    {
+        typeof(Creature),
+        typeof(decimal),
+        typeof(ValueProp),
+        typeof(CardPlay),
+        typeof(bool),
+    })]
+public static class FortifierCreatureGainBlockHistoryPatch
+{
+    [HarmonyPrefix]
+    public static void Prefix(
+        Creature creature,
+        CardPlay? cardPlay,
+        out FortifierBlockCommandFrame? __state)
+    {
+        __state = null;
+
+        try
+        {
+            __state = FortifierBlockFrameTracker.BeginCommand(
+                creature,
+                cardPlay);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug(
+                $"FortifierCreatureGainBlockHistoryPatch.Prefix failed: {e.Message}");
+        }
+    }
+
+    [HarmonyPostfix]
+    public static void Postfix(
+        FortifierBlockCommandFrame? __state,
+        ref Task<decimal> __result)
+    {
+        if (__state == null) return;
+        if (__result == null)
+        {
+            FortifierBlockFrameTracker.EndCommand(__state);
+            return;
+        }
+
+        __result = ObserveBlockAsync(__state, __result);
+    }
+
+    [HarmonyFinalizer]
+    public static Exception? Finalizer(
+        Exception? __exception,
+        FortifierBlockCommandFrame? __state)
+    {
+        if (__exception != null && __state != null)
+            FortifierBlockFrameTracker.EndCommand(__state);
+        return __exception;
+    }
+
+    private static async Task<decimal> ObserveBlockAsync(
+        FortifierBlockCommandFrame state,
+        Task<decimal> inner)
+    {
+        try
+        {
+            var blockGained = await inner.ConfigureAwait(false);
+            if (state.Potion != null)
+                RunTracker.RecordFortifierBlockGain(state.Potion, blockGained);
+            return blockGained;
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug(
+                $"FortifierCreatureGainBlockHistoryPatch.ObserveBlockAsync failed: {e.Message}");
+            throw;
+        }
+        finally
+        {
+            FortifierBlockFrameTracker.EndCommand(state);
+        }
+    }
+}
+
+internal static class FortifierBlockFrameTracker
+{
+    private static readonly AsyncLocal<FortifierUseFrame?> PendingUse = new();
+    private static readonly AsyncLocal<Stack<FortifierBlockCommandFrame>?>
+        ActiveCommands = new();
+
+    internal static FortifierUseFrame BeginUse(
+        Fortifier potion,
+        Creature target)
+    {
+        var frame = new FortifierUseFrame(
+            potion,
+            target,
+            PendingUse.Value);
+        PendingUse.Value = frame;
+        return frame;
+    }
+
+    internal static void EndUse(FortifierUseFrame frame)
+    {
+        if (ReferenceEquals(PendingUse.Value, frame))
+            PendingUse.Value = frame.Previous;
+    }
+
+    internal static FortifierBlockCommandFrame BeginCommand(
+        Creature creature,
+        CardPlay? cardPlay)
+    {
+        Fortifier? potion = null;
+        var pending = PendingUse.Value;
+        if (cardPlay == null
+            && pending != null
+            && ReferenceEquals(pending.Target, creature))
+        {
+            potion = pending.Potion;
+            PendingUse.Value = pending.Previous;
+        }
+
+        var commands = ActiveCommands.Value;
+        if (commands == null)
+        {
+            commands = new Stack<FortifierBlockCommandFrame>();
+            ActiveCommands.Value = commands;
+        }
+
+        var frame = new FortifierBlockCommandFrame(potion, creature);
+        commands.Push(frame);
+        return frame;
+    }
+
+    internal static void EndCommand(FortifierBlockCommandFrame frame)
+    {
+        var commands = ActiveCommands.Value;
+        if (commands == null
+            || commands.Count == 0
+            || !ReferenceEquals(commands.Peek(), frame))
+        {
+            return;
+        }
+
+        commands.Pop();
+        if (commands.Count == 0)
+            ActiveCommands.Value = null;
+    }
+
+    internal static bool TryGetActiveFortifier(
+        Creature creature,
+        out Fortifier? potion)
+    {
+        potion = null;
+        var commands = ActiveCommands.Value;
+        if (commands == null || commands.Count == 0) return false;
+
+        var frame = commands.Peek();
+        if (frame.Potion == null
+            || !ReferenceEquals(frame.Creature, creature))
+        {
+            return false;
+        }
+
+        potion = frame.Potion;
+        return true;
+    }
+}
+
+public sealed record FortifierUseFrame(
+    Fortifier Potion,
+    Creature Target,
+    FortifierUseFrame? Previous);
+
+public sealed record FortifierBlockCommandFrame(
+    Fortifier? Potion,
+    Creature Creature);
 
 /// <summary>
 /// Explosive Ampoule passes its branching choice context into one multi-target

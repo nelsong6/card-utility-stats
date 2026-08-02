@@ -3540,6 +3540,53 @@ public static class RunTracker
         entry.CardDrawsBlocked = Math.Max(0, cardsRequested - observed);
     }
 
+    public static void RecordFortifierBlockGain(
+        Fortifier? potion,
+        decimal blockGained)
+    {
+        if (potion?.Owner == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(potion.Owner)) return;
+
+                EnsureLazyCurrentRunLocked();
+                if (!TryGetPotionSequence(potion, out var sequence)) return;
+                RecordPotionBlockGainedForSequenceLocked(
+                    sequence,
+                    Math.Max(0, (int)blockGained));
+                FinishPotionHistoryMutationLocked();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordFortifierBlockGain failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordPotionBlockGainForTest(
+        PotionRunHistoryEntry entry,
+        int blockGained)
+    {
+        if (entry == null) return;
+        entry.BlockGained = Math.Max(0, blockGained);
+        entry.BlockEffective ??= 0;
+        entry.BlockWasted ??= 0;
+    }
+
+    private static void RecordPotionBlockGainedForSequenceLocked(
+        int sequence,
+        int blockGained)
+    {
+        var entry = GetMutablePotionHistoryLocked().FirstOrDefault(candidate =>
+            candidate.Sequence == sequence);
+        if (entry == null) return;
+        RecordPotionBlockGainForTest(entry, blockGained);
+    }
+
     public static void RecordExplosiveAmpouleDamage(
         ExplosiveAmpoule? potion,
         IEnumerable<DamageResult>? results)
@@ -3850,6 +3897,9 @@ public static class RunTracker
             HpGained = source.HpGained,
             CardsDrawn = source.CardsDrawn,
             CardDrawsBlocked = source.CardDrawsBlocked,
+            BlockGained = source.BlockGained,
+            BlockEffective = source.BlockEffective,
+            BlockWasted = source.BlockWasted,
             DamageAttempted = source.DamageAttempted,
             DamageDealt = source.DamageDealt,
             DamageBlocked = source.DamageBlocked,
@@ -28905,19 +28955,45 @@ public static class RunTracker
         lock (_lock)
         {
             // Co-op: block gained by a partner (or their summon) must not enter
-            // our aggregates/ledger. Non-player receivers unaffected.
-            if (entry.Receiver.IsPlayer && !IsTrackedPlayerCreature(entry.Receiver)) return;
+            // our card/relic aggregates or shared local-player ledger. A
+            // tracked owner's Fortifier can target that partner, however, so
+            // its own observed gain is still retained without a later
+            // effective/wasted ledger claim.
+            bool isTrackedPlayerReceiver = entry.Receiver.IsPlayer
+                && IsTrackedPlayerCreature(entry.Receiver);
+            int? potionSequence = null;
+            if (entry.Receiver.IsPlayer
+                && Patches.FortifierBlockFrameTracker.TryGetActiveFortifier(
+                    entry.Receiver,
+                    out var fortifier)
+                && fortifier?.Owner != null
+                && IsTrackedPlayer(fortifier.Owner)
+                && TryGetPotionSequence(fortifier, out var activePotionSequence))
+            {
+                potionSequence = activePotionSequence;
+            }
+
+            if (entry.Receiver.IsPlayer
+                && !isTrackedPlayerReceiver
+                && !potionSequence.HasValue)
+            {
+                return;
+            }
+
             _pendingCombat ??= new PendingCombat();
 
             string? instanceId = null;
-            bool isFrostOrbBlock = TryRecordFrostOrbBlockLocked(entry);
+            bool isFrostOrbBlock = isTrackedPlayerReceiver
+                && TryRecordFrostOrbBlockLocked(entry);
             bool isOrnamentalFanBlock = !isFrostOrbBlock
-                && entry.Receiver.IsPlayer
+                && isTrackedPlayerReceiver
                 && ConsumePendingCreatureAttribution(
                     _pendingOrnamentalFanBlockHistoryAttributions,
                     entry.Receiver);
             string? relicId = isOrnamentalFanBlock ? OrnamentalFanRelicId : null;
-            bool hasKnownNonCardSource = isFrostOrbBlock || isOrnamentalFanBlock;
+            bool hasKnownNonCardSource = isFrostOrbBlock
+                || isOrnamentalFanBlock
+                || potionSequence.HasValue;
             if (!hasKnownNonCardSource && entry.CardPlay?.Card != null)
             {
                 instanceId = GetOrAssignInstanceId(entry.CardPlay.Card);
@@ -28942,6 +29018,12 @@ public static class RunTracker
                     Blocked = entry.Amount,
                 });
             }
+            else if (potionSequence.HasValue)
+            {
+                RecordPotionBlockGainedForSequenceLocked(
+                    potionSequence.Value,
+                    entry.Amount);
+            }
             else if (!hasKnownNonCardSource && entry.Receiver.IsPlayer)
             {
                 var recvDesc = DescribeCreature(entry.Receiver);
@@ -28949,9 +29031,13 @@ public static class RunTracker
                     $"BlockGainedEntry unattributed receiver={recvDesc} amount={entry.Amount}");
             }
 
-            if (entry.Receiver.IsPlayer)
+            if (isTrackedPlayerReceiver)
             {
-                AppendPlayerBlockChunkLocked(instanceId, relicId, entry.Amount);
+                AppendPlayerBlockChunkLocked(
+                    instanceId,
+                    relicId,
+                    entry.Amount,
+                    potionSequence);
                 ReconcilePlayerBlockLedgerLocked(entry.Receiver);
             }
         }
@@ -29069,7 +29155,8 @@ public static class RunTracker
     private static void AppendPlayerBlockChunkLocked(
         string? cardInstanceId,
         string? relicId,
-        int amount)
+        int amount,
+        int? potionSequence = null)
     {
         if (_pendingCombat == null || amount <= 0) return;
 
@@ -29077,6 +29164,7 @@ public static class RunTracker
         {
             CardInstanceId = cardInstanceId,
             RelicId = relicId,
+            PotionSequence = potionSequence,
             Remaining = amount,
         });
     }
@@ -29105,6 +29193,13 @@ public static class RunTracker
                 var agg = GetOrCreatePendingRelicAggregateLocked(chunk.RelicId);
                 agg.AdditionalBlockEffective += consumed;
             }
+            else if (chunk.PotionSequence.HasValue)
+            {
+                var potion = _pendingCombat.PotionHistory?.FirstOrDefault(entry =>
+                    entry.Sequence == chunk.PotionSequence.Value);
+                if (potion != null)
+                    potion.BlockEffective = (potion.BlockEffective ?? 0) + consumed;
+            }
         }
 
         _pendingCombat.PlayerBlockLedger.RemoveAll(chunk => chunk.Remaining <= 0);
@@ -29132,6 +29227,13 @@ public static class RunTracker
             {
                 var agg = GetOrCreatePendingRelicAggregateLocked(chunk.RelicId);
                 agg.AdditionalBlockWasted += wasted;
+            }
+            else if (chunk.PotionSequence.HasValue)
+            {
+                var potion = _pendingCombat.PotionHistory?.FirstOrDefault(entry =>
+                    entry.Sequence == chunk.PotionSequence.Value);
+                if (potion != null)
+                    potion.BlockWasted = (potion.BlockWasted ?? 0) + wasted;
             }
         }
 
@@ -29164,15 +29266,45 @@ public static class RunTracker
         IEnumerable<(string? cardInstanceId, string? relicId, int amount)> gains,
         int blockedDamage,
         int clearedUnusedBlock)
+        => RunBlockLedgerWithAllSourcesForTest(
+            gains.Select(gain =>
+                (gain.cardInstanceId, gain.relicId, potionSequence: (int?)null, gain.amount)),
+            potionHistory: null,
+            blockedDamage,
+            clearedUnusedBlock);
+
+    internal static PendingCombat RunBlockLedgerWithPotionSourceForTest(
+        PotionRunHistoryEntry potion,
+        int amount,
+        int blockedDamage,
+        int clearedUnusedBlock)
+        => RunBlockLedgerWithAllSourcesForTest(
+            [(cardInstanceId: null, relicId: null, potionSequence: (int?)potion.Sequence, amount)],
+            [potion],
+            blockedDamage,
+            clearedUnusedBlock);
+
+    private static PendingCombat RunBlockLedgerWithAllSourcesForTest(
+        IEnumerable<(
+            string? cardInstanceId,
+            string? relicId,
+            int? potionSequence,
+            int amount)> gains,
+        List<PotionRunHistoryEntry>? potionHistory,
+        int blockedDamage,
+        int clearedUnusedBlock)
     {
         lock (_lock)
         {
             var previous = _pendingCombat;
             try
             {
-                var scratch = new PendingCombat();
+                var scratch = new PendingCombat
+                {
+                    PotionHistory = potionHistory,
+                };
                 _pendingCombat = scratch;
-                foreach (var (cardInstanceId, relicId, amount) in gains)
+                foreach (var (cardInstanceId, relicId, potionSequence, amount) in gains)
                 {
                     // Mirror the production block-gain pairing: the owner aggregate
                     // receives the gain while the source-bearing ledger chunk later
@@ -29187,7 +29319,18 @@ public static class RunTracker
                         else
                             relicAgg.AdditionalBlockGained += amount;
                     }
-                    AppendPlayerBlockChunkLocked(cardInstanceId, relicId, amount);
+                    else if (potionSequence.HasValue)
+                    {
+                        var potion = scratch.PotionHistory?.FirstOrDefault(entry =>
+                            entry.Sequence == potionSequence.Value);
+                        if (potion != null)
+                            RecordPotionBlockGainForTest(potion, amount);
+                    }
+                    AppendPlayerBlockChunkLocked(
+                        cardInstanceId,
+                        relicId,
+                        amount,
+                        potionSequence);
                 }
                 AttributeBlockedDamageLocked(blockedDamage);
                 AttributeUnusedBlockLocked(clearedUnusedBlock);
@@ -30935,6 +31078,7 @@ internal sealed class BlockChunk
 {
     public string? CardInstanceId { get; init; }
     public string? RelicId { get; init; }
+    public int? PotionSequence { get; init; }
     public int Remaining { get; set; }
 }
 
