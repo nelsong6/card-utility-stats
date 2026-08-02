@@ -17728,6 +17728,17 @@ public static class RunTracker
     /// modifier still exposes both the requested and doubled amounts.
     /// Completion is deferred until the game confirms the power application.
     /// </summary>
+    internal static bool IsRuinedHelmetStrengthTrackingWindow(
+        bool hasPendingCombat,
+        bool combatIsInProgress)
+    {
+        // Room-entry relics such as Red Skull apply Strength after CombatSetUp
+        // creates the pending buffer but before the turn loop marks combat as
+        // in progress. Keep the old active-combat fallback for unusual flows
+        // where CombatSetUp was not observed.
+        return hasPendingCombat || combatIsInProgress;
+    }
+
     public static void StageRuinedHelmetStrengthGain(
         RuinedHelmet relic,
         PowerModel canonicalPower,
@@ -17746,7 +17757,12 @@ public static class RunTracker
             try
             {
                 if (!IsTrackedRelic(relic) || !IsTrackedPlayer(relic.Owner)) return;
-                if (CombatManager.Instance?.IsInProgress != true) return;
+                if (!IsRuinedHelmetStrengthTrackingWindow(
+                        _pendingCombat != null,
+                        CombatManager.Instance?.IsInProgress == true))
+                {
+                    return;
+                }
 
                 _pendingCombat ??= new PendingCombat();
                 RecordRuinedHelmetCombatForPlayerLocked(relic.Owner);
@@ -17781,7 +17797,6 @@ public static class RunTracker
                 }
 
                 if (!IsTrackedRelic(relic) || !IsTrackedPlayer(relic.Owner)) return;
-                if (CombatManager.Instance?.IsInProgress != true) return;
 
                 var agg = GetOrCreatePendingRelicAggregateLocked(RuinedHelmetRelicId);
                 RecordRuinedHelmetStrengthGainForTest(agg, strengthAdded);

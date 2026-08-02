@@ -48,6 +48,22 @@ public class RuinedHelmetStatsTests
             appliedTarget!.GetParameters().Select(parameter => parameter.ParameterType));
     }
 
+    [Theory]
+    [InlineData(true, false, true)]
+    [InlineData(false, true, true)]
+    [InlineData(false, false, false)]
+    public void RunTracker_RuinedHelmetTrackingWindow_IncludesRoomEntrySetup(
+        bool hasPendingCombat,
+        bool combatIsInProgress,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            RunTracker.IsRuinedHelmetStrengthTrackingWindow(
+                hasPendingCombat,
+                combatIsInProgress));
+    }
+
     [Fact]
     public void RelicAggregate_RuinedHelmetFields_DefaultToZero()
     {
