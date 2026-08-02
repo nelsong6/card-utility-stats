@@ -179,6 +179,9 @@ in the SpireLens tooltip.
 Toy Box records each wax relic it bestows, the floor where each relic melts,
 and average floors until melting. Wax relic hovers retain their ordinary relic
 stats and append their own bestowed/melted lifecycle rows.
+Musical Box records successfully created Attacks by rarity, averages them over
+all held turns and combats, and counts its exact generated Attacks that later
+exhaust because of Ethereal.
 
 Drain Power additionally tracks its observed discard-pile upgrades and later
 plays of the exact combat cards it upgraded, with held-turn and held-combat

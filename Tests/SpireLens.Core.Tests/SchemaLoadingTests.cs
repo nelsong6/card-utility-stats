@@ -5634,4 +5634,36 @@ public class SchemaLoadingTests
         Assert.Equal(2, relicAgg.Activations);
         Assert.Equal(6, relicAgg.StrengthAdded);
     }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsMusicBoxRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("music-box-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertMusicBoxFixture(loaded.Data.RelicAggregates["RELIC.MUSIC_BOX"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsMusicBoxRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("music-box-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertMusicBoxFixture(resumed!.RelicAggregates["RELIC.MUSIC_BOX"]);
+    }
+
+    private static void AssertMusicBoxFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(7, relicAgg.MusicBoxAttacksCreated);
+        Assert.Equal(2, relicAgg.MusicBoxCommonAttacksCreated);
+        Assert.Equal(2, relicAgg.MusicBoxUncommonAttacksCreated);
+        Assert.Equal(1, relicAgg.MusicBoxRareAttacksCreated);
+        Assert.Equal(3, relicAgg.MusicBoxAttacksExhaustedByEthereal);
+        Assert.Equal(5, relicAgg.MusicBoxTurns);
+        Assert.Equal(2, relicAgg.MusicBoxCombats);
+    }
 }

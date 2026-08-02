@@ -868,6 +868,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is MusicBox)
+        {
+            title = "Musical Box";
+            body = BuildMusicBoxBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is IntimidatingHelmet)
         {
             title = "Intimidating Helmet";
@@ -3029,6 +3036,68 @@ public static class RelicHoverShowPatch
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
         Row3(sb, BlockLabel("avg block per turn"), FormatDecimal(blockPerTurn), "");
         Row3(sb, BlockLabel("avg block per combat"), FormatDecimal(blockPerCombat), "");
+        return sb.ToString();
+    }
+
+    private static string BuildMusicBoxBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var attacksPerTurn = agg.MusicBoxTurns <= 0
+            ? 0m
+            : (decimal)agg.MusicBoxAttacksCreated / agg.MusicBoxTurns;
+        var attacksPerCombat = agg.MusicBoxCombats <= 0
+            ? 0m
+            : (decimal)agg.MusicBoxAttacksCreated / agg.MusicBoxCombats;
+
+        DescribedIconRow(
+            sb,
+            ["attack"],
+            [],
+            "created",
+            agg.MusicBoxAttacksCreated.ToString(),
+            "Attacks created by Musical Box that successfully entered combat.");
+        DescribedIconRow(
+            sb,
+            ["attack_common"],
+            [],
+            "created",
+            agg.MusicBoxCommonAttacksCreated.ToString(),
+            "Common Attacks created by Musical Box.");
+        DescribedIconRow(
+            sb,
+            ["attack_uncommon"],
+            [],
+            "created",
+            agg.MusicBoxUncommonAttacksCreated.ToString(),
+            "Uncommon Attacks created by Musical Box.");
+        DescribedIconRow(
+            sb,
+            ["attack_rare"],
+            [],
+            "created",
+            agg.MusicBoxRareAttacksCreated.ToString(),
+            "Rare Attacks created by Musical Box.");
+        DescribedIconRow(
+            sb,
+            ["average", "attack", "turn"],
+            ["turn"],
+            "created",
+            FormatDecimal(attacksPerTurn),
+            "Average Attacks created by Musical Box per turn while held.");
+        DescribedIconRow(
+            sb,
+            ["average", "attack", "combat"],
+            ["combat"],
+            "created",
+            FormatDecimal(attacksPerCombat),
+            "Average Attacks created by Musical Box per combat while held.");
+        DescribedIconRow(
+            sb,
+            ["attack", "exhaust"],
+            [],
+            "by Ethereal",
+            agg.MusicBoxAttacksExhaustedByEthereal.ToString(),
+            "Musical Box Attacks that remained in hand and exhausted because of Ethereal.");
         return sb.ToString();
     }
 

@@ -1,0 +1,27 @@
+{
+  "run_id": "music-box-relic-fixture",
+  "started_at": "2026-08-02T18:00:00Z",
+  "updated_at": "2026-08-02T18:24:00Z",
+  "character": "CHAR.IRONCLAD",
+  "ascension": 6,
+  "floor_reached": 21,
+  "outcome": "in_progress",
+  "game_start_time": 1785693600,
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.MUSIC_BOX": {
+      "music_box_attacks_created": 7,
+      "music_box_common_attacks_created": 2,
+      "music_box_uncommon_attacks_created": 2,
+      "music_box_rare_attacks_created": 1,
+      "music_box_attacks_exhausted_by_ethereal": 3,
+      "music_box_turns": 5,
+      "music_box_combats": 2
+    }
+  },
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

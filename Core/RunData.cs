@@ -1352,6 +1352,18 @@ public class RelicAggregate
     public int RegaliteCombats { get; set; }
     public int RegaliteTurns { get; set; }
 
+    // Musical Box tracking. Creation uses the final successful combat-pile
+    // result and retains that exact card reference so only a confirmed
+    // causedByEthereal exhaust is counted. Turns and combats are held-period,
+    // zero-inclusive denominators.
+    public int MusicBoxAttacksCreated { get; set; }
+    public int MusicBoxCommonAttacksCreated { get; set; }
+    public int MusicBoxUncommonAttacksCreated { get; set; }
+    public int MusicBoxRareAttacksCreated { get; set; }
+    public int MusicBoxAttacksExhaustedByEthereal { get; set; }
+    public int MusicBoxTurns { get; set; }
+    public int MusicBoxCombats { get; set; }
+
     // Intimidating Helmet tracking. Activations is the number of owner card
     // plays whose play-time EnergyValue met the relic's 2+ threshold;
     // AdditionalBlockGained is the observed block. These are held combat/turn

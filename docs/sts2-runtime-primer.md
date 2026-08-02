@@ -810,6 +810,19 @@ Juggling card tooltip projects that shared record. Count the application turn
 and each later turn that starts with the power, plus each distinct combat, so
 the per-turn and per-combat averages include active zero-copy periods.
 
+Musical Box's owner-specific `AfterCardPlayed` callback retains the first
+owner Attack of the turn in `_cardBeingPlayed`, clones it, gives the clone
+Ethereal, and awaits one `CardPileCmd.AddGeneratedCardToCombat`. Arm a
+single-attempt attribution window only when that private reference is the exact
+callback card, then classify the final successful `CardPileAddResult.cardAdded`
+rather than the requested clone. Keep the exact added card reference through
+combat and consume it only when `Hook.AfterCardExhausted` reports
+`causedByEthereal`; `CardExhaustedEntry` does not preserve that reason. Count
+all successful Attack copies in the total, but keep Basic/Event edge cases out
+of the Common/Uncommon/Rare buckets. Held-turn and held-combat denominators are
+zero-inclusive so the creation averages include turns and combats where the
+box produced no card.
+
 `ViciousPower.AfterPowerAmountChanged` owns the exact trigger condition: a
 positive Vulnerable change applied by the power's owner. Arm a narrow window
 around that callback and consume it at the immediate `CardPileCmd.Draw` call.

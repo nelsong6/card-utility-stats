@@ -2227,6 +2227,13 @@ public static class RunTracker
         target.RegaliteCardsCreated += source.RegaliteCardsCreated;
         target.RegaliteCombats += source.RegaliteCombats;
         target.RegaliteTurns += source.RegaliteTurns;
+        target.MusicBoxAttacksCreated += source.MusicBoxAttacksCreated;
+        target.MusicBoxCommonAttacksCreated += source.MusicBoxCommonAttacksCreated;
+        target.MusicBoxUncommonAttacksCreated += source.MusicBoxUncommonAttacksCreated;
+        target.MusicBoxRareAttacksCreated += source.MusicBoxRareAttacksCreated;
+        target.MusicBoxAttacksExhaustedByEthereal += source.MusicBoxAttacksExhaustedByEthereal;
+        target.MusicBoxTurns += source.MusicBoxTurns;
+        target.MusicBoxCombats += source.MusicBoxCombats;
         target.IntimidatingHelmetCombats += source.IntimidatingHelmetCombats;
         target.IntimidatingHelmetTurns += source.IntimidatingHelmetTurns;
         target.DaughterOfTheWindCombats += source.DaughterOfTheWindCombats;
@@ -7088,6 +7095,7 @@ public static class RunTracker
     private const string ShurikenRelicId = "RELIC.SHURIKEN";
     private const string PaperPhrogRelicId = "RELIC.PAPER_PHROG";
     private const string RegaliteRelicId = "RELIC.REGALITE";
+    private const string MusicBoxRelicId = "RELIC.MUSIC_BOX";
     private const string IntimidatingHelmetRelicId = "RELIC.INTIMIDATING_HELMET";
     private const string DaughterOfTheWindRelicId = "RELIC.DAUGHTER_OF_THE_WIND";
     private const string SturdyClampRelicId = "RELIC.STURDY_CLAMP";
@@ -17416,6 +17424,178 @@ public static class RunTracker
         }
     }
 
+    internal static PendingMusicBoxCreationWindow? ArmMusicBoxCreationAttribution(
+        MusicBox? relic,
+        CardPlay? cardPlay)
+    {
+        if (relic?.Owner == null || cardPlay?.Card == null) return null;
+
+        lock (_lock)
+        {
+            try
+            {
+                var player = relic.Owner;
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(player)) return null;
+                if (CombatManager.Instance?.IsInProgress != true) return null;
+                if (!ReferenceEquals(cardPlay.Card.Owner, player)) return null;
+                if (cardPlay.Card.Type != CardType.Attack) return null;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordMusicBoxCombatForPlayerLocked(player);
+                RecordMusicBoxTurnForPlayerLocked(player);
+
+                var window = new PendingMusicBoxCreationWindow
+                {
+                    Player = player,
+                    SourceCardId = cardPlay.Card.Id.ToString(),
+                    RemainingAttempts = 1,
+                };
+                _pendingCombat.PendingMusicBoxCreationWindows[player] = window;
+                return window;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"ArmMusicBoxCreationAttribution failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+    internal static PendingMusicBoxCreationWindow? CaptureMusicBoxCreationAttempt(
+        CardModel? card,
+        Player? creator)
+    {
+        if (card == null || creator == null) return null;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null) return null;
+                if (!_pendingCombat.PendingMusicBoxCreationWindows.TryGetValue(
+                        creator,
+                        out var window))
+                {
+                    return null;
+                }
+
+                if (window.RemainingAttempts <= 0) return null;
+                if (card.Type != CardType.Attack) return null;
+                if (!string.Equals(
+                        card.Id.ToString(),
+                        window.SourceCardId,
+                        StringComparison.Ordinal))
+                {
+                    return null;
+                }
+
+                window.RemainingAttempts--;
+                return window;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"CaptureMusicBoxCreationAttempt failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+    internal static void RecordMusicBoxCreationResult(
+        PendingMusicBoxCreationWindow? window,
+        CardPileAddResult result)
+    {
+        if (window == null || !result.success || result.cardAdded == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null || !IsTrackedPlayer(window.Player)) return;
+                if (!_pendingCombat.PendingMusicBoxCreationWindows.TryGetValue(
+                        window.Player,
+                        out var activeWindow)
+                    || !ReferenceEquals(activeWindow, window))
+                {
+                    return;
+                }
+
+                if (!ReferenceEquals(result.cardAdded.Owner, window.Player)) return;
+                if (result.cardAdded.Type != CardType.Attack) return;
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(MusicBoxRelicId);
+                RecordMusicBoxAttackCreatedForTest(
+                    agg,
+                    success: true,
+                    result.cardAdded.Rarity);
+                _pendingCombat.MusicBoxGeneratedAttacks.Add(result.cardAdded);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordMusicBoxCreationResult failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void DisarmMusicBoxCreationAttribution(
+        PendingMusicBoxCreationWindow? window)
+    {
+        if (window == null) return;
+
+        lock (_lock)
+        {
+            if (_pendingCombat == null) return;
+            if (_pendingCombat.PendingMusicBoxCreationWindows.TryGetValue(
+                    window.Player,
+                    out var activeWindow)
+                && ReferenceEquals(activeWindow, window))
+            {
+                _pendingCombat.PendingMusicBoxCreationWindows.Remove(window.Player);
+            }
+        }
+    }
+
+    public static void RecordMusicBoxEtherealExhaust(
+        CardModel? card,
+        bool causedByEthereal)
+    {
+        if (card == null || !causedByEthereal) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null) return;
+                if (!_pendingCombat.MusicBoxGeneratedAttacks.Remove(card)) return;
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(MusicBoxRelicId);
+                RecordMusicBoxEtherealExhaustForTest(agg);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordMusicBoxEtherealExhaust failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordMusicBoxTurnStarted(Player player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                _pendingCombat ??= new PendingCombat();
+                RecordMusicBoxTurnForPlayerLocked(player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordMusicBoxTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
     /// <summary>
     /// Count one owner card play that meets Intimidating Helmet's exact
     /// play-time EnergyValue threshold, then arm the relic's immediately
@@ -17866,6 +18046,48 @@ public static class RunTracker
     {
         if (agg == null) return;
         agg.RegaliteTurns += Math.Max(0, count);
+    }
+
+    internal static void RecordMusicBoxAttackCreatedForTest(
+        RelicAggregate agg,
+        bool success,
+        CardRarity? rarity)
+    {
+        if (agg == null || !success) return;
+
+        agg.MusicBoxAttacksCreated++;
+        switch (rarity)
+        {
+            case CardRarity.Common:
+                agg.MusicBoxCommonAttacksCreated++;
+                break;
+            case CardRarity.Uncommon:
+                agg.MusicBoxUncommonAttacksCreated++;
+                break;
+            case CardRarity.Rare:
+                agg.MusicBoxRareAttacksCreated++;
+                break;
+        }
+    }
+
+    internal static void RecordMusicBoxEtherealExhaustForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.MusicBoxAttacksExhaustedByEthereal += Math.Max(0, count);
+    }
+
+    internal static void RecordMusicBoxTurnForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.MusicBoxTurns += Math.Max(0, count);
+    }
+
+    internal static void RecordMusicBoxCombatForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.MusicBoxCombats += Math.Max(0, count);
     }
 
     internal static bool IntimidatingHelmetEnergyValueQualifiesForTest(int energyValue, int threshold = 2)
@@ -23530,6 +23752,18 @@ public static class RunTracker
         }
     }
 
+    private static bool PlayerHasMusicBox(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is MusicBox);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static bool PlayerHasIntimidatingHelmet(Player player)
     {
         try
@@ -23795,6 +24029,7 @@ public static class RunTracker
             RecordWarHammerCombatForPlayerLocked(player);
             RecordTriBoomerangCombatForPlayerLocked(player);
             RecordRegaliteCombatForPlayerLocked(player);
+            RecordMusicBoxCombatForPlayerLocked(player);
             RecordIntimidatingHelmetCombatForPlayerLocked(player);
             RecordDaughterOfTheWindCombatForPlayerLocked(player);
             RecordOrnamentalFanCombatForPlayerLocked(player);
@@ -24771,6 +25006,38 @@ public static class RunTracker
 
         var agg = GetOrCreatePendingRelicAggregateLocked(RegaliteRelicId);
         RecordRegaliteTurnForTest(agg);
+    }
+
+    private static void RecordMusicBoxCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasMusicBox(player)) return;
+        if (!_pendingCombat.MusicBoxCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(MusicBoxRelicId);
+        RecordMusicBoxCombatForTest(agg);
+    }
+
+    private static void RecordMusicBoxTurnForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasMusicBox(player)) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.MusicBoxTurnCountedTurns.TryGetValue(
+                player,
+                out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.MusicBoxTurnCountedTurns[player] = turnNumber;
+        RecordMusicBoxCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(MusicBoxRelicId);
+        RecordMusicBoxTurnForTest(agg);
     }
 
     private static void RecordIntimidatingHelmetCombatForPlayerLocked(Player player)
@@ -30846,6 +31113,13 @@ internal sealed class PendingBurningSticksDuplicateWindow
     public int RemainingAttempts { get; set; }
 }
 
+internal sealed class PendingMusicBoxCreationWindow
+{
+    public required Player Player { get; init; }
+    public string SourceCardId { get; init; } = "";
+    public int RemainingAttempts { get; set; }
+}
+
 internal sealed class PendingFreeAttackUse
 {
     public required FreeAttackPower Power { get; init; }
@@ -31176,6 +31450,14 @@ internal class PendingCombat
     public HashSet<Player> RegaliteCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> RegaliteTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> MusicBoxCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> MusicBoxTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, PendingMusicBoxCreationWindow> PendingMusicBoxCreationWindows { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<CardModel> MusicBoxGeneratedAttacks { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> IntimidatingHelmetCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

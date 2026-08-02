@@ -552,6 +552,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `toy-box-wax-relic-run.json`
   Adds Toy Box's ordered wax-relic ledger with observed bestowed and melted
   floors while preserving each wax relic's ordinary effect aggregate by id.
+- `music-box-relic-run.json`
+  Adds Musical Box's successfully created Attacks, Common/Uncommon/Rare splits,
+  Ethereal exhausts, and zero-inclusive held turn/combat denominators.
 
 Why these exist:
 
