@@ -157,6 +157,16 @@ public class PotionRunHistoryEntry
     // Blood Potion is the first potion to populate this outcome.
     public int? HpGained { get; set; }
 
+    // Observed results from a potion-owned damage command. Nullable fields
+    // distinguish older history entries from newly observed zero outcomes.
+    // Explosive Ampoule is the first potion to populate this outcome set.
+    public int? DamageAttempted { get; set; }
+    public int? DamageDealt { get; set; }
+    public int? DamageBlocked { get; set; }
+    public int? DamageOverkill { get; set; }
+    public int? Kills { get; set; }
+    public int? TargetsHit { get; set; }
+
     public bool Discarded { get; set; }
     public int? DiscardedFloor { get; set; }
     public string? DiscardedLocationKind { get; set; }

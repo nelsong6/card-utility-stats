@@ -3493,6 +3493,81 @@ public static class RunTracker
         entry.HpGained = Math.Max(0, currentHp - initialHp);
     }
 
+    public static void RecordExplosiveAmpouleDamage(
+        ExplosiveAmpoule? potion,
+        IEnumerable<DamageResult>? results)
+    {
+        if (potion?.Owner == null || results == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(potion.Owner)) return;
+
+                EnsureLazyCurrentRunLocked();
+                var history = GetMutablePotionHistoryLocked();
+                if (!TryGetPotionSequence(potion, out var sequence)) return;
+                var entry = history.FirstOrDefault(candidate =>
+                    candidate.Sequence == sequence);
+                if (entry == null) return;
+
+                RecordPotionAoeDamageForTest(
+                    entry,
+                    results.Where(result => result != null).Select(result =>
+                        (
+                            result.BlockedDamage,
+                            result.UnblockedDamage,
+                            result.OverkillDamage,
+                            result.WasTargetKilled)));
+                FinishPotionHistoryMutationLocked();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordExplosiveAmpouleDamage failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordPotionAoeDamageForTest(
+        PotionRunHistoryEntry entry,
+        IEnumerable<(
+            int BlockedDamage,
+            int UnblockedDamage,
+            int OverkillDamage,
+            bool WasTargetKilled)> results)
+    {
+        if (entry == null || results == null) return;
+
+        int attempted = 0;
+        int dealt = 0;
+        int blocked = 0;
+        int overkill = 0;
+        int kills = 0;
+        int targets = 0;
+        foreach (var result in results)
+        {
+            var damageTotals = ComputeEnemyDamageTotals(
+                result.BlockedDamage,
+                result.UnblockedDamage,
+                result.OverkillDamage);
+            attempted += damageTotals.IntendedDamage;
+            dealt += damageTotals.EffectiveDamage;
+            blocked += result.BlockedDamage;
+            overkill += result.OverkillDamage;
+            targets += 1;
+            if (result.WasTargetKilled) kills += 1;
+        }
+
+        entry.DamageAttempted = attempted;
+        entry.DamageDealt = dealt;
+        entry.DamageBlocked = blocked;
+        entry.DamageOverkill = overkill;
+        entry.Kills = kills;
+        entry.TargetsHit = targets;
+    }
+
     public static void RecordPotionDiscarded(Player? player, PotionModel? potion)
     {
         RecordPotionDisposition(player, potion, used: false);
@@ -3726,6 +3801,12 @@ public static class RunTracker
             UsedLocationName = source.UsedLocationName,
             UsedTurn = source.UsedTurn,
             HpGained = source.HpGained,
+            DamageAttempted = source.DamageAttempted,
+            DamageDealt = source.DamageDealt,
+            DamageBlocked = source.DamageBlocked,
+            DamageOverkill = source.DamageOverkill,
+            Kills = source.Kills,
+            TargetsHit = source.TargetsHit,
             Discarded = source.Discarded,
             DiscardedFloor = source.DiscardedFloor,
             DiscardedLocationKind = source.DiscardedLocationKind,

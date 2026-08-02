@@ -285,6 +285,16 @@ the mutable potion reference. This supports another player as the target,
 records zero when used at full HP, respects heal clamping and prevention, and
 excludes unrelated healing from later generic potion hooks.
 
+Explosive Ampoule's protected `OnUse` callback snapshots the hittable enemies,
+waits for its VFX, then calls the final multi-target `CreatureCmd.Damage`
+overload. Its branching `PlayerChoiceContext` still has the exact ampoule as
+`LastInvolvedModel` when that command begins. Use that model reference instead
+of a dealer-wide attribution window, wrap the returned damage task, and attach
+the observed blocked/unblocked/overkill/kill split to the already-bound potion
+history entry. An empty result is still an observed zero-target outcome; older
+entries remain distinguishable because the persisted damage fields are
+nullable.
+
 Jack of All Trades selects distinct cards from the unlocked colorless combat
 pool, then awaits `CardPileCmd.AddGeneratedCardToCombat` once for each selected
 card. Capture the currently resolving physical Jack before each async command,

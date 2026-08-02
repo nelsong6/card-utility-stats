@@ -1,7 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using System.Threading.Tasks;
 using HarmonyLib;
+using MegaCrit.Sts2.Core.Commands;
+using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Merchant;
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Entities.Players;
@@ -10,6 +13,7 @@ using MegaCrit.Sts2.Core.GameActions.Multiplayer;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Potions;
 using MegaCrit.Sts2.Core.Rewards;
+using MegaCrit.Sts2.Core.ValueProps;
 
 namespace SpireLens.Core.Patches;
 
@@ -148,6 +152,80 @@ public static class BloodPotionHistoryHealingPatch
         Player? Player,
         Creature? Target,
         int InitialHp);
+}
+
+/// <summary>
+/// Explosive Ampoule passes its branching choice context into one multi-target
+/// damage command while the potion remains the last involved model. That
+/// context identifies the exact potion without a dealer-wide attribution
+/// window, and the command result supplies the observed AOE damage split.
+/// </summary>
+[HarmonyPatch(
+    typeof(CreatureCmd),
+    nameof(CreatureCmd.Damage),
+    new[]
+    {
+        typeof(PlayerChoiceContext),
+        typeof(IEnumerable<Creature>),
+        typeof(decimal),
+        typeof(ValueProp),
+        typeof(Creature),
+        typeof(CardModel),
+        typeof(CardPlay),
+    })]
+public static class ExplosiveAmpouleHistoryDamagePatch
+{
+    [HarmonyPrefix]
+    public static void Prefix(
+        PlayerChoiceContext choiceContext,
+        Creature? dealer,
+        out ExplosiveAmpoule? __state)
+    {
+        __state = null;
+
+        try
+        {
+            if (choiceContext?.LastInvolvedModel is not ExplosiveAmpoule potion)
+                return;
+            if (!ReferenceEquals(potion.Owner?.Creature, dealer)) return;
+
+            __state = potion;
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug(
+                $"ExplosiveAmpouleHistoryDamagePatch.Prefix failed: {e.Message}");
+        }
+    }
+
+    [HarmonyPostfix]
+    public static void Postfix(
+        ExplosiveAmpoule? __state,
+        ref Task<IEnumerable<DamageResult>> __result)
+    {
+        if (__state == null || __result == null) return;
+        __result = ObserveDamageAsync(__state, __result);
+    }
+
+    private static async Task<IEnumerable<DamageResult>> ObserveDamageAsync(
+        ExplosiveAmpoule potion,
+        Task<IEnumerable<DamageResult>> inner)
+    {
+        try
+        {
+            var results = await inner.ConfigureAwait(false);
+            var materialized = results as IReadOnlyList<DamageResult>
+                ?? new List<DamageResult>(results);
+            RunTracker.RecordExplosiveAmpouleDamage(potion, materialized);
+            return materialized;
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug(
+                $"ExplosiveAmpouleHistoryDamagePatch.ObserveDamageAsync failed: {e.Message}");
+            throw;
+        }
+    }
 }
 
 [HarmonyPatch(typeof(Player), "DiscardPotionInternal")]

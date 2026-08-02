@@ -665,6 +665,33 @@ internal static class PotionCompendiumHistoryUi
                     "HP gained",
                     Math.Max(0, entry.HpGained.Value).ToString());
             }
+            if (entry.DamageAttempted.HasValue)
+            {
+                AppendTooltipRow(
+                    body,
+                    "Damage attempted",
+                    Math.Max(0, entry.DamageAttempted.Value).ToString());
+                AppendTooltipRow(
+                    body,
+                    "Damage dealt",
+                    Math.Max(0, entry.DamageDealt ?? 0).ToString());
+                AppendTooltipRow(
+                    body,
+                    "Damage blocked",
+                    Math.Max(0, entry.DamageBlocked ?? 0).ToString());
+                AppendTooltipRow(
+                    body,
+                    "Overkill",
+                    Math.Max(0, entry.DamageOverkill ?? 0).ToString());
+                AppendTooltipRow(
+                    body,
+                    "Kills",
+                    Math.Max(0, entry.Kills ?? 0).ToString());
+                AppendTooltipRow(
+                    body,
+                    "Targets hit",
+                    Math.Max(0, entry.TargetsHit ?? 0).ToString());
+            }
         }
         else if (occurrence == PotionTimelineOccurrence.Discarded)
         {

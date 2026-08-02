@@ -524,6 +524,10 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `blood-potion-run-history.json`
   Adds Blood Potion's observed current-HP restoration to its exact used
   potion-history entry.
+- `explosive-ampoule-run-history.json`
+  Adds Explosive Ampoule's observed attempted, effective, blocked, and
+  overkill damage plus kills and targets hit to its exact used potion-history
+  entry.
 - `potion-slot-relic-combat-start-run.json`
   Adds zero-inclusive combat-start potion-count totals and samples for Potion
   Belt, Alchemical Coffer, and Phial Holster.

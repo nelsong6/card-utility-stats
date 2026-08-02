@@ -5301,6 +5301,41 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsExplosiveAmpouleRunHistoryFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("explosive-ampoule-run-history.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertExplosiveAmpouleHistoryFixture(loaded.Data);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsExplosiveAmpouleRunHistoryFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("explosive-ampoule-run-history.json"));
+
+        Assert.NotNull(resumed);
+        AssertExplosiveAmpouleHistoryFixture(resumed!);
+    }
+
+    private static void AssertExplosiveAmpouleHistoryFixture(RunData run)
+    {
+        var potion = Assert.Single(run.PotionHistory);
+        Assert.Equal("POTION.EXPLOSIVE_AMPOULE", potion.PotionId);
+        Assert.True(potion.Used);
+        Assert.Equal(2, potion.UsedTurn);
+        Assert.Equal(20, potion.DamageAttempted);
+        Assert.Equal(9, potion.DamageDealt);
+        Assert.Equal(4, potion.DamageBlocked);
+        Assert.Equal(7, potion.DamageOverkill);
+        Assert.Equal(1, potion.Kills);
+        Assert.Equal(2, potion.TargetsHit);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsPotionSlotRelicCombatStartFixture()
     {
         var loaded = RunStorage.LoadHistorical(

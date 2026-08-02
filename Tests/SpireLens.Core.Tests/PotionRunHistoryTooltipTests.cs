@@ -1,9 +1,13 @@
 using System;
 using System.Reflection;
 using System.Threading.Tasks;
+using MegaCrit.Sts2.Core.Commands;
+using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
+using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Potions;
+using MegaCrit.Sts2.Core.ValueProps;
 using SpireLens.Core.Patches;
 using Xunit;
 
@@ -158,6 +162,87 @@ public class PotionRunHistoryTooltipTests
 
         Assert.DoesNotContain("HP gained", acquiredBody);
         Assert.Contains("HP gained  [b]12[/b]", usedBody);
+    }
+
+    [Fact]
+    public void ExplosiveAmpouleDamagePatch_TargetsFinalMultiTargetDamageCommand()
+    {
+        var target = typeof(CreatureCmd).GetMethod(
+            nameof(CreatureCmd.Damage),
+            BindingFlags.Public | BindingFlags.Static,
+            binder: null,
+            types:
+            [
+                typeof(PlayerChoiceContext),
+                typeof(IEnumerable<Creature>),
+                typeof(decimal),
+                typeof(ValueProp),
+                typeof(Creature),
+                typeof(CardModel),
+                typeof(CardPlay),
+            ],
+            modifiers: null);
+
+        Assert.NotNull(target);
+        Assert.Equal(
+            typeof(Task<IEnumerable<DamageResult>>),
+            target!.ReturnType);
+    }
+
+    [Fact]
+    public void ExplosiveAmpouleDamage_RecordsObservedAoeDamageSplit()
+    {
+        var entry = new PotionRunHistoryEntry();
+
+        RunTracker.RecordPotionAoeDamageForTest(
+            entry,
+            [
+                (BlockedDamage: 4, UnblockedDamage: 6, OverkillDamage: 0, WasTargetKilled: false),
+                (BlockedDamage: 0, UnblockedDamage: 3, OverkillDamage: 7, WasTargetKilled: true),
+            ]);
+
+        Assert.Equal(20, entry.DamageAttempted);
+        Assert.Equal(9, entry.DamageDealt);
+        Assert.Equal(4, entry.DamageBlocked);
+        Assert.Equal(7, entry.DamageOverkill);
+        Assert.Equal(1, entry.Kills);
+        Assert.Equal(2, entry.TargetsHit);
+    }
+
+    [Fact]
+    public void ExplosiveAmpouleUsedTooltip_ShowsAoeDamageRowsOnlyAtUse()
+    {
+        var entry = new PotionRunHistoryEntry
+        {
+            PotionId = "POTION.EXPLOSIVE_AMPOULE",
+            DisplayName = "Explosive Ampoule",
+            Acquired = true,
+            Used = true,
+            UsedFloor = 8,
+            DamageAttempted = 20,
+            DamageDealt = 9,
+            DamageBlocked = 4,
+            DamageOverkill = 7,
+            Kills = 1,
+            TargetsHit = 2,
+        };
+
+        var acquiredBody = BuildBody(
+            entry,
+            "in_progress",
+            PotionTimelineOccurrence.Acquired);
+        var usedBody = BuildBody(
+            entry,
+            "in_progress",
+            PotionTimelineOccurrence.Used);
+
+        Assert.DoesNotContain("Damage attempted", acquiredBody);
+        Assert.Contains("Damage attempted  [b]20[/b]", usedBody);
+        Assert.Contains("Damage dealt  [b]9[/b]", usedBody);
+        Assert.Contains("Damage blocked  [b]4[/b]", usedBody);
+        Assert.Contains("Overkill  [b]7[/b]", usedBody);
+        Assert.Contains("Kills  [b]1[/b]", usedBody);
+        Assert.Contains("Targets hit  [b]2[/b]", usedBody);
     }
 
     private static string BuildBody(
