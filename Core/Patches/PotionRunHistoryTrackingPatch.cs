@@ -175,21 +175,37 @@ public static class BloodPotionHistoryHealingPatch
     })]
 public static class ExplosiveAmpouleHistoryDamagePatch
 {
+    private static readonly HashSet<PlayerChoiceContext> ClaimedContexts =
+        new(ReferenceEqualityComparer.Instance);
+
     [HarmonyPrefix]
     public static void Prefix(
         PlayerChoiceContext choiceContext,
         Creature? dealer,
-        out ExplosiveAmpoule? __state)
+        CardModel? cardSource,
+        CardPlay? cardPlay,
+        out ExplosiveAmpouleDamageState? __state)
     {
         __state = null;
 
         try
         {
-            if (choiceContext?.LastInvolvedModel is not ExplosiveAmpoule potion)
+            if (choiceContext is not BranchingPlayerChoiceContext
+                {
+                    Source: ExplosiveAmpoule potion,
+                    LastInvolvedModel: ExplosiveAmpoule involvedPotion,
+                })
                 return;
+            if (!ReferenceEquals(potion, involvedPotion)) return;
             if (!ReferenceEquals(potion.Owner?.Creature, dealer)) return;
+            if (cardSource != null || cardPlay != null) return;
 
-            __state = potion;
+            lock (ClaimedContexts)
+            {
+                if (!ClaimedContexts.Add(choiceContext)) return;
+            }
+
+            __state = new ExplosiveAmpouleDamageState(potion, choiceContext);
         }
         catch (Exception e)
         {
@@ -200,15 +216,31 @@ public static class ExplosiveAmpouleHistoryDamagePatch
 
     [HarmonyPostfix]
     public static void Postfix(
-        ExplosiveAmpoule? __state,
+        ExplosiveAmpouleDamageState? __state,
         ref Task<IEnumerable<DamageResult>> __result)
     {
-        if (__state == null || __result == null) return;
+        if (__state == null) return;
+        if (__result == null)
+        {
+            ReleaseContext(__state.Context);
+            return;
+        }
+
         __result = ObserveDamageAsync(__state, __result);
     }
 
+    [HarmonyFinalizer]
+    public static Exception? Finalizer(
+        Exception? __exception,
+        ExplosiveAmpouleDamageState? __state)
+    {
+        if (__exception != null && __state != null)
+            ReleaseContext(__state.Context);
+        return __exception;
+    }
+
     private static async Task<IEnumerable<DamageResult>> ObserveDamageAsync(
-        ExplosiveAmpoule potion,
+        ExplosiveAmpouleDamageState state,
         Task<IEnumerable<DamageResult>> inner)
     {
         try
@@ -216,7 +248,7 @@ public static class ExplosiveAmpouleHistoryDamagePatch
             var results = await inner.ConfigureAwait(false);
             var materialized = results as IReadOnlyList<DamageResult>
                 ?? new List<DamageResult>(results);
-            RunTracker.RecordExplosiveAmpouleDamage(potion, materialized);
+            RunTracker.RecordExplosiveAmpouleDamage(state.Potion, materialized);
             return materialized;
         }
         catch (Exception e)
@@ -225,7 +257,21 @@ public static class ExplosiveAmpouleHistoryDamagePatch
                 $"ExplosiveAmpouleHistoryDamagePatch.ObserveDamageAsync failed: {e.Message}");
             throw;
         }
+        finally
+        {
+            ReleaseContext(state.Context);
+        }
     }
+
+    private static void ReleaseContext(PlayerChoiceContext context)
+    {
+        lock (ClaimedContexts)
+            ClaimedContexts.Remove(context);
+    }
+
+    public sealed record ExplosiveAmpouleDamageState(
+        ExplosiveAmpoule Potion,
+        PlayerChoiceContext Context);
 }
 
 [HarmonyPatch(typeof(Player), "DiscardPotionInternal")]

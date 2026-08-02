@@ -289,11 +289,13 @@ Explosive Ampoule's protected `OnUse` callback snapshots the hittable enemies,
 waits for its VFX, then calls the final multi-target `CreatureCmd.Damage`
 overload. Its branching `PlayerChoiceContext` still has the exact ampoule as
 `LastInvolvedModel` when that command begins. Use that model reference instead
-of a dealer-wide attribution window, wrap the returned damage task, and attach
-the observed blocked/unblocked/overkill/kill split to the already-bound potion
-history entry. An empty result is still an observed zero-target outcome; older
-entries remain distinguishable because the persisted damage fields are
-nullable.
+of a dealer-wide attribution window, require the same ampoule as the branching
+context's `Source`, and claim the context's first owner-dealt, non-card damage
+command so nested damage cannot overwrite the potion's result. Wrap the
+returned damage task and attach the observed blocked/unblocked/overkill/kill
+split to the already-bound potion history entry. An empty result is still an
+observed zero-target outcome; older entries remain distinguishable because the
+persisted damage fields are nullable.
 
 Jack of All Trades selects distinct cards from the unlocked colorless combat
 pool, then awaits `CardPileCmd.AddGeneratedCardToCombat` once for each selected
