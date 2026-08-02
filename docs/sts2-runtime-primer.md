@@ -277,6 +277,14 @@ Weak Potion observed rather than the third potion of any kind. Potion mutations
 that happen in combat belong in the pending-combat history snapshot; their
 merged gallery view is immediate, but they are not persisted until promotion.
 
+Blood Potion's protected `OnUse` callback owns and awaits its one
+`CreatureCmd.Heal` call before the broader `AfterPotionUsed` hook runs. Snapshot
+the targeted player's current HP around that exact callback and attach the
+nonnegative observed delta to the owner's potion-history entry already bound to
+the mutable potion reference. This supports another player as the target,
+records zero when used at full HP, respects heal clamping and prevention, and
+excludes unrelated healing from later generic potion hooks.
+
 Jack of All Trades selects distinct cards from the unlocked colorless combat
 pool, then awaits `CardPileCmd.AddGeneratedCardToCombat` once for each selected
 card. Capture the currently resolving physical Jack before each async command,

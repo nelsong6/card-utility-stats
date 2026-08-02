@@ -1,8 +1,14 @@
+using System;
+using System.Reflection;
+using System.Threading.Tasks;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Entities.Merchant;
+using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Entities.Potions;
+using MegaCrit.Sts2.Core.GameActions.Multiplayer;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Models.Potions;
 using MegaCrit.Sts2.Core.Rewards;
 
 namespace SpireLens.Core.Patches;
@@ -46,6 +52,102 @@ public static class PotionHistoryUsedPatch
             RunTracker.RecordPotionUsed(__instance, potion);
         });
     }
+}
+
+/// <summary>
+/// Blood Potion owns one awaited heal command. Observe current HP around that
+/// exact callback so the history records restored HP after clamping without
+/// including unrelated AfterPotionUsed hook effects.
+/// </summary>
+[HarmonyPatch]
+public static class BloodPotionHistoryHealingPatch
+{
+    private static MethodBase? TargetMethod()
+        => AccessTools.Method(
+            typeof(BloodPotion),
+            "OnUse",
+            [typeof(PlayerChoiceContext), typeof(Creature)]);
+
+    [HarmonyPrefix]
+    public static void Prefix(
+        BloodPotion __instance,
+        Creature target,
+        out BloodPotionUseState __state)
+    {
+        __state = default;
+        try
+        {
+            var player = __instance?.Owner;
+            if (player == null
+                || target == null
+                || target.Player == null)
+            {
+                return;
+            }
+
+            __state = new BloodPotionUseState(player, target, target.CurrentHp);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug(
+                $"BloodPotionHistoryHealingPatch.Prefix failed: {e.Message}");
+        }
+    }
+
+    [HarmonyPostfix]
+    public static void Postfix(
+        BloodPotion __instance,
+        BloodPotionUseState __state,
+        ref Task __result)
+    {
+        try
+        {
+            if (__state.Player == null || __state.Target == null) return;
+            if (__result == null)
+            {
+                RunTracker.RecordBloodPotionHealing(
+                    __instance,
+                    __state.Player,
+                    __state.InitialHp,
+                    __state.Target.CurrentHp);
+                return;
+            }
+
+            __result = ObserveAsync(__instance, __state, __result);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug(
+                $"BloodPotionHistoryHealingPatch.Postfix failed: {e.Message}");
+        }
+    }
+
+    private static async Task ObserveAsync(
+        BloodPotion potion,
+        BloodPotionUseState state,
+        Task inner)
+    {
+        try
+        {
+            await inner.ConfigureAwait(false);
+            RunTracker.RecordBloodPotionHealing(
+                potion,
+                state.Player,
+                state.InitialHp,
+                state.Target?.CurrentHp ?? state.InitialHp);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug(
+                $"BloodPotionHistoryHealingPatch.ObserveAsync failed: {e.Message}");
+            throw;
+        }
+    }
+
+    public readonly record struct BloodPotionUseState(
+        Player? Player,
+        Creature? Target,
+        int InitialHp);
 }
 
 [HarmonyPatch(typeof(Player), "DiscardPotionInternal")]

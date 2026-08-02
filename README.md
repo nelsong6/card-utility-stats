@@ -62,7 +62,8 @@ discarded, or held-at-run-end potion repeats with the same per-potion-type
 instance number and a native connector back to its acquisition. Timeline
 entries remain the gallery's native hoverable potion holders; acquisition,
 use, discard, and held-at-run-end details appear in their ordinary hover
-tooltips.
+tooltips. A used Blood Potion additionally reports the current HP it actually
+restored.
 
 The optional, mutually exclusive relic-bar filters hide already-resolved relics
 while leaving them owned, functional, and visible on every other relic surface.

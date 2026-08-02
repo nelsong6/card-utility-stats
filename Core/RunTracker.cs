@@ -3448,6 +3448,51 @@ public static class RunTracker
         RecordPotionDisposition(player, potion, used: true);
     }
 
+    public static void RecordBloodPotionHealing(
+        BloodPotion? potion,
+        Player? player,
+        int initialHp,
+        int currentHp)
+    {
+        if (potion == null || player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)
+                    || !ReferenceEquals(potion.Owner, player))
+                {
+                    return;
+                }
+
+                EnsureLazyCurrentRunLocked();
+                var history = GetMutablePotionHistoryLocked();
+                if (!TryGetPotionSequence(potion, out var sequence)) return;
+                var entry = history.FirstOrDefault(candidate =>
+                    candidate.Sequence == sequence);
+                if (entry == null) return;
+
+                RecordPotionHealingForTest(entry, initialHp, currentHp);
+                FinishPotionHistoryMutationLocked();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordBloodPotionHealing failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordPotionHealingForTest(
+        PotionRunHistoryEntry entry,
+        int initialHp,
+        int currentHp)
+    {
+        if (entry == null) return;
+        entry.HpGained = Math.Max(0, currentHp - initialHp);
+    }
+
     public static void RecordPotionDiscarded(Player? player, PotionModel? potion)
     {
         RecordPotionDisposition(player, potion, used: false);
@@ -3680,6 +3725,7 @@ public static class RunTracker
             UsedLocationKind = source.UsedLocationKind,
             UsedLocationName = source.UsedLocationName,
             UsedTurn = source.UsedTurn,
+            HpGained = source.HpGained,
             Discarded = source.Discarded,
             DiscardedFloor = source.DiscardedFloor,
             DiscardedLocationKind = source.DiscardedLocationKind,

@@ -5271,6 +5271,36 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsBloodPotionRunHistoryFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("blood-potion-run-history.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertBloodPotionHistoryFixture(loaded.Data);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsBloodPotionRunHistoryFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("blood-potion-run-history.json"));
+
+        Assert.NotNull(resumed);
+        AssertBloodPotionHistoryFixture(resumed!);
+    }
+
+    private static void AssertBloodPotionHistoryFixture(RunData run)
+    {
+        var potion = Assert.Single(run.PotionHistory);
+        Assert.Equal("POTION.BLOOD_POTION", potion.PotionId);
+        Assert.True(potion.Used);
+        Assert.Equal(2, potion.UsedTurn);
+        Assert.Equal(12, potion.HpGained);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsPotionSlotRelicCombatStartFixture()
     {
         var loaded = RunStorage.LoadHistorical(

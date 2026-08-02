@@ -1,5 +1,9 @@
 using System;
 using System.Reflection;
+using System.Threading.Tasks;
+using MegaCrit.Sts2.Core.Entities.Creatures;
+using MegaCrit.Sts2.Core.GameActions.Multiplayer;
+using MegaCrit.Sts2.Core.Models.Potions;
 using SpireLens.Core.Patches;
 using Xunit;
 
@@ -98,6 +102,62 @@ public class PotionRunHistoryTooltipTests
         Assert.Equal(1, numbers[2]);
         Assert.Equal(2, numbers[3]);
         Assert.Equal(3, numbers[4]);
+    }
+
+    [Fact]
+    public void BloodPotionHealingPatch_TargetsPotionOwnedUseCallback()
+    {
+        var target = typeof(BloodPotion).GetMethod(
+            "OnUse",
+            BindingFlags.NonPublic | BindingFlags.Instance,
+            binder: null,
+            types: [typeof(PlayerChoiceContext), typeof(Creature)],
+            modifiers: null);
+
+        Assert.NotNull(target);
+        Assert.Equal(typeof(Task), target!.ReturnType);
+    }
+
+    [Fact]
+    public void BloodPotionHealing_RecordsObservedCurrentHpDelta()
+    {
+        var healed = new PotionRunHistoryEntry();
+        var fullHealth = new PotionRunHistoryEntry();
+
+        RunTracker.RecordPotionHealingForTest(healed, initialHp: 41, currentHp: 53);
+        RunTracker.RecordPotionHealingForTest(
+            fullHealth,
+            initialHp: 60,
+            currentHp: 60);
+
+        Assert.Equal(12, healed.HpGained);
+        Assert.Equal(0, fullHealth.HpGained);
+    }
+
+    [Fact]
+    public void BloodPotionUsedTooltip_ShowsObservedHpGainedOnlyAtUse()
+    {
+        var entry = new PotionRunHistoryEntry
+        {
+            PotionId = "POTION.BLOOD_POTION",
+            DisplayName = "Blood Potion",
+            Acquired = true,
+            Used = true,
+            UsedFloor = 8,
+            HpGained = 12,
+        };
+
+        var acquiredBody = BuildBody(
+            entry,
+            "in_progress",
+            PotionTimelineOccurrence.Acquired);
+        var usedBody = BuildBody(
+            entry,
+            "in_progress",
+            PotionTimelineOccurrence.Used);
+
+        Assert.DoesNotContain("HP gained", acquiredBody);
+        Assert.Contains("HP gained  [b]12[/b]", usedBody);
     }
 
     private static string BuildBody(

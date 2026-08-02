@@ -152,6 +152,11 @@ public class PotionRunHistoryEntry
     public string? UsedLocationName { get; set; }
     public int? UsedTurn { get; set; }
 
+    // Actual current HP restored by this potion's own use callback. Nullable
+    // keeps historical entries distinct from newly observed zero healing.
+    // Blood Potion is the first potion to populate this outcome.
+    public int? HpGained { get; set; }
+
     public bool Discarded { get; set; }
     public int? DiscardedFloor { get; set; }
     public string? DiscardedLocationKind { get; set; }

@@ -658,6 +658,13 @@ internal static class PotionCompendiumHistoryUi
                 entry.UsedLocationKind,
                 entry.UsedLocationName,
                 entry.UsedTurn);
+            if (entry.HpGained.HasValue)
+            {
+                AppendTooltipRow(
+                    body,
+                    "HP gained",
+                    Math.Max(0, entry.HpGained.Value).ToString());
+            }
         }
         else if (occurrence == PotionTimelineOccurrence.Discarded)
         {
