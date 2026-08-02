@@ -1,5 +1,8 @@
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Combat.History;
+using MegaCrit.Sts2.Core.Combat.History.Entries;
+using MegaCrit.Sts2.Core.Context;
+using MegaCrit.Sts2.Core.Entities.Cards;
 
 namespace SpireLens.Core.Patches;
 
@@ -33,5 +36,14 @@ public static class CombatHistoryAddPatch
     public static void Postfix(CombatHistoryEntry entry)
     {
         PatchGuard.Run(nameof(CombatHistoryAddPatch), () => RunTracker.Observe(entry));
+
+        if (entry is CardPlayFinishedEntry finished
+            && finished.CardPlay.IsFirstInSeries
+            && LocalContext.NetId.HasValue
+            && finished.CardPlay.Player.NetId == LocalContext.NetId
+            && finished.CardPlay.Card.Type == CardType.Power)
+        {
+            PatchGuard.Run(nameof(PowerHistoryPileUi), PowerHistoryPileUi.RefreshAll);
+        }
     }
 }
