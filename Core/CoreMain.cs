@@ -141,6 +141,7 @@ public static class CoreMain
         // reopen the deck view.
         Patches.ViewStatsInjectorPatch.ReinjectIntoActiveDeckView();
         RunHistoryDeckViewer.ReinjectIntoActiveRunHistory();
+        RunHistoryCampfireSummary.ReinjectIntoActiveRunHistory();
         RunHistoryDeckViewer.RefreshAllArrowHotkeys();
         Patches.RelicBarFilterPatch.InitializeHooks();
         Patches.RelicBarFilterPatch.RefreshAll("core initialized");
@@ -182,6 +183,9 @@ public static class CoreMain
 
         try { RunHistoryDeckViewer.Teardown(); }
         catch (Exception e) { Logger.Error($"Shutdown: run-history deck viewer teardown failed: {e}"); }
+
+        try { RunHistoryCampfireSummary.Teardown(); }
+        catch (Exception e) { Logger.Error($"Shutdown: run-history campfire summary teardown failed: {e}"); }
 
         try { SpireLensOptionsMenu.Destroy(); }
         catch (Exception e) { Logger.Error($"Shutdown: options menu teardown failed: {e}"); }

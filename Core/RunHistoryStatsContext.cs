@@ -537,6 +537,33 @@ public static class RunHistoryDisplayRunStatsContextPatch
             StatsTooltipPinManager.AttachRunHistoryTargets(__instance);
             RunHistoryDeckViewer.InjectButton(__instance);
             RunHistoryDeckViewer.RestoreVisibleArrowHotkeys(__instance);
+            var player = __instance._selectedPlayerIcon?.Player;
+            if (player != null)
+                RunHistoryCampfireSummary.Refresh(__instance, history, player);
+        });
+    }
+}
+
+[HarmonyPatch(
+    typeof(NRunHistory),
+    "SelectPlayer",
+    new[] { typeof(NRunHistoryPlayerIcon) })]
+public static class RunHistorySelectPlayerCampfireSummaryPatch
+{
+    [HarmonyPostfix]
+    public static void Postfix(
+        NRunHistory __instance,
+        NRunHistoryPlayerIcon playerIcon)
+    {
+        PatchGuard.Run(nameof(RunHistorySelectPlayerCampfireSummaryPatch), () =>
+        {
+            if (__instance._history != null && playerIcon?.Player != null)
+            {
+                RunHistoryCampfireSummary.Refresh(
+                    __instance,
+                    __instance._history,
+                    playerIcon.Player);
+            }
         });
     }
 }
@@ -551,6 +578,7 @@ public static class RunHistoryHiddenStatsContextPatch
         {
             RunHistoryDeckViewer.Close();
             RunHistoryDeckViewer.DisableArrowHotkeys(__instance);
+            RunHistoryCampfireSummary.Remove(__instance);
             StatsTooltipPinManager.ClearPin();
             RunHistoryStatsContext.Clear();
         });

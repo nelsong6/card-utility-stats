@@ -90,7 +90,9 @@ continues to the game normally.
 
 Run history also has a deck icon beside its Cards section. It opens the
 selected player's final deck in the normal deck viewer, with duplicate cards
-kept as separate, inspectable card instances.
+kept as separate, inspectable card instances. A Campfires row beneath the act
+history uses the native campfire icon; hovering it lists that player's campfire
+choices in chronological floor order.
 
 The relic compendium's **Edit combat relevance** mode shows each discovered
 relic's classification with the game's enemy-map icon for combat or top-bar
