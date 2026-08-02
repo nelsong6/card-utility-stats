@@ -270,9 +270,12 @@ reward clicks and full-belt/blocker failures leave the offer in the not-taken
 lane. `Player.RemoveUsedPotionInternal` and `Player.DiscardPotionInternal`
 confirm the two terminal belt removals. Bind the mutable potion reference to a
 monotonic run sequence so duplicate definitions remain separate, and rebuild
-bindings from live belt order after Continue/hot reload. Potion mutations that
-happen in combat belong in the pending-combat history snapshot; their merged
-gallery view is immediate, but they are not persisted until promotion.
+bindings from live belt order after Continue/hot reload. Keep that sequence as
+an internal chronological identity; derive the tooltip's visible instance
+number independently per potion definition, so Weak Potion 3 means the third
+Weak Potion observed rather than the third potion of any kind. Potion mutations
+that happen in combat belong in the pending-combat history snapshot; their
+merged gallery view is immediate, but they are not persisted until promotion.
 
 Jack of All Trades selects distinct cards from the unlocked colorless combat
 pool, then awaits `CardPileCmd.AddGeneratedCardToCombat` once for each selected

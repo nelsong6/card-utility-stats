@@ -270,6 +270,8 @@ internal static class PotionCompendiumHistoryUi
         var entries = RunTracker.GetEffectivePotionHistory(out var outcome)
             .OrderBy(entry => entry.Sequence)
             .ToList();
+        var instanceNumbersBySequence =
+            BuildPotionInstanceNumbersBySequence(entries);
         var root = new MarginContainer
         {
             Name = HistoryRootName,
@@ -297,7 +299,10 @@ internal static class PotionCompendiumHistoryUi
 
         var acquiredCells = new Dictionary<int, Control>();
         var endpointCells = new Dictionary<int, Control>();
-        foreach (var row in BuildTimelineRows(entries, outcome))
+        foreach (var row in BuildTimelineRows(
+                     entries,
+                     outcome,
+                     instanceNumbersBySequence))
         {
             timeline.AddChild(BuildTimelineCell(row.SeenNotTaken, outcome));
 
@@ -322,15 +327,22 @@ internal static class PotionCompendiumHistoryUi
 
     private static IReadOnlyList<PotionTimelineRow> BuildTimelineRows(
         IReadOnlyList<PotionRunHistoryEntry> entries,
-        string outcome)
+        string outcome,
+        IReadOnlyDictionary<int, int> instanceNumbersBySequence)
     {
         var rows = new List<PotionTimelineRow>();
         foreach (var entry in entries)
         {
+            var instanceNumber = instanceNumbersBySequence.TryGetValue(
+                entry.Sequence,
+                out var numberedInstance)
+                ? numberedInstance
+                : 1;
             if (!entry.Acquired)
             {
                 var seen = NewTimelineItem(
                     entry,
+                    instanceNumber,
                     PotionTimelineOccurrence.SeenNotTaken,
                     entry.SeenFloor,
                     entry.SeenLocationKind,
@@ -342,12 +354,13 @@ internal static class PotionCompendiumHistoryUi
 
             var acquired = NewTimelineItem(
                 entry,
+                instanceNumber,
                 PotionTimelineOccurrence.Acquired,
                 entry.AcquiredFloor,
                 entry.AcquiredLocationKind,
                 entry.AcquiredLocationName,
                 entry.AcquiredTurn);
-            var endpoint = BuildEndpointItem(entry, outcome);
+            var endpoint = BuildEndpointItem(entry, instanceNumber, outcome);
             if (endpoint != null && SameTimelineMoment(acquired.Position, endpoint.Position))
             {
                 rows.Add(new PotionTimelineRow(acquired.Position, null, acquired, endpoint));
@@ -370,12 +383,14 @@ internal static class PotionCompendiumHistoryUi
 
     private static PotionTimelineItem? BuildEndpointItem(
         PotionRunHistoryEntry entry,
+        int instanceNumber,
         string outcome)
     {
         if (entry.Used)
         {
             return NewTimelineItem(
                 entry,
+                instanceNumber,
                 PotionTimelineOccurrence.Used,
                 entry.UsedFloor,
                 entry.UsedLocationKind,
@@ -387,6 +402,7 @@ internal static class PotionCompendiumHistoryUi
         {
             return NewTimelineItem(
                 entry,
+                instanceNumber,
                 PotionTimelineOccurrence.Discarded,
                 entry.DiscardedFloor,
                 entry.DiscardedLocationKind,
@@ -397,6 +413,7 @@ internal static class PotionCompendiumHistoryUi
         if (!entry.HeldAtRunEnd && outcome == "in_progress") return null;
         return NewTimelineItem(
             entry,
+            instanceNumber,
             PotionTimelineOccurrence.HeldAtRunEnd,
             entry.HeldAtRunEndFloor,
             "Run end",
@@ -406,6 +423,7 @@ internal static class PotionCompendiumHistoryUi
 
     private static PotionTimelineItem NewTimelineItem(
         PotionRunHistoryEntry entry,
+        int instanceNumber,
         PotionTimelineOccurrence occurrence,
         int? floor,
         string? kind,
@@ -413,6 +431,7 @@ internal static class PotionCompendiumHistoryUi
         int? turn)
         => new(
             entry,
+            instanceNumber,
             occurrence,
             new PotionTimelinePosition(
                 floor,
@@ -423,6 +442,25 @@ internal static class PotionCompendiumHistoryUi
                 occurrence == PotionTimelineOccurrence.SeenNotTaken ? 0
                     : occurrence == PotionTimelineOccurrence.Acquired ? 1
                     : 2));
+
+    internal static IReadOnlyDictionary<int, int>
+        BuildPotionInstanceNumbersBySequence(
+            IReadOnlyList<PotionRunHistoryEntry> entries)
+    {
+        var countsByPotionId = new Dictionary<string, int>(
+            StringComparer.Ordinal);
+        var numbersBySequence = new Dictionary<int, int>();
+        foreach (var entry in entries.OrderBy(entry => entry.Sequence))
+        {
+            var potionId = entry.PotionId ?? string.Empty;
+            countsByPotionId.TryGetValue(potionId, out var previousCount);
+            var instanceNumber = previousCount + 1;
+            countsByPotionId[potionId] = instanceNumber;
+            numbersBySequence[entry.Sequence] = instanceNumber;
+        }
+
+        return numbersBySequence;
+    }
 
     private static bool SameTimelineMoment(
         PotionTimelinePosition left,
@@ -528,7 +566,7 @@ internal static class PotionCompendiumHistoryUi
         if (!HolderHistory.TryGetValue(holder, out var context)) return false;
 
         statsTip = StatsTooltip.CreateNativeTip(
-            BuildTooltipTitle(context.Entry),
+            BuildTooltipTitle(context.Entry, context.InstanceNumber),
             BuildTooltipBody(context.Entry, context.Outcome, context.Occurrence));
         return true;
     }
@@ -548,7 +586,11 @@ internal static class PotionCompendiumHistoryUi
                 ModelVisibility.Visible);
             HolderHistory.Add(
                 holder,
-                new PotionHoverContext(item.Entry, outcome, item.Occurrence));
+                new PotionHoverContext(
+                    item.Entry,
+                    item.InstanceNumber,
+                    outcome,
+                    item.Occurrence));
             return holder;
         }
         catch (Exception e)
@@ -559,12 +601,14 @@ internal static class PotionCompendiumHistoryUi
         }
     }
 
-    private static string BuildTooltipTitle(PotionRunHistoryEntry entry)
+    private static string BuildTooltipTitle(
+        PotionRunHistoryEntry entry,
+        int instanceNumber)
     {
         var name = string.IsNullOrWhiteSpace(entry.DisplayName)
             ? entry.PotionId
             : entry.DisplayName;
-        return $"{name} {entry.Sequence}";
+        return $"{name} {Math.Max(1, instanceNumber)}";
     }
 
     private static string BuildTooltipBody(
@@ -770,11 +814,13 @@ internal static class PotionCompendiumHistoryUi
 
     private sealed record PotionHoverContext(
         PotionRunHistoryEntry Entry,
+        int InstanceNumber,
         string Outcome,
         PotionTimelineOccurrence Occurrence);
 
     private sealed record PotionTimelineItem(
         PotionRunHistoryEntry Entry,
+        int InstanceNumber,
         PotionTimelineOccurrence Occurrence,
         PotionTimelinePosition Position);
 

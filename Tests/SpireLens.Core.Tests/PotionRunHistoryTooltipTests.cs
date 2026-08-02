@@ -67,10 +67,10 @@ public class PotionRunHistoryTooltipTests
             entry,
             "in_progress",
             PotionTimelineOccurrence.Used);
-        var title = (string)(BuildTooltipTitleMethod.Invoke(null, [entry])
+        var title = (string)(BuildTooltipTitleMethod.Invoke(null, [entry, 1])
             ?? throw new InvalidOperationException("BuildTooltipTitle returned null."));
 
-        Assert.Equal("Swift Potion 3", title);
+        Assert.Equal("Swift Potion 1", title);
         Assert.Contains("Acquired  [b]Floor 5[/b]\n", acquiredBody);
         Assert.Contains("Shop  [b]Merchant[/b]\n", acquiredBody);
         Assert.DoesNotContain("Used  ", acquiredBody);
@@ -78,6 +78,26 @@ public class PotionRunHistoryTooltipTests
         Assert.Contains("Elite combat  [b]Lagavulin[/b]\n", usedBody);
         Assert.Contains("Turn  [b]2[/b]", usedBody);
         Assert.DoesNotContain("Acquired  ", usedBody);
+    }
+
+    [Fact]
+    public void PotionInstanceNumbers_CountEachPotionDefinitionSeparately()
+    {
+        var entries = new List<PotionRunHistoryEntry>
+        {
+            new() { Sequence = 3, PotionId = "POTION.WEAK_POTION" },
+            new() { Sequence = 1, PotionId = "POTION.WEAK_POTION" },
+            new() { Sequence = 2, PotionId = "POTION.ENERGY_POTION" },
+            new() { Sequence = 4, PotionId = "POTION.WEAK_POTION" },
+        };
+
+        var numbers = PotionCompendiumHistoryUi
+            .BuildPotionInstanceNumbersBySequence(entries);
+
+        Assert.Equal(1, numbers[1]);
+        Assert.Equal(1, numbers[2]);
+        Assert.Equal(2, numbers[3]);
+        Assert.Equal(3, numbers[4]);
     }
 
     private static string BuildBody(
