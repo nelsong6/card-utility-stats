@@ -2035,6 +2035,10 @@ public static class RunTracker
         MergeHealingLostReasonsInto(target, source);
         target.MeatOnTheBonePreTriggerHpMissingTotal +=
             source.MeatOnTheBonePreTriggerHpMissingTotal;
+        target.MeatOnTheBonePreTriggerHpBelowHalfTotal +=
+            source.MeatOnTheBonePreTriggerHpBelowHalfTotal;
+        target.MeatOnTheBonePreTriggerHpBelowHalfSamples +=
+            source.MeatOnTheBonePreTriggerHpBelowHalfSamples;
         target.MeatOnTheBonePreTriggerHpPercentTotal +=
             source.MeatOnTheBonePreTriggerHpPercentTotal;
         target.MeatOnTheBonePreTriggerHpSamples +=
@@ -13326,7 +13330,10 @@ public static class RunTracker
     {
         if (agg == null || maxHp <= 0m) return;
 
-        agg.MeatOnTheBonePreTriggerHpMissingTotal += Math.Max(0m, maxHp - currentHp);
+        agg.MeatOnTheBonePreTriggerHpBelowHalfTotal += Math.Max(
+            0m,
+            maxHp * 0.5m - currentHp);
+        agg.MeatOnTheBonePreTriggerHpBelowHalfSamples++;
         agg.MeatOnTheBonePreTriggerHpPercentTotal += 100m * currentHp / maxHp;
         agg.MeatOnTheBonePreTriggerHpSamples++;
     }

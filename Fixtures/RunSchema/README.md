@@ -560,8 +560,8 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds Musical Box's successfully created Attacks, Common/Uncommon/Rare splits,
   Ethereal exhausts, and zero-inclusive held turn/combat denominators.
 - `meat-on-the-bone-pre-trigger-hp-run.json`
-  Adds Meat on the Bone's qualifying combat-end HP deficit, normalized HP
-  percentage, and matching pre-trigger sample count.
+  Adds Meat on the Bone's qualifying combat-end HP distance below 50%,
+  normalized HP percentage, and matching pre-trigger sample counts.
 - `crossbow-relic-run.json`
   Adds Crossbow's successfully gained Attacks, rarity splits, observed energy
   discount, and zero-inclusive held turn/combat denominators.

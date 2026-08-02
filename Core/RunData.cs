@@ -936,10 +936,20 @@ public class RelicAggregate
     public decimal TotalHealingLost { get; set; }
     public Dictionary<string, HealingLostReasonAggregate> HealingLostReasons { get; set; } = new();
 
-    // Meat on the Bone snapshots the owner's HP immediately before each
-    // qualifying combat-end heal. The percentage total stores one normalized
-    // percentage per trigger so max-HP changes do not distort the average.
+    // Legacy numerator from the first pre-trigger HP implementation. It used
+    // max HP as the baseline and is retained only so files written by that
+    // short-lived build remain loadable; new observations do not update it.
     public decimal MeatOnTheBonePreTriggerHpMissingTotal { get; set; }
+
+    // Meat on the Bone snapshots the owner's HP immediately before each
+    // qualifying combat-end heal. Below-half is the raw HP-point distance
+    // from exactly 50% max HP. It has its own observation-era sample count so
+    // the legacy max-HP numerator above cannot distort the corrected average.
+    public decimal MeatOnTheBonePreTriggerHpBelowHalfTotal { get; set; }
+    public int MeatOnTheBonePreTriggerHpBelowHalfSamples { get; set; }
+
+    // The percentage total stores one normalized percentage per trigger so
+    // max-HP changes do not distort the average.
     public decimal MeatOnTheBonePreTriggerHpPercentTotal { get; set; }
     public int MeatOnTheBonePreTriggerHpSamples { get; set; }
 

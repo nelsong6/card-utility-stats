@@ -35,7 +35,8 @@ public class MeatOnTheBoneStatsTests
             TotalHealingAttempted = 24,
             TotalHealingRestored = 19,
             TotalHealingLost = 5,
-            MeatOnTheBonePreTriggerHpMissingTotal = 110,
+            MeatOnTheBonePreTriggerHpBelowHalfTotal = 20,
+            MeatOnTheBonePreTriggerHpBelowHalfSamples = 2,
             MeatOnTheBonePreTriggerHpPercentTotal = 77.5m,
             MeatOnTheBonePreTriggerHpSamples = 2,
         };
@@ -54,23 +55,39 @@ public class MeatOnTheBoneStatsTests
         Assert.Contains("[b]19[/b]", body);
         Assert.Contains("healing lost", body);
         Assert.Contains("[b]5[/b]", body);
-        Assert.Contains("Average HP missing from maximum HP", body);
-        Assert.Contains("[b]55[/b]", body);
+        Assert.Contains("Average raw HP-point distance below 50%", body);
+        Assert.Contains("[b]10[/b]", body);
         Assert.Contains("Average current HP at combat end", body);
         Assert.Contains("[b]38.75%[/b]", body);
     }
 
     [Fact]
-    public void PreTriggerHpSnapshot_AccumulatesRawDeficitAndPerTriggerPercentage()
+    public void PreTriggerHpSnapshot_AccumulatesDistanceBelowHalfAndPerTriggerPercentage()
     {
         var aggregate = new RelicAggregate();
 
         RunTracker.RecordMeatOnTheBonePreTriggerHpForTest(aggregate, currentHp: 30m, maxHp: 80m);
         RunTracker.RecordMeatOnTheBonePreTriggerHpForTest(aggregate, currentHp: 40m, maxHp: 100m);
 
-        Assert.Equal(110m, aggregate.MeatOnTheBonePreTriggerHpMissingTotal);
+        Assert.Equal(20m, aggregate.MeatOnTheBonePreTriggerHpBelowHalfTotal);
+        Assert.Equal(2, aggregate.MeatOnTheBonePreTriggerHpBelowHalfSamples);
+        Assert.Equal(0m, aggregate.MeatOnTheBonePreTriggerHpMissingTotal);
         Assert.Equal(77.5m, aggregate.MeatOnTheBonePreTriggerHpPercentTotal);
         Assert.Equal(2, aggregate.MeatOnTheBonePreTriggerHpSamples);
+    }
+
+    [Fact]
+    public void PreTriggerHpSnapshot_UsesExactHalfOfOddMaximumHp()
+    {
+        var aggregate = new RelicAggregate();
+
+        RunTracker.RecordMeatOnTheBonePreTriggerHpForTest(
+            aggregate,
+            currentHp: 34m,
+            maxHp: 69m);
+
+        Assert.Equal(0.5m, aggregate.MeatOnTheBonePreTriggerHpBelowHalfTotal);
+        Assert.Equal(1, aggregate.MeatOnTheBonePreTriggerHpBelowHalfSamples);
     }
 
     [Fact]
@@ -80,7 +97,8 @@ public class MeatOnTheBoneStatsTests
 
         RunTracker.RecordMeatOnTheBonePreTriggerHpForTest(aggregate, currentHp: 0m, maxHp: 0m);
 
-        Assert.Equal(0m, aggregate.MeatOnTheBonePreTriggerHpMissingTotal);
+        Assert.Equal(0m, aggregate.MeatOnTheBonePreTriggerHpBelowHalfTotal);
+        Assert.Equal(0, aggregate.MeatOnTheBonePreTriggerHpBelowHalfSamples);
         Assert.Equal(0m, aggregate.MeatOnTheBonePreTriggerHpPercentTotal);
         Assert.Equal(0, aggregate.MeatOnTheBonePreTriggerHpSamples);
     }
@@ -90,20 +108,23 @@ public class MeatOnTheBoneStatsTests
     {
         var target = new RelicAggregate
         {
-            MeatOnTheBonePreTriggerHpMissingTotal = 50m,
+            MeatOnTheBonePreTriggerHpBelowHalfTotal = 10m,
+            MeatOnTheBonePreTriggerHpBelowHalfSamples = 1,
             MeatOnTheBonePreTriggerHpPercentTotal = 37.5m,
             MeatOnTheBonePreTriggerHpSamples = 1,
         };
         var source = new RelicAggregate
         {
-            MeatOnTheBonePreTriggerHpMissingTotal = 60m,
+            MeatOnTheBonePreTriggerHpBelowHalfTotal = 10m,
+            MeatOnTheBonePreTriggerHpBelowHalfSamples = 1,
             MeatOnTheBonePreTriggerHpPercentTotal = 40m,
             MeatOnTheBonePreTriggerHpSamples = 1,
         };
 
         RunTracker.MergeRelicAggregateInto(target, source);
 
-        Assert.Equal(110m, target.MeatOnTheBonePreTriggerHpMissingTotal);
+        Assert.Equal(20m, target.MeatOnTheBonePreTriggerHpBelowHalfTotal);
+        Assert.Equal(2, target.MeatOnTheBonePreTriggerHpBelowHalfSamples);
         Assert.Equal(77.5m, target.MeatOnTheBonePreTriggerHpPercentTotal);
         Assert.Equal(2, target.MeatOnTheBonePreTriggerHpSamples);
     }

@@ -3946,10 +3946,10 @@ public static class RelicHoverShowPatch
     private static string BuildMeatOnTheBoneBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        var averageHpMissing = agg.MeatOnTheBonePreTriggerHpSamples <= 0
+        var averageHpBelowHalf = agg.MeatOnTheBonePreTriggerHpBelowHalfSamples <= 0
             ? 0m
-            : agg.MeatOnTheBonePreTriggerHpMissingTotal
-                / agg.MeatOnTheBonePreTriggerHpSamples;
+            : agg.MeatOnTheBonePreTriggerHpBelowHalfTotal
+                / agg.MeatOnTheBonePreTriggerHpBelowHalfSamples;
         var averageHpPercent = agg.MeatOnTheBonePreTriggerHpSamples <= 0
             ? 0m
             : agg.MeatOnTheBonePreTriggerHpPercentTotal
@@ -3959,10 +3959,10 @@ public static class RelicHoverShowPatch
         AppendHealingStats(sb, agg);
         Row3(
             sb,
-            "Avg HP missing before trigger",
-            FormatDecimal(averageHpMissing),
+            "Avg HP below 50% before trigger",
+            FormatDecimal(averageHpBelowHalf),
             "",
-            "Average HP missing from maximum HP at combat end, immediately before Meat on the Bone triggered.");
+            "Average raw HP-point distance below 50% of maximum HP at combat end, immediately before Meat on the Bone triggered.");
         Row3(
             sb,
             "Avg HP before trigger",
