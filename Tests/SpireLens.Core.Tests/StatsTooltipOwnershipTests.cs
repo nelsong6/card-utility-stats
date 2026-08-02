@@ -37,7 +37,7 @@ public sealed class StatsTooltipOwnershipTests
 
         Assert.Null(tip.Title);
         Assert.Equal(
-            "[font_size=20]Activation [lb]observed][/font_size]",
+            "[left][font_size=20]Activation [lb]observed][/font_size][/left]",
             tip.Description);
         Assert.Equal("SPIRELENS.HINT", tip.Id);
     }

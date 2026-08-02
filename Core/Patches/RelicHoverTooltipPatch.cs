@@ -50,6 +50,10 @@ public static class RelicHoverShowPatch
     private const string MapUnknownIconPath = "res://images/atlases/ui_atlas.sprites/map/icons/map_unknown.tres";
     private const string MapTreasureIconPath = "res://images/atlases/ui_atlas.sprites/map/icons/map_chest.tres";
     private const string MapRestSiteIconPath = "res://images/atlases/ui_atlas.sprites/map/icons/map_rest.tres";
+    private const string AttacksPlayedDescription =
+        "The number of Attack cards played while this relic was held.";
+    private const string AttacksPlayedWhileActiveDescription =
+        "The number of Attack cards played while this relic was active.";
     private const int SealOfGoldLossPerTrigger = 5;
     private const float SturdyClampTooltipWidth = 420f;
     private const float EmberTeaTooltipWidth = 500f;
@@ -2245,7 +2249,12 @@ public static class RelicHoverShowPatch
             ? 0m
             : (decimal)agg.NunchakuCombatEndChargeTotal / combats;
 
-        Row3(sb, "Attacks played", agg.NunchakuAttacksPlayed.ToString(), "");
+        Row3(
+            sb,
+            "Attacks played",
+            agg.NunchakuAttacksPlayed.ToString(),
+            "",
+            AttacksPlayedDescription);
         Row3(sb, "Avg attacks played per combat", FormatDecimal(averageAttacks), "");
         Row3(sb, EnergyLabel("Energy gained total"), agg.EnergyGenerated.ToString(), "");
         Row3(sb, EnergyLabel("Avg energy gained per combat"), FormatDecimal(averageEnergy), "");
@@ -2547,7 +2556,12 @@ public static class RelicHoverShowPatch
         RelicActivationRow(sb, activations.ToString());
         Row3(sb, "Base damage added", agg.TotalDamageAttempted.ToString(), "");
         Row3(sb, "Avg base damage added per attack", FormatDecimal(averageBaseDamage), "");
-        Row3(sb, "Attacks played", agg.PenNibAttacksPlayed.ToString(), "");
+        Row3(
+            sb,
+            "Attacks played",
+            agg.PenNibAttacksPlayed.ToString(),
+            "",
+            AttacksPlayedDescription);
         Row3(sb, "Turns ended on 8 charges", agg.PenNibTurnsEndedOn8Charges.ToString(), "");
         Row3(sb, "Turns ended on 9 charges", agg.PenNibTurnsEndedOn9Charges.ToString(), "");
         Row3(sb, "Avg charge at turn end", FormatDecimal(averageEndCharge), "");
@@ -4916,7 +4930,12 @@ public static class RelicHoverShowPatch
     private static string BuildVajraBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Attacks played", agg.VajraAttacksPlayed.ToString(), "");
+        Row3(
+            sb,
+            "Attacks played",
+            agg.VajraAttacksPlayed.ToString(),
+            "",
+            AttacksPlayedDescription);
         Row3(sb, "Attack hits", agg.VajraAttackHits.ToString(), "");
         return sb.ToString();
     }
@@ -4950,7 +4969,12 @@ public static class RelicHoverShowPatch
             ? 0m
             : (decimal)agg.EmberTeaHitsWhileActive / agg.EmberTeaActiveCombats;
 
-        Row3(sb, "Attacks played while active", agg.EmberTeaAttacksPlayedWhileActive.ToString(), "");
+        Row3(
+            sb,
+            "Attacks played while active",
+            agg.EmberTeaAttacksPlayedWhileActive.ToString(),
+            "",
+            AttacksPlayedWhileActiveDescription);
         Row3(sb, "Avg attacks played per turn while active", FormatDecimal(attacksPerTurn), "");
         Row3(sb, "Avg attacks played per combat while active", FormatDecimal(attacksPerCombat), "");
         Row3(sb, "Hits while active", agg.EmberTeaHitsWhileActive.ToString(), "");
@@ -4975,7 +4999,12 @@ public static class RelicHoverShowPatch
             ? 0m
             : (decimal)agg.RedSkullHitsWhileActive / agg.RedSkullActiveCombats;
 
-        Row3(sb, "Attacks played while active", agg.RedSkullAttacksPlayedWhileActive.ToString(), "");
+        Row3(
+            sb,
+            "Attacks played while active",
+            agg.RedSkullAttacksPlayedWhileActive.ToString(),
+            "",
+            AttacksPlayedWhileActiveDescription);
         Row3(sb, "Avg attacks played while active per turn", FormatDecimal(attacksPerTurn), "");
         Row3(sb, "Avg attacks played while active per combat", FormatDecimal(attacksPerCombat), "");
         Row3(sb, "Hits while active", agg.RedSkullHitsWhileActive.ToString(), "");
@@ -5013,7 +5042,12 @@ public static class RelicHoverShowPatch
             ? 0m
             : (decimal)agg.KunaiTurnEndChargeTotal / agg.KunaiTurnEndChargeCount;
 
-        Row3(sb, "Attacks played", agg.KunaiAttacksPlayed.ToString(), "");
+        Row3(
+            sb,
+            "Attacks played",
+            agg.KunaiAttacksPlayed.ToString(),
+            "",
+            AttacksPlayedDescription);
         RelicActivationRow(sb, agg.Activations.ToString());
         AppendLiveActivationRows(sb, liveActivationCounts);
         Row3(sb, "Dexterity gained", agg.KunaiDexterityGained.ToString(), "");
@@ -5032,7 +5066,12 @@ public static class RelicHoverShowPatch
             - agg.KusarigamaTurnsEndedAt1Charge
             - agg.KusarigamaTurnsEndedAt2Charges);
 
-        Row3(sb, "Attacks played", agg.KusarigamaAttacksPlayed.ToString(), "");
+        Row3(
+            sb,
+            "Attacks played",
+            agg.KusarigamaAttacksPlayed.ToString(),
+            "",
+            AttacksPlayedDescription);
         AppendRelicDamageStats(
             sb,
             agg,
@@ -5070,7 +5109,12 @@ public static class RelicHoverShowPatch
             ? 0m
             : 100m * agg.AdditionalBlockWasted / agg.OrnamentalFanRateBlockGained;
 
-        Row3(sb, "Attacks played", agg.OrnamentalFanAttacksPlayed.ToString(), "");
+        Row3(
+            sb,
+            "Attacks played",
+            agg.OrnamentalFanAttacksPlayed.ToString(),
+            "",
+            AttacksPlayedDescription);
         RelicActivationRow(sb, agg.Activations.ToString());
         AppendLiveActivationRows(sb, liveActivationCounts);
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
@@ -5105,7 +5149,12 @@ public static class RelicHoverShowPatch
     {
         var sb = new StringBuilder();
 
-        Row3(sb, "Attacks played", agg.ShurikenAttacksPlayed.ToString(), "");
+        Row3(
+            sb,
+            "Attacks played",
+            agg.ShurikenAttacksPlayed.ToString(),
+            "",
+            AttacksPlayedDescription);
         RelicActivationRow(sb, agg.Activations.ToString());
         AppendLiveActivationRows(sb, liveActivationCounts);
         Row3(sb, "Strength gained", FormatDecimal(agg.StrengthAdded), "");

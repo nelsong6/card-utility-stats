@@ -377,6 +377,9 @@ public class UnlimitedAttackChargeRelicStatsTests
             ShurikenTurnEndChargeCount = 4,
         });
         Assert.Contains("Attacks played", shurikenBody);
+        Assert.Contains(
+            "The number of Attack cards played while this relic was held.",
+            shurikenBody);
         Assert.Contains("Activations", shurikenBody);
         Assert.Contains("Strength gained", shurikenBody);
         Assert.DoesNotContain("Strength gained per activation", shurikenBody);
