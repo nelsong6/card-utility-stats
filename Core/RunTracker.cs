@@ -359,6 +359,23 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Read-only chronological maximum-HP changes for the active run. Combat
+    /// changes are read from the same pending snapshot used by potion history,
+    /// so they appear immediately without being committed if combat is later
+    /// abandoned.
+    /// </summary>
+    public static IReadOnlyList<MaxHpRunHistoryEntry> GetEffectiveMaxHpHistory()
+    {
+        lock (_lock)
+        {
+            if (_currentRun == null) return Array.Empty<MaxHpRunHistoryEntry>();
+
+            var source = _pendingCombat?.MaxHpHistory ?? _currentRun.MaxHpHistory;
+            return CloneMaxHpHistory(source);
+        }
+    }
+
+    /// <summary>
     /// Resolve any CardModel (combat clone or deck original) to its canonical
     /// per-deck reference. Combat clones have <c>DeckVersion</c> set to the
     /// original deck card by <c>Player.PopulateCombatState</c>
@@ -1875,6 +1892,9 @@ public static class RunTracker
 
         if (pending.PotionHistory != null)
             run.PotionHistory = ClonePotionHistory(pending.PotionHistory);
+
+        if (pending.MaxHpHistory != null)
+            run.MaxHpHistory = CloneMaxHpHistory(pending.MaxHpHistory);
 
         foreach (var (relicId, pendingRelicAgg) in pending.RelicAggregates)
         {
@@ -3767,6 +3787,136 @@ public static class RunTracker
         }
     }
 
+    /// <summary>
+    /// Record an actually applied maximum-HP mutation. CreatureCmd.SetMaxHp's
+    /// postfix is the observed boundary, so clamping has already affected
+    /// <paramref name="newMaxHp"/>.
+    /// </summary>
+    public static void RecordMaxHpChanged(
+        Creature? creature,
+        int previousMaxHp,
+        int newMaxHp)
+    {
+        if (creature?.Player == null
+            || previousMaxHp <= 0
+            || previousMaxHp == newMaxHp)
+            return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(creature.Player)) return;
+                if (_currentRun == null && RunManager.Instance?.IsInProgress != true)
+                    return;
+
+                EnsureLazyCurrentRunLocked();
+                var history = GetMutableMaxHpHistoryLocked();
+                var location = CapturePotionLocationLocked(creature.Player);
+                var sourceCard = FindCurrentlyResolvingCardPlay()?.Card;
+                var sourceName = sourceCard != null
+                    && (sourceCard.Owner == null
+                        || ReferenceEquals(sourceCard.Owner, creature.Player))
+                        ? GetCardDisplayName(sourceCard)
+                        : null;
+
+                history.Add(new MaxHpRunHistoryEntry
+                {
+                    Sequence = history.Count == 0
+                        ? 1
+                        : history.Max(entry => entry.Sequence) + 1,
+                    Floor = Math.Max(0, location.Floor ?? CurrentRunFloorLocked() ?? 0),
+                    LocationKind = location.Kind,
+                    LocationName = location.Name,
+                    Turn = location.Turn,
+                    SourceName = sourceName,
+                    PreviousMaxHp = previousMaxHp,
+                    NewMaxHp = newMaxHp,
+                });
+
+                FinishMaxHpHistoryMutationLocked();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordMaxHpChanged failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void AnnotateMaxHpChanged(
+        Creature? creature,
+        int previousMaxHp,
+        int newMaxHp,
+        string sourceName)
+    {
+        if (creature?.Player == null || previousMaxHp == newMaxHp) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(creature.Player)) return;
+                AnnotateLatestMaxHpHistoryLocked(
+                    sourceName,
+                    previousMaxHp,
+                    newMaxHp);
+                if (_pendingCombat == null)
+                    SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"AnnotateMaxHpChanged failed: {e.Message}");
+            }
+        }
+    }
+
+    private static List<MaxHpRunHistoryEntry> GetMutableMaxHpHistoryLocked()
+    {
+        EnsureLazyCurrentRunLocked();
+        _currentRun.MaxHpHistory ??= new List<MaxHpRunHistoryEntry>();
+        if (_pendingCombat == null) return _currentRun.MaxHpHistory;
+
+        _pendingCombat.MaxHpHistory ??= CloneMaxHpHistory(_currentRun.MaxHpHistory);
+        return _pendingCombat.MaxHpHistory;
+    }
+
+    private static void FinishMaxHpHistoryMutationLocked()
+    {
+        if (_currentRun == null) return;
+        _currentRun.UpdatedAt = Now();
+        RefreshCurrentRunMetadataLocked();
+        if (_pendingCombat == null)
+            SaveCurrentRun();
+    }
+
+    private static void AnnotateLatestMaxHpHistoryLocked(
+        string sourceName,
+        decimal? previousMaxHp = null,
+        decimal? newMaxHp = null,
+        decimal? delta = null)
+    {
+        if (_currentRun == null || string.IsNullOrWhiteSpace(sourceName)) return;
+
+        var history = _pendingCombat?.MaxHpHistory ?? _currentRun.MaxHpHistory;
+        if (history == null || history.Count == 0) return;
+
+        var floor = CurrentRunFloorLocked();
+        var match = history
+            .OrderByDescending(entry => entry.Sequence)
+            .FirstOrDefault(entry =>
+                (!floor.HasValue || entry.Floor == floor.Value)
+                && (!previousMaxHp.HasValue
+                    || entry.PreviousMaxHp == (int)previousMaxHp.Value)
+                && (!newMaxHp.HasValue
+                    || entry.NewMaxHp == (int)newMaxHp.Value)
+                && (!delta.HasValue
+                    || entry.NewMaxHp - entry.PreviousMaxHp == (int)delta.Value));
+        if (match == null) return;
+
+        match.SourceName = sourceName;
+        _currentRun.UpdatedAt = Now();
+    }
+
     private static List<PotionRunHistoryEntry> GetMutablePotionHistoryLocked()
     {
         EnsureLazyCurrentRunLocked();
@@ -3905,6 +4055,20 @@ public static class RunTracker
     private static List<PotionRunHistoryEntry> ClonePotionHistory(
         IEnumerable<PotionRunHistoryEntry>? source)
         => source?.Select(ClonePotionHistoryEntry).ToList() ?? new List<PotionRunHistoryEntry>();
+
+    private static List<MaxHpRunHistoryEntry> CloneMaxHpHistory(
+        IEnumerable<MaxHpRunHistoryEntry>? source)
+        => source?.Select(entry => new MaxHpRunHistoryEntry
+        {
+            Sequence = entry.Sequence,
+            Floor = entry.Floor,
+            LocationKind = entry.LocationKind,
+            LocationName = entry.LocationName,
+            Turn = entry.Turn,
+            SourceName = entry.SourceName,
+            PreviousMaxHp = entry.PreviousMaxHp,
+            NewMaxHp = entry.NewMaxHp,
+        }).ToList() ?? new List<MaxHpRunHistoryEntry>();
 
     private static PotionRunHistoryEntry ClonePotionHistoryEntry(PotionRunHistoryEntry source)
         => new()
@@ -12979,6 +13143,10 @@ public static class RunTracker
                 var instanceId = GetOrAssignInstanceId(card);
                 var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
                 RecordBrightestFlameMaxHpLostForTest(agg, previousMaxHp, currentMaxHp);
+                AnnotateLatestMaxHpHistoryLocked(
+                    GetCardDisplayName(card),
+                    previousMaxHp,
+                    currentMaxHp);
             }
             catch (Exception e)
             {
@@ -13019,6 +13187,10 @@ public static class RunTracker
                 var instanceId = GetOrAssignInstanceId(card);
                 var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
                 RecordFeedMaxHpGainedForTest(agg, previousMaxHp, currentMaxHp);
+                AnnotateLatestMaxHpHistoryLocked(
+                    GetCardDisplayName(card),
+                    previousMaxHp,
+                    currentMaxHp);
             }
             catch (Exception e)
             {
@@ -13646,6 +13818,10 @@ public static class RunTracker
                 RecordPrecariousShearsPickupForTest(
                     agg,
                     pending.CardsRemoved,
+                    pending.StartingMaxHp,
+                    resultingMaxHp);
+                AnnotateLatestMaxHpHistoryLocked(
+                    "Precarious Shears",
                     pending.StartingMaxHp,
                     resultingMaxHp);
                 SaveCurrentRun();
@@ -14279,6 +14455,7 @@ public static class RunTracker
             {
                 var agg = GetOrCreateCurrentRunRelicAggregateLocked(LeesWaffleRelicId);
                 RecordLeesWafflePickupHpGainedForTest(agg, hpGained, originalMaxHp, newMaxHp);
+                AnnotateLatestMaxHpHistoryLocked("Lee's Waffle", originalMaxHp, newMaxHp);
                 SaveCurrentRun();
             }
             catch (Exception e)
@@ -14324,6 +14501,7 @@ public static class RunTracker
                 if (!IsTrackedPlayer(creature.Player)) return;
                 var agg = GetOrCreateCurrentRunRelicAggregateLocked(StrawberryRelicId);
                 RecordStrawberryMaxHpGainedForTest(agg, maxHpGained, originalMaxHp, newMaxHp);
+                AnnotateLatestMaxHpHistoryLocked("Strawberry", originalMaxHp, newMaxHp);
                 SaveCurrentRun();
             }
             catch (Exception e)
@@ -14352,6 +14530,7 @@ public static class RunTracker
                 if (!IsTrackedPlayer(creature.Player)) return;
                 var agg = GetOrCreateCurrentRunRelicAggregateLocked(PearRelicId);
                 RecordPearMaxHpGainedForTest(agg, maxHpGained, originalMaxHp, newMaxHp);
+                AnnotateLatestMaxHpHistoryLocked("Pear", originalMaxHp, newMaxHp);
                 SaveCurrentRun();
             }
             catch (Exception e)
@@ -14380,6 +14559,7 @@ public static class RunTracker
                 if (!IsTrackedPlayer(creature.Player)) return;
                 var agg = GetOrCreateCurrentRunRelicAggregateLocked(MangoRelicId);
                 RecordMangoMaxHpGainedForTest(agg, maxHpGained, originalMaxHp, newMaxHp);
+                AnnotateLatestMaxHpHistoryLocked("Mango", originalMaxHp, newMaxHp);
                 SaveCurrentRun();
             }
             catch (Exception e)
@@ -14412,6 +14592,7 @@ public static class RunTracker
                     maxHpGained,
                     originalMaxHp,
                     newMaxHp);
+                AnnotateLatestMaxHpHistoryLocked("Mango???", originalMaxHp, newMaxHp);
                 SaveCurrentRun();
             }
             catch (Exception e)
@@ -14440,6 +14621,10 @@ public static class RunTracker
                 if (!IsTrackedPlayer(creature.Player)) return;
                 var agg = GetOrCreateCurrentRunRelicAggregateLocked(NutritiousOysterRelicId);
                 RecordNutritiousOysterMaxHpGainedForTest(agg, maxHpGained, originalMaxHp, newMaxHp);
+                AnnotateLatestMaxHpHistoryLocked(
+                    "Nutritious Oyster",
+                    originalMaxHp,
+                    newMaxHp);
                 SaveCurrentRun();
             }
             catch (Exception e)
@@ -14470,6 +14655,10 @@ public static class RunTracker
 
                 var agg = GetOrCreateCurrentRunRelicAggregateLocked(StoneHumidifierRelicId);
                 RecordStoneHumidifierMaxHpGainForTest(agg, startingMaxHp, resultingMaxHp);
+                AnnotateLatestMaxHpHistoryLocked(
+                    "Stone Humidifier",
+                    startingMaxHp,
+                    resultingMaxHp);
                 SaveCurrentRun();
             }
             catch (Exception e)
@@ -14549,6 +14738,9 @@ public static class RunTracker
                 bool persistDirectlyToRun = _pendingCombat == null;
                 var agg = GetOrCreateRelicAggregateForCurrentContextLocked(ChosenCheeseRelicId);
                 RecordChosenCheeseMaxHpGainedForTest(agg, maxHpGained);
+                AnnotateLatestMaxHpHistoryLocked(
+                    "Chosen Cheese",
+                    delta: maxHpGained);
                 if (persistDirectlyToRun)
                     SaveCurrentRun();
             }
@@ -14575,6 +14767,10 @@ public static class RunTracker
             {
                 var agg = GetOrCreateCurrentRunRelicAggregateLocked(DarkstonePeriaptRelicId);
                 RecordDarkstonePeriaptCurseAcquiredForTest(agg, maxHpGained, originalMaxHp, newMaxHp);
+                AnnotateLatestMaxHpHistoryLocked(
+                    "Darkstone Periapt",
+                    originalMaxHp,
+                    newMaxHp);
                 SaveCurrentRun();
             }
             catch (Exception e)
@@ -15369,6 +15565,10 @@ public static class RunTracker
 
                 var agg = GetOrCreateCurrentRunRelicAggregateLocked(LeafyPoulticeRelicId);
                 RecordLeafyPoulticeMaxHpChangedForTest(agg, originalMaxHp, newMaxHp);
+                AnnotateLatestMaxHpHistoryLocked(
+                    "Leafy Poultice",
+                    originalMaxHp,
+                    newMaxHp);
                 SaveCurrentRun();
             }
             catch (Exception e)
@@ -15479,6 +15679,10 @@ public static class RunTracker
             {
                 var agg = GetOrCreateCurrentRunRelicAggregateLocked(LeafyPoulticeRelicId);
                 RecordLeafyPoulticeMaxHpChangedForTest(agg, originalMaxHp, newMaxHp);
+                AnnotateLatestMaxHpHistoryLocked(
+                    "Leafy Poultice",
+                    originalMaxHp,
+                    newMaxHp);
                 SaveCurrentRun();
             }
             catch (Exception e)
@@ -22081,6 +22285,10 @@ public static class RunTracker
 
                 var agg = GetOrCreateCurrentRunRelicAggregateLocked(FresnelLensRelicId);
                 RecordFresnelLensMaxHpChangedForTest(agg, originalMaxHp, newMaxHp);
+                AnnotateLatestMaxHpHistoryLocked(
+                    "Drowning Beacon",
+                    originalMaxHp,
+                    newMaxHp);
                 RefreshCurrentRunMetadataLocked();
                 SaveCurrentRun();
             }
@@ -31582,6 +31790,7 @@ internal class PendingCombat
     public Dictionary<string, CardAggregate> CombatAggregates { get; } = new();
     public List<CardEvent> CombatEvents { get; } = new();
     public List<PotionRunHistoryEntry>? PotionHistory { get; set; }
+    public List<MaxHpRunHistoryEntry>? MaxHpHistory { get; set; }
     public Dictionary<string, RelicAggregate> RelicAggregates { get; } = new();
     public Dictionary<string, EnemyAggregate> EnemyAggregates { get; } = new();
     public List<BlockChunk> PlayerBlockLedger { get; } = new();

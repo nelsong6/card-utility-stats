@@ -57,6 +57,14 @@ public class RunData
     public List<PotionRunHistoryEntry> PotionHistory { get; set; } = new();
 
     /// <summary>
+    /// Every observed change to the tracked player's maximum HP, in run order.
+    /// Entries retain the exact before/after values instead of reconstructing
+    /// deltas from per-floor game-history totals, so multiple changes on one
+    /// floor (for example Feed followed by Chosen Cheese) stay distinct.
+    /// </summary>
+    public List<MaxHpRunHistoryEntry> MaxHpHistory { get; set; } = new();
+
+    /// <summary>
     /// Ordered provenance for the portion of the player's gold balance that
     /// still matters to source attribution. Old Coin seeds the first tracked
     /// chunk; ordinary balance before and after it is represented by chunks
@@ -121,6 +129,22 @@ public class RunData
     // _pendingCombat is null outside of active combat. See git history
     // on 2026-04-20 for the full PendingCombatSnapshot approach if we
     // ever decide to re-enable mid-combat persistence.)
+}
+
+/// <summary>
+/// One applied maximum-HP mutation. Source is best-effort presentation
+/// context; the before/after values are always observed from the creature.
+/// </summary>
+public class MaxHpRunHistoryEntry
+{
+    public int Sequence { get; set; }
+    public int Floor { get; set; }
+    public string LocationKind { get; set; } = "";
+    public string? LocationName { get; set; }
+    public int? Turn { get; set; }
+    public string? SourceName { get; set; }
+    public int PreviousMaxHp { get; set; }
+    public int NewMaxHp { get; set; }
 }
 
 /// <summary>

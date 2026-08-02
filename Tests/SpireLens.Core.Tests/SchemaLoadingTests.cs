@@ -5312,6 +5312,44 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsMaxHpRunHistoryFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("max-hp-run-history.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertMaxHpRunHistoryFixture(loaded.Data);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsMaxHpRunHistoryFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("max-hp-run-history.json"));
+
+        Assert.NotNull(resumed);
+        AssertMaxHpRunHistoryFixture(resumed!);
+    }
+
+    private static void AssertMaxHpRunHistoryFixture(RunData run)
+    {
+        Assert.Equal(2, run.MaxHpHistory.Count);
+
+        var loss = run.MaxHpHistory[0];
+        Assert.Equal(4, loss.Floor);
+        Assert.Equal("Drowning Beacon", loss.SourceName);
+        Assert.Equal(70, loss.PreviousMaxHp);
+        Assert.Equal(63, loss.NewMaxHp);
+
+        var gain = run.MaxHpHistory[1];
+        Assert.Equal(9, gain.Floor);
+        Assert.Equal("Chosen Cheese", gain.SourceName);
+        Assert.Equal(63, gain.PreviousMaxHp);
+        Assert.Equal(66, gain.NewMaxHp);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsPotionRunHistoryTurnsFixture()
     {
         var loaded = RunStorage.LoadHistorical(

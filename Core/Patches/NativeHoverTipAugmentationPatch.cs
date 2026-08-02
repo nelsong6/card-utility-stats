@@ -11,6 +11,7 @@ using MegaCrit.Sts2.Core.Nodes.Relics;
 using MegaCrit.Sts2.Core.Nodes.Screens.PotionLab;
 using MegaCrit.Sts2.Core.Nodes.Screens.RelicCollection;
 using MegaCrit.Sts2.Core.Nodes.Screens.RunHistoryScreen;
+using MegaCrit.sts2.Core.Nodes.TopBar;
 
 namespace SpireLens.Core.Patches;
 
@@ -255,6 +256,11 @@ internal static class NativeStatsHoverTipFactory
 
             case NRelicBasicHolder holder
                 when RunHistoryStatsContext.TryBuildNativeRelicHoverTip(holder, out tip):
+                statsTip = tip;
+                return true;
+
+            case NTopBarHp hp
+                when MaxHpHistoryTooltip.TryBuildNativeHoverTip(hp, out tip):
                 statsTip = tip;
                 return true;
 
