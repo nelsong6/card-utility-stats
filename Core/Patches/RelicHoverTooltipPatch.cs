@@ -3962,6 +3962,9 @@ public static class RelicHoverShowPatch
             ? 0m
             : agg.MeatOnTheBonePreTriggerHpPercentTotal
                 / agg.MeatOnTheBonePreTriggerHpSamples;
+        var averageHpPercentRelativeToHalf = agg.MeatOnTheBonePreTriggerHpSamples <= 0
+            ? 0m
+            : averageHpPercent - 50m;
 
         RelicActivationRow(sb, agg.Activations.ToString());
         AppendHealingStats(sb, agg);
@@ -3973,10 +3976,10 @@ public static class RelicHoverShowPatch
             "Average raw HP-point difference from 50% of maximum HP at combat end, immediately before Meat on the Bone triggered. Negative is below 50%; positive is above 50%.");
         Row3(
             sb,
-            "Avg HP before trigger",
-            $"{FormatDecimal(averageHpPercent)}%",
+            "Avg HP% relative to 50% before trigger",
+            $"{FormatSignedDecimal(averageHpPercentRelativeToHalf)}%",
             "",
-            "Average current HP at combat end before Meat on the Bone triggered, calculated as a percentage of maximum HP for each activation.");
+            "Average HP percentage-point difference from 50% of maximum HP at combat end, immediately before Meat on the Bone triggered. Negative is below 50%; positive is above 50%.");
         return sb.ToString();
     }
 

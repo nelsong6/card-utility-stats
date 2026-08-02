@@ -1729,7 +1729,8 @@ the same prefix snapshot: accumulate the signed raw
 `current HP - (max HP * 0.5)` difference from exactly 50% and one
 `current HP / max HP` percentage per qualifying trigger. Negative differences
 are below half and positive differences are above half. Average the per-trigger
-percentages directly so max-HP changes during the run do not bias the result
+percentages directly, then subtract 50 percentage points for the signed
+percentage display, so max-HP changes during the run do not bias the result
 toward combats with a larger health pool.
 
 Good hook surfaces already proven useful:

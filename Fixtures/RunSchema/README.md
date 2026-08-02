@@ -561,7 +561,8 @@ New fixtures added going forward do not need a `v*-` prefix.
   Ethereal exhausts, and zero-inclusive held turn/combat denominators.
 - `meat-on-the-bone-pre-trigger-hp-run.json`
   Adds Meat on the Bone's qualifying combat-end signed HP difference from 50%,
-  normalized HP percentage, and matching pre-trigger sample counts.
+  normalized HP percentage used for the signed percentage-point difference,
+  and matching pre-trigger sample counts.
 - `crossbow-relic-run.json`
   Adds Crossbow's successfully gained Attacks, rarity splits, observed energy
   discount, and zero-inclusive held turn/combat denominators.

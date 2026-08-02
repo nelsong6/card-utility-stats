@@ -57,8 +57,8 @@ public class MeatOnTheBoneStatsTests
         Assert.Contains("[b]5[/b]", body);
         Assert.Contains("Average raw HP-point difference from 50%", body);
         Assert.Contains("[b]-10[/b]", body);
-        Assert.Contains("Average current HP at combat end", body);
-        Assert.Contains("[b]38.75%[/b]", body);
+        Assert.Contains("Average HP percentage-point difference from 50%", body);
+        Assert.Contains("[b]-11.25%[/b]", body);
     }
 
     [Fact]
@@ -139,6 +139,8 @@ public class MeatOnTheBoneStatsTests
         {
             MeatOnTheBonePreTriggerHpRelativeToHalfTotal = 10m,
             MeatOnTheBonePreTriggerHpRelativeToHalfSamples = 2,
+            MeatOnTheBonePreTriggerHpPercentTotal = 120m,
+            MeatOnTheBonePreTriggerHpSamples = 2,
         };
 
         Assert.True(RelicHoverShowPatch.TryBuildBodyBBCode(
@@ -148,6 +150,7 @@ public class MeatOnTheBoneStatsTests
             out _,
             out var body));
         Assert.Contains("[b]+5[/b]", body);
+        Assert.Contains("[b]+10%[/b]", body);
     }
 
     [Fact]

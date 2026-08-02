@@ -167,8 +167,9 @@ turn-end charge rows, differing only in Dexterity versus Strength gained.
 Ornamental Fan also shows live activation counts for the current turn and
 combat; fixed-value per-activation gain rows are omitted.
 Meat on the Bone records the HP it actually restores plus the signed average
-HP difference from 50% (negative below, positive above) and average percentage
-of maximum HP immediately before each qualifying combat-end trigger.
+raw HP difference and signed average percentage-point difference from 50%
+(negative below, positive above) immediately before each qualifying combat-end
+trigger.
 Lead Paperweight records its pickup floor, both concrete Colorless card
 options, and which option actually resulted in a permanent-deck addition.
 Screaming Flagon records every empty-hand activation, its observed AOE damage
