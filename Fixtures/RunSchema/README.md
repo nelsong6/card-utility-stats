@@ -562,6 +562,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `meat-on-the-bone-pre-trigger-hp-run.json`
   Adds Meat on the Bone's qualifying combat-end HP deficit, normalized HP
   percentage, and matching pre-trigger sample count.
+- `crossbow-relic-run.json`
+  Adds Crossbow's successfully gained Attacks, rarity splits, observed energy
+  discount, and zero-inclusive held turn/combat denominators.
 
 Why these exist:
 

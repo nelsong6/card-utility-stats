@@ -1216,6 +1216,14 @@ Read both type and rarity from that exact selected card; a trigger with no card
 left to discount belongs in activation rates but not in either recipient
 breakdown.
 
+Crossbow selects one unlocked Attack, calls `SetToFreeThisTurn`, and starts
+`CardPileCmd.AddGeneratedCardsToCombat` before its owner-specific
+`AfterSideTurnStart` callback reaches the first await. A thread-local scope may
+therefore capture the effective before/after energy cost and the exact batch
+attempt synchronously, but gain and rarity must wait for the returned
+`CardPileAddResult`. Count held player turns and combats independently so a
+failed or zero-discount generation still contributes to the rate denominator.
+
 Unrelenting applies one stack of the shared `FreeAttackPower`; multiple
 physical copies therefore lose distinct ownership once their stacks merge.
 Persist downstream charge use in a power-ID-keyed aggregate and project that

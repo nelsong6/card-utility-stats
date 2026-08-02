@@ -190,6 +190,9 @@ stats and append their own bestowed/melted lifecycle rows.
 Musical Box records successfully created Attacks by rarity, averages them over
 all held turns and combats, and counts its exact generated Attacks that later
 exhaust because of Ethereal.
+Crossbow records only Attacks that successfully enter combat, splits them by
+rarity, and averages both Attack gains and their observed energy discount over
+its zero-inclusive held turns and combats.
 
 Drain Power additionally tracks its observed discard-pile upgrades and later
 plays of the exact combat cards it upgraded, with held-turn and held-combat

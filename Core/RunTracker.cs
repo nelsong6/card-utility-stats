@@ -2244,6 +2244,13 @@ public static class RunTracker
         target.MusicBoxAttacksExhaustedByEthereal += source.MusicBoxAttacksExhaustedByEthereal;
         target.MusicBoxTurns += source.MusicBoxTurns;
         target.MusicBoxCombats += source.MusicBoxCombats;
+        target.CrossbowAttacksGained += source.CrossbowAttacksGained;
+        target.CrossbowCommonAttacksGained += source.CrossbowCommonAttacksGained;
+        target.CrossbowUncommonAttacksGained += source.CrossbowUncommonAttacksGained;
+        target.CrossbowRareAttacksGained += source.CrossbowRareAttacksGained;
+        target.CrossbowDiscountGivenTotal += source.CrossbowDiscountGivenTotal;
+        target.CrossbowTurns += source.CrossbowTurns;
+        target.CrossbowCombats += source.CrossbowCombats;
         target.IntimidatingHelmetCombats += source.IntimidatingHelmetCombats;
         target.IntimidatingHelmetTurns += source.IntimidatingHelmetTurns;
         target.DaughterOfTheWindCombats += source.DaughterOfTheWindCombats;
@@ -7106,6 +7113,7 @@ public static class RunTracker
     private const string PaperPhrogRelicId = "RELIC.PAPER_PHROG";
     private const string RegaliteRelicId = "RELIC.REGALITE";
     private const string MusicBoxRelicId = "RELIC.MUSIC_BOX";
+    private const string CrossbowRelicId = "RELIC.CROSSBOW";
     private const string IntimidatingHelmetRelicId = "RELIC.INTIMIDATING_HELMET";
     private const string DaughterOfTheWindRelicId = "RELIC.DAUGHTER_OF_THE_WIND";
     private const string SturdyClampRelicId = "RELIC.STURDY_CLAMP";
@@ -17763,6 +17771,69 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Count Crossbow's owner-turn opportunity and open its exact generation
+    /// scope only when the relic's owner belongs to the side that just began.
+    /// </summary>
+    internal static bool RecordCrossbowTurnStarted(
+        Crossbow? relic,
+        IReadOnlyList<Creature>? participants)
+    {
+        if (relic?.Owner?.Creature == null || participants == null) return false;
+        if (!participants.Contains(relic.Owner.Creature)) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                var player = relic.Owner;
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(player)) return false;
+                if (CombatManager.Instance?.IsInProgress != true) return false;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordCrossbowTurnForPlayerLocked(player);
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordCrossbowTurnStarted failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record a Crossbow Attack only after the generated-card command confirms
+    /// that the exact card entered combat.
+    /// </summary>
+    internal static void RecordCrossbowAttackGained(
+        Player? player,
+        CardModel? attack,
+        decimal observedDiscount)
+    {
+        if (player == null || attack == null || attack.Type != CardType.Attack) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null || !IsTrackedPlayer(player)) return;
+                if (!ReferenceEquals(attack.Owner, player)) return;
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(CrossbowRelicId);
+                RecordCrossbowAttackGainedForTest(
+                    agg,
+                    success: true,
+                    attack.Rarity,
+                    observedDiscount);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordCrossbowAttackGained failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Count one owner card play that meets Intimidating Helmet's exact
     /// play-time EnergyValue threshold, then arm the relic's immediately
     /// following BlockVar gain-block command for observed-result attribution.
@@ -18254,6 +18325,42 @@ public static class RunTracker
     {
         if (agg == null) return;
         agg.MusicBoxCombats += Math.Max(0, count);
+    }
+
+    internal static void RecordCrossbowAttackGainedForTest(
+        RelicAggregate agg,
+        bool success,
+        CardRarity? rarity,
+        decimal observedDiscount)
+    {
+        if (agg == null || !success) return;
+
+        agg.CrossbowAttacksGained++;
+        agg.CrossbowDiscountGivenTotal += Math.Max(0m, observedDiscount);
+        switch (rarity)
+        {
+            case CardRarity.Common:
+                agg.CrossbowCommonAttacksGained++;
+                break;
+            case CardRarity.Uncommon:
+                agg.CrossbowUncommonAttacksGained++;
+                break;
+            case CardRarity.Rare:
+                agg.CrossbowRareAttacksGained++;
+                break;
+        }
+    }
+
+    internal static void RecordCrossbowTurnForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.CrossbowTurns += Math.Max(0, count);
+    }
+
+    internal static void RecordCrossbowCombatForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.CrossbowCombats += Math.Max(0, count);
     }
 
     internal static bool IntimidatingHelmetEnergyValueQualifiesForTest(int energyValue, int threshold = 2)
@@ -23945,6 +24052,18 @@ public static class RunTracker
         }
     }
 
+    private static bool PlayerHasCrossbow(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is Crossbow);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static bool PlayerHasIntimidatingHelmet(Player player)
     {
         try
@@ -24211,6 +24330,7 @@ public static class RunTracker
             RecordTriBoomerangCombatForPlayerLocked(player);
             RecordRegaliteCombatForPlayerLocked(player);
             RecordMusicBoxCombatForPlayerLocked(player);
+            RecordCrossbowCombatForPlayerLocked(player);
             RecordIntimidatingHelmetCombatForPlayerLocked(player);
             RecordDaughterOfTheWindCombatForPlayerLocked(player);
             RecordThreeAttackScalingRelicsCombatForPlayerLocked(player);
@@ -25220,6 +25340,38 @@ public static class RunTracker
 
         var agg = GetOrCreatePendingRelicAggregateLocked(MusicBoxRelicId);
         RecordMusicBoxTurnForTest(agg);
+    }
+
+    private static void RecordCrossbowCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasCrossbow(player)) return;
+        if (!_pendingCombat.CrossbowCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(CrossbowRelicId);
+        RecordCrossbowCombatForTest(agg);
+    }
+
+    private static void RecordCrossbowTurnForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasCrossbow(player)) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.CrossbowTurnCountedTurns.TryGetValue(
+                player,
+                out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.CrossbowTurnCountedTurns[player] = turnNumber;
+        RecordCrossbowCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(CrossbowRelicId);
+        RecordCrossbowTurnForTest(agg);
     }
 
     private static void RecordIntimidatingHelmetCombatForPlayerLocked(Player player)
@@ -31640,6 +31792,10 @@ internal class PendingCombat
     public Dictionary<Player, PendingMusicBoxCreationWindow> PendingMusicBoxCreationWindows { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<CardModel> MusicBoxGeneratedAttacks { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> CrossbowCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> CrossbowTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> IntimidatingHelmetCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

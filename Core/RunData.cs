@@ -1380,6 +1380,18 @@ public class RelicAggregate
     public int MusicBoxTurns { get; set; }
     public int MusicBoxCombats { get; set; }
 
+    // Crossbow tracking. Attacks gained and rarity use only successful
+    // generated-card add results. Discount is the effective energy-cost delta
+    // around Crossbow's exact SetToFreeThisTurn call; turns and combats are
+    // zero-inclusive held denominators.
+    public int CrossbowAttacksGained { get; set; }
+    public int CrossbowCommonAttacksGained { get; set; }
+    public int CrossbowUncommonAttacksGained { get; set; }
+    public int CrossbowRareAttacksGained { get; set; }
+    public decimal CrossbowDiscountGivenTotal { get; set; }
+    public int CrossbowTurns { get; set; }
+    public int CrossbowCombats { get; set; }
+
     // Intimidating Helmet tracking. Activations is the number of owner card
     // plays whose play-time EnergyValue met the relic's 2+ threshold;
     // AdditionalBlockGained is the observed block. These are held combat/turn

@@ -5737,4 +5737,36 @@ public class SchemaLoadingTests
         Assert.Equal(77.5m, relicAgg.MeatOnTheBonePreTriggerHpPercentTotal);
         Assert.Equal(2, relicAgg.MeatOnTheBonePreTriggerHpSamples);
     }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsCrossbowRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("crossbow-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertCrossbowFixture(loaded.Data.RelicAggregates["RELIC.CROSSBOW"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsCrossbowRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("crossbow-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertCrossbowFixture(resumed!.RelicAggregates["RELIC.CROSSBOW"]);
+    }
+
+    private static void AssertCrossbowFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(6, relicAgg.CrossbowAttacksGained);
+        Assert.Equal(2, relicAgg.CrossbowCommonAttacksGained);
+        Assert.Equal(2, relicAgg.CrossbowUncommonAttacksGained);
+        Assert.Equal(1, relicAgg.CrossbowRareAttacksGained);
+        Assert.Equal(9m, relicAgg.CrossbowDiscountGivenTotal);
+        Assert.Equal(4, relicAgg.CrossbowTurns);
+        Assert.Equal(2, relicAgg.CrossbowCombats);
+    }
 }

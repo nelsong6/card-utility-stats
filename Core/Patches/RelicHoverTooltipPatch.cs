@@ -957,6 +957,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is Crossbow)
+        {
+            title = "Crossbow";
+            body = BuildCrossbowBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is MusicBox)
         {
             title = "Musical Box";
@@ -3189,6 +3196,71 @@ public static class RelicHoverShowPatch
             "by Ethereal",
             agg.MusicBoxAttacksExhaustedByEthereal.ToString(),
             "Musical Box Attacks that remained in hand and exhausted because of Ethereal.");
+        return sb.ToString();
+    }
+
+    private static string BuildCrossbowBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var attacksPerCombat = agg.CrossbowCombats <= 0
+            ? 0m
+            : (decimal)agg.CrossbowAttacksGained / agg.CrossbowCombats;
+        var discountPerTurn = agg.CrossbowTurns <= 0
+            ? 0m
+            : agg.CrossbowDiscountGivenTotal / agg.CrossbowTurns;
+        var discountPerCombat = agg.CrossbowCombats <= 0
+            ? 0m
+            : agg.CrossbowDiscountGivenTotal / agg.CrossbowCombats;
+
+        DescribedIconRow(
+            sb,
+            ["attack"],
+            [],
+            "gained",
+            agg.CrossbowAttacksGained.ToString(),
+            "Attacks gained from Crossbow that successfully entered combat.");
+        DescribedIconRow(
+            sb,
+            ["average", "attack", "combat"],
+            ["combat"],
+            "gained",
+            FormatDecimal(attacksPerCombat),
+            "Average Attacks gained from Crossbow per combat while held.");
+        DescribedIconRow(
+            sb,
+            ["average", "attack", "energy", "turn"],
+            ["turn"],
+            "discount",
+            FormatDecimal(discountPerTurn),
+            "Average effective energy discount given to Crossbow Attacks per player turn while held.");
+        DescribedIconRow(
+            sb,
+            ["average", "attack", "energy", "combat"],
+            ["combat"],
+            "discount",
+            FormatDecimal(discountPerCombat),
+            "Average effective energy discount given to Crossbow Attacks per combat while held.");
+        DescribedIconRow(
+            sb,
+            ["attack_common"],
+            [],
+            "gained",
+            agg.CrossbowCommonAttacksGained.ToString(),
+            "Common Attacks gained from Crossbow.");
+        DescribedIconRow(
+            sb,
+            ["attack_uncommon"],
+            [],
+            "gained",
+            agg.CrossbowUncommonAttacksGained.ToString(),
+            "Uncommon Attacks gained from Crossbow.");
+        DescribedIconRow(
+            sb,
+            ["attack_rare"],
+            [],
+            "gained",
+            agg.CrossbowRareAttacksGained.ToString(),
+            "Rare Attacks gained from Crossbow.");
         return sb.ToString();
     }
 
