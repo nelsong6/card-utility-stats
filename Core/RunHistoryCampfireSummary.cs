@@ -7,17 +7,22 @@ using MegaCrit.Sts2.addons.mega_text;
 using MegaCrit.Sts2.Core.HoverTips;
 using MegaCrit.Sts2.Core.Localization;
 using MegaCrit.Sts2.Core.Map;
+using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Nodes.HoverTips;
 using MegaCrit.Sts2.Core.Nodes.Screens.RunHistoryScreen;
 using MegaCrit.Sts2.Core.Rooms;
 using MegaCrit.Sts2.Core.Runs;
+using MegaCrit.Sts2.Core.Runs.History;
+using MegaCrit.Sts2.Core.Saves;
+using MegaCrit.Sts2.Core.Saves.Runs;
 using SpireLens.Core.Patches;
 
 namespace SpireLens.Core;
 
 internal sealed record RunHistoryCampfireEntry(
     int Floor,
-    IReadOnlyList<string> ChoiceIds);
+    IReadOnlyList<string> ChoiceIds,
+    PlayerMapPointHistoryEntry PlayerEntry);
 
 /// <summary>
 /// Adds one compact campfire-history entry beneath the stock act rows. The
@@ -173,7 +178,15 @@ internal static class RunHistoryCampfireSummary
                     || choiceIds.Length > 0;
 
                 if (isCampfire)
-                    result.Add(new RunHistoryCampfireEntry(floor, choiceIds));
+                {
+                    result.Add(new RunHistoryCampfireEntry(
+                        floor,
+                        choiceIds,
+                        playerEntry ?? new PlayerMapPointHistoryEntry
+                        {
+                            PlayerId = playerId,
+                        }));
+                }
 
                 floor++;
             }
@@ -189,25 +202,316 @@ internal static class RunHistoryCampfireSummary
         choiceFormatter ??= FormatChoice;
         var floorIcon = StatConceptGlossary.RenderHintedGlyph("floor");
         var body = new StringBuilder();
+        var liftNumber = 0;
 
         foreach (var entry in entries)
         {
             if (body.Length > 0) body.Append('\n');
 
-            var choices = entry.ChoiceIds.Count == 0
-                ? "No choice recorded"
-                : string.Join(
-                    " · ",
-                    entry.ChoiceIds.Select(choiceFormatter));
+            liftNumber += entry.ChoiceIds.Count(choice =>
+                string.Equals(choice, "LIFT", StringComparison.OrdinalIgnoreCase));
+            var outcome = BuildOutcomeText(
+                entry,
+                liftNumber,
+                choiceFormatter);
             body.Append(floorIcon)
                 .Append(' ')
                 .Append(Math.Max(0, entry.Floor))
                 .Append("   ")
-                .Append(StatsTooltip.EscapeBbcode(choices));
+                .Append(StatsTooltip.EscapeBbcode(outcome));
         }
 
         return body.ToString();
     }
+
+    internal static string BuildOutcomeText(
+        RunHistoryCampfireEntry entry,
+        int liftNumber,
+        Func<string, string>? choiceFormatter = null)
+    {
+        choiceFormatter ??= FormatChoice;
+        var player = entry.PlayerEntry;
+        var choices = entry.ChoiceIds
+            .Where(choice => !string.IsNullOrWhiteSpace(choice))
+            .ToArray();
+        var choiceSet = choices.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var pickedRelics = (player.RelicChoices ?? [])
+            .Where(choice => choice.wasPicked)
+            .Select(choice => choice.choice)
+            .Where(id => id != null)
+            .ToList();
+        var hatchRelics = pickedRelics
+            .Where(id => string.Equals(
+                id.ToString(),
+                "RELIC.BYRDPIP",
+                StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        var digRelics = choiceSet.Contains("HATCH")
+            ? pickedRelics.Except(hatchRelics).ToList()
+            : pickedRelics;
+
+        var consumedHealing = false;
+        var consumedMaxHp = false;
+        var consumedUpgrades = false;
+        var consumedRemovedCards = false;
+        var consumedGainedCards = false;
+        var consumedRelics = false;
+        var consumedTransformations = false;
+        var segments = new List<string>();
+
+        foreach (var choice in choices)
+        {
+            var action = choiceFormatter(choice);
+            var details = new List<string>();
+
+            switch (choice.ToUpperInvariant())
+            {
+                case "HEAL":
+                    details.Add($"healed {Math.Max(0, player.HpHealed)} HP");
+                    consumedHealing = true;
+                    break;
+
+                case "SMITH":
+                    if ((player.UpgradedCards?.Count ?? 0) > 0)
+                    {
+                        details.Add(
+                            $"upgraded {JoinNames((player.UpgradedCards ?? []).Select(FormatCardId))}");
+                    }
+                    consumedUpgrades = true;
+                    break;
+
+                case "DIG":
+                    if (digRelics.Count > 0)
+                    {
+                        details.Add(
+                            $"obtained {JoinNames(digRelics.Select(FormatRelicId))}");
+                    }
+                    consumedRelics = true;
+                    break;
+
+                case "LIFT":
+                    details.Add(
+                        $"gained 1 Strength (lift {Math.Clamp(liftNumber, 1, 3)} of 3)");
+                    break;
+
+                case "MEND":
+                    // The history records healing on the recipient, but does
+                    // not save which player's Mend caused which portion.
+                    details.Add("healed another player");
+                    break;
+
+                case "HATCH":
+                    var obtained = hatchRelics.Count > 0
+                        ? hatchRelics
+                        : choiceSet.Contains("DIG")
+                            ? []
+                            : pickedRelics;
+                    if (obtained.Count > 0)
+                    {
+                        details.Add(
+                            $"obtained {JoinNames(obtained.Select(FormatRelicId))}");
+                    }
+
+                    if ((player.CardsTransformed?.Count ?? 0) > 0)
+                    {
+                        details.Add(
+                            $"transformed {JoinNames((player.CardsTransformed ?? []).Select(FormatTransformation))}");
+                    }
+
+                    consumedRelics = true;
+                    consumedTransformations = true;
+                    break;
+
+                case "KINDLE":
+                    details.Add("added 5 Pumpkin Candle charges");
+                    break;
+
+                case "COOK":
+                    if ((player.CardsRemoved?.Count ?? 0) > 0)
+                    {
+                        details.Add(
+                            $"removed {JoinNames((player.CardsRemoved ?? []).Select(FormatSerializableCard))}");
+                    }
+
+                    if (player.MaxHpGained > 0)
+                        details.Add($"gained {player.MaxHpGained} Max HP");
+                    if (!choiceSet.Contains("HEAL") && player.HpHealed > 0)
+                    {
+                        details.Add($"healed {player.HpHealed} HP");
+                        consumedHealing = true;
+                    }
+
+                    consumedRemovedCards = true;
+                    consumedMaxHp = true;
+                    break;
+
+                case "CLONE":
+                    if ((player.CardsGained?.Count ?? 0) > 0)
+                    {
+                        details.Add(
+                            $"cloned {JoinNames((player.CardsGained ?? []).Select(FormatSerializableCard))}");
+                    }
+                    consumedGainedCards = true;
+                    break;
+            }
+
+            segments.Add(details.Count == 0
+                ? action
+                : $"{action} — {string.Join("; ", details)}");
+        }
+
+        if (segments.Count == 0)
+            segments.Add("No choice recorded");
+
+        var supplemental = new List<string>();
+        if (!consumedHealing && player.HpHealed > 0)
+            supplemental.Add($"healed {player.HpHealed} HP");
+        if (!consumedMaxHp && player.MaxHpGained > 0)
+            supplemental.Add($"gained {player.MaxHpGained} Max HP");
+        if (player.MaxHpLost > 0)
+            supplemental.Add($"lost {player.MaxHpLost} Max HP");
+        if (!consumedUpgrades && (player.UpgradedCards?.Count ?? 0) > 0)
+        {
+            supplemental.Add(
+                $"upgraded {JoinNames((player.UpgradedCards ?? []).Select(FormatCardId))}");
+        }
+        if ((player.DowngradedCards?.Count ?? 0) > 0)
+        {
+            supplemental.Add(
+                $"downgraded {JoinNames((player.DowngradedCards ?? []).Select(FormatCardId))}");
+        }
+        if (!consumedRemovedCards && (player.CardsRemoved?.Count ?? 0) > 0)
+        {
+            supplemental.Add(
+                $"removed {JoinNames((player.CardsRemoved ?? []).Select(FormatSerializableCard))}");
+        }
+        if (!consumedGainedCards && (player.CardsGained?.Count ?? 0) > 0)
+        {
+            supplemental.Add(
+                $"gained {JoinNames((player.CardsGained ?? []).Select(FormatSerializableCard))}");
+        }
+        if (!consumedTransformations
+            && (player.CardsTransformed?.Count ?? 0) > 0)
+        {
+            supplemental.Add(
+                $"transformed {JoinNames((player.CardsTransformed ?? []).Select(FormatTransformation))}");
+        }
+        if ((player.CardsEnchanted?.Count ?? 0) > 0)
+        {
+            supplemental.Add(
+                $"enchanted {JoinNames((player.CardsEnchanted ?? []).Select(FormatEnchantment))}");
+        }
+        if (!consumedRelics && pickedRelics.Count > 0)
+        {
+            supplemental.Add(
+                $"obtained {JoinNames(pickedRelics.Select(FormatRelicId))}");
+        }
+        if ((player.RelicsRemoved?.Count ?? 0) > 0)
+        {
+            supplemental.Add(
+                $"removed {JoinNames((player.RelicsRemoved ?? []).Select(FormatRelicId))}");
+        }
+
+        var pickedPotions = (player.PotionChoices ?? [])
+            .Where(choice => choice.wasPicked)
+            .Select(choice => choice.choice)
+            .Where(id => id != null)
+            .ToList();
+        if (pickedPotions.Count > 0)
+        {
+            supplemental.Add(
+                $"obtained {JoinNames(pickedPotions.Select(FormatPotionId))}");
+        }
+        if (player.GoldGained > 0)
+            supplemental.Add($"gained {player.GoldGained} gold");
+        if (player.GoldSpent > 0)
+            supplemental.Add($"spent {player.GoldSpent} gold");
+        if (player.GoldLost > 0)
+            supplemental.Add($"lost {player.GoldLost} gold");
+
+        if (supplemental.Count > 0)
+            segments.Add(string.Join("; ", supplemental));
+
+        return string.Join(" · ", segments);
+    }
+
+    private static string FormatCardId(ModelId id) =>
+        FormatModelTitle(
+            id,
+            () => SaveUtil.CardOrDeprecated(id).Title);
+
+    private static string FormatRelicId(ModelId id) =>
+        FormatModelTitle(
+            id,
+            () => SaveUtil.RelicOrDeprecated(id).Title.GetFormattedText());
+
+    private static string FormatPotionId(ModelId id) =>
+        FormatModelTitle(
+            id,
+            () => SaveUtil.PotionOrDeprecated(id).Title.GetFormattedText());
+
+    private static string FormatEnchantmentId(ModelId id) =>
+        FormatModelTitle(
+            id,
+            () => SaveUtil.EnchantmentOrDeprecated(id).Title.GetFormattedText());
+
+    private static string FormatSerializableCard(SerializableCard card)
+    {
+        var fallback = FormatModelId(card?.Id);
+        try
+        {
+            if (card == null) return fallback;
+            var title = CardModel.FromSerializable(card).Title;
+            if (!string.IsNullOrWhiteSpace(title)) fallback = title;
+        }
+        catch
+        {
+            // Deprecated or modded cards may not resolve in the current build.
+        }
+
+        if (card?.CurrentUpgradeLevel > 0)
+        {
+            fallback += card.CurrentUpgradeLevel == 1
+                ? "+"
+                : $"+{card.CurrentUpgradeLevel}";
+        }
+
+        return fallback;
+    }
+
+    private static string FormatTransformation(
+        CardTransformationHistoryEntry transformation) =>
+        $"{FormatSerializableCard(transformation.OriginalCard)} → "
+        + FormatSerializableCard(transformation.FinalCard);
+
+    private static string FormatEnchantment(
+        CardEnchantmentHistoryEntry enchantment) =>
+        $"{FormatSerializableCard(enchantment.Card)} with "
+        + FormatEnchantmentId(enchantment.Enchantment);
+
+    private static string FormatModelTitle(
+        ModelId? id,
+        Func<string> titleProvider)
+    {
+        var fallback = FormatModelId(id);
+        if (id == null) return fallback;
+
+        try
+        {
+            var title = titleProvider();
+            return string.IsNullOrWhiteSpace(title) ? fallback : title;
+        }
+        catch
+        {
+            return fallback;
+        }
+    }
+
+    private static string FormatModelId(ModelId? id) =>
+        id == null ? "Unknown" : HumanizeChoiceId(id.Entry);
+
+    private static string JoinNames(IEnumerable<string> names) =>
+        string.Join(", ", names.Where(name => !string.IsNullOrWhiteSpace(name)));
 
     internal static string HumanizeChoiceId(string choiceId)
     {

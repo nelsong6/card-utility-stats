@@ -1,8 +1,10 @@
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Map;
+using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Nodes.Screens.RunHistoryScreen;
 using MegaCrit.Sts2.Core.Runs;
 using MegaCrit.Sts2.Core.Runs.History;
+using MegaCrit.Sts2.Core.Saves.Runs;
 using SpireLens.Core;
 using Xunit;
 
@@ -35,12 +37,108 @@ public class RunHistoryCampfireSummaryTests
             {
                 Assert.Equal(2, entry.Floor);
                 Assert.Equal(["SMITH"], entry.ChoiceIds);
+                Assert.Equal(1UL, entry.PlayerEntry.PlayerId);
             },
             entry =>
             {
                 Assert.Equal(3, entry.Floor);
                 Assert.Equal(["DIG"], entry.ChoiceIds);
             });
+    }
+
+    [Fact]
+    public void BuildOutcomeText_ReportsHealingAndUpgradedCard()
+    {
+        var playerEntry = new PlayerMapPointHistoryEntry
+        {
+            PlayerId = 1,
+            HpHealed = 22,
+            RestSiteChoices = ["SMITH", "HEAL"],
+            UpgradedCards = [new ModelId("CARD", "WHITE_NOISE")],
+        };
+        var entry = new RunHistoryCampfireEntry(
+            7,
+            playerEntry.RestSiteChoices,
+            playerEntry);
+
+        var outcome = RunHistoryCampfireSummary.BuildOutcomeText(
+            entry,
+            liftNumber: 0,
+            choice => choice == "HEAL"
+                ? "Rest"
+                : RunHistoryCampfireSummary.HumanizeChoiceId(choice));
+
+        Assert.Contains("Smith — upgraded White Noise", outcome);
+        Assert.Contains("Rest — healed 22 HP", outcome);
+    }
+
+    [Fact]
+    public void BuildOutcomeText_ReportsCookResults()
+    {
+        var playerEntry = new PlayerMapPointHistoryEntry
+        {
+            PlayerId = 1,
+            HpHealed = 9,
+            MaxHpGained = 9,
+            RestSiteChoices = ["COOK"],
+            CardsRemoved =
+            [
+                new SerializableCard
+                {
+                    Id = new ModelId("CARD", "REGRET"),
+                },
+                new SerializableCard
+                {
+                    Id = new ModelId("CARD", "STRIKE_SILENT"),
+                },
+            ],
+        };
+        var entry = new RunHistoryCampfireEntry(
+            40,
+            playerEntry.RestSiteChoices,
+            playerEntry);
+
+        var outcome = RunHistoryCampfireSummary.BuildOutcomeText(
+            entry,
+            liftNumber: 0,
+            RunHistoryCampfireSummary.HumanizeChoiceId);
+
+        Assert.Contains("Cook — removed Regret, Strike Silent", outcome);
+        Assert.Contains("gained 9 Max HP", outcome);
+        Assert.Contains("healed 9 HP", outcome);
+    }
+
+    [Fact]
+    public void BuildOutcomeText_ReportsDigRelicAndLiftProgress()
+    {
+        var digEntry = new PlayerMapPointHistoryEntry
+        {
+            PlayerId = 1,
+            RestSiteChoices = ["DIG"],
+            RelicChoices =
+            [
+                new ModelChoiceHistoryEntry(
+                    new ModelId("RELIC", "ANCHOR"),
+                    wasPicked: true),
+            ],
+        };
+        var liftEntry = new PlayerMapPointHistoryEntry
+        {
+            PlayerId = 1,
+            RestSiteChoices = ["LIFT"],
+        };
+
+        var digOutcome = RunHistoryCampfireSummary.BuildOutcomeText(
+            new RunHistoryCampfireEntry(7, digEntry.RestSiteChoices, digEntry),
+            liftNumber: 0,
+            RunHistoryCampfireSummary.HumanizeChoiceId);
+        var liftOutcome = RunHistoryCampfireSummary.BuildOutcomeText(
+            new RunHistoryCampfireEntry(13, liftEntry.RestSiteChoices, liftEntry),
+            liftNumber: 2,
+            RunHistoryCampfireSummary.HumanizeChoiceId);
+
+        Assert.Equal("Dig — obtained Anchor", digOutcome);
+        Assert.Equal("Lift — gained 1 Strength (lift 2 of 3)", liftOutcome);
     }
 
     [Fact]
