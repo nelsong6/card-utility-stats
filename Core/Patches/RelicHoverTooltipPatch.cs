@@ -4268,18 +4268,19 @@ public static class RelicHoverShowPatch
             var icon = StatConceptGlossary.RenderHintedInlineImage(
                 ResolveGrantedRelicIconPath(waxRelic.RelicId),
                 displayName);
+            var floorIcon = StatConceptGlossary.RenderHintedGlyph("floor");
             var bestowed = waxRelic.FloorBestowed.HasValue
-                ? $"Floor {Math.Max(0, waxRelic.FloorBestowed.Value)}"
-                : "Floor not tracked";
+                ? $"{floorIcon} {Math.Max(0, waxRelic.FloorBestowed.Value)}"
+                : $"{floorIcon} not tracked";
             var outcome = waxRelic.FloorMelted.HasValue
-                ? $"{bestowed} · melted Floor {Math.Max(0, waxRelic.FloorMelted.Value)}"
+                ? $"{bestowed} · melted {floorIcon} {Math.Max(0, waxRelic.FloorMelted.Value)}"
                 : $"{bestowed} · not melted";
             DescribedIconFlowRow(
                 sb,
                 [],
                 [],
                 icon,
-                StatsTooltip.EscapeBbcode(outcome),
+                outcome,
                 $"{displayName} was bestowed as a wax relic by Toy Box.");
         }
 
@@ -4340,19 +4341,20 @@ public static class RelicHoverShowPatch
 
         var floorBestowed = entry?.FloorBestowed ?? fallbackBestowedFloor;
         var floorMelted = entry?.FloorMelted;
+        var floorIcon = StatConceptGlossary.RenderHintedGlyph("floor");
         var sb = new StringBuilder(body ?? string.Empty);
         Row3(
             sb,
             "Wax bestowed",
             floorBestowed.HasValue
-                ? $"Floor {Math.Max(0, floorBestowed.Value)}"
+                ? $"{floorIcon} {Math.Max(0, floorBestowed.Value)}"
                 : "not tracked",
             "");
         Row3(
             sb,
             "Wax melted",
             floorMelted.HasValue
-                ? $"Floor {Math.Max(0, floorMelted.Value)}"
+                ? $"{floorIcon} {Math.Max(0, floorMelted.Value)}"
                 : relicModel.IsMelted
                     ? "not tracked"
                     : "not yet",

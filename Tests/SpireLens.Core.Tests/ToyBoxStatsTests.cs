@@ -140,8 +140,14 @@ public class ToyBoxStatsTests
         Assert.Contains("Avg floors to melt", body);
         Assert.Contains("Wax Anchor", body);
         Assert.Contains("Wax Bag of Preparation", body);
-        Assert.Contains("Floor 5 · melted Floor 9", body);
-        Assert.Contains("Floor 5 · not melted", body);
+        Assert.Contains(
+            "res://images/atlases/ui_atlas.sprites/top_bar/top_bar_floor.tres",
+            body);
+        Assert.Contains("5 · melted", body);
+        Assert.Contains("9", body);
+        Assert.Contains("5 · not melted", body);
+        Assert.DoesNotContain("Floor 5", body);
+        Assert.DoesNotContain("melted Floor", body);
         Assert.Contains("[b]4[/b]", body);
     }
 
