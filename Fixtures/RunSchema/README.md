@@ -549,6 +549,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `small-capsule-relic-run.json`
   Adds Small Capsule's concrete rolled relic plus the terminal taken/skipped
   outcome for that exact reward.
+- `toy-box-wax-relic-run.json`
+  Adds Toy Box's ordered wax-relic ledger with observed bestowed and melted
+  floors while preserving each wax relic's ordinary effect aggregate by id.
 
 Why these exist:
 

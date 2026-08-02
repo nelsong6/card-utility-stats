@@ -262,7 +262,7 @@ internal static class RunHistoryStatsContext
             neowsBonesCurseAggs = curseAggs;
         }
 
-        return RelicHoverShowPatch.TryBuildBodyBBCode(
+        var built = RelicHoverShowPatch.TryBuildBodyBBCode(
             relicModel,
             aggregate,
             run.FloorReached,
@@ -272,6 +272,22 @@ internal static class RunHistoryStatsContext
             storybookBrightestFlameAgg,
             out title,
             out body);
+        if (relicModel.IsWax)
+        {
+            var toyBoxAggregate = run.RelicAggregates.TryGetValue(
+                "RELIC.TOY_BOX",
+                out var toyBoxSaved)
+                ? toyBoxSaved
+                : null;
+            RelicHoverShowPatch.ApplyWaxRelicPresentation(
+                relicModel,
+                toyBoxAggregate,
+                ref title,
+                ref body);
+            return true;
+        }
+
+        return built;
     }
 
     public static bool HasAncestor<T>(Node? node) where T : Node

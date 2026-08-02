@@ -176,6 +176,9 @@ charges, and campfire rekindles.
 Small Capsule records the exact relic rolled on its reward screen and whether
 that same reward was taken or left behind, with the relic remaining hoverable
 in the SpireLens tooltip.
+Toy Box records each wax relic it bestows, the floor where each relic melts,
+and average floors until melting. Wax relic hovers retain their ordinary relic
+stats and append their own bestowed/melted lifecycle rows.
 
 Drain Power additionally tracks its observed discard-pile upgrades and later
 plays of the exact combat cards it upgraded, with held-turn and held-combat

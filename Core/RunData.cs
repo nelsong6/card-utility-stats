@@ -1185,6 +1185,11 @@ public class RelicAggregate
     // relics were obtained.
     public Dictionary<string, RelicGrantedAggregate> RelicsGranted { get; set; } = new();
 
+    // Ordered physical wax relics bestowed by Toy Box. Each entry keeps the
+    // original relic identity plus its observed acquisition and melt floors;
+    // the relic's ordinary effect stats continue to live under its own id.
+    public List<ToyBoxWaxRelicAggregate> ToyBoxWaxRelics { get; set; } = new();
+
     // Ordered relic rewards created by Small Capsule. Each entry preserves
     // the concrete relic rolled by the game and whether it was taken, skipped,
     // or is still awaiting a decision.
@@ -1636,6 +1641,15 @@ public class RelicGrantedAggregate
     public string RelicId { get; set; } = "";
     public string DisplayName { get; set; } = "";
     public int Count { get; set; }
+}
+
+public class ToyBoxWaxRelicAggregate
+{
+    public int Sequence { get; set; }
+    public string RelicId { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public int? FloorBestowed { get; set; }
+    public int? FloorMelted { get; set; }
 }
 
 public class RelicRewardChoiceAggregate

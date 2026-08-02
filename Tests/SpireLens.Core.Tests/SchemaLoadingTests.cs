@@ -5563,6 +5563,44 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsToyBoxWaxRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("toy-box-wax-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertToyBoxWaxRelicFixture(loaded.Data);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsToyBoxWaxRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("toy-box-wax-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertToyBoxWaxRelicFixture(resumed!);
+    }
+
+    private static void AssertToyBoxWaxRelicFixture(RunData run)
+    {
+        var toyBox = run.RelicAggregates["RELIC.TOY_BOX"];
+        Assert.Equal(2, toyBox.ToyBoxWaxRelics.Count);
+        Assert.Equal("RELIC.ANCHOR", toyBox.ToyBoxWaxRelics[0].RelicId);
+        Assert.Equal(5, toyBox.ToyBoxWaxRelics[0].FloorBestowed);
+        Assert.Equal(9, toyBox.ToyBoxWaxRelics[0].FloorMelted);
+        Assert.Equal(
+            "RELIC.BAG_OF_PREPARATION",
+            toyBox.ToyBoxWaxRelics[1].RelicId);
+        Assert.Null(toyBox.ToyBoxWaxRelics[1].FloorMelted);
+
+        var anchor = run.RelicAggregates["RELIC.ANCHOR"];
+        Assert.Equal(2, anchor.Activations);
+        Assert.Equal(20, anchor.AdditionalBlockGained);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsSwordInTheStoneRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(

@@ -90,7 +90,8 @@ public static class RelicCmdObtainStatsPatch
             || RunTracker.IsLizardTailStatsRelic(relic)
             || RunTracker.IsChosenCheeseStatsRelic(relic)
             || relic is BookOfFiveRings
-            || relic is SwordOfStone;
+            || relic is SwordOfStone
+            || relic?.IsWax == true;
     }
 
     private static void RecordObtainStats(RelicModel relic, Player player, ChosenCheeseObtainState chosenCheeseState)
@@ -101,6 +102,7 @@ public static class RelicCmdObtainStatsPatch
         if (relic is BookOfFiveRings bookOfFiveRings)
             RunTracker.RecordBookOfFiveRingsObtained(bookOfFiveRings, player);
         RunTracker.RecordSwordOfStoneObtained(relic, player);
+        RunTracker.RecordToyBoxWaxRelicBestowed(relic, player);
 
         if (chosenCheeseState.Player != null)
             RunTracker.RecordChosenCheeseObtained(relic, player, chosenCheeseState.StartingMaxHp);

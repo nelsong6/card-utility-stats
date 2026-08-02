@@ -32,6 +32,7 @@ public static class RelicHoverShowPatch
     private const string CursedPearlCurseDefinitionId = "CARD.GREED";
     private const string BrightestFlameDefinitionId = "CARD.BRIGHTEST_FLAME";
     private const string DowsingRodRelicId = "RELIC.DOWSING_ROD";
+    private const string ToyBoxRelicId = "RELIC.TOY_BOX";
     private const string VulnerableIconPath = "res://images/atlases/power_atlas.sprites/vulnerable_power.tres";
     private const string WeakIconPath = "res://images/atlases/power_atlas.sprites/weak_power.tres";
     private const string BlockIconPath = "res://images/ui/combat/block.png";
@@ -163,7 +164,7 @@ public static class RelicHoverShowPatch
 
         floorCount ??= RunTracker.GetCurrentFloorForRateStats();
 
-        return TryBuildBodyBBCode(
+        var built = TryBuildBodyBBCode(
             relicModel,
             aggregate ?? new RelicAggregate(),
             floorCount,
@@ -173,6 +174,21 @@ public static class RelicHoverShowPatch
             storybookBrightestFlameAgg,
             out title,
             out body);
+
+        if (relicModel.IsWax)
+        {
+            var toyBoxAggregate = useEndedRun
+                ? RunTracker.GetLastEndedRelicAggregate(ToyBoxRelicId)
+                : RunTracker.GetRelicAggregate(ToyBoxRelicId);
+            ApplyWaxRelicPresentation(
+                relicModel,
+                toyBoxAggregate,
+                ref title,
+                ref body);
+            return true;
+        }
+
+        return built;
     }
 
     internal static string GetStatsAggregateId(RelicModel relicModel)
@@ -1235,6 +1251,13 @@ public static class RelicHoverShowPatch
         {
             title = "Blood Vial???";
             body = BuildBloodVialBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is ToyBox)
+        {
+            title = "Toy Box";
+            body = BuildToyBoxBodyBBCode(agg);
             return true;
         }
 
@@ -4145,6 +4168,135 @@ public static class RelicHoverShowPatch
         Row3(sb, "Uncommon cards taken", agg.UncommonCardsTaken.ToString(), "");
         Row3(sb, "Rare cards taken", agg.RareCardsTaken.ToString(), "");
         return sb.ToString();
+    }
+
+    private static string BuildToyBoxBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var waxRelics = (agg.ToyBoxWaxRelics
+                ?? new List<ToyBoxWaxRelicAggregate>())
+            .Where(entry => entry != null)
+            .OrderBy(entry => entry.Sequence)
+            .ToList();
+        var melted = waxRelics.Count(entry => entry.FloorMelted.HasValue);
+        var averageFloors = CalculateToyBoxAverageFloorsToMelt(agg);
+
+        Row3(sb, "Wax relics bestowed", waxRelics.Count.ToString(), "");
+        Row3(sb, "Wax relics melted", melted.ToString(), "");
+        Row3(
+            sb,
+            "Avg floors to melt",
+            averageFloors.HasValue
+                ? FormatDecimal(averageFloors.Value)
+                : "—",
+            "");
+
+        foreach (var waxRelic in waxRelics)
+        {
+            var displayName = string.IsNullOrWhiteSpace(waxRelic.DisplayName)
+                ? RunTracker.FormatRelicIdForDisplay(waxRelic.RelicId)
+                : waxRelic.DisplayName;
+            var icon = StatConceptGlossary.RenderHintedInlineImage(
+                ResolveGrantedRelicIconPath(waxRelic.RelicId),
+                displayName);
+            var bestowed = waxRelic.FloorBestowed.HasValue
+                ? $"Floor {Math.Max(0, waxRelic.FloorBestowed.Value)}"
+                : "Floor not tracked";
+            var outcome = waxRelic.FloorMelted.HasValue
+                ? $"{bestowed} · melted Floor {Math.Max(0, waxRelic.FloorMelted.Value)}"
+                : $"{bestowed} · not melted";
+            DescribedIconFlowRow(
+                sb,
+                [],
+                [],
+                icon,
+                StatsTooltip.EscapeBbcode(outcome),
+                $"{displayName} was bestowed as a wax relic by Toy Box.");
+        }
+
+        return sb.ToString();
+    }
+
+    internal static decimal? CalculateToyBoxAverageFloorsToMelt(
+        RelicAggregate agg)
+    {
+        if (agg?.ToyBoxWaxRelics == null) return null;
+
+        var durations = agg.ToyBoxWaxRelics
+            .Where(entry => entry?.FloorBestowed.HasValue == true
+                && entry.FloorMelted.HasValue)
+            .Select(entry => Math.Max(
+                0,
+                entry.FloorMelted!.Value - entry.FloorBestowed!.Value))
+            .ToList();
+        return durations.Count == 0
+            ? null
+            : durations.Average(duration => (decimal)duration);
+    }
+
+    internal static void ApplyWaxRelicPresentation(
+        RelicModel relicModel,
+        RelicAggregate? toyBoxAggregate,
+        ref string title,
+        ref string body)
+    {
+        if (relicModel?.IsWax != true) return;
+
+        try
+        {
+            var waxTitle = relicModel.Title.GetFormattedText();
+            if (!string.IsNullOrWhiteSpace(waxTitle))
+                title = waxTitle;
+        }
+        catch
+        {
+            if (!title.StartsWith("Wax ", StringComparison.OrdinalIgnoreCase))
+                title = $"Wax {title}";
+        }
+
+        var relicId = relicModel.Id.ToString();
+        var fallbackBestowedFloor = RelicFloorAddedToDeck(relicModel);
+        var entries = toyBoxAggregate?.ToyBoxWaxRelics
+            ?? new List<ToyBoxWaxRelicAggregate>();
+        var entry = entries
+            .Where(candidate => candidate != null
+                && string.Equals(
+                    candidate.RelicId,
+                    relicId,
+                    StringComparison.Ordinal))
+            .OrderByDescending(candidate =>
+                candidate.FloorMelted.HasValue == relicModel.IsMelted)
+            .ThenByDescending(candidate => candidate.Sequence)
+            .FirstOrDefault();
+
+        var floorBestowed = entry?.FloorBestowed ?? fallbackBestowedFloor;
+        var floorMelted = entry?.FloorMelted;
+        var sb = new StringBuilder(body ?? string.Empty);
+        Row3(
+            sb,
+            "Wax bestowed",
+            floorBestowed.HasValue
+                ? $"Floor {Math.Max(0, floorBestowed.Value)}"
+                : "not tracked",
+            "");
+        Row3(
+            sb,
+            "Wax melted",
+            floorMelted.HasValue
+                ? $"Floor {Math.Max(0, floorMelted.Value)}"
+                : relicModel.IsMelted
+                    ? "not tracked"
+                    : "not yet",
+            "");
+        if (floorBestowed.HasValue && floorMelted.HasValue)
+        {
+            Row3(
+                sb,
+                "Floors until melt",
+                Math.Max(0, floorMelted.Value - floorBestowed.Value).ToString(),
+                "");
+        }
+        body = sb.ToString();
     }
 
     private static string BuildWhiteStarBodyBBCode(RelicAggregate agg)

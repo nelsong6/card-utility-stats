@@ -2131,6 +2131,7 @@ public static class RunTracker
         target.RareRelicsAcquired += source.RareRelicsAcquired;
         target.CampfiresNotDug += source.CampfiresNotDug;
         MergeRelicsGranted(target.RelicsGranted, source.RelicsGranted);
+        MergeToyBoxWaxRelics(target, source);
         MergeRelicRewardChoices(target, source);
         target.CommonCardsOffered += source.CommonCardsOffered;
         target.UncommonCardsOffered += source.UncommonCardsOffered;
@@ -7063,6 +7064,7 @@ public static class RunTracker
     private const string SmallCapsuleRelicId = "RELIC.SMALL_CAPSULE";
     private const string LargeCapsuleRelicId = "RELIC.LARGE_CAPSULE";
     private const string NeowsBonesRelicId = "RELIC.NEOWS_BONES";
+    private const string ToyBoxRelicId = "RELIC.TOY_BOX";
     private const string BoundPhylacteryRelicId = "RELIC.BOUND_PHYLACTERY";
     private const string PhylacteryUnboundRelicId = "RELIC.PHYLACTERY_UNBOUND";
     private const string ToolboxRelicId = "RELIC.TOOLBOX";
@@ -10624,6 +10626,249 @@ public static class RunTracker
             GetRelicDisplayName(relic),
             "pending");
         return true;
+    }
+
+    /// <summary>
+    /// Record the concrete wax relic that successfully completed the normal
+    /// relic-obtain command. Toy Box is the game's only producer of IsWax
+    /// relics; their ordinary behavior stats remain keyed by the relic's own
+    /// model id while this ordered ledger belongs to Toy Box.
+    /// </summary>
+    public static void RecordToyBoxWaxRelicBestowed(
+        RelicModel? relic,
+        Player? player)
+    {
+        if (relic?.IsWax != true || player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)
+                    || !ReferenceEquals(relic.Owner, player)
+                    || player.Relics?.Contains(relic) != true)
+                {
+                    return;
+                }
+
+                var effective = GetEffectiveToyBoxWaxRelicsLocked();
+                var relicId = relic.Id.ToString();
+                var floorBestowed = RelicFloorAddedToDeck(relic)
+                    ?? CurrentRunFloorLocked();
+                if (effective.Any(entry => entry != null
+                    && string.Equals(
+                        entry.RelicId,
+                        relicId,
+                        StringComparison.Ordinal)
+                    && entry.FloorBestowed == floorBestowed))
+                {
+                    return;
+                }
+
+                var sequence = effective
+                    .Select(entry => entry?.Sequence ?? 0)
+                    .DefaultIfEmpty(0)
+                    .Max() + 1;
+                var aggregate = GetOrCreateRelicAggregateForCurrentContextLocked(
+                    ToyBoxRelicId);
+                RecordToyBoxWaxRelicBestowedForTest(
+                    aggregate,
+                    relicId,
+                    GetRelicDisplayName(relic),
+                    floorBestowed,
+                    sequence);
+                FinishToyBoxWaxRelicMutationLocked();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordToyBoxWaxRelicBestowed failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record the exact wax relic after RelicCmd.Melt has changed its live
+    /// state. Combat-time melts remain pending until the normal combat
+    /// promotion boundary.
+    /// </summary>
+    public static void RecordToyBoxWaxRelicMelted(RelicModel? relic)
+    {
+        if (relic?.IsWax != true || relic.IsMelted != true) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var player = relic.Owner;
+                if (!IsTrackedPlayer(player)) return;
+
+                var relicId = relic.Id.ToString();
+                var effective = GetEffectiveToyBoxWaxRelicsLocked();
+                var existing = effective
+                    .Where(entry => entry != null
+                        && string.Equals(
+                            entry.RelicId,
+                            relicId,
+                            StringComparison.Ordinal)
+                        && !entry.FloorMelted.HasValue)
+                    .OrderBy(entry => entry.Sequence)
+                    .FirstOrDefault();
+                var sequence = existing?.Sequence
+                    ?? (effective
+                        .Select(entry => entry?.Sequence ?? 0)
+                        .DefaultIfEmpty(0)
+                        .Max() + 1);
+
+                var aggregate = GetOrCreateRelicAggregateForCurrentContextLocked(
+                    ToyBoxRelicId);
+                RecordToyBoxWaxRelicMeltedForTest(
+                    aggregate,
+                    relicId,
+                    existing?.DisplayName ?? GetRelicDisplayName(relic),
+                    existing?.FloorBestowed
+                        ?? RelicFloorAddedToDeck(relic)
+                        ?? CurrentRunFloorLocked(),
+                    CurrentRunFloorLocked(),
+                    sequence);
+                FinishToyBoxWaxRelicMutationLocked();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordToyBoxWaxRelicMelted failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordToyBoxWaxRelicBestowedForTest(
+        RelicAggregate aggregate,
+        string? relicId,
+        string? displayName,
+        int? floorBestowed,
+        int? sequence = null)
+    {
+        if (aggregate == null || string.IsNullOrWhiteSpace(relicId)) return;
+
+        aggregate.ToyBoxWaxRelics ??= new List<ToyBoxWaxRelicAggregate>();
+        var normalizedSequence = sequence.GetValueOrDefault();
+        if (normalizedSequence <= 0)
+        {
+            normalizedSequence = aggregate.ToyBoxWaxRelics
+                .Select(entry => entry?.Sequence ?? 0)
+                .DefaultIfEmpty(0)
+                .Max() + 1;
+        }
+
+        UpsertToyBoxWaxRelic(
+            aggregate.ToyBoxWaxRelics,
+            normalizedSequence,
+            relicId,
+            displayName,
+            floorBestowed,
+            floorMelted: null);
+    }
+
+    internal static void RecordToyBoxWaxRelicMeltedForTest(
+        RelicAggregate aggregate,
+        string? relicId,
+        string? displayName,
+        int? floorBestowed,
+        int? floorMelted,
+        int? sequence = null)
+    {
+        if (aggregate == null || string.IsNullOrWhiteSpace(relicId)) return;
+
+        aggregate.ToyBoxWaxRelics ??= new List<ToyBoxWaxRelicAggregate>();
+        var normalizedSequence = sequence.GetValueOrDefault();
+        if (normalizedSequence <= 0)
+        {
+            normalizedSequence = aggregate.ToyBoxWaxRelics
+                .Where(entry => entry != null
+                    && string.Equals(
+                        entry.RelicId,
+                        relicId,
+                        StringComparison.Ordinal)
+                    && !entry.FloorMelted.HasValue)
+                .OrderBy(entry => entry.Sequence)
+                .Select(entry => entry.Sequence)
+                .FirstOrDefault();
+        }
+        if (normalizedSequence <= 0)
+        {
+            normalizedSequence = aggregate.ToyBoxWaxRelics
+                .Select(entry => entry?.Sequence ?? 0)
+                .DefaultIfEmpty(0)
+                .Max() + 1;
+        }
+
+        UpsertToyBoxWaxRelic(
+            aggregate.ToyBoxWaxRelics,
+            normalizedSequence,
+            relicId,
+            displayName,
+            floorBestowed,
+            floorMelted);
+    }
+
+    private static List<ToyBoxWaxRelicAggregate>
+        GetEffectiveToyBoxWaxRelicsLocked()
+    {
+        var aggregate = new RelicAggregate();
+        if (_currentRun?.RelicAggregates.TryGetValue(
+                ToyBoxRelicId,
+                out var committed) == true)
+        {
+            MergeToyBoxWaxRelics(aggregate, committed);
+        }
+        if (_pendingCombat?.RelicAggregates.TryGetValue(
+                ToyBoxRelicId,
+                out var pending) == true)
+        {
+            MergeToyBoxWaxRelics(aggregate, pending);
+        }
+        return aggregate.ToyBoxWaxRelics;
+    }
+
+    private static void FinishToyBoxWaxRelicMutationLocked()
+    {
+        RefreshCurrentRunMetadataLocked();
+        if (_pendingCombat == null)
+            SaveCurrentRun();
+    }
+
+    private static void UpsertToyBoxWaxRelic(
+        List<ToyBoxWaxRelicAggregate> entries,
+        int sequence,
+        string relicId,
+        string? displayName,
+        int? floorBestowed,
+        int? floorMelted)
+    {
+        var entry = entries.FirstOrDefault(candidate =>
+            candidate != null && candidate.Sequence == sequence);
+        if (entry == null)
+        {
+            entry = new ToyBoxWaxRelicAggregate
+            {
+                Sequence = sequence,
+                RelicId = relicId,
+            };
+            entries.Add(entry);
+        }
+
+        if (string.IsNullOrWhiteSpace(entry.RelicId))
+            entry.RelicId = relicId;
+        if (!string.IsNullOrWhiteSpace(displayName))
+            entry.DisplayName = displayName;
+        if (floorBestowed.HasValue && !entry.FloorBestowed.HasValue)
+            entry.FloorBestowed = Math.Max(0, floorBestowed.Value);
+        if (floorMelted.HasValue)
+            entry.FloorMelted = Math.Max(0, floorMelted.Value);
+
+        entries.Sort((left, right) =>
+            (left?.Sequence ?? int.MaxValue).CompareTo(
+                right?.Sequence ?? int.MaxValue));
     }
 
     public static bool BeginLargeCapsulePickup(
@@ -26171,6 +26416,40 @@ public static class RunTracker
             if (relic.Count <= 0) continue;
             var relicId = string.IsNullOrWhiteSpace(relic.RelicId) ? kvp.Key : relic.RelicId;
             AddRelicGranted(target, relicId, relic.DisplayName, relic.Count);
+        }
+    }
+
+    private static void MergeToyBoxWaxRelics(
+        RelicAggregate target,
+        RelicAggregate source)
+    {
+        if (source.ToyBoxWaxRelics == null
+            || source.ToyBoxWaxRelics.Count == 0)
+        {
+            return;
+        }
+
+        target.ToyBoxWaxRelics ??= new List<ToyBoxWaxRelicAggregate>();
+        foreach (var waxRelic in source.ToyBoxWaxRelics
+                     .Where(entry => entry != null)
+                     .OrderBy(entry => entry.Sequence))
+        {
+            var sequence = waxRelic.Sequence;
+            if (sequence <= 0)
+            {
+                sequence = target.ToyBoxWaxRelics
+                    .Select(entry => entry?.Sequence ?? 0)
+                    .DefaultIfEmpty(0)
+                    .Max() + 1;
+            }
+
+            UpsertToyBoxWaxRelic(
+                target.ToyBoxWaxRelics,
+                sequence,
+                waxRelic.RelicId,
+                waxRelic.DisplayName,
+                waxRelic.FloorBestowed,
+                waxRelic.FloorMelted);
         }
     }
 

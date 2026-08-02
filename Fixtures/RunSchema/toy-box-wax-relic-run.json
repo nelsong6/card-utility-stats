@@ -1,0 +1,45 @@
+{
+  "run_id": "toy-box-wax-relic-fixture",
+  "started_at": "2026-08-02T20:00:00Z",
+  "updated_at": "2026-08-02T20:30:00Z",
+  "outcome": "in_progress",
+  "floor_reached": 14,
+  "aggregates": {
+    "CARD.STRIKE_IRONCLAD#1": {
+      "initial_upgrade_level": 0
+    }
+  },
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.TOY_BOX": {
+      "toy_box_wax_relics": [
+        {
+          "sequence": 1,
+          "relic_id": "RELIC.ANCHOR",
+          "display_name": "Wax Anchor",
+          "floor_bestowed": 5,
+          "floor_melted": 9
+        },
+        {
+          "sequence": 2,
+          "relic_id": "RELIC.BAG_OF_PREPARATION",
+          "display_name": "Wax Bag of Preparation",
+          "floor_bestowed": 5
+        }
+      ]
+    },
+    "RELIC.ANCHOR": {
+      "activations": 2,
+      "additional_block_gained": 20
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.STRIKE_IRONCLAD": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.STRIKE_IRONCLAD": 1
+  }
+}

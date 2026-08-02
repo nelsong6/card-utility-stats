@@ -1662,6 +1662,15 @@ returned task completes. Keep `RELIC.BLOOD_VIAL` and
 `RELIC.FAKE_BLOOD_VIAL` in separate aggregates even though their tooltip rows
 are identical.
 
+Toy Box wax relics are ordinary mutable relic models with `IsWax = true`, not
+separate wrapper types or ids. `ToyBox.AfterObtained` pulls each model from the
+front of the seeded relic grab bag before marking it wax, so the same ordinary
+relic cannot later be rolled from that bag. Keep its effect attribution under
+the original relic id, and keep Toy Box's ordered bestowed/melted lifecycle in
+its own aggregate. `RelicCmd.Melt` synchronously sets `IsMelted` before awaiting
+`AfterRemoved`, making its postfix an observed boundary for the exact wax relic
+and melt floor.
+
 Happy Flower and Happy Flower??? (`FakeHappyFlower`) both grant energy from
 their owner-specific `AfterSideTurnStart` callback, but on three-turn and
 five-turn counters respectively. Patch both callbacks, key the energy window
