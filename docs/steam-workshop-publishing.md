@@ -29,7 +29,20 @@ D:\repos\spirelens-workshop\
 - `workshop.json` `dependencies` is a list of **numeric workshop item IDs**. BaseLib = `3737335127`.
   The in-game dependency (`SpireLens.json` → `"id": "BaseLib"`) is separate and also required.
 
-## Publishing an update
+## Normal release flow
+
+The normal release trigger is a merged version bump, not a manually pushed tag:
+
+1. Put the player-facing bullets in each feature pull request's `## Workshop notes` section.
+2. Open and merge a release pull request that bumps `SpireLens.json` to the next version.
+3. After the merged `main` build succeeds, the release workflow creates the matching tag and
+   dispatches the tagged publication automatically.
+4. The tagged run creates the GitHub release and uploads the same package and changelog to Steam.
+
+Manually pushing a matching `v*` tag remains a recovery path, but it is not part of the normal
+release process.
+
+## Manual workspace publishing
 
 1. Bump `"version"` in [SpireLens.json](../SpireLens.json) (repo root, source of truth). SemVer-ish:
    minor for features, patch for fixes. The string is shown to subscribers in-game.
@@ -53,11 +66,12 @@ Success looks like `Status: k_EItemUpdateStatusCommittingChanges` →
 `Successfully uploaded 'SpireLens' ...`. The trailing `k_EItemUpdateStatusInvalid`
 line is the SDK's idle state, not an error.
 
-## Automated tagged releases
+## Automated releases
 
 [The release workflow](../.github/workflows/release.yml) publishes the exact
-packaged mod to Workshop item `3774710835` after a successful `v*` tag build.
-The job:
+packaged mod to Workshop item `3774710835`. A successful merged `main` build creates and dispatches
+the manifest's tag when that version has not been released yet; an explicit `v*` tag still works as
+a recovery trigger. The tagged publication job:
 
 1. requires the tag to exactly match `SpireLens.json`'s version;
 2. validates the package allowlist;
@@ -94,8 +108,9 @@ It does **not** upload the Steam password or Steam Guard code. Do not substitute
 the desktop Steam client's broad `config.vdf`; use the isolated credential made
 by this script.
 
-The Workshop upload runs only for tags. Pull requests and ordinary `main`
-pushes still build packages but cannot access the protected publishing secret.
+The Workshop upload itself runs only in the tagged publication job. Pull requests cannot access the
+protected publishing secret, and ordinary `main` pushes only queue that tagged job when the manifest
+contains a version that has not been released yet.
 
 ## workshop.json clobbers page edits
 
