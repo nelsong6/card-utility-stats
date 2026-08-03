@@ -1145,7 +1145,8 @@ public static class CardHoverShowPatch
             sb,
             "0-cost cards returned",
             agg.AllForOneZeroCostCardsReturned.ToString(),
-            "");
+            "",
+            "Zero-cost cards returned from the discard pile to hand by All for One.");
         if (compact) return;
 
         var returnedPerPlay = agg.Plays <= 0
@@ -1154,8 +1155,18 @@ public static class CardHoverShowPatch
         var returnedPerCombat = agg.CombatsInDeck <= 0
             ? 0m
             : (decimal)agg.AllForOneZeroCostCardsReturned / agg.CombatsInDeck;
-        Row3(sb, "Avg returned per play", FormatDecimal(returnedPerPlay), "");
-        Row3(sb, "Avg returned per combat", FormatDecimal(returnedPerCombat), "");
+        Row3(
+            sb,
+            "Avg returned per play",
+            FormatDecimal(returnedPerPlay),
+            "",
+            "Average zero-cost cards returned each time All for One was played.");
+        Row3(
+            sb,
+            "Avg returned per combat",
+            FormatDecimal(returnedPerCombat),
+            "",
+            "Average zero-cost cards returned by All for One per combat in the deck.");
     }
 
     private static void AppendSplashStats(
@@ -1165,9 +1176,24 @@ public static class CardHoverShowPatch
     {
         if (card is not Splash && !IsCardId(card, "CARD.SPLASH")) return;
 
-        Row3(sb, "Commons taken", agg.SplashCommonAttacksTaken.ToString(), "");
-        Row3(sb, "Uncommons taken", agg.SplashUncommonAttacksTaken.ToString(), "");
-        Row3(sb, "Rares taken", agg.SplashRareAttacksTaken.ToString(), "");
+        Row3(
+            sb,
+            "Commons taken",
+            agg.SplashCommonAttacksTaken.ToString(),
+            "",
+            "Common Attacks selected from Splash.");
+        Row3(
+            sb,
+            "Uncommons taken",
+            agg.SplashUncommonAttacksTaken.ToString(),
+            "",
+            "Uncommon Attacks selected from Splash.");
+        Row3(
+            sb,
+            "Rares taken",
+            agg.SplashRareAttacksTaken.ToString(),
+            "",
+            "Rare Attacks selected from Splash.");
 
         var averageDiscount = agg.SplashAttacksTaken <= 0
             ? 0m
@@ -1176,7 +1202,8 @@ public static class CardHoverShowPatch
             sb,
             GetEnergyStatLabel("avg discount"),
             FormatDecimal(averageDiscount),
-            "");
+            "",
+            "Average energy-cost discount applied to Attacks selected from Splash.");
     }
 
     private static void AppendOutbreakStats(
@@ -1192,7 +1219,8 @@ public static class CardHoverShowPatch
                 PoisonPowerIconPath,
                 "damage from extra triggers"),
             agg.OutbreakExtraPoisonTriggerDamage.ToString(),
-            "");
+            "",
+            "Damage dealt by the extra Poison triggers caused by Outbreak.");
     }
 
     private static void AppendDrainPowerStats(
@@ -1841,23 +1869,32 @@ public static class CardHoverShowPatch
     }
 
     /// <summary>
-    /// Emit a single stat row in the canonical 3-column layout used for
+    /// Emit a single stat row in the canonical 4-column layout used for
     /// every stat line in the tooltip. <paramref name="pct"/> can be empty
     /// — the cell's still present so the label and value columns align
     /// vertically with rows that DO have a percentage (Overkill, Blocked,
     /// Played/Drawn). The cell padding keeps adjacent columns from
     /// crowding visually (fixes "Played/Drawn1/1100%"-style crowding).
     ///
-    /// Column weights: label=4, value=1, percent=1. Label dominates
+    /// The first compact column holds the informational hover icon. Column
+    /// weights after that are label=4, value=1, percent=1. Label dominates
     /// (~66% of width) so the label text always fits; numeric columns
     /// are narrow since their content is typically 1-5 chars.
     /// Padding: label gets right-padding (12px), value gets right-padding
     /// (12px) so it sits off the percent column, percent gets left-side
     /// padding from value's right-padding and small right-padding (4px).
     /// </summary>
-    private static void Row3(StringBuilder sb, string label, string value, string pct)
+    private static void Row3(
+        StringBuilder sb,
+        string label,
+        string value,
+        string pct,
+        string? fullDescription = null)
     {
-        sb.Append("[table=3]");
+        sb.Append("[table=4]");
+        sb.Append("[cell expand=0 padding=0,0,10,0]");
+        sb.Append(StatsTooltip.RenderRowInformationHint(label, fullDescription));
+        sb.Append("[/cell]");
         sb.Append($"[cell expand=4 padding=0,0,12,0][color=#e0e0e0]{label}[/color][/cell]");
         sb.Append($"[cell expand=1 padding=0,0,12,0][right][b]{value}[/b][/right][/cell]");
         sb.Append($"[cell expand=1 padding=0,0,4,0][right][color=#b5b5b5]{pct}[/color][/right][/cell]");
@@ -1872,9 +1909,15 @@ public static class CardHoverShowPatch
     /// </summary>
     private static void RowDual(StringBuilder sb, string leftLabel, string leftValue, string rightLabel, string rightValue)
     {
-        sb.Append("[table=4]");
+        sb.Append("[table=6]");
+        sb.Append("[cell expand=0 padding=0,0,10,0]");
+        sb.Append(StatsTooltip.RenderRowInformationHint(leftLabel));
+        sb.Append("[/cell]");
         sb.Append($"[cell expand=3 padding=0,0,12,0][color=#e0e0e0]{leftLabel}[/color][/cell]");
         sb.Append($"[cell expand=1 padding=0,0,18,0][right][b]{leftValue}[/b][/right][/cell]");
+        sb.Append("[cell expand=0 padding=0,0,10,0]");
+        sb.Append(StatsTooltip.RenderRowInformationHint(rightLabel));
+        sb.Append("[/cell]");
         sb.Append($"[cell expand=3 padding=0,0,12,0][color=#e0e0e0]{rightLabel}[/color][/cell]");
         sb.Append($"[cell expand=1 padding=0,0,4,0][right][b]{rightValue}[/b][/right][/cell]");
         sb.Append("[/table]\n");

@@ -117,10 +117,11 @@ public class GoldStatsTests
             && row.Contains("Unknown room:")
             && row.Contains("Gold gained:")
             && row.Contains("Gained   [b]16[/b]"));
-        Assert.DoesNotContain("Gold spent", body);
-        Assert.DoesNotContain("per shop", body);
-        Assert.DoesNotContain("per floor", body);
-        Assert.DoesNotContain("per combat", body);
-        Assert.DoesNotContain("per event", body);
+        Assert.Contains(
+            StatConceptGlossary.RenderInformationHint("All gold acquired this run."),
+            body);
+        Assert.Contains(
+            StatConceptGlossary.RenderInformationHint("Average gold spent per shop visited."),
+            body);
     }
 }

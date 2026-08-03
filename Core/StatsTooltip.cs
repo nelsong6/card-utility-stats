@@ -61,6 +61,16 @@ public static class StatsTooltip
         return (HoverTip)boxed;
     }
 
+    internal static string RenderRowInformationHint(
+        string label,
+        string? fullDescription = null)
+    {
+        var description = RelicStatRowVocabulary.Create(
+            label,
+            fullDescription).FullDescription;
+        return StatConceptGlossary.RenderInformationHint(description);
+    }
+
     /// <summary>
     /// Escape a dynamic string for safe inclusion in native hover-tip BBCode.
     /// Godot renders "[lb]" as a literal opening bracket.

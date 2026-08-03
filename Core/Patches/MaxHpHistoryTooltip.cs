@@ -77,32 +77,38 @@ internal static class MaxHpHistoryTooltip
             body,
             damageIcon,
             "HP lost in combats",
-            FormatDecimal(healthStats.HpLostInCombats));
+            FormatDecimal(healthStats.HpLostInCombats),
+            "HP lost to combat damage this run.");
         AppendStatRow(
             body,
             damageIcon,
             "HP lost in events",
-            FormatDecimal(healthStats.HpLostInEvents));
+            FormatDecimal(healthStats.HpLostInEvents),
+            "HP lost from events this run.");
         AppendStatRow(
             body,
             $"{averageIcon} {floorIcon}",
             "Avg HP lost per floor",
-            FormatDecimal(avgPerFloor));
+            FormatDecimal(avgPerFloor),
+            "Average total HP lost per floor reached.");
         AppendStatRow(
             body,
             $"{averageIcon} {combatIcon}",
             "Avg HP lost per combat",
-            FormatDecimal(avgPerCombat));
+            FormatDecimal(avgPerCombat),
+            "Average HP lost to combat damage per combat.");
         AppendStatRow(
             body,
             maxHpGainedIcon,
             "Max HP gained",
-            maxHpGained.ToString(CultureInfo.InvariantCulture));
+            maxHpGained.ToString(CultureInfo.InvariantCulture),
+            "Total maximum HP gained this run.");
         AppendStatRow(
             body,
             maxHpIcon,
             "Max HP lost",
-            maxHpLost.ToString(CultureInfo.InvariantCulture));
+            maxHpLost.ToString(CultureInfo.InvariantCulture),
+            "Total maximum HP lost this run.");
 
         if (orderedHistory.Length > 0)
         {
@@ -157,10 +163,13 @@ internal static class MaxHpHistoryTooltip
         StringBuilder body,
         string icon,
         string label,
-        string value)
+        string value,
+        string fullDescription)
     {
         if (body.Length > 0) body.Append('\n');
-        body.Append(icon)
+        body.Append(StatsTooltip.RenderRowInformationHint(label, fullDescription))
+            .Append(' ')
+            .Append(icon)
             .Append(' ')
             .Append(label)
             .Append("   [b]")

@@ -298,12 +298,34 @@ internal static class MapLegendStatsTooltip
         string value)
     {
         if (body.Length > 0) body.Append('\n');
-        body.Append(icon)
+        body.Append(StatsTooltip.RenderRowInformationHint(
+                label,
+                DescribeRow(label)))
+            .Append(' ')
+            .Append(icon)
             .Append(' ')
             .Append(label)
             .Append("   [b]")
             .Append(value)
             .Append("[/b]");
+    }
+
+    private static string DescribeRow(string label)
+    {
+        if (label.StartsWith("Avg floors between ", StringComparison.Ordinal))
+            return "Average number of floors traveled between visits to this map location type.";
+
+        return label switch
+        {
+            "Win rate" => "Share of completed combats at this map location type that were won.",
+            "Perfect combats" => "Combats won at this map location type without losing HP.",
+            "Avg turns per combat" => "Average player turns taken per combat at this map location type.",
+            "Avg HP lost per combat" => "Average HP lost per combat at this map location type.",
+            "Avg HP restored per rest site" => "Average HP restored per rest-site visit.",
+            "Avg gold gained per combat" => "Average gold gained per combat at this map location type.",
+            "Avg gold spent per merchant" => "Average gold spent per merchant visited.",
+            _ => $"{label} at this map location type.",
+        };
     }
 
     private static decimal Divide(int numerator, int denominator)

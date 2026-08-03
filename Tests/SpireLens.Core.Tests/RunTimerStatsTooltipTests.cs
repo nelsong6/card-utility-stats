@@ -64,6 +64,10 @@ public class RunTimerStatsTooltipTests
             new RunTimeStats { CombatSeconds = 217 });
 
         Assert.Contains("03:36", before);
+        Assert.Contains(
+            StatConceptGlossary.RenderInformationHint(
+                "Total time spent in combats this run."),
+            before);
         Assert.Contains("03:37", after);
         Assert.NotEqual(before, after);
     }

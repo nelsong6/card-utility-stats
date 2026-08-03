@@ -91,6 +91,10 @@ public class OutbreakStatsTests
         Assert.Contains("poison_power.tres", body);
         Assert.Contains("damage from extra triggers", body);
         Assert.Contains("[b]37[/b]", body);
+        Assert.Contains(
+            StatConceptGlossary.RenderInformationHint(
+                "Damage dealt by the extra Poison triggers caused by Outbreak."),
+            body);
     }
 
     [Fact]

@@ -663,60 +663,72 @@ internal static class PotionCompendiumHistoryUi
                 AppendTooltipRow(
                     body,
                     "HP gained",
-                    Math.Max(0, entry.HpGained.Value).ToString());
+                    Math.Max(0, entry.HpGained.Value).ToString(),
+                    "HP actually restored when this potion was used.");
             }
             if (entry.CardsDrawn.HasValue)
             {
                 AppendTooltipRow(
                     body,
                     "Cards drawn",
-                    Math.Max(0, entry.CardsDrawn.Value).ToString());
+                    Math.Max(0, entry.CardsDrawn.Value).ToString(),
+                    "Cards actually drawn when this potion was used.");
                 AppendTooltipRow(
                     body,
                     "Card draws blocked",
-                    Math.Max(0, entry.CardDrawsBlocked ?? 0).ToString());
+                    Math.Max(0, entry.CardDrawsBlocked ?? 0).ToString(),
+                    "Card draws attempted by this potion that were blocked.");
             }
             if (entry.BlockGained.HasValue)
             {
                 AppendTooltipRow(
                     body,
                     "Block gained",
-                    Math.Max(0, entry.BlockGained.Value).ToString());
+                    Math.Max(0, entry.BlockGained.Value).ToString(),
+                    "Block actually gained when this potion was used.");
                 AppendTooltipRow(
                     body,
                     "Block absorbed",
-                    Math.Max(0, entry.BlockEffective ?? 0).ToString());
+                    Math.Max(0, entry.BlockEffective ?? 0).ToString(),
+                    "Block from this potion that absorbed damage.");
                 AppendTooltipRow(
                     body,
                     "Block wasted",
-                    Math.Max(0, entry.BlockWasted ?? 0).ToString());
+                    Math.Max(0, entry.BlockWasted ?? 0).ToString(),
+                    "Unused Block from this potion that expired.");
             }
             if (entry.DamageAttempted.HasValue)
             {
                 AppendTooltipRow(
                     body,
                     "Damage attempted",
-                    Math.Max(0, entry.DamageAttempted.Value).ToString());
+                    Math.Max(0, entry.DamageAttempted.Value).ToString(),
+                    "Damage this potion attempted before Block and overkill.");
                 AppendTooltipRow(
                     body,
                     "Damage dealt",
-                    Math.Max(0, entry.DamageDealt ?? 0).ToString());
+                    Math.Max(0, entry.DamageDealt ?? 0).ToString(),
+                    "HP damage actually dealt by this potion.");
                 AppendTooltipRow(
                     body,
                     "Damage blocked",
-                    Math.Max(0, entry.DamageBlocked ?? 0).ToString());
+                    Math.Max(0, entry.DamageBlocked ?? 0).ToString(),
+                    "Damage from this potion prevented by enemy Block.");
                 AppendTooltipRow(
                     body,
                     "Overkill",
-                    Math.Max(0, entry.DamageOverkill ?? 0).ToString());
+                    Math.Max(0, entry.DamageOverkill ?? 0).ToString(),
+                    "Damage from this potion beyond the target's remaining HP.");
                 AppendTooltipRow(
                     body,
                     "Kills",
-                    Math.Max(0, entry.Kills ?? 0).ToString());
+                    Math.Max(0, entry.Kills ?? 0).ToString(),
+                    "Enemies killed by this potion.");
                 AppendTooltipRow(
                     body,
                     "Targets hit",
-                    Math.Max(0, entry.TargetsHit ?? 0).ToString());
+                    Math.Max(0, entry.TargetsHit ?? 0).ToString(),
+                    "Enemies hit by this potion.");
             }
         }
         else if (occurrence == PotionTimelineOccurrence.Discarded)
@@ -741,8 +753,19 @@ internal static class PotionCompendiumHistoryUi
         return body.ToString().TrimEnd();
     }
 
-    private static void AppendTooltipRow(StringBuilder body, string label, string value)
+    private static void AppendTooltipRow(
+        StringBuilder body,
+        string label,
+        string value,
+        string? fullDescription = null)
     {
+        if (!string.IsNullOrWhiteSpace(fullDescription))
+        {
+            body.Append(StatsTooltip.RenderRowInformationHint(
+                label,
+                fullDescription));
+            body.Append(' ');
+        }
         body.Append(StatsTooltip.EscapeBbcode(label));
         body.Append("  [b]");
         body.Append(StatsTooltip.EscapeBbcode(value));

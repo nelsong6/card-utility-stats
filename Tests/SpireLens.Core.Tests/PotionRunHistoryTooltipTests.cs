@@ -163,6 +163,10 @@ public class PotionRunHistoryTooltipTests
 
         Assert.DoesNotContain("HP gained", acquiredBody);
         Assert.Contains("HP gained  [b]12[/b]", usedBody);
+        Assert.Contains(
+            StatConceptGlossary.RenderInformationHint(
+                "HP actually restored when this potion was used."),
+            usedBody);
     }
 
     [Fact]

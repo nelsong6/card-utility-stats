@@ -97,6 +97,9 @@ public class MaxHpHistoryTests
         Assert.Contains("Avg HP lost per combat   [b]10[/b]", body);
         Assert.Contains("Max HP gained   [b]14[/b]", body);
         Assert.Contains("Max HP lost   [b]7[/b]", body);
+        Assert.Contains(
+            StatConceptGlossary.RenderInformationHint("HP lost to combat damage this run."),
+            body);
         Assert.Contains("70 → 84", body);
         Assert.Contains("84 → 77", body);
     }

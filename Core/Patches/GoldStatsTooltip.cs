@@ -49,38 +49,54 @@ internal static class GoldStatsTooltip
         var shopIcon = StatConceptGlossary.RenderHintedGlyph("shop");
         var body = new StringBuilder();
 
-        AppendStatRow(body, goldGainedIcon, "Acquired", goldStats.GoldAcquired);
-        AppendStatRow(body, goldIcon, "Spent", goldStats.GoldSpent);
+        AppendStatRow(
+            body,
+            goldGainedIcon,
+            "Acquired",
+            goldStats.GoldAcquired,
+            "All gold acquired this run.");
+        AppendStatRow(
+            body,
+            goldIcon,
+            "Spent",
+            goldStats.GoldSpent,
+            "All gold spent this run.");
         AppendStatRow(
             body,
             $"{shopIcon} {goldIcon}",
             "Spent",
-            goldStats.GoldSpentInShops);
+            goldStats.GoldSpentInShops,
+            "Gold spent in shops this run.");
         AppendStatRow(
             body,
             $"{averageIcon} {shopIcon} {goldIcon}",
             "Spent",
-            Divide(goldStats.GoldSpentInShops, goldStats.ShopsVisited));
+            Divide(goldStats.GoldSpentInShops, goldStats.ShopsVisited),
+            "Average gold spent per shop visited.");
         AppendStatRow(
             body,
             $"{eventIcon} {goldIcon}",
             "Spent",
-            goldStats.GoldSpentInEvents);
+            goldStats.GoldSpentInEvents,
+            "Gold spent in events this run.");
         AppendStatRow(
             body,
             $"{averageIcon} {floorIcon} {goldGainedIcon}",
             "Gained",
-            Divide(goldStats.GoldAcquired, floors));
+            Divide(goldStats.GoldAcquired, floors),
+            "Average gold acquired per floor reached.");
         AppendStatRow(
             body,
             $"{averageIcon} {combatIcon} {goldGainedIcon}",
             "Gained",
-            Divide(goldStats.GoldGainedInCombats, goldStats.Combats));
+            Divide(goldStats.GoldGainedInCombats, goldStats.Combats),
+            "Average gold gained per combat.");
         AppendStatRow(
             body,
             $"{averageIcon} {eventIcon} {goldGainedIcon}",
             "Gained",
-            Divide(goldStats.GoldGainedInEvents, goldStats.EventsVisited));
+            Divide(goldStats.GoldGainedInEvents, goldStats.EventsVisited),
+            "Average gold gained per event visited.");
 
         return body.ToString();
     }
@@ -89,28 +105,34 @@ internal static class GoldStatsTooltip
         StringBuilder body,
         string icon,
         string label,
-        int value)
+        int value,
+        string fullDescription)
         => AppendStatRow(
             body,
             icon,
             label,
-            value.ToString(CultureInfo.InvariantCulture));
+            value.ToString(CultureInfo.InvariantCulture),
+            fullDescription);
 
     private static void AppendStatRow(
         StringBuilder body,
         string icon,
         string label,
-        decimal value)
-        => AppendStatRow(body, icon, label, FormatDecimal(value));
+        decimal value,
+        string fullDescription)
+        => AppendStatRow(body, icon, label, FormatDecimal(value), fullDescription);
 
     private static void AppendStatRow(
         StringBuilder body,
         string icon,
         string label,
-        string value)
+        string value,
+        string fullDescription)
     {
         if (body.Length > 0) body.Append('\n');
-        body.Append(icon)
+        body.Append(StatsTooltip.RenderRowInformationHint(label, fullDescription))
+            .Append(' ')
+            .Append(icon)
             .Append(' ')
             .Append(label)
             .Append("   [b]")

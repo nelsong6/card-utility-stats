@@ -125,62 +125,74 @@ internal static class PotionBeltStatsTooltip
             body,
             $"{combatIcon} {offeredIcon} {potionIcon}",
             "Offered",
-            summary.CombatRewardPotionsOffered);
+            summary.CombatRewardPotionsOffered,
+            "Potions offered in combat rewards this run.");
         AppendRow(
             body,
             $"{averageIcon} {floorIcon} {offeredIcon} {potionIcon}",
             "Offered",
-            Divide(summary.TotalPotionsOffered, summary.Floors));
+            Divide(summary.TotalPotionsOffered, summary.Floors),
+            "Average potions offered per floor reached.");
         AppendRow(
             body,
             $"{combatIcon} {offeredIcon} {commonIcon}",
             "Offered",
-            summary.CommonCombatRewardPotions);
+            summary.CommonCombatRewardPotions,
+            "Common potions offered in combat rewards.");
         AppendRow(
             body,
             $"{combatIcon} {offeredIcon} {uncommonIcon}",
             "Offered",
-            summary.UncommonCombatRewardPotions);
+            summary.UncommonCombatRewardPotions,
+            "Uncommon potions offered in combat rewards.");
         AppendRow(
             body,
             $"{combatIcon} {offeredIcon} {rareIcon}",
             "Offered",
-            summary.RareCombatRewardPotions);
+            summary.RareCombatRewardPotions,
+            "Rare potions offered in combat rewards.");
         AppendRow(
             body,
             $"{combatIcon} {offeredIcon} {fruitJuiceIcon}",
             "Offered",
-            summary.FruitJuicesInCombatRewards);
+            summary.FruitJuicesInCombatRewards,
+            "Fruit Juices offered in combat rewards.");
         AppendRow(
             body,
             $"{offeredIcon} {wastedIcon} {potionIcon}",
             "Rejected",
-            summary.RejectedPotionsAtRewardScreen);
+            summary.RejectedPotionsAtRewardScreen,
+            "Potions rejected at reward screens.");
         AppendRow(
             body,
             $"{eventIcon} {offeredIcon} {potionIcon}",
             "Offered",
-            summary.PotionsOfferedInEvents);
+            summary.PotionsOfferedInEvents,
+            "Potions offered in events.");
         AppendRow(
             body,
             $"{shopIcon} {offeredIcon} {potionIcon}",
             "Offered",
-            summary.PotionsOfferedInShops);
+            summary.PotionsOfferedInShops,
+            "Potions offered in shops.");
         AppendRow(
             body,
             $"{shopIcon} {takenIcon} {potionIcon}",
             "Purchased",
-            summary.PotionsPurchasedInShops);
+            summary.PotionsPurchasedInShops,
+            "Potions purchased in shops.");
         AppendRow(
             body,
             $"{activationIcon} {potionIcon}",
             "Activated",
-            summary.TotalPotionActivations);
+            summary.TotalPotionActivations,
+            "Potions activated this run.");
         AppendRow(
             body,
             $"{wastedIcon} {potionIcon}",
             "Discarded",
-            summary.TotalPotionDiscards);
+            summary.TotalPotionDiscards,
+            "Potions discarded without being used this run.");
 
         return body.ToString();
     }
@@ -230,32 +242,39 @@ internal static class PotionBeltStatsTooltip
         StringBuilder body,
         string icon,
         string label,
-        int value)
+        int value,
+        string fullDescription)
         => AppendRow(
             body,
             icon,
             label,
-            value.ToString(CultureInfo.InvariantCulture));
+            value.ToString(CultureInfo.InvariantCulture),
+            fullDescription);
 
     private static void AppendRow(
         StringBuilder body,
         string icon,
         string label,
-        decimal value)
+        decimal value,
+        string fullDescription)
         => AppendRow(
             body,
             icon,
             label,
-            value.ToString("0.##", CultureInfo.InvariantCulture));
+            value.ToString("0.##", CultureInfo.InvariantCulture),
+            fullDescription);
 
     private static void AppendRow(
         StringBuilder body,
         string icon,
         string label,
-        string value)
+        string value,
+        string fullDescription)
     {
         if (body.Length > 0) body.Append('\n');
-        body.Append(icon)
+        body.Append(StatsTooltip.RenderRowInformationHint(label, fullDescription))
+            .Append(' ')
+            .Append(icon)
             .Append(' ')
             .Append(label)
             .Append("   [b]")

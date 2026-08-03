@@ -149,10 +149,14 @@ public class PotionBeltStatsTooltipTests
             && row.Contains("Potion:")
             && row.Contains("Discarded   [b]1[/b]"));
 
-        Assert.DoesNotContain("combat reward potions", body, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("potions offered", body, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("potion activations", body, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("potion discards", body, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            StatConceptGlossary.RenderInformationHint(
+                "Potions offered in combat rewards this run."),
+            body);
+        Assert.Contains(
+            StatConceptGlossary.RenderInformationHint(
+                "Potions discarded without being used this run."),
+            body);
     }
 
     private static PotionRunHistoryEntry Entry(
