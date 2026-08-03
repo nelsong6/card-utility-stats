@@ -190,6 +190,31 @@ internal static class StatsTooltipPinManager
         }
     }
 
+    internal static void RefreshPinnedRunTimerStats(
+        Control target,
+        string body)
+    {
+        // Do not reconcile here: the native factory asks for the stats body
+        // while a new pin is still being constructed and before _pinnedTipSet
+        // can be assigned. A refresh during that window should simply wait for
+        // the next sampler tick.
+        if (!ReferenceEquals(_pinnedTarget, target)
+            || !IsLive(_pinnedTipSet)
+            || _pinnedTipSet!.IsQueuedForDeletion()
+            || !IsLive(_pinnedStatsDescription)
+            || _pinnedStatsDescription!.IsQueuedForDeletion()
+            || string.Equals(
+                _pinnedStatsDescription.Text,
+                body,
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _pinnedStatsDescription.Text = body;
+        RunTimerStatsTooltip.AlignClearOfTarget(target, _pinnedTipSet);
+    }
+
     public static void ClearPin()
         => ClearPin(restoreOrdinaryHover: false);
 

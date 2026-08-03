@@ -31,6 +31,8 @@ internal static class RunTimerStatsTooltip
 
     private static Binding? _liveBinding;
     private static Binding? _historyBinding;
+    private static NHoverTipSet? _visibleLiveTipSet;
+    private static RichTextLabel? _visibleLiveDescription;
 
     public static void Initialize() => EnsureLiveTarget();
 
@@ -121,6 +123,9 @@ internal static class RunTimerStatsTooltip
             return;
         }
 
+        if (ReferenceEquals(target, _liveBinding?.Target))
+            ClearVisibleLiveTooltip();
+
         NHoverTipSet.Remove(target);
         var tipSet = NHoverTipSet.CreateAndShow(
             target,
@@ -130,6 +135,55 @@ internal static class RunTimerStatsTooltip
         {
             NativeStatsHoverTipStyler.ApplyToLastTextTip(tipSet);
             AlignClearOfTarget(target, tipSet);
+
+            if (ReferenceEquals(target, _liveBinding?.Target))
+            {
+                _visibleLiveTipSet = tipSet;
+                _visibleLiveDescription =
+                    NativeStatsHoverTipStyler.GetLastStatsDescription(tipSet);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Updates an already-visible live timer page in place. Historical timer
+    /// pages remain snapshots. Replacing the label text lets Godot handle the
+    /// redraw and preserves the native hover/pin lifecycle.
+    /// </summary>
+    internal static void RefreshVisibleLiveTooltip()
+    {
+        try
+        {
+            var target = _liveBinding?.Target;
+            if (!IsLive(target)
+                || !RunTracker.TryGetEffectiveRunTimeStats(out var stats))
+            {
+                return;
+            }
+
+            var body = RunTimeStatsTooltip.BuildBodyBBCode(stats);
+            if (IsVisible(_visibleLiveTipSet, _visibleLiveDescription))
+            {
+                if (!string.Equals(
+                        _visibleLiveDescription!.Text,
+                        body,
+                        StringComparison.Ordinal))
+                {
+                    _visibleLiveDescription.Text = body;
+                    AlignClearOfTarget(target!, _visibleLiveTipSet!);
+                }
+            }
+            else
+            {
+                ClearVisibleLiveTooltip();
+            }
+
+            StatsTooltipPinManager.RefreshPinnedRunTimerStats(target!, body);
+        }
+        catch (Exception exception)
+        {
+            CoreMain.LogDebug(
+                $"RunTimerStatsTooltip live refresh failed: {exception.Message}");
         }
     }
 
@@ -249,7 +303,10 @@ internal static class RunTimerStatsTooltip
     private static void RemoveBinding(ref Binding? binding)
     {
         var current = binding;
+        var removesLiveBinding = ReferenceEquals(current, _liveBinding);
         binding = null;
+        if (removesLiveBinding)
+            ClearVisibleLiveTooltip();
         if (current == null || !IsLive(current.Target)) return;
 
         NHoverTipSet.Remove(current.Target);
@@ -276,8 +333,28 @@ internal static class RunTimerStatsTooltip
 
     private static void HideTooltip(Control target)
     {
+        if (ReferenceEquals(target, _liveBinding?.Target))
+            ClearVisibleLiveTooltip();
+
         if (IsLive(target))
             NHoverTipSet.Remove(target);
+    }
+
+    private static bool IsVisible(
+        NHoverTipSet? tipSet,
+        RichTextLabel? description)
+    {
+        return IsLive(tipSet)
+            && !tipSet!.IsQueuedForDeletion()
+            && IsLive(description)
+            && !description!.IsQueuedForDeletion()
+            && description.IsVisibleInTree();
+    }
+
+    private static void ClearVisibleLiveTooltip()
+    {
+        _visibleLiveTipSet = null;
+        _visibleLiveDescription = null;
     }
 
     private static RunTimeStats Clone(RunTimeStats? source)

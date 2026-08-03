@@ -1,6 +1,7 @@
 using Godot;
 using MegaCrit.Sts2.Core.HoverTips;
 using SpireLens.Core;
+using SpireLens.Core.Patches;
 using Xunit;
 
 namespace SpireLens.Core.Tests;
@@ -52,5 +53,18 @@ public class RunTimerStatsTooltipTests
             viewport);
 
         Assert.Equal(8f, x);
+    }
+
+    [Fact]
+    public void TimerBody_ChangesWhenTrackedClockAdvances()
+    {
+        var before = RunTimeStatsTooltip.BuildBodyBBCode(
+            new RunTimeStats { CombatSeconds = 216 });
+        var after = RunTimeStatsTooltip.BuildBodyBBCode(
+            new RunTimeStats { CombatSeconds = 217 });
+
+        Assert.Contains("03:36", before);
+        Assert.Contains("03:37", after);
+        Assert.NotEqual(before, after);
     }
 }

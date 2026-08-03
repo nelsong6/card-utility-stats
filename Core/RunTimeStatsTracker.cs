@@ -94,6 +94,7 @@ internal static class RunTimeStatsTracker
             RunTracker.SampleRunTimeStats(
                 ClassifyCurrentSurface(),
                 Math.Max(0L, RunManager.Instance.RunTime));
+            RunTimerStatsTooltip.RefreshVisibleLiveTooltip();
         }
         catch (Exception exception)
         {
