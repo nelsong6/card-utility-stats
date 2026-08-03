@@ -8,6 +8,7 @@ using MegaCrit.Sts2.Core.Localization;
 using MegaCrit.Sts2.Core.Nodes.Cards;
 using MegaCrit.Sts2.Core.Nodes.Cards.Holders;
 using MegaCrit.Sts2.Core.Nodes.HoverTips;
+using MegaCrit.Sts2.Core.Nodes.Potions;
 using MegaCrit.Sts2.Core.Nodes.Relics;
 using MegaCrit.Sts2.Core.Nodes.Screens;
 using MegaCrit.Sts2.Core.Nodes.Screens.RelicCollection;
@@ -134,6 +135,12 @@ internal static class StatsTooltipPinManager
     {
         if (target is NTopBarHp or NTopBarGold)
             AttachTarget(target, subscribeToGuiInput: true);
+    }
+
+    public static void AttachPotionStatsTarget(NPotionHolder? holder)
+    {
+        if (holder != null)
+            AttachTarget(holder, subscribeToGuiInput: true);
     }
 
     public static void AttachRunTimerStatsTarget(Control? target)
@@ -355,6 +362,7 @@ internal static class StatsTooltipPinManager
             && owner is not RunHistoryCampfireButton
             && owner is not NTopBarHp
             && owner is not NTopBarGold
+            && owner is not NPotionHolder
             && !RunHistoryHpTooltip.IsTarget(owner)
             && !RunHistoryGoldTooltip.IsTarget(owner)
             && !RunTimerStatsTooltip.IsTarget(owner))
@@ -485,7 +493,7 @@ internal static class StatsTooltipPinManager
             MouseFilter = Control.MouseFilterEnum.Ignore,
             FocusMode = Control.FocusModeEnum.None,
         };
-        target.AddChild(pinOwner);
+        GetPinOwnerParent(target).AddChild(pinOwner);
 
         _pinnedTarget = target;
         _pinOwner = pinOwner;
@@ -530,6 +538,8 @@ internal static class StatsTooltipPinManager
         var target = _pinnedTarget;
         var pinOwner = _pinOwner;
         DetachCopyImageButton();
+        ClearHintPopup();
+        RemoveLockIcon(target);
 
         _pinnedTarget = null;
         _pinOwner = null;
@@ -537,7 +547,6 @@ internal static class StatsTooltipPinManager
         _pinnedStatsControl = null;
         _pinnedStatsDescription = null;
         _pinnedCardModel = null;
-        ClearHintPopup();
 
         if (IsLive(pinOwner))
         {
@@ -545,8 +554,6 @@ internal static class StatsTooltipPinManager
             pinOwner!.GetParent()?.RemoveChild(pinOwner);
             pinOwner.QueueFree();
         }
-
-        RemoveLockIcon(target);
 
         if (!restoreOrdinaryHover
             || !IsLive(target)
@@ -848,6 +855,9 @@ internal static class StatsTooltipPinManager
             case NTopBarGold gold:
                 return GoldStatsTooltip.TryBuildNativeHoverTip(gold, out tip);
 
+            case NPotionHolder holder:
+                return PotionBeltStatsTooltip.TryBuildNativeHoverTip(holder, out tip);
+
             case Control label when RunHistoryHpTooltip.IsTarget(label):
                 return RunHistoryHpTooltip.TryBuildStatsTip(label, out tip);
 
@@ -901,15 +911,23 @@ internal static class StatsTooltipPinManager
             case NTopBarHp:
                 nativeHoverTips = new IHoverTip[]
                 {
-                    CreateStockTopBarTip("HIT_POINTS"),
+                    CreateStockHoverTip("HIT_POINTS"),
                 };
                 return true;
 
             case NTopBarGold:
                 nativeHoverTips = new IHoverTip[]
                 {
-                    CreateStockTopBarTip("MONEY_POUCH"),
+                    CreateStockHoverTip("MONEY_POUCH"),
                 };
+                return true;
+
+            case NPotionHolder holder:
+                nativeHoverTips = holder.Potion?.Model.HoverTips
+                    ?? new IHoverTip[]
+                    {
+                        CreateStockHoverTip("POTION_SLOT"),
+                    };
                 return true;
 
             case Control label when RunHistoryHpTooltip.IsTarget(label):
@@ -962,6 +980,10 @@ internal static class StatsTooltipPinManager
 
             case NTopBarHp or NTopBarGold:
                 AlignTopBarTipSet(target, tipSet);
+                break;
+
+            case NPotionHolder holder:
+                AlignPotionTipSet(holder, tipSet);
                 break;
 
             case Control label when RunHistoryHpTooltip.IsTarget(label):
@@ -1029,6 +1051,15 @@ internal static class StatsTooltipPinManager
                     AlignTopBarTipSet(target, tipSet);
                 break;
 
+            case NPotionHolder holder:
+                var potionTipSet = NHoverTipSet.CreateAndShow(
+                    target,
+                    nativeHoverTips,
+                    HoverTipAlignment.Center);
+                if (potionTipSet != null)
+                    AlignPotionTipSet(holder, potionTipSet);
+                break;
+
             case Control label when RunHistoryHpTooltip.IsTarget(label):
                 RunHistoryHpTooltip.ShowTooltip(label);
                 break;
@@ -1060,6 +1091,8 @@ internal static class StatsTooltipPinManager
             RunHistoryCampfireButton => "run-history-campfires",
             NTopBarHp => "live-run-hp",
             NTopBarGold => "live-run-gold",
+            NPotionHolder holder => holder.Potion?.Model.Id.ToString()
+                ?? "empty-potion-slot",
             Control label when RunHistoryHpTooltip.IsTarget(label)
                 => "run-history-hp",
             Control label when RunHistoryGoldTooltip.IsTarget(label)
@@ -1070,7 +1103,7 @@ internal static class StatsTooltipPinManager
         };
     }
 
-    private static HoverTip CreateStockTopBarTip(string localizationKey)
+    private static HoverTip CreateStockHoverTip(string localizationKey)
     {
         return new HoverTip(
             new LocString("static_hover_tips", $"{localizationKey}.title"),
@@ -1084,6 +1117,30 @@ internal static class StatsTooltipPinManager
         tipSet.SetGlobalPosition(
             target.GlobalPosition + new Vector2(0f, target.Size.Y + 20f));
     }
+
+    private static void AlignPotionTipSet(
+        NPotionHolder holder,
+        NHoverTipSet tipSet)
+    {
+        tipSet.SetGlobalPosition(
+            holder.GlobalPosition
+            + Vector2.Down
+            * holder.Size.Y
+            * Mathf.Max(1.5f, holder.Scale.Y));
+        tipSet.SetAlignment(holder, HoverTipAlignment.Center);
+    }
+
+    private static Node GetPinOwnerParent(Control target)
+    {
+        if (!UsesLayoutNeutralPinOverlay(target))
+            return target;
+
+        var root = target.GetTree()?.Root;
+        return root != null ? root : target;
+    }
+
+    private static bool UsesLayoutNeutralPinOverlay(Control target)
+        => target is NTopBarHp or NTopBarGold or NPotionHolder;
 
     private static void ShowHintPopup(string tooltip, Vector2 pointerPosition)
     {
@@ -1161,6 +1218,7 @@ internal static class StatsTooltipPinManager
             ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
         };
+        var usesLayoutNeutralOverlay = UsesLayoutNeutralPinOverlay(target);
         if (isFullCard)
         {
             // NCard draws its 300x422 card centered around a zero-sized
@@ -1172,7 +1230,7 @@ internal static class StatsTooltipPinManager
                 (-NCard.defaultSize.Y / 2f) + topInset);
             lockIcon.Size = new Vector2(width, height);
         }
-        else
+        else if (!usesLayoutNeutralOverlay)
         {
             lockIcon.AnchorLeft = 1f;
             lockIcon.AnchorRight = 1f;
@@ -1185,11 +1243,27 @@ internal static class StatsTooltipPinManager
         }
 
         host!.AddChild(lockIcon);
+        if (usesLayoutNeutralOverlay)
+        {
+            // Top-bar counters and potion holders participate in container
+            // layout and may clip children. Keep the badge in the same
+            // root-level overlay as the pin surrogate, then place it over the
+            // rendered target without affecting any minimum-size calculation.
+            var targetRect = GetRenderedSubjectRect(target);
+            lockIcon.Size = new Vector2(width, height);
+            lockIcon.GlobalPosition = new Vector2(
+                targetRect.Position.X + targetRect.Size.X - rightInset - width,
+                targetRect.Position.Y + topInset);
+            lockIcon.ZIndex = 1000;
+        }
         _lockIconHost = host;
     }
 
     private static Control GetLockIconHost(Control target)
     {
+        if (UsesLayoutNeutralPinOverlay(target) && IsLive(_pinOwner))
+            return _pinOwner!;
+
         // Card holders are interaction/layout slots whose bounds can be much
         // larger than the rendered card. NCard owns the visual transform; its
         // centered visual bounds are handled explicitly in AddLockIcon.

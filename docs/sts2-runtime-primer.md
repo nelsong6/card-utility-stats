@@ -1664,7 +1664,10 @@ Important surfaces:
 - Live top-bar HP and gold controls register with the shared pin manager when
   their first augmented native tooltip is built. Their pinned sets recreate
   the stock Hit Points or Money Pouch page before the SpireLens stats page and
-  retain the native below-the-control placement.
+  retain the native below-the-control placement. Top-bar counters and potion
+  holders keep their pin surrogate and lock badge under the scene root rather
+  than under the hovered control; adding children to those layout participants
+  can change the top-bar minimum size and shift the potion belt.
 - Card right-click must be claimed on the press, not the release.
   `NCardHolder.OnMousePressed` normally stores right press as
   `_currentPressedAction`; its matching release then emits `AltPressed`.

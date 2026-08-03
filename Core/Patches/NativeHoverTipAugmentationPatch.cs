@@ -279,10 +279,14 @@ internal static class NativeStatsHoverTipFactory
                 }
                 return false;
 
-            case NPotionHolder holder
-                when PotionBeltStatsTooltip.TryBuildNativeHoverTip(holder, out tip):
-                statsTip = tip;
-                return true;
+            case NPotionHolder holder:
+                StatsTooltipPinManager.AttachPotionStatsTarget(holder);
+                if (PotionBeltStatsTooltip.TryBuildNativeHoverTip(holder, out tip))
+                {
+                    statsTip = tip;
+                    return true;
+                }
+                return false;
 
             case NMapLegendItem legendItem
                 when MapLegendStatsTooltip.TryBuildNativeHoverTip(legendItem, out tip):
