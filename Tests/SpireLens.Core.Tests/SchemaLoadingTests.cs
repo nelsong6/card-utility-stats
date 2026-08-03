@@ -5278,11 +5278,12 @@ public class SchemaLoadingTests
 
         Assert.NotNull(loaded);
         Assert.True(loaded!.SupportsResume);
-        Assert.Equal(3, loaded.Data.PotionHistory.Count);
+        Assert.Equal(4, loaded.Data.PotionHistory.Count);
 
         var notTaken = loaded.Data.PotionHistory[0];
         Assert.Equal("POTION.FIRE_POTION", notTaken.PotionId);
         Assert.Equal("Shop", notTaken.AcquisitionMethod);
+        Assert.Equal("Common", notTaken.Rarity);
         Assert.False(notTaken.Acquired);
         Assert.Equal(4, notTaken.SeenFloor);
 
@@ -5298,6 +5299,11 @@ public class SchemaLoadingTests
         var held = loaded.Data.PotionHistory[2];
         Assert.True(held.HeldAtRunEnd);
         Assert.Equal(12, held.HeldAtRunEndFloor);
+
+        var rejected = loaded.Data.PotionHistory[3];
+        Assert.Equal("Rare", rejected.Rarity);
+        Assert.True(rejected.RejectedAtRewardScreen);
+        Assert.False(rejected.Acquired);
     }
 
     [Fact]
@@ -5307,8 +5313,9 @@ public class SchemaLoadingTests
             FixturePath("potion-run-history.json"));
 
         Assert.NotNull(resumed);
-        Assert.Equal(3, resumed!.PotionHistory.Count);
+        Assert.Equal(4, resumed!.PotionHistory.Count);
         Assert.Equal("Potion reward", resumed.PotionHistory[1].AcquisitionMethod);
+        Assert.True(resumed.PotionHistory[3].RejectedAtRewardScreen);
     }
 
     [Fact]

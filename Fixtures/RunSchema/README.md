@@ -524,7 +524,8 @@ New fixtures added going forward do not need a `v*-` prefix.
   outcomes, and zero-inclusive held turn/combat denominators.
 - `potion-run-history.json`
   Adds ordered per-potion offer, acquisition, use, and held-at-run-end
-  provenance for the potion gallery's current-run history view.
+  provenance for the potion gallery's current-run history view, plus concrete
+  rarity and terminal reward-screen rejection for run-wide belt statistics.
 - `max-hp-run-history.json`
   Adds chronological observed maximum-HP changes with exact before/after
   values plus floor, room, turn, and best-known source presentation context.

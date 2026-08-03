@@ -272,7 +272,11 @@ boundary, while `MerchantPotionEntry.FillSlot` is the shop boundary where the
 game has selected and marked the stocked potion as seen. A successful
 `Player.AddPotionInternal` result is the final belt-insertion truth; failed
 reward clicks and full-belt/blocker failures leave the offer in the not-taken
-lane. `Player.RemoveUsedPotionInternal` and `Player.DiscardPotionInternal`
+lane. A potion reward is rejected only when its exact `PotionReward.OnSkipped`
+callback runs; visibility and unsuccessful selection attempts are not terminal
+outcomes. Preserve the concrete potion rarity on the history entry so the
+run-wide belt summary can split combat-reward offers without reconstructing
+historic mutable models. `Player.RemoveUsedPotionInternal` and `Player.DiscardPotionInternal`
 confirm the two terminal belt removals. Bind the mutable potion reference to a
 monotonic run sequence so duplicate definitions remain separate, and rebuild
 bindings from live belt order after Continue/hot reload. Keep that sequence as

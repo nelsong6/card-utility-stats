@@ -17,6 +17,7 @@
       "potion_id": "POTION.FIRE_POTION",
       "display_name": "Fire Potion",
       "acquisition_method": "Shop",
+      "rarity": "Common",
       "seen_floor": 4,
       "seen_location_kind": "Shop",
       "acquired": false,
@@ -27,6 +28,7 @@
       "potion_id": "POTION.SWIFT_POTION",
       "display_name": "Swift Potion",
       "acquisition_method": "Potion reward",
+      "rarity": "Common",
       "seen_floor": 6,
       "seen_location_kind": "Combat",
       "seen_location_name": "Cultist",
@@ -45,6 +47,7 @@
       "potion_id": "POTION.BLOOD_POTION",
       "display_name": "Blood Potion",
       "acquisition_method": "Starting potion",
+      "rarity": "Common",
       "seen_floor": 1,
       "seen_location_kind": "Run start",
       "acquired": true,
@@ -52,6 +55,19 @@
       "acquired_location_kind": "Run start",
       "held_at_run_end": true,
       "held_at_run_end_floor": 12
+    },
+    {
+      "sequence": 4,
+      "potion_id": "POTION.FRUIT_JUICE",
+      "display_name": "Fruit Juice",
+      "acquisition_method": "Potion reward",
+      "rarity": "Rare",
+      "seen_floor": 10,
+      "seen_location_kind": "Combat",
+      "seen_location_name": "Slime Boss",
+      "acquired": false,
+      "rejected_at_reward_screen": true,
+      "held_at_run_end": false
     }
   ],
   "gold_attribution_ledger": [],

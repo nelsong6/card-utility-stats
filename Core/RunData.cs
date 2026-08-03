@@ -202,6 +202,7 @@ public class PotionRunHistoryEntry
     public string PotionId { get; set; } = "";
     public string DisplayName { get; set; } = "";
     public string AcquisitionMethod { get; set; } = "";
+    public string? Rarity { get; set; }
 
     public int? SeenFloor { get; set; }
     public string? SeenLocationKind { get; set; }
@@ -253,6 +254,11 @@ public class PotionRunHistoryEntry
     public string? DiscardedLocationKind { get; set; }
     public string? DiscardedLocationName { get; set; }
     public int? DiscardedTurn { get; set; }
+
+    // True only after the concrete PotionReward reaches its terminal skip
+    // callback. A merely visible or unsuccessfully clicked reward remains
+    // unresolved, so the belt summary does not prematurely call it rejected.
+    public bool RejectedAtRewardScreen { get; set; }
 
     public bool HeldAtRunEnd { get; set; }
     public int? HeldAtRunEndFloor { get; set; }

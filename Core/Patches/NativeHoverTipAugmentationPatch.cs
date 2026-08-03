@@ -7,6 +7,7 @@ using MegaCrit.Sts2.Core.HoverTips;
 using MegaCrit.Sts2.Core.Nodes.Cards.Holders;
 using MegaCrit.Sts2.Core.Nodes.Combat;
 using MegaCrit.Sts2.Core.Nodes.HoverTips;
+using MegaCrit.Sts2.Core.Nodes.Potions;
 using MegaCrit.Sts2.Core.Nodes.Relics;
 using MegaCrit.Sts2.Core.Nodes.Screens.PotionLab;
 using MegaCrit.Sts2.Core.Nodes.Screens.RelicCollection;
@@ -266,6 +267,11 @@ internal static class NativeStatsHoverTipFactory
 
             case NTopBarGold gold
                 when GoldStatsTooltip.TryBuildNativeHoverTip(gold, out tip):
+                statsTip = tip;
+                return true;
+
+            case NPotionHolder holder
+                when PotionBeltStatsTooltip.TryBuildNativeHoverTip(holder, out tip):
                 statsTip = tip;
                 return true;
 

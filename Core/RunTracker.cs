@@ -359,6 +359,32 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Read-only current-run potion provenance for the top-bar belt summary.
+    /// Unlike the gallery accessor, this deliberately does not fall back to
+    /// the last ended run when no active run exists.
+    /// </summary>
+    public static bool TryGetEffectivePotionStatsSource(
+        out IReadOnlyList<PotionRunHistoryEntry> history,
+        out int floors)
+    {
+        lock (_lock)
+        {
+            if (_currentRun == null)
+            {
+                history = Array.Empty<PotionRunHistoryEntry>();
+                floors = 0;
+                return false;
+            }
+
+            var source = _pendingCombat?.PotionHistory
+                ?? _currentRun.PotionHistory;
+            history = ClonePotionHistory(source);
+            floors = Math.Max(0, CurrentRunFloorLocked() ?? 0);
+            return true;
+        }
+    }
+
+    /// <summary>
     /// Read-only chronological maximum-HP changes for the active run. Combat
     /// changes are read from the same pending snapshot used by potion history,
     /// so they appear immediately without being committed if combat is later
@@ -3479,6 +3505,8 @@ public static class RunTracker
                     var existing = history.FirstOrDefault(e => e.Sequence == existingSequence);
                     if (existing != null)
                     {
+                        if (PopulatePotionRarity(existing, potion))
+                            FinishPotionHistoryMutationLocked();
                         BindPotionSequence(potion, existing.Sequence);
                         return;
                     }
@@ -3495,6 +3523,8 @@ public static class RunTracker
                         && e.SeenLocationName == location.Name);
                 if (rebound != null)
                 {
+                    if (PopulatePotionRarity(rebound, potion))
+                        FinishPotionHistoryMutationLocked();
                     BindPotionSequence(offerSource, rebound.Sequence);
                     BindPotionSequence(potion, rebound.Sequence);
                     return;
@@ -3506,6 +3536,7 @@ public static class RunTracker
                     PotionId = potionId,
                     DisplayName = GetPotionDisplayName(potion),
                     AcquisitionMethod = acquisitionMethod,
+                    Rarity = potion.Rarity.ToString(),
                     SeenFloor = location.Floor,
                     SeenLocationKind = location.Kind,
                     SeenLocationName = location.Name,
@@ -3519,6 +3550,49 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordPotionOffer failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Marks a visible potion reward rejected only at its terminal skip
+    /// callback. Failed selection attempts and still-open rewards remain
+    /// unresolved.
+    /// </summary>
+    public static void RecordPotionRewardRejected(PotionReward? reward)
+    {
+        if (reward?.Player == null || reward.Potion == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(reward.Player)) return;
+                EnsureLazyCurrentRunLocked();
+                var history = GetMutablePotionHistoryLocked();
+                if (!TryGetPotionSequence(reward, out var sequence)
+                    && !TryGetPotionSequence(reward.Potion, out sequence))
+                {
+                    return;
+                }
+
+                var entry = history.FirstOrDefault(candidate =>
+                    candidate.Sequence == sequence);
+                if (entry == null
+                    || entry.Acquired
+                    || entry.RejectedAtRewardScreen)
+                {
+                    return;
+                }
+
+                PopulatePotionRarity(entry, reward.Potion);
+                entry.RejectedAtRewardScreen = true;
+                FinishPotionHistoryMutationLocked();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordPotionRewardRejected failed: {e.Message}");
             }
         }
     }
@@ -3568,6 +3642,7 @@ public static class RunTracker
                         PotionId = potionId,
                         DisplayName = GetPotionDisplayName(acquiredPotion),
                         AcquisitionMethod = InferDirectPotionAcquisitionMethodLocked(player),
+                        Rarity = acquiredPotion.Rarity.ToString(),
                         SeenFloor = location.Floor,
                         SeenLocationKind = location.Kind,
                         SeenLocationName = location.Name,
@@ -3576,6 +3651,7 @@ public static class RunTracker
                     history.Add(entry);
                 }
 
+                var changed = PopulatePotionRarity(entry, acquiredPotion);
                 if (!entry.Acquired)
                 {
                     entry.Acquired = true;
@@ -3583,8 +3659,11 @@ public static class RunTracker
                     entry.AcquiredLocationKind = location.Kind;
                     entry.AcquiredLocationName = location.Name;
                     entry.AcquiredTurn = location.Turn;
-                    FinishPotionHistoryMutationLocked();
+                    changed = true;
                 }
+
+                if (changed)
+                    FinishPotionHistoryMutationLocked();
 
                 BindPotionSequence(acquiredPotion, entry.Sequence);
                 if (requestedPotion != null)
@@ -3855,10 +3934,13 @@ public static class RunTracker
                         PotionId = potionId,
                         DisplayName = GetPotionDisplayName(potion),
                         AcquisitionMethod = "Prior acquisition",
+                        Rarity = potion.Rarity.ToString(),
                         Acquired = true,
                     };
                     history.Add(entry);
                 }
+
+                PopulatePotionRarity(entry, potion);
 
                 if (entry.Used || entry.Discarded) return;
                 if (used)
@@ -4201,6 +4283,15 @@ public static class RunTracker
         return potion.Id.Entry;
     }
 
+    private static bool PopulatePotionRarity(
+        PotionRunHistoryEntry entry,
+        PotionModel potion)
+    {
+        if (!string.IsNullOrWhiteSpace(entry.Rarity)) return false;
+        entry.Rarity = potion.Rarity.ToString();
+        return true;
+    }
+
     private static List<PotionRunHistoryEntry> ClonePotionHistory(
         IEnumerable<PotionRunHistoryEntry>? source)
         => source?.Select(ClonePotionHistoryEntry).ToList() ?? new List<PotionRunHistoryEntry>();
@@ -4254,6 +4345,7 @@ public static class RunTracker
             PotionId = source.PotionId,
             DisplayName = source.DisplayName,
             AcquisitionMethod = source.AcquisitionMethod,
+            Rarity = source.Rarity,
             SeenFloor = source.SeenFloor,
             SeenLocationKind = source.SeenLocationKind,
             SeenLocationName = source.SeenLocationName,
@@ -4285,6 +4377,7 @@ public static class RunTracker
             DiscardedLocationKind = source.DiscardedLocationKind,
             DiscardedLocationName = source.DiscardedLocationName,
             DiscardedTurn = source.DiscardedTurn,
+            RejectedAtRewardScreen = source.RejectedAtRewardScreen,
             HeldAtRunEnd = source.HeldAtRunEnd,
             HeldAtRunEndFloor = source.HeldAtRunEndFloor,
         };
@@ -4321,6 +4414,7 @@ public static class RunTracker
                 Sequence = NextPotionHistorySequence(_currentRun.PotionHistory),
                 PotionId = potionId,
                 DisplayName = GetPotionDisplayName(potion),
+                Rarity = potion.Rarity.ToString(),
                 AcquisitionMethod = isRunStart
                     ? "Starting potion"
                     : "Present when tracking began",
