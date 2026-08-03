@@ -122,9 +122,23 @@ internal static class RunTimerStatsTooltip
         var tipSet = NHoverTipSet.CreateAndShow(
             target,
             tip,
-            HoverTip.GetHoverTipAlignment(target));
+            GetNonObscuringAlignment(target));
         if (tipSet != null)
             NativeStatsHoverTipStyler.ApplyToLastTextTip(tipSet);
+    }
+
+    internal static HoverTipAlignment GetNonObscuringAlignment(Control target)
+    {
+        var targetRect = target.GetGlobalRect();
+        var viewportRect = target.GetViewport()?.GetVisibleRect() ?? default;
+        if (viewportRect.Size.X <= 0f)
+            return HoverTipAlignment.Left;
+
+        var targetCenterX = targetRect.Position.X + targetRect.Size.X / 2f;
+        var viewportCenterX = viewportRect.Position.X + viewportRect.Size.X / 2f;
+        return targetCenterX >= viewportCenterX
+            ? HoverTipAlignment.Left
+            : HoverTipAlignment.Right;
     }
 
     private static void Bind(

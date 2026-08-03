@@ -906,7 +906,7 @@ internal static class StatsTooltipPinManager
             case Control timer when RunTimerStatsTooltip.IsTarget(timer):
                 tipSet.SetAlignment(
                     timer,
-                    HoverTip.GetHoverTipAlignment(timer));
+                    RunTimerStatsTooltip.GetNonObscuringAlignment(timer));
                 break;
         }
     }
