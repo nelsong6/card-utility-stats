@@ -46,31 +46,40 @@ internal static class GoldStatsTooltip
         var floorIcon = StatConceptGlossary.RenderHintedGlyph("floor");
         var combatIcon = StatConceptGlossary.RenderHintedGlyph("combat");
         var eventIcon = StatConceptGlossary.RenderHintedGlyph("unknown_room");
+        var shopIcon = StatConceptGlossary.RenderHintedGlyph("shop");
         var body = new StringBuilder();
 
-        AppendStatRow(body, goldGainedIcon, "Gold acquired", goldStats.GoldAcquired);
-        AppendStatRow(body, goldIcon, "Gold spent", goldStats.GoldSpent);
-        AppendStatRow(body, goldIcon, "Gold spent in shops", goldStats.GoldSpentInShops);
+        AppendStatRow(body, goldGainedIcon, "Acquired", goldStats.GoldAcquired);
+        AppendStatRow(body, goldIcon, "Spent", goldStats.GoldSpent);
         AppendStatRow(
             body,
-            $"{averageIcon} {goldIcon}",
-            "Avg gold spent per shop",
+            $"{shopIcon} {goldIcon}",
+            "Spent",
+            goldStats.GoldSpentInShops);
+        AppendStatRow(
+            body,
+            $"{averageIcon} {shopIcon} {goldIcon}",
+            "Spent",
             Divide(goldStats.GoldSpentInShops, goldStats.ShopsVisited));
-        AppendStatRow(body, goldIcon, "Gold spent in events", goldStats.GoldSpentInEvents);
         AppendStatRow(
             body,
-            $"{averageIcon} {floorIcon}",
-            "Avg gold gained per floor",
+            $"{eventIcon} {goldIcon}",
+            "Spent",
+            goldStats.GoldSpentInEvents);
+        AppendStatRow(
+            body,
+            $"{averageIcon} {floorIcon} {goldGainedIcon}",
+            "Gained",
             Divide(goldStats.GoldAcquired, floors));
         AppendStatRow(
             body,
-            $"{averageIcon} {combatIcon}",
-            "Avg gold gained per combat",
+            $"{averageIcon} {combatIcon} {goldGainedIcon}",
+            "Gained",
             Divide(goldStats.GoldGainedInCombats, goldStats.Combats));
         AppendStatRow(
             body,
-            $"{averageIcon} {eventIcon}",
-            "Avg gold gained per event",
+            $"{averageIcon} {eventIcon} {goldGainedIcon}",
+            "Gained",
             Divide(goldStats.GoldGainedInEvents, goldStats.EventsVisited));
 
         return body.ToString();

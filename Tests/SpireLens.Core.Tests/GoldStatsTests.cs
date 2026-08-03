@@ -90,13 +90,37 @@ public class GoldStatsTests
             },
             floors: 12);
 
-        Assert.Contains("Gold acquired   [b]480[/b]", body);
-        Assert.Contains("Gold spent   [b]300[/b]", body);
-        Assert.Contains("Gold spent in shops   [b]220[/b]", body);
-        Assert.Contains("Avg gold spent per shop   [b]55[/b]", body);
-        Assert.Contains("Gold spent in events   [b]50[/b]", body);
-        Assert.Contains("Avg gold gained per floor   [b]40[/b]", body);
-        Assert.Contains("Avg gold gained per combat   [b]18[/b]", body);
-        Assert.Contains("Avg gold gained per event   [b]16[/b]", body);
+        var rows = body.Split('\n');
+        Assert.Contains(rows, row => row.Contains("Gold gained:")
+            && row.Contains("Acquired   [b]480[/b]"));
+        Assert.Contains(rows, row => row.Contains("Gold:")
+            && row.Contains("Spent   [b]300[/b]"));
+        Assert.Contains(rows, row => row.Contains("Merchant:")
+            && row.Contains("Gold:")
+            && row.Contains("Spent   [b]220[/b]"));
+        Assert.Contains(rows, row => row.Contains("Average:")
+            && row.Contains("Merchant:")
+            && row.Contains("Gold:")
+            && row.Contains("Spent   [b]55[/b]"));
+        Assert.Contains(rows, row => row.Contains("Unknown room:")
+            && row.Contains("Gold:")
+            && row.Contains("Spent   [b]50[/b]"));
+        Assert.Contains(rows, row => row.Contains("Average:")
+            && row.Contains("Floor:")
+            && row.Contains("Gold gained:")
+            && row.Contains("Gained   [b]40[/b]"));
+        Assert.Contains(rows, row => row.Contains("Average:")
+            && row.Contains("Combat:")
+            && row.Contains("Gold gained:")
+            && row.Contains("Gained   [b]18[/b]"));
+        Assert.Contains(rows, row => row.Contains("Average:")
+            && row.Contains("Unknown room:")
+            && row.Contains("Gold gained:")
+            && row.Contains("Gained   [b]16[/b]"));
+        Assert.DoesNotContain("Gold spent", body);
+        Assert.DoesNotContain("per shop", body);
+        Assert.DoesNotContain("per floor", body);
+        Assert.DoesNotContain("per combat", body);
+        Assert.DoesNotContain("per event", body);
     }
 }

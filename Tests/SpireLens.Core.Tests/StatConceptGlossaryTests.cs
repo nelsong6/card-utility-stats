@@ -153,6 +153,7 @@ public class StatConceptGlossaryTests
         var rareRelic = StatConceptGlossary.RenderHintedGlyph("relic_rare");
         var uncommonRelic = StatConceptGlossary.RenderHintedGlyph("relic_uncommon");
         var skill = StatConceptGlossary.RenderHintedGlyph("skill");
+        var shop = StatConceptGlossary.RenderHintedGlyph("shop");
         var strengthGained = StatConceptGlossary.RenderHintedGlyph("strength_gained");
         var swift = StatConceptGlossary.RenderHintedGlyph("swift");
         var taken = StatConceptGlossary.RenderHintedGlyph("taken");
@@ -198,6 +199,7 @@ public class StatConceptGlossaryTests
             rareRelic,
             uncommonRelic,
             skill,
+            shop,
             strengthGained,
             swift,
             taken,
@@ -320,6 +322,10 @@ public class StatConceptGlossaryTests
         Assert.Contains(
             "res://images/packed/card_library/type_sort_skill.png",
             skill);
+        Assert.Contains("[hint=\"Merchant:", shop);
+        Assert.Contains(
+            "res://images/atlases/ui_atlas.sprites/map/icons/map_shop.tres",
+            shop);
         Assert.Contains("[hint=\"Strength gained:", strengthGained);
         Assert.Contains(
             "user://SpireLens/generated-icons/strength_gained-",
