@@ -154,6 +154,7 @@ public static class RunTracker
     private static readonly System.Threading.AsyncLocal<EnemyStatusSourceFrame?> _enemyStatusSourceFrame = new();
     private static readonly System.Threading.AsyncLocal<PendingToastyMittensActivation?> _toastyMittensActivation = new();
     private static readonly System.Threading.AsyncLocal<HpLossPowerSourceFrame?> _hpLossPowerSourceFrame = new();
+    private static readonly System.Threading.AsyncLocal<CardRemovalSourceFrame?> _cardRemovalSourceFrame = new();
     private static int _pendingPlayerBlockClearAmount;
     private static bool _pendingPlayerBlockClearArmed;
     private static bool _pendingAkabekoVigorAttribution;
@@ -29298,7 +29299,7 @@ public static class RunTracker
     {
         lock (_lock)
         {
-            RecordPrecariousShearsCardRemovedLocked(card);
+            bool removedByPrecariousShears = RecordPrecariousShearsCardRemovedLocked(card);
             if (_currentRun == null) return;
 
             // Non-assigning: if we haven't seen this card enter the deck,
@@ -29308,11 +29309,16 @@ public static class RunTracker
             // removed must have entered the deck at some point.
             if (!TryGetInstanceId(card, out var instanceId)) return;
             var floor = RunManager.Instance.State?.TotalFloor;
+            var removalSource = CaptureCardRemovalSourceLocked(
+                card,
+                removedByPrecariousShears);
 
             if (_currentRun.Aggregates.TryGetValue(instanceId, out var agg))
             {
                 agg.Removed = true;
                 agg.RemovedAtFloor = floor;
+                agg.RemovalSource = removalSource.Source;
+                agg.RemovalGoldCost = removalSource.GoldCost;
 
                 // Snapshot the card's full state (upgrade, enchantment,
                 // props, floor_added) so we can reconstruct a matching
@@ -29330,7 +29336,10 @@ public static class RunTracker
                 Floor = floor,
             });
 
-            CoreMain.Logger.Info($"card_removed: {instanceId} floor={floor}");
+            CoreMain.Logger.Info(
+                $"card_removed: {instanceId} floor={floor} "
+                + $"source={removalSource.Source ?? "unknown"} "
+                + $"gold_cost={removalSource.GoldCost?.ToString() ?? "n/a"}");
 
             // Save immediately — removals happen OUTSIDE combat (Smith, events,
             // rest-site interactions, curse dispose). Without saving here, the
@@ -29343,22 +29352,108 @@ public static class RunTracker
         }
     }
 
-    private static void RecordPrecariousShearsCardRemovedLocked(CardModel card)
+    private static bool RecordPrecariousShearsCardRemovedLocked(CardModel card)
     {
         try
         {
-            if (card == null) return;
+            if (card == null) return false;
             var owner = card.Owner;
-            if (owner == null) return;
-            if (!_pendingPrecariousShearsPickups.TryGetValue(owner, out var pending)) return;
+            if (owner == null) return false;
+            if (!_pendingPrecariousShearsPickups.TryGetValue(owner, out var pending)) return false;
 
             pending.CardsRemoved.Add(GetCardDisplayNameForStats(card));
+            return true;
         }
         catch (Exception e)
         {
             CoreMain.LogDebug($"RecordPrecariousShearsCardRemovedLocked failed: {e.Message}");
+            return false;
         }
     }
+
+    private static CardRemovalSourceFrame CaptureCardRemovalSourceLocked(
+        CardModel card,
+        bool removedByPrecariousShears)
+    {
+        if (removedByPrecariousShears)
+            return new CardRemovalSourceFrame("Relic — Precarious Shears", null);
+
+        var explicitSource = _cardRemovalSourceFrame.Value;
+        if (explicitSource != null)
+            return explicitSource;
+
+        try
+        {
+            var currentCard = _currentPlayerCardPlay?.Card;
+            if (currentCard != null
+                && (currentCard.Owner == null
+                    || card.Owner == null
+                    || ReferenceEquals(currentCard.Owner, card.Owner)))
+            {
+                return new CardRemovalSourceFrame(
+                    $"Card — {GetCardDisplayNameForStats(currentCard)}",
+                    null);
+            }
+
+            var room = RunManager.Instance?.State?.CurrentRoom;
+            if (room is MerchantRoom)
+                return new CardRemovalSourceFrame("Shopkeeper", null);
+
+            if (room is EventRoom eventRoom)
+            {
+                string? eventName = null;
+                try
+                {
+                    eventName = (eventRoom.LocalMutableEvent ?? eventRoom.CanonicalEvent)
+                        ?.Title.GetFormattedText();
+                }
+                catch
+                {
+                    // The room category still gives us useful attribution.
+                }
+
+                return new CardRemovalSourceFrame(
+                    string.IsNullOrWhiteSpace(eventName)
+                        ? "Event"
+                        : $"Event — {eventName}",
+                    null);
+            }
+
+            if (room is RestSiteRoom)
+                return new CardRemovalSourceFrame("Rest site", null);
+
+            if (room != null)
+            {
+                string source = room.RoomType switch
+                {
+                    RoomType.Treasure => "Treasure room",
+                    RoomType.Monster => "Combat",
+                    RoomType.Elite => "Elite combat",
+                    RoomType.Boss => "Boss combat",
+                    _ => room.RoomType.ToString(),
+                };
+                return new CardRemovalSourceFrame(source, null);
+            }
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"CaptureCardRemovalSourceLocked failed: {e.Message}");
+        }
+
+        return new CardRemovalSourceFrame(null, null);
+    }
+
+    internal static CardRemovalSourceFrame? PushCardRemovalSource(
+        string source,
+        int? goldCost)
+    {
+        var previous = _cardRemovalSourceFrame.Value;
+        _cardRemovalSourceFrame.Value = new CardRemovalSourceFrame(source, goldCost);
+        return previous;
+    }
+
+    internal static void RestoreCardRemovalSource(CardRemovalSourceFrame? previous)
+        => _cardRemovalSourceFrame.Value = previous;
 
     private static string GetCardDisplayNameForStats(CardModel card)
     {
@@ -32683,6 +32778,8 @@ public static class RunTracker
             InitialUpgradeLevel = source.InitialUpgradeLevel,
             Removed = source.Removed,
             RemovedAtFloor = source.RemovedAtFloor,
+            RemovalSource = source.RemovalSource,
+            RemovalGoldCost = source.RemovalGoldCost,
             RemovedSnapshot = source.RemovedSnapshot,
         };
         MergeAggregateInto(clone, source);
@@ -34161,6 +34258,10 @@ internal sealed class PendingPrecariousShearsPickup
     public required decimal StartingMaxHp { get; init; }
     public List<string> CardsRemoved { get; } = new();
 }
+
+internal sealed record CardRemovalSourceFrame(
+    string? Source,
+    int? GoldCost);
 
 internal sealed class PendingSandCastlePickup
 {

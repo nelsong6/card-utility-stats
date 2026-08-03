@@ -87,7 +87,8 @@ public class AggregateDriftTests
     // Lineage/identity fields a merge intentionally does NOT accumulate.
     private static readonly HashSet<string> CardLineage = new()
     {
-        "FloorAdded", "InitialUpgradeLevel", "Removed", "RemovedAtFloor", "RemovedSnapshot",
+        "FloorAdded", "InitialUpgradeLevel", "Removed", "RemovedAtFloor",
+        "RemovalSource", "RemovalGoldCost", "RemovedSnapshot",
     };
     // RemovedSnapshot is a game type we can't reflectively populate.
     private static readonly HashSet<string> Unconstructable = new() { "RemovedSnapshot" };

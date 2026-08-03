@@ -6073,6 +6073,37 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsCardRemovalSourceFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("card-removal-source-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertCardRemovalSourceFixture(
+            loaded.Data.Aggregates["CARD.STRIKE_IRONCLAD#2"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsCardRemovalSourceFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("card-removal-source-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertCardRemovalSourceFixture(
+            resumed!.Aggregates["CARD.STRIKE_IRONCLAD#2"]);
+    }
+
+    private static void AssertCardRemovalSourceFixture(CardAggregate cardAgg)
+    {
+        Assert.True(cardAgg.Removed);
+        Assert.Equal(12, cardAgg.RemovedAtFloor);
+        Assert.Equal("Shopkeeper", cardAgg.RemovalSource);
+        Assert.Equal(100, cardAgg.RemovalGoldCost);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsEternalFeatherCampfireHealingFixture()
     {
         var loaded = RunStorage.LoadHistorical(

@@ -648,6 +648,9 @@ public class CardAggregate
     // how was it performing?" via the deck-view injection.
     //   Removed: true once the card left the permanent deck
     //   RemovedAtFloor: floor the removal happened on
+    //   RemovalSource: best-effort observed source (Shopkeeper, a named
+    //     event/relic, a card effect, or a room interaction)
+    //   RemovalGoldCost: exact merchant removal charge when applicable
     //   RemovedSnapshot: the card's full serializable state at removal —
     //     upgrade level, enchantment, props, etc. Used on resume to
     //     reconstruct a CardModel ref matching the removed card's state
@@ -655,6 +658,8 @@ public class CardAggregate
     //     renders it correctly post-reload.
     public bool Removed { get; set; }
     public int? RemovedAtFloor { get; set; }
+    public string? RemovalSource { get; set; }
+    public int? RemovalGoldCost { get; set; }
     public MegaCrit.Sts2.Core.Saves.Runs.SerializableCard? RemovedSnapshot { get; set; }
 
     // M3c: Draw count attribution. Null until M3c.

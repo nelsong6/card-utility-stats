@@ -1,0 +1,46 @@
+{
+  "run_id": "card-removal-source-fixture",
+  "started_at": "2026-08-02T22:00:00Z",
+  "updated_at": "2026-08-02T22:15:00Z",
+  "character": "IRONCLAD",
+  "ascension": 8,
+  "floor_reached": 14,
+  "outcome": "in_progress",
+  "game_start_time": 1785708000,
+  "aggregates": {
+    "CARD.STRIKE_IRONCLAD#2": {
+      "combats_in_deck": 5,
+      "plays": 7,
+      "times_drawn": 11,
+      "floor_added": 1,
+      "initial_upgrade_level": 0,
+      "removed": true,
+      "removed_at_floor": 12,
+      "removal_source": "Shopkeeper",
+      "removal_gold_cost": 100
+    }
+  },
+  "events": [
+    {
+      "t": 900,
+      "type": "card_removed",
+      "card_id": "CARD.STRIKE_IRONCLAD#2",
+      "floor": 12
+    }
+  ],
+  "relic_aggregates": {},
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.STRIKE_IRONCLAD": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ]
+  },
+  "def_counters": {
+    "CARD.STRIKE_IRONCLAD": 5
+  }
+}

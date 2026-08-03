@@ -230,12 +230,7 @@ public static class CardHoverShowPatch
             // glance that this is a removed card even without the visual
             // grouping in the deck view. Floor 0 defaults to "?" text.
             if (agg.Removed)
-            {
-                string rfloor = agg.RemovedAtFloor.HasValue
-                    ? $"floor [b]{agg.RemovedAtFloor.Value}[/b]"
-                    : "[b]?[/b]";
-                sb.Append($"[color=#b5b5b5]Removed {rfloor}[/color]\n");
-            }
+                AppendRemovalLine(sb, agg);
         }
         else
         {
@@ -247,7 +242,10 @@ public static class CardHoverShowPatch
             // the generic "not present" line for them. Other ephemerals keep
             // the subdued grey note.
             if (agg.Removed)
+            {
                 sb.Append("[color=#e04c4c][b]Card Removed[/b][/color]\n");
+                AppendRemovalLine(sb, agg);
+            }
             else if (!isSupplementalMetaCard)
                 sb.Append("[color=#b5b5b5]Card not present in deck[/color]\n");
         }
@@ -308,15 +306,25 @@ public static class CardHoverShowPatch
         }
 
         if (agg.Removed)
-        {
-            string rfloor = agg.RemovedAtFloor.HasValue
-                ? $"floor [b]{agg.RemovedAtFloor.Value}[/b]"
-                : "[b]?[/b]";
-            sb.Append($"[color=#b5b5b5]Removed {rfloor}[/color]\n");
-        }
+            AppendRemovalLine(sb, agg);
 
         AppendFullStatRows(sb, cardModel, agg, metaStats);
         return sb.ToString();
+    }
+
+    private static void AppendRemovalLine(StringBuilder sb, CardAggregate agg)
+    {
+        string floor = agg.RemovedAtFloor.HasValue
+            ? $"floor [b]{agg.RemovedAtFloor.Value}[/b]"
+            : "floor [b]?[/b]";
+        string source = string.IsNullOrWhiteSpace(agg.RemovalSource)
+            ? ""
+            : $" · {StatsTooltip.EscapeBbcode(agg.RemovalSource)}";
+        string cost = agg.RemovalGoldCost.HasValue
+            ? $" · {StatConceptGlossary.RenderHintedGlyph("gold")} [b]{agg.RemovalGoldCost.Value}[/b]"
+            : "";
+
+        sb.Append($"[color=#b5b5b5]Removed {floor}{source}{cost}[/color]\n");
     }
 
     private static void AppendFullStatRows(
