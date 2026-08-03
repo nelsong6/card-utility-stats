@@ -5332,6 +5332,35 @@ public class SchemaLoadingTests
         AssertMaxHpRunHistoryFixture(resumed!);
     }
 
+    [Fact]
+    public void HistoricalLoad_AcceptsHpRunStatsFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("hp-run-stats.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertHpRunStatsFixture(loaded.Data);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsHpRunStatsFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("hp-run-stats.json"));
+
+        Assert.NotNull(resumed);
+        AssertHpRunStatsFixture(resumed!);
+    }
+
+    private static void AssertHpRunStatsFixture(RunData run)
+    {
+        Assert.Equal(31m, run.HealthStats.HpLostInCombats);
+        Assert.Equal(9m, run.HealthStats.HpLostInEvents);
+        Assert.Equal(5, run.HealthStats.Combats);
+        Assert.Equal(2, run.MaxHpHistory.Count);
+    }
+
     private static void AssertMaxHpRunHistoryFixture(RunData run)
     {
         Assert.Equal(2, run.MaxHpHistory.Count);

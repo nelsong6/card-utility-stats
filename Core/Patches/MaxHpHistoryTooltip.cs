@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using MegaCrit.sts2.Core.Nodes.TopBar;
@@ -16,14 +17,100 @@ internal static class MaxHpHistoryTooltip
         tip = default;
         if (owner == null) return false;
 
-        var history = RunTracker.GetEffectiveMaxHpHistory();
-        if (history.Count == 0) return false;
+        if (!RunTracker.TryGetEffectiveHealthStats(
+                out var healthStats,
+                out var floors))
+        {
+            return false;
+        }
 
+        var history = RunTracker.GetEffectiveMaxHpHistory();
+
+        return TryBuildNativeHoverTip(
+            healthStats,
+            floors,
+            history,
+            out tip);
+    }
+
+    internal static bool TryBuildNativeHoverTip(
+        RunHealthStats? healthStats,
+        int floors,
+        IEnumerable<MaxHpRunHistoryEntry>? history,
+        out HoverTip tip)
+    {
         tip = StatsTooltip.CreateNativeTip(
-            "Max HP history",
-            BuildBodyBBCode(history),
+            "HP stats",
+            BuildBodyBBCode(healthStats, floors, history),
             stretchHorizontally: true);
         return true;
+    }
+
+    internal static string BuildBodyBBCode(
+        RunHealthStats? healthStats,
+        int floors,
+        IEnumerable<MaxHpRunHistoryEntry>? history)
+    {
+        healthStats ??= new RunHealthStats();
+        var orderedHistory = (history ?? Array.Empty<MaxHpRunHistoryEntry>())
+            .Where(entry => entry != null && entry.PreviousMaxHp != entry.NewMaxHp)
+            .OrderBy(entry => entry.Sequence)
+            .ToArray();
+        var totalHpLost = healthStats.HpLostInCombats + healthStats.HpLostInEvents;
+        var avgPerFloor = floors > 0 ? totalHpLost / floors : 0m;
+        var avgPerCombat = healthStats.Combats > 0
+            ? healthStats.HpLostInCombats / healthStats.Combats
+            : 0m;
+        var maxHpGained = orderedHistory.Sum(entry =>
+            Math.Max(0, entry.NewMaxHp - entry.PreviousMaxHp));
+        var maxHpLost = orderedHistory.Sum(entry =>
+            Math.Max(0, entry.PreviousMaxHp - entry.NewMaxHp));
+        var damageIcon = StatConceptGlossary.RenderHintedGlyph("damage");
+        var averageIcon = StatConceptGlossary.RenderHintedGlyph("average");
+        var floorIcon = StatConceptGlossary.RenderHintedGlyph("floor");
+        var combatIcon = StatConceptGlossary.RenderHintedGlyph("combat");
+        var maxHpIcon = StatConceptGlossary.RenderHintedGlyph("max_hp");
+        var maxHpGainedIcon = StatConceptGlossary.RenderHintedGlyph("max_hp_gained");
+        var body = new StringBuilder();
+
+        AppendStatRow(
+            body,
+            damageIcon,
+            "HP lost in combats",
+            FormatDecimal(healthStats.HpLostInCombats));
+        AppendStatRow(
+            body,
+            damageIcon,
+            "HP lost in events",
+            FormatDecimal(healthStats.HpLostInEvents));
+        AppendStatRow(
+            body,
+            $"{averageIcon} {floorIcon}",
+            "Avg HP lost per floor",
+            FormatDecimal(avgPerFloor));
+        AppendStatRow(
+            body,
+            $"{averageIcon} {combatIcon}",
+            "Avg HP lost per combat",
+            FormatDecimal(avgPerCombat));
+        AppendStatRow(
+            body,
+            maxHpGainedIcon,
+            "Max HP gained",
+            maxHpGained.ToString(CultureInfo.InvariantCulture));
+        AppendStatRow(
+            body,
+            maxHpIcon,
+            "Max HP lost",
+            maxHpLost.ToString(CultureInfo.InvariantCulture));
+
+        if (orderedHistory.Length > 0)
+        {
+            body.Append("\n[b]Max HP changes[/b]\n")
+                .Append(BuildBodyBBCode(orderedHistory));
+        }
+
+        return body.ToString();
     }
 
     internal static string BuildBodyBBCode(
@@ -65,4 +152,22 @@ internal static class MaxHpHistoryTooltip
 
         return body.ToString();
     }
+
+    private static void AppendStatRow(
+        StringBuilder body,
+        string icon,
+        string label,
+        string value)
+    {
+        if (body.Length > 0) body.Append('\n');
+        body.Append(icon)
+            .Append(' ')
+            .Append(label)
+            .Append("   [b]")
+            .Append(value)
+            .Append("[/b]");
+    }
+
+    private static string FormatDecimal(decimal value)
+        => value.ToString("0.##", CultureInfo.InvariantCulture);
 }

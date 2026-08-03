@@ -142,6 +142,7 @@ public static class CoreMain
         Patches.ViewStatsInjectorPatch.ReinjectIntoActiveDeckView();
         RunHistoryDeckViewer.ReinjectIntoActiveRunHistory();
         RunHistoryCampfireSummary.ReinjectIntoActiveRunHistory();
+        RunHistoryHpTooltip.ReinjectIntoActiveRunHistory();
         RunHistoryDeckViewer.RefreshAllArrowHotkeys();
         Patches.RelicBarFilterPatch.InitializeHooks();
         Patches.RelicBarFilterPatch.RefreshAll("core initialized");
@@ -186,6 +187,9 @@ public static class CoreMain
 
         try { RunHistoryCampfireSummary.Teardown(); }
         catch (Exception e) { Logger.Error($"Shutdown: run-history campfire summary teardown failed: {e}"); }
+
+        try { RunHistoryHpTooltip.Teardown(); }
+        catch (Exception e) { Logger.Error($"Shutdown: run-history HP tooltip teardown failed: {e}"); }
 
         try { SpireLensOptionsMenu.Destroy(); }
         catch (Exception e) { Logger.Error($"Shutdown: options menu teardown failed: {e}"); }

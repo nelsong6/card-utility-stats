@@ -541,7 +541,10 @@ public static class RunHistoryDisplayRunStatsContextPatch
             RunHistoryDeckViewer.RestoreVisibleArrowHotkeys(__instance);
             var player = __instance._selectedPlayerIcon?.Player;
             if (player != null)
+            {
                 RunHistoryCampfireSummary.Refresh(__instance, history, player);
+                RunHistoryHpTooltip.Refresh(__instance, player);
+            }
         });
     }
 }
@@ -561,10 +564,12 @@ public static class RunHistorySelectPlayerCampfireSummaryPatch
         {
             if (__instance._history != null && playerIcon?.Player != null)
             {
+                StatsTooltipPinManager.ClearPin();
                 RunHistoryCampfireSummary.Refresh(
                     __instance,
                     __instance._history,
                     playerIcon.Player);
+                RunHistoryHpTooltip.Refresh(__instance, playerIcon.Player);
             }
         });
     }
@@ -581,6 +586,7 @@ public static class RunHistoryHiddenStatsContextPatch
             RunHistoryDeckViewer.Close();
             RunHistoryDeckViewer.DisableArrowHotkeys(__instance);
             RunHistoryCampfireSummary.Remove(__instance);
+            RunHistoryHpTooltip.Remove(__instance);
             StatsTooltipPinManager.ClearPin();
             RunHistoryStatsContext.Clear();
         });

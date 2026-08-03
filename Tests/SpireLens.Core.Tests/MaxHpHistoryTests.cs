@@ -61,6 +61,47 @@ public class MaxHpHistoryTests
     }
 
     [Fact]
+    public void HpTooltip_ShowsLossRatesAndMaximumHpTotals()
+    {
+        var body = MaxHpHistoryTooltip.BuildBodyBBCode(
+            new RunHealthStats
+            {
+                HpLostInCombats = 30m,
+                HpLostInEvents = 10m,
+                Combats = 3,
+            },
+            floors: 8,
+            history:
+            [
+                new MaxHpRunHistoryEntry
+                {
+                    Sequence = 1,
+                    Floor = 3,
+                    SourceName = "Mango",
+                    PreviousMaxHp = 70,
+                    NewMaxHp = 84,
+                },
+                new MaxHpRunHistoryEntry
+                {
+                    Sequence = 2,
+                    Floor = 7,
+                    SourceName = "Drowning Beacon",
+                    PreviousMaxHp = 84,
+                    NewMaxHp = 77,
+                },
+            ]);
+
+        Assert.Contains("HP lost in combats   [b]30[/b]", body);
+        Assert.Contains("HP lost in events   [b]10[/b]", body);
+        Assert.Contains("Avg HP lost per floor   [b]5[/b]", body);
+        Assert.Contains("Avg HP lost per combat   [b]10[/b]", body);
+        Assert.Contains("Max HP gained   [b]14[/b]", body);
+        Assert.Contains("Max HP lost   [b]7[/b]", body);
+        Assert.Contains("70 → 84", body);
+        Assert.Contains("84 → 77", body);
+    }
+
+    [Fact]
     public void CombatPromotion_ReplacesCommittedHistoryWithPendingSnapshot()
     {
         var run = new RunData
@@ -102,5 +143,33 @@ public class MaxHpHistoryTests
         Assert.Equal(2, run.MaxHpHistory.Count);
         Assert.Equal(78, run.MaxHpHistory[1].NewMaxHp);
         Assert.NotSame(pending.MaxHpHistory, run.MaxHpHistory);
+    }
+
+    [Fact]
+    public void CombatPromotion_AddsHpLossAndZeroInclusiveCombatCount()
+    {
+        var run = new RunData
+        {
+            HealthStats = new RunHealthStats
+            {
+                HpLostInCombats = 10m,
+                HpLostInEvents = 4m,
+                Combats = 2,
+            },
+        };
+        var pending = new PendingCombat
+        {
+            HealthStats = new RunHealthStats
+            {
+                HpLostInCombats = 7m,
+                Combats = 1,
+            },
+        };
+
+        RunTracker.PromotePendingCombatIntoRun(pending, run);
+
+        Assert.Equal(17m, run.HealthStats.HpLostInCombats);
+        Assert.Equal(4m, run.HealthStats.HpLostInEvents);
+        Assert.Equal(3, run.HealthStats.Combats);
     }
 }

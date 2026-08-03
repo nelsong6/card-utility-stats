@@ -30,6 +30,7 @@ public static class HookAfterCurrentHpChangedPatch
             }
             else
             {
+                RunTracker.RecordRunHpLost(combatState, creature, -delta);
                 RunTracker.RecordWhisperingEarringHpLost(
                     combatState,
                     creature,

@@ -14,7 +14,7 @@ using MegaCrit.Sts2.Core.Nodes.Screens.RunHistoryScreen;
 namespace SpireLens.Core.Patches;
 
 /// <summary>
-/// Pins one card, relic, or campfire-summary tooltip set at a time. The
+/// Pins one card, relic, or run-history tooltip set at a time. The
 /// pinned set uses a dedicated native owner so the game's ordinary
 /// OnUnfocus/Remove lifecycle
 /// can run unchanged without dismissing it.
@@ -109,6 +109,12 @@ internal static class StatsTooltipPinManager
     {
         if (button != null)
             AttachTarget(button, subscribeToGuiInput: true);
+    }
+
+    public static void AttachRunHistoryHpLabel(Control? label)
+    {
+        if (label != null)
+            AttachTarget(label, subscribeToGuiInput: true);
     }
 
     public static void AttachRunHistoryTargets(NRunHistory? runHistory)
@@ -294,7 +300,8 @@ internal static class StatsTooltipPinManager
             && owner is not NCardHolder
             && owner is not NDeckHistoryEntry
             && owner is not NRelicBasicHolder
-            && owner is not RunHistoryCampfireButton)
+            && owner is not RunHistoryCampfireButton
+            && !RunHistoryHpTooltip.IsTarget(owner))
         {
             return false;
         }
@@ -678,6 +685,9 @@ internal static class StatsTooltipPinManager
             case RunHistoryCampfireButton button:
                 return button.TryBuildStatsTip(out tip);
 
+            case Control label when RunHistoryHpTooltip.IsTarget(label):
+                return RunHistoryHpTooltip.TryBuildStatsTip(label, out tip);
+
             default:
                 tip = default;
                 return false;
@@ -719,6 +729,10 @@ internal static class StatsTooltipPinManager
                 nativeHoverTips = Array.Empty<IHoverTip>();
                 return true;
 
+            case Control label when RunHistoryHpTooltip.IsTarget(label):
+                nativeHoverTips = Array.Empty<IHoverTip>();
+                return true;
+
             default:
                 nativeHoverTips = null!;
                 return false;
@@ -753,6 +767,12 @@ internal static class StatsTooltipPinManager
                 tipSet.SetAlignment(
                     button,
                     HoverTip.GetHoverTipAlignment(button));
+                break;
+
+            case Control label when RunHistoryHpTooltip.IsTarget(label):
+                tipSet.SetAlignment(
+                    label,
+                    HoverTip.GetHoverTipAlignment(label));
                 break;
         }
     }
@@ -797,6 +817,10 @@ internal static class StatsTooltipPinManager
             case RunHistoryCampfireButton button:
                 RunHistoryCampfireSummary.ShowTooltip(button);
                 break;
+
+            case Control label when RunHistoryHpTooltip.IsTarget(label):
+                RunHistoryHpTooltip.ShowTooltip(label);
+                break;
         }
     }
 
@@ -815,6 +839,8 @@ internal static class StatsTooltipPinManager
             NRelicBasicHolder holder when IsLive(holder.Relic)
                 => holder.Relic.Model.Id.ToString(),
             RunHistoryCampfireButton => "run-history-campfires",
+            Control label when RunHistoryHpTooltip.IsTarget(label)
+                => "run-history-hp",
             _ => target.Name,
         };
     }

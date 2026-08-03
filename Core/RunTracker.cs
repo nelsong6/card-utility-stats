@@ -376,6 +376,32 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Read-only current-run HP loss with the active combat overlaid. Returns
+    /// false outside a tracked run so the live top bar keeps its stock-only
+    /// hover behavior at the main menu.
+    /// </summary>
+    public static bool TryGetEffectiveHealthStats(
+        out RunHealthStats healthStats,
+        out int floors)
+    {
+        lock (_lock)
+        {
+            if (_currentRun == null)
+            {
+                healthStats = new RunHealthStats();
+                floors = 0;
+                return false;
+            }
+
+            healthStats = CloneHealthStats(_currentRun.HealthStats);
+            if (_pendingCombat != null)
+                MergeHealthStatsInto(healthStats, _pendingCombat.HealthStats);
+            floors = Math.Max(0, CurrentRunFloorLocked() ?? 0);
+            return true;
+        }
+    }
+
+    /// <summary>
     /// Resolve any CardModel (combat clone or deck original) to its canonical
     /// per-deck reference. Combat clones have <c>DeckVersion</c> set to the
     /// original deck card by <c>Player.PopulateCombatState</c>
@@ -1770,7 +1796,10 @@ public static class RunTracker
             // Fresh pending buffer for this combat. Anything accumulated from a prior
             // combat that didn't get a CombatEnded (shouldn't happen but defensive) is dropped.
             UnsubscribeCardOrbEventsLocked();
-            _pendingCombat = new PendingCombat();
+            _pendingCombat = new PendingCombat
+            {
+                HealthStats = { Combats = 1 },
+            };
             ResetCombatContextState();
             RecordPantographCombatStartForTrackedPlayerLocked(state);
             RecordPotionSlotRelicCombatStartForTrackedPlayerLocked(state);
@@ -1896,6 +1925,9 @@ public static class RunTracker
         if (pending.MaxHpHistory != null)
             run.MaxHpHistory = CloneMaxHpHistory(pending.MaxHpHistory);
 
+        run.HealthStats ??= new RunHealthStats();
+        MergeHealthStatsInto(run.HealthStats, pending.HealthStats);
+
         foreach (var (relicId, pendingRelicAgg) in pending.RelicAggregates)
         {
             if (!run.RelicAggregates.TryGetValue(relicId, out var runRelicAgg))
@@ -1922,6 +1954,17 @@ public static class RunTracker
         }
 
         MergeMetaStatsInto(run.MetaStats, pending.MetaStats);
+    }
+
+    internal static void MergeHealthStatsInto(
+        RunHealthStats target,
+        RunHealthStats? source)
+    {
+        if (source == null) return;
+
+        target.HpLostInCombats += source.HpLostInCombats;
+        target.HpLostInEvents += source.HpLostInEvents;
+        target.Combats += source.Combats;
     }
 
     /// <summary>
@@ -3844,6 +3887,54 @@ public static class RunTracker
         }
     }
 
+    /// <summary>
+    /// Records an observed current-HP decrease after the game's own clamping
+    /// and prevention hooks. Combat loss remains in the pending combat buffer;
+    /// event loss is durable immediately because it happens outside combat.
+    /// </summary>
+    public static void RecordRunHpLost(
+        ICombatState? combatState,
+        Creature? creature,
+        decimal amount)
+    {
+        if (creature?.Player == null || amount <= 0m) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(creature.Player)) return;
+                if (_currentRun == null && RunManager.Instance?.IsInProgress != true)
+                    return;
+
+                EnsureLazyCurrentRunLocked();
+                var isCombat = combatState != null
+                    || CombatManager.Instance?.IsInProgress == true
+                    || RunManager.Instance?.State?.CurrentRoom is CombatRoom;
+                if (isCombat)
+                {
+                    _pendingCombat ??= new PendingCombat
+                    {
+                        HealthStats = { Combats = 1 },
+                    };
+                    _pendingCombat.HealthStats.HpLostInCombats += amount;
+                }
+                else if (RunManager.Instance?.State?.CurrentRoom is EventRoom)
+                {
+                    _currentRun.HealthStats ??= new RunHealthStats();
+                    _currentRun.HealthStats.HpLostInEvents += amount;
+                    _currentRun.UpdatedAt = Now();
+                    RefreshCurrentRunMetadataLocked();
+                    SaveCurrentRun();
+                }
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordRunHpLost failed: {e.Message}");
+            }
+        }
+    }
+
     public static void AnnotateMaxHpChanged(
         Creature? creature,
         int previousMaxHp,
@@ -4070,6 +4161,16 @@ public static class RunTracker
             PreviousMaxHp = entry.PreviousMaxHp,
             NewMaxHp = entry.NewMaxHp,
         }).ToList() ?? new List<MaxHpRunHistoryEntry>();
+
+    private static RunHealthStats CloneHealthStats(RunHealthStats? source)
+        => source == null
+            ? new RunHealthStats()
+            : new RunHealthStats
+            {
+                HpLostInCombats = source.HpLostInCombats,
+                HpLostInEvents = source.HpLostInEvents,
+                Combats = source.Combats,
+            };
 
     private static PotionRunHistoryEntry ClonePotionHistoryEntry(PotionRunHistoryEntry source)
         => new()
@@ -31852,6 +31953,7 @@ internal class PendingCombat
     public List<CardEvent> CombatEvents { get; } = new();
     public List<PotionRunHistoryEntry>? PotionHistory { get; set; }
     public List<MaxHpRunHistoryEntry>? MaxHpHistory { get; set; }
+    public RunHealthStats HealthStats { get; set; } = new();
     public Dictionary<string, RelicAggregate> RelicAggregates { get; } = new();
     public Dictionary<string, EnemyAggregate> EnemyAggregates { get; } = new();
     public List<BlockChunk> PlayerBlockLedger { get; } = new();

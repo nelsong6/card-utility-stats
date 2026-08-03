@@ -65,6 +65,15 @@ public class RunData
     public List<MaxHpRunHistoryEntry> MaxHpHistory { get; set; } = new();
 
     /// <summary>
+    /// Observed current-HP loss grouped by the two non-recoverable run
+    /// contexts exposed in the HP tooltip. Combat loss is buffered until the
+    /// combat finishes; event loss is persisted when it occurs. Combats is a
+    /// zero-inclusive denominator, so the average includes fights where no HP
+    /// was lost.
+    /// </summary>
+    public RunHealthStats HealthStats { get; set; } = new();
+
+    /// <summary>
     /// Ordered provenance for the portion of the player's gold balance that
     /// still matters to source attribution. Old Coin seeds the first tracked
     /// chunk; ordinary balance before and after it is represented by chunks
@@ -129,6 +138,16 @@ public class RunData
     // _pendingCombat is null outside of active combat. See git history
     // on 2026-04-20 for the full PendingCombatSnapshot approach if we
     // ever decide to re-enable mid-combat persistence.)
+}
+
+/// <summary>
+/// Run-wide observed current-HP loss and its combat denominator.
+/// </summary>
+public class RunHealthStats
+{
+    public decimal HpLostInCombats { get; set; }
+    public decimal HpLostInEvents { get; set; }
+    public int Combats { get; set; }
 }
 
 /// <summary>
