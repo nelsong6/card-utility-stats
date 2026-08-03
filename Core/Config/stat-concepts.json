@@ -569,6 +569,16 @@
         "description": "An Uncommon relic or a count of Uncommon relics."
       }
     },
+    "shop": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/atlases/ui_atlas.sprites/map/icons/map_shop.tres"
+      },
+      "help": {
+        "label": "Merchant",
+        "description": "A merchant room or a value measured across merchant visits."
+      }
+    },
     "skill": {
       "display": {
         "type": "game_resource",
@@ -640,16 +650,6 @@
       "help": {
         "label": "Strength gained",
         "description": "Strength added by a card, relic, or other effect."
-      }
-    },
-    "shop": {
-      "display": {
-        "type": "game_resource",
-        "path": "res://images/atlases/ui_atlas.sprites/map/icons/map_shop.tres"
-      },
-      "help": {
-        "label": "Merchant",
-        "description": "A merchant room or a value measured across merchant visits."
       }
     },
     "swift": {

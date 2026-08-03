@@ -944,8 +944,14 @@ internal static class StatConceptGlossary
             var ids = properties.Select(property => property.Name).ToArray();
             if (!ids.SequenceEqual(ids.OrderBy(id => id, StringComparer.Ordinal), StringComparer.Ordinal))
             {
-                throw new InvalidOperationException(
-                    "Stat concept glossary concept IDs must be alphabetically sorted.");
+                // Ordering keeps the checked-in catalog reviewable, but it is
+                // not a runtime validity requirement. Do not turn one misplaced
+                // entry into fallback text for every stats icon.
+                CoreMain.Logger.Warn(
+                    "Stat concept glossary concept IDs are not alphabetically sorted; loading them in sorted order.");
+                properties = properties
+                    .OrderBy(property => property.Name, StringComparer.Ordinal)
+                    .ToArray();
             }
 
             var concepts = new Dictionary<string, StatConcept>(
