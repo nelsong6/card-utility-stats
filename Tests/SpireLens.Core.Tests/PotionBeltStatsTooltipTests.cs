@@ -98,31 +98,61 @@ public class PotionBeltStatsTooltipTests
                 TotalPotionDiscards = 1,
             });
 
-        Assert.Contains("Combat reward potions offered   [b]4[/b]", body);
-        Assert.Contains(
-            "Avg potions offered per floor   [b]0.88[/b]",
-            body);
-        var combatRewardRarityRows = body
-            .Split('\n')
-            .Where(row => row.Contains("Combat rewards   [b]"))
-            .ToArray();
-        Assert.Equal(3, combatRewardRarityRows.Length);
-        Assert.Contains(combatRewardRarityRows, row => row.Contains("Common potion:")
-            && row.Contains("Combat rewards   [b]1[/b]"));
-        Assert.Contains(combatRewardRarityRows, row => row.Contains("Uncommon potion:")
-            && row.Contains("Combat rewards   [b]1[/b]"));
-        Assert.Contains(combatRewardRarityRows, row => row.Contains("Rare potion:")
-            && row.Contains("Combat rewards   [b]2[/b]"));
-        Assert.DoesNotContain("Common combat reward potions", body);
-        Assert.DoesNotContain("Uncommon combat reward potions", body);
-        Assert.DoesNotContain("Rare combat reward potions", body);
-        Assert.Contains("Fruit Juices in combat rewards   [b]1[/b]", body);
-        Assert.Contains("Rejected potions at reward screen   [b]2[/b]", body);
-        Assert.Contains("Potions offered in events   [b]1[/b]", body);
-        Assert.Contains("Potions offered in shops   [b]2[/b]", body);
-        Assert.Contains("Potions purchased in shops   [b]1[/b]", body);
-        Assert.Contains("Total potion activations   [b]3[/b]", body);
-        Assert.Contains("Total potion discards   [b]1[/b]", body);
+        var rows = body.Split('\n');
+        Assert.Equal(12, rows.Length);
+
+        Assert.Contains(rows, row => row.Contains("Combat:")
+            && row.Contains("Offered:")
+            && row.Contains("Potion:")
+            && row.Contains("Offered   [b]4[/b]"));
+        Assert.Contains(rows, row => row.Contains("Average:")
+            && row.Contains("Floor:")
+            && row.Contains("Offered:")
+            && row.Contains("Potion:")
+            && row.Contains("Offered   [b]0.88[/b]"));
+        Assert.Contains(rows, row => row.Contains("Combat:")
+            && row.Contains("Offered:")
+            && row.Contains("Common potion:")
+            && row.Contains("Offered   [b]1[/b]"));
+        Assert.Contains(rows, row => row.Contains("Combat:")
+            && row.Contains("Offered:")
+            && row.Contains("Uncommon potion:")
+            && row.Contains("Offered   [b]1[/b]"));
+        Assert.Contains(rows, row => row.Contains("Combat:")
+            && row.Contains("Offered:")
+            && row.Contains("Rare potion:")
+            && row.Contains("Offered   [b]2[/b]"));
+        Assert.Contains(rows, row => row.Contains("Combat:")
+            && row.Contains("Offered:")
+            && row.Contains("Fruit Juice:")
+            && row.Contains("Offered   [b]1[/b]"));
+        Assert.Contains(rows, row => row.Contains("Offered:")
+            && row.Contains("Wasted:")
+            && row.Contains("Potion:")
+            && row.Contains("Rejected   [b]2[/b]"));
+        Assert.Contains(rows, row => row.Contains("Unknown room:")
+            && row.Contains("Offered:")
+            && row.Contains("Potion:")
+            && row.Contains("Offered   [b]1[/b]"));
+        Assert.Contains(rows, row => row.Contains("Merchant:")
+            && row.Contains("Offered:")
+            && row.Contains("Potion:")
+            && row.Contains("Offered   [b]2[/b]"));
+        Assert.Contains(rows, row => row.Contains("Merchant:")
+            && row.Contains("Taken:")
+            && row.Contains("Potion:")
+            && row.Contains("Purchased   [b]1[/b]"));
+        Assert.Contains(rows, row => row.Contains("Activation:")
+            && row.Contains("Potion:")
+            && row.Contains("Activated   [b]3[/b]"));
+        Assert.Contains(rows, row => row.Contains("Wasted:")
+            && row.Contains("Potion:")
+            && row.Contains("Discarded   [b]1[/b]"));
+
+        Assert.DoesNotContain("combat reward potions", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("potions offered", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("potion activations", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("potion discards", body, StringComparison.OrdinalIgnoreCase);
     }
 
     private static PotionRunHistoryEntry Entry(

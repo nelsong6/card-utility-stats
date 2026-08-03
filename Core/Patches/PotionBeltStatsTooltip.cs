@@ -116,7 +116,7 @@ internal static class PotionBeltStatsTooltip
         var floorIcon = StatConceptGlossary.RenderHintedGlyph("floor");
         var combatIcon = StatConceptGlossary.RenderHintedGlyph("combat");
         var eventIcon = StatConceptGlossary.RenderHintedGlyph("unknown_room");
-        var goldIcon = StatConceptGlossary.RenderHintedGlyph("gold");
+        var shopIcon = StatConceptGlossary.RenderHintedGlyph("shop");
         var activationIcon = StatConceptGlossary.RenderHintedGlyph("activation");
         var wastedIcon = StatConceptGlossary.RenderHintedGlyph("wasted");
         var body = new StringBuilder();
@@ -124,62 +124,62 @@ internal static class PotionBeltStatsTooltip
         AppendRow(
             body,
             $"{combatIcon} {offeredIcon} {potionIcon}",
-            "Combat reward potions offered",
+            "Offered",
             summary.CombatRewardPotionsOffered);
         AppendRow(
             body,
-            $"{averageIcon} {floorIcon} {potionIcon}",
-            "Avg potions offered per floor",
+            $"{averageIcon} {floorIcon} {offeredIcon} {potionIcon}",
+            "Offered",
             Divide(summary.TotalPotionsOffered, summary.Floors));
         AppendRow(
             body,
-            commonIcon,
-            "Combat rewards",
+            $"{combatIcon} {offeredIcon} {commonIcon}",
+            "Offered",
             summary.CommonCombatRewardPotions);
         AppendRow(
             body,
-            uncommonIcon,
-            "Combat rewards",
+            $"{combatIcon} {offeredIcon} {uncommonIcon}",
+            "Offered",
             summary.UncommonCombatRewardPotions);
         AppendRow(
             body,
-            rareIcon,
-            "Combat rewards",
+            $"{combatIcon} {offeredIcon} {rareIcon}",
+            "Offered",
             summary.RareCombatRewardPotions);
         AppendRow(
             body,
-            fruitJuiceIcon,
-            "Fruit Juices in combat rewards",
+            $"{combatIcon} {offeredIcon} {fruitJuiceIcon}",
+            "Offered",
             summary.FruitJuicesInCombatRewards);
         AppendRow(
             body,
-            $"{wastedIcon} {potionIcon}",
-            "Rejected potions at reward screen",
+            $"{offeredIcon} {wastedIcon} {potionIcon}",
+            "Rejected",
             summary.RejectedPotionsAtRewardScreen);
         AppendRow(
             body,
             $"{eventIcon} {offeredIcon} {potionIcon}",
-            "Potions offered in events",
+            "Offered",
             summary.PotionsOfferedInEvents);
         AppendRow(
             body,
-            $"{goldIcon} {offeredIcon} {potionIcon}",
-            "Potions offered in shops",
+            $"{shopIcon} {offeredIcon} {potionIcon}",
+            "Offered",
             summary.PotionsOfferedInShops);
         AppendRow(
             body,
-            $"{goldIcon} {takenIcon} {potionIcon}",
-            "Potions purchased in shops",
+            $"{shopIcon} {takenIcon} {potionIcon}",
+            "Purchased",
             summary.PotionsPurchasedInShops);
         AppendRow(
             body,
             $"{activationIcon} {potionIcon}",
-            "Total potion activations",
+            "Activated",
             summary.TotalPotionActivations);
         AppendRow(
             body,
             $"{wastedIcon} {potionIcon}",
-            "Total potion discards",
+            "Discarded",
             summary.TotalPotionDiscards);
 
         return body.ToString();
