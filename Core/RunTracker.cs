@@ -29,6 +29,15 @@ using MegaCrit.Sts2.Core.Runs;
 
 namespace SpireLens.Core;
 
+internal enum RunTimeCategory
+{
+    None,
+    Combat,
+    RewardScreen,
+    Event,
+    Map,
+}
+
 /// <summary>
 /// Tracks the current run's stats in memory and commits them to disk at
 /// combat boundaries.
@@ -109,6 +118,7 @@ public static class RunTracker
     private static RunData? _currentRun;
     private static RunData? _lastEndedRun;
     private static PendingCombat? _pendingCombat;
+    private static long _unsavedRunTimeSeconds;
     private static CardPlay? _currentPlayerCardPlay;
     private static CardPlay? _recentCompletedPlayerCardPlay;
     private static int _recentCompletedPlayerCardPlayHistoryCount;
@@ -480,6 +490,144 @@ public static class RunTracker
             return true;
         }
     }
+
+    /// <summary>
+    /// Read-only timer summary with the active combat overlaid. Sampling is
+    /// triggered by the timer UI immediately before this accessor so the live
+    /// page stays current to the same one-second precision as the stock clock.
+    /// </summary>
+    public static bool TryGetEffectiveRunTimeStats(out RunTimeStats timeStats)
+    {
+        lock (_lock)
+        {
+            if (_currentRun == null)
+            {
+                timeStats = new RunTimeStats();
+                return false;
+            }
+
+            timeStats = CloneRunTimeStats(_currentRun.TimeStats);
+            if (_pendingCombat != null)
+                MergeRunTimeStatsInto(timeStats, _pendingCombat.TimeStats);
+            return true;
+        }
+    }
+
+    internal static void SampleRunTimeStats(
+        RunTimeCategory currentCategory,
+        long currentRunTime,
+        bool saveOutsideCombat = true)
+    {
+        lock (_lock)
+        {
+            SampleRunTimeStatsLocked(
+                currentCategory,
+                currentRunTime,
+                saveOutsideCombat);
+        }
+    }
+
+    internal static void FlushRunTimeStats()
+    {
+        lock (_lock)
+        {
+            if (_currentRun == null || _unsavedRunTimeSeconds <= 0) return;
+
+            _currentRun.UpdatedAt = Now();
+            SaveCurrentRun();
+            _unsavedRunTimeSeconds = 0;
+        }
+    }
+
+    private static void SampleRunTimeStatsLocked(
+        RunTimeCategory currentCategory,
+        long currentRunTime,
+        bool saveOutsideCombat)
+    {
+        if (_currentRun == null) return;
+
+        _currentRun.TimeStats ??= new RunTimeStats();
+        var cursor = _currentRun.TimeStats;
+        currentRunTime = Math.Max(0L, currentRunTime);
+
+        if (!cursor.LastObservedRunTime.HasValue
+            || currentRunTime < cursor.LastObservedRunTime.Value)
+        {
+            cursor.LastObservedRunTime = currentRunTime;
+            cursor.ActiveCategory = RunTimeCategoryKey(currentCategory);
+            return;
+        }
+
+        var previousCategory = ParseRunTimeCategory(cursor.ActiveCategory);
+        var elapsed = currentRunTime - cursor.LastObservedRunTime.Value;
+        var addedOutsideCombat = false;
+        if (elapsed > 0)
+        {
+            switch (previousCategory)
+            {
+                case RunTimeCategory.Combat when _pendingCombat != null:
+                    _pendingCombat.TimeStats.CombatSeconds += elapsed;
+                    break;
+                case RunTimeCategory.RewardScreen:
+                    cursor.RewardScreenSeconds += elapsed;
+                    addedOutsideCombat = true;
+                    break;
+                case RunTimeCategory.Event:
+                    cursor.EventSeconds += elapsed;
+                    addedOutsideCombat = true;
+                    break;
+                case RunTimeCategory.Map:
+                    cursor.MapSeconds += elapsed;
+                    addedOutsideCombat = true;
+                    break;
+            }
+        }
+
+        var categoryChanged = previousCategory != currentCategory;
+        cursor.LastObservedRunTime = currentRunTime;
+        cursor.ActiveCategory = RunTimeCategoryKey(currentCategory);
+
+        if (!addedOutsideCombat || !saveOutsideCombat) return;
+
+        _unsavedRunTimeSeconds += elapsed;
+        if (categoryChanged || _unsavedRunTimeSeconds >= 30)
+        {
+            _currentRun.UpdatedAt = Now();
+            SaveCurrentRun();
+            _unsavedRunTimeSeconds = 0;
+        }
+    }
+
+    private static long CurrentGameRunTimeSeconds()
+    {
+        try
+        {
+            return Math.Max(0L, RunManager.Instance.RunTime);
+        }
+        catch
+        {
+            return 0L;
+        }
+    }
+
+    private static void FinalizePendingCombatRunTimeLocked()
+    {
+        if (_pendingCombat == null) return;
+
+        _pendingCombat.TimeStats.Combats = 1;
+        var player = GetTrackedRunPlayerLocked();
+        _pendingCombat.TimeStats.CombatTurns = Math.Max(
+            0,
+            player?.PlayerCombatState?.TurnNumber ?? 0);
+    }
+
+    private static string? RunTimeCategoryKey(RunTimeCategory category)
+        => category == RunTimeCategory.None ? null : category.ToString();
+
+    private static RunTimeCategory ParseRunTimeCategory(string? category)
+        => Enum.TryParse<RunTimeCategory>(category, out var parsed)
+            ? parsed
+            : RunTimeCategory.None;
 
     /// <summary>
     /// Resolve any CardModel (combat clone or deck original) to its canonical
@@ -1461,6 +1609,8 @@ public static class RunTracker
     private static void AdoptRunLocked(RunData run, RunState? runState, string context, bool repairAggregates)
     {
         _currentRun = run;
+        _currentRun.TimeStats ??= new RunTimeStats();
+        _unsavedRunTimeSeconds = 0;
         // Re-derive the tracked local player on every adopt/resume/continue
         // (hot-reload, main-menu Continue, continue-after-restart).
         ResolveTrackedPlayerLocked(runState);
@@ -1811,6 +1961,7 @@ public static class RunTracker
                 // RunStarted dispatch exactly when the first read failed.
                 GameStartTime = gameStartTime != 0 ? gameStartTime : null,
             };
+            _unsavedRunTimeSeconds = 0;
             UnsubscribeCardOrbEventsLocked();
             _pendingCombat = null;
 
@@ -1844,6 +1995,13 @@ public static class RunTracker
         lock (_lock)
         {
             if (_currentRun == null) return;
+
+            SampleRunTimeStatsLocked(
+                RunTimeCategory.None,
+                CurrentGameRunTimeSeconds(),
+                saveOutsideCombat: false);
+            if (_pendingCombat != null)
+                FinalizePendingCombatRunTimeLocked();
 
             // A loss reaches RunManager.OnEnded synchronously from the killing
             // action; the fatal combat's CombatEnded only fires LATER via
@@ -1879,6 +2037,7 @@ public static class RunTracker
             _currentRun = null;
             UnsubscribeCardOrbEventsLocked();
             _pendingCombat = null;
+            _unsavedRunTimeSeconds = 0;
             ResetCombatContextState();
             ResetRewardContextState();
             ResetDeckViewCachesLocked();
@@ -1893,6 +2052,16 @@ public static class RunTracker
         lock (_lock)
         {
             RuntimeOptionsProvider.Refresh();
+            EnsureLazyCurrentRunLocked();
+            SampleRunTimeStatsLocked(
+                RunTimeCategory.Combat,
+                CurrentGameRunTimeSeconds(),
+                saveOutsideCombat: true);
+            // Persist the category cursor before creating the pending combat.
+            // This cursor contains no combat result, but it prevents a
+            // Continue or Core reload from assigning early combat seconds to
+            // the map/event surface that preceded the fight.
+            SaveCurrentRun();
             // Fresh pending buffer for this combat. Anything accumulated from a prior
             // combat that didn't get a CombatEnded (shouldn't happen but defensive) is dropped.
             UnsubscribeCardOrbEventsLocked();
@@ -1935,6 +2104,12 @@ public static class RunTracker
             // (e.g. mod loaded mid-run), create a minimal run record now so we
             // don't drop the combat's data.
             EnsureLazyCurrentRunLocked();
+
+            SampleRunTimeStatsLocked(
+                RunTimeCategory.RewardScreen,
+                CurrentGameRunTimeSeconds(),
+                saveOutsideCombat: false);
+            FinalizePendingCombatRunTimeLocked();
 
             _pendingCombat.MapLegendCombatWon = true;
 
@@ -2039,6 +2214,9 @@ public static class RunTracker
         run.MapLegendStats ??= new RunMapLegendStats();
         MergeMapLegendStatsInto(run.MapLegendStats, pending.MapLegendStats);
 
+        run.TimeStats ??= new RunTimeStats();
+        MergeRunTimeStatsInto(run.TimeStats, pending.TimeStats);
+
         foreach (var (relicId, pendingRelicAgg) in pending.RelicAggregates)
         {
             if (!run.RelicAggregates.TryGetValue(relicId, out var runRelicAgg))
@@ -2097,6 +2275,20 @@ public static class RunTracker
             target.LastShopFloorCounted = source.LastShopFloorCounted;
         if (source.LastEventFloorCounted.HasValue)
             target.LastEventFloorCounted = source.LastEventFloorCounted;
+    }
+
+    internal static void MergeRunTimeStatsInto(
+        RunTimeStats target,
+        RunTimeStats? source)
+    {
+        if (source == null) return;
+
+        target.CombatSeconds += source.CombatSeconds;
+        target.RewardScreenSeconds += source.RewardScreenSeconds;
+        target.EventSeconds += source.EventSeconds;
+        target.MapSeconds += source.MapSeconds;
+        target.Combats += source.Combats;
+        target.CombatTurns += source.CombatTurns;
     }
 
     internal static void MergeMapLegendStatsInto(
@@ -4521,6 +4713,21 @@ public static class RunTracker
                 Combats = source.Combats,
                 LastShopFloorCounted = source.LastShopFloorCounted,
                 LastEventFloorCounted = source.LastEventFloorCounted,
+            };
+
+    private static RunTimeStats CloneRunTimeStats(RunTimeStats? source)
+        => source == null
+            ? new RunTimeStats()
+            : new RunTimeStats
+            {
+                CombatSeconds = source.CombatSeconds,
+                RewardScreenSeconds = source.RewardScreenSeconds,
+                EventSeconds = source.EventSeconds,
+                MapSeconds = source.MapSeconds,
+                Combats = source.Combats,
+                CombatTurns = source.CombatTurns,
+                LastObservedRunTime = source.LastObservedRunTime,
+                ActiveCategory = source.ActiveCategory,
             };
 
     private static RunMapLegendStats CloneMapLegendStats(RunMapLegendStats? source)
@@ -32833,6 +33040,7 @@ internal class PendingCombat
     public RunHealthStats HealthStats { get; set; } = new();
     public RunGoldStats GoldStats { get; set; } = new();
     public RunMapLegendStats MapLegendStats { get; set; } = new();
+    public RunTimeStats TimeStats { get; set; } = new();
     public string? MapLegendCategory { get; set; }
     public bool MapLegendCombatWon { get; set; }
     public bool MapLegendCombatFinalized { get; set; }

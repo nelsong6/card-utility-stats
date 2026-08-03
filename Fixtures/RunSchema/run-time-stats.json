@@ -1,0 +1,33 @@
+{
+  "run_id": "fixture-run-time-stats",
+  "started_at": "2026-08-02T22:00:00.0000000Z",
+  "updated_at": "2026-08-02T23:00:00.0000000Z",
+  "character": "CHARACTER.IRONCLAD",
+  "ascension": 7,
+  "floor_reached": 24,
+  "outcome": "in_progress",
+  "game_start_time": 1785708002,
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {},
+  "potion_history": [],
+  "max_hp_history": [],
+  "health_stats": {},
+  "gold_stats": {},
+  "map_legend_stats": {},
+  "time_stats": {
+    "combat_seconds": 742,
+    "reward_screen_seconds": 121,
+    "event_seconds": 318,
+    "map_seconds": 205,
+    "combats": 12,
+    "combat_turns": 47,
+    "last_observed_run_time": 1820,
+    "active_category": "Map"
+  },
+  "gold_attribution_ledger": [],
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

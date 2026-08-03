@@ -89,6 +89,15 @@ public class RunData
     public RunMapLegendStats MapLegendStats { get; set; } = new();
 
     /// <summary>
+    /// Run-time seconds attributed from the game's own pause-aware run clock.
+    /// Combat time is committed only with its completed combat; reward, event,
+    /// and map time are accumulated while their native surface is active.
+    /// The sampling cursor is persisted so Continue and Core hot reload can
+    /// resume without counting the same interval twice.
+    /// </summary>
+    public RunTimeStats TimeStats { get; set; } = new();
+
+    /// <summary>
     /// Ordered provenance for the portion of the player's gold balance that
     /// still matters to source attribution. Old Coin seeds the first tracked
     /// chunk; ordinary balance before and after it is represented by chunks
@@ -181,6 +190,29 @@ public class RunGoldStats
     public int Combats { get; set; }
     public int? LastShopFloorCounted { get; set; }
     public int? LastEventFloorCounted { get; set; }
+}
+
+/// <summary>
+/// Run-wide time spent on the timer's tracked gameplay surfaces. All elapsed
+/// values use whole seconds because RunManager.RunTime is the authoritative
+/// pause-aware clock shown by the stock timer.
+/// </summary>
+public class RunTimeStats
+{
+    public long CombatSeconds { get; set; }
+    public long RewardScreenSeconds { get; set; }
+    public long EventSeconds { get; set; }
+    public long MapSeconds { get; set; }
+    public int Combats { get; set; }
+    public int CombatTurns { get; set; }
+
+    /// <summary>
+    /// Internal resumable sampling cursor. These fields are presentation-
+    /// neutral and additive; older run files simply begin sampling when first
+    /// observed by a build that understands timer stats.
+    /// </summary>
+    public long? LastObservedRunTime { get; set; }
+    public string? ActiveCategory { get; set; }
 }
 
 /// <summary>

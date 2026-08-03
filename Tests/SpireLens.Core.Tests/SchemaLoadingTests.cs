@@ -5443,6 +5443,39 @@ public class SchemaLoadingTests
         Assert.Equal("Elite", run.MapLegendStats.CurrentPointType);
     }
 
+    [Fact]
+    public void HistoricalLoad_AcceptsRunTimeStatsFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("run-time-stats.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertRunTimeStatsFixture(loaded.Data);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsRunTimeStatsFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("run-time-stats.json"));
+
+        Assert.NotNull(resumed);
+        AssertRunTimeStatsFixture(resumed!);
+    }
+
+    private static void AssertRunTimeStatsFixture(RunData run)
+    {
+        Assert.Equal(742, run.TimeStats.CombatSeconds);
+        Assert.Equal(121, run.TimeStats.RewardScreenSeconds);
+        Assert.Equal(318, run.TimeStats.EventSeconds);
+        Assert.Equal(205, run.TimeStats.MapSeconds);
+        Assert.Equal(12, run.TimeStats.Combats);
+        Assert.Equal(47, run.TimeStats.CombatTurns);
+        Assert.Equal(1820, run.TimeStats.LastObservedRunTime);
+        Assert.Equal("Map", run.TimeStats.ActiveCategory);
+    }
+
     private static void AssertMaxHpRunHistoryFixture(RunData run)
     {
         Assert.Equal(2, run.MaxHpHistory.Count);

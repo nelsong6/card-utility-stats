@@ -123,6 +123,12 @@ internal static class StatsTooltipPinManager
             AttachTarget(label, subscribeToGuiInput: true);
     }
 
+    public static void AttachRunTimerStatsTarget(Control? target)
+    {
+        if (target != null)
+            AttachTarget(target, subscribeToGuiInput: true);
+    }
+
     public static void AttachRunHistoryTargets(NRunHistory? runHistory)
     {
         if (!IsLive(runHistory)) return;
@@ -308,7 +314,8 @@ internal static class StatsTooltipPinManager
             && owner is not NRelicBasicHolder
             && owner is not RunHistoryCampfireButton
             && !RunHistoryHpTooltip.IsTarget(owner)
-            && !RunHistoryGoldTooltip.IsTarget(owner))
+            && !RunHistoryGoldTooltip.IsTarget(owner)
+            && !RunTimerStatsTooltip.IsTarget(owner))
         {
             return false;
         }
@@ -698,6 +705,9 @@ internal static class StatsTooltipPinManager
             case Control label when RunHistoryGoldTooltip.IsTarget(label):
                 return RunHistoryGoldTooltip.TryBuildStatsTip(label, out tip);
 
+            case Control timer when RunTimerStatsTooltip.IsTarget(timer):
+                return RunTimerStatsTooltip.TryBuildStatsTip(timer, out tip);
+
             default:
                 tip = default;
                 return false;
@@ -747,6 +757,10 @@ internal static class StatsTooltipPinManager
                 nativeHoverTips = Array.Empty<IHoverTip>();
                 return true;
 
+            case Control timer when RunTimerStatsTooltip.IsTarget(timer):
+                nativeHoverTips = Array.Empty<IHoverTip>();
+                return true;
+
             default:
                 nativeHoverTips = null!;
                 return false;
@@ -793,6 +807,12 @@ internal static class StatsTooltipPinManager
                 tipSet.SetAlignment(
                     label,
                     HoverTip.GetHoverTipAlignment(label));
+                break;
+
+            case Control timer when RunTimerStatsTooltip.IsTarget(timer):
+                tipSet.SetAlignment(
+                    timer,
+                    HoverTip.GetHoverTipAlignment(timer));
                 break;
         }
     }
@@ -845,6 +865,10 @@ internal static class StatsTooltipPinManager
             case Control label when RunHistoryGoldTooltip.IsTarget(label):
                 RunHistoryGoldTooltip.ShowTooltip(label);
                 break;
+
+            case Control timer when RunTimerStatsTooltip.IsTarget(timer):
+                RunTimerStatsTooltip.ShowTooltip(timer);
+                break;
         }
     }
 
@@ -867,6 +891,8 @@ internal static class StatsTooltipPinManager
                 => "run-history-hp",
             Control label when RunHistoryGoldTooltip.IsTarget(label)
                 => "run-history-gold",
+            Control timer when RunTimerStatsTooltip.IsTarget(timer)
+                => "run-timer-stats",
             _ => target.Name,
         };
     }

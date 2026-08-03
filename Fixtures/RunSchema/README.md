@@ -538,6 +538,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `map-legend-run-stats.json`
   Adds per-icon map visit pacing, unknown-site resolutions, combat/elite
   outcomes, and room-attributed HP, gold, card, upgrade, and relic results.
+- `run-time-stats.json`
+  Adds pause-aware time spent in combats, reward screens, events, and the map,
+  plus completed-combat and turn denominators and the resumable sample cursor.
 - `eternal-feather-campfire-healing-run.json`
   Adds Eternal Feather's observed restored HP per campfire floor so native
   combined rest-site healing can be split by source in run history.

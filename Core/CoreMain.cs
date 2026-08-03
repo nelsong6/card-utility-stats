@@ -135,6 +135,8 @@ public static class CoreMain
         // No-op if we're not mid-run (main menu, between runs) — RunStarted
         // will handle fresh setup when the next run begins.
         RunTracker.TryResumeActiveRun();
+        RunTimerStatsTooltip.Initialize();
+        RunTimeStatsTracker.Initialize();
         // Re-inject the ViewStats checkbox if the deck view is currently
         // open — Shutdown just freed the injected clone, so without this
         // the user would see the checkbox disappear until they close and
@@ -144,6 +146,7 @@ public static class CoreMain
         RunHistoryCampfireSummary.ReinjectIntoActiveRunHistory();
         RunHistoryHpTooltip.ReinjectIntoActiveRunHistory();
         RunHistoryGoldTooltip.ReinjectIntoActiveRunHistory();
+        RunTimerStatsTooltip.ReinjectIntoActiveRunHistory();
         RunHistoryDeckViewer.RefreshAllArrowHotkeys();
         Patches.RelicBarFilterPatch.InitializeHooks();
         Patches.RelicBarFilterPatch.RefreshAll("core initialized");
@@ -194,6 +197,12 @@ public static class CoreMain
 
         try { RunHistoryGoldTooltip.Teardown(); }
         catch (Exception e) { Logger.Error($"Shutdown: run-history gold tooltip teardown failed: {e}"); }
+
+        try { RunTimeStatsTracker.Shutdown(); }
+        catch (Exception e) { Logger.Error($"Shutdown: run timer tracker teardown failed: {e}"); }
+
+        try { RunTimerStatsTooltip.Shutdown(); }
+        catch (Exception e) { Logger.Error($"Shutdown: run timer tooltip teardown failed: {e}"); }
 
         try { SpireLensOptionsMenu.Destroy(); }
         catch (Exception e) { Logger.Error($"Shutdown: options menu teardown failed: {e}"); }
