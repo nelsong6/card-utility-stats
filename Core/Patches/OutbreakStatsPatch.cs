@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Combat;
@@ -18,9 +19,12 @@ namespace SpireLens.Core.Patches;
 /// Outbreak explicitly calls PoisonPower.Trigger while its physical card play
 /// is resolving. This window excludes ordinary side-turn Poison triggers.
 /// </summary>
-[HarmonyPatch(typeof(PoisonPower), nameof(PoisonPower.Trigger))]
+[HarmonyPatch]
 internal static class OutbreakPoisonPowerTriggerStatsPatch
 {
+    private static MethodBase? TargetMethod()
+        => AccessTools.Method(typeof(PoisonPower), "Trigger", Type.EmptyTypes);
+
     [HarmonyPrefix]
     public static void Prefix(
         PoisonPower __instance,

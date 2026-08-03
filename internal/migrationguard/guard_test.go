@@ -33,9 +33,10 @@ func TestRetiredHarnessDirsAreGone(t *testing.T) {
 	}
 }
 
-// No shell/pwsh harness file may reappear under the retired locations, and the
-// repo must carry no .ps1 at all (the only pwsh was the retired harness; the
-// external spire-lens-mcp build.ps1 lives in another repo).
+// No shell/pwsh harness file may reappear under the retired locations. The
+// repository still intentionally carries unrelated maintenance PowerShell in
+// scripts/ (Workshop publishing, release notes, and catalog syncing), so the
+// guard must remain scoped to the retired harness directories named above.
 func TestNoRetiredHarnessFiles(t *testing.T) {
 	root := repoRoot(t)
 	_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
@@ -46,7 +47,7 @@ func TestNoRetiredHarnessFiles(t *testing.T) {
 		if strings.HasPrefix(rel, ".git"+string(os.PathSeparator)) || strings.Contains(rel, "node_modules") {
 			return nil
 		}
-		if strings.HasSuffix(path, ".ps1") {
+		if strings.HasPrefix(rel, ".github"+string(os.PathSeparator)+"scripts"+string(os.PathSeparator)) && strings.HasSuffix(path, ".ps1") {
 			t.Errorf("retired PowerShell harness file reintroduced: %s", rel)
 		}
 		if strings.HasPrefix(rel, "scripts"+string(os.PathSeparator)+"glimmung-native") && strings.HasSuffix(path, ".sh") {
