@@ -4,6 +4,7 @@ using System.IO;
 using System.Threading.Tasks;
 using Godot;
 using MegaCrit.Sts2.Core.HoverTips;
+using MegaCrit.Sts2.Core.Localization;
 using MegaCrit.Sts2.Core.Nodes.Cards;
 using MegaCrit.Sts2.Core.Nodes.Cards.Holders;
 using MegaCrit.Sts2.Core.Nodes.HoverTips;
@@ -11,6 +12,7 @@ using MegaCrit.Sts2.Core.Nodes.Relics;
 using MegaCrit.Sts2.Core.Nodes.Screens;
 using MegaCrit.Sts2.Core.Nodes.Screens.RelicCollection;
 using MegaCrit.Sts2.Core.Nodes.Screens.RunHistoryScreen;
+using MegaCrit.sts2.Core.Nodes.TopBar;
 
 namespace SpireLens.Core.Patches;
 
@@ -126,6 +128,12 @@ internal static class StatsTooltipPinManager
     {
         if (label != null)
             AttachTarget(label, subscribeToGuiInput: true);
+    }
+
+    public static void AttachTopBarRunStatsTarget(Control? target)
+    {
+        if (target is NTopBarHp or NTopBarGold)
+            AttachTarget(target, subscribeToGuiInput: true);
     }
 
     public static void AttachRunTimerStatsTarget(Control? target)
@@ -345,6 +353,8 @@ internal static class StatsTooltipPinManager
             && owner is not NDeckHistoryEntry
             && owner is not NRelicBasicHolder
             && owner is not RunHistoryCampfireButton
+            && owner is not NTopBarHp
+            && owner is not NTopBarGold
             && !RunHistoryHpTooltip.IsTarget(owner)
             && !RunHistoryGoldTooltip.IsTarget(owner)
             && !RunTimerStatsTooltip.IsTarget(owner))
@@ -832,6 +842,12 @@ internal static class StatsTooltipPinManager
             case RunHistoryCampfireButton button:
                 return button.TryBuildStatsTip(out tip);
 
+            case NTopBarHp hp:
+                return MaxHpHistoryTooltip.TryBuildNativeHoverTip(hp, out tip);
+
+            case NTopBarGold gold:
+                return GoldStatsTooltip.TryBuildNativeHoverTip(gold, out tip);
+
             case Control label when RunHistoryHpTooltip.IsTarget(label):
                 return RunHistoryHpTooltip.TryBuildStatsTip(label, out tip);
 
@@ -882,6 +898,20 @@ internal static class StatsTooltipPinManager
                 nativeHoverTips = Array.Empty<IHoverTip>();
                 return true;
 
+            case NTopBarHp:
+                nativeHoverTips = new IHoverTip[]
+                {
+                    CreateStockTopBarTip("HIT_POINTS"),
+                };
+                return true;
+
+            case NTopBarGold:
+                nativeHoverTips = new IHoverTip[]
+                {
+                    CreateStockTopBarTip("MONEY_POUCH"),
+                };
+                return true;
+
             case Control label when RunHistoryHpTooltip.IsTarget(label):
                 nativeHoverTips = Array.Empty<IHoverTip>();
                 return true;
@@ -928,6 +958,10 @@ internal static class StatsTooltipPinManager
                 tipSet.SetAlignment(
                     button,
                     HoverTip.GetHoverTipAlignment(button));
+                break;
+
+            case NTopBarHp or NTopBarGold:
+                AlignTopBarTipSet(target, tipSet);
                 break;
 
             case Control label when RunHistoryHpTooltip.IsTarget(label):
@@ -989,6 +1023,12 @@ internal static class StatsTooltipPinManager
                 RunHistoryCampfireSummary.ShowTooltip(button);
                 break;
 
+            case NTopBarHp or NTopBarGold:
+                var tipSet = NHoverTipSet.CreateAndShow(target, nativeHoverTips);
+                if (tipSet != null)
+                    AlignTopBarTipSet(target, tipSet);
+                break;
+
             case Control label when RunHistoryHpTooltip.IsTarget(label):
                 RunHistoryHpTooltip.ShowTooltip(label);
                 break;
@@ -1018,6 +1058,8 @@ internal static class StatsTooltipPinManager
             NRelicBasicHolder holder when IsLive(holder.Relic)
                 => holder.Relic.Model.Id.ToString(),
             RunHistoryCampfireButton => "run-history-campfires",
+            NTopBarHp => "live-run-hp",
+            NTopBarGold => "live-run-gold",
             Control label when RunHistoryHpTooltip.IsTarget(label)
                 => "run-history-hp",
             Control label when RunHistoryGoldTooltip.IsTarget(label)
@@ -1026,6 +1068,21 @@ internal static class StatsTooltipPinManager
                 => "run-timer-stats",
             _ => target.Name,
         };
+    }
+
+    private static HoverTip CreateStockTopBarTip(string localizationKey)
+    {
+        return new HoverTip(
+            new LocString("static_hover_tips", $"{localizationKey}.title"),
+            new LocString("static_hover_tips", $"{localizationKey}.description"));
+    }
+
+    private static void AlignTopBarTipSet(
+        Control target,
+        NHoverTipSet tipSet)
+    {
+        tipSet.SetGlobalPosition(
+            target.GlobalPosition + new Vector2(0f, target.Size.Y + 20f));
     }
 
     private static void ShowHintPopup(string tooltip, Vector2 pointerPosition)

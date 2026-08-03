@@ -261,15 +261,23 @@ internal static class NativeStatsHoverTipFactory
                 statsTip = tip;
                 return true;
 
-            case NTopBarHp hp
-                when MaxHpHistoryTooltip.TryBuildNativeHoverTip(hp, out tip):
-                statsTip = tip;
-                return true;
+            case NTopBarHp hp:
+                StatsTooltipPinManager.AttachTopBarRunStatsTarget(hp);
+                if (MaxHpHistoryTooltip.TryBuildNativeHoverTip(hp, out tip))
+                {
+                    statsTip = tip;
+                    return true;
+                }
+                return false;
 
-            case NTopBarGold gold
-                when GoldStatsTooltip.TryBuildNativeHoverTip(gold, out tip):
-                statsTip = tip;
-                return true;
+            case NTopBarGold gold:
+                StatsTooltipPinManager.AttachTopBarRunStatsTarget(gold);
+                if (GoldStatsTooltip.TryBuildNativeHoverTip(gold, out tip))
+                {
+                    statsTip = tip;
+                    return true;
+                }
+                return false;
 
             case NPotionHolder holder
                 when PotionBeltStatsTooltip.TryBuildNativeHoverTip(holder, out tip):

@@ -1661,6 +1661,10 @@ Important surfaces:
   selection while their rows are rebuilt, so their `ChildEnteredTree` signals
   attach the same right-click behavior to each replacement row without
   introducing separate lifecycle patches for the two row factories.
+- Live top-bar HP and gold controls register with the shared pin manager when
+  their first augmented native tooltip is built. Their pinned sets recreate
+  the stock Hit Points or Money Pouch page before the SpireLens stats page and
+  retain the native below-the-control placement.
 - Card right-click must be claimed on the press, not the release.
   `NCardHolder.OnMousePressed` normally stores right press as
   `_currentPressedAction`; its matching release then emits `AltPressed`.
