@@ -802,12 +802,12 @@ internal static class StatsTooltipPinManager
         };
 
         if (visual is not NCard card)
-            return visual.GetGlobalRect();
+            return StatsImageCapture.GetViewportRect(visual);
 
         // NCard draws around a zero-sized Control origin, so its ordinary
         // global rect is empty. Transform the known visual bounds instead.
         var halfSize = NCard.defaultSize / 2f;
-        var transform = card.GetGlobalTransform();
+        var transform = card.GetGlobalTransformWithCanvas();
         var topLeft = transform * -halfSize;
         var topRight = transform * new Vector2(halfSize.X, -halfSize.Y);
         var bottomLeft = transform * new Vector2(-halfSize.X, halfSize.Y);

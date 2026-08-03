@@ -52,7 +52,7 @@ internal static class StatsImageCapture
         }
 
         var pixelRect = CalculatePixelRect(
-            control.GetGlobalRect(),
+            GetViewportRect(control),
             viewport.GetVisibleRect(),
             new Vector2I(
                 viewportImage.GetWidth(),
@@ -246,7 +246,7 @@ internal static class StatsImageCapture
 
             var usedRect = source.GetUsedRect();
             if (usedRect.Size.X <= 0 || usedRect.Size.Y <= 0)
-                usedRect = new Rect2I(0, 0, source.GetWidth(), source.GetHeight());
+                return false;
 
             image = source.GetRegion(usedRect);
             image.Convert(Image.Format.Rgba8);
@@ -304,7 +304,7 @@ internal static class StatsImageCapture
                 continue;
             }
 
-            var rect = control.GetGlobalRect();
+            var rect = GetViewportRect(control);
             if (rect.Size.X <= 0f || rect.Size.Y <= 0f) continue;
 
             bounds = found ? Merge(bounds, rect) : rect;
@@ -312,6 +312,41 @@ internal static class StatsImageCapture
         }
 
         return found;
+    }
+
+    internal static Rect2 GetViewportRect(Control control)
+        => TransformRect(
+            new Rect2(Vector2.Zero, control.Size),
+            control.GetGlobalTransformWithCanvas());
+
+    internal static Rect2 TransformRect(
+        Rect2 localRect,
+        Transform2D transform)
+    {
+        if (localRect.Size.X <= 0f || localRect.Size.Y <= 0f)
+            return new Rect2();
+
+        var topLeft = transform * localRect.Position;
+        var topRight = transform * new Vector2(
+            localRect.End.X,
+            localRect.Position.Y);
+        var bottomLeft = transform * new Vector2(
+            localRect.Position.X,
+            localRect.End.Y);
+        var bottomRight = transform * localRect.End;
+        var left = Math.Min(
+            Math.Min(topLeft.X, topRight.X),
+            Math.Min(bottomLeft.X, bottomRight.X));
+        var top = Math.Min(
+            Math.Min(topLeft.Y, topRight.Y),
+            Math.Min(bottomLeft.Y, bottomRight.Y));
+        var right = Math.Max(
+            Math.Max(topLeft.X, topRight.X),
+            Math.Max(bottomLeft.X, bottomRight.X));
+        var bottom = Math.Max(
+            Math.Max(topLeft.Y, topRight.Y),
+            Math.Max(bottomLeft.Y, bottomRight.Y));
+        return new Rect2(left, top, right - left, bottom - top);
     }
 
     private static Rect2 Merge(Rect2 left, Rect2 right)

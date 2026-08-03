@@ -29,6 +29,21 @@ public class StatsImageClipboardTests
     }
 
     [Fact]
+    public void TransformRect_AppliesCanvasScaleAndTranslation()
+    {
+        var transform = new Transform2D(
+            new Vector2(2f, 0f),
+            new Vector2(0f, 3f),
+            new Vector2(10f, 20f));
+
+        var result = StatsImageCapture.TransformRect(
+            new Rect2(0f, 0f, 100f, 50f),
+            transform);
+
+        Assert.Equal(new Rect2(10f, 20f, 200f, 150f), result);
+    }
+
+    [Fact]
     public void BuildDib_WritesHeaderAndBottomUpBgraPixels()
     {
         // Top row: red, green. Bottom row: blue, white.
