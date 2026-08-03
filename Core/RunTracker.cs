@@ -1675,6 +1675,8 @@ public static class RunTracker
                 GetOrAssignNumber(card);
             }
         }
+        bool repairedYummyCookieUpgrades = repairAggregates
+            && RepairYummyCookieUpgradesLocked(run, GetTrackedRunPlayerLocked());
         bool strikeDummyDeckCountsChanged = RefreshStrikeDummyDeckCountsIfOwnedLocked();
         bool miniatureCannonDeckCountsChanged = RefreshMiniatureCannonDeckCountsIfOwnedLocked();
         bool dowsingRoomsChanged = RefreshDowsingRoomsRemainingIfOwnedLocked(player);
@@ -1757,7 +1759,13 @@ public static class RunTracker
             CoreMain.Logger.Info(
                 $"{context}: repaired offensive damage aggregates for run_id={run.RunId}");
         }
+        if (repairedYummyCookieUpgrades)
+        {
+            CoreMain.Logger.Info(
+                $"{context}: repaired Yummy Cookie upgraded cards for run_id={run.RunId}");
+        }
         if (repairedDamageAggregates
+            || repairedYummyCookieUpgrades
             || prunedGhosts > 0
             || strikeDummyDeckCountsChanged
             || miniatureCannonDeckCountsChanged
@@ -15046,8 +15054,8 @@ public static class RunTracker
     }
 
     /// <summary>
-    /// Arm Yummy Cookie pickup attribution. Actual upgraded cards are observed
-    /// from <see cref="RecordUpgrade"/> while the pickup task resolves.
+    /// Arm Yummy Cookie pickup attribution. Exact permanent-deck upgrades are
+    /// observed from <see cref="RecordUpgrade"/> while the pickup task resolves.
     /// </summary>
     public static bool BeginYummyCookiePickup(RelicModel relic, out Player? player)
     {
@@ -29193,7 +29201,6 @@ public static class RunTracker
             // mechanics, including temporary combat-copy upgrades.
             RecordSandCastleCardUpgradedLocked(card);
             RecordWhetstoneCardUpgradedLocked(card);
-            RecordYummyCookieCardUpgradedLocked(card);
             RecordWarPaintCardUpgradedLocked(card);
             RecordFragrantMushroomCardUpgradedLocked(card);
             RecordFishingRodCardUpgradedLocked(card);
@@ -29201,6 +29208,13 @@ public static class RunTracker
             RecordArmamentsCardUpgradedLocked(card);
             RecordDrainPowerCardUpgradedLocked(card);
             RecordAggressionCardUpgradedLocked(card);
+
+            // Yummy Cookie's pickup flow also invokes UpgradeInternal while
+            // constructing non-deck copies of cards that were already
+            // upgraded. Only an exact permanent-deck mutation is one of the
+            // cards Cookie actually upgraded.
+            if (isPermanentDeckUpgrade)
+                RecordYummyCookieCardUpgradedLocked(card);
 
             // Card lineage is different: only mutation of the exact object in
             // the permanent deck counts. Do not canonicalize a combat clone
@@ -29332,6 +29346,121 @@ public static class RunTracker
         {
             CoreMain.LogDebug($"RecordYummyCookieCardUpgradedLocked failed: {e.Message}");
         }
+    }
+
+    private static bool RepairYummyCookieUpgradesLocked(
+        RunData run,
+        Player? player)
+    {
+        try
+        {
+            if (player == null
+                || !run.RelicAggregates.TryGetValue(
+                    YummyCookieRelicId,
+                    out var aggregate)
+                || aggregate.CardsUpgraded <= 4)
+            {
+                return false;
+            }
+
+            var cookie = player.Relics.OfType<YummyCookie>().FirstOrDefault();
+            var pickupFloor = cookie == null
+                ? null
+                : RelicFloorAddedToDeck(cookie);
+            if (!pickupFloor.HasValue) return false;
+
+            var upgradeEvents = SelectYummyCookieUpgradeEventsForRepair(
+                run.Events,
+                pickupFloor.Value);
+            if (upgradeEvents.Count == 0) return false;
+
+            var repairedNames = upgradeEvents
+                .Select(GetUpgradeEventCardDisplayNameLocked)
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .ToList();
+            if (repairedNames.Count == 0) return false;
+
+            aggregate.UpgradedCards = repairedNames;
+            aggregate.CardsUpgraded = repairedNames.Count;
+            return true;
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug(
+                $"RepairYummyCookieUpgradesLocked failed: {e.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Legacy Yummy Cookie records can contain UpgradeInternal calls from
+    /// copied, already-upgraded cards. Its real permanent upgrades are the
+    /// final synchronous cluster on the pickup floor, after any earlier
+    /// combat-end upgrades on that same floor.
+    /// </summary>
+    internal static IReadOnlyList<CardEvent> SelectYummyCookieUpgradeEventsForRepair(
+        IEnumerable<CardEvent>? events,
+        int pickupFloor)
+    {
+        const int maximumCookieUpgrades = 4;
+        var candidates = events?
+            .Where(cardEvent =>
+                string.Equals(
+                    cardEvent.Type,
+                    "card_upgraded",
+                    StringComparison.Ordinal)
+                && cardEvent.Floor == pickupFloor
+                && cardEvent.UpgradeLevel > 0)
+            .ToList()
+            ?? new List<CardEvent>();
+        if (candidates.Count == 0
+            || !DateTimeOffset.TryParse(candidates[^1].T, out var latestTime))
+        {
+            return Array.Empty<CardEvent>();
+        }
+
+        var selected = new List<CardEvent>();
+        for (var index = candidates.Count - 1;
+             index >= 0 && selected.Count < maximumCookieUpgrades;
+             index--)
+        {
+            var candidate = candidates[index];
+            if (!DateTimeOffset.TryParse(candidate.T, out var candidateTime)
+                || latestTime - candidateTime > TimeSpan.FromSeconds(1))
+            {
+                break;
+            }
+
+            selected.Add(candidate);
+        }
+
+        selected.Reverse();
+        return selected;
+    }
+
+    private static string GetUpgradeEventCardDisplayNameLocked(CardEvent cardEvent)
+    {
+        foreach (var pair in _instanceNumbers)
+        {
+            if (string.Equals(
+                $"{pair.Key.Id}#{pair.Value}",
+                cardEvent.CardId,
+                StringComparison.Ordinal))
+            {
+                return GetCardDisplayNameForStats(pair.Key);
+            }
+        }
+
+        if (!TryParseAggregateKey(cardEvent.CardId, out var cardId, out _))
+            return "";
+
+        var displayName = FormatCardIdForDisplay(cardId);
+        return cardEvent.UpgradeLevel switch
+        {
+            1 => displayName + "+",
+            > 1 => $"{displayName}+{cardEvent.UpgradeLevel.Value}",
+            _ => displayName,
+        };
     }
 
     private static void RecordWarPaintCardUpgradedLocked(CardModel card)

@@ -995,6 +995,13 @@ physical permanent-deck references. Mark an option taken only when the chosen
 card actually produces a deck addition; preserve a null selection as a true
 skip rather than treating selection intent as acquisition.
 
+Yummy Cookie's pickup flow calls `CardModel.UpgradeInternal` both for its real
+permanent-deck upgrades and while constructing non-deck copies of cards that
+were already upgraded. A callback-wide UpgradeInternal window therefore
+overcounts every upgraded card displayed during pickup. Require the exact
+object passed to `UpgradeInternal` to be a current permanent-deck member; those
+positive mutations are the observed Cookie outcomes.
+
 Gnarled Hammer's `AfterObtained` awaits a deck selection, then synchronously
 calls `CardCmd.Enchant` with Sharp on each returned physical deck card. Snapshot
 the deck card references and their optional Sharp amounts before the callback,
