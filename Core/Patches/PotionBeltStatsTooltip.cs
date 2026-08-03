@@ -134,17 +134,17 @@ internal static class PotionBeltStatsTooltip
         AppendRow(
             body,
             commonIcon,
-            "Common combat reward potions",
+            "Combat rewards",
             summary.CommonCombatRewardPotions);
         AppendRow(
             body,
             uncommonIcon,
-            "Uncommon combat reward potions",
+            "Combat rewards",
             summary.UncommonCombatRewardPotions);
         AppendRow(
             body,
             rareIcon,
-            "Rare combat reward potions",
+            "Combat rewards",
             summary.RareCombatRewardPotions);
         AppendRow(
             body,

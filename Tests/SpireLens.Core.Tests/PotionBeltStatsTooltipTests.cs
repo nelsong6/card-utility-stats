@@ -102,9 +102,20 @@ public class PotionBeltStatsTooltipTests
         Assert.Contains(
             "Avg potions offered per floor   [b]0.88[/b]",
             body);
-        Assert.Contains("Common combat reward potions   [b]1[/b]", body);
-        Assert.Contains("Uncommon combat reward potions   [b]1[/b]", body);
-        Assert.Contains("Rare combat reward potions   [b]2[/b]", body);
+        var combatRewardRarityRows = body
+            .Split('\n')
+            .Where(row => row.Contains("Combat rewards   [b]"))
+            .ToArray();
+        Assert.Equal(3, combatRewardRarityRows.Length);
+        Assert.Contains(combatRewardRarityRows, row => row.Contains("Common potion:")
+            && row.Contains("Combat rewards   [b]1[/b]"));
+        Assert.Contains(combatRewardRarityRows, row => row.Contains("Uncommon potion:")
+            && row.Contains("Combat rewards   [b]1[/b]"));
+        Assert.Contains(combatRewardRarityRows, row => row.Contains("Rare potion:")
+            && row.Contains("Combat rewards   [b]2[/b]"));
+        Assert.DoesNotContain("Common combat reward potions", body);
+        Assert.DoesNotContain("Uncommon combat reward potions", body);
+        Assert.DoesNotContain("Rare combat reward potions", body);
         Assert.Contains("Fruit Juices in combat rewards   [b]1[/b]", body);
         Assert.Contains("Rejected potions at reward screen   [b]2[/b]", body);
         Assert.Contains("Potions offered in events   [b]1[/b]", body);
