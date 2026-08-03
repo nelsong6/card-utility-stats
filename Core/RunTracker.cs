@@ -2533,6 +2533,13 @@ public static class RunTracker
         target.PumpkinCandleCombatStartChargeSamples +=
             source.PumpkinCandleCombatStartChargeSamples;
         target.PumpkinCandleRekindles += source.PumpkinCandleRekindles;
+        target.SpikedGauntletsTaxedPowersPlayed +=
+            source.SpikedGauntletsTaxedPowersPlayed;
+        target.SpikedGauntletsPowerCostTotal +=
+            source.SpikedGauntletsPowerCostTotal;
+        target.SpikedGauntletsPowerEnergySpent +=
+            source.SpikedGauntletsPowerEnergySpent;
+        target.SpikedGauntletsTurns += source.SpikedGauntletsTurns;
         target.GoldGained += source.GoldGained;
         target.MawBankShopsSkipped += source.MawBankShopsSkipped;
         target.MawBankGoldSpentOutsideShops +=
@@ -2989,6 +2996,7 @@ public static class RunTracker
             RecordPaelsClawGoopyCardPlayedIfOwnedLocked(cardPlay.Card);
             RecordThrowingAxeExtraPlayLocked(cardPlay);
             RecordStampedeAutoPlayedAttackLocked(cardPlay);
+            RecordSpikedGauntletsPowerPlayedIfOwnedLocked(cardPlay);
 
             if (!ShouldTrackCardStatsDuringCombatLocked()) return;
             RecordMetaPowerCardPlayedLocked(cardPlay.Card);
@@ -8155,6 +8163,7 @@ public static class RunTracker
     private const string CaptainsWheelRelicId = "RELIC.CAPTAINS_WHEEL";
     private const string PrismaticGemRelicId = "RELIC.PRISMATIC_GEM";
     private const string PumpkinCandleRelicId = "RELIC.PUMPKIN_CANDLE";
+    private const string SpikedGauntletsRelicId = "RELIC.SPIKED_GAUNTLETS";
     private const string SealOfGoldRelicId = "RELIC.SEAL_OF_GOLD";
     private const string FresnelLensRelicId = "RELIC.FRESNEL_LENS";
     private const string WingCharmRelicId = "RELIC.WING_CHARM";
@@ -19887,6 +19896,71 @@ public static class RunTracker
         }
     }
 
+    public static void RecordSpikedGauntletsTurnStarted(Player? player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player) || _pendingCombat == null) return;
+                RecordSpikedGauntletsTurnForPlayerLocked(player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordSpikedGauntletsTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void RecordSpikedGauntletsPowerPlayedIfOwnedLocked(
+        CardPlay cardPlay)
+    {
+        if (_pendingCombat == null || cardPlay?.Card?.Owner == null) return;
+        if (cardPlay.Card.Type != CardType.Power) return;
+
+        var player = cardPlay.Card.Owner;
+        if (!PlayerHasSpikedGauntlets(player)) return;
+
+        RecordSpikedGauntletsCombatForPlayerLocked(player);
+        RecordSpikedGauntletsTurnForPlayerLocked(player);
+        var agg = GetOrCreatePendingRelicAggregateLocked(
+            SpikedGauntletsRelicId);
+        RecordSpikedGauntletsPowerPlayedForTest(
+            agg,
+            cardPlay.Resources.EnergyValue,
+            cardPlay.Resources.EnergySpent);
+    }
+
+    internal static void RecordSpikedGauntletsPowerPlayedForTest(
+        RelicAggregate agg,
+        decimal powerCost,
+        int energySpent)
+    {
+        if (agg == null) return;
+        agg.SpikedGauntletsTaxedPowersPlayed++;
+        agg.SpikedGauntletsPowerCostTotal += Math.Max(0m, powerCost);
+        agg.SpikedGauntletsPowerEnergySpent += Math.Max(0, energySpent);
+    }
+
+    internal static void RecordSpikedGauntletsCombatForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.EnergyGeneratedCombats += Math.Max(0, count);
+    }
+
+    internal static void RecordSpikedGauntletsTurnForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.SpikedGauntletsTurns += Math.Max(0, count);
+    }
+
     internal static void RecordPaperPhrogVulnerableBonusForTest(
         RelicAggregate agg,
         decimal damageAdded,
@@ -23366,6 +23440,24 @@ public static class RunTracker
             countRoundOneCombat: false);
     }
 
+    /// <summary>
+    /// Count Spiked Gauntlets' Ancient max-energy contribution at the actual
+    /// player energy-reset boundary. Held-combat counting is kept separate so
+    /// the per-combat average remains zero-inclusive.
+    /// </summary>
+    public static void RecordSpikedGauntletsEnergyGenerated(
+        MegaCrit.Sts2.Core.Combat.ICombatState combatState,
+        Player player,
+        int amount)
+    {
+        RecordEnergyResetRelicEnergyGenerated(
+            SpikedGauntletsRelicId,
+            combatState,
+            player,
+            amount,
+            countRoundOneCombat: false);
+    }
+
     public static void RecordBloodSoakedRoseEnergyGenerated(
         MegaCrit.Sts2.Core.Combat.ICombatState combatState,
         Player player,
@@ -26008,6 +26100,7 @@ public static class RunTracker
             RecordScreamingFlagonCombatForPlayerLocked(player);
             RecordRuinedHelmetCombatForPlayerLocked(player);
             RecordMummifiedHandCombatForPlayerLocked(player);
+            RecordSpikedGauntletsCombatForPlayerLocked(player);
             RecordBurningSticksCombatForPlayerLocked(player);
             RecordThrowingAxeCombatForPlayerLocked(player);
             RecordToastyMittensCombatForPlayerLocked(player);
@@ -27131,6 +27224,42 @@ public static class RunTracker
         RecordMummifiedHandCombatForTest(agg);
     }
 
+    private static void RecordSpikedGauntletsCombatForPlayerLocked(
+        Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasSpikedGauntlets(player)) return;
+        if (!_pendingCombat.SpikedGauntletsCombatCountedPlayers.Add(player))
+            return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(
+            SpikedGauntletsRelicId);
+        RecordSpikedGauntletsCombatForTest(agg);
+    }
+
+    private static void RecordSpikedGauntletsTurnForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasSpikedGauntlets(player)) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.SpikedGauntletsTurnCountedTurns.TryGetValue(
+                player,
+                out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.SpikedGauntletsTurnCountedTurns[player] = turnNumber;
+        RecordSpikedGauntletsCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(
+            SpikedGauntletsRelicId);
+        RecordSpikedGauntletsTurnForTest(agg);
+    }
+
     private static void RecordBurningSticksCombatForPlayerLocked(Player player)
     {
         if (_pendingCombat == null) return;
@@ -27681,6 +27810,18 @@ public static class RunTracker
         try
         {
             return player.Relics.Any(r => r is MummifiedHand);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool PlayerHasSpikedGauntlets(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is SpikedGauntlets);
         }
         catch
         {
@@ -33607,6 +33748,10 @@ internal class PendingCombat
     public HashSet<Player> MummifiedHandCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> MummifiedHandTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> SpikedGauntletsCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> SpikedGauntletsTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> BurningSticksCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

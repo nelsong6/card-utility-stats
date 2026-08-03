@@ -786,6 +786,15 @@ and deck-add replacement modifiers. Do not infer a successful return merely
 from the stored entry disappearing; Tooth removes it even when the deck-add
 result reports failure.
 
+Spiked Gauntlets has no owner callback for its Power tax: its
+`TryModifyEnergyCostInCombat` modifier adds one to every same-owner Power, while
+`ModifyMaxEnergy` grants one Ancient max energy. Count completed owner Power
+plays at the established `CardPlayFinishedEntry` boundary and keep both the
+resolved `EnergyValue` cost and actual `EnergySpent`; autoplay/free plays can
+have a taxed resolved cost while spending zero. Sample held turns and combats
+zero-inclusively, and count Ancient energy at the established
+`Hook.AfterEnergyReset` boundary rather than from repeated max-energy queries.
+
 For relics that grant block after a specific owner-owned condition, arm a narrow block-gain window at the relic callback and let `Hook.AfterBlockGained` record the modified amount. Permafrost follows this pattern from `Permafrost.AfterCardPlayed`: mirror the first-owned-Power condition, count that combat trigger, then derive block per triggered combat from observed block gained divided by triggers. Count every combat where Permafrost was held, including zero-trigger combats, as the separate trigger-rate denominator. Older runs predate that denominator; because Permafrost can trigger at most once per combat, backfill the minimum known historical combat count from its activation total before adding newly observed combats. Its private `_activatedThisCombat` field is the authoritative live source for whether it has triggered in the current combat; display that state directly rather than inferring it from persisted activation totals.
 
 Cloak Clasp's owner-specific `BeforeSideTurnEnd` callback makes exactly one

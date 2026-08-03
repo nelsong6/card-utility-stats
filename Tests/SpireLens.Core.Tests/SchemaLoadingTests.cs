@@ -5829,6 +5829,40 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsSpikedGauntletsRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("spiked-gauntlets-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertSpikedGauntletsFixture(
+            loaded.Data.RelicAggregates["RELIC.SPIKED_GAUNTLETS"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsSpikedGauntletsRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("spiked-gauntlets-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertSpikedGauntletsFixture(
+            resumed!.RelicAggregates["RELIC.SPIKED_GAUNTLETS"]);
+    }
+
+    private static void AssertSpikedGauntletsFixture(
+        RelicAggregate relicAgg)
+    {
+        Assert.Equal(7, relicAgg.EnergyGenerated);
+        Assert.Equal(2, relicAgg.EnergyGeneratedCombats);
+        Assert.Equal(3, relicAgg.SpikedGauntletsTaxedPowersPlayed);
+        Assert.Equal(8m, relicAgg.SpikedGauntletsPowerCostTotal);
+        Assert.Equal(6, relicAgg.SpikedGauntletsPowerEnergySpent);
+        Assert.Equal(4, relicAgg.SpikedGauntletsTurns);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsSmallCapsuleRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(

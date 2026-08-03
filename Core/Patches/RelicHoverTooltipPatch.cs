@@ -864,6 +864,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is SpikedGauntlets)
+        {
+            title = "Spiked Gauntlets";
+            body = BuildSpikedGauntletsBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is SealOfGold)
         {
             title = "Seal of Gold";
@@ -2647,6 +2654,56 @@ public static class RelicHoverShowPatch
             candleIcon,
             agg.PumpkinCandleRekindles.ToString(),
             "Times Pumpkin Candle was rekindled at a campfire.");
+        return sb.ToString();
+    }
+
+    private static string BuildSpikedGauntletsBodyBBCode(
+        RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var powersPlayed = agg.SpikedGauntletsTaxedPowersPlayed;
+        var combats = agg.EnergyGeneratedCombats;
+        var averagePowerCost = powersPlayed <= 0
+            ? 0m
+            : agg.SpikedGauntletsPowerCostTotal / powersPlayed;
+        var averageSpentPerTurn = agg.SpikedGauntletsTurns <= 0
+            ? 0m
+            : (decimal)agg.SpikedGauntletsPowerEnergySpent
+              / agg.SpikedGauntletsTurns;
+        var averageSpentPerCombat = combats <= 0
+            ? 0m
+            : (decimal)agg.SpikedGauntletsPowerEnergySpent / combats;
+
+        Row3(
+            sb,
+            "Taxed Powers played",
+            powersPlayed.ToString(),
+            "",
+            "Completed owner Power plays while Spiked Gauntlets applied its +1 Energy cost modifier.");
+        Row3(
+            sb,
+            EnergyLabel("Avg cost of Powers"),
+            FormatDecimal(averagePowerCost),
+            "",
+            "Average resolved Energy cost of Powers played while Spiked Gauntlets was held, including its tax.");
+        Row3(
+            sb,
+            EnergyLabel("Avg spent on Powers per turn"),
+            FormatDecimal(averageSpentPerTurn),
+            "",
+            "Average Energy actually spent on Powers per player turn while Spiked Gauntlets was held, including zero-spend turns.");
+        Row3(
+            sb,
+            EnergyLabel("Avg spent on Powers per combat"),
+            FormatDecimal(averageSpentPerCombat),
+            "",
+            "Average Energy actually spent on Powers per combat while Spiked Gauntlets was held, including zero-spend combats.");
+        AppendEnergyGeneratedStats(
+            sb,
+            agg,
+            totalLabel: "Energy gained total",
+            includeAveragePerCombat: true,
+            combatCount: combats);
         return sb.ToString();
     }
 

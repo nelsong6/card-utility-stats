@@ -1208,6 +1208,15 @@ public class RelicAggregate
     public int PumpkinCandleCombatStartChargeSamples { get; set; }
     public int PumpkinCandleRekindles { get; set; }
 
+    // Spiked Gauntlets tracking. Taxed Powers are completed owner Power plays
+    // while the relic is held. Cost is the resolved play-time EnergyValue;
+    // spent is the observed EnergySpent. Turns and combats are zero-inclusive
+    // held denominators. EnergyGenerated stores its Ancient max-energy benefit.
+    public int SpikedGauntletsTaxedPowersPlayed { get; set; }
+    public decimal SpikedGauntletsPowerCostTotal { get; set; }
+    public int SpikedGauntletsPowerEnergySpent { get; set; }
+    public int SpikedGauntletsTurns { get; set; }
+
     // Gold attributed to a relic effect. Lucky Fysh measures the owner's
     // completed balance delta after its gold command resolves; Bowler Hat
     // stores only the observed bonus beyond the unmodified integer grant;
