@@ -106,7 +106,7 @@ public class EmberTeaStatsTests
     {
         var body = BuildBody(PopulatedAggregate());
 
-        Assert.Contains("Attacks played while active", body);
+        Assert.Contains("The number of Attack cards played while this relic was active.", body);
         Assert.Contains("Avg attacks played per turn while active", body);
         Assert.Contains("Avg attacks played per combat while active", body);
         Assert.Contains("Hits while active", body);
@@ -129,7 +129,7 @@ public class EmberTeaStatsTests
     {
         var body = BuildBody(new RelicAggregate());
 
-        Assert.Contains("Attacks played while active", body);
+        Assert.Contains("The number of Attack cards played while this relic was active.", body);
         Assert.Contains("Hits while active", body);
         Assert.Equal(6, CountOccurrences(body, "[b]0[/b]"));
     }

@@ -156,11 +156,11 @@ public class KunaiStatsTests
             ThreeAttackScalingCombats = 3,
         });
 
-        Assert.Contains("Attacks played", body);
+        Assert.Contains("The number of Attack cards played while this relic was held.", body);
         Assert.Contains("Activations", body);
         Assert.Contains("Dexterity gained", body);
-        Assert.Contains("Avg activations per turn", body);
-        Assert.Contains("Avg activations per combat", body);
+        Assert.Contains("Average activations per turn", body);
+        Assert.Contains("Average activations per combat", body);
         Assert.Contains("Turns ended at 0 charges", body);
         Assert.Contains("Turns ended at 1 charge", body);
         Assert.Contains("Turns ended at 2 charges", body);
@@ -177,11 +177,11 @@ public class KunaiStatsTests
     {
         var body = BuildBody(new RelicAggregate());
 
-        Assert.Contains("Attacks played", body);
+        Assert.Contains("The number of Attack cards played while this relic was held.", body);
         Assert.Contains("Activations", body);
         Assert.Contains("Dexterity gained", body);
-        Assert.Contains("Avg activations per turn", body);
-        Assert.Contains("Avg activations per combat", body);
+        Assert.Contains("Average activations per turn", body);
+        Assert.Contains("Average activations per combat", body);
         Assert.Contains("Turns ended at 0 charges", body);
         Assert.Contains("Turns ended at 1 charge", body);
         Assert.Contains("Turns ended at 2 charges", body);

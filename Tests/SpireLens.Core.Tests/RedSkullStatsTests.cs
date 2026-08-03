@@ -80,7 +80,7 @@ public class RedSkullStatsTests
     {
         var body = BuildBody(PopulatedAggregate());
 
-        Assert.Contains("Attacks played while active", body);
+        Assert.Contains("The number of Attack cards played while this relic was active.", body);
         Assert.Contains("Avg attacks played while active per turn", body);
         Assert.Contains("Avg attacks played while active per combat", body);
         Assert.Contains("Hits while active", body);

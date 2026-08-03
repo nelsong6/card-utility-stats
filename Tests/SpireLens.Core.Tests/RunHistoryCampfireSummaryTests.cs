@@ -1,4 +1,4 @@
-using HarmonyLib;
+using System.Reflection;
 using MegaCrit.Sts2.Core.Map;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Nodes.Screens.RunHistoryScreen;
@@ -227,10 +227,12 @@ public class RunHistoryCampfireSummaryTests
     [Fact]
     public void SelectPlayerPatchTargetExists()
     {
-        var target = AccessTools.Method(
-            typeof(NRunHistory),
+        var target = typeof(NRunHistory).GetMethod(
             "SelectPlayer",
-            [typeof(NRunHistoryPlayerIcon)]);
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+            binder: null,
+            [typeof(NRunHistoryPlayerIcon)],
+            modifiers: null);
 
         Assert.NotNull(target);
     }

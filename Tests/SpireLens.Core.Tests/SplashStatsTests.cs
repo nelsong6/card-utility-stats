@@ -119,7 +119,7 @@ public class SplashStatsTests
         Assert.Contains("Uncommons taken", body);
         Assert.Contains("Rares taken", body);
         Assert.Contains("avg discount", body);
-        Assert.Contains("[b]1.2[/b]", body);
+        Assert.Contains("[b]1.17[/b]", body);
         Assert.Contains(
             StatConceptGlossary.RenderInformationHint(
                 "Common Attacks selected from Splash."),

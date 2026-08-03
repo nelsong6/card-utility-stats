@@ -79,7 +79,7 @@ public class ScrollBoxesStatsTests
         var body = BuildBody(agg);
 
         Assert.Contains("Bundles chosen", body);
-        Assert.Contains("Cards received", body);
+        Assert.Contains("Cards actually added to the permanent deck", body);
         Assert.Contains("[b]3[/b]", body);
         Assert.Contains("Strike x2", body);
         Assert.Contains("Shrug It Off", body);

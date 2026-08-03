@@ -1,4 +1,3 @@
-using Godot;
 using MegaCrit.Sts2.Core.HoverTips;
 using SpireLens.Core;
 using SpireLens.Core.Patches;
@@ -11,46 +10,43 @@ public class RunTimerStatsTooltipTests
     [Fact]
     public void LeftPlacement_LeavesClearanceBeforeTimer()
     {
-        var target = new Rect2(700f, 20f, 120f, 40f);
-        var viewport = new Rect2(0f, 0f, 928f, 512f);
-
         var x = RunTimerStatsTooltip.GetClearTooltipX(
-            target,
+            targetX: 700f,
+            targetWidth: 120f,
             tooltipWidth: 560f,
             HoverTipAlignment.Left,
-            viewport);
+            viewportX: 0f,
+            viewportWidth: 928f);
 
         Assert.Equal(120f, x);
-        Assert.True(x + 560f < target.Position.X);
+        Assert.True(x + 560f < 700f);
     }
 
     [Fact]
     public void RightPlacement_LeavesClearanceAfterTimer()
     {
-        var target = new Rect2(100f, 20f, 120f, 40f);
-        var viewport = new Rect2(0f, 0f, 1200f, 700f);
-
         var x = RunTimerStatsTooltip.GetClearTooltipX(
-            target,
+            targetX: 100f,
+            targetWidth: 120f,
             tooltipWidth: 560f,
             HoverTipAlignment.Right,
-            viewport);
+            viewportX: 0f,
+            viewportWidth: 1200f);
 
         Assert.Equal(240f, x);
-        Assert.True(x > target.Position.X + target.Size.X);
+        Assert.True(x > 220f);
     }
 
     [Fact]
     public void Placement_StaysInsideViewportMargin()
     {
-        var target = new Rect2(300f, 20f, 120f, 40f);
-        var viewport = new Rect2(0f, 0f, 640f, 480f);
-
         var x = RunTimerStatsTooltip.GetClearTooltipX(
-            target,
+            targetX: 300f,
+            targetWidth: 120f,
             tooltipWidth: 560f,
             HoverTipAlignment.Left,
-            viewport);
+            viewportX: 0f,
+            viewportWidth: 640f);
 
         Assert.Equal(8f, x);
     }

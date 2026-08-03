@@ -50,8 +50,8 @@ public sealed class ThreeAttackScalingRelicParityTests
         Assert.Equal(
             NormalizeScalingAttribute(kunaiBody),
             NormalizeScalingAttribute(shurikenBody));
-        Assert.Contains("Avg activations per turn", kunaiBody);
-        Assert.Contains("Avg activations per combat", kunaiBody);
+        Assert.Contains("Average activations per turn", kunaiBody);
+        Assert.Contains("Average activations per combat", kunaiBody);
         Assert.Contains("Turns ended at 0 charges", kunaiBody);
         Assert.Contains("[b]0.67[/b]", kunaiBody);
         Assert.Contains("[b]2[/b]", kunaiBody);

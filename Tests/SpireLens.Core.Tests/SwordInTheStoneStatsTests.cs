@@ -135,7 +135,7 @@ public class SwordInTheStoneStatsTests
 
         Assert.Contains("Floor acquired", body);
         Assert.Contains("Elites slain", body);
-        Assert.Contains("Avg floors per elite", body);
+        Assert.Contains("Average floors ascended between consecutive Elite victories", body);
         Assert.Contains("Gremlin Nob", body);
         Assert.Contains("Lagavulin", body);
         Assert.Contains("Gremlin Leader", body);
@@ -210,7 +210,7 @@ public class SwordInTheStoneStatsTests
 
         Assert.True(recognized);
         Assert.Equal(expectedTitle, title);
-        Assert.Contains("Avg floors per elite", body);
+        Assert.Contains("Average floors ascended between consecutive Elite victories", body);
     }
 
     private static string BuildBody(RelicAggregate agg)

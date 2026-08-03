@@ -242,6 +242,9 @@ public static class RelicHoverShowPatch
         if (relicModel is SwordOfStone or SwordOfJade)
             return "RELIC.SWORD_OF_STONE";
 
+        if (relicModel is ScreamingFlagon)
+            return "RELIC.SCREAMING_FLAGON";
+
         return relicModel.Id.ToString();
     }
 

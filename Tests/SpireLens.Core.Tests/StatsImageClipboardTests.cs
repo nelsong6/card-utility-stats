@@ -1,5 +1,4 @@
 using System.Buffers.Binary;
-using Godot;
 using Xunit;
 
 namespace SpireLens.Core.Tests;
@@ -9,38 +8,34 @@ public class StatsImageClipboardTests
     [Fact]
     public void CalculatePixelRect_AccountsForViewportScaling()
     {
-        var result = StatsImageCapture.CalculatePixelRect(
-            new Rect2(100f, 50f, 200f, 100f),
-            new Rect2(0f, 0f, 960f, 540f),
-            new Vector2I(1920, 1080));
+        var result = StatsImageCapture.CalculatePixelBounds(
+            100f, 50f, 200f, 100f,
+            0f, 0f, 960f, 540f,
+            1920, 1080);
 
-        Assert.Equal(new Rect2I(200, 100, 400, 200), result);
+        Assert.Equal(new CapturePixelRect(200, 100, 400, 200), result);
     }
 
     [Fact]
     public void CalculatePixelRect_ClipsPanelToViewportImage()
     {
-        var result = StatsImageCapture.CalculatePixelRect(
-            new Rect2(-10f, -5f, 30f, 15f),
-            new Rect2(0f, 0f, 100f, 100f),
-            new Vector2I(200, 200));
+        var result = StatsImageCapture.CalculatePixelBounds(
+            -10f, -5f, 30f, 15f,
+            0f, 0f, 100f, 100f,
+            200, 200);
 
-        Assert.Equal(new Rect2I(0, 0, 40, 20), result);
+        Assert.Equal(new CapturePixelRect(0, 0, 40, 20), result);
     }
 
     [Fact]
     public void TransformRect_AppliesCanvasScaleAndTranslation()
     {
-        var transform = new Transform2D(
-            new Vector2(2f, 0f),
-            new Vector2(0f, 3f),
-            new Vector2(10f, 20f));
+        var result = StatsImageCapture.TransformBounds(
+            0f, 0f, 100f, 50f,
+            2f, 0f, 0f, 3f,
+            10f, 20f);
 
-        var result = StatsImageCapture.TransformRect(
-            new Rect2(0f, 0f, 100f, 50f),
-            transform);
-
-        Assert.Equal(new Rect2(10f, 20f, 200f, 150f), result);
+        Assert.Equal(new CaptureFloatRect(10f, 20f, 200f, 150f), result);
     }
 
     [Fact]

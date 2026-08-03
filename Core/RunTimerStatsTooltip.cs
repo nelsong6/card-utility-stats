@@ -254,15 +254,30 @@ internal static class RunTimerStatsTooltip
         float tooltipWidth,
         HoverTipAlignment alignment,
         Rect2 viewportRect)
+        => GetClearTooltipX(
+            targetRect.Position.X,
+            targetRect.Size.X,
+            tooltipWidth,
+            alignment,
+            viewportRect.Position.X,
+            viewportRect.Size.X);
+
+    internal static float GetClearTooltipX(
+        float targetX,
+        float targetWidth,
+        float tooltipWidth,
+        HoverTipAlignment alignment,
+        float viewportX,
+        float viewportWidth)
     {
         var desiredX = alignment == HoverTipAlignment.Right
-            ? targetRect.Position.X + targetRect.Size.X + HorizontalClearance
-            : targetRect.Position.X - HorizontalClearance - tooltipWidth;
-        var minimumX = viewportRect.Position.X + ViewportMargin;
+            ? targetX + targetWidth + HorizontalClearance
+            : targetX - HorizontalClearance - tooltipWidth;
+        var minimumX = viewportX + ViewportMargin;
         var maximumX = Math.Max(
             minimumX,
-            viewportRect.Position.X
-                + viewportRect.Size.X
+            viewportX
+                + viewportWidth
                 - ViewportMargin
                 - tooltipWidth);
         return Math.Clamp(desiredX, minimumX, maximumX);

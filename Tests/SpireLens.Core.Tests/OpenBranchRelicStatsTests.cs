@@ -356,7 +356,7 @@ public class OpenBranchRelicStatsTests
             penNibBody);
         Assert.Contains("Base damage added", penNibBody);
         Assert.Contains("Avg base damage added per attack", penNibBody);
-        Assert.Contains("Attacks played", penNibBody);
+        Assert.Contains("The number of Attack cards played while this relic was held.", penNibBody);
         Assert.Contains("Turns ended on 8 charges", penNibBody);
         Assert.Contains("Turns ended on 9 charges", penNibBody);
         Assert.Contains("Avg charge at turn end", penNibBody);

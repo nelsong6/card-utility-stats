@@ -4,6 +4,18 @@ using Godot;
 
 namespace SpireLens.Core;
 
+internal readonly record struct CaptureFloatRect(
+    float X,
+    float Y,
+    float Width,
+    float Height);
+
+internal readonly record struct CapturePixelRect(
+    int X,
+    int Y,
+    int Width,
+    int Height);
+
 /// <summary>
 /// Captures an already-rendered UI control from its viewport. The control's
 /// logical Godot coordinates are converted to texture pixels so resolution
@@ -356,17 +368,56 @@ internal static class StatsImageCapture
         Rect2 localRect,
         Transform2D transform)
     {
-        if (localRect.Size.X <= 0f || localRect.Size.Y <= 0f)
-            return new Rect2();
-
-        var topLeft = transform * localRect.Position;
-        var topRight = transform * new Vector2(
-            localRect.End.X,
-            localRect.Position.Y);
-        var bottomLeft = transform * new Vector2(
+        var result = TransformBounds(
             localRect.Position.X,
-            localRect.End.Y);
-        var bottomRight = transform * localRect.End;
+            localRect.Position.Y,
+            localRect.Size.X,
+            localRect.Size.Y,
+            transform.X.X,
+            transform.X.Y,
+            transform.Y.X,
+            transform.Y.Y,
+            transform.Origin.X,
+            transform.Origin.Y);
+        return new Rect2(result.X, result.Y, result.Width, result.Height);
+    }
+
+    internal static CaptureFloatRect TransformBounds(
+        float localX,
+        float localY,
+        float localWidth,
+        float localHeight,
+        float basisXX,
+        float basisXY,
+        float basisYX,
+        float basisYY,
+        float originX,
+        float originY)
+    {
+        if (localWidth <= 0f || localHeight <= 0f)
+            return default;
+
+        static (float X, float Y) TransformPoint(
+            float x,
+            float y,
+            float xx,
+            float xy,
+            float yx,
+            float yy,
+            float ox,
+            float oy)
+            => (xx * x + yx * y + ox, xy * x + yy * y + oy);
+
+        var rightX = localX + localWidth;
+        var bottomY = localY + localHeight;
+        var topLeft = TransformPoint(
+            localX, localY, basisXX, basisXY, basisYX, basisYY, originX, originY);
+        var topRight = TransformPoint(
+            rightX, localY, basisXX, basisXY, basisYX, basisYY, originX, originY);
+        var bottomLeft = TransformPoint(
+            localX, bottomY, basisXX, basisXY, basisYX, basisYY, originX, originY);
+        var bottomRight = TransformPoint(
+            rightX, bottomY, basisXX, basisXY, basisYX, basisYY, originX, originY);
         var left = Math.Min(
             Math.Min(topLeft.X, topRight.X),
             Math.Min(bottomLeft.X, bottomRight.X));
@@ -379,7 +430,7 @@ internal static class StatsImageCapture
         var bottom = Math.Max(
             Math.Max(topLeft.Y, topRight.Y),
             Math.Max(bottomLeft.Y, bottomRight.Y));
-        return new Rect2(left, top, right - left, bottom - top);
+        return new CaptureFloatRect(left, top, right - left, bottom - top);
     }
 
     private static Rect2 Merge(Rect2 left, Rect2 right)
@@ -403,41 +454,67 @@ internal static class StatsImageCapture
         Rect2 viewportRect,
         Vector2I imageSize)
     {
-        if (controlRect.Size.X <= 0f
-            || controlRect.Size.Y <= 0f
-            || viewportRect.Size.X <= 0f
-            || viewportRect.Size.Y <= 0f
-            || imageSize.X <= 0
-            || imageSize.Y <= 0)
+        var result = CalculatePixelBounds(
+            controlRect.Position.X,
+            controlRect.Position.Y,
+            controlRect.Size.X,
+            controlRect.Size.Y,
+            viewportRect.Position.X,
+            viewportRect.Position.Y,
+            viewportRect.Size.X,
+            viewportRect.Size.Y,
+            imageSize.X,
+            imageSize.Y);
+        return new Rect2I(result.X, result.Y, result.Width, result.Height);
+    }
+
+    internal static CapturePixelRect CalculatePixelBounds(
+        float controlX,
+        float controlY,
+        float controlWidth,
+        float controlHeight,
+        float viewportX,
+        float viewportY,
+        float viewportWidth,
+        float viewportHeight,
+        int imageWidth,
+        int imageHeight)
+    {
+        if (controlWidth <= 0f
+            || controlHeight <= 0f
+            || viewportWidth <= 0f
+            || viewportHeight <= 0f
+            || imageWidth <= 0
+            || imageHeight <= 0)
         {
-            return new Rect2I();
+            return default;
         }
 
-        var scaleX = imageSize.X / viewportRect.Size.X;
-        var scaleY = imageSize.Y / viewportRect.Size.Y;
-        var relativeLeft = controlRect.Position.X - viewportRect.Position.X;
-        var relativeTop = controlRect.Position.Y - viewportRect.Position.Y;
-        var relativeRight = controlRect.End.X - viewportRect.Position.X;
-        var relativeBottom = controlRect.End.Y - viewportRect.Position.Y;
+        var scaleX = imageWidth / viewportWidth;
+        var scaleY = imageHeight / viewportHeight;
+        var relativeLeft = controlX - viewportX;
+        var relativeTop = controlY - viewportY;
+        var relativeRight = controlX + controlWidth - viewportX;
+        var relativeBottom = controlY + controlHeight - viewportY;
 
         var left = Math.Clamp(
             (int)MathF.Floor(relativeLeft * scaleX),
             0,
-            imageSize.X);
+            imageWidth);
         var top = Math.Clamp(
             (int)MathF.Floor(relativeTop * scaleY),
             0,
-            imageSize.Y);
+            imageHeight);
         var right = Math.Clamp(
             (int)MathF.Ceiling(relativeRight * scaleX),
             0,
-            imageSize.X);
+            imageWidth);
         var bottom = Math.Clamp(
             (int)MathF.Ceiling(relativeBottom * scaleY),
             0,
-            imageSize.Y);
+            imageHeight);
 
-        return new Rect2I(
+        return new CapturePixelRect(
             left,
             top,
             Math.Max(0, right - left),

@@ -325,7 +325,7 @@ public class UnlimitedAttackChargeRelicStatsTests
             KusarigamaTurnEndChargeTotal = 8,
             KusarigamaTurnEndChargeCount = 7,
         });
-        Assert.Contains("Attacks played", kusarigamaBody);
+        Assert.Contains("The number of Attack cards played while this relic was held.", kusarigamaBody);
         Assert.Contains("Activations", kusarigamaBody);
         Assert.Contains("Damage attempted", kusarigamaBody);
         Assert.Contains("Damage dealt", kusarigamaBody);
@@ -357,7 +357,7 @@ public class UnlimitedAttackChargeRelicStatsTests
             OrnamentalFanTurnEndChargeTotal = 7,
             OrnamentalFanTurnEndChargeCount = 5,
         });
-        Assert.Contains("Attacks played", ornamentalFanBody);
+        Assert.Contains("The number of Attack cards played while this relic was held.", ornamentalFanBody);
         Assert.Contains("Activations", ornamentalFanBody);
         Assert.Contains("[hint=\"Block gained:", ornamentalFanBody);
         Assert.Contains("block gained", ornamentalFanBody);
@@ -389,14 +389,14 @@ public class UnlimitedAttackChargeRelicStatsTests
             ThreeAttackScalingTurns = 4,
             ThreeAttackScalingCombats = 2,
         });
-        Assert.Contains("Attacks played", shurikenBody);
+        Assert.Contains("The number of Attack cards played while this relic was held.", shurikenBody);
         Assert.Contains(
             "The number of Attack cards played while this relic was held.",
             shurikenBody);
         Assert.Contains("Activations", shurikenBody);
         Assert.Contains("Strength gained", shurikenBody);
-        Assert.Contains("Avg activations per turn", shurikenBody);
-        Assert.Contains("Avg activations per combat", shurikenBody);
+        Assert.Contains("Average activations per turn", shurikenBody);
+        Assert.Contains("Average activations per combat", shurikenBody);
         Assert.Contains("Turns ended at 0 charges", shurikenBody);
         Assert.DoesNotContain("Strength gained per activation", shurikenBody);
         Assert.Contains("Turns ended at 1 charge", shurikenBody);
@@ -442,7 +442,7 @@ public class UnlimitedAttackChargeRelicStatsTests
             out var kusarigamaTitle,
             out var kusarigamaBody));
         Assert.Equal("Kusarigama", kusarigamaTitle);
-        Assert.Contains("Attacks played", kusarigamaBody);
+        Assert.Contains("The number of Attack cards played while this relic was held.", kusarigamaBody);
 
         Assert.True(RelicHoverShowPatch.TryBuildBodyBBCode(
             ornamentalFan,
@@ -451,7 +451,7 @@ public class UnlimitedAttackChargeRelicStatsTests
             out var ornamentalFanTitle,
             out var ornamentalFanBody));
         Assert.Equal("Ornamental Fan", ornamentalFanTitle);
-        Assert.Contains("Attacks played", ornamentalFanBody);
+        Assert.Contains("The number of Attack cards played while this relic was held.", ornamentalFanBody);
 
         Assert.True(RelicHoverShowPatch.TryBuildBodyBBCode(
             shuriken,
@@ -460,7 +460,7 @@ public class UnlimitedAttackChargeRelicStatsTests
             out var shurikenTitle,
             out var shurikenBody));
         Assert.Equal("Shuriken", shurikenTitle);
-        Assert.Contains("Attacks played", shurikenBody);
+        Assert.Contains("The number of Attack cards played while this relic was held.", shurikenBody);
     }
 
     [Fact]

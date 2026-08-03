@@ -1,5 +1,4 @@
 using System.Text;
-using MegaCrit.Sts2.Core.Helpers;
 using MegaCrit.Sts2.Core.HoverTips;
 
 namespace SpireLens.Core.Patches;
@@ -81,13 +80,22 @@ internal static class RunTimeStatsTooltip
         => StatConceptGlossary.RenderHintedGlyph(concept);
 
     private static string Format(long seconds)
-        => TimeFormatting.Format((float)System.Math.Max(0L, seconds));
+    {
+        var nonNegativeSeconds = System.Math.Max(0L, seconds);
+        var hours = nonNegativeSeconds / 3600L;
+        var minutes = nonNegativeSeconds % 3600L / 60L;
+        var remainingSeconds = nonNegativeSeconds % 60L;
+        return hours > 0L
+            ? $"{hours:00}:{minutes:00}:{remainingSeconds:00}"
+            : $"{minutes:00}:{remainingSeconds:00}";
+    }
 
     private static string FormatAverage(long seconds, int samples)
-        => TimeFormatting.Format(
-            samples > 0
-                ? (float)System.Math.Max(0L, seconds) / samples
-                : 0f);
+        => Format(samples > 0
+            ? (long)System.Math.Round(
+                (double)System.Math.Max(0L, seconds) / samples,
+                MidpointRounding.AwayFromZero)
+            : 0L);
 
     private static void AppendRow(
         StringBuilder body,
