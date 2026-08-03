@@ -1,0 +1,32 @@
+{
+  "run_id": "outbreak-card-fixture",
+  "started_at": "2026-08-02T18:00:00Z",
+  "updated_at": "2026-08-02T18:24:00Z",
+  "character": "SILENT",
+  "ascension": 8,
+  "floor_reached": 17,
+  "outcome": "in_progress",
+  "game_start_time": 1785693600,
+  "aggregates": {
+    "CARD.OUTBREAK#1": {
+      "combats_in_deck": 4,
+      "plays": 3,
+      "times_drawn": 5,
+      "floor_added": 6,
+      "initial_upgrade_level": 0,
+      "outbreak_extra_poison_trigger_damage": 37
+    }
+  },
+  "events": [],
+  "relic_aggregates": {},
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.OUTBREAK": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.OUTBREAK": 1
+  }
+}

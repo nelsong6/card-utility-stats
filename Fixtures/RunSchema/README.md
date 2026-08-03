@@ -115,6 +115,10 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds a power-ID-keyed Vicious aggregate with the cards confirmed by its
   owner-applied-Vulnerable draw commands. Every Vicious card projects this
   shared power total.
+- `outbreak-card-run.json`
+  Adds per-instance Outbreak effective damage observed from the explicit
+  Poison triggers made by that physical card play. Ordinary side-turn Poison
+  damage remains separate.
 - `stampede-power-run.json`
   Adds a power-ID-keyed Stampede aggregate with confirmed direct Attack
   autoplays, rarity splits, and the resolved energy those free plays saved.

@@ -34,6 +34,7 @@ public static class CardHoverShowPatch
     private const string RupturePowerId = "POWER.RUPTURE";
     private const string StampedePowerId = "POWER.STAMPEDE";
     private const string ViciousPowerId = "POWER.VICIOUS";
+    private const string PoisonPowerIconPath = "res://images/atlases/power_atlas.sprites/poison_power.tres";
     private const string StarIconPath = "res://images/packed/sprite_fonts/star_icon.png";
     private const string SovereignBladeMetaNote = "Reflects All Sovereign Blade Usage";
 
@@ -366,6 +367,7 @@ public static class CardHoverShowPatch
         AppendJackOfAllTradesStats(sb, cardModel, agg, compact: false);
         AppendDiscoveryStats(sb, cardModel, agg, compact: false);
         AppendAllForOneStats(sb, cardModel, agg, compact: false);
+        AppendOutbreakStats(sb, cardModel, agg);
         AppendArmamentsStats(sb, cardModel, agg);
         AppendDrainPowerStats(sb, cardModel, agg, compact: false);
         AppendUnrelentingFreeAttackStats(sb, cardModel, metaStats, compact: false);
@@ -587,6 +589,7 @@ public static class CardHoverShowPatch
         AppendJackOfAllTradesStats(sb, cardModel, agg, compact: true);
         AppendDiscoveryStats(sb, cardModel, agg, compact: true);
         AppendAllForOneStats(sb, cardModel, agg, compact: true);
+        AppendOutbreakStats(sb, cardModel, agg);
         AppendArmamentsStats(sb, cardModel, agg);
         AppendDrainPowerStats(sb, cardModel, agg, compact: true);
         AppendUnrelentingFreeAttackStats(sb, cardModel, metaStats, compact: true);
@@ -1151,6 +1154,22 @@ public static class CardHoverShowPatch
             : (decimal)agg.AllForOneZeroCostCardsReturned / agg.CombatsInDeck;
         Row3(sb, "Avg returned per play", FormatDecimal(returnedPerPlay), "");
         Row3(sb, "Avg returned per combat", FormatDecimal(returnedPerCombat), "");
+    }
+
+    private static void AppendOutbreakStats(
+        StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel card,
+        CardAggregate agg)
+    {
+        if (card is not Outbreak && !IsCardId(card, "CARD.OUTBREAK")) return;
+
+        Row3(
+            sb,
+            GetInlineIconStatLabel(
+                PoisonPowerIconPath,
+                "damage from extra triggers"),
+            agg.OutbreakExtraPoisonTriggerDamage.ToString(),
+            "");
     }
 
     private static void AppendDrainPowerStats(

@@ -579,6 +579,13 @@ Noxious Fumes has an extra wrinkle:
 - `NoxiousFumesPower.AfterSideTurnStart` arms a short attribution window.
 - Contribution ledgers preserve which source card owns the Fumes effect before the poison fanout is added to poison ownership.
 
+Outbreak is deliberately separate from the ordinary side-turn poison ledger:
+
+- Its current `OnPlay` first applies Poison to every hittable enemy, then explicitly calls each surviving `PoisonPower.Trigger()` while the physical Outbreak card is still the resolving player card.
+- `PoisonPower.Trigger` may issue multiple damage commands according to `TriggerCount`. Each uses the single-target decimal `CreatureCmd.Damage` overload with `ValueProp.Unblockable | ValueProp.Unpowered` and null card source/play.
+- Arm at `PoisonPower.Trigger` only while Outbreak is resolving, consume only those exact target/amount/flags/null-source commands, and sum their returned `DamageResult.UnblockedDamage` values. This observes effective damage without claiming ordinary side-turn Poison ticks or unrelated damage.
+- Because the resolving physical card is still known, this outcome belongs on that Outbreak card instance rather than a pooled power aggregate.
+
 When adding another downstream effect stat, follow the poison pattern only if there is a reliable arming event and a narrow enough outcome window. Anonymous damage or anonymous pile movement without a narrow source window should not be guessed broadly.
 
 ## Relic Attribution

@@ -26,6 +26,7 @@ using MegaCrit.Sts2.Core.Models.Relics;
 using MegaCrit.Sts2.Core.Rewards;
 using MegaCrit.Sts2.Core.Rooms;
 using MegaCrit.Sts2.Core.Runs;
+using MegaCrit.Sts2.Core.ValueProps;
 
 namespace SpireLens.Core;
 
@@ -170,6 +171,7 @@ public static class RunTracker
     private static readonly List<Creature> _pendingMercuryHourglassDamageAttributions = new();
     private static readonly List<Creature> _pendingMrStrugglesDamageAttributions = new();
     private static readonly List<Creature> _pendingLostWispDamageAttributions = new();
+    private static readonly List<PendingOutbreakPoisonTriggerAttribution> _activeOutbreakPoisonTriggers = new();
     private static readonly Dictionary<PowerModel, int> _bronzeScalesThornsContributions = new(ReferenceEqualityComparer.Instance);
     private static readonly List<PendingBronzeScalesDamageAttribution> _pendingBronzeScalesDamageAttributions = new();
     private static readonly List<Creature> _pendingHornCleatBlockAttributions = new();
@@ -1472,6 +1474,7 @@ public static class RunTracker
         _pendingMercuryHourglassDamageAttributions.Clear();
         _pendingMrStrugglesDamageAttributions.Clear();
         _pendingLostWispDamageAttributions.Clear();
+        _activeOutbreakPoisonTriggers.Clear();
         _bronzeScalesThornsContributions.Clear();
         _pendingBronzeScalesDamageAttributions.Clear();
         _pendingHornCleatBlockAttributions.Clear();
@@ -6053,6 +6056,144 @@ public static class RunTracker
         if (agg == null || cardsDrawn <= 0) return;
         agg.ViciousCardsDrawn += cardsDrawn;
         agg.RateViciousCardsDrawn += cardsDrawn;
+    }
+
+    /// <summary>
+    /// Outbreak directly calls PoisonPower.Trigger for each enemy after its
+    /// own Poison applications finish. Arm that exact trigger only while a
+    /// tracked physical Outbreak card is the resolving player card.
+    /// </summary>
+    internal static PendingOutbreakPoisonTriggerAttribution?
+        ArmOutbreakPoisonTriggerAttribution(PoisonPower? poison)
+    {
+        if (poison?.Owner == null || poison.Owner.IsPlayer) return null;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return null;
+                if (CombatManager.Instance?.IsInProgress != true) return null;
+
+                var sourceCard = _currentPlayerCardPlay?.Card;
+                if (sourceCard == null || !IsTrackedCard(sourceCard)) return null;
+                if (sourceCard is not Outbreak
+                    && !string.Equals(
+                        sourceCard.Id.ToString(),
+                        "CARD.OUTBREAK",
+                        StringComparison.Ordinal))
+                {
+                    return null;
+                }
+
+                int triggerCount = poison.TriggerCount;
+                if (triggerCount <= 0) return null;
+
+                _pendingCombat ??= new PendingCombat();
+                var pending = new PendingOutbreakPoisonTriggerAttribution
+                {
+                    PendingCombat = _pendingCombat,
+                    Power = poison,
+                    SourceCardInstanceId = GetOrAssignInstanceId(sourceCard),
+                    RemainingDamageCommands = triggerCount,
+                };
+                _activeOutbreakPoisonTriggers.Add(pending);
+                return pending;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"ArmOutbreakPoisonTriggerAttribution failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+    internal static PendingOutbreakDamageAttribution?
+        TryConsumeOutbreakPoisonDamageAttribution(
+            Creature? target,
+            decimal amount,
+            ValueProp props,
+            CardModel? cardSource,
+            CardPlay? cardPlay)
+    {
+        const ValueProp poisonDamageProps =
+            ValueProp.Unblockable | ValueProp.Unpowered;
+        if (target == null
+            || props != poisonDamageProps
+            || cardSource != null
+            || cardPlay != null)
+        {
+            return null;
+        }
+
+        lock (_lock)
+        {
+            for (int i = _activeOutbreakPoisonTriggers.Count - 1; i >= 0; i--)
+            {
+                var trigger = _activeOutbreakPoisonTriggers[i];
+                if (!ReferenceEquals(trigger.PendingCombat, _pendingCombat)) continue;
+                if (!ReferenceEquals(trigger.Power.Owner, target)) continue;
+                if (trigger.RemainingDamageCommands <= 0) continue;
+                if (!AreClose(trigger.Power.Amount, amount)) continue;
+
+                trigger.RemainingDamageCommands--;
+                return new PendingOutbreakDamageAttribution
+                {
+                    PendingCombat = trigger.PendingCombat,
+                    SourceCardInstanceId = trigger.SourceCardInstanceId,
+                };
+            }
+
+            return null;
+        }
+    }
+
+    internal static void DisarmOutbreakPoisonTriggerAttribution(
+        PendingOutbreakPoisonTriggerAttribution? pending)
+    {
+        if (pending == null) return;
+        lock (_lock)
+            _activeOutbreakPoisonTriggers.Remove(pending);
+    }
+
+    internal static void RecordOutbreakPoisonTriggerDamage(
+        PendingOutbreakDamageAttribution? pending,
+        IEnumerable<DamageResult>? results)
+    {
+        if (pending == null || results == null) return;
+
+        int effectiveDamage = results
+            .Where(result => result != null)
+            .Sum(result => Math.Max(0, result.UnblockedDamage));
+        if (effectiveDamage <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ReferenceEquals(pending.PendingCombat, _pendingCombat)) return;
+                var agg = GetOrCreateAggregate(
+                    _pendingCombat!,
+                    pending.SourceCardInstanceId);
+                RecordOutbreakExtraPoisonTriggerDamageForTest(
+                    agg,
+                    effectiveDamage);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordOutbreakPoisonTriggerDamage failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordOutbreakExtraPoisonTriggerDamageForTest(
+        CardAggregate agg,
+        int effectiveDamage)
+    {
+        if (agg == null || effectiveDamage <= 0) return;
+        agg.OutbreakExtraPoisonTriggerDamage += effectiveDamage;
     }
 
     internal static PendingDarkEmbraceDraw?
@@ -32186,6 +32327,8 @@ public static class RunTracker
         target.DiscoveryPowersPicked += source.DiscoveryPowersPicked;
         target.DiscoveryEnergyDiscountTotal += source.DiscoveryEnergyDiscountTotal;
         target.AllForOneZeroCostCardsReturned += source.AllForOneZeroCostCardsReturned;
+        target.OutbreakExtraPoisonTriggerDamage +=
+            source.OutbreakExtraPoisonTriggerDamage;
         target.ArmamentsCardsUpgraded += source.ArmamentsCardsUpgraded;
         target.DrainPowerCardsUpgraded += source.DrainPowerCardsUpgraded;
         target.DrainPowerTurnsInDeck += source.DrainPowerTurnsInDeck;
@@ -32996,6 +33139,20 @@ internal sealed class PendingFeelNoPainBlockAttribution
     public required Creature Owner { get; init; }
     public required string PowerId { get; init; }
     public required string DisplayName { get; init; }
+}
+
+internal sealed class PendingOutbreakPoisonTriggerAttribution
+{
+    public required PendingCombat PendingCombat { get; init; }
+    public required PoisonPower Power { get; init; }
+    public required string SourceCardInstanceId { get; init; }
+    public int RemainingDamageCommands { get; set; }
+}
+
+internal sealed class PendingOutbreakDamageAttribution
+{
+    public required PendingCombat PendingCombat { get; init; }
+    public required string SourceCardInstanceId { get; init; }
 }
 
 internal sealed class PendingDarkEmbraceDraw

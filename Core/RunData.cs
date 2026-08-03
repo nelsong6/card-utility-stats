@@ -448,6 +448,11 @@ public class CardAggregate
     // for One is resolving. CombatsInDeck and Plays provide its averages.
     public int AllForOneZeroCostCardsReturned { get; set; }
 
+    // Outbreak outcomes. This is effective HP damage observed from the exact
+    // PoisonPower.Trigger calls made while this physical Outbreak resolves.
+    // Ordinary side-turn Poison ticks are excluded.
+    public int OutbreakExtraPoisonTriggerDamage { get; set; }
+
     // Armaments outcomes. Counts successful UpgradeInternal calls observed
     // while this physical Armaments is resolving. Armaments+ may add several
     // upgrades in one play; cards that were already fully upgraded never

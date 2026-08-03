@@ -602,6 +602,20 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsOutbreakCardFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("outbreak-card-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        AssertOutbreakCardFixture(
+            loaded.Data.Aggregates["CARD.OUTBREAK#1"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsDarkEmbracePowerFixture()
     {
         var loaded = RunStorage.LoadHistorical(
@@ -1494,6 +1508,17 @@ public class SchemaLoadingTests
         Assert.NotNull(resumed);
         AssertViciousPowerFixture(
             resumed!.MetaStats.PowerAggregates["POWER.VICIOUS"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsOutbreakCardFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("outbreak-card-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertOutbreakCardFixture(
+            resumed!.Aggregates["CARD.OUTBREAK#1"]);
     }
 
     [Fact]
@@ -4607,6 +4632,13 @@ public class SchemaLoadingTests
         Assert.Equal("POWER.VICIOUS", powerAgg.PowerId);
         Assert.Equal("Vicious", powerAgg.DisplayName);
         Assert.Equal(11, powerAgg.ViciousCardsDrawn);
+    }
+
+    private static void AssertOutbreakCardFixture(CardAggregate cardAgg)
+    {
+        Assert.Equal(4, cardAgg.CombatsInDeck);
+        Assert.Equal(3, cardAgg.Plays);
+        Assert.Equal(37, cardAgg.OutbreakExtraPoisonTriggerDamage);
     }
 
     private static void AssertDarkEmbracePowerFixture(PowerAggregate powerAgg)
