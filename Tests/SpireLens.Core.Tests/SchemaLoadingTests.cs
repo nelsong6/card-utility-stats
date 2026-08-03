@@ -5836,4 +5836,44 @@ public class SchemaLoadingTests
         Assert.Equal(4, relicAgg.CrossbowTurns);
         Assert.Equal(2, relicAgg.CrossbowCombats);
     }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsEternalFeatherCampfireHealingFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("eternal-feather-campfire-healing-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertEternalFeatherCampfireHealingFixture(
+            loaded.Data.RelicAggregates["RELIC.ETERNAL_FEATHER"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsEternalFeatherCampfireHealingFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("eternal-feather-campfire-healing-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertEternalFeatherCampfireHealingFixture(
+            resumed!.RelicAggregates["RELIC.ETERNAL_FEATHER"]);
+    }
+
+    private static void AssertEternalFeatherCampfireHealingFixture(
+        RelicAggregate relicAgg)
+    {
+        Assert.Collection(
+            relicAgg.EternalFeatherHealingActivations,
+            activation =>
+            {
+                Assert.Equal(7, activation.Floor);
+                Assert.Equal(9m, activation.HpRestored);
+            },
+            activation =>
+            {
+                Assert.Equal(14, activation.Floor);
+                Assert.Equal(0m, activation.HpRestored);
+            });
+    }
 }

@@ -73,6 +73,59 @@ public class RunHistoryCampfireSummaryTests
     }
 
     [Fact]
+    public void BuildBodyBBCode_SplitsEternalFeatherFromRestHealing()
+    {
+        var playerEntry = new PlayerMapPointHistoryEntry
+        {
+            PlayerId = 1,
+            HpHealed = 31,
+            RestSiteChoices = ["HEAL"],
+        };
+        var entry = new RunHistoryCampfireEntry(
+            7,
+            playerEntry.RestSiteChoices,
+            playerEntry,
+            EternalFeatherHealing: 9m);
+
+        var body = RunHistoryCampfireSummary.BuildBodyBBCode(
+            [entry],
+            choice => choice == "HEAL" ? "Rest" : choice);
+
+        Assert.Contains("Rest — healed 22 HP", body);
+        Assert.Contains("\n      Eternal Feather — healed 9 HP", body);
+        Assert.DoesNotContain("Rest — healed 31 HP", body);
+    }
+
+    [Fact]
+    public void CollectEntries_AddsTrackedEternalFeatherHealingToItsFloor()
+    {
+        var history = new RunHistory
+        {
+            MapPointHistory =
+            [
+                [
+                    Point(MapPointType.Monster, (1, [])),
+                    Point(MapPointType.RestSite, (1, ["SMITH"])),
+                ],
+            ],
+        };
+        var run = new RunData();
+        var aggregate = new RelicAggregate();
+        aggregate.EternalFeatherHealingActivations.Add(
+            new EternalFeatherHealingActivationAggregate
+            {
+                Floor = 2,
+                HpRestored = 6m,
+            });
+        run.RelicAggregates["RELIC.ETERNAL_FEATHER"] = aggregate;
+
+        var entry = Assert.Single(
+            RunHistoryCampfireSummary.CollectEntries(history, 1, run));
+
+        Assert.Equal(6m, entry.EternalFeatherHealing);
+    }
+
+    [Fact]
     public void BuildOutcomeText_ReportsCookResults()
     {
         var playerEntry = new PlayerMapPointHistoryEntry

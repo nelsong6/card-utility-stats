@@ -1597,7 +1597,12 @@ Important surfaces:
   from those side effects, and do not add parallel SpireLens persistence for
   data the game history already owns. Mend's history is lossy: healing is saved
   on the recipient without the source or a per-Mend amount, so it cannot be
-  attributed exactly from a completed run file.
+  attributed exactly from a completed run file. Rest-site `hp_healed` also
+  combines the selected campfire action with Eternal Feather's earlier
+  room-entry healing. Preserve Eternal Feather's owner-specific observed
+  restored amount per floor so the campfire tooltip can subtract that exact
+  share and render it on its own line; older runs without those records retain
+  the combined native value.
 - `ViewStatsInjectorPatch` hooks `NCardsViewScreen.ConnectSignals`, gates to `NDeckViewScreen`, persists preferences, and reinjects its menu shortcut on hot reload if the deck view is already open. The master on/off control gates every SpireLens stats surface, while separate default-off controls gate card stats and monster hover stats. Gate `NativeStatsHoverTipFactory` before aggregate lookup or tooltip construction when the relevant stats option is off. The Card Stats control is presentation-only and must not be wired to `DisableCardStatsDuringCombat`, which suppresses attribution itself.
 - `StatsVisibilityHotkeyPatch` postfixes the stable Loader input node so hot-reloaded Core code can handle both keyboard and controller events. A standalone Left Shift tap and raw Right Stick (R3) press share the persisted master toggle and the same focus/overlay/transition/rebind guards. Shift chords are rejected whether the other modifier is pressed before or after Shift, covering shortcuts such as Windows+Shift+S. Left Stick press is the game's Peek action; R3 is absent from the shipped and saved controller action maps. Native Steam Input layouts must expose R3 as a virtual joypad button for the raw event to reach the mod.
 - `NCardsViewScreen.ConnectSignals` calls its controller-state update before the SpireLens postfix. Controller mode hides the built-in `%Upgrades` tickbox, so clones of that subtree inherit `Visible=false` unless SpireLens explicitly restores visibility. Any injected deck controls cloned from View Upgrades must set their own visibility rather than inherit the source's controller-specific state.

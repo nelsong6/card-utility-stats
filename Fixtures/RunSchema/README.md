@@ -528,6 +528,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `max-hp-run-history.json`
   Adds chronological observed maximum-HP changes with exact before/after
   values plus floor, room, turn, and best-known source presentation context.
+- `eternal-feather-campfire-healing-run.json`
+  Adds Eternal Feather's observed restored HP per campfire floor so native
+  combined rest-site healing can be split by source in run history.
 - `potion-run-history-turns.json`
   Adds combat-turn timing for potion lifecycle points that occur during
   combat, allowing same-turn acquisitions and uses to share a timeline row.

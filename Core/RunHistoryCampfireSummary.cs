@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using Godot;
@@ -23,7 +24,8 @@ namespace SpireLens.Core;
 internal sealed record RunHistoryCampfireEntry(
     int Floor,
     IReadOnlyList<string> ChoiceIds,
-    PlayerMapPointHistoryEntry PlayerEntry);
+    PlayerMapPointHistoryEntry PlayerEntry,
+    decimal? EternalFeatherHealing = null);
 
 internal sealed class RunHistoryCampfireButton : Button
 {
@@ -72,7 +74,10 @@ internal static class RunHistoryCampfireSummary
             return;
         }
 
-        var entries = CollectEntries(history, player.Id);
+        var entries = CollectEntries(
+            history,
+            player.Id,
+            RunHistoryStatsContext.GetCurrentRunData());
         if (entries.Count == 0) return;
 
         var acts = runHistory._mapPointHistory.GetNodeOrNull<Container>("%Acts");
@@ -177,10 +182,12 @@ internal static class RunHistoryCampfireSummary
 
     internal static IReadOnlyList<RunHistoryCampfireEntry> CollectEntries(
         RunHistory history,
-        ulong playerId)
+        ulong playerId,
+        RunData? trackedRun = null)
     {
         var result = new List<RunHistoryCampfireEntry>();
         var floor = 1;
+        var eternalFeatherHealingByFloor = GetEternalFeatherHealingByFloor(trackedRun);
 
         foreach (var act in history.MapPointHistory)
         {
@@ -197,13 +204,18 @@ internal static class RunHistoryCampfireSummary
 
                 if (isCampfire)
                 {
+                    decimal? eternalFeatherHealing =
+                        eternalFeatherHealingByFloor.TryGetValue(floor, out var healed)
+                            ? healed
+                            : null;
                     result.Add(new RunHistoryCampfireEntry(
                         floor,
                         choiceIds,
                         playerEntry ?? new PlayerMapPointHistoryEntry
                         {
                             PlayerId = playerId,
-                        }));
+                        },
+                        eternalFeatherHealing));
                 }
 
                 floor++;
@@ -237,6 +249,14 @@ internal static class RunHistoryCampfireSummary
                 .Append(Math.Max(0, entry.Floor))
                 .Append("   ")
                 .Append(StatsTooltip.EscapeBbcode(outcome));
+
+            if (entry.EternalFeatherHealing.HasValue)
+            {
+                body.Append('\n')
+                    .Append("      Eternal Feather — healed ")
+                    .Append(FormatHealing(entry.EternalFeatherHealing.Value))
+                    .Append(" HP");
+            }
         }
 
         return body.ToString();
@@ -276,6 +296,9 @@ internal static class RunHistoryCampfireSummary
         var consumedRelics = false;
         var consumedTransformations = false;
         var segments = new List<string>();
+        var nonFeatherHealing = Math.Max(
+            0m,
+            player.HpHealed - Math.Max(0m, entry.EternalFeatherHealing ?? 0m));
 
         foreach (var choice in choices)
         {
@@ -285,7 +308,7 @@ internal static class RunHistoryCampfireSummary
             switch (choice.ToUpperInvariant())
             {
                 case "HEAL":
-                    details.Add($"healed {Math.Max(0, player.HpHealed)} HP");
+                    details.Add($"healed {FormatHealing(nonFeatherHealing)} HP");
                     consumedHealing = true;
                     break;
 
@@ -353,9 +376,9 @@ internal static class RunHistoryCampfireSummary
 
                     if (player.MaxHpGained > 0)
                         details.Add($"gained {player.MaxHpGained} Max HP");
-                    if (!choiceSet.Contains("HEAL") && player.HpHealed > 0)
+                    if (!choiceSet.Contains("HEAL") && nonFeatherHealing > 0m)
                     {
-                        details.Add($"healed {player.HpHealed} HP");
+                        details.Add($"healed {FormatHealing(nonFeatherHealing)} HP");
                         consumedHealing = true;
                     }
 
@@ -382,8 +405,8 @@ internal static class RunHistoryCampfireSummary
             segments.Add("No choice recorded");
 
         var supplemental = new List<string>();
-        if (!consumedHealing && player.HpHealed > 0)
-            supplemental.Add($"healed {player.HpHealed} HP");
+        if (!consumedHealing && nonFeatherHealing > 0m)
+            supplemental.Add($"healed {FormatHealing(nonFeatherHealing)} HP");
         if (!consumedMaxHp && player.MaxHpGained > 0)
             supplemental.Add($"gained {player.MaxHpGained} Max HP");
         if (player.MaxHpLost > 0)
@@ -452,6 +475,29 @@ internal static class RunHistoryCampfireSummary
 
         return string.Join(" · ", segments);
     }
+
+    private static Dictionary<int, decimal> GetEternalFeatherHealingByFloor(
+        RunData? run)
+    {
+        if (run == null
+            || !run.RelicAggregates.TryGetValue(
+                "RELIC.ETERNAL_FEATHER",
+                out var aggregate)
+            || aggregate.EternalFeatherHealingActivations == null)
+        {
+            return new Dictionary<int, decimal>();
+        }
+
+        return aggregate.EternalFeatherHealingActivations
+            .Where(activation => activation != null && activation.Floor > 0)
+            .GroupBy(activation => activation.Floor)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Sum(activation => Math.Max(0m, activation.HpRestored)));
+    }
+
+    private static string FormatHealing(decimal value) =>
+        Math.Max(0m, value).ToString("0.##", CultureInfo.InvariantCulture);
 
     private static string FormatCardId(ModelId id) =>
         FormatModelTitle(

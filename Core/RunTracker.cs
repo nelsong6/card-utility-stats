@@ -2053,6 +2053,7 @@ public static class RunTracker
         target.TotalHealingRestored += source.TotalHealingRestored;
         target.TotalHealingLost += source.TotalHealingLost;
         MergeHealingLostReasonsInto(target, source);
+        MergeEternalFeatherHealingActivations(target, source);
         target.MeatOnTheBonePreTriggerHpMissingTotal +=
             source.MeatOnTheBonePreTriggerHpMissingTotal;
         target.MeatOnTheBonePreTriggerHpBelowHalfTotal +=
@@ -13711,7 +13712,8 @@ public static class RunTracker
             attemptedHealing,
             nameof(RecordEternalFeatherTrigger),
             forceDirectRunPersistence: true,
-            allowZeroAttempt: true);
+            allowZeroAttempt: true,
+            recordEternalFeatherActivation: true);
     }
 
     /// <summary>
@@ -19234,7 +19236,8 @@ public static class RunTracker
         string callerName,
         bool forceDirectRunPersistence = false,
         bool allowZeroAttempt = false,
-        Action<RelicAggregate>? configureAggregate = null)
+        Action<RelicAggregate>? configureAggregate = null,
+        bool recordEternalFeatherActivation = false)
     {
         if (healedCreature == null) return;
         if (attemptedHealing < 0m || (!allowZeroAttempt && attemptedHealing <= 0m)) return;
@@ -19249,9 +19252,16 @@ public static class RunTracker
                     : GetOrCreateRelicAggregateLocked(relicId);
                 configureAggregate?.Invoke(agg);
                 agg.Activations++;
+                int? activationFloor = recordEternalFeatherActivation
+                    ? CurrentRunFloorLocked()
+                    : null;
 
                 if (attemptedHealing <= 0m)
                 {
+                    AddEternalFeatherHealingActivationLocked(
+                        agg,
+                        activationFloor,
+                        restored: 0m);
                     if (persistDirectlyToRun)
                         SaveCurrentRun();
                     return;
@@ -19263,6 +19273,10 @@ public static class RunTracker
                 {
                     agg.TotalHealingLost += attemptedHealing;
                     AddHealingLostReasonLocked(agg, HealingLostFullHpReasonId, "full HP", attemptedHealing);
+                    AddEternalFeatherHealingActivationLocked(
+                        agg,
+                        activationFloor,
+                        restored: 0m);
                     if (persistDirectlyToRun)
                         SaveCurrentRun();
                     return;
@@ -19276,6 +19290,7 @@ public static class RunTracker
                     InitialCurrentHp = healedCreature.CurrentHp,
                     InitialMissingHp = initialMissingHp,
                     PersistDirectlyToRun = persistDirectlyToRun,
+                    EternalFeatherActivationFloor = activationFloor,
                 });
             }
             catch (Exception e)
@@ -19341,6 +19356,11 @@ public static class RunTracker
                     var restoredAgg = GetOrCreateRelicAggregateForHealingLocked(pending);
                     restoredAgg.TotalHealingRestored += observedRestoredDelta;
                 }
+
+                AddEternalFeatherHealingActivationLocked(
+                    GetOrCreateRelicAggregateForHealingLocked(pending),
+                    pending.EternalFeatherActivationFloor,
+                    observedRestored);
 
                 decimal lost = Math.Max(0m, pending.Attempted - observedRestored);
                 if (lost <= 0m)
@@ -27383,6 +27403,47 @@ public static class RunTracker
         }
     }
 
+    private static void MergeEternalFeatherHealingActivations(
+        RelicAggregate target,
+        RelicAggregate source)
+    {
+        if (source.EternalFeatherHealingActivations == null
+            || source.EternalFeatherHealingActivations.Count == 0)
+        {
+            return;
+        }
+
+        target.EternalFeatherHealingActivations ??=
+            new List<EternalFeatherHealingActivationAggregate>();
+        foreach (var activation in source.EternalFeatherHealingActivations)
+        {
+            if (activation == null) continue;
+            target.EternalFeatherHealingActivations.Add(
+                new EternalFeatherHealingActivationAggregate
+                {
+                    Floor = Math.Max(0, activation.Floor),
+                    HpRestored = Math.Max(0m, activation.HpRestored),
+                });
+        }
+    }
+
+    private static void AddEternalFeatherHealingActivationLocked(
+        RelicAggregate aggregate,
+        int? floor,
+        decimal restored)
+    {
+        if (!floor.HasValue) return;
+
+        aggregate.EternalFeatherHealingActivations ??=
+            new List<EternalFeatherHealingActivationAggregate>();
+        aggregate.EternalFeatherHealingActivations.Add(
+            new EternalFeatherHealingActivationAggregate
+            {
+                Floor = Math.Max(0, floor.Value),
+                HpRestored = Math.Max(0m, restored),
+            });
+    }
+
     private static void AddRelicCardGranted(
         Dictionary<string, RelicCardAggregate> cards,
         string cardId,
@@ -32325,6 +32386,7 @@ internal sealed class PendingRelicHealing
     public required decimal InitialCurrentHp { get; init; }
     public required decimal InitialMissingHp { get; init; }
     public bool PersistDirectlyToRun { get; init; }
+    public int? EternalFeatherActivationFloor { get; init; }
     public decimal ActualRestored { get; set; }
 }
 

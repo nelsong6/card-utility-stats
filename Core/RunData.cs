@@ -965,6 +965,12 @@ public class RelicAggregate
     public decimal TotalHealingLost { get; set; }
     public Dictionary<string, HealingLostReasonAggregate> HealingLostReasons { get; set; } = new();
 
+    // Eternal Feather heals on rest-site entry before the selected campfire
+    // action resolves. The game's run history combines both sources in one
+    // floor-level HP-healed value, so retain the Feather's observed share per
+    // activation for an exact campfire-history split.
+    public List<EternalFeatherHealingActivationAggregate> EternalFeatherHealingActivations { get; set; } = new();
+
     // Legacy numerator from the first pre-trigger HP implementation. It used
     // max HP as the baseline and is retained only so files written by that
     // short-lived build remain loadable; new observations do not update it.
@@ -1757,6 +1763,12 @@ public class RelicMaxHpActivationAggregate
 {
     public decimal StartingHp { get; set; }
     public decimal ResultingHp { get; set; }
+}
+
+public class EternalFeatherHealingActivationAggregate
+{
+    public int Floor { get; set; }
+    public decimal HpRestored { get; set; }
 }
 
 public class SwordInTheStoneEliteSlainAggregate

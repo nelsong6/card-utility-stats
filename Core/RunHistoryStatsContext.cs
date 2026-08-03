@@ -34,6 +34,8 @@ internal static class RunHistoryStatsContext
 
     public static bool HasCurrent => EnsureLoaded()?.Data != null;
 
+    internal static RunData? GetCurrentRunData() => EnsureLoaded()?.Data;
+
     public static void SetHistoricalDeckViewer(
         NDeckViewScreen viewer,
         IReadOnlyList<CardModel> cards)
