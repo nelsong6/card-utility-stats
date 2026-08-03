@@ -551,6 +551,18 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsSplashCardFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("splash-card-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        AssertSplashFixture(loaded.Data.Aggregates["CARD.SPLASH#1"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsDrainPowerCardFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("drain-power-card-run.json"));
@@ -1469,6 +1481,15 @@ public class SchemaLoadingTests
         Assert.Equal(2, cardAgg.DiscoverySkillsPicked);
         Assert.Equal(1, cardAgg.DiscoveryPowersPicked);
         Assert.Equal(7, cardAgg.DiscoveryEnergyDiscountTotal);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsSplashCardFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("splash-card-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertSplashFixture(resumed!.Aggregates["CARD.SPLASH#1"]);
     }
 
     [Fact]
@@ -6051,5 +6072,14 @@ public class SchemaLoadingTests
                 Assert.Equal(14, activation.Floor);
                 Assert.Equal(0m, activation.HpRestored);
             });
+    }
+
+    private static void AssertSplashFixture(CardAggregate cardAgg)
+    {
+        Assert.Equal(6, cardAgg.SplashAttacksTaken);
+        Assert.Equal(2, cardAgg.SplashCommonAttacksTaken);
+        Assert.Equal(2, cardAgg.SplashUncommonAttacksTaken);
+        Assert.Equal(2, cardAgg.SplashRareAttacksTaken);
+        Assert.Equal(7, cardAgg.SplashEnergyDiscountTotal);
     }
 }

@@ -7762,6 +7762,109 @@ public static class RunTracker
             type,
             Math.Max(0, costBefore - costAfter));
 
+    /// <summary>
+    /// Capture Splash at the exact SetToFreeThisTurn call it makes on the
+    /// selected Attack. A skipped choice never reaches this boundary.
+    /// </summary>
+    internal static CardModel? CaptureSplashChoiceSource(CardModel? selectedCard)
+    {
+        if (selectedCard == null || selectedCard.Type != CardType.Attack)
+            return null;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return null;
+
+                var causingPlay = FindCurrentlyResolvingCardPlay();
+                var sourceCard = causingPlay?.Card;
+                if (sourceCard is not Splash) return null;
+                var player = sourceCard.Owner;
+                if (player == null || !IsTrackedPlayer(player)) return null;
+                if (selectedCard.Owner != null
+                    && !ReferenceEquals(selectedCard.Owner, player))
+                {
+                    return null;
+                }
+
+                return Canonical(sourceCard);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"CaptureSplashChoiceSource failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record the selected Attack after Splash makes it free. The discount is
+    /// the observed effective energy-cost reduction across that exact call.
+    /// </summary>
+    internal static void RecordSplashAttackTaken(
+        CardModel sourceCard,
+        CardModel? selectedCard,
+        int costBefore,
+        int costAfter)
+    {
+        if (selectedCard == null || selectedCard.Type != CardType.Attack) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+                if (sourceCard is not Splash) return;
+                if (!IsTrackedCard(sourceCard)) return;
+
+                _pendingCombat ??= new PendingCombat();
+                var instanceId = GetOrAssignInstanceId(sourceCard);
+                var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
+                AccumulateSplashAttackTaken(
+                    agg,
+                    selectedCard.Rarity,
+                    Math.Max(0, costBefore - costAfter));
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordSplashAttackTaken failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void AccumulateSplashAttackTaken(
+        CardAggregate agg,
+        CardRarity rarity,
+        int energyDiscount)
+    {
+        agg.SplashAttacksTaken++;
+        agg.SplashEnergyDiscountTotal += Math.Max(0, energyDiscount);
+
+        switch (rarity)
+        {
+            case CardRarity.Common:
+                agg.SplashCommonAttacksTaken++;
+                break;
+            case CardRarity.Uncommon:
+                agg.SplashUncommonAttacksTaken++;
+                break;
+            case CardRarity.Rare:
+                agg.SplashRareAttacksTaken++;
+                break;
+        }
+    }
+
+    internal static void RecordSplashAttackTakenForTest(
+        CardAggregate agg,
+        CardRarity rarity,
+        int costBefore,
+        int costAfter)
+        => AccumulateSplashAttackTaken(
+            agg,
+            rarity,
+            Math.Max(0, costBefore - costAfter));
+
     private static void RecordArmamentsCardUpgradedLocked(CardModel upgradedCard)
     {
         if (!ShouldTrackCardStatsDuringCombatLocked()) return;
@@ -32455,6 +32558,11 @@ public static class RunTracker
         target.DiscoverySkillsPicked += source.DiscoverySkillsPicked;
         target.DiscoveryPowersPicked += source.DiscoveryPowersPicked;
         target.DiscoveryEnergyDiscountTotal += source.DiscoveryEnergyDiscountTotal;
+        target.SplashAttacksTaken += source.SplashAttacksTaken;
+        target.SplashCommonAttacksTaken += source.SplashCommonAttacksTaken;
+        target.SplashUncommonAttacksTaken += source.SplashUncommonAttacksTaken;
+        target.SplashRareAttacksTaken += source.SplashRareAttacksTaken;
+        target.SplashEnergyDiscountTotal += source.SplashEnergyDiscountTotal;
         target.AllForOneZeroCostCardsReturned += source.AllForOneZeroCostCardsReturned;
         target.OutbreakExtraPoisonTriggerDamage +=
             source.OutbreakExtraPoisonTriggerDamage;

@@ -1243,6 +1243,13 @@ Read both type and rarity from that exact selected card; a trigger with no card
 left to discount belongs in activation rates but not in either recipient
 breakdown.
 
+Splash follows Discovery's choose-card flow: after a non-null Attack selection,
+it synchronously calls `SetToFreeThisTurn` before awaiting
+`CardPileCmd.AddGeneratedCardToCombat`. Observe rarity and effective energy
+cost immediately around that exact mutation. A skipped choice never reaches
+the boundary, and the resolving Splash play distinguishes it from Discovery,
+Crossbow, and other callers of the shared cost method.
+
 Crossbow selects one unlocked Attack, calls `SetToFreeThisTurn`, and starts
 `CardPileCmd.AddGeneratedCardsToCombat` before its owner-specific
 `AfterSideTurnStart` callback reaches the first await. A thread-local scope may

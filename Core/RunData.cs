@@ -443,6 +443,16 @@ public class CardAggregate
     public int DiscoveryPowersPicked { get; set; }
     public int DiscoveryEnergyDiscountTotal { get; set; }
 
+    // Splash choice outcomes. AttacksTaken is the denominator for average
+    // discount and counts only non-null Attack selections from Splash's own
+    // choose-card screen. The discount is the selected Attack's observed
+    // effective energy-cost reduction when Splash makes it free.
+    public int SplashAttacksTaken { get; set; }
+    public int SplashCommonAttacksTaken { get; set; }
+    public int SplashUncommonAttacksTaken { get; set; }
+    public int SplashRareAttacksTaken { get; set; }
+    public int SplashEnergyDiscountTotal { get; set; }
+
     // All for One outcomes. Counts only zero-cost non-X Attack/Skill/Power
     // cards observed moving from Discard into Hand while this physical All
     // for One is resolving. CombatsInDeck and Plays provide its averages.

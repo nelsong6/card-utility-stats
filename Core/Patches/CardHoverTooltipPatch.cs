@@ -366,6 +366,7 @@ public static class CardHoverShowPatch
         AppendAlchemizePotionStats(sb, cardModel, agg, compact: false);
         AppendJackOfAllTradesStats(sb, cardModel, agg, compact: false);
         AppendDiscoveryStats(sb, cardModel, agg, compact: false);
+        AppendSplashStats(sb, cardModel, agg);
         AppendAllForOneStats(sb, cardModel, agg, compact: false);
         AppendOutbreakStats(sb, cardModel, agg);
         AppendArmamentsStats(sb, cardModel, agg);
@@ -588,6 +589,7 @@ public static class CardHoverShowPatch
         AppendAlchemizePotionStats(sb, cardModel, agg, compact: true);
         AppendJackOfAllTradesStats(sb, cardModel, agg, compact: true);
         AppendDiscoveryStats(sb, cardModel, agg, compact: true);
+        AppendSplashStats(sb, cardModel, agg);
         AppendAllForOneStats(sb, cardModel, agg, compact: true);
         AppendOutbreakStats(sb, cardModel, agg);
         AppendArmamentsStats(sb, cardModel, agg);
@@ -1154,6 +1156,27 @@ public static class CardHoverShowPatch
             : (decimal)agg.AllForOneZeroCostCardsReturned / agg.CombatsInDeck;
         Row3(sb, "Avg returned per play", FormatDecimal(returnedPerPlay), "");
         Row3(sb, "Avg returned per combat", FormatDecimal(returnedPerCombat), "");
+    }
+
+    private static void AppendSplashStats(
+        StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel card,
+        CardAggregate agg)
+    {
+        if (card is not Splash && !IsCardId(card, "CARD.SPLASH")) return;
+
+        Row3(sb, "Commons taken", agg.SplashCommonAttacksTaken.ToString(), "");
+        Row3(sb, "Uncommons taken", agg.SplashUncommonAttacksTaken.ToString(), "");
+        Row3(sb, "Rares taken", agg.SplashRareAttacksTaken.ToString(), "");
+
+        var averageDiscount = agg.SplashAttacksTaken <= 0
+            ? 0m
+            : (decimal)agg.SplashEnergyDiscountTotal / agg.SplashAttacksTaken;
+        Row3(
+            sb,
+            GetEnergyStatLabel("avg discount"),
+            FormatDecimal(averageDiscount),
+            "");
     }
 
     private static void AppendOutbreakStats(

@@ -104,6 +104,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `discovery-card-run.json`
   Adds Discovery picked-card totals, common/uncommon/rare and
   attack/skill/power splits, plus the numerator for average energy discount.
+- `splash-card-run.json`
+  Adds Splash selected-Attack totals, common/uncommon/rare splits, and the
+  numerator for average observed energy discount.
 - `feed-card-run.json`
   Adds Feed's observed maximum-HP gain to the physical card aggregate after
   its Fatal play callback completes successfully.
