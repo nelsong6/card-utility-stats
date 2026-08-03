@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Godot;
 
 namespace SpireLens.Core;
@@ -10,6 +11,16 @@ namespace SpireLens.Core;
 /// </summary>
 internal static class StatsImageCapture
 {
+    private const int ShareImagePadding = 24;
+    private const int ShareImageGap = 24;
+    private const int MaxRenderedSubjectWidth = 420;
+    private const int MaxRenderedSubjectHeight = 560;
+    private const int MaxIsolatedSubjectSize = 224;
+    private const float TooltipCaptureMargin = 10f;
+
+    private static readonly Color ShareImageBackground =
+        Color.FromHtml("#0B0910");
+
     public static bool TryCapture(
         Control control,
         out Image image,
@@ -63,6 +74,261 @@ internal static class StatsImageCapture
 
         return true;
     }
+
+    /// <summary>
+    /// Builds a clipboard-ready share image from the rendered tooltip set and
+    /// the thing that owns it. Relics can provide their source texture so the
+    /// composition contains isolated artwork instead of the surrounding relic
+    /// bar; cards and other targets use their exact rendered viewport bounds.
+    /// </summary>
+    public static bool TryCaptureShareImage(
+        Control viewportAnchor,
+        Rect2 renderedSubjectRect,
+        Texture2D? isolatedSubjectTexture,
+        IReadOnlyList<Control> tooltipGroups,
+        out Image image,
+        out string error)
+    {
+        image = null!;
+        error = string.Empty;
+
+        if (viewportAnchor == null
+            || !GodotObject.IsInstanceValid(viewportAnchor))
+        {
+            error = "The pinned item is no longer available.";
+            return false;
+        }
+
+        var viewport = viewportAnchor.GetViewport();
+        if (viewport == null || !GodotObject.IsInstanceValid(viewport))
+        {
+            error = "The pinned item has no active viewport.";
+            return false;
+        }
+
+        using var viewportImage = viewport.GetTexture()?.GetImage();
+        if (viewportImage == null
+            || viewportImage.GetWidth() <= 0
+            || viewportImage.GetHeight() <= 0)
+        {
+            error = "The game viewport did not provide an image.";
+            return false;
+        }
+
+        if (!TryGetVisibleBounds(tooltipGroups, out var tooltipBounds))
+        {
+            error = "The pinned tooltip set is outside the visible game viewport.";
+            return false;
+        }
+
+        tooltipBounds = Grow(tooltipBounds, TooltipCaptureMargin);
+        var viewportRect = viewport.GetVisibleRect();
+        var viewportImageSize = new Vector2I(
+            viewportImage.GetWidth(),
+            viewportImage.GetHeight());
+        var tooltipPixelRect = CalculatePixelRect(
+            tooltipBounds,
+            viewportRect,
+            viewportImageSize);
+        if (tooltipPixelRect.Size.X <= 0 || tooltipPixelRect.Size.Y <= 0)
+        {
+            error = "The pinned tooltip set is outside the visible game viewport.";
+            return false;
+        }
+
+        using var tooltipImage = viewportImage.GetRegion(tooltipPixelRect);
+        if (tooltipImage == null
+            || tooltipImage.GetWidth() <= 0
+            || tooltipImage.GetHeight() <= 0)
+        {
+            error = "The pinned tooltip image was empty.";
+            return false;
+        }
+
+        Image? subjectImage = null;
+        try
+        {
+            var isolatedSubject = TryCaptureTexture(
+                isolatedSubjectTexture,
+                out subjectImage);
+            if (!isolatedSubject)
+            {
+                var subjectPixelRect = CalculatePixelRect(
+                    renderedSubjectRect,
+                    viewportRect,
+                    viewportImageSize);
+                if (subjectPixelRect.Size.X > 0 && subjectPixelRect.Size.Y > 0)
+                    subjectImage = viewportImage.GetRegion(subjectPixelRect);
+            }
+
+            if (subjectImage != null
+                && subjectImage.GetWidth() > 0
+                && subjectImage.GetHeight() > 0)
+            {
+                ResizeSubject(subjectImage, isolatedSubject);
+            }
+            else
+            {
+                subjectImage?.Dispose();
+                subjectImage = null;
+            }
+
+            var subjectWidth = subjectImage?.GetWidth() ?? 0;
+            var subjectHeight = subjectImage?.GetHeight() ?? 0;
+            var contentGap = subjectImage == null ? 0 : ShareImageGap;
+            var width = checked(
+                ShareImagePadding * 2
+                + subjectWidth
+                + contentGap
+                + tooltipImage.GetWidth());
+            var height = checked(
+                ShareImagePadding * 2
+                + Math.Max(subjectHeight, tooltipImage.GetHeight()));
+
+            var combined = Image.CreateEmpty(
+                width,
+                height,
+                false,
+                Image.Format.Rgba8);
+            combined.Fill(ShareImageBackground);
+
+            if (subjectImage != null)
+            {
+                combined.BlendRect(
+                    subjectImage,
+                    new Rect2I(
+                        0,
+                        0,
+                        subjectImage.GetWidth(),
+                        subjectImage.GetHeight()),
+                    new Vector2I(
+                        ShareImagePadding,
+                        (height - subjectImage.GetHeight()) / 2));
+            }
+
+            combined.BlitRect(
+                tooltipImage,
+                new Rect2I(
+                    0,
+                    0,
+                    tooltipImage.GetWidth(),
+                    tooltipImage.GetHeight()),
+                new Vector2I(
+                    ShareImagePadding + subjectWidth + contentGap,
+                    (height - tooltipImage.GetHeight()) / 2));
+
+            image = combined;
+            return true;
+        }
+        finally
+        {
+            subjectImage?.Dispose();
+        }
+    }
+
+    private static bool TryCaptureTexture(
+        Texture2D? texture,
+        out Image? image)
+    {
+        image = null;
+        if (texture == null || !GodotObject.IsInstanceValid(texture))
+            return false;
+
+        try
+        {
+            using var source = texture.GetImage();
+            if (source == null
+                || source.GetWidth() <= 0
+                || source.GetHeight() <= 0)
+            {
+                return false;
+            }
+
+            var usedRect = source.GetUsedRect();
+            if (usedRect.Size.X <= 0 || usedRect.Size.Y <= 0)
+                usedRect = new Rect2I(0, 0, source.GetWidth(), source.GetHeight());
+
+            image = source.GetRegion(usedRect);
+            image.Convert(Image.Format.Rgba8);
+            return image.GetWidth() > 0 && image.GetHeight() > 0;
+        }
+        catch
+        {
+            image?.Dispose();
+            image = null;
+            return false;
+        }
+    }
+
+    private static void ResizeSubject(Image subject, bool isolatedSubject)
+    {
+        var maxWidth = isolatedSubject
+            ? MaxIsolatedSubjectSize
+            : MaxRenderedSubjectWidth;
+        var maxHeight = isolatedSubject
+            ? MaxIsolatedSubjectSize
+            : MaxRenderedSubjectHeight;
+        var scale = Math.Min(
+            1d,
+            Math.Min(
+                maxWidth / (double)subject.GetWidth(),
+                maxHeight / (double)subject.GetHeight()));
+        if (scale >= 1d) return;
+
+        subject.Resize(
+            Math.Max(
+                1,
+                (int)Math.Round(
+                    subject.GetWidth() * scale,
+                    MidpointRounding.AwayFromZero)),
+            Math.Max(
+                1,
+                (int)Math.Round(
+                    subject.GetHeight() * scale,
+                    MidpointRounding.AwayFromZero)),
+            Image.Interpolation.Lanczos);
+    }
+
+    private static bool TryGetVisibleBounds(
+        IReadOnlyList<Control> controls,
+        out Rect2 bounds)
+    {
+        bounds = default;
+        var found = false;
+        foreach (var control in controls)
+        {
+            if (control == null
+                || !GodotObject.IsInstanceValid(control)
+                || !control.IsVisibleInTree())
+            {
+                continue;
+            }
+
+            var rect = control.GetGlobalRect();
+            if (rect.Size.X <= 0f || rect.Size.Y <= 0f) continue;
+
+            bounds = found ? Merge(bounds, rect) : rect;
+            found = true;
+        }
+
+        return found;
+    }
+
+    private static Rect2 Merge(Rect2 left, Rect2 right)
+    {
+        var start = new Vector2(
+            Math.Min(left.Position.X, right.Position.X),
+            Math.Min(left.Position.Y, right.Position.Y));
+        var end = new Vector2(
+            Math.Max(left.End.X, right.End.X),
+            Math.Max(left.End.Y, right.End.Y));
+        return new Rect2(start, end - start);
+    }
+
+    private static Rect2 Grow(Rect2 rect, float amount)
+        => new(
+            rect.Position - new Vector2(amount, amount),
+            rect.Size + new Vector2(amount * 2f, amount * 2f));
 
     internal static Rect2I CalculatePixelRect(
         Rect2 controlRect,

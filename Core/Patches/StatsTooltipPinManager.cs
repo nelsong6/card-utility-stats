@@ -582,7 +582,9 @@ internal static class StatsTooltipPinManager
     {
         if (_copyImageInProgress
             || !IsLive(_copyImageButton)
-            || !IsLive(_pinnedStatsControl))
+            || !IsLive(_pinnedStatsControl)
+            || !IsLive(_pinnedTarget)
+            || !IsLive(_pinnedTipSet))
         {
             return;
         }
@@ -590,11 +592,18 @@ internal static class StatsTooltipPinManager
         var generation = _copyImageGeneration;
         var button = _copyImageButton!;
         var statsControl = _pinnedStatsControl!;
+        var pinnedTarget = _pinnedTarget!;
+        var pinnedTipSet = _pinnedTipSet!;
+        var lockIcon = _lockIconHost
+            ?.GetNodeOrNull<CanvasItem>(LockIconNodeName);
+        var lockIconWasVisible = IsLive(lockIcon) && lockIcon!.Visible;
         var copied = false;
         var feedback = "Copy failed";
         _copyImageInProgress = true;
         button.Disabled = true;
         button.Visible = false;
+        if (lockIconWasVisible)
+            lockIcon!.Visible = false;
 
         try
         {
@@ -604,13 +613,18 @@ internal static class StatsTooltipPinManager
                 RenderingServer.Singleton,
                 RenderingServer.SignalName.FramePostDraw);
             if (generation != _copyImageGeneration
-                || !IsLive(statsControl))
+                || !IsLive(statsControl)
+                || !IsLive(pinnedTarget)
+                || !IsLive(pinnedTipSet))
             {
                 return;
             }
 
-            if (!StatsImageCapture.TryCapture(
+            if (!StatsImageCapture.TryCaptureShareImage(
                     statsControl,
+                    GetRenderedSubjectRect(pinnedTarget),
+                    GetIsolatedSubjectTexture(pinnedTarget),
+                    GetTooltipCaptureGroups(pinnedTipSet),
                     out var image,
                     out var captureError))
             {
@@ -642,6 +656,9 @@ internal static class StatsTooltipPinManager
         }
         finally
         {
+            if (lockIconWasVisible && IsLive(lockIcon))
+                lockIcon!.Visible = true;
+
             if (generation == _copyImageGeneration && IsLive(button))
             {
                 button.Text = feedback;
@@ -675,6 +692,83 @@ internal static class StatsTooltipPinManager
             CoreMain.LogDebug(
                 $"Stats image copy feedback reset skipped: {exception.Message}");
         }
+    }
+
+    private static IReadOnlyList<Control> GetTooltipCaptureGroups(
+        NHoverTipSet tipSet)
+    {
+        var groups = new List<Control>(2);
+        if (IsLive(tipSet._textHoverTipContainer)
+            && tipSet._textHoverTipContainer.GetChildCount() > 0)
+        {
+            groups.Add(tipSet._textHoverTipContainer);
+        }
+
+        if (IsLive(tipSet._cardHoverTipContainer)
+            && tipSet._cardHoverTipContainer.GetChildCount() > 0)
+        {
+            groups.Add(tipSet._cardHoverTipContainer);
+        }
+
+        return groups;
+    }
+
+    private static Texture2D? GetIsolatedSubjectTexture(Control target)
+    {
+        var relicModel = target switch
+        {
+            NRelicInventoryHolder holder => holder.Relic.Model,
+            NRelicCollectionEntry entry
+                when CompendiumRelicStatsContext.TryGetRelicModel(entry, out var model)
+                => model,
+            NRelicBasicHolder holder when IsLive(holder.Relic)
+                => holder.Relic.Model,
+            _ => null,
+        };
+
+        return relicModel?.BigIcon ?? relicModel?.Icon;
+    }
+
+    private static Rect2 GetRenderedSubjectRect(Control target)
+    {
+        Control visual = target switch
+        {
+            NCardHolder holder when IsLive(holder.CardNode)
+                => holder.CardNode!,
+            NRelicInventoryHolder holder when IsLive(holder.Relic)
+                => holder.Relic!,
+            NDeckHistoryEntry entry
+                when IsLive(entry.GetNodeOrNull<Control>("%Card"))
+                => entry.GetNode<Control>("%Card"),
+            NRelicBasicHolder holder when IsLive(holder.Relic)
+                => holder.Relic!,
+            _ => target,
+        };
+
+        if (visual is not NCard card)
+            return visual.GetGlobalRect();
+
+        // NCard draws around a zero-sized Control origin, so its ordinary
+        // global rect is empty. Transform the known visual bounds instead.
+        var halfSize = NCard.defaultSize / 2f;
+        var transform = card.GetGlobalTransform();
+        var topLeft = transform * -halfSize;
+        var topRight = transform * new Vector2(halfSize.X, -halfSize.Y);
+        var bottomLeft = transform * new Vector2(-halfSize.X, halfSize.Y);
+        var bottomRight = transform * halfSize;
+        var left = Math.Min(
+            Math.Min(topLeft.X, topRight.X),
+            Math.Min(bottomLeft.X, bottomRight.X));
+        var top = Math.Min(
+            Math.Min(topLeft.Y, topRight.Y),
+            Math.Min(bottomLeft.Y, bottomRight.Y));
+        var right = Math.Max(
+            Math.Max(topLeft.X, topRight.X),
+            Math.Max(bottomLeft.X, bottomRight.X));
+        var bottom = Math.Max(
+            Math.Max(topLeft.Y, topRight.Y),
+            Math.Max(bottomLeft.Y, bottomRight.Y));
+        return new Rect2(left, top, right - left, bottom - top);
     }
 
     private static bool TryBuildStatsTip(Control target, out HoverTip tip)
