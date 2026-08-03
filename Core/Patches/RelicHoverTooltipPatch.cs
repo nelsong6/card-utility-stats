@@ -3973,6 +3973,20 @@ public static class RelicHoverShowPatch
     private static string BuildFragrantMushroomBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
+        DescribedIconRow(
+            sb,
+            ["hp"],
+            [],
+            "starting",
+            FormatDecimal(Math.Max(0m, agg.StartingHp ?? 0m)),
+            "Starting HP — current HP immediately before Fragrant Mushroom dealt its pickup damage.");
+        DescribedIconRow(
+            sb,
+            ["hp"],
+            [],
+            "resulting",
+            FormatDecimal(Math.Max(0m, agg.ResultingHp ?? 0m)),
+            "Resulting HP — current HP after Fragrant Mushroom's pickup damage resolved.");
         AppendUpgradedCardStats(sb, agg);
         return sb.ToString();
     }

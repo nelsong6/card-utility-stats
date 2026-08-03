@@ -2941,6 +2941,8 @@ public class SchemaLoadingTests
         var relicAgg = loaded.Data.RelicAggregates["RELIC.FRAGRANT_MUSHROOM"];
         Assert.Equal(2, relicAgg.CardsUpgraded);
         Assert.Equal(new[] { "Strike+", "Defend+" }, relicAgg.UpgradedCards);
+        Assert.Equal(52m, relicAgg.StartingHp);
+        Assert.Equal(37m, relicAgg.ResultingHp);
     }
 
     [Fact]
@@ -2952,6 +2954,8 @@ public class SchemaLoadingTests
         var relicAgg = resumed!.RelicAggregates["RELIC.FRAGRANT_MUSHROOM"];
         Assert.Equal(2, relicAgg.CardsUpgraded);
         Assert.Equal(new[] { "Strike+", "Defend+" }, relicAgg.UpgradedCards);
+        Assert.Equal(52m, relicAgg.StartingHp);
+        Assert.Equal(37m, relicAgg.ResultingHp);
     }
 
     [Fact]

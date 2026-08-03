@@ -395,7 +395,8 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `sand-castle-relic-run.json`
   Adds Sand Castle pickup tracking: the actual cards upgraded by the relic.
 - `fragrant-mushroom-relic-run.json`
-  Adds Fragrant Mushroom pickup tracking: the actual cards upgraded by the relic.
+  Adds Fragrant Mushroom pickup tracking: the actual cards upgraded by the relic
+  plus observed current HP before and after its pickup damage.
 - `fishing-rod-relic-run.json`
   Adds Fishing Rod tracking: every card actually upgraded at its three-combat
   interval, retained in upgrade order.

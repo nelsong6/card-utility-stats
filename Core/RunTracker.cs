@@ -2520,6 +2520,10 @@ public static class RunTracker
             target.FloorActivated = source.FloorActivated;
         MergeSwordInTheStoneElitesSlain(target, source);
         target.MaxHpGained += source.MaxHpGained;
+        if (source.StartingHp.HasValue && !target.StartingHp.HasValue)
+            target.StartingHp = source.StartingHp;
+        if (source.ResultingHp.HasValue)
+            target.ResultingHp = source.ResultingHp;
         MergeRelicMaxHpActivations(target, source);
         if (source.OriginalMaxHp.HasValue && !target.OriginalMaxHp.HasValue)
             target.OriginalMaxHp = source.OriginalMaxHp;
@@ -15284,7 +15288,13 @@ public static class RunTracker
                 if (!IsTrackedPlayer(relic.Owner)) return false;
 
                 player = relic.Owner;
-                _pendingFragrantMushroomPickups[player] = new PendingFragrantMushroomPickup();
+                var creature = player.Creature;
+                if (creature == null) return false;
+
+                _pendingFragrantMushroomPickups[player] = new PendingFragrantMushroomPickup
+                {
+                    StartingHp = Math.Max(0m, creature.CurrentHp),
+                };
                 return true;
             }
             catch (Exception e)
@@ -15308,7 +15318,11 @@ public static class RunTracker
                 if (!succeeded) return;
 
                 var agg = GetOrCreateCurrentRunRelicAggregateLocked(FragrantMushroomRelicId);
-                RecordFragrantMushroomUpgradesForTest(agg, pending.UpgradedCards);
+                RecordFragrantMushroomPickupForTest(
+                    agg,
+                    pending.UpgradedCards,
+                    pending.StartingHp,
+                    player.Creature?.CurrentHp ?? pending.StartingHp);
                 SaveCurrentRun();
             }
             catch (Exception e)
@@ -17644,6 +17658,19 @@ public static class RunTracker
         RelicAggregate agg,
         IEnumerable<string>? upgradedCards)
         => RecordRelicUpgradedCards(agg, upgradedCards);
+
+    internal static void RecordFragrantMushroomPickupForTest(
+        RelicAggregate agg,
+        IEnumerable<string>? upgradedCards,
+        decimal startingHp,
+        decimal resultingHp)
+    {
+        if (agg == null) return;
+
+        RecordRelicUpgradedCards(agg, upgradedCards);
+        agg.StartingHp ??= Math.Max(0m, startingHp);
+        agg.ResultingHp = Math.Max(0m, resultingHp);
+    }
 
     internal static void RecordFishingRodUpgradesForTest(
         RelicAggregate agg,
@@ -34157,6 +34184,7 @@ internal sealed class PendingWarPaintPickup
 
 internal sealed class PendingFragrantMushroomPickup
 {
+    public decimal StartingHp { get; init; }
     public List<string> UpgradedCards { get; } = new();
 }
 

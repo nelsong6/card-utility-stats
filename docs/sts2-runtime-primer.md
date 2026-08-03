@@ -1011,6 +1011,14 @@ overcounts every upgraded card displayed during pickup. Require the exact
 object passed to `UpgradeInternal` to be a current permanent-deck member; those
 positive mutations are the observed Cookie outcomes.
 
+Fragrant Mushroom's owner-specific `AfterObtained` callback first awaits its
+unblockable, unpowered damage and then synchronously upgrades two eligible
+permanent-deck cards. Snapshot the owner's current HP before the callback and
+after its task completes so the relic reports the observed starting and
+resulting HP instead of assuming all 15 listed damage landed. Keep the existing
+callback-wide permanent-deck `UpgradeInternal` window for its upgraded-card
+list.
+
 Gnarled Hammer's `AfterObtained` awaits a deck selection, then synchronously
 calls `CardCmd.Enchant` with Sharp on each returned physical deck card. Snapshot
 the deck card references and their optional Sharp amounts before the callback,

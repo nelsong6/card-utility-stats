@@ -33,7 +33,9 @@
       "upgraded_cards": [
         "Strike+",
         "Defend+"
-      ]
+      ],
+      "starting_hp": 52,
+      "resulting_hp": 37
     }
   },
   "meta_stats": {},

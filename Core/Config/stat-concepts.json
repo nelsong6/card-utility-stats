@@ -368,6 +368,16 @@
         "description": "An enemy killed by the tracked card, relic, or effect."
       }
     },
+    "hp": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/atlases/ui_atlas.sprites/top_bar/top_bar_heart.tres"
+      },
+      "help": {
+        "label": "Current HP",
+        "description": "The player's current HP at the observed moment."
+      }
+    },
     "max_hp": {
       "display": {
         "type": "game_resource",

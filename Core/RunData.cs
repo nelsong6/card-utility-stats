@@ -1168,6 +1168,12 @@ public class RelicAggregate
     // Total observed maximum HP gained by pickup max-HP relics and Chosen Cheese.
     public decimal MaxHpGained { get; set; }
 
+    // Shared current-HP before/after snapshot for one-shot relic pickup
+    // effects. Fragrant Mushroom records the HP surrounding its awaited
+    // unblockable damage rather than assuming its listed 15 HP loss landed.
+    public decimal? StartingHp { get; set; }
+    public decimal? ResultingHp { get; set; }
+
     // Ordered observed before/after max-HP snapshots for repeatable relic
     // effects. Used by Stone Humidifier so each rest-site activation remains
     // inspectable even when unrelated max-HP changes happen between rests.
