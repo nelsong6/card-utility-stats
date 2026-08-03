@@ -753,6 +753,20 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsPounceFreeSkillPowerFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("pounce-free-skill-power-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        AssertPounceFreeSkillPowerFixture(
+            loaded.Data.MetaStats.PowerAggregates["POWER.FREE_SKILL_POWER"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsDebtCardFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("debt-card-run.json"));
@@ -1638,6 +1652,17 @@ public class SchemaLoadingTests
         Assert.NotNull(resumed);
         AssertUnrelentingFreeAttackPowerFixture(
             resumed!.MetaStats.PowerAggregates["POWER.FREE_ATTACK_POWER"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsPounceFreeSkillPowerFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("pounce-free-skill-power-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertPounceFreeSkillPowerFixture(
+            resumed!.MetaStats.PowerAggregates["POWER.FREE_SKILL_POWER"]);
     }
 
     [Fact]
@@ -4764,6 +4789,20 @@ public class SchemaLoadingTests
         Assert.Equal(2, powerAgg.FreeAttackCommonAttacksDiscounted);
         Assert.Equal(3, powerAgg.FreeAttackUncommonAttacksDiscounted);
         Assert.Equal(1, powerAgg.FreeAttackRareAttacksDiscounted);
+    }
+
+    private static void AssertPounceFreeSkillPowerFixture(PowerAggregate powerAgg)
+    {
+        Assert.Equal("POWER.FREE_SKILL_POWER", powerAgg.PowerId);
+        Assert.Equal("Free Skill", powerAgg.DisplayName);
+        Assert.Equal(10, powerAgg.FreeSkillChargesGranted);
+        Assert.Equal(8, powerAgg.FreeSkillChargesUsed);
+        Assert.Equal(2, powerAgg.FreeSkillZeroEnergySavingsUses);
+        Assert.Equal(13m, powerAgg.FreeSkillEnergySaved);
+        Assert.Equal(2, powerAgg.FreeSkillBasicSkillsDiscounted);
+        Assert.Equal(2, powerAgg.FreeSkillCommonSkillsDiscounted);
+        Assert.Equal(3, powerAgg.FreeSkillUncommonSkillsDiscounted);
+        Assert.Equal(1, powerAgg.FreeSkillRareSkillsDiscounted);
     }
 
     private static void AssertSturdyClampFixture(RelicAggregate relicAgg)

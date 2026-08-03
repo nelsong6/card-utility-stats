@@ -155,6 +155,10 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds a power-ID-keyed Free Attack aggregate with charges granted and used,
   observed energy savings, zero-savings uses, and discounted Attack rarity
   splits. Every Unrelenting card projects this shared power data.
+- `pounce-free-skill-power-run.json`
+  Adds Pounce's symmetric power-ID-keyed Free Skill aggregate with charges
+  granted and used, observed energy savings, zero-savings uses, and discounted
+  Skill rarity splits. Every Pounce card projects this shared power data.
 - `debt-card-run.json`
   Adds Debt end-of-turn trigger tracking with observed gold lost and the
   unaffordable portion blocked by the player being out of gold.

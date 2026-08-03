@@ -30,6 +30,7 @@ public static class CardHoverShowPatch
     private const string EntropyPowerId = "POWER.ENTROPY";
     private const string FeelNoPainPowerId = "POWER.FEEL_NO_PAIN";
     private const string FreeAttackPowerId = "POWER.FREE_ATTACK_POWER";
+    private const string FreeSkillPowerId = "POWER.FREE_SKILL_POWER";
     private const string JugglingPowerId = "POWER.JUGGLING";
     private const string RupturePowerId = "POWER.RUPTURE";
     private const string StampedePowerId = "POWER.STAMPEDE";
@@ -380,6 +381,7 @@ public static class CardHoverShowPatch
         AppendArmamentsStats(sb, cardModel, agg);
         AppendDrainPowerStats(sb, cardModel, agg, compact: false);
         AppendUnrelentingFreeAttackStats(sb, cardModel, metaStats, compact: false);
+        AppendPounceFreeSkillStats(sb, cardModel, metaStats, compact: false);
         AppendDebtStats(sb, cardModel, agg);
         AppendNormalityStats(sb, cardModel, agg);
         AppendReplayStats(sb, agg);
@@ -603,6 +605,7 @@ public static class CardHoverShowPatch
         AppendArmamentsStats(sb, cardModel, agg);
         AppendDrainPowerStats(sb, cardModel, agg, compact: true);
         AppendUnrelentingFreeAttackStats(sb, cardModel, metaStats, compact: true);
+        AppendPounceFreeSkillStats(sb, cardModel, metaStats, compact: true);
         AppendDebtStats(sb, cardModel, agg);
         AppendNormalityStats(sb, cardModel, agg);
         AppendReplayStats(sb, agg);
@@ -1464,54 +1467,101 @@ public static class CardHoverShowPatch
         }
         powerAgg ??= new PowerAggregate();
 
-        var utilization = powerAgg.FreeAttackChargesGranted <= 0
+        AppendFreeCardDiscountStats(
+            sb,
+            "Free Attack",
+            "Attacks",
+            powerAgg.FreeAttackChargesGranted,
+            powerAgg.FreeAttackChargesUsed,
+            powerAgg.FreeAttackZeroEnergySavingsUses,
+            powerAgg.FreeAttackEnergySaved,
+            powerAgg.FreeAttackBasicAttacksDiscounted,
+            powerAgg.FreeAttackCommonAttacksDiscounted,
+            powerAgg.FreeAttackUncommonAttacksDiscounted,
+            powerAgg.FreeAttackRareAttacksDiscounted,
+            compact);
+    }
+
+    private static void AppendPounceFreeSkillStats(
+        StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel card,
+        RunMetaStats metaStats,
+        bool compact)
+    {
+        if (card is not Pounce && !IsCardId(card, "CARD.POUNCE")) return;
+
+        metaStats ??= new RunMetaStats();
+        PowerAggregate? powerAgg = null;
+        if (metaStats.PowerAggregates != null)
+        {
+            metaStats.PowerAggregates.TryGetValue(FreeSkillPowerId, out powerAgg);
+            powerAgg ??= metaStats.PowerAggregates.Values.FirstOrDefault(candidate =>
+                string.Equals(candidate.PowerId, FreeSkillPowerId, StringComparison.Ordinal)
+                || string.Equals(candidate.DisplayName, "Free Skill", StringComparison.OrdinalIgnoreCase));
+        }
+        powerAgg ??= new PowerAggregate();
+
+        AppendFreeCardDiscountStats(
+            sb,
+            "Free Skill",
+            "Skills",
+            powerAgg.FreeSkillChargesGranted,
+            powerAgg.FreeSkillChargesUsed,
+            powerAgg.FreeSkillZeroEnergySavingsUses,
+            powerAgg.FreeSkillEnergySaved,
+            powerAgg.FreeSkillBasicSkillsDiscounted,
+            powerAgg.FreeSkillCommonSkillsDiscounted,
+            powerAgg.FreeSkillUncommonSkillsDiscounted,
+            powerAgg.FreeSkillRareSkillsDiscounted,
+            compact);
+    }
+
+    private static void AppendFreeCardDiscountStats(
+        StringBuilder sb,
+        string chargeName,
+        string discountedCardType,
+        int chargesGranted,
+        int chargesUsed,
+        int zeroSavingsUses,
+        decimal energySaved,
+        int basicDiscounted,
+        int commonDiscounted,
+        int uncommonDiscounted,
+        int rareDiscounted,
+        bool compact)
+    {
+        var utilization = chargesGranted <= 0
             ? 0m
-            : 100m * powerAgg.FreeAttackChargesUsed / powerAgg.FreeAttackChargesGranted;
+            : 100m * chargesUsed / chargesGranted;
         Row3(
             sb,
-            "Free Attack charges used/granted",
-            $"{powerAgg.FreeAttackChargesUsed}/{powerAgg.FreeAttackChargesGranted}",
+            $"{chargeName} charges used/granted",
+            $"{chargesUsed}/{chargesGranted}",
             $"{utilization:F0}%");
         Row3(
             sb,
             GetEnergyStatLabel("total saved"),
-            FormatDecimal(powerAgg.FreeAttackEnergySaved),
+            FormatDecimal(energySaved),
             "");
         if (compact) return;
 
-        var averageEnergySaved = powerAgg.FreeAttackChargesUsed <= 0
+        var averageEnergySaved = chargesUsed <= 0
             ? 0m
-            : powerAgg.FreeAttackEnergySaved / powerAgg.FreeAttackChargesUsed;
+            : energySaved / chargesUsed;
         Row3(
             sb,
             GetEnergyStatLabel("charges used with 0 saved"),
-            powerAgg.FreeAttackZeroEnergySavingsUses.ToString(),
+            zeroSavingsUses.ToString(),
             "");
         Row3(
             sb,
             GetEnergyStatLabel("avg saved per charge used"),
             FormatDecimal(averageEnergySaved),
             "");
-        Row3(
-            sb,
-            "Basic Attacks discounted",
-            powerAgg.FreeAttackBasicAttacksDiscounted.ToString(),
-            "");
-        Row3(
-            sb,
-            "Common Attacks discounted",
-            powerAgg.FreeAttackCommonAttacksDiscounted.ToString(),
-            "");
-        Row3(
-            sb,
-            "Uncommon Attacks discounted",
-            powerAgg.FreeAttackUncommonAttacksDiscounted.ToString(),
-            "");
-        Row3(
-            sb,
-            "Rare Attacks discounted",
-            powerAgg.FreeAttackRareAttacksDiscounted.ToString(),
-            "");
+        Row3(sb, $"Basic {discountedCardType} discounted", basicDiscounted.ToString(), "");
+        Row3(sb, $"Common {discountedCardType} discounted", commonDiscounted.ToString(), "");
+        Row3(sb, $"Uncommon {discountedCardType} discounted", uncommonDiscounted.ToString(), "");
+        Row3(sb, $"Rare {discountedCardType} discounted", rareDiscounted.ToString(), "");
     }
 
     private static void AppendViciousPowerStats(

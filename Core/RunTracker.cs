@@ -7661,6 +7661,152 @@ public static class RunTracker
         => AccumulateFreeAttackUse(agg, energySaved, rarity);
 
     /// <summary>
+    /// Remember Free Skill's marginal reduction for the exact Skill. As with
+    /// Free Attack, repeated cost queries only update an offer snapshot; the
+    /// native charge decrement is the authoritative use boundary.
+    /// </summary>
+    internal static void RememberFreeSkillEnergySavings(
+        FreeSkillPower? power,
+        CardModel? card,
+        decimal originalCost,
+        decimal modifiedCost)
+    {
+        if (power?.Owner?.Player == null || card == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+                if (!IsTrackedPlayer(power.Owner.Player)) return;
+                if (!ReferenceEquals(card.Owner, power.Owner.Player)) return;
+                if (card.Type != CardType.Skill) return;
+                if (_pendingCombat == null) return;
+
+                _pendingCombat.FreeSkillEnergySavingsByCard[card] =
+                    Math.Max(0m, originalCost - modifiedCost);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RememberFreeSkillEnergySavings failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static PendingFreeSkillUse? CaptureFreeSkillUse(
+        FreeSkillPower? power,
+        CardPlay? cardPlay)
+    {
+        if (power?.Owner?.Player == null || cardPlay?.Card == null) return null;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return null;
+                if (!IsTrackedPlayer(power.Owner.Player)) return null;
+                if (!ReferenceEquals(cardPlay.Card.Owner, power.Owner.Player)) return null;
+                if (cardPlay.Card.Type != CardType.Skill) return null;
+                if (cardPlay.Card.Pile?.Type is not (PileType.Hand or PileType.Play)) return null;
+                if (power.Amount <= 0) return null;
+
+                _pendingCombat ??= new PendingCombat();
+                _pendingCombat.FreeSkillEnergySavingsByCard.Remove(
+                    cardPlay.Card,
+                    out var offeredEnergySavings);
+
+                return new PendingFreeSkillUse
+                {
+                    Power = power,
+                    Player = power.Owner.Player,
+                    Card = cardPlay.Card,
+                    StartingPowerAmount = power.Amount,
+                    OfferedEnergySavings = Math.Max(0m, offeredEnergySavings),
+                    IsAutoPlay = cardPlay.IsAutoPlay,
+                };
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"CaptureFreeSkillUse failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+    internal static void RecordFreeSkillUse(PendingFreeSkillUse? observation)
+    {
+        if (observation == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+                if (_pendingCombat == null || !IsTrackedPlayer(observation.Player)) return;
+                if (observation.Power.Amount >= observation.StartingPowerAmount) return;
+
+                var agg = GetOrCreatePowerAggregate(
+                    _pendingCombat.MetaStats,
+                    observation.Power.Id.ToString(),
+                    GetPowerDisplayName(observation.Power));
+                AccumulateFreeSkillUse(
+                    agg,
+                    observation.IsAutoPlay ? 0m : observation.OfferedEnergySavings,
+                    observation.Card.Rarity);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordFreeSkillUse failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void AccumulateFreeSkillGrant(PowerAggregate agg, int charges)
+    {
+        if (agg == null || charges <= 0) return;
+        agg.FreeSkillChargesGranted += charges;
+    }
+
+    private static void AccumulateFreeSkillUse(
+        PowerAggregate agg,
+        decimal energySaved,
+        CardRarity rarity)
+    {
+        if (agg == null) return;
+
+        var observedEnergySaved = Math.Max(0m, energySaved);
+        agg.FreeSkillChargesUsed++;
+        agg.FreeSkillEnergySaved += observedEnergySaved;
+        if (observedEnergySaved <= 0m)
+            agg.FreeSkillZeroEnergySavingsUses++;
+
+        switch (rarity)
+        {
+            case CardRarity.Basic:
+                agg.FreeSkillBasicSkillsDiscounted++;
+                break;
+            case CardRarity.Common:
+                agg.FreeSkillCommonSkillsDiscounted++;
+                break;
+            case CardRarity.Uncommon:
+                agg.FreeSkillUncommonSkillsDiscounted++;
+                break;
+            case CardRarity.Rare:
+                agg.FreeSkillRareSkillsDiscounted++;
+                break;
+        }
+    }
+
+    internal static void RecordFreeSkillGrantForTest(PowerAggregate agg, int charges)
+        => AccumulateFreeSkillGrant(agg, charges);
+
+    internal static void RecordFreeSkillUseForTest(
+        PowerAggregate agg,
+        decimal energySaved,
+        CardRarity rarity)
+        => AccumulateFreeSkillUse(agg, energySaved, rarity);
+
+    /// <summary>
     /// Capture Discovery at the exact SetToFreeThisTurn call it makes on the
     /// picked card. A skipped choice never reaches this boundary.
     /// </summary>
@@ -31833,6 +31979,20 @@ public static class RunTracker
                         Math.Max(0, (int)Math.Floor(entry.Amount)));
                 }
 
+                if (target?.IsPlayer == true
+                    && entry.Amount > 0m
+                    && entry.Power is FreeSkillPower
+                    && causingPlay.Card is Pounce)
+                {
+                    var powerAgg = GetOrCreatePowerAggregate(
+                        _pendingCombat.MetaStats,
+                        entry.Power.Id.ToString(),
+                        GetPowerDisplayName(entry.Power));
+                    AccumulateFreeSkillGrant(
+                        powerAgg,
+                        Math.Max(0, (int)Math.Floor(entry.Amount)));
+                }
+
                 if (target?.IsPlayer == true && entry.Amount > 0m)
                 {
                     var effect = GetOrCreateAppliedEffect(agg, entry.Power);
@@ -32985,6 +33145,14 @@ public static class RunTracker
             targetAgg.FreeAttackCommonAttacksDiscounted += sourceAgg.FreeAttackCommonAttacksDiscounted;
             targetAgg.FreeAttackUncommonAttacksDiscounted += sourceAgg.FreeAttackUncommonAttacksDiscounted;
             targetAgg.FreeAttackRareAttacksDiscounted += sourceAgg.FreeAttackRareAttacksDiscounted;
+            targetAgg.FreeSkillChargesGranted += sourceAgg.FreeSkillChargesGranted;
+            targetAgg.FreeSkillChargesUsed += sourceAgg.FreeSkillChargesUsed;
+            targetAgg.FreeSkillZeroEnergySavingsUses += sourceAgg.FreeSkillZeroEnergySavingsUses;
+            targetAgg.FreeSkillEnergySaved += sourceAgg.FreeSkillEnergySaved;
+            targetAgg.FreeSkillBasicSkillsDiscounted += sourceAgg.FreeSkillBasicSkillsDiscounted;
+            targetAgg.FreeSkillCommonSkillsDiscounted += sourceAgg.FreeSkillCommonSkillsDiscounted;
+            targetAgg.FreeSkillUncommonSkillsDiscounted += sourceAgg.FreeSkillUncommonSkillsDiscounted;
+            targetAgg.FreeSkillRareSkillsDiscounted += sourceAgg.FreeSkillRareSkillsDiscounted;
             targetAgg.EntropyChainsOfBindingBroken +=
                 sourceAgg.EntropyChainsOfBindingBroken;
             targetAgg.EntropyCardsGenerated += sourceAgg.EntropyCardsGenerated;
@@ -33627,6 +33795,16 @@ internal sealed class PendingFreeAttackUse
     public bool IsAutoPlay { get; init; }
 }
 
+internal sealed class PendingFreeSkillUse
+{
+    public required FreeSkillPower Power { get; init; }
+    public required Player Player { get; init; }
+    public required CardModel Card { get; init; }
+    public int StartingPowerAmount { get; init; }
+    public decimal OfferedEnergySavings { get; init; }
+    public bool IsAutoPlay { get; init; }
+}
+
 internal sealed class PendingDanseMacabreBlockAttribution
 {
     public required PendingCombat PendingCombat { get; init; }
@@ -33935,6 +34113,8 @@ internal class PendingCombat
     public Dictionary<Player, int> RupturePowerTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<CardModel, decimal> FreeAttackEnergySavingsByCard { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<CardModel, decimal> FreeSkillEnergySavingsByCard { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<string, int> DrainPowerTurnCountedTurns { get; }
         = new(StringComparer.Ordinal);

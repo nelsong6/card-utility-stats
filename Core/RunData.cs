@@ -765,6 +765,19 @@ public class PowerAggregate
     public int FreeAttackUncommonAttacksDiscounted { get; set; }
     public int FreeAttackRareAttacksDiscounted { get; set; }
 
+    // Pounce / Free Skill tracking. This deliberately mirrors Free Attack:
+    // shared stacks belong to the power aggregate, a use requires the native
+    // decrement to complete, and savings use the power's own marginal cost
+    // reduction rather than the card's printed cost.
+    public int FreeSkillChargesGranted { get; set; }
+    public int FreeSkillChargesUsed { get; set; }
+    public int FreeSkillZeroEnergySavingsUses { get; set; }
+    public decimal FreeSkillEnergySaved { get; set; }
+    public int FreeSkillBasicSkillsDiscounted { get; set; }
+    public int FreeSkillCommonSkillsDiscounted { get; set; }
+    public int FreeSkillUncommonSkillsDiscounted { get; set; }
+    public int FreeSkillRareSkillsDiscounted { get; set; }
+
     // Entropy tracking. Generated cards are confirmed from successful
     // CardCmd.Transform results. Chains broken counts replacements whose
     // original card had the Queen's Bound affliction before transformation.
