@@ -15,6 +15,9 @@ namespace SpireLens.Core;
 /// </summary>
 internal static class RunTimerStatsTooltip
 {
+    private const float HorizontalClearance = 20f;
+    private const float ViewportMargin = 8f;
+
     private sealed class Binding
     {
         public required Control Target { get; init; }
@@ -124,7 +127,10 @@ internal static class RunTimerStatsTooltip
             tip,
             GetNonObscuringAlignment(target));
         if (tipSet != null)
+        {
             NativeStatsHoverTipStyler.ApplyToLastTextTip(tipSet);
+            AlignClearOfTarget(target, tipSet);
+        }
     }
 
     internal static HoverTipAlignment GetNonObscuringAlignment(Control target)
@@ -139,6 +145,73 @@ internal static class RunTimerStatsTooltip
         return targetCenterX >= viewportCenterX
             ? HoverTipAlignment.Left
             : HoverTipAlignment.Right;
+    }
+
+    /// <summary>
+    /// Native left/right alignment touches the tooltip edge directly to the
+    /// owner's anchor. Timer glyph outlines extend to that edge, so enforce a
+    /// real gap after the tooltip has measured its rendered width. Repeat on
+    /// the deferred layout pass because pinning adds the camera control after
+    /// the native hover-tip set is first constructed.
+    /// </summary>
+    internal static void AlignClearOfTarget(
+        Control target,
+        NHoverTipSet tipSet)
+    {
+        ApplyClearance(target, tipSet);
+        Callable.From(() =>
+        {
+            if (IsTarget(target) && IsLive(tipSet))
+                ApplyClearance(target, tipSet);
+        }).CallDeferred();
+    }
+
+    private static void ApplyClearance(
+        Control target,
+        NHoverTipSet tipSet)
+    {
+        if (!IsLive(target)
+            || !IsLive(tipSet)
+            || !IsLive(tipSet._textHoverTipContainer))
+        {
+            return;
+        }
+
+        var alignment = GetNonObscuringAlignment(target);
+        tipSet.SetAlignment(target, alignment);
+
+        var container = tipSet._textHoverTipContainer;
+        var width = container.Size.X;
+        if (width <= 0f) return;
+
+        var viewportRect = target.GetViewport()?.GetVisibleRect() ?? default;
+        if (viewportRect.Size.X <= 0f) return;
+
+        var x = GetClearTooltipX(
+            target.GetGlobalRect(),
+            width,
+            alignment,
+            viewportRect);
+        container.GlobalPosition = new Vector2(x, container.GlobalPosition.Y);
+    }
+
+    internal static float GetClearTooltipX(
+        Rect2 targetRect,
+        float tooltipWidth,
+        HoverTipAlignment alignment,
+        Rect2 viewportRect)
+    {
+        var desiredX = alignment == HoverTipAlignment.Right
+            ? targetRect.Position.X + targetRect.Size.X + HorizontalClearance
+            : targetRect.Position.X - HorizontalClearance - tooltipWidth;
+        var minimumX = viewportRect.Position.X + ViewportMargin;
+        var maximumX = Math.Max(
+            minimumX,
+            viewportRect.Position.X
+                + viewportRect.Size.X
+                - ViewportMargin
+                - tooltipWidth);
+        return Math.Clamp(desiredX, minimumX, maximumX);
     }
 
     private static void Bind(

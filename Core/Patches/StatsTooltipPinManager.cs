@@ -918,9 +918,7 @@ internal static class StatsTooltipPinManager
                 break;
 
             case Control timer when RunTimerStatsTooltip.IsTarget(timer):
-                tipSet.SetAlignment(
-                    timer,
-                    RunTimerStatsTooltip.GetNonObscuringAlignment(timer));
+                RunTimerStatsTooltip.AlignClearOfTarget(timer, tipSet);
                 break;
         }
     }
