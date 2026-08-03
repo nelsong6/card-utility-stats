@@ -51,6 +51,9 @@ internal static class StatsImageCapture
             return false;
         }
 
+        if (!TryNormalizeForComposition(viewportImage, out error))
+            return false;
+
         var pixelRect = CalculatePixelRect(
             GetViewportRect(control),
             viewport.GetVisibleRect(),
@@ -114,6 +117,9 @@ internal static class StatsImageCapture
             error = "The game viewport did not provide an image.";
             return false;
         }
+
+        if (!TryNormalizeForComposition(viewportImage, out error))
+            return false;
 
         if (!TryGetVisibleBounds(tooltipGroups, out var tooltipBounds))
         {
@@ -244,12 +250,14 @@ internal static class StatsImageCapture
                 return false;
             }
 
+            if (!TryNormalizeForComposition(source, out _))
+                return false;
+
             var usedRect = source.GetUsedRect();
             if (usedRect.Size.X <= 0 || usedRect.Size.Y <= 0)
                 return false;
 
             image = source.GetRegion(usedRect);
-            image.Convert(Image.Format.Rgba8);
             return image.GetWidth() > 0 && image.GetHeight() > 0;
         }
         catch
@@ -258,6 +266,31 @@ internal static class StatsImageCapture
             image = null;
             return false;
         }
+    }
+
+    private static bool TryNormalizeForComposition(
+        Image image,
+        out string error)
+    {
+        error = string.Empty;
+        if (image.IsCompressed())
+        {
+            var decompressError = image.Decompress();
+            if (decompressError != Error.Ok)
+            {
+                error = $"Could not decompress the captured image ({decompressError}).";
+                return false;
+            }
+        }
+
+        if (image.GetFormat() != Image.Format.Rgba8)
+            image.Convert(Image.Format.Rgba8);
+
+        if (image.GetFormat() == Image.Format.Rgba8)
+            return true;
+
+        error = "Could not convert the captured image to RGBA pixels.";
+        return false;
     }
 
     private static void ResizeSubject(Image subject, bool isolatedSubject)
