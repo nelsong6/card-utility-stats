@@ -256,7 +256,8 @@ public static class CardHoverShowPatch
             cardModel,
             agg,
             RunTracker.GetEffectiveMetaStats(),
-            RunTracker.GetEtherealCardsPlayedThisCombat());
+            RunTracker.GetEtherealCardsPlayedThisCombat(),
+            GetSupermassiveCardsCreatedThisCombat(cardModel));
 
         // No footer. Previously we rendered "A4 · DEFECT · this run" here
         // as a mirror of SlayTheStats' filter-context footer — but they need
@@ -333,7 +334,8 @@ public static class CardHoverShowPatch
         MegaCrit.Sts2.Core.Models.CardModel cardModel,
         CardAggregate agg,
         RunMetaStats metaStats,
-        int? etherealCardsPlayedThisCombat = null)
+        int? etherealCardsPlayedThisCombat = null,
+        int? cardsCreatedThisCombat = null)
     {
         // Per-play averages — the actual "utility" signal. Guard against
         // div-by-zero for the unplayed case.
@@ -367,6 +369,8 @@ public static class CardHoverShowPatch
 
         if (etherealCardsPlayedThisCombat.HasValue)
             AppendPullFromBelowStats(sb, cardModel, etherealCardsPlayedThisCombat.Value);
+        if (cardsCreatedThisCombat.HasValue)
+            AppendSupermassiveStats(sb, cardModel, cardsCreatedThisCombat.Value);
         AppendMakeItSoStats(sb, cardModel, agg, compact: false);
         AppendUnleashStats(sb, cardModel, agg, compact: false);
         AppendOstySummonStats(sb, cardModel, agg, metaStats, compact: false);
@@ -549,7 +553,8 @@ public static class CardHoverShowPatch
             cardModel,
             agg,
             RunTracker.GetEffectiveMetaStats(),
-            RunTracker.GetEtherealCardsPlayedThisCombat());
+            RunTracker.GetEtherealCardsPlayedThisCombat(),
+            GetSupermassiveCardsCreatedThisCombat(cardModel));
     }
 
     private static void AppendCompactBodyWithMetaStats(
@@ -557,7 +562,8 @@ public static class CardHoverShowPatch
         MegaCrit.Sts2.Core.Models.CardModel cardModel,
         CardAggregate agg,
         RunMetaStats metaStats,
-        int? etherealCardsPlayedThisCombat = null)
+        int? etherealCardsPlayedThisCombat = null,
+        int? cardsCreatedThisCombat = null)
     {
         bool isAttack = cardModel.Type == CardType.Attack;
 
@@ -591,6 +597,8 @@ public static class CardHoverShowPatch
 
         if (etherealCardsPlayedThisCombat.HasValue)
             AppendPullFromBelowStats(sb, cardModel, etherealCardsPlayedThisCombat.Value);
+        if (cardsCreatedThisCombat.HasValue)
+            AppendSupermassiveStats(sb, cardModel, cardsCreatedThisCombat.Value);
         AppendMakeItSoStats(sb, cardModel, agg, compact: true);
         AppendUnleashStats(sb, cardModel, agg, compact: true);
         AppendOstySummonStats(sb, cardModel, agg, metaStats, compact: true);
@@ -2147,6 +2155,36 @@ public static class CardHoverShowPatch
         if (cardModel is not PullFromBelow) return;
 
         Row3(sb, "Ethereal cards played this combat", etherealCardsPlayedThisCombat.ToString(), "");
+    }
+
+    private static void AppendSupermassiveStats(
+        StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel cardModel,
+        int cardsCreatedThisCombat)
+    {
+        if (cardModel is not Supermassive
+            && !IsCardId(cardModel, "CARD.SUPERMASSIVE"))
+        {
+            return;
+        }
+
+        Row3(
+            sb,
+            "Cards created this combat",
+            Math.Max(0, cardsCreatedThisCombat).ToString(),
+            "");
+    }
+
+    private static int? GetSupermassiveCardsCreatedThisCombat(
+        MegaCrit.Sts2.Core.Models.CardModel cardModel)
+    {
+        if (cardModel is not Supermassive
+            && !IsCardId(cardModel, "CARD.SUPERMASSIVE"))
+        {
+            return null;
+        }
+
+        return RunTracker.GetCardsCreatedThisCombat(cardModel.Owner);
     }
 
     private static string GetInlineIconStatLabel(string iconPath, string suffix)

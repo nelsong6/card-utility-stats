@@ -709,6 +709,35 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Return the same owner-scoped CardGeneratedEntry count Supermassive uses
+    /// as the multiplier for its calculated damage. This is intentionally
+    /// live-only: outside combat there is no meaningful "this combat" value.
+    /// </summary>
+    public static int? GetCardsCreatedThisCombat(Player? player)
+    {
+        if (player == null) return null;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (CombatManager.Instance?.IsInProgress != true) return null;
+                var entries = CombatManager.Instance.History?.Entries;
+                if (entries == null) return 0;
+
+                return entries
+                    .OfType<CardGeneratedEntry>()
+                    .Count(entry => entry.Creator == player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"GetCardsCreatedThisCombat failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+    /// <summary>
     /// The instance number for a card for UI display purposes — derived from
     /// the card's position in the player's deck among other cards of the same
     /// definition. Stable across a run, doesn't depend on play order or on
