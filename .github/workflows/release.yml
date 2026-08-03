@@ -10,6 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: write
   contents: write
   pull-requests: read
 
@@ -96,6 +97,93 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  queue-version-release:
+    name: Queue version release
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout merged commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine release work
+        id: release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          Set-StrictMode -Version Latest
+
+          $manifest = Get-Content -Raw -LiteralPath "SpireLens.json" | ConvertFrom-Json
+          $version = [string]$manifest.version
+          if ($version -notmatch '^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$') {
+            throw "Manifest version '$version' is not a supported release tag."
+          }
+
+          $remoteTag = git ls-remote --tags origin "refs/tags/$version"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Could not inspect origin for release tag '$version'."
+          }
+          $tagExists = -not [string]::IsNullOrWhiteSpace(($remoteTag | Out-String))
+
+          $releaseRunExists = $false
+          if ($tagExists) {
+            $runsJson = gh run list `
+              --repo $env:GITHUB_REPOSITORY `
+              --workflow release.yml `
+              --branch $version `
+              --limit 1 `
+              --json databaseId
+            if ($LASTEXITCODE -ne 0) {
+              throw "Could not inspect release runs for '$version'."
+            }
+            $releaseRunExists = @($runsJson | ConvertFrom-Json).Count -gt 0
+          }
+
+          $tagRequired = if ($tagExists) { "false" } else { "true" }
+          $dispatchRequired = if ($releaseRunExists) { "false" } else { "true" }
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "tag_required=$tagRequired" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "dispatch_required=$dispatchRequired" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Create release tag
+        if: steps.release.outputs.tag_required == 'true'
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a $env:VERSION $env:GITHUB_SHA -m "SpireLens $env:VERSION"
+          git push origin "refs/tags/$env:VERSION"
+
+      - name: Dispatch tagged release
+        if: steps.release.outputs.dispatch_required == 'true'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          gh workflow run release.yml `
+            --repo $env:GITHUB_REPOSITORY `
+            --ref $env:VERSION
+          "Queued the $env:VERSION tagged release." |
+            Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
+
+      - name: Report existing release
+        if: steps.release.outputs.dispatch_required != 'true'
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          "$env:VERSION already has a tagged release run; no publication was queued." |
+            Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
 
   workshop:
     name: Publish Steam Workshop
