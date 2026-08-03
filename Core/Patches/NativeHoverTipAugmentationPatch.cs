@@ -264,6 +264,11 @@ internal static class NativeStatsHoverTipFactory
                 statsTip = tip;
                 return true;
 
+            case NTopBarGold gold
+                when GoldStatsTooltip.TryBuildNativeHoverTip(gold, out tip):
+                statsTip = tip;
+                return true;
+
             default:
                 return false;
         }

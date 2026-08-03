@@ -544,6 +544,7 @@ public static class RunHistoryDisplayRunStatsContextPatch
             {
                 RunHistoryCampfireSummary.Refresh(__instance, history, player);
                 RunHistoryHpTooltip.Refresh(__instance, player);
+                RunHistoryGoldTooltip.Refresh(__instance, player);
             }
         });
     }
@@ -570,6 +571,7 @@ public static class RunHistorySelectPlayerCampfireSummaryPatch
                     __instance._history,
                     playerIcon.Player);
                 RunHistoryHpTooltip.Refresh(__instance, playerIcon.Player);
+                RunHistoryGoldTooltip.Refresh(__instance, playerIcon.Player);
             }
         });
     }
@@ -587,6 +589,7 @@ public static class RunHistoryHiddenStatsContextPatch
             RunHistoryDeckViewer.DisableArrowHotkeys(__instance);
             RunHistoryCampfireSummary.Remove(__instance);
             RunHistoryHpTooltip.Remove(__instance);
+            RunHistoryGoldTooltip.Remove(__instance);
             StatsTooltipPinManager.ClearPin();
             RunHistoryStatsContext.Clear();
         });

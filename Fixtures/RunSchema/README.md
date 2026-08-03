@@ -531,6 +531,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `hp-run-stats.json`
   Adds run-wide current-HP loss split between combats and events, plus the
   zero-inclusive completed-combat denominator used by HP-loss averages.
+- `gold-run-stats.json`
+  Adds observed run-wide gold acquisition and game-classified spending,
+  context splits, and zero-inclusive shop/event/combat rate denominators.
 - `eternal-feather-campfire-healing-run.json`
   Adds Eternal Feather's observed restored HP per campfire floor so native
   combined rest-site healing can be split by source in run history.

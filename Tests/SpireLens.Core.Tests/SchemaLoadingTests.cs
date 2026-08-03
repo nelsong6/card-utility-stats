@@ -5361,6 +5361,42 @@ public class SchemaLoadingTests
         Assert.Equal(2, run.MaxHpHistory.Count);
     }
 
+    [Fact]
+    public void HistoricalLoad_AcceptsGoldRunStatsFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("gold-run-stats.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertGoldRunStatsFixture(loaded.Data);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsGoldRunStatsFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("gold-run-stats.json"));
+
+        Assert.NotNull(resumed);
+        AssertGoldRunStatsFixture(resumed!);
+    }
+
+    private static void AssertGoldRunStatsFixture(RunData run)
+    {
+        Assert.Equal(480, run.GoldStats.GoldAcquired);
+        Assert.Equal(300, run.GoldStats.GoldSpent);
+        Assert.Equal(220, run.GoldStats.GoldSpentInShops);
+        Assert.Equal(50, run.GoldStats.GoldSpentInEvents);
+        Assert.Equal(180, run.GoldStats.GoldGainedInCombats);
+        Assert.Equal(80, run.GoldStats.GoldGainedInEvents);
+        Assert.Equal(4, run.GoldStats.ShopsVisited);
+        Assert.Equal(5, run.GoldStats.EventsVisited);
+        Assert.Equal(10, run.GoldStats.Combats);
+        Assert.Equal(9, run.GoldStats.LastShopFloorCounted);
+        Assert.Equal(11, run.GoldStats.LastEventFloorCounted);
+    }
+
     private static void AssertMaxHpRunHistoryFixture(RunData run)
     {
         Assert.Equal(2, run.MaxHpHistory.Count);

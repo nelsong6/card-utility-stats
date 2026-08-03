@@ -143,6 +143,7 @@ public static class CoreMain
         RunHistoryDeckViewer.ReinjectIntoActiveRunHistory();
         RunHistoryCampfireSummary.ReinjectIntoActiveRunHistory();
         RunHistoryHpTooltip.ReinjectIntoActiveRunHistory();
+        RunHistoryGoldTooltip.ReinjectIntoActiveRunHistory();
         RunHistoryDeckViewer.RefreshAllArrowHotkeys();
         Patches.RelicBarFilterPatch.InitializeHooks();
         Patches.RelicBarFilterPatch.RefreshAll("core initialized");
@@ -190,6 +191,9 @@ public static class CoreMain
 
         try { RunHistoryHpTooltip.Teardown(); }
         catch (Exception e) { Logger.Error($"Shutdown: run-history HP tooltip teardown failed: {e}"); }
+
+        try { RunHistoryGoldTooltip.Teardown(); }
+        catch (Exception e) { Logger.Error($"Shutdown: run-history gold tooltip teardown failed: {e}"); }
 
         try { SpireLensOptionsMenu.Destroy(); }
         catch (Exception e) { Logger.Error($"Shutdown: options menu teardown failed: {e}"); }

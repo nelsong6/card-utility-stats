@@ -19,6 +19,7 @@ public static class SignetRingStatsPatch
     {
         try
         {
+            RunTracker.RecordRunGoldRoomEntered(runState, room);
             if (room is MerchantRoom)
                 RunTracker.RecordSignetRingShopReached(runState, room);
         }

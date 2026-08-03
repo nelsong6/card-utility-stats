@@ -74,6 +74,13 @@ public class RunData
     public RunHealthStats HealthStats { get; set; } = new();
 
     /// <summary>
+    /// Observed positive gold balance changes and game-classified spending,
+    /// with zero-inclusive room/combat denominators for the run-level gold
+    /// tooltip. Lost and stolen gold remain outside spending totals.
+    /// </summary>
+    public RunGoldStats GoldStats { get; set; } = new();
+
+    /// <summary>
     /// Ordered provenance for the portion of the player's gold balance that
     /// still matters to source attribution. Old Coin seeds the first tracked
     /// chunk; ordinary balance before and after it is represented by chunks
@@ -148,6 +155,24 @@ public class RunHealthStats
     public decimal HpLostInCombats { get; set; }
     public decimal HpLostInEvents { get; set; }
     public int Combats { get; set; }
+}
+
+/// <summary>
+/// Run-wide observed gold flow and its rate denominators.
+/// </summary>
+public class RunGoldStats
+{
+    public int GoldAcquired { get; set; }
+    public int GoldSpent { get; set; }
+    public int GoldSpentInShops { get; set; }
+    public int GoldSpentInEvents { get; set; }
+    public int GoldGainedInCombats { get; set; }
+    public int GoldGainedInEvents { get; set; }
+    public int ShopsVisited { get; set; }
+    public int EventsVisited { get; set; }
+    public int Combats { get; set; }
+    public int? LastShopFloorCounted { get; set; }
+    public int? LastEventFloorCounted { get; set; }
 }
 
 /// <summary>

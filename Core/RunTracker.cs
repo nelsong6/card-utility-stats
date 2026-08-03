@@ -402,6 +402,30 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Read-only current-run gold flow with the active combat overlaid.
+    /// </summary>
+    public static bool TryGetEffectiveGoldStats(
+        out RunGoldStats goldStats,
+        out int floors)
+    {
+        lock (_lock)
+        {
+            if (_currentRun == null)
+            {
+                goldStats = new RunGoldStats();
+                floors = 0;
+                return false;
+            }
+
+            goldStats = CloneGoldStats(_currentRun.GoldStats);
+            if (_pendingCombat != null)
+                MergeGoldStatsInto(goldStats, _pendingCombat.GoldStats);
+            floors = Math.Max(0, CurrentRunFloorLocked() ?? 0);
+            return true;
+        }
+    }
+
+    /// <summary>
     /// Resolve any CardModel (combat clone or deck original) to its canonical
     /// per-deck reference. Combat clones have <c>DeckVersion</c> set to the
     /// original deck card by <c>Player.PopulateCombatState</c>
@@ -1703,6 +1727,14 @@ public static class RunTracker
                 Character = runState.Players.FirstOrDefault()?.Character?.Id.ToString(),
                 Ascension = runState.AscensionLevel,
                 FloorReached = runState.TotalFloor,
+                GoldStats =
+                {
+                    GoldAcquired = Math.Max(
+                        0,
+                        runState.Players.FirstOrDefault(IsTrackedPlayer)?.Gold
+                            ?? runState.Players.FirstOrDefault()?.Gold
+                            ?? 0),
+                },
                 // The game's own run identifier (RunManager._startTime via
                 // Publicizer) — matches the filename it uses for its
                 // run-history save ({StartTime}.run). Enables M5 correlation.
@@ -1799,6 +1831,7 @@ public static class RunTracker
             _pendingCombat = new PendingCombat
             {
                 HealthStats = { Combats = 1 },
+                GoldStats = { Combats = 1 },
             };
             ResetCombatContextState();
             RecordPantographCombatStartForTrackedPlayerLocked(state);
@@ -1928,6 +1961,9 @@ public static class RunTracker
         run.HealthStats ??= new RunHealthStats();
         MergeHealthStatsInto(run.HealthStats, pending.HealthStats);
 
+        run.GoldStats ??= new RunGoldStats();
+        MergeGoldStatsInto(run.GoldStats, pending.GoldStats);
+
         foreach (var (relicId, pendingRelicAgg) in pending.RelicAggregates)
         {
             if (!run.RelicAggregates.TryGetValue(relicId, out var runRelicAgg))
@@ -1965,6 +2001,27 @@ public static class RunTracker
         target.HpLostInCombats += source.HpLostInCombats;
         target.HpLostInEvents += source.HpLostInEvents;
         target.Combats += source.Combats;
+    }
+
+    internal static void MergeGoldStatsInto(
+        RunGoldStats target,
+        RunGoldStats? source)
+    {
+        if (source == null) return;
+
+        target.GoldAcquired += source.GoldAcquired;
+        target.GoldSpent += source.GoldSpent;
+        target.GoldSpentInShops += source.GoldSpentInShops;
+        target.GoldSpentInEvents += source.GoldSpentInEvents;
+        target.GoldGainedInCombats += source.GoldGainedInCombats;
+        target.GoldGainedInEvents += source.GoldGainedInEvents;
+        target.ShopsVisited += source.ShopsVisited;
+        target.EventsVisited += source.EventsVisited;
+        target.Combats += source.Combats;
+        if (source.LastShopFloorCounted.HasValue)
+            target.LastShopFloorCounted = source.LastShopFloorCounted;
+        if (source.LastEventFloorCounted.HasValue)
+            target.LastEventFloorCounted = source.LastEventFloorCounted;
     }
 
     /// <summary>
@@ -4170,6 +4227,24 @@ public static class RunTracker
                 HpLostInCombats = source.HpLostInCombats,
                 HpLostInEvents = source.HpLostInEvents,
                 Combats = source.Combats,
+            };
+
+    private static RunGoldStats CloneGoldStats(RunGoldStats? source)
+        => source == null
+            ? new RunGoldStats()
+            : new RunGoldStats
+            {
+                GoldAcquired = source.GoldAcquired,
+                GoldSpent = source.GoldSpent,
+                GoldSpentInShops = source.GoldSpentInShops,
+                GoldSpentInEvents = source.GoldSpentInEvents,
+                GoldGainedInCombats = source.GoldGainedInCombats,
+                GoldGainedInEvents = source.GoldGainedInEvents,
+                ShopsVisited = source.ShopsVisited,
+                EventsVisited = source.EventsVisited,
+                Combats = source.Combats,
+                LastShopFloorCounted = source.LastShopFloorCounted,
+                LastEventFloorCounted = source.LastEventFloorCounted,
             };
 
     private static PotionRunHistoryEntry ClonePotionHistoryEntry(PotionRunHistoryEntry source)
@@ -15212,6 +15287,174 @@ public static class RunTracker
         }
     }
 
+    internal static GoldObservationContext CaptureGoldObservationContext(Player? player)
+    {
+        try
+        {
+            var runState = player?.RunState ?? RunManager.Instance?.State;
+            var room = runState?.BaseRoom ?? RunManager.Instance?.State?.CurrentRoom;
+            return new GoldObservationContext(
+                room?.RoomType,
+                Math.Max(0, runState?.TotalFloor ?? CurrentRunFloorLocked() ?? 0));
+        }
+        catch
+        {
+            return new GoldObservationContext(
+                null,
+                Math.Max(0, CurrentRunFloorLocked() ?? 0));
+        }
+    }
+
+    /// <summary>
+    /// Records the actual positive balance delta after the central gold-gain
+    /// command completes. The call-site room is captured before awaiting so a
+    /// later screen or room transition cannot reclassify the gain.
+    /// </summary>
+    internal static void RecordRunGoldGain(
+        Player player,
+        int initialGold,
+        int currentGold,
+        GoldObservationContext context)
+    {
+        var gained = Math.Max(0, currentGold - initialGold);
+        if (player == null || gained <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                if (_currentRun == null && RunManager.Instance?.IsInProgress != true)
+                    return;
+
+                EnsureLazyCurrentRunLocked();
+                var isCombat = IsCombatRoomType(context.RoomType);
+                if (isCombat && _pendingCombat == null
+                    && CombatManager.Instance?.IsInProgress == true)
+                {
+                    _pendingCombat = new PendingCombat
+                    {
+                        GoldStats = { Combats = 1 },
+                    };
+                }
+
+                var stats = isCombat && _pendingCombat != null
+                    ? _pendingCombat.GoldStats
+                    : _currentRun.GoldStats ??= new RunGoldStats();
+                RecordGoldGainForTest(stats, gained, context.RoomType);
+
+                RecordGoldRoomVisitForTest(stats, context.RoomType, context.Floor);
+                _currentRun.UpdatedAt = Now();
+                RefreshCurrentRunMetadataLocked();
+                if (!ReferenceEquals(stats, _pendingCombat?.GoldStats))
+                    SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordRunGoldGain failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Counts resolved Event and Merchant rooms once per floor. The persisted
+    /// last-floor markers keep Continue and Core reload callbacks idempotent.
+    /// </summary>
+    public static void RecordRunGoldRoomEntered(IRunState runState, AbstractRoom room)
+    {
+        if (runState == null
+            || room == null
+            || room.RoomType is not (RoomType.Event or RoomType.Shop))
+        {
+            return;
+        }
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_currentRun == null && RunManager.Instance?.IsInProgress != true)
+                    return;
+
+                EnsureLazyCurrentRunLocked();
+                _currentRun.GoldStats ??= new RunGoldStats();
+                if (!RecordGoldRoomVisitForTest(
+                        _currentRun.GoldStats,
+                        room.RoomType,
+                        Math.Max(0, runState.TotalFloor)))
+                {
+                    return;
+                }
+
+                _currentRun.UpdatedAt = Now();
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordRunGoldRoomEntered failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static bool RecordGoldRoomVisitForTest(
+        RunGoldStats stats,
+        RoomType? roomType,
+        int floor)
+    {
+        if (stats == null) return false;
+        floor = Math.Max(0, floor);
+
+        if (roomType == RoomType.Shop)
+        {
+            if (stats.LastShopFloorCounted == floor) return false;
+            stats.LastShopFloorCounted = floor;
+            stats.ShopsVisited++;
+            return true;
+        }
+
+        if (roomType == RoomType.Event)
+        {
+            if (stats.LastEventFloorCounted == floor) return false;
+            stats.LastEventFloorCounted = floor;
+            stats.EventsVisited++;
+            return true;
+        }
+
+        return false;
+    }
+
+    internal static void RecordGoldGainForTest(
+        RunGoldStats stats,
+        int gained,
+        RoomType? roomType)
+    {
+        if (stats == null || gained <= 0) return;
+
+        stats.GoldAcquired += gained;
+        if (IsCombatRoomType(roomType))
+            stats.GoldGainedInCombats += gained;
+        else if (roomType == RoomType.Event)
+            stats.GoldGainedInEvents += gained;
+    }
+
+    internal static void RecordGoldSpentForTest(
+        RunGoldStats stats,
+        int spent,
+        RoomType? roomType)
+    {
+        if (stats == null || spent <= 0) return;
+
+        stats.GoldSpent += spent;
+        if (roomType == RoomType.Shop)
+            stats.GoldSpentInShops += spent;
+        else if (roomType == RoomType.Event)
+            stats.GoldSpentInEvents += spent;
+    }
+
+    private static bool IsCombatRoomType(RoomType? roomType)
+        => roomType is RoomType.Monster or RoomType.Elite or RoomType.Boss;
+
     /// <summary>
     /// Starts Old Coin's FIFO attribution from its observed completed pickup
     /// effect. Gold already held by the owner is placed before the relic's
@@ -15275,9 +15518,35 @@ public static class RunTracker
             {
                 if (!IsTrackedPlayer(player)) return;
 
-                var inCombat = CombatManager.Instance?.IsInProgress == true;
+                var context = CaptureGoldObservationContext(player);
+                var inCombat = IsCombatRoomType(context.RoomType)
+                    && (_pendingCombat != null
+                        || CombatManager.Instance?.IsInProgress == true);
                 var countsAsSpent = goldLossType == GoldLossType.Spent;
                 var changed = false;
+
+                if (countsAsSpent)
+                {
+                    EnsureLazyCurrentRunLocked();
+                    if (inCombat && _pendingCombat == null)
+                    {
+                        _pendingCombat = new PendingCombat
+                        {
+                            GoldStats = { Combats = 1 },
+                        };
+                    }
+
+                    var goldStats = inCombat
+                        ? _pendingCombat!.GoldStats
+                        : _currentRun.GoldStats ??= new RunGoldStats();
+                    var spent = Math.Max(0, initialGold - currentGold);
+                    RecordGoldSpentForTest(goldStats, spent, context.RoomType);
+                    RecordGoldRoomVisitForTest(
+                        goldStats,
+                        context.RoomType,
+                        context.Floor);
+                    changed = true;
+                }
 
                 var mawBank = player.GetRelic<MawBank>();
                 if (mawBank != null && IsTrackedRelic(mawBank))
@@ -15322,7 +15591,11 @@ public static class RunTracker
                 }
 
                 if (!inCombat && changed)
+                {
+                    _currentRun!.UpdatedAt = Now();
+                    RefreshCurrentRunMetadataLocked();
                     SaveCurrentRun();
+                }
             }
             catch (Exception e)
             {
@@ -31938,6 +32211,10 @@ internal readonly record struct PotionRunLocation(
     string? Name,
     int? Turn);
 
+internal readonly record struct GoldObservationContext(
+    RoomType? RoomType,
+    int Floor);
+
 internal sealed record CardOrbEventSubscription(
     Action PassiveHandler,
     Action<Creature[]> EvokeHandler);
@@ -31954,6 +32231,7 @@ internal class PendingCombat
     public List<PotionRunHistoryEntry>? PotionHistory { get; set; }
     public List<MaxHpRunHistoryEntry>? MaxHpHistory { get; set; }
     public RunHealthStats HealthStats { get; set; } = new();
+    public RunGoldStats GoldStats { get; set; } = new();
     public Dictionary<string, RelicAggregate> RelicAggregates { get; } = new();
     public Dictionary<string, EnemyAggregate> EnemyAggregates { get; } = new();
     public List<BlockChunk> PlayerBlockLedger { get; } = new();
