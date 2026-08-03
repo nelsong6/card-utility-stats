@@ -19,6 +19,10 @@ public class UnlimitedAttackChargeRelicStatsTests
     private static readonly MethodInfo BuildKusarigamaBodyMethod = GetBuilder("BuildKusarigamaBodyBBCode");
     private static readonly MethodInfo BuildOrnamentalFanBodyMethod = GetBuilder("BuildOrnamentalFanBodyBBCode");
     private static readonly MethodInfo BuildShurikenBodyMethod = GetBuilder("BuildShurikenBodyBBCode");
+    private static readonly MethodInfo BuildOrnamentalFanLiveBodyMethod =
+        GetBuilder("BuildOrnamentalFanBodyBBCodeWithLiveActivations");
+    private static readonly MethodInfo BuildShurikenLiveBodyMethod =
+        GetBuilder("BuildShurikenBodyBBCodeWithLiveActivations");
 
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
@@ -49,6 +53,9 @@ public class UnlimitedAttackChargeRelicStatsTests
         Assert.Equal(0, agg.ShurikenTurnsEndedAt2Charges);
         Assert.Equal(0, agg.ShurikenTurnEndChargeTotal);
         Assert.Equal(0, agg.ShurikenTurnEndChargeCount);
+        Assert.Equal(0, agg.ThreeAttackScalingRateActivations);
+        Assert.Equal(0, agg.ThreeAttackScalingTurns);
+        Assert.Equal(0, agg.ThreeAttackScalingCombats);
 
         Assert.Equal(0, agg.Activations);
         Assert.Equal(0, agg.TotalDamageAttempted);
@@ -132,6 +139,10 @@ public class UnlimitedAttackChargeRelicStatsTests
         RunTracker.RecordOrnamentalFanBlockGainedForTest(ornamentalFan, 4);
         RunTracker.RecordOrnamentalFanBlockGainedForTest(ornamentalFan, 5);
         RunTracker.RecordOrnamentalFanBlockGainedForTest(ornamentalFan, -2);
+        RunTracker.RecordOrnamentalFanTurnForTest(ornamentalFan, 5);
+        RunTracker.RecordOrnamentalFanTurnForTest(ornamentalFan, -2);
+        RunTracker.RecordOrnamentalFanCombatForTest(ornamentalFan, 2);
+        RunTracker.RecordOrnamentalFanCombatForTest(ornamentalFan, -2);
         RunTracker.RecordOrnamentalFanTurnEndChargeForTest(ornamentalFan, 0);
         RunTracker.RecordOrnamentalFanTurnEndChargeForTest(ornamentalFan, 1);
         RunTracker.RecordOrnamentalFanTurnEndChargeForTest(ornamentalFan, 2);
@@ -141,6 +152,9 @@ public class UnlimitedAttackChargeRelicStatsTests
         Assert.Equal(8, ornamentalFan.OrnamentalFanAttacksPlayed);
         Assert.Equal(2, ornamentalFan.Activations);
         Assert.Equal(9, ornamentalFan.AdditionalBlockGained);
+        Assert.Equal(9, ornamentalFan.OrnamentalFanRateBlockGained);
+        Assert.Equal(5, ornamentalFan.OrnamentalFanTurns);
+        Assert.Equal(2, ornamentalFan.OrnamentalFanCombats);
         Assert.Equal(1, ornamentalFan.OrnamentalFanTurnsEndedAt0Charges);
         Assert.Equal(2, ornamentalFan.OrnamentalFanTurnsEndedAt1Charge);
         Assert.Equal(1, ornamentalFan.OrnamentalFanTurnsEndedAt2Charges);
@@ -161,6 +175,7 @@ public class UnlimitedAttackChargeRelicStatsTests
 
         Assert.Equal(11, shuriken.ShurikenAttacksPlayed);
         Assert.Equal(3, shuriken.Activations);
+        Assert.Equal(3, shuriken.ThreeAttackScalingRateActivations);
         Assert.Equal(3m, shuriken.StrengthAdded);
         Assert.Equal(1, shuriken.ShurikenTurnsEndedAt1Charge);
         Assert.Equal(2, shuriken.ShurikenTurnsEndedAt2Charges);
@@ -218,6 +233,11 @@ public class UnlimitedAttackChargeRelicStatsTests
             OrnamentalFanAttacksPlayed = 5,
             Activations = 1,
             AdditionalBlockGained = 4,
+            AdditionalBlockEffective = 3,
+            AdditionalBlockWasted = 1,
+            OrnamentalFanRateBlockGained = 4,
+            OrnamentalFanTurns = 2,
+            OrnamentalFanCombats = 1,
             OrnamentalFanTurnsEndedAt1Charge = 1,
             OrnamentalFanTurnEndChargeTotal = 1,
             OrnamentalFanTurnEndChargeCount = 1,
@@ -227,6 +247,11 @@ public class UnlimitedAttackChargeRelicStatsTests
             OrnamentalFanAttacksPlayed = 6,
             Activations = 2,
             AdditionalBlockGained = 9,
+            AdditionalBlockEffective = 5,
+            AdditionalBlockWasted = 4,
+            OrnamentalFanRateBlockGained = 9,
+            OrnamentalFanTurns = 3,
+            OrnamentalFanCombats = 2,
             OrnamentalFanTurnsEndedAt0Charges = 1,
             OrnamentalFanTurnsEndedAt2Charges = 3,
             OrnamentalFanTurnEndChargeTotal = 6,
@@ -236,6 +261,11 @@ public class UnlimitedAttackChargeRelicStatsTests
         Assert.Equal(11, ornamentalFan.OrnamentalFanAttacksPlayed);
         Assert.Equal(3, ornamentalFan.Activations);
         Assert.Equal(13, ornamentalFan.AdditionalBlockGained);
+        Assert.Equal(8, ornamentalFan.AdditionalBlockEffective);
+        Assert.Equal(5, ornamentalFan.AdditionalBlockWasted);
+        Assert.Equal(13, ornamentalFan.OrnamentalFanRateBlockGained);
+        Assert.Equal(5, ornamentalFan.OrnamentalFanTurns);
+        Assert.Equal(3, ornamentalFan.OrnamentalFanCombats);
         Assert.Equal(1, ornamentalFan.OrnamentalFanTurnsEndedAt0Charges);
         Assert.Equal(1, ornamentalFan.OrnamentalFanTurnsEndedAt1Charge);
         Assert.Equal(3, ornamentalFan.OrnamentalFanTurnsEndedAt2Charges);
@@ -260,6 +290,9 @@ public class UnlimitedAttackChargeRelicStatsTests
             ShurikenTurnsEndedAt2Charges = 2,
             ShurikenTurnEndChargeTotal = 5,
             ShurikenTurnEndChargeCount = 4,
+            ThreeAttackScalingRateActivations = 3,
+            ThreeAttackScalingTurns = 4,
+            ThreeAttackScalingCombats = 2,
         });
 
         Assert.Equal(17, shuriken.ShurikenAttacksPlayed);
@@ -269,6 +302,9 @@ public class UnlimitedAttackChargeRelicStatsTests
         Assert.Equal(2, shuriken.ShurikenTurnsEndedAt2Charges);
         Assert.Equal(6, shuriken.ShurikenTurnEndChargeTotal);
         Assert.Equal(6, shuriken.ShurikenTurnEndChargeCount);
+        Assert.Equal(3, shuriken.ThreeAttackScalingRateActivations);
+        Assert.Equal(4, shuriken.ThreeAttackScalingTurns);
+        Assert.Equal(2, shuriken.ThreeAttackScalingCombats);
     }
 
     [Fact]
@@ -289,7 +325,7 @@ public class UnlimitedAttackChargeRelicStatsTests
             KusarigamaTurnEndChargeTotal = 8,
             KusarigamaTurnEndChargeCount = 7,
         });
-        Assert.Contains("Attacks played", kusarigamaBody);
+        Assert.Contains("The number of Attack cards played while this relic was held.", kusarigamaBody);
         Assert.Contains("Activations", kusarigamaBody);
         Assert.Contains("Damage attempted", kusarigamaBody);
         Assert.Contains("Damage dealt", kusarigamaBody);
@@ -310,22 +346,34 @@ public class UnlimitedAttackChargeRelicStatsTests
             OrnamentalFanAttacksPlayed = 11,
             Activations = 3,
             AdditionalBlockGained = 13,
+            AdditionalBlockEffective = 9,
+            AdditionalBlockWasted = 4,
+            OrnamentalFanRateBlockGained = 13,
+            OrnamentalFanTurns = 5,
+            OrnamentalFanCombats = 2,
             OrnamentalFanTurnsEndedAt0Charges = 1,
             OrnamentalFanTurnsEndedAt1Charge = 1,
             OrnamentalFanTurnsEndedAt2Charges = 3,
             OrnamentalFanTurnEndChargeTotal = 7,
             OrnamentalFanTurnEndChargeCount = 5,
         });
-        Assert.Contains("Attacks played", ornamentalFanBody);
+        Assert.Contains("The number of Attack cards played while this relic was held.", ornamentalFanBody);
         Assert.Contains("Activations", ornamentalFanBody);
         Assert.Contains("[hint=\"Block gained:", ornamentalFanBody);
         Assert.Contains("block gained", ornamentalFanBody);
-        Assert.Contains("block gained per activation", ornamentalFanBody);
+        Assert.Contains("block absorbed", ornamentalFanBody);
+        Assert.Contains("block wasted", ornamentalFanBody);
+        Assert.Contains("avg block gained per turn", ornamentalFanBody);
+        Assert.Contains("avg block gained per combat", ornamentalFanBody);
+        Assert.DoesNotContain("block gained per activation", ornamentalFanBody);
         Assert.Contains("Turns ended at 0 charges", ornamentalFanBody);
         Assert.Contains("Turns ended at 1 charge", ornamentalFanBody);
         Assert.Contains("Turns ended at 2 charges", ornamentalFanBody);
         Assert.Contains("Avg charge at turn end", ornamentalFanBody);
-        Assert.Contains("[b]4.33[/b]", ornamentalFanBody);
+        Assert.Contains("[b]2.6[/b]", ornamentalFanBody);
+        Assert.Contains("[b]6.5[/b]", ornamentalFanBody);
+        Assert.Contains("69%", ornamentalFanBody);
+        Assert.Contains("31%", ornamentalFanBody);
         Assert.Contains("[b]1.4[/b]", ornamentalFanBody);
 
         var shurikenBody = BuildBody(BuildShurikenBodyMethod, new RelicAggregate
@@ -337,15 +385,47 @@ public class UnlimitedAttackChargeRelicStatsTests
             ShurikenTurnsEndedAt2Charges = 2,
             ShurikenTurnEndChargeTotal = 5,
             ShurikenTurnEndChargeCount = 4,
+            ThreeAttackScalingRateActivations = 3,
+            ThreeAttackScalingTurns = 4,
+            ThreeAttackScalingCombats = 2,
         });
-        Assert.Contains("Attacks played", shurikenBody);
+        Assert.Contains("The number of Attack cards played while this relic was held.", shurikenBody);
+        Assert.Contains(
+            "The number of Attack cards played while this relic was held.",
+            shurikenBody);
         Assert.Contains("Activations", shurikenBody);
         Assert.Contains("Strength gained", shurikenBody);
-        Assert.Contains("Strength gained per activation", shurikenBody);
+        Assert.Contains("Average activations per turn", shurikenBody);
+        Assert.Contains("Average activations per combat", shurikenBody);
+        Assert.Contains("Turns ended at 0 charges", shurikenBody);
+        Assert.DoesNotContain("Strength gained per activation", shurikenBody);
         Assert.Contains("Turns ended at 1 charge", shurikenBody);
         Assert.Contains("Turns ended at 2 charges", shurikenBody);
         Assert.Contains("Avg charge at turn end", shurikenBody);
-        Assert.Contains("[b]1.25[/b]", shurikenBody);
+    }
+
+    [Fact]
+    public void RelicTooltips_OrnamentalFanAndShuriken_ShowLiveActivationRowsInCombat()
+    {
+        var liveCounts = new RelicLiveActivationCounts(ThisTurn: 2, ThisCombat: 5);
+        var ornamentalFanBody = BuildLiveBody(
+            BuildOrnamentalFanLiveBodyMethod,
+            new RelicAggregate(),
+            liveCounts);
+        var shurikenBody = BuildLiveBody(
+            BuildShurikenLiveBodyMethod,
+            new RelicAggregate(),
+            liveCounts);
+
+        foreach (var body in new[] { ornamentalFanBody, shurikenBody })
+        {
+            Assert.Contains("this turn", body);
+            Assert.Contains("this combat", body);
+            Assert.Contains("Times activated this turn", body);
+            Assert.Contains("Times activated this combat", body);
+            Assert.Contains("[b]2[/b]", body);
+            Assert.Contains("[b]5[/b]", body);
+        }
     }
 
     [Fact]
@@ -362,7 +442,7 @@ public class UnlimitedAttackChargeRelicStatsTests
             out var kusarigamaTitle,
             out var kusarigamaBody));
         Assert.Equal("Kusarigama", kusarigamaTitle);
-        Assert.Contains("Attacks played", kusarigamaBody);
+        Assert.Contains("The number of Attack cards played while this relic was held.", kusarigamaBody);
 
         Assert.True(RelicHoverShowPatch.TryBuildBodyBBCode(
             ornamentalFan,
@@ -371,7 +451,7 @@ public class UnlimitedAttackChargeRelicStatsTests
             out var ornamentalFanTitle,
             out var ornamentalFanBody));
         Assert.Equal("Ornamental Fan", ornamentalFanTitle);
-        Assert.Contains("Attacks played", ornamentalFanBody);
+        Assert.Contains("The number of Attack cards played while this relic was held.", ornamentalFanBody);
 
         Assert.True(RelicHoverShowPatch.TryBuildBodyBBCode(
             shuriken,
@@ -380,7 +460,7 @@ public class UnlimitedAttackChargeRelicStatsTests
             out var shurikenTitle,
             out var shurikenBody));
         Assert.Equal("Shuriken", shurikenTitle);
-        Assert.Contains("Attacks played", shurikenBody);
+        Assert.Contains("The number of Attack cards played while this relic was held.", shurikenBody);
     }
 
     [Fact]
@@ -393,10 +473,14 @@ public class UnlimitedAttackChargeRelicStatsTests
         Assert.Contains("Damage per activation", kusarigamaBody);
         Assert.Contains("Avg charge at turn end", kusarigamaBody);
         Assert.Contains("[b]0[/b]", kusarigamaBody);
-        Assert.Contains("block gained per activation", ornamentalFanBody);
+        Assert.Contains("block absorbed", ornamentalFanBody);
+        Assert.Contains("block wasted", ornamentalFanBody);
+        Assert.Contains("avg block gained per turn", ornamentalFanBody);
+        Assert.Contains("avg block gained per combat", ornamentalFanBody);
+        Assert.DoesNotContain("block gained per activation", ornamentalFanBody);
         Assert.Contains("Avg charge at turn end", ornamentalFanBody);
         Assert.Contains("[b]0[/b]", ornamentalFanBody);
-        Assert.Contains("Strength gained per activation", shurikenBody);
+        Assert.DoesNotContain("Strength gained per activation", shurikenBody);
         Assert.Contains("Avg charge at turn end", shurikenBody);
         Assert.Contains("[b]0[/b]", shurikenBody);
     }
@@ -442,6 +526,11 @@ public class UnlimitedAttackChargeRelicStatsTests
         Assert.Equal(0, ornamentalFan.OrnamentalFanTurnEndChargeTotal);
         Assert.Equal(0, ornamentalFan.OrnamentalFanTurnEndChargeCount);
         Assert.Equal(0, ornamentalFan.AdditionalBlockGained);
+        Assert.Equal(0, ornamentalFan.AdditionalBlockEffective);
+        Assert.Equal(0, ornamentalFan.AdditionalBlockWasted);
+        Assert.Equal(0, ornamentalFan.OrnamentalFanRateBlockGained);
+        Assert.Equal(0, ornamentalFan.OrnamentalFanTurns);
+        Assert.Equal(0, ornamentalFan.OrnamentalFanCombats);
 
         var shuriken = run.RelicAggregates[ShurikenRelicId];
         Assert.Equal(0, shuriken.ShurikenAttacksPlayed);
@@ -475,6 +564,11 @@ public class UnlimitedAttackChargeRelicStatsTests
             OrnamentalFanAttacksPlayed = 11,
             Activations = 3,
             AdditionalBlockGained = 13,
+            AdditionalBlockEffective = 9,
+            AdditionalBlockWasted = 4,
+            OrnamentalFanRateBlockGained = 13,
+            OrnamentalFanTurns = 5,
+            OrnamentalFanCombats = 2,
             OrnamentalFanTurnsEndedAt0Charges = 1,
             OrnamentalFanTurnsEndedAt1Charge = 1,
             OrnamentalFanTurnsEndedAt2Charges = 3,
@@ -514,6 +608,11 @@ public class UnlimitedAttackChargeRelicStatsTests
         Assert.Equal(11, ornamentalFan.OrnamentalFanAttacksPlayed);
         Assert.Equal(3, ornamentalFan.Activations);
         Assert.Equal(13, ornamentalFan.AdditionalBlockGained);
+        Assert.Equal(9, ornamentalFan.AdditionalBlockEffective);
+        Assert.Equal(4, ornamentalFan.AdditionalBlockWasted);
+        Assert.Equal(13, ornamentalFan.OrnamentalFanRateBlockGained);
+        Assert.Equal(5, ornamentalFan.OrnamentalFanTurns);
+        Assert.Equal(2, ornamentalFan.OrnamentalFanCombats);
         Assert.Equal(1, ornamentalFan.OrnamentalFanTurnsEndedAt0Charges);
         Assert.Equal(1, ornamentalFan.OrnamentalFanTurnsEndedAt1Charge);
         Assert.Equal(3, ornamentalFan.OrnamentalFanTurnsEndedAt2Charges);
@@ -536,5 +635,12 @@ public class UnlimitedAttackChargeRelicStatsTests
 
     private static string BuildBody(MethodInfo builder, RelicAggregate agg)
         => (string)(builder.Invoke(null, new object?[] { agg })
+            ?? throw new InvalidOperationException($"{builder.Name} returned null."));
+
+    private static string BuildLiveBody(
+        MethodInfo builder,
+        RelicAggregate agg,
+        RelicLiveActivationCounts liveCounts)
+        => (string)(builder.Invoke(null, new object?[] { agg, liveCounts })
             ?? throw new InvalidOperationException($"{builder.Name} returned null."));
 }

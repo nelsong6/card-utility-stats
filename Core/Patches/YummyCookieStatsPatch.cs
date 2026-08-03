@@ -9,8 +9,10 @@ namespace SpireLens.Core.Patches;
 
 /// <summary>
 /// Tracks the cards Yummy Cookie actually upgrades during its async pickup
-/// effect. Card names are captured from CardModel.UpgradeInternal while this
-/// pickup window is armed.
+/// effect. Card names are captured only from CardModel.UpgradeInternal calls
+/// on exact permanent-deck objects while this pickup window is armed; the
+/// pickup flow also upgrades non-deck display copies of previously upgraded
+/// cards.
 /// </summary>
 [HarmonyPatch]
 public static class YummyCookieAfterObtainedPatch

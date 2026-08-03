@@ -57,8 +57,18 @@ public static class StatsTooltip
         object boxed = tip;
         DescriptionProperty.SetValue(
             boxed,
-            $"[font_size={BodyFontSize}]{EscapeBbcode(bodyText)}[/font_size]");
+            $"[left][font_size={BodyFontSize}]{EscapeBbcode(bodyText)}[/font_size][/left]");
         return (HoverTip)boxed;
+    }
+
+    internal static string RenderRowInformationHint(
+        string label,
+        string? fullDescription = null)
+    {
+        var description = RelicStatRowVocabulary.Create(
+            label,
+            fullDescription).FullDescription;
+        return StatConceptGlossary.RenderInformationHint(description);
     }
 
     /// <summary>

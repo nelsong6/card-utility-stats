@@ -7,7 +7,9 @@ using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
+using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
+using MegaCrit.Sts2.Core.Hooks;
 using MegaCrit.Sts2.Core.Localization.DynamicVars;
 using MegaCrit.Sts2.Core.Models.Powers;
 using MegaCrit.Sts2.Core.Models.Relics;
@@ -111,7 +113,8 @@ public static class KusarigamaCreatureDamageStatsPatch
 
 /// <summary>
 /// Ornamental Fan counts owner Attacks and arms its block command on every
-/// third play. The command result is the block amount after modifiers.
+/// third play. The command result is the block amount after modifiers, and its
+/// history entry remains relic-owned rather than falling back to that Attack.
 /// </summary>
 [HarmonyPatch(typeof(OrnamentalFan), nameof(OrnamentalFan.AfterCardPlayed))]
 public static class OrnamentalFanAfterCardPlayedStatsPatch
@@ -290,6 +293,29 @@ public sealed class ShurikenActivationState
 
     public Creature OwnerCreature { get; }
     public decimal StrengthBefore { get; }
+}
+
+/// <summary>
+/// Counts the same zero-inclusive held-turn denominator for Kunai and
+/// Shuriken. Their actual Dexterity/Strength observations remain in their
+/// owner-specific callbacks, but their rate windows share this lifecycle.
+/// </summary>
+[HarmonyPatch(typeof(Hook), nameof(Hook.AfterPlayerTurnStart))]
+public static class HookAfterPlayerTurnStartThreeAttackScalingRelicsStatsPatch
+{
+    [HarmonyPrefix]
+    public static void Prefix(Player player)
+    {
+        try
+        {
+            RunTracker.RecordThreeAttackScalingRelicsTurnStarted(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug(
+                $"HookAfterPlayerTurnStartThreeAttackScalingRelicsStatsPatch failed: {e.Message}");
+        }
+    }
 }
 
 /// <summary>

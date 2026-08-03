@@ -32,6 +32,7 @@ public class EternalFeatherStatsTests
         Assert.Equal(0m, agg.TotalHealingRestored);
         Assert.Equal(0m, agg.TotalHealingLost);
         Assert.Empty(agg.HealingLostReasons);
+        Assert.Empty(agg.EternalFeatherHealingActivations);
     }
 
     [Fact]
@@ -51,6 +52,12 @@ public class EternalFeatherStatsTests
             DisplayName = "full HP",
             Amount = 7m,
         };
+        agg.EternalFeatherHealingActivations.Add(
+            new EternalFeatherHealingActivationAggregate
+            {
+                Floor = 7,
+                HpRestored = 11m,
+            });
         run.RelicAggregates[EternalFeatherRelicId] = agg;
 
         var json = JsonSerializer.Serialize(run, SerializerOptions);
@@ -68,6 +75,9 @@ public class EternalFeatherStatsTests
         Assert.Equal(11m, restoredAgg.TotalHealingRestored);
         Assert.Equal(7m, restoredAgg.TotalHealingLost);
         Assert.Equal(7m, restoredAgg.HealingLostReasons["full_hp"].Amount);
+        var activation = Assert.Single(restoredAgg.EternalFeatherHealingActivations);
+        Assert.Equal(7, activation.Floor);
+        Assert.Equal(11m, activation.HpRestored);
     }
 
     [Fact]
@@ -137,5 +147,6 @@ public class EternalFeatherStatsTests
         Assert.Equal(0m, agg.TotalHealingRestored);
         Assert.Equal(0m, agg.TotalHealingLost);
         Assert.Empty(agg.HealingLostReasons);
+        Assert.Empty(agg.EternalFeatherHealingActivations);
     }
 }

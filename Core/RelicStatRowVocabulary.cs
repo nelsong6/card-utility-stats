@@ -90,6 +90,9 @@ internal static class RelicStatRowVocabulary
         Rule("attack", @"\battacks?\b"),
         Rule("block_gained", @"\bblock\s+gained\b"),
         Rule("block", @"\bblock\b"),
+        Rule("potion_rare", @"\brare\s+potions?\b"),
+        Rule("potion_uncommon", @"\buncommon\s+potions?\b"),
+        Rule("potion_common", @"\bcommon\s+potions?\b"),
         Rule("card_rare", @"\brare(?:s|\s+cards?)?\b"),
         Rule("card_uncommon", @"\buncommon(?:s|\s+cards?)?\b"),
         Rule("card", @"\bcards?\b|\bcommons?\b"),
@@ -106,6 +109,7 @@ internal static class RelicStatRowVocabulary
         Rule("floor", @"\bfloors?\b", true),
         Rule("gold_gained", @"\bgold\s+gained\b"),
         Rule("gold", @"\bgold\b"),
+        Rule("kill", @"\b(?:kills?|killed|slain)\b"),
         Rule("potion_gained", @"\bpotions?\s+gained\b"),
         Rule("potion", @"\bpotions?\b"),
         Rule("power", @"\bpowers?\b"),
@@ -160,7 +164,7 @@ internal static class RelicStatRowVocabulary
             plainSuffix,
             imageMeanings);
         var description = string.IsNullOrWhiteSpace(fullDescription)
-            ? BuildDefaultDescription(descriptionText)
+            ? descriptionText.Trim()
             : fullDescription.Trim();
 
         var workingText = plainSuffix;
@@ -303,15 +307,6 @@ internal static class RelicStatRowVocabulary
         return NormalizeSpaces(string.Join(
             " ",
             missingMeanings.Append(originalPlainText)));
-    }
-
-    private static string BuildDefaultDescription(string descriptionText)
-    {
-        if (string.IsNullOrWhiteSpace(descriptionText))
-            return "This value is tracked for this relic.";
-
-        var withoutPeriod = descriptionText.Trim().TrimEnd('.');
-        return $"{withoutPeriod} — this value is tracked for this relic.";
     }
 
     private static void AddImageMeaning(ICollection<string> meanings, string image)

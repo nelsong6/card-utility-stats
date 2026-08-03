@@ -25,6 +25,7 @@ public class StatConceptGlossaryTests
                 "power_common",
                 "relic_common",
                 "skill_common",
+                "hp",
                 "damage",
                 "dexterity",
                 "dexterity_gained",
@@ -44,8 +45,10 @@ public class StatConceptGlossaryTests
                 "healing_gained",
                 "healing_wasted",
                 "information",
+                "kill",
                 "max_hp",
                 "max_hp_gained",
+                "shop",
                 "nimble",
                 "offered",
                 "osty_summon_gained",
@@ -130,6 +133,9 @@ public class StatConceptGlossaryTests
         var card = StatConceptGlossary.RenderHintedGlyph("card");
         var rareCard = StatConceptGlossary.RenderHintedGlyph("card_rare");
         var uncommonCard = StatConceptGlossary.RenderHintedGlyph("card_uncommon");
+        var commonPotion = StatConceptGlossary.RenderHintedGlyph("potion_common");
+        var rarePotion = StatConceptGlossary.RenderHintedGlyph("potion_rare");
+        var uncommonPotion = StatConceptGlossary.RenderHintedGlyph("potion_uncommon");
         var charge = StatConceptGlossary.RenderHintedGlyph("charge");
         var combat = StatConceptGlossary.RenderHintedGlyph("combat");
         var dexterityGained = StatConceptGlossary.RenderHintedGlyph("dexterity_gained");
@@ -140,6 +146,7 @@ public class StatConceptGlossaryTests
         var healingGained = StatConceptGlossary.RenderHintedGlyph("healing_gained");
         var healingWasted = StatConceptGlossary.RenderHintedGlyph("healing_wasted");
         var informationConcept = StatConceptGlossary.RenderHintedGlyph("information");
+        var kill = StatConceptGlossary.RenderHintedGlyph("kill");
         var nimble = StatConceptGlossary.RenderHintedGlyph("nimble");
         var offered = StatConceptGlossary.RenderHintedGlyph("offered");
         var summon = StatConceptGlossary.RenderHintedGlyph("osty_summon_gained");
@@ -148,6 +155,7 @@ public class StatConceptGlossaryTests
         var rareRelic = StatConceptGlossary.RenderHintedGlyph("relic_rare");
         var uncommonRelic = StatConceptGlossary.RenderHintedGlyph("relic_uncommon");
         var skill = StatConceptGlossary.RenderHintedGlyph("skill");
+        var shop = StatConceptGlossary.RenderHintedGlyph("shop");
         var strengthGained = StatConceptGlossary.RenderHintedGlyph("strength_gained");
         var swift = StatConceptGlossary.RenderHintedGlyph("swift");
         var taken = StatConceptGlossary.RenderHintedGlyph("taken");
@@ -171,6 +179,9 @@ public class StatConceptGlossaryTests
             card,
             rareCard,
             uncommonCard,
+            commonPotion,
+            rarePotion,
+            uncommonPotion,
             charge,
             combat,
             dexterityGained,
@@ -181,6 +192,7 @@ public class StatConceptGlossaryTests
             healingGained,
             healingWasted,
             informationConcept,
+            kill,
             nimble,
             offered,
             summon,
@@ -189,6 +201,7 @@ public class StatConceptGlossaryTests
             rareRelic,
             uncommonRelic,
             skill,
+            shop,
             strengthGained,
             swift,
             taken,
@@ -234,6 +247,15 @@ public class StatConceptGlossaryTests
         Assert.Contains("color=#EFC850", rareCard);
         Assert.Contains("[hint=\"Uncommon card:", uncommonCard);
         Assert.Contains("color=#87CEEB", uncommonCard);
+        Assert.Contains("[hint=\"Common potion:", commonPotion);
+        Assert.Contains("potion_icon.png", commonPotion);
+        Assert.Contains("color=#B5B5B5", commonPotion);
+        Assert.Contains("[hint=\"Rare potion:", rarePotion);
+        Assert.Contains("potion_icon.png", rarePotion);
+        Assert.Contains("color=#EFC850", rarePotion);
+        Assert.Contains("[hint=\"Uncommon potion:", uncommonPotion);
+        Assert.Contains("potion_icon.png", uncommonPotion);
+        Assert.Contains("color=#87CEEB", uncommonPotion);
         Assert.Contains("[hint=\"Charge:", charge);
         Assert.Contains(
             "user://SpireLens/generated-icons/charge-",
@@ -277,6 +299,8 @@ public class StatConceptGlossaryTests
         Assert.Contains(
             "user://SpireLens/generated-icons/information-",
             informationConcept);
+        Assert.Contains("[hint=\"Kill:", kill);
+        Assert.Contains("res://images/ui/emote/skull.png", kill);
         Assert.Contains("[hint=\"Nimble:", nimble);
         Assert.Contains("res://images/enchantments/nimble.png", nimble);
         Assert.Contains("[hint=\"Offered:", offered);
@@ -300,6 +324,10 @@ public class StatConceptGlossaryTests
         Assert.Contains(
             "res://images/packed/card_library/type_sort_skill.png",
             skill);
+        Assert.Contains("[hint=\"Merchant:", shop);
+        Assert.Contains(
+            "res://images/atlases/ui_atlas.sprites/map/icons/map_shop.tres",
+            shop);
         Assert.Contains("[hint=\"Strength gained:", strengthGained);
         Assert.Contains(
             "user://SpireLens/generated-icons/strength_gained-",

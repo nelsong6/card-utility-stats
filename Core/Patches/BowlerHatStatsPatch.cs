@@ -9,10 +9,9 @@ using MegaCrit.Sts2.Core.Models.Relics;
 namespace SpireLens.Core.Patches;
 
 /// <summary>
-/// Measures Bowler Hat at the same centralized GainGold command the game
-/// modifies. The completed owner-balance delta captures integer truncation and
-/// gold prevention; subtracting the unmodified integer grant leaves only gold
-/// that actually reached the player because of Bowler Hat.
+/// Measures every observed run-level gold gain and Bowler Hat's share at the
+/// same centralized GainGold command the game modifies. The completed owner-
+/// balance delta captures integer truncation and gold prevention.
 /// </summary>
 [HarmonyPatch(
     typeof(PlayerCmd),
@@ -21,7 +20,7 @@ namespace SpireLens.Core.Patches;
 public static class BowlerHatGainGoldStatsPatch
 {
     [HarmonyPrefix]
-    public static void Prefix(
+    private static void Prefix(
         decimal amount,
         Player player,
         out BowlerHatGoldGainState __state)
@@ -35,13 +34,15 @@ public static class BowlerHatGainGoldStatsPatch
             var relic = player.Relics?
                 .OfType<BowlerHat>()
                 .FirstOrDefault(candidate => !candidate.IsMelted);
-            if (relic == null || !RunTracker.IsTrackedRelic(relic)) return;
+            if (relic != null && !RunTracker.IsTrackedRelic(relic))
+                relic = null;
 
             __state = new BowlerHatGoldGainState(
                 relic,
                 player,
                 player.Gold,
-                amount);
+                amount,
+                RunTracker.CaptureGoldObservationContext(player));
         }
         catch (Exception e)
         {
@@ -51,14 +52,13 @@ public static class BowlerHatGainGoldStatsPatch
     }
 
     [HarmonyPostfix]
-    public static void Postfix(
+    private static void Postfix(
         ref Task __result,
         BowlerHatGoldGainState __state)
     {
         try
         {
             if (__result == null
-                || __state.Relic == null
                 || __state.Owner == null)
             {
                 return;
@@ -81,12 +81,20 @@ public static class BowlerHatGainGoldStatsPatch
 
         try
         {
-            RunTracker.RecordBowlerHatGoldGain(
-                state.Relic!,
+            RunTracker.RecordRunGoldGain(
                 state.Owner!,
                 state.InitialGold,
                 state.Owner!.Gold,
-                state.UnmodifiedAmount);
+                state.Context);
+            if (state.Relic != null)
+            {
+                RunTracker.RecordBowlerHatGoldGain(
+                    state.Relic,
+                    state.Owner!,
+                    state.InitialGold,
+                    state.Owner!.Gold,
+                    state.UnmodifiedAmount);
+            }
         }
         catch (Exception e)
         {
@@ -95,9 +103,10 @@ public static class BowlerHatGainGoldStatsPatch
         }
     }
 
-    public readonly record struct BowlerHatGoldGainState(
+    internal readonly record struct BowlerHatGoldGainState(
         BowlerHat? Relic,
         Player? Owner,
         int InitialGold,
-        decimal UnmodifiedAmount);
+        decimal UnmodifiedAmount,
+        GoldObservationContext Context);
 }

@@ -1,0 +1,30 @@
+{
+  "run_id": "pumpkin-candle-relic-fixture",
+  "started_at": "2026-08-01T22:00:00Z",
+  "updated_at": "2026-08-01T22:25:00Z",
+  "outcome": "in_progress",
+  "floor_reached": 24,
+  "aggregates": {
+    "CARD.STRIKE_NECROBINDER#1": {
+      "initial_upgrade_level": 0
+    }
+  },
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.PUMPKIN_CANDLE": {
+      "energy_generated": 14,
+      "pumpkin_candle_combat_start_charge_total": 12,
+      "pumpkin_candle_combat_start_charge_samples": 4,
+      "pumpkin_candle_rekindles": 2
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.STRIKE_NECROBINDER": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.STRIKE_NECROBINDER": 1
+  }
+}

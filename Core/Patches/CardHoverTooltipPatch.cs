@@ -30,10 +30,12 @@ public static class CardHoverShowPatch
     private const string EntropyPowerId = "POWER.ENTROPY";
     private const string FeelNoPainPowerId = "POWER.FEEL_NO_PAIN";
     private const string FreeAttackPowerId = "POWER.FREE_ATTACK_POWER";
+    private const string FreeSkillPowerId = "POWER.FREE_SKILL_POWER";
     private const string JugglingPowerId = "POWER.JUGGLING";
     private const string RupturePowerId = "POWER.RUPTURE";
     private const string StampedePowerId = "POWER.STAMPEDE";
     private const string ViciousPowerId = "POWER.VICIOUS";
+    private const string PoisonPowerIconPath = "res://images/atlases/power_atlas.sprites/poison_power.tres";
     private const string StarIconPath = "res://images/packed/sprite_fonts/star_icon.png";
     private const string SovereignBladeMetaNote = "Reflects All Sovereign Blade Usage";
 
@@ -229,12 +231,7 @@ public static class CardHoverShowPatch
             // glance that this is a removed card even without the visual
             // grouping in the deck view. Floor 0 defaults to "?" text.
             if (agg.Removed)
-            {
-                string rfloor = agg.RemovedAtFloor.HasValue
-                    ? $"floor [b]{agg.RemovedAtFloor.Value}[/b]"
-                    : "[b]?[/b]";
-                sb.Append($"[color=#b5b5b5]Removed {rfloor}[/color]\n");
-            }
+                AppendRemovalLine(sb, agg);
         }
         else
         {
@@ -246,7 +243,10 @@ public static class CardHoverShowPatch
             // the generic "not present" line for them. Other ephemerals keep
             // the subdued grey note.
             if (agg.Removed)
+            {
                 sb.Append("[color=#e04c4c][b]Card Removed[/b][/color]\n");
+                AppendRemovalLine(sb, agg);
+            }
             else if (!isSupplementalMetaCard)
                 sb.Append("[color=#b5b5b5]Card not present in deck[/color]\n");
         }
@@ -256,7 +256,8 @@ public static class CardHoverShowPatch
             cardModel,
             agg,
             RunTracker.GetEffectiveMetaStats(),
-            RunTracker.GetEtherealCardsPlayedThisCombat());
+            RunTracker.GetEtherealCardsPlayedThisCombat(),
+            GetSupermassiveCardsCreatedThisCombat(cardModel));
 
         // No footer. Previously we rendered "A4 · DEFECT · this run" here
         // as a mirror of SlayTheStats' filter-context footer — but they need
@@ -307,15 +308,25 @@ public static class CardHoverShowPatch
         }
 
         if (agg.Removed)
-        {
-            string rfloor = agg.RemovedAtFloor.HasValue
-                ? $"floor [b]{agg.RemovedAtFloor.Value}[/b]"
-                : "[b]?[/b]";
-            sb.Append($"[color=#b5b5b5]Removed {rfloor}[/color]\n");
-        }
+            AppendRemovalLine(sb, agg);
 
         AppendFullStatRows(sb, cardModel, agg, metaStats);
         return sb.ToString();
+    }
+
+    private static void AppendRemovalLine(StringBuilder sb, CardAggregate agg)
+    {
+        string floor = agg.RemovedAtFloor.HasValue
+            ? $"floor [b]{agg.RemovedAtFloor.Value}[/b]"
+            : "floor [b]?[/b]";
+        string source = string.IsNullOrWhiteSpace(agg.RemovalSource)
+            ? ""
+            : $" · {StatsTooltip.EscapeBbcode(agg.RemovalSource)}";
+        string cost = agg.RemovalGoldCost.HasValue
+            ? $" · {StatConceptGlossary.RenderHintedGlyph("gold")} [b]{agg.RemovalGoldCost.Value}[/b]"
+            : "";
+
+        sb.Append($"[color=#b5b5b5]Removed {floor}{source}{cost}[/color]\n");
     }
 
     private static void AppendFullStatRows(
@@ -323,7 +334,8 @@ public static class CardHoverShowPatch
         MegaCrit.Sts2.Core.Models.CardModel cardModel,
         CardAggregate agg,
         RunMetaStats metaStats,
-        int? etherealCardsPlayedThisCombat = null)
+        int? etherealCardsPlayedThisCombat = null,
+        int? cardsCreatedThisCombat = null)
     {
         // Per-play averages — the actual "utility" signal. Guard against
         // div-by-zero for the unplayed case.
@@ -357,6 +369,8 @@ public static class CardHoverShowPatch
 
         if (etherealCardsPlayedThisCombat.HasValue)
             AppendPullFromBelowStats(sb, cardModel, etherealCardsPlayedThisCombat.Value);
+        if (cardsCreatedThisCombat.HasValue)
+            AppendSupermassiveStats(sb, cardModel, cardsCreatedThisCombat.Value);
         AppendMakeItSoStats(sb, cardModel, agg, compact: false);
         AppendUnleashStats(sb, cardModel, agg, compact: false);
         AppendOstySummonStats(sb, cardModel, agg, metaStats, compact: false);
@@ -365,9 +379,13 @@ public static class CardHoverShowPatch
         AppendAlchemizePotionStats(sb, cardModel, agg, compact: false);
         AppendJackOfAllTradesStats(sb, cardModel, agg, compact: false);
         AppendDiscoveryStats(sb, cardModel, agg, compact: false);
+        AppendSplashStats(sb, cardModel, agg);
+        AppendAllForOneStats(sb, cardModel, agg, compact: false);
+        AppendOutbreakStats(sb, cardModel, agg);
         AppendArmamentsStats(sb, cardModel, agg);
         AppendDrainPowerStats(sb, cardModel, agg, compact: false);
         AppendUnrelentingFreeAttackStats(sb, cardModel, metaStats, compact: false);
+        AppendPounceFreeSkillStats(sb, cardModel, metaStats, compact: false);
         AppendDebtStats(sb, cardModel, agg);
         AppendNormalityStats(sb, cardModel, agg);
         AppendReplayStats(sb, agg);
@@ -535,7 +553,8 @@ public static class CardHoverShowPatch
             cardModel,
             agg,
             RunTracker.GetEffectiveMetaStats(),
-            RunTracker.GetEtherealCardsPlayedThisCombat());
+            RunTracker.GetEtherealCardsPlayedThisCombat(),
+            GetSupermassiveCardsCreatedThisCombat(cardModel));
     }
 
     private static void AppendCompactBodyWithMetaStats(
@@ -543,7 +562,8 @@ public static class CardHoverShowPatch
         MegaCrit.Sts2.Core.Models.CardModel cardModel,
         CardAggregate agg,
         RunMetaStats metaStats,
-        int? etherealCardsPlayedThisCombat = null)
+        int? etherealCardsPlayedThisCombat = null,
+        int? cardsCreatedThisCombat = null)
     {
         bool isAttack = cardModel.Type == CardType.Attack;
 
@@ -577,6 +597,8 @@ public static class CardHoverShowPatch
 
         if (etherealCardsPlayedThisCombat.HasValue)
             AppendPullFromBelowStats(sb, cardModel, etherealCardsPlayedThisCombat.Value);
+        if (cardsCreatedThisCombat.HasValue)
+            AppendSupermassiveStats(sb, cardModel, cardsCreatedThisCombat.Value);
         AppendMakeItSoStats(sb, cardModel, agg, compact: true);
         AppendUnleashStats(sb, cardModel, agg, compact: true);
         AppendOstySummonStats(sb, cardModel, agg, metaStats, compact: true);
@@ -585,9 +607,13 @@ public static class CardHoverShowPatch
         AppendAlchemizePotionStats(sb, cardModel, agg, compact: true);
         AppendJackOfAllTradesStats(sb, cardModel, agg, compact: true);
         AppendDiscoveryStats(sb, cardModel, agg, compact: true);
+        AppendSplashStats(sb, cardModel, agg);
+        AppendAllForOneStats(sb, cardModel, agg, compact: true);
+        AppendOutbreakStats(sb, cardModel, agg);
         AppendArmamentsStats(sb, cardModel, agg);
         AppendDrainPowerStats(sb, cardModel, agg, compact: true);
         AppendUnrelentingFreeAttackStats(sb, cardModel, metaStats, compact: true);
+        AppendPounceFreeSkillStats(sb, cardModel, metaStats, compact: true);
         AppendDebtStats(sb, cardModel, agg);
         AppendNormalityStats(sb, cardModel, agg);
         AppendReplayStats(sb, agg);
@@ -1126,6 +1152,96 @@ public static class CardHoverShowPatch
             "");
     }
 
+    private static void AppendAllForOneStats(
+        StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel card,
+        CardAggregate agg,
+        bool compact)
+    {
+        if (card is not AllForOne && !IsCardId(card, "CARD.ALL_FOR_ONE")) return;
+
+        Row3(
+            sb,
+            "0-cost cards returned",
+            agg.AllForOneZeroCostCardsReturned.ToString(),
+            "",
+            "Zero-cost cards returned from the discard pile to hand by All for One.");
+        if (compact) return;
+
+        var returnedPerPlay = agg.Plays <= 0
+            ? 0m
+            : (decimal)agg.AllForOneZeroCostCardsReturned / agg.Plays;
+        var returnedPerCombat = agg.CombatsInDeck <= 0
+            ? 0m
+            : (decimal)agg.AllForOneZeroCostCardsReturned / agg.CombatsInDeck;
+        Row3(
+            sb,
+            "Avg returned per play",
+            FormatDecimal(returnedPerPlay),
+            "",
+            "Average zero-cost cards returned each time All for One was played.");
+        Row3(
+            sb,
+            "Avg returned per combat",
+            FormatDecimal(returnedPerCombat),
+            "",
+            "Average zero-cost cards returned by All for One per combat in the deck.");
+    }
+
+    private static void AppendSplashStats(
+        StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel card,
+        CardAggregate agg)
+    {
+        if (card is not Splash && !IsCardId(card, "CARD.SPLASH")) return;
+
+        Row3(
+            sb,
+            "Commons taken",
+            agg.SplashCommonAttacksTaken.ToString(),
+            "",
+            "Common Attacks selected from Splash.");
+        Row3(
+            sb,
+            "Uncommons taken",
+            agg.SplashUncommonAttacksTaken.ToString(),
+            "",
+            "Uncommon Attacks selected from Splash.");
+        Row3(
+            sb,
+            "Rares taken",
+            agg.SplashRareAttacksTaken.ToString(),
+            "",
+            "Rare Attacks selected from Splash.");
+
+        var averageDiscount = agg.SplashAttacksTaken <= 0
+            ? 0m
+            : (decimal)agg.SplashEnergyDiscountTotal / agg.SplashAttacksTaken;
+        Row3(
+            sb,
+            GetEnergyStatLabel("avg discount"),
+            FormatDecimal(averageDiscount),
+            "",
+            "Average energy-cost discount applied to Attacks selected from Splash.");
+    }
+
+    private static void AppendOutbreakStats(
+        StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel card,
+        CardAggregate agg)
+    {
+        if (card is not Outbreak && !IsCardId(card, "CARD.OUTBREAK")) return;
+
+        Row3(
+            sb,
+            GetInlineIconStatLabel(
+                PoisonPowerIconPath,
+                "damage from extra triggers"),
+            agg.OutbreakExtraPoisonTriggerDamage.ToString(),
+            "",
+            "Damage dealt by the extra Poison triggers caused by Outbreak.");
+    }
+
     private static void AppendDrainPowerStats(
         StringBuilder sb,
         MegaCrit.Sts2.Core.Models.CardModel card,
@@ -1359,54 +1475,101 @@ public static class CardHoverShowPatch
         }
         powerAgg ??= new PowerAggregate();
 
-        var utilization = powerAgg.FreeAttackChargesGranted <= 0
+        AppendFreeCardDiscountStats(
+            sb,
+            "Free Attack",
+            "Attacks",
+            powerAgg.FreeAttackChargesGranted,
+            powerAgg.FreeAttackChargesUsed,
+            powerAgg.FreeAttackZeroEnergySavingsUses,
+            powerAgg.FreeAttackEnergySaved,
+            powerAgg.FreeAttackBasicAttacksDiscounted,
+            powerAgg.FreeAttackCommonAttacksDiscounted,
+            powerAgg.FreeAttackUncommonAttacksDiscounted,
+            powerAgg.FreeAttackRareAttacksDiscounted,
+            compact);
+    }
+
+    private static void AppendPounceFreeSkillStats(
+        StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel card,
+        RunMetaStats metaStats,
+        bool compact)
+    {
+        if (card is not Pounce && !IsCardId(card, "CARD.POUNCE")) return;
+
+        metaStats ??= new RunMetaStats();
+        PowerAggregate? powerAgg = null;
+        if (metaStats.PowerAggregates != null)
+        {
+            metaStats.PowerAggregates.TryGetValue(FreeSkillPowerId, out powerAgg);
+            powerAgg ??= metaStats.PowerAggregates.Values.FirstOrDefault(candidate =>
+                string.Equals(candidate.PowerId, FreeSkillPowerId, StringComparison.Ordinal)
+                || string.Equals(candidate.DisplayName, "Free Skill", StringComparison.OrdinalIgnoreCase));
+        }
+        powerAgg ??= new PowerAggregate();
+
+        AppendFreeCardDiscountStats(
+            sb,
+            "Free Skill",
+            "Skills",
+            powerAgg.FreeSkillChargesGranted,
+            powerAgg.FreeSkillChargesUsed,
+            powerAgg.FreeSkillZeroEnergySavingsUses,
+            powerAgg.FreeSkillEnergySaved,
+            powerAgg.FreeSkillBasicSkillsDiscounted,
+            powerAgg.FreeSkillCommonSkillsDiscounted,
+            powerAgg.FreeSkillUncommonSkillsDiscounted,
+            powerAgg.FreeSkillRareSkillsDiscounted,
+            compact);
+    }
+
+    private static void AppendFreeCardDiscountStats(
+        StringBuilder sb,
+        string chargeName,
+        string discountedCardType,
+        int chargesGranted,
+        int chargesUsed,
+        int zeroSavingsUses,
+        decimal energySaved,
+        int basicDiscounted,
+        int commonDiscounted,
+        int uncommonDiscounted,
+        int rareDiscounted,
+        bool compact)
+    {
+        var utilization = chargesGranted <= 0
             ? 0m
-            : 100m * powerAgg.FreeAttackChargesUsed / powerAgg.FreeAttackChargesGranted;
+            : 100m * chargesUsed / chargesGranted;
         Row3(
             sb,
-            "Free Attack charges used/granted",
-            $"{powerAgg.FreeAttackChargesUsed}/{powerAgg.FreeAttackChargesGranted}",
+            $"{chargeName} charges used/granted",
+            $"{chargesUsed}/{chargesGranted}",
             $"{utilization:F0}%");
         Row3(
             sb,
             GetEnergyStatLabel("total saved"),
-            FormatDecimal(powerAgg.FreeAttackEnergySaved),
+            FormatDecimal(energySaved),
             "");
         if (compact) return;
 
-        var averageEnergySaved = powerAgg.FreeAttackChargesUsed <= 0
+        var averageEnergySaved = chargesUsed <= 0
             ? 0m
-            : powerAgg.FreeAttackEnergySaved / powerAgg.FreeAttackChargesUsed;
+            : energySaved / chargesUsed;
         Row3(
             sb,
             GetEnergyStatLabel("charges used with 0 saved"),
-            powerAgg.FreeAttackZeroEnergySavingsUses.ToString(),
+            zeroSavingsUses.ToString(),
             "");
         Row3(
             sb,
             GetEnergyStatLabel("avg saved per charge used"),
             FormatDecimal(averageEnergySaved),
             "");
-        Row3(
-            sb,
-            "Basic Attacks discounted",
-            powerAgg.FreeAttackBasicAttacksDiscounted.ToString(),
-            "");
-        Row3(
-            sb,
-            "Common Attacks discounted",
-            powerAgg.FreeAttackCommonAttacksDiscounted.ToString(),
-            "");
-        Row3(
-            sb,
-            "Uncommon Attacks discounted",
-            powerAgg.FreeAttackUncommonAttacksDiscounted.ToString(),
-            "");
-        Row3(
-            sb,
-            "Rare Attacks discounted",
-            powerAgg.FreeAttackRareAttacksDiscounted.ToString(),
-            "");
+        Row3(sb, $"Basic {discountedCardType} discounted", basicDiscounted.ToString(), "");
+        Row3(sb, $"Common {discountedCardType} discounted", commonDiscounted.ToString(), "");
+        Row3(sb, $"Uncommon {discountedCardType} discounted", uncommonDiscounted.ToString(), "");
+        Row3(sb, $"Rare {discountedCardType} discounted", rareDiscounted.ToString(), "");
     }
 
     private static void AppendViciousPowerStats(
@@ -1772,23 +1935,32 @@ public static class CardHoverShowPatch
     }
 
     /// <summary>
-    /// Emit a single stat row in the canonical 3-column layout used for
+    /// Emit a single stat row in the canonical 4-column layout used for
     /// every stat line in the tooltip. <paramref name="pct"/> can be empty
     /// — the cell's still present so the label and value columns align
     /// vertically with rows that DO have a percentage (Overkill, Blocked,
     /// Played/Drawn). The cell padding keeps adjacent columns from
     /// crowding visually (fixes "Played/Drawn1/1100%"-style crowding).
     ///
-    /// Column weights: label=4, value=1, percent=1. Label dominates
+    /// The first compact column holds the informational hover icon. Column
+    /// weights after that are label=4, value=1, percent=1. Label dominates
     /// (~66% of width) so the label text always fits; numeric columns
     /// are narrow since their content is typically 1-5 chars.
     /// Padding: label gets right-padding (12px), value gets right-padding
     /// (12px) so it sits off the percent column, percent gets left-side
     /// padding from value's right-padding and small right-padding (4px).
     /// </summary>
-    private static void Row3(StringBuilder sb, string label, string value, string pct)
+    private static void Row3(
+        StringBuilder sb,
+        string label,
+        string value,
+        string pct,
+        string? fullDescription = null)
     {
-        sb.Append("[table=3]");
+        sb.Append("[table=4]");
+        sb.Append("[cell expand=0 padding=0,0,10,0]");
+        sb.Append(StatsTooltip.RenderRowInformationHint(label, fullDescription));
+        sb.Append("[/cell]");
         sb.Append($"[cell expand=4 padding=0,0,12,0][color=#e0e0e0]{label}[/color][/cell]");
         sb.Append($"[cell expand=1 padding=0,0,12,0][right][b]{value}[/b][/right][/cell]");
         sb.Append($"[cell expand=1 padding=0,0,4,0][right][color=#b5b5b5]{pct}[/color][/right][/cell]");
@@ -1803,9 +1975,15 @@ public static class CardHoverShowPatch
     /// </summary>
     private static void RowDual(StringBuilder sb, string leftLabel, string leftValue, string rightLabel, string rightValue)
     {
-        sb.Append("[table=4]");
+        sb.Append("[table=6]");
+        sb.Append("[cell expand=0 padding=0,0,10,0]");
+        sb.Append(StatsTooltip.RenderRowInformationHint(leftLabel));
+        sb.Append("[/cell]");
         sb.Append($"[cell expand=3 padding=0,0,12,0][color=#e0e0e0]{leftLabel}[/color][/cell]");
         sb.Append($"[cell expand=1 padding=0,0,18,0][right][b]{leftValue}[/b][/right][/cell]");
+        sb.Append("[cell expand=0 padding=0,0,10,0]");
+        sb.Append(StatsTooltip.RenderRowInformationHint(rightLabel));
+        sb.Append("[/cell]");
         sb.Append($"[cell expand=3 padding=0,0,12,0][color=#e0e0e0]{rightLabel}[/color][/cell]");
         sb.Append($"[cell expand=1 padding=0,0,4,0][right][b]{rightValue}[/b][/right][/cell]");
         sb.Append("[/table]\n");
@@ -1977,6 +2155,36 @@ public static class CardHoverShowPatch
         if (cardModel is not PullFromBelow) return;
 
         Row3(sb, "Ethereal cards played this combat", etherealCardsPlayedThisCombat.ToString(), "");
+    }
+
+    private static void AppendSupermassiveStats(
+        StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel cardModel,
+        int cardsCreatedThisCombat)
+    {
+        if (cardModel is not Supermassive
+            && !IsCardId(cardModel, "CARD.SUPERMASSIVE"))
+        {
+            return;
+        }
+
+        Row3(
+            sb,
+            "Cards created this combat",
+            Math.Max(0, cardsCreatedThisCombat).ToString(),
+            "");
+    }
+
+    private static int? GetSupermassiveCardsCreatedThisCombat(
+        MegaCrit.Sts2.Core.Models.CardModel cardModel)
+    {
+        if (cardModel is not Supermassive
+            && !IsCardId(cardModel, "CARD.SUPERMASSIVE"))
+        {
+            return null;
+        }
+
+        return RunTracker.GetCardsCreatedThisCombat(cardModel.Owner);
     }
 
     private static string GetInlineIconStatLabel(string iconPath, string suffix)

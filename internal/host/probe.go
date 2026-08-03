@@ -12,10 +12,10 @@ import (
 	"time"
 )
 
-// BaseLibMinVersion is the BaseLib version floor (env-prep.sh): below 3.1.8
-// BaseLib hard-references the renamed Creature.ShowsInfiniteHp and freezes the
-// combat HUD, corrupting screenshot evidence.
-const BaseLibMinVersion = "3.1.8"
+// BaseLibMinVersion is the BaseLib version floor enforced during env prep.
+// BaseLib 3.3.7 hard-references the removed MegaInput.releaseCard field from
+// its NPlayerHand patch, preventing every attempted card play on STS2 v0.110.1.
+const BaseLibMinVersion = "3.4.0"
 
 // allowedMods is the AGENTS.md mod allowlist; SpireLensMcp may be absent before
 // install (per-run), so only a name OUTSIDE this set is unexpected.

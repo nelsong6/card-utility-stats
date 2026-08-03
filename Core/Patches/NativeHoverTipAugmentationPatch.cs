@@ -7,9 +7,13 @@ using MegaCrit.Sts2.Core.HoverTips;
 using MegaCrit.Sts2.Core.Nodes.Cards.Holders;
 using MegaCrit.Sts2.Core.Nodes.Combat;
 using MegaCrit.Sts2.Core.Nodes.HoverTips;
+using MegaCrit.Sts2.Core.Nodes.Potions;
 using MegaCrit.Sts2.Core.Nodes.Relics;
+using MegaCrit.Sts2.Core.Nodes.Screens.PotionLab;
 using MegaCrit.Sts2.Core.Nodes.Screens.RelicCollection;
 using MegaCrit.Sts2.Core.Nodes.Screens.RunHistoryScreen;
+using MegaCrit.Sts2.Core.Nodes.Screens.Map;
+using MegaCrit.sts2.Core.Nodes.TopBar;
 
 namespace SpireLens.Core.Patches;
 
@@ -99,9 +103,6 @@ internal static class NativeStatsHoverTipStyler
     private static readonly Color BrandColor = new(0.408f, 0.408f, 0.408f, 1f);
     private static readonly Color ShadowColor = new(0f, 0f, 0f, 0.251f);
 
-    private static Font? _regularFont;
-    private static bool _fontLoadAttempted;
-
     public static void ApplyToLastTextTip(NHoverTipSet tipSet)
     {
         var container = tipSet._textHoverTipContainer;
@@ -128,13 +129,16 @@ internal static class NativeStatsHoverTipStyler
 
     public static RichTextLabel? GetLastStatsDescription(NHoverTipSet tipSet)
     {
+        return GetLastStatsControl(tipSet)
+            ?.GetNodeOrNull<RichTextLabel>("%Description");
+    }
+
+    public static Control? GetLastStatsControl(NHoverTipSet tipSet)
+    {
         var container = tipSet._textHoverTipContainer;
         if (container == null || container.GetChildCount() == 0) return null;
 
-        if (container.GetChild(container.GetChildCount() - 1) is not Control statsTip)
-            return null;
-
-        return statsTip.GetNodeOrNull<RichTextLabel>("%Description");
+        return container.GetChild(container.GetChildCount() - 1) as Control;
     }
 
     private static void AddBrand(Control statsTip)
@@ -148,8 +152,6 @@ internal static class NativeStatsHoverTipStyler
         }
 
         if (header.GetNodeOrNull<Label>(BrandNodeName) != null) return;
-
-        LoadFontOnce();
 
         // The native hover-tip scene is a MarginContainer whose header is an
         // HBoxContainer. Preserve every native title setting and give the
@@ -174,8 +176,7 @@ internal static class NativeStatsHoverTipStyler
         };
 
         brand.AddThemeColorOverride("font_color", BrandColor);
-        if (_regularFont != null)
-            brand.AddThemeFontOverride("font", _regularFont);
+        ApplyBrandFont(brand);
         brand.AddThemeFontSizeOverride("font_size", 14);
         brand.AddThemeColorOverride("font_shadow_color", ShadowColor);
         brand.AddThemeConstantOverride("shadow_offset_x", 3);
@@ -185,18 +186,25 @@ internal static class NativeStatsHoverTipStyler
         header.AddChild(brand);
     }
 
-    private static void LoadFontOnce()
+    private static void ApplyBrandFont(Label brand)
     {
-        if (_fontLoadAttempted) return;
-        _fontLoadAttempted = true;
-
         try
         {
-            _regularFont = ResourceLoader.Load<Font>(RegularFontPath);
+            // Do not retain a Godot resource wrapper across scene-cache
+            // unloads or Core hot reloads. The game may invalidate that
+            // wrapper while this orphan-tolerant assembly remains alive.
+            var font = ResourceLoader.Load<Font>(
+                RegularFontPath,
+                typeHint: null,
+                ResourceLoader.CacheMode.Reuse);
+            if (font != null && GodotObject.IsInstanceValid(font))
+                brand.AddThemeFontOverride("font", font);
         }
         catch (Exception e)
         {
-            CoreMain.LogDebug($"SpireLens brand font load failed: {e.Message}");
+            // Branding is supplemental. Inherit the native hover-tip font if
+            // the game's resource cache is between unload/reload phases.
+            CoreMain.LogDebug($"SpireLens brand font unavailable: {e.Message}");
         }
     }
 }
@@ -238,6 +246,11 @@ internal static class NativeStatsHoverTipFactory
                 statsTip = tip;
                 return true;
 
+            case NLabPotionHolder holder
+                when PotionCompendiumHistoryUi.TryBuildNativeHoverTip(holder, out tip):
+                statsTip = tip;
+                return true;
+
             case NDeckHistoryEntry entry
                 when RunHistoryStatsContext.TryBuildNativeCardHoverTip(entry, out tip):
                 statsTip = tip;
@@ -245,6 +258,38 @@ internal static class NativeStatsHoverTipFactory
 
             case NRelicBasicHolder holder
                 when RunHistoryStatsContext.TryBuildNativeRelicHoverTip(holder, out tip):
+                statsTip = tip;
+                return true;
+
+            case NTopBarHp hp:
+                StatsTooltipPinManager.AttachTopBarRunStatsTarget(hp);
+                if (MaxHpHistoryTooltip.TryBuildNativeHoverTip(hp, out tip))
+                {
+                    statsTip = tip;
+                    return true;
+                }
+                return false;
+
+            case NTopBarGold gold:
+                StatsTooltipPinManager.AttachTopBarRunStatsTarget(gold);
+                if (GoldStatsTooltip.TryBuildNativeHoverTip(gold, out tip))
+                {
+                    statsTip = tip;
+                    return true;
+                }
+                return false;
+
+            case NPotionHolder holder:
+                StatsTooltipPinManager.AttachPotionStatsTarget(holder);
+                if (PotionBeltStatsTooltip.TryBuildNativeHoverTip(holder, out tip))
+                {
+                    statsTip = tip;
+                    return true;
+                }
+                return false;
+
+            case NMapLegendItem legendItem
+                when MapLegendStatsTooltip.TryBuildNativeHoverTip(legendItem, out tip):
                 statsTip = tip;
                 return true;
 

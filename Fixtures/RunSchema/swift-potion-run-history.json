@@ -1,0 +1,34 @@
+{
+  "run_id": "swift-potion-run-history-fixture",
+  "started_at": "2026-08-02T18:00:00Z",
+  "updated_at": "2026-08-02T18:20:00Z",
+  "outcome": "in_progress",
+  "floor_reached": 8,
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {},
+  "potion_history": [
+    {
+      "sequence": 1,
+      "potion_id": "POTION.SWIFT_POTION",
+      "display_name": "Swift Potion",
+      "acquisition_method": "Potion reward",
+      "seen_floor": 4,
+      "seen_location_kind": "Combat",
+      "acquired": true,
+      "acquired_floor": 4,
+      "acquired_location_kind": "Combat",
+      "used": true,
+      "used_floor": 8,
+      "used_location_kind": "Combat",
+      "used_turn": 2,
+      "cards_drawn": 2,
+      "card_draws_blocked": 1
+    }
+  ],
+  "gold_attribution_ledger": [],
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

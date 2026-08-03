@@ -1,29 +1,41 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Threading.Tasks;
 using Godot;
 using MegaCrit.Sts2.Core.HoverTips;
+using MegaCrit.Sts2.Core.Localization;
 using MegaCrit.Sts2.Core.Nodes.Cards;
 using MegaCrit.Sts2.Core.Nodes.Cards.Holders;
 using MegaCrit.Sts2.Core.Nodes.HoverTips;
+using MegaCrit.Sts2.Core.Nodes.Potions;
 using MegaCrit.Sts2.Core.Nodes.Relics;
 using MegaCrit.Sts2.Core.Nodes.Screens;
 using MegaCrit.Sts2.Core.Nodes.Screens.RelicCollection;
 using MegaCrit.Sts2.Core.Nodes.Screens.RunHistoryScreen;
+using MegaCrit.sts2.Core.Nodes.TopBar;
 
 namespace SpireLens.Core.Patches;
 
 /// <summary>
-/// Pins one card or relic tooltip set at a time. The pinned set uses a
-/// dedicated native owner so the game's ordinary OnUnfocus/Remove lifecycle
+/// Pins one card, relic, or run-history tooltip set at a time. The
+/// pinned set uses a dedicated native owner so the game's ordinary
+/// OnUnfocus/Remove lifecycle
 /// can run unchanged without dismissing it.
 /// </summary>
 internal static class StatsTooltipPinManager
 {
+    private const float CardCaptureMargin = 10f;
     private const string PinOwnerNodeName = "SpireLensPinnedStatsTooltipOwner";
     private const string LockIconNodeName = "SpireLensStatsTooltipLock";
     private const string LockIconPath =
         "res://images/ui/top_panel/reminder_lock.png";
     private const string HintOwnerNodeName = "SpireLensPinnedStatsHintOwner";
+    private const string CopyImageButtonNodeName = "SpireLensCopyStatsImageButton";
+    private const string CopyImageButtonTooltip = "Copy image";
+    private const string CopyImageIconResourceSuffix =
+        "Assets.stat-camera.svg";
+    private const float CopyFeedbackDurationSeconds = 1.25f;
     private const float LockIconWidth = 24f;
     private const float LockIconHeight = 28f;
     private const float LockIconRightInset = 3f;
@@ -74,13 +86,20 @@ internal static class StatsTooltipPinManager
     private static Control? _pinnedTarget;
     private static Control? _pinOwner;
     private static NHoverTipSet? _pinnedTipSet;
+    private static Control? _pinnedStatsControl;
     private static RichTextLabel? _pinnedStatsDescription;
+    private static Button? _copyImageButton;
+    private static Action? _copyImageButtonHandler;
+    private static int _copyImageGeneration;
+    private static bool _copyImageInProgress;
     private static Control? _hintOwner;
     private static Control? _lockIconHost;
     private static string? _visibleHintText;
     private static object? _pinnedCardModel;
     private static Texture2D? _lockTexture;
     private static bool _lockLoadAttempted;
+    private static ImageTexture? _copyImageIconTexture;
+    private static bool _copyImageIconLoadAttempted;
     private static bool _suppressRightPressUntilRelease;
 
     public static void Attach(NRelicInventoryHolder? holder)
@@ -93,6 +112,42 @@ internal static class StatsTooltipPinManager
     {
         if (entry != null)
             AttachTarget(entry, subscribeToGuiInput: true);
+    }
+
+    public static void Attach(RunHistoryCampfireButton? button)
+    {
+        if (button != null)
+            AttachTarget(button, subscribeToGuiInput: true);
+    }
+
+    public static void AttachRunHistoryHpLabel(Control? label)
+    {
+        if (label != null)
+            AttachTarget(label, subscribeToGuiInput: true);
+    }
+
+    public static void AttachRunHistoryGoldLabel(Control? label)
+    {
+        if (label != null)
+            AttachTarget(label, subscribeToGuiInput: true);
+    }
+
+    public static void AttachTopBarRunStatsTarget(Control? target)
+    {
+        if (target is NTopBarHp or NTopBarGold)
+            AttachTarget(target, subscribeToGuiInput: true);
+    }
+
+    public static void AttachPotionStatsTarget(NPotionHolder? holder)
+    {
+        if (holder != null)
+            AttachTarget(holder, subscribeToGuiInput: true);
+    }
+
+    public static void AttachRunTimerStatsTarget(Control? target)
+    {
+        if (target != null)
+            AttachTarget(target, subscribeToGuiInput: true);
     }
 
     public static void AttachRunHistoryTargets(NRunHistory? runHistory)
@@ -151,6 +206,31 @@ internal static class StatsTooltipPinManager
         }
     }
 
+    internal static void RefreshPinnedRunTimerStats(
+        Control target,
+        string body)
+    {
+        // Do not reconcile here: the native factory asks for the stats body
+        // while a new pin is still being constructed and before _pinnedTipSet
+        // can be assigned. A refresh during that window should simply wait for
+        // the next sampler tick.
+        if (!ReferenceEquals(_pinnedTarget, target)
+            || !IsLive(_pinnedTipSet)
+            || _pinnedTipSet!.IsQueuedForDeletion()
+            || !IsLive(_pinnedStatsDescription)
+            || _pinnedStatsDescription!.IsQueuedForDeletion()
+            || string.Equals(
+                _pinnedStatsDescription.Text,
+                body,
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _pinnedStatsDescription.Text = body;
+        RunTimerStatsTooltip.AlignClearOfTarget(target, _pinnedTipSet);
+    }
+
     public static void ClearPin()
         => ClearPin(restoreOrdinaryHover: false);
 
@@ -188,6 +268,8 @@ internal static class StatsTooltipPinManager
         RunHistoryContainerSubscriptions.Clear();
         _lockTexture = null;
         _lockLoadAttempted = false;
+        _copyImageIconTexture = null;
+        _copyImageIconLoadAttempted = false;
         _suppressRightPressUntilRelease = false;
     }
 
@@ -218,6 +300,13 @@ internal static class StatsTooltipPinManager
         {
             _suppressRightPressUntilRelease = false;
         }
+
+        // The copy control is the only actionable child of a pinned tooltip.
+        // Preserve the pin through its press so Godot can deliver the later
+        // release and Pressed signal to the button. Every other click keeps
+        // the ordinary dismiss-and-continue behavior below.
+        if (IsCopyImageButtonPress(inputEvent))
+            return;
 
         if (_pinnedTarget == null || !IsDismissAction(inputEvent))
             return;
@@ -270,7 +359,14 @@ internal static class StatsTooltipPinManager
             && owner is not NRelicCollectionEntry
             && owner is not NCardHolder
             && owner is not NDeckHistoryEntry
-            && owner is not NRelicBasicHolder)
+            && owner is not NRelicBasicHolder
+            && owner is not RunHistoryCampfireButton
+            && owner is not NTopBarHp
+            && owner is not NTopBarGold
+            && owner is not NPotionHolder
+            && !RunHistoryHpTooltip.IsTarget(owner)
+            && !RunHistoryGoldTooltip.IsTarget(owner)
+            && !RunTimerStatsTooltip.IsTarget(owner))
         {
             return false;
         }
@@ -398,7 +494,7 @@ internal static class StatsTooltipPinManager
             MouseFilter = Control.MouseFilterEnum.Ignore,
             FocusMode = Control.FocusModeEnum.None,
         };
-        target.AddChild(pinOwner);
+        GetPinOwnerParent(target).AddChild(pinOwner);
 
         _pinnedTarget = target;
         _pinOwner = pinOwner;
@@ -422,8 +518,11 @@ internal static class StatsTooltipPinManager
 
             _pinnedTipSet = tipSet;
             AlignPinnedTipSet(target, tipSet);
+            _pinnedStatsControl =
+                NativeStatsHoverTipStyler.GetLastStatsControl(tipSet);
             _pinnedStatsDescription =
                 NativeStatsHoverTipStyler.GetLastStatsDescription(tipSet);
+            AttachCopyImageButton();
             AddLockIcon(target);
             CoreMain.LogDebug(
                 $"Pinned stats tooltip: {GetTargetDebugId(target)}");
@@ -439,13 +538,16 @@ internal static class StatsTooltipPinManager
     {
         var target = _pinnedTarget;
         var pinOwner = _pinOwner;
+        DetachCopyImageButton();
+        ClearHintPopup();
+        RemoveLockIcon(target);
 
         _pinnedTarget = null;
         _pinOwner = null;
         _pinnedTipSet = null;
+        _pinnedStatsControl = null;
         _pinnedStatsDescription = null;
         _pinnedCardModel = null;
-        ClearHintPopup();
 
         if (IsLive(pinOwner))
         {
@@ -453,8 +555,6 @@ internal static class StatsTooltipPinManager
             pinOwner!.GetParent()?.RemoveChild(pinOwner);
             pinOwner.QueueFree();
         }
-
-        RemoveLockIcon(target);
 
         if (!restoreOrdinaryHover
             || !IsLive(target)
@@ -465,6 +565,255 @@ internal static class StatsTooltipPinManager
         }
 
         RestoreOrdinaryHover(target);
+    }
+
+    private static void AttachCopyImageButton()
+    {
+        DetachCopyImageButton();
+        if (!IsLive(_pinnedStatsControl)) return;
+
+        var title = _pinnedStatsControl!
+            .GetNodeOrNull<Control>("%Title");
+        if (title?.GetParent() is not HBoxContainer header)
+        {
+            CoreMain.LogDebug(
+                "Stats image copy button skipped: tooltip title header was not found.");
+            return;
+        }
+
+        var icon = GetCopyImageIcon();
+        var button = new Button
+        {
+            Name = CopyImageButtonNodeName,
+            Text = icon == null ? "Copy" : string.Empty,
+            Icon = icon,
+            TooltipText = CopyImageButtonTooltip,
+            Flat = true,
+            FocusMode = Control.FocusModeEnum.None,
+            MouseFilter = Control.MouseFilterEnum.Stop,
+            CustomMinimumSize = new Vector2(icon == null ? 68f : 34f, 28f),
+            SizeFlagsHorizontal = Control.SizeFlags.ShrinkEnd,
+            SizeFlagsVertical = Control.SizeFlags.ShrinkCenter,
+        };
+        button.AddThemeFontSizeOverride("font_size", 14);
+        button.AddThemeColorOverride("font_color", Color.FromHtml("#94A0AE"));
+        button.AddThemeColorOverride("font_hover_color", Color.FromHtml("#E8EDF4"));
+        button.AddThemeColorOverride("font_pressed_color", Color.FromHtml("#A9BCEB"));
+        button.AddThemeColorOverride("font_disabled_color", Color.FromHtml("#94A0AE"));
+        button.AddThemeColorOverride("icon_normal_color", Color.FromHtml("#94A0AE"));
+        button.AddThemeColorOverride("icon_hover_color", Color.FromHtml("#E8EDF4"));
+        button.AddThemeColorOverride("icon_pressed_color", Color.FromHtml("#A9BCEB"));
+        button.AddThemeColorOverride("icon_disabled_color", Color.FromHtml("#94A0AE"));
+
+        Action handler = OnCopyImageButtonPressed;
+        button.Pressed += handler;
+        header.AddChild(button);
+
+        _copyImageButton = button;
+        _copyImageButtonHandler = handler;
+        _copyImageGeneration++;
+        _copyImageInProgress = false;
+    }
+
+    private static void DetachCopyImageButton()
+    {
+        _copyImageGeneration++;
+        _copyImageInProgress = false;
+
+        var button = _copyImageButton;
+        var handler = _copyImageButtonHandler;
+        _copyImageButton = null;
+        _copyImageButtonHandler = null;
+
+        if (IsLive(button) && handler != null)
+            button!.Pressed -= handler;
+    }
+
+    private static void OnCopyImageButtonPressed()
+    {
+        if (_copyImageInProgress) return;
+        _ = CopyPinnedStatsImageAsync();
+    }
+
+    private static async Task CopyPinnedStatsImageAsync()
+    {
+        if (_copyImageInProgress
+            || !IsLive(_copyImageButton)
+            || !IsLive(_pinnedStatsControl)
+            || !IsLive(_pinnedTarget)
+            || !IsLive(_pinnedTipSet))
+        {
+            return;
+        }
+
+        var generation = _copyImageGeneration;
+        var button = _copyImageButton!;
+        var statsControl = _pinnedStatsControl!;
+        var pinnedTarget = _pinnedTarget!;
+        var pinnedTipSet = _pinnedTipSet!;
+        var lockIcon = _lockIconHost
+            ?.GetNodeOrNull<CanvasItem>(LockIconNodeName);
+        var lockIconWasVisible = IsLive(lockIcon) && lockIcon!.Visible;
+        var copied = false;
+        var feedback = "Copy failed";
+        _copyImageInProgress = true;
+        button.Disabled = true;
+        button.Visible = false;
+        if (lockIconWasVisible)
+            lockIcon!.Visible = false;
+
+        try
+        {
+            // Wait until the next completed draw so the hidden button is not
+            // present in the viewport texture being captured.
+            await statsControl.ToSignal(
+                RenderingServer.Singleton,
+                RenderingServer.SignalName.FramePostDraw);
+            if (generation != _copyImageGeneration
+                || !IsLive(statsControl)
+                || !IsLive(pinnedTarget)
+                || !IsLive(pinnedTipSet))
+            {
+                return;
+            }
+
+            if (!StatsImageCapture.TryCaptureShareImage(
+                    statsControl,
+                    GetRenderedSubjectRect(pinnedTarget),
+                    GetIsolatedSubjectTexture(pinnedTarget),
+                    GetTooltipCaptureGroups(pinnedTipSet),
+                    out var image,
+                    out var captureError))
+            {
+                CoreMain.Logger.Error(
+                    $"Stats image capture failed: {captureError}");
+                feedback = "Capture failed";
+                return;
+            }
+
+            using (image)
+            {
+                if (!WindowsImageClipboard.TrySetImage(
+                        image,
+                        out var clipboardError))
+                {
+                    CoreMain.Logger.Error(
+                        $"Stats image clipboard write failed: {clipboardError}");
+                    return;
+                }
+            }
+
+            copied = true;
+            feedback = "Copied";
+        }
+        catch (Exception exception)
+        {
+            CoreMain.Logger.Error(
+                $"Stats image copy failed: {exception}");
+        }
+        finally
+        {
+            if (lockIconWasVisible && IsLive(lockIcon))
+                lockIcon!.Visible = true;
+
+            if (generation == _copyImageGeneration && IsLive(button))
+            {
+                button.TooltipText = feedback;
+                button.Visible = true;
+                button.Disabled = false;
+            }
+
+            if (generation == _copyImageGeneration)
+                _copyImageInProgress = false;
+        }
+
+        if (!copied
+            || generation != _copyImageGeneration
+            || !IsLive(button))
+        {
+            return;
+        }
+
+        try
+        {
+            var tree = button.GetTree();
+            if (tree == null) return;
+
+            var timer = tree.CreateTimer(CopyFeedbackDurationSeconds);
+            await button.ToSignal(timer, SceneTreeTimer.SignalName.Timeout);
+            if (generation == _copyImageGeneration && IsLive(button))
+                button.TooltipText = CopyImageButtonTooltip;
+        }
+        catch (Exception exception)
+        {
+            CoreMain.LogDebug(
+                $"Stats image copy feedback reset skipped: {exception.Message}");
+        }
+    }
+
+    private static IReadOnlyList<Control> GetTooltipCaptureGroups(
+        NHoverTipSet tipSet)
+    {
+        var groups = new List<Control>(2);
+        if (IsLive(tipSet._textHoverTipContainer)
+            && tipSet._textHoverTipContainer.GetChildCount() > 0)
+        {
+            groups.Add(tipSet._textHoverTipContainer);
+        }
+
+        if (IsLive(tipSet._cardHoverTipContainer)
+            && tipSet._cardHoverTipContainer.GetChildCount() > 0)
+        {
+            groups.Add(tipSet._cardHoverTipContainer);
+        }
+
+        return groups;
+    }
+
+    private static Texture2D? GetIsolatedSubjectTexture(Control target)
+    {
+        var relicModel = target switch
+        {
+            NRelicInventoryHolder holder => holder.Relic.Model,
+            NRelicCollectionEntry entry
+                when CompendiumRelicStatsContext.TryGetRelicModel(entry, out var model)
+                => model,
+            NRelicBasicHolder holder when IsLive(holder.Relic)
+                => holder.Relic.Model,
+            _ => null,
+        };
+
+        return relicModel?.BigIcon ?? relicModel?.Icon;
+    }
+
+    private static Rect2 GetRenderedSubjectRect(Control target)
+    {
+        Control visual = target switch
+        {
+            NCardHolder holder when IsLive(holder.CardNode)
+                => holder.CardNode!,
+            NRelicInventoryHolder holder when IsLive(holder.Relic)
+                => holder.Relic!,
+            NDeckHistoryEntry entry
+                when IsLive(entry.GetNodeOrNull<Control>("%Card"))
+                => entry.GetNode<Control>("%Card"),
+            NRelicBasicHolder holder when IsLive(holder.Relic)
+                => holder.Relic!,
+            _ => target,
+        };
+
+        if (visual is not NCard card)
+            return StatsImageCapture.GetViewportRect(visual);
+
+        // NCard draws around a zero-sized Control origin, so its ordinary
+        // global rect is empty. Its frame, cost badge, and shadow also extend
+        // slightly outside defaultSize; retain a small local-space margin so
+        // those details survive the viewport crop at every rendered scale.
+        var captureSize = NCard.defaultSize
+            + Vector2.One * (CardCaptureMargin * 2f);
+        return StatsImageCapture.TransformRect(
+            new Rect2(-captureSize / 2f, captureSize),
+            card.GetGlobalTransformWithCanvas());
     }
 
     private static bool TryBuildStatsTip(Control target, out HoverTip tip)
@@ -485,6 +834,27 @@ internal static class StatsTooltipPinManager
 
             case NRelicBasicHolder holder:
                 return RunHistoryStatsContext.TryBuildNativeRelicHoverTip(holder, out tip);
+
+            case RunHistoryCampfireButton button:
+                return button.TryBuildStatsTip(out tip);
+
+            case NTopBarHp hp:
+                return MaxHpHistoryTooltip.TryBuildNativeHoverTip(hp, out tip);
+
+            case NTopBarGold gold:
+                return GoldStatsTooltip.TryBuildNativeHoverTip(gold, out tip);
+
+            case NPotionHolder holder:
+                return PotionBeltStatsTooltip.TryBuildNativeHoverTip(holder, out tip);
+
+            case Control label when RunHistoryHpTooltip.IsTarget(label):
+                return RunHistoryHpTooltip.TryBuildStatsTip(label, out tip);
+
+            case Control label when RunHistoryGoldTooltip.IsTarget(label):
+                return RunHistoryGoldTooltip.TryBuildStatsTip(label, out tip);
+
+            case Control timer when RunTimerStatsTooltip.IsTarget(timer):
+                return RunTimerStatsTooltip.TryBuildStatsTip(timer, out tip);
 
             default:
                 tip = default;
@@ -519,6 +889,48 @@ internal static class StatsTooltipPinManager
                 nativeHoverTips = holder.Relic.Model.HoverTips;
                 return true;
 
+            case RunHistoryCampfireButton:
+                // The campfire summary has no stock tooltip page. The pin
+                // surrogate receives its SpireLens page through
+                // NativeStatsHoverTipFactory, just like appended card/relic
+                // stats, so the native sequence intentionally starts empty.
+                nativeHoverTips = Array.Empty<IHoverTip>();
+                return true;
+
+            case NTopBarHp:
+                nativeHoverTips = new IHoverTip[]
+                {
+                    CreateStockHoverTip("HIT_POINTS"),
+                };
+                return true;
+
+            case NTopBarGold:
+                nativeHoverTips = new IHoverTip[]
+                {
+                    CreateStockHoverTip("MONEY_POUCH"),
+                };
+                return true;
+
+            case NPotionHolder holder:
+                nativeHoverTips = holder.Potion?.Model.HoverTips
+                    ?? new IHoverTip[]
+                    {
+                        CreateStockHoverTip("POTION_SLOT"),
+                    };
+                return true;
+
+            case Control label when RunHistoryHpTooltip.IsTarget(label):
+                nativeHoverTips = Array.Empty<IHoverTip>();
+                return true;
+
+            case Control label when RunHistoryGoldTooltip.IsTarget(label):
+                nativeHoverTips = Array.Empty<IHoverTip>();
+                return true;
+
+            case Control timer when RunTimerStatsTooltip.IsTarget(timer):
+                nativeHoverTips = Array.Empty<IHoverTip>();
+                return true;
+
             default:
                 nativeHoverTips = null!;
                 return false;
@@ -547,6 +959,36 @@ internal static class StatsTooltipPinManager
 
             case NRelicBasicHolder holder:
                 tipSet.SetAlignmentForRelic(holder.Relic);
+                break;
+
+            case RunHistoryCampfireButton button:
+                tipSet.SetAlignment(
+                    button,
+                    HoverTip.GetHoverTipAlignment(button));
+                break;
+
+            case NTopBarHp or NTopBarGold:
+                AlignTopBarTipSet(target, tipSet);
+                break;
+
+            case NPotionHolder holder:
+                AlignPotionTipSet(holder, tipSet);
+                break;
+
+            case Control label when RunHistoryHpTooltip.IsTarget(label):
+                tipSet.SetAlignment(
+                    label,
+                    HoverTip.GetHoverTipAlignment(label));
+                break;
+
+            case Control label when RunHistoryGoldTooltip.IsTarget(label):
+                tipSet.SetAlignment(
+                    label,
+                    HoverTip.GetHoverTipAlignment(label));
+                break;
+
+            case Control timer when RunTimerStatsTooltip.IsTarget(timer):
+                RunTimerStatsTooltip.AlignClearOfTarget(timer, tipSet);
                 break;
         }
     }
@@ -587,6 +1029,37 @@ internal static class StatsTooltipPinManager
                 NHoverTipSet.CreateAndShow(target, nativeHoverTips)
                     ?.SetAlignmentForRelic(holder.Relic);
                 break;
+
+            case RunHistoryCampfireButton button:
+                RunHistoryCampfireSummary.ShowTooltip(button);
+                break;
+
+            case NTopBarHp or NTopBarGold:
+                var tipSet = NHoverTipSet.CreateAndShow(target, nativeHoverTips);
+                if (tipSet != null)
+                    AlignTopBarTipSet(target, tipSet);
+                break;
+
+            case NPotionHolder holder:
+                var potionTipSet = NHoverTipSet.CreateAndShow(
+                    target,
+                    nativeHoverTips,
+                    HoverTipAlignment.Center);
+                if (potionTipSet != null)
+                    AlignPotionTipSet(holder, potionTipSet);
+                break;
+
+            case Control label when RunHistoryHpTooltip.IsTarget(label):
+                RunHistoryHpTooltip.ShowTooltip(label);
+                break;
+
+            case Control label when RunHistoryGoldTooltip.IsTarget(label):
+                RunHistoryGoldTooltip.ShowTooltip(label);
+                break;
+
+            case Control timer when RunTimerStatsTooltip.IsTarget(timer):
+                RunTimerStatsTooltip.ShowTooltip(timer);
+                break;
         }
     }
 
@@ -604,9 +1077,59 @@ internal static class StatsTooltipPinManager
                 => entry.Card.Id.ToString(),
             NRelicBasicHolder holder when IsLive(holder.Relic)
                 => holder.Relic.Model.Id.ToString(),
+            RunHistoryCampfireButton => "run-history-campfires",
+            NTopBarHp => "live-run-hp",
+            NTopBarGold => "live-run-gold",
+            NPotionHolder holder => holder.Potion?.Model.Id.ToString()
+                ?? "empty-potion-slot",
+            Control label when RunHistoryHpTooltip.IsTarget(label)
+                => "run-history-hp",
+            Control label when RunHistoryGoldTooltip.IsTarget(label)
+                => "run-history-gold",
+            Control timer when RunTimerStatsTooltip.IsTarget(timer)
+                => "run-timer-stats",
             _ => target.Name,
         };
     }
+
+    private static HoverTip CreateStockHoverTip(string localizationKey)
+    {
+        return new HoverTip(
+            new LocString("static_hover_tips", $"{localizationKey}.title"),
+            new LocString("static_hover_tips", $"{localizationKey}.description"));
+    }
+
+    private static void AlignTopBarTipSet(
+        Control target,
+        NHoverTipSet tipSet)
+    {
+        tipSet.SetGlobalPosition(
+            target.GlobalPosition + new Vector2(0f, target.Size.Y + 20f));
+    }
+
+    private static void AlignPotionTipSet(
+        NPotionHolder holder,
+        NHoverTipSet tipSet)
+    {
+        tipSet.SetGlobalPosition(
+            holder.GlobalPosition
+            + Vector2.Down
+            * holder.Size.Y
+            * Mathf.Max(1.5f, holder.Scale.Y));
+        tipSet.SetAlignment(holder, HoverTipAlignment.Center);
+    }
+
+    private static Node GetPinOwnerParent(Control target)
+    {
+        if (!UsesLayoutNeutralPinOverlay(target))
+            return target;
+
+        var root = target.GetTree()?.Root;
+        return root != null ? root : target;
+    }
+
+    private static bool UsesLayoutNeutralPinOverlay(Control target)
+        => target is NTopBarHp or NTopBarGold or NPotionHolder;
 
     private static void ShowHintPopup(string tooltip, Vector2 pointerPosition)
     {
@@ -684,6 +1207,7 @@ internal static class StatsTooltipPinManager
             ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
         };
+        var usesLayoutNeutralOverlay = UsesLayoutNeutralPinOverlay(target);
         if (isFullCard)
         {
             // NCard draws its 300x422 card centered around a zero-sized
@@ -695,7 +1219,7 @@ internal static class StatsTooltipPinManager
                 (-NCard.defaultSize.Y / 2f) + topInset);
             lockIcon.Size = new Vector2(width, height);
         }
-        else
+        else if (!usesLayoutNeutralOverlay)
         {
             lockIcon.AnchorLeft = 1f;
             lockIcon.AnchorRight = 1f;
@@ -708,11 +1232,27 @@ internal static class StatsTooltipPinManager
         }
 
         host!.AddChild(lockIcon);
+        if (usesLayoutNeutralOverlay)
+        {
+            // Top-bar counters and potion holders participate in container
+            // layout and may clip children. Keep the badge in the same
+            // root-level overlay as the pin surrogate, then place it over the
+            // rendered target without affecting any minimum-size calculation.
+            var targetRect = GetRenderedSubjectRect(target);
+            lockIcon.Size = new Vector2(width, height);
+            lockIcon.GlobalPosition = new Vector2(
+                targetRect.Position.X + targetRect.Size.X - rightInset - width,
+                targetRect.Position.Y + topInset);
+            lockIcon.ZIndex = 1000;
+        }
         _lockIconHost = host;
     }
 
     private static Control GetLockIconHost(Control target)
     {
+        if (UsesLayoutNeutralPinOverlay(target) && IsLive(_pinOwner))
+            return _pinOwner!;
+
         // Card holders are interaction/layout slots whose bounds can be much
         // larger than the rendered card. NCard owns the visual transform; its
         // centered visual bounds are handled explicitly in AddLockIcon.
@@ -845,6 +1385,42 @@ internal static class StatsTooltipPinManager
         return _lockTexture;
     }
 
+    private static Texture2D? GetCopyImageIcon()
+    {
+        if (_copyImageIconLoadAttempted) return _copyImageIconTexture;
+        _copyImageIconLoadAttempted = true;
+
+        try
+        {
+            var assembly = typeof(StatsTooltipPinManager).Assembly;
+            var resourceName = Array.Find(
+                assembly.GetManifestResourceNames(),
+                name => name.EndsWith(
+                    CopyImageIconResourceSuffix,
+                    StringComparison.Ordinal));
+            if (resourceName == null)
+                throw new InvalidOperationException("embedded camera icon was not found");
+
+            using var stream = assembly.GetManifestResourceStream(resourceName)
+                ?? throw new InvalidOperationException("embedded camera icon could not be opened");
+            using var buffer = new MemoryStream();
+            stream.CopyTo(buffer);
+            using var image = Image.CreateEmpty(1, 1, false, Image.Format.Rgba8);
+            var loadError = image.LoadSvgFromBuffer(buffer.ToArray(), 1f);
+            if (loadError != Error.Ok)
+                throw new InvalidOperationException($"SVG loader returned {loadError}");
+
+            _copyImageIconTexture = ImageTexture.CreateFromImage(image);
+        }
+        catch (Exception exception)
+        {
+            CoreMain.Logger.Error(
+                $"Could not load stats image camera icon: {exception.Message}");
+        }
+
+        return _copyImageIconTexture;
+    }
+
     private static void OnTargetTreeExiting(
         Control target,
         ulong instanceId)
@@ -884,6 +1460,19 @@ internal static class StatsTooltipPinManager
             ButtonIndex: MouseButton.Right,
             Pressed: false,
         };
+
+    private static bool IsCopyImageButtonPress(InputEvent inputEvent)
+    {
+        return inputEvent is InputEventMouseButton
+            {
+                ButtonIndex: MouseButton.Left,
+                Pressed: true,
+            } mouseButton
+            && IsLive(_copyImageButton)
+            && _copyImageButton!.Visible
+            && !_copyImageButton.Disabled
+            && _copyImageButton.GetGlobalRect().HasPoint(mouseButton.Position);
+    }
 
     private static bool IsLive(GodotObject? instance)
         => instance != null && GodotObject.IsInstanceValid(instance);

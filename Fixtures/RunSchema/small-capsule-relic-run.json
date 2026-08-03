@@ -1,0 +1,40 @@
+{
+  "run_id": "small-capsule-relic-fixture",
+  "started_at": "2026-08-01T23:00:00Z",
+  "updated_at": "2026-08-01T23:05:00Z",
+  "outcome": "in_progress",
+  "floor_reached": 12,
+  "aggregates": {
+    "CARD.STRIKE_IRONCLAD#1": {
+      "initial_upgrade_level": 0
+    }
+  },
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.SMALL_CAPSULE": {
+      "relic_reward_choices": [
+        {
+          "choice_number": 1,
+          "relic_id": "RELIC.DATA_DISK",
+          "display_name": "Data Disk",
+          "outcome": "taken"
+        },
+        {
+          "choice_number": 2,
+          "relic_id": "RELIC.BAG_OF_PREPARATION",
+          "display_name": "Bag of Preparation",
+          "outcome": "skipped"
+        }
+      ]
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.STRIKE_IRONCLAD": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.STRIKE_IRONCLAD": 1
+  }
+}

@@ -74,8 +74,8 @@ public static class JugglingPowerAfterAppliedStatsPatch
 /// the native callback starts, and keep attribution armed until every awaited
 /// generated-card add has completed.
 /// </summary>
-[HarmonyPatch(typeof(JugglingPower), nameof(JugglingPower.AfterCardPlayed))]
-internal static class JugglingPowerAfterCardPlayedStatsPatch
+[HarmonyPatch(typeof(JugglingPower), nameof(JugglingPower.BeforeCardPlayed))]
+internal static class JugglingPowerBeforeCardPlayedStatsPatch
 {
     [HarmonyPrefix]
     public static void Prefix(
@@ -114,7 +114,7 @@ internal static class JugglingPowerAfterCardPlayedStatsPatch
         }
         catch (Exception e)
         {
-            CoreMain.LogDebug($"JugglingPowerAfterCardPlayedStatsPatch failed: {e.Message}");
+            CoreMain.LogDebug($"JugglingPowerBeforeCardPlayedStatsPatch failed: {e.Message}");
             RunTracker.DisarmJugglingCopyAttribution(__state);
         }
     }

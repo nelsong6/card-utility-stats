@@ -7,11 +7,11 @@ using MegaCrit.Sts2.Core.Models.Relics;
 namespace SpireLens.Core.Patches;
 
 /// <summary>
-/// Keeps Toasty Mittens attribution attached to its async hand-draw callback
-/// without exposing that scope to the caller after the callback returns.
+/// Keeps Toasty Mittens attribution attached to its async post-draw turn-start
+/// callback without exposing that scope to the caller after it returns.
 /// </summary>
-[HarmonyPatch(typeof(ToastyMittens), nameof(ToastyMittens.BeforeHandDraw))]
-internal static class ToastyMittensBeforeHandDrawStatsPatch
+[HarmonyPatch(typeof(ToastyMittens), nameof(ToastyMittens.AfterPlayerTurnStart))]
+internal static class ToastyMittensAfterPlayerTurnStartStatsPatch
 {
     [HarmonyPrefix]
     public static void Prefix(

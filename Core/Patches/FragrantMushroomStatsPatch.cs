@@ -8,9 +8,9 @@ using MegaCrit.Sts2.Core.Models.Relics;
 namespace SpireLens.Core.Patches;
 
 /// <summary>
-/// Tracks the cards Fragrant Mushroom actually upgrades during its async
-/// pickup effect. Card names are captured from CardModel.UpgradeInternal while
-/// this pickup window is armed.
+/// Tracks current HP across Fragrant Mushroom's async pickup damage and the
+/// cards it actually upgrades. Card names are captured from
+/// CardModel.UpgradeInternal while this pickup window is armed.
 /// </summary>
 [HarmonyPatch]
 public static class FragrantMushroomAfterObtainedPatch

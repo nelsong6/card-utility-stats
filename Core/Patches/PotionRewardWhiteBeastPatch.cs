@@ -98,6 +98,7 @@ public static class PotionRewardWhiteBeastOnSkippedPatch
     {
         try
         {
+            RunTracker.RecordPotionRewardRejected(__instance);
             RunTracker.RecordWhiteBeastPotionRewardSkipped(__instance);
             RunTracker.RecordTinyMailboxPotionRewardSkipped(__instance);
         }

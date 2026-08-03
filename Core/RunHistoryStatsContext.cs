@@ -34,6 +34,8 @@ internal static class RunHistoryStatsContext
 
     public static bool HasCurrent => EnsureLoaded()?.Data != null;
 
+    internal static RunData? GetCurrentRunData() => EnsureLoaded()?.Data;
+
     public static void SetHistoricalDeckViewer(
         NDeckViewScreen viewer,
         IReadOnlyList<CardModel> cards)
@@ -262,7 +264,7 @@ internal static class RunHistoryStatsContext
             neowsBonesCurseAggs = curseAggs;
         }
 
-        return RelicHoverShowPatch.TryBuildBodyBBCode(
+        var built = RelicHoverShowPatch.TryBuildBodyBBCode(
             relicModel,
             aggregate,
             run.FloorReached,
@@ -272,6 +274,22 @@ internal static class RunHistoryStatsContext
             storybookBrightestFlameAgg,
             out title,
             out body);
+        if (relicModel.IsWax)
+        {
+            var toyBoxAggregate = run.RelicAggregates.TryGetValue(
+                "RELIC.TOY_BOX",
+                out var toyBoxSaved)
+                ? toyBoxSaved
+                : null;
+            RelicHoverShowPatch.ApplyWaxRelicPresentation(
+                relicModel,
+                toyBoxAggregate,
+                ref title,
+                ref body);
+            return true;
+        }
+
+        return built;
     }
 
     public static bool HasAncestor<T>(Node? node) where T : Node
@@ -521,6 +539,42 @@ public static class RunHistoryDisplayRunStatsContextPatch
             StatsTooltipPinManager.AttachRunHistoryTargets(__instance);
             RunHistoryDeckViewer.InjectButton(__instance);
             RunHistoryDeckViewer.RestoreVisibleArrowHotkeys(__instance);
+            RunTimerStatsTooltip.RefreshRunHistory(__instance);
+            var player = __instance._selectedPlayerIcon?.Player;
+            if (player != null)
+            {
+                RunHistoryCampfireSummary.Refresh(__instance, history, player);
+                RunHistoryHpTooltip.Refresh(__instance, player);
+                RunHistoryGoldTooltip.Refresh(__instance, player);
+            }
+        });
+    }
+}
+
+[HarmonyPatch(
+    typeof(NRunHistory),
+    "SelectPlayer",
+    new[] { typeof(NRunHistoryPlayerIcon) })]
+public static class RunHistorySelectPlayerCampfireSummaryPatch
+{
+    [HarmonyPostfix]
+    public static void Postfix(
+        NRunHistory __instance,
+        NRunHistoryPlayerIcon playerIcon)
+    {
+        PatchGuard.Run(nameof(RunHistorySelectPlayerCampfireSummaryPatch), () =>
+        {
+            if (__instance._history != null && playerIcon?.Player != null)
+            {
+                StatsTooltipPinManager.ClearPin();
+                RunHistoryCampfireSummary.Refresh(
+                    __instance,
+                    __instance._history,
+                    playerIcon.Player);
+                RunHistoryHpTooltip.Refresh(__instance, playerIcon.Player);
+                RunHistoryGoldTooltip.Refresh(__instance, playerIcon.Player);
+                RunTimerStatsTooltip.RefreshRunHistory(__instance);
+            }
         });
     }
 }
@@ -535,6 +589,10 @@ public static class RunHistoryHiddenStatsContextPatch
         {
             RunHistoryDeckViewer.Close();
             RunHistoryDeckViewer.DisableArrowHotkeys(__instance);
+            RunHistoryCampfireSummary.Remove(__instance);
+            RunHistoryHpTooltip.Remove(__instance);
+            RunHistoryGoldTooltip.Remove(__instance);
+            RunTimerStatsTooltip.RemoveRunHistory(__instance);
             StatsTooltipPinManager.ClearPin();
             RunHistoryStatsContext.Clear();
         });

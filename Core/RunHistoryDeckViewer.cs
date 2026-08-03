@@ -353,7 +353,7 @@ internal static class RunHistoryDeckViewer
                 NClickableControl.SignalName.Released,
                 _closeCallable);
 
-            if (NControllerManager.Instance?.IsUsingController == true)
+            if (NControllerManager.Instance?.IsUsingDirectionalNavigation == true)
                 viewer.DefaultFocusedControl?.GrabFocus();
 
             CoreMain.LogDebug(

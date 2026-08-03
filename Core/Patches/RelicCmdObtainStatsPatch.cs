@@ -54,8 +54,6 @@ public static class RelicCmdObtainStatsPatch
     {
         try
         {
-            if (!IsTrackedObtainStatsRelic(relic)) return;
-
             if (__result == null)
             {
                 RecordObtainStats(relic, player, __state);
@@ -83,22 +81,16 @@ public static class RelicCmdObtainStatsPatch
         }
     }
 
-    private static bool IsTrackedObtainStatsRelic(RelicModel relic)
-    {
-        return RunTracker.IsStrikeDummyStatsRelic(relic)
-            || RunTracker.IsMiniatureCannonStatsRelic(relic)
-            || RunTracker.IsLizardTailStatsRelic(relic)
-            || RunTracker.IsChosenCheeseStatsRelic(relic)
-            || relic is BookOfFiveRings;
-    }
-
     private static void RecordObtainStats(RelicModel relic, Player player, ChosenCheeseObtainState chosenCheeseState)
     {
+        RunTracker.RecordMapLegendRelicObtained(relic, player);
         RunTracker.RecordStrikeDummyObtained(relic, player);
         RunTracker.RecordMiniatureCannonObtained(relic, player);
         RunTracker.RecordLizardTailObtained(relic, player);
         if (relic is BookOfFiveRings bookOfFiveRings)
             RunTracker.RecordBookOfFiveRingsObtained(bookOfFiveRings, player);
+        RunTracker.RecordSwordOfStoneObtained(relic, player);
+        RunTracker.RecordToyBoxWaxRelicBestowed(relic, player);
 
         if (chosenCheeseState.Player != null)
             RunTracker.RecordChosenCheeseObtained(relic, player, chosenCheeseState.StartingMaxHp);

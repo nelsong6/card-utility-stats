@@ -1,0 +1,40 @@
+{
+  "run_id": "sword-in-the-stone-relic-fixture",
+  "started_at": "2026-07-31T20:00:00Z",
+  "updated_at": "2026-07-31T20:30:00Z",
+  "character": "CHARACTER.IRONCLAD",
+  "ascension": 8,
+  "floor_reached": 31,
+  "outcome": "in_progress",
+  "game_start_time": 1785556800,
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.SWORD_OF_STONE": {
+      "floor_acquired": 8,
+      "sword_in_the_stone_elites_slain": [
+        {
+          "floor": 12,
+          "encounter_id": "ENCOUNTER.GREMLIN_NOB",
+          "display_name": "Gremlin Nob"
+        },
+        {
+          "floor": 18,
+          "encounter_id": "ENCOUNTER.LAGAVULIN",
+          "display_name": "Lagavulin"
+        },
+        {
+          "floor": 23,
+          "encounter_id": "ENCOUNTER.GREMLIN_LEADER",
+          "display_name": "Gremlin Leader"
+        }
+      ],
+      "activations": 2,
+      "strength_added": 6
+    }
+  },
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

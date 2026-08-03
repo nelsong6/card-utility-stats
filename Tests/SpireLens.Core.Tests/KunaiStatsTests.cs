@@ -15,6 +15,11 @@ public class KunaiStatsTests
     private static readonly MethodInfo BuildKunaiBodyMethod =
         typeof(RelicHoverShowPatch).GetMethod("BuildKunaiBodyBBCode", BindingFlags.NonPublic | BindingFlags.Static)
         ?? throw new InvalidOperationException("BuildKunaiBodyBBCode not found.");
+    private static readonly MethodInfo BuildKunaiLiveBodyMethod =
+        typeof(RelicHoverShowPatch).GetMethod(
+            "BuildKunaiBodyBBCodeWithLiveActivations",
+            BindingFlags.NonPublic | BindingFlags.Static)
+        ?? throw new InvalidOperationException("BuildKunaiBodyBBCodeWithLiveActivations not found.");
 
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
@@ -34,6 +39,9 @@ public class KunaiStatsTests
         Assert.Equal(0, agg.KunaiTurnsEndedAt2Charges);
         Assert.Equal(0, agg.KunaiTurnEndChargeTotal);
         Assert.Equal(0, agg.KunaiTurnEndChargeCount);
+        Assert.Equal(0, agg.ThreeAttackScalingRateActivations);
+        Assert.Equal(0, agg.ThreeAttackScalingTurns);
+        Assert.Equal(0, agg.ThreeAttackScalingCombats);
     }
 
     [Fact]
@@ -90,6 +98,7 @@ public class KunaiStatsTests
 
         Assert.Equal(14, agg.KunaiAttacksPlayed);
         Assert.Equal(2, agg.Activations);
+        Assert.Equal(2, agg.ThreeAttackScalingRateActivations);
         Assert.Equal(4, agg.KunaiDexterityGained);
         Assert.Equal(1, agg.KunaiTurnsEndedAt1Charge);
         Assert.Equal(2, agg.KunaiTurnsEndedAt2Charges);
@@ -142,11 +151,17 @@ public class KunaiStatsTests
             KunaiTurnsEndedAt2Charges = 3,
             KunaiTurnEndChargeTotal = 11,
             KunaiTurnEndChargeCount = 7,
+            ThreeAttackScalingRateActivations = 4,
+            ThreeAttackScalingTurns = 7,
+            ThreeAttackScalingCombats = 3,
         });
 
-        Assert.Contains("Attacks played", body);
+        Assert.Contains("The number of Attack cards played while this relic was held.", body);
         Assert.Contains("Activations", body);
         Assert.Contains("Dexterity gained", body);
+        Assert.Contains("Average activations per turn", body);
+        Assert.Contains("Average activations per combat", body);
+        Assert.Contains("Turns ended at 0 charges", body);
         Assert.Contains("Turns ended at 1 charge", body);
         Assert.Contains("Turns ended at 2 charges", body);
         Assert.Contains("Avg charge at turn end", body);
@@ -162,13 +177,35 @@ public class KunaiStatsTests
     {
         var body = BuildBody(new RelicAggregate());
 
-        Assert.Contains("Attacks played", body);
+        Assert.Contains("The number of Attack cards played while this relic was held.", body);
         Assert.Contains("Activations", body);
         Assert.Contains("Dexterity gained", body);
+        Assert.Contains("Average activations per turn", body);
+        Assert.Contains("Average activations per combat", body);
+        Assert.Contains("Turns ended at 0 charges", body);
         Assert.Contains("Turns ended at 1 charge", body);
         Assert.Contains("Turns ended at 2 charges", body);
         Assert.Contains("Avg charge at turn end", body);
-        Assert.Equal(6, CountOccurrences(body, "[b]0[/b]"));
+        Assert.Equal(9, CountOccurrences(body, "[b]0[/b]"));
+    }
+
+    [Fact]
+    public void RelicTooltip_Kunai_ShowsLiveActivationRowsInCombat()
+    {
+        var body = (string)(BuildKunaiLiveBodyMethod.Invoke(
+            null,
+            new object?[]
+            {
+                new RelicAggregate(),
+                new RelicLiveActivationCounts(ThisTurn: 3, ThisCombat: 7),
+            }) ?? throw new InvalidOperationException("BuildKunaiBodyBBCodeWithLiveActivations returned null."));
+
+        Assert.Contains("this turn", body);
+        Assert.Contains("this combat", body);
+        Assert.Contains("Times activated this turn", body);
+        Assert.Contains("Times activated this combat", body);
+        Assert.Contains("[b]3[/b]", body);
+        Assert.Contains("[b]7[/b]", body);
     }
 
     [Fact]
@@ -201,6 +238,9 @@ public class KunaiStatsTests
         Assert.Equal(0, agg.KunaiTurnsEndedAt2Charges);
         Assert.Equal(0, agg.KunaiTurnEndChargeTotal);
         Assert.Equal(0, agg.KunaiTurnEndChargeCount);
+        Assert.Equal(0, agg.ThreeAttackScalingRateActivations);
+        Assert.Equal(0, agg.ThreeAttackScalingTurns);
+        Assert.Equal(0, agg.ThreeAttackScalingCombats);
     }
 
     private static string BuildBody(RelicAggregate agg)

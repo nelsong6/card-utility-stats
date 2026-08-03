@@ -24,24 +24,22 @@ public class ToastyMittensStatsTests
         ?? throw new InvalidOperationException("BuildToastyMittensBodyBBCode not found.");
 
     [Fact]
-    public void Patch_TargetsToastyMittensBeforeHandDrawWithExpectedParameters()
+    public void Patch_TargetsToastyMittensAfterPlayerTurnStartWithExpectedParameters()
     {
         var target = typeof(ToastyMittens).GetMethod(
-            nameof(ToastyMittens.BeforeHandDraw),
+            nameof(ToastyMittens.AfterPlayerTurnStart),
             new[]
             {
-                typeof(Player),
                 typeof(PlayerChoiceContext),
-                typeof(ICombatState),
+                typeof(Player),
             });
 
         Assert.NotNull(target);
         Assert.Equal(
             new[]
             {
-                typeof(Player),
                 typeof(PlayerChoiceContext),
-                typeof(ICombatState),
+                typeof(Player),
             },
             target!.GetParameters().Select(parameter => parameter.ParameterType));
     }

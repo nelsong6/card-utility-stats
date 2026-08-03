@@ -1,0 +1,68 @@
+{
+  "run_id": "fishing-rod-floor-averages-fixture",
+  "started_at": "2026-08-01T18:00:00Z",
+  "updated_at": "2026-08-01T18:20:00Z",
+  "outcome": "in_progress",
+  "floor_reached": 20,
+  "aggregates": {
+    "CARD.GRAVE_WARDEN#1": {
+      "initial_upgrade_level": 0
+    },
+    "CARD.REAP#1": {
+      "initial_upgrade_level": 0
+    }
+  },
+  "events": [
+    {
+      "t": "2026-08-01T18:10:00Z",
+      "type": "card_upgraded",
+      "card_id": "CARD.GRAVE_WARDEN#1",
+      "floor": 12,
+      "upgrade_level": 1
+    },
+    {
+      "t": "2026-08-01T18:20:00Z",
+      "type": "card_upgraded",
+      "card_id": "CARD.REAP#1",
+      "floor": 20,
+      "upgrade_level": 1
+    }
+  ],
+  "relic_aggregates": {
+    "RELIC.FISHING_ROD": {
+      "floor_acquired": 5,
+      "cards_upgraded": 2,
+      "upgraded_cards": [
+        "Grave Warden+",
+        "Reap+"
+      ],
+      "fishing_rod_combat_floor_distances": [
+        2,
+        2,
+        3,
+        3,
+        4,
+        1
+      ],
+      "fishing_rod_last_combat_floor": 20,
+      "fishing_rod_upgrade_floor_distances": [
+        7,
+        8
+      ],
+      "fishing_rod_last_upgrade_floor": 20
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.GRAVE_WARDEN": [
+      1
+    ],
+    "CARD.REAP": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.GRAVE_WARDEN": 1,
+    "CARD.REAP": 1
+  }
+}

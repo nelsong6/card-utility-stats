@@ -1,0 +1,34 @@
+{
+  "run_id": "eternal-feather-campfire-healing-fixture",
+  "started_at": "2026-08-02T21:00:00Z",
+  "updated_at": "2026-08-02T21:30:00Z",
+  "character": "CHAR.IRONCLAD",
+  "ascension": 8,
+  "floor_reached": 16,
+  "outcome": "in_progress",
+  "game_start_time": 1785729600,
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.ETERNAL_FEATHER": {
+      "activations": 2,
+      "total_healing_attempted": 18,
+      "total_healing_restored": 9,
+      "total_healing_lost": 9,
+      "eternal_feather_healing_activations": [
+        {
+          "floor": 7,
+          "hp_restored": 9
+        },
+        {
+          "floor": 14,
+          "hp_restored": 0
+        }
+      ]
+    }
+  },
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

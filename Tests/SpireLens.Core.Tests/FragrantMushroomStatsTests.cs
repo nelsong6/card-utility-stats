@@ -29,6 +29,8 @@ public class FragrantMushroomStatsTests
 
         Assert.Equal(0, agg.CardsUpgraded);
         Assert.Empty(agg.UpgradedCards);
+        Assert.Null(agg.StartingHp);
+        Assert.Null(agg.ResultingHp);
     }
 
     [Fact]
@@ -39,12 +41,16 @@ public class FragrantMushroomStatsTests
         {
             CardsUpgraded = 2,
             UpgradedCards = { "Strike+", "Defend+" },
+            StartingHp = 52m,
+            ResultingHp = 37m,
         };
 
         var json = JsonSerializer.Serialize(run, SerializerOptions);
 
         Assert.Contains("cards_upgraded", json);
         Assert.Contains("upgraded_cards", json);
+        Assert.Contains("starting_hp", json);
+        Assert.Contains("resulting_hp", json);
 
         var restored = JsonSerializer.Deserialize<RunData>(json, SerializerOptions);
 
@@ -52,6 +58,8 @@ public class FragrantMushroomStatsTests
         var agg = restored!.RelicAggregates[FragrantMushroomRelicId];
         Assert.Equal(2, agg.CardsUpgraded);
         Assert.Equal(new[] { "Strike+", "Defend+" }, agg.UpgradedCards);
+        Assert.Equal(52m, agg.StartingHp);
+        Assert.Equal(37m, agg.ResultingHp);
     }
 
     [Fact]
@@ -66,12 +74,30 @@ public class FragrantMushroomStatsTests
     }
 
     [Fact]
+    public void RunTracker_FragrantMushroomPickup_RecordsObservedHp()
+    {
+        var agg = new RelicAggregate();
+
+        RunTracker.RecordFragrantMushroomPickupForTest(
+            agg,
+            new[] { "Strike+", "Defend+" },
+            startingHp: 52m,
+            resultingHp: 37m);
+
+        Assert.Equal(52m, agg.StartingHp);
+        Assert.Equal(37m, agg.ResultingHp);
+        Assert.Equal(2, agg.CardsUpgraded);
+    }
+
+    [Fact]
     public void RelicTooltip_FragrantMushroom_ShowsCardsUpgradedAndCardList()
     {
         var body = BuildBody(new RelicAggregate
         {
             CardsUpgraded = 2,
             UpgradedCards = { "Strike+", "Defend+" },
+            StartingHp = 52m,
+            ResultingHp = 37m,
         });
 
         Assert.Contains("Cards upgraded", body);
@@ -79,6 +105,10 @@ public class FragrantMushroomStatsTests
         Assert.Contains("Strike+", body);
         Assert.Contains("Defend+", body);
         Assert.Contains("[b]2[/b]", body);
+        Assert.Contains("starting", body);
+        Assert.Contains("resulting", body);
+        Assert.Contains("[b]52[/b]", body);
+        Assert.Contains("[b]37[/b]", body);
     }
 
     [Fact]
@@ -88,6 +118,8 @@ public class FragrantMushroomStatsTests
 
         Assert.Contains("Cards upgraded", body);
         Assert.Contains("[b]0[/b]", body);
+        Assert.Contains("starting", body);
+        Assert.Contains("resulting", body);
     }
 
     private static string BuildBody(RelicAggregate agg)

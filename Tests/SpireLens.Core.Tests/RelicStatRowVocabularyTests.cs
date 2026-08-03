@@ -167,6 +167,21 @@ public class RelicStatRowVocabularyTests
         "potion_gained",
         "")]
     [InlineData(
+        "Common potions",
+        "",
+        "potion_common",
+        "")]
+    [InlineData(
+        "Uncommon potions",
+        "",
+        "potion_uncommon",
+        "")]
+    [InlineData(
+        "Rare potions",
+        "",
+        "potion_rare",
+        "")]
+    [InlineData(
         "Total block gained",
         "Total",
         "block_gained",
@@ -180,6 +195,11 @@ public class RelicStatRowVocabularyTests
         "Gold gained",
         "",
         "gold_gained",
+        "")]
+    [InlineData(
+        "Kills",
+        "",
+        "kill",
         "")]
     [InlineData(
         "Relic gained",
@@ -221,7 +241,11 @@ public class RelicStatRowVocabularyTests
         Assert.Equal(
             expectedDenominators,
             string.Join(",", presentation.DenominatorConceptIds));
-        Assert.Contains(label, presentation.FullDescription);
+        Assert.Equal(label, presentation.FullDescription);
+        Assert.DoesNotContain(
+            "tracked for this relic",
+            presentation.FullDescription,
+            StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

@@ -1,0 +1,27 @@
+{
+  "run_id": "crossbow-relic-fixture",
+  "started_at": "2026-08-02T20:00:00Z",
+  "updated_at": "2026-08-02T20:20:00Z",
+  "character": "CHAR.IRONCLAD",
+  "ascension": 8,
+  "floor_reached": 31,
+  "outcome": "in_progress",
+  "game_start_time": 1785726000,
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.CROSSBOW": {
+      "crossbow_attacks_gained": 6,
+      "crossbow_common_attacks_gained": 2,
+      "crossbow_uncommon_attacks_gained": 2,
+      "crossbow_rare_attacks_gained": 1,
+      "crossbow_discount_given_total": 9,
+      "crossbow_turns": 4,
+      "crossbow_combats": 2
+    }
+  },
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

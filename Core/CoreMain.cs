@@ -135,16 +135,24 @@ public static class CoreMain
         // No-op if we're not mid-run (main menu, between runs) — RunStarted
         // will handle fresh setup when the next run begins.
         RunTracker.TryResumeActiveRun();
+        RunTimerStatsTooltip.Initialize();
+        RunTimeStatsTracker.Initialize();
         // Re-inject the ViewStats checkbox if the deck view is currently
         // open — Shutdown just freed the injected clone, so without this
         // the user would see the checkbox disappear until they close and
         // reopen the deck view.
         Patches.ViewStatsInjectorPatch.ReinjectIntoActiveDeckView();
         RunHistoryDeckViewer.ReinjectIntoActiveRunHistory();
+        RunHistoryCampfireSummary.ReinjectIntoActiveRunHistory();
+        RunHistoryHpTooltip.ReinjectIntoActiveRunHistory();
+        RunHistoryGoldTooltip.ReinjectIntoActiveRunHistory();
+        RunTimerStatsTooltip.ReinjectIntoActiveRunHistory();
         RunHistoryDeckViewer.RefreshAllArrowHotkeys();
         Patches.RelicBarFilterPatch.InitializeHooks();
         Patches.RelicBarFilterPatch.RefreshAll("core initialized");
         Patches.RelicCompendiumFilterUi.ReinjectIntoActiveCollections();
+        Patches.PotionCompendiumHistoryUi.ReinjectIntoActiveLabs();
+        Patches.PowerHistoryPileUi.ReinjectIntoActiveCombat();
 
         // Visible confirmation on screen so hot reload has immediate feedback.
         // Kept in Core (not Loader) so toast text/style can be tweaked and
@@ -181,6 +189,21 @@ public static class CoreMain
         try { RunHistoryDeckViewer.Teardown(); }
         catch (Exception e) { Logger.Error($"Shutdown: run-history deck viewer teardown failed: {e}"); }
 
+        try { RunHistoryCampfireSummary.Teardown(); }
+        catch (Exception e) { Logger.Error($"Shutdown: run-history campfire summary teardown failed: {e}"); }
+
+        try { RunHistoryHpTooltip.Teardown(); }
+        catch (Exception e) { Logger.Error($"Shutdown: run-history HP tooltip teardown failed: {e}"); }
+
+        try { RunHistoryGoldTooltip.Teardown(); }
+        catch (Exception e) { Logger.Error($"Shutdown: run-history gold tooltip teardown failed: {e}"); }
+
+        try { RunTimeStatsTracker.Shutdown(); }
+        catch (Exception e) { Logger.Error($"Shutdown: run timer tracker teardown failed: {e}"); }
+
+        try { RunTimerStatsTooltip.Shutdown(); }
+        catch (Exception e) { Logger.Error($"Shutdown: run timer tooltip teardown failed: {e}"); }
+
         try { SpireLensOptionsMenu.Destroy(); }
         catch (Exception e) { Logger.Error($"Shutdown: options menu teardown failed: {e}"); }
 
@@ -195,6 +218,12 @@ public static class CoreMain
 
         try { RelicCompendiumFilterUi.TeardownInjectedUI(); }
         catch (Exception e) { Logger.Error($"Shutdown: relic compendium filter teardown failed: {e}"); }
+
+        try { PotionCompendiumHistoryUi.TeardownInjectedUi(); }
+        catch (Exception e) { Logger.Error($"Shutdown: potion compendium history teardown failed: {e}"); }
+
+        try { PowerHistoryPileUi.TeardownInjectedUi(); }
+        catch (Exception e) { Logger.Error($"Shutdown: power history pile teardown failed: {e}"); }
 
         try { RunTracker.TeardownHooks(); }
         catch (Exception e) { Logger.Error($"Shutdown: TeardownHooks failed: {e}"); }

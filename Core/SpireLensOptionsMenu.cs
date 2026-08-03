@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
+using MegaCrit.Sts2.Core.Nodes.Screens;
+using MegaCrit.Sts2.Core.Nodes.Screens.MainMenu;
 using SpireLens.Core.Patches;
 
 namespace SpireLens.Core;
@@ -15,6 +18,7 @@ public static class SpireLensOptionsMenu
     private const int Layer = 1000;
     private static CanvasLayer? _layer;
     private static readonly List<Button> Checkboxes = new();
+    private static readonly List<Button> SelectableButtons = new();
     private static readonly List<Button> CheckboxIndicators = new();
     private static readonly List<Panel> SelectionHighlights = new();
     private static int _selectedIndex;
@@ -43,7 +47,7 @@ public static class SpireLensOptionsMenu
 
         RefreshCheckboxes();
         _layer!.Visible = true;
-        _selectedIndex = Math.Clamp(_selectedIndex, 0, Checkboxes.Count - 1);
+        _selectedIndex = Math.Clamp(_selectedIndex, 0, SelectableButtons.Count - 1);
         _leftStickVerticalDirection = 0;
         _leftStickHorizontalDirection = 0;
         _leftTriggerPressed = false;
@@ -92,7 +96,7 @@ public static class SpireLensOptionsMenu
                     JumpToEdge(first: true);
                     return true;
                 case JoyButton.A:
-                    ToggleOption(_selectedIndex, "menu confirm");
+                    ActivateSelection(_selectedIndex, "menu confirm");
                     return true;
                 default:
                     Close("menu controller button");
@@ -108,6 +112,7 @@ public static class SpireLensOptionsMenu
             _layer.QueueFree();
         _layer = null;
         Checkboxes.Clear();
+        SelectableButtons.Clear();
         CheckboxIndicators.Clear();
         SelectionHighlights.Clear();
         _selectedIndex = 0;
@@ -140,7 +145,7 @@ public static class SpireLensOptionsMenu
 
         var panel = new PanelContainer
         {
-            CustomMinimumSize = new Vector2(780, 790),
+            CustomMinimumSize = new Vector2(780, 900),
             MouseFilter = Control.MouseFilterEnum.Stop,
         };
         center.AddChild(panel);
@@ -160,7 +165,7 @@ public static class SpireLensOptionsMenu
         title.HorizontalAlignment = HorizontalAlignment.Center;
         rows.AddChild(title);
 
-        var help = NewLabel("Up/Down selects • A toggles • Left/Right or LB/LT jumps • Esc closes", 18);
+        var help = NewLabel("Up/Down selects • A toggles or opens • Left/Right or LB/LT jumps • Esc closes", 18);
         help.HorizontalAlignment = HorizontalAlignment.Center;
         help.Modulate = new Color(0.82f, 0.82f, 0.82f);
         rows.AddChild(help);
@@ -176,6 +181,11 @@ public static class SpireLensOptionsMenu
         rows.AddChild(relicFilterHeader);
         AddOption(rows, "Show combat-only relics at the combat screen", 5);
         AddOption(rows, "Force show only combat relics on all screens", 6);
+
+        var runViewsHeader = NewLabel("Run views", 20);
+        runViewsHeader.Modulate = new Color(0.72f, 0.8f, 0.92f);
+        rows.AddChild(runViewsHeader);
+        AddAction(rows, "View current-run potion history", 7, OpenPotionHistory);
 
         var close = new Button
         {
@@ -251,8 +261,52 @@ public static class SpireLensOptionsMenu
         };
         checkbox.MouseEntered += () => SetSelectedIndex(index);
         Checkboxes.Add(checkbox);
+        SelectableButtons.Add(checkbox);
         optionHost.AddChild(checkbox);
 
+    }
+
+    private static void AddAction(
+        VBoxContainer parent,
+        string text,
+        int index,
+        Action action)
+    {
+        var optionHost = new Control
+        {
+            CustomMinimumSize = new Vector2(0, 56),
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+        };
+        parent.AddChild(optionHost);
+
+        var selectionHighlight = new Panel
+        {
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            Visible = false,
+        };
+        selectionHighlight.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        SelectionHighlights.Add(selectionHighlight);
+        optionHost.AddChild(selectionHighlight);
+
+        var button = new Button
+        {
+            Text = text,
+            Flat = true,
+            Alignment = HorizontalAlignment.Left,
+            FocusMode = Control.FocusModeEnum.None,
+            MouseDefaultCursorShape = Control.CursorShape.PointingHand,
+        };
+        button.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        button.AddThemeFontSizeOverride("font_size", 23);
+        button.MouseEntered += () => SetSelectedIndex(index);
+        button.Pressed += () =>
+        {
+            SetSelectedIndex(index);
+            action();
+        };
+        SelectableButtons.Add(button);
+        optionHost.AddChild(button);
     }
 
     private static Button CreateCheckboxIndicator()
@@ -288,33 +342,44 @@ public static class SpireLensOptionsMenu
 
     private static void ToggleOption(int index, string source)
     {
+        if (index < 0 || index >= Checkboxes.Count) return;
         RefreshCheckboxes();
         SetOption(index, !Checkboxes[index].ButtonPressed, source);
         RefreshCheckboxes();
     }
 
+    private static void ActivateSelection(int index, string source)
+    {
+        if (index == 7)
+        {
+            OpenPotionHistory();
+            return;
+        }
+        ToggleOption(index, source);
+    }
+
     private static void MoveFocus(int delta)
     {
-        if (Checkboxes.Count == 0) return;
-        SetSelectedIndex((_selectedIndex + delta + Checkboxes.Count) % Checkboxes.Count);
+        if (SelectableButtons.Count == 0) return;
+        SetSelectedIndex((_selectedIndex + delta + SelectableButtons.Count) % SelectableButtons.Count);
     }
 
     private static void JumpToEdge(bool first)
     {
-        if (Checkboxes.Count == 0) return;
-        SetSelectedIndex(first ? 0 : Checkboxes.Count - 1);
+        if (SelectableButtons.Count == 0) return;
+        SetSelectedIndex(first ? 0 : SelectableButtons.Count - 1);
     }
 
     private static void SetSelectedIndex(int index)
     {
-        if (Checkboxes.Count == 0) return;
-        _selectedIndex = Math.Clamp(index, 0, Checkboxes.Count - 1);
+        if (SelectableButtons.Count == 0) return;
+        _selectedIndex = Math.Clamp(index, 0, SelectableButtons.Count - 1);
         RefreshSelectionHighlight();
     }
 
     private static void RefreshSelectionHighlight()
     {
-        if (Checkboxes.Count != SelectionHighlights.Count) return;
+        if (SelectableButtons.Count != SelectionHighlights.Count) return;
 
         for (var i = 0; i < SelectionHighlights.Count; i++)
         {
@@ -328,7 +393,7 @@ public static class SpireLensOptionsMenu
                 // its exact focus, highlight, and hover state.
                 highlight.AddThemeStyleboxOverride(
                     "panel",
-                    Checkboxes[i].GetThemeStylebox("focus"));
+                    SelectableButtons[i].GetThemeStylebox("focus"));
                 highlight.Visible = true;
             }
             else
@@ -411,6 +476,46 @@ public static class SpireLensOptionsMenu
             case 6:
                 ViewStatsInjectorPatch.SetHideNonCombatRelicStats(enabled, source);
                 break;
+        }
+    }
+
+    private static void OpenPotionHistory()
+    {
+        try
+        {
+            var tree = Engine.GetMainLoop() as SceneTree;
+            if (tree == null) return;
+
+            var capstone = FindNodesOfType<NCapstoneSubmenuStack>(tree.Root)
+                .FirstOrDefault(stack => stack.IsVisibleInTree())
+                ?? FindNodesOfType<NCapstoneSubmenuStack>(tree.Root).FirstOrDefault();
+            if (capstone == null)
+            {
+                CoreMain.Logger.Warn("SpireLens options: active run submenu stack not found for potion history");
+                return;
+            }
+
+            PotionCompendiumHistoryUi.SelectCurrentRunMode();
+            Close("potion history button");
+            var compendium = capstone.ShowScreen(CapstoneSubmenuType.Compendium)
+                as NCompendiumSubmenu;
+            compendium?.OpenPotionLab(null!);
+            CoreMain.Logger.Info("SpireLens options: opened current-run potion history");
+        }
+        catch (Exception e)
+        {
+            CoreMain.Logger.Error($"SpireLens options: opening potion history failed: {e}");
+        }
+    }
+
+    private static IEnumerable<T> FindNodesOfType<T>(Node? node) where T : Node
+    {
+        if (node == null) yield break;
+        if (node is T match) yield return match;
+        for (var i = 0; i < node.GetChildCount(); i++)
+        {
+            foreach (var childMatch in FindNodesOfType<T>(node.GetChild(i)))
+                yield return childMatch;
         }
     }
 

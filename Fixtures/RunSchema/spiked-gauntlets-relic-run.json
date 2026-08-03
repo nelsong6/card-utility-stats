@@ -1,0 +1,26 @@
+{
+  "run_id": "spiked-gauntlets-relic-fixture",
+  "started_at": "2026-08-02T18:00:00Z",
+  "updated_at": "2026-08-02T18:20:00Z",
+  "character": "CHAR.NECROBINDER",
+  "ascension": 6,
+  "floor_reached": 22,
+  "outcome": "in_progress",
+  "game_start_time": 1785693600,
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.SPIKED_GAUNTLETS": {
+      "energy_generated": 7,
+      "energy_generated_combats": 2,
+      "spiked_gauntlets_taxed_powers_played": 3,
+      "spiked_gauntlets_power_cost_total": 8,
+      "spiked_gauntlets_power_energy_spent": 6,
+      "spiked_gauntlets_turns": 4
+    }
+  },
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

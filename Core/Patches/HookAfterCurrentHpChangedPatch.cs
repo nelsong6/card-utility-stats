@@ -26,10 +26,12 @@ public static class HookAfterCurrentHpChangedPatch
 
             if (delta > 0m)
             {
+                RunTracker.RecordRunHpGained(combatState, creature, delta);
                 RunTracker.RecordRelicHealingHpChanged(creature, delta);
             }
             else
             {
+                RunTracker.RecordRunHpLost(combatState, creature, -delta);
                 RunTracker.RecordWhisperingEarringHpLost(
                     combatState,
                     creature,

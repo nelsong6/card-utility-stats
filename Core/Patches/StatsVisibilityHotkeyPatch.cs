@@ -93,8 +93,13 @@ public static class StatsVisibilityHotkeyPatch
             // keyboard shortcut quietly disables itself. R3 is not exposed as
             // a remappable game action, so it cannot collide through this map.
             if (evt is InputEventKey
-                && NInputManager.remappableKeyboardInputs.Any(
-                    action => inputManager.GetShortcutKey(action) == Key.Shift)) return;
+                && (NInputManager.remappableMKbInputs.Any(
+                        action => inputManager.GetMKbHotkey(action) == Key.Shift)
+                    || NInputManager.remappableKbOnlyInputs.Any(
+                        action => inputManager.GetKbOnlyHotkey(action) == Key.Shift)))
+            {
+                return;
+            }
 
             SpireLensOptionsMenu.Toggle(toggleSource);
             inputManager.GetViewport()?.SetInputAsHandled();

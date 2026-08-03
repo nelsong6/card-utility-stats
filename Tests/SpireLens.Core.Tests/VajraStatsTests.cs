@@ -77,7 +77,7 @@ public class VajraStatsTests
             VajraAttackHits = 11,
         });
 
-        Assert.Contains("Attacks played", body);
+        Assert.Contains("The number of Attack cards played while this relic was held.", body);
         Assert.Contains("Attack hits", body);
         Assert.Contains("[b]6[/b]", body);
         Assert.Contains("[b]11[/b]", body);
@@ -88,7 +88,7 @@ public class VajraStatsTests
     {
         var body = BuildBody(new RelicAggregate());
 
-        Assert.Contains("Attacks played", body);
+        Assert.Contains("The number of Attack cards played while this relic was held.", body);
         Assert.Contains("Attack hits", body);
         Assert.Contains("[b]0[/b]", body);
     }

@@ -102,7 +102,7 @@ public class NunchakuStatsTests
 
         var body = InvokeTooltipBuilder(agg);
 
-        Assert.Contains("Attacks played", body);
+        Assert.Contains("The number of Attack cards played while this relic was held.", body);
         Assert.Contains("Avg attacks played per combat", body);
         Assert.Contains("Energy gained total", body);
         Assert.Contains("Avg energy gained per combat", body);
@@ -123,7 +123,7 @@ public class NunchakuStatsTests
     {
         var body = InvokeTooltipBuilder(new RelicAggregate());
 
-        Assert.Contains("Attacks played", body);
+        Assert.Contains("The number of Attack cards played while this relic was held.", body);
         Assert.Contains("Avg attacks played per combat", body);
         Assert.Contains("Energy gained total", body);
         Assert.Contains("Avg energy gained per combat", body);

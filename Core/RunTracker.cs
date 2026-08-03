@@ -26,8 +26,18 @@ using MegaCrit.Sts2.Core.Models.Relics;
 using MegaCrit.Sts2.Core.Rewards;
 using MegaCrit.Sts2.Core.Rooms;
 using MegaCrit.Sts2.Core.Runs;
+using MegaCrit.Sts2.Core.ValueProps;
 
 namespace SpireLens.Core;
+
+internal enum RunTimeCategory
+{
+    None,
+    Combat,
+    RewardScreen,
+    Event,
+    Map,
+}
 
 /// <summary>
 /// Tracks the current run's stats in memory and commits them to disk at
@@ -86,6 +96,8 @@ public static class RunTracker
         "SpireLens.PendingEggOfferAttributions";
     private const string WongosMysteryTicketRewardAttributionsAppDomainKey =
         "SpireLens.WongosMysteryTicketRewardAttributions";
+    private const string SmallCapsuleRewardAttributionsAppDomainKey =
+        "SpireLens.SmallCapsuleRewardAttributions";
     private const string WhiteStarRewardAttributionsAppDomainKey =
         "SpireLens.WhiteStarRewardAttributions";
     private const string PrayerWheelRewardAttributionsAppDomainKey =
@@ -94,6 +106,8 @@ public static class RunTracker
         "SpireLens.TinyMailboxRewardAttributions";
     private const string TinyMailboxOfferRecordedAttributionsAppDomainKey =
         "SpireLens.TinyMailboxOfferRecordedAttributions";
+    private const string PotionHistorySequencesAppDomainKey =
+        "SpireLens.PotionHistorySequences";
 
     private static readonly object _lock = new();
 
@@ -105,6 +119,7 @@ public static class RunTracker
     private static RunData? _currentRun;
     private static RunData? _lastEndedRun;
     private static PendingCombat? _pendingCombat;
+    private static long _unsavedRunTimeSeconds;
     private static CardPlay? _currentPlayerCardPlay;
     private static CardPlay? _recentCompletedPlayerCardPlay;
     private static int _recentCompletedPlayerCardPlayHistoryCount;
@@ -118,6 +133,9 @@ public static class RunTracker
         _wongosMysteryTicketRewardAttributions =
             GetWongosMysteryTicketRewardAttributions();
     private static readonly ConditionalWeakTable<object, Tuple<int>>
+        _smallCapsuleRewardAttributions =
+            GetSmallCapsuleRewardAttributions();
+    private static readonly ConditionalWeakTable<object, Tuple<int>>
         _whiteStarRewardAttributions =
             GetWhiteStarRewardAttributions();
     private static readonly ConditionalWeakTable<object, Tuple<int>>
@@ -129,20 +147,24 @@ public static class RunTracker
     private static readonly ConditionalWeakTable<object, Tuple<int>>
         _tinyMailboxOfferRecordedAttributions =
             GetTinyMailboxOfferRecordedAttributions();
+    private static readonly ConditionalWeakTable<object, Tuple<int>>
+        _potionHistorySequences = GetPotionHistorySequences();
     private static readonly List<PendingPowerChangeAttempt> _pendingPowerChangeAttempts = new();
     private static readonly List<PendingUnsettlingLampDebuff> _pendingUnsettlingLampDebuffs = new();
     private static readonly System.Threading.AsyncLocal<EnemyStatusSourceFrame?> _enemyStatusSourceFrame = new();
     private static readonly System.Threading.AsyncLocal<PendingToastyMittensActivation?> _toastyMittensActivation = new();
     private static readonly System.Threading.AsyncLocal<HpLossPowerSourceFrame?> _hpLossPowerSourceFrame = new();
+    private static readonly System.Threading.AsyncLocal<CardRemovalSourceFrame?> _cardRemovalSourceFrame = new();
     private static int _pendingPlayerBlockClearAmount;
     private static bool _pendingPlayerBlockClearArmed;
     private static bool _pendingAkabekoVigorAttribution;
     private static readonly List<PendingRelicHealing> _pendingRelicHeals = new();
-    private static readonly List<Player> _pendingPendulumDrawAttributions = new();
     private static readonly List<Creature> _pendingParryingShieldDamageAttributions = new();
     private static readonly List<Creature> _pendingKusarigamaDamageAttributions = new();
     private static readonly List<Creature> _pendingFestivePopperDamageAttributions = new();
+    private static readonly List<Creature> _pendingScreamingFlagonDamageAttributions = new();
     private static readonly List<Creature> _pendingOrnamentalFanBlockAttributions = new();
+    private static readonly List<Creature> _pendingOrnamentalFanBlockHistoryAttributions = new();
     private static readonly List<Creature> _pendingIntimidatingHelmetBlockAttributions = new();
     private static readonly List<Creature> _pendingDaughterOfTheWindBlockAttributions = new();
     private static readonly List<PendingDanseMacabreBlockAttribution> _pendingDanseMacabreBlockAttributions = new();
@@ -150,6 +172,7 @@ public static class RunTracker
     private static readonly List<Creature> _pendingMercuryHourglassDamageAttributions = new();
     private static readonly List<Creature> _pendingMrStrugglesDamageAttributions = new();
     private static readonly List<Creature> _pendingLostWispDamageAttributions = new();
+    private static readonly List<PendingOutbreakPoisonTriggerAttribution> _activeOutbreakPoisonTriggers = new();
     private static readonly Dictionary<PowerModel, int> _bronzeScalesThornsContributions = new(ReferenceEqualityComparer.Instance);
     private static readonly List<PendingBronzeScalesDamageAttribution> _pendingBronzeScalesDamageAttributions = new();
     private static readonly List<Creature> _pendingHornCleatBlockAttributions = new();
@@ -158,6 +181,8 @@ public static class RunTracker
     private static int _pendingWhiteBeastPotionRewards;
     private static int _pendingToolboxOfferScreens;
     private static readonly List<Player> _pendingHeftyTabletChoicePlayers = new();
+    private static readonly Dictionary<Player, PendingLeadPaperweightChoice>
+        _pendingLeadPaperweightChoices = new(ReferenceEqualityComparer.Instance);
     private static readonly HashSet<PotionReward> _whiteBeastPotionRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, PendingPaelSacrificeReward> _paelSacrificeRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, PendingFresnelLensReward> _fresnelLensRewards = new(ReferenceEqualityComparer.Instance);
@@ -170,6 +195,7 @@ public static class RunTracker
     private static readonly Dictionary<CardReward, PendingPrayerWheelReward> _prayerWheelRewardCardsBeforeSelection =
         new(ReferenceEqualityComparer.Instance);
     private static Orrery? _orreryRewardRegistrationRelic;
+    private static SmallCapsule? _smallCapsuleRewardRegistrationRelic;
     private static readonly List<int> _silverCrucibleRestoreBatchScreenNumbers = new();
     private static int _silverCrucibleRestoreBatchDepth;
     private static readonly Dictionary<Player, PendingRegalPillowRestHeal> _pendingRegalPillowRestHeals = new(ReferenceEqualityComparer.Instance);
@@ -324,6 +350,289 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Read-only merged potion history for the gallery. Mid-combat potion
+    /// changes come from the pending snapshot and remain unsaved until combat
+    /// promotion, matching every other combat-boundary stat.
+    /// </summary>
+    public static IReadOnlyList<PotionRunHistoryEntry> GetEffectivePotionHistory(
+        out string outcome)
+    {
+        lock (_lock)
+        {
+            var run = _currentRun ?? _lastEndedRun;
+            outcome = run?.Outcome ?? "none";
+            if (run == null) return Array.Empty<PotionRunHistoryEntry>();
+
+            var source = ReferenceEquals(run, _currentRun)
+                && _pendingCombat?.PotionHistory != null
+                    ? _pendingCombat.PotionHistory
+                    : run.PotionHistory;
+            return ClonePotionHistory(source);
+        }
+    }
+
+    /// <summary>
+    /// Read-only current-run potion provenance for the top-bar belt summary.
+    /// Unlike the gallery accessor, this deliberately does not fall back to
+    /// the last ended run when no active run exists.
+    /// </summary>
+    public static bool TryGetEffectivePotionStatsSource(
+        out IReadOnlyList<PotionRunHistoryEntry> history,
+        out int floors)
+    {
+        lock (_lock)
+        {
+            if (_currentRun == null)
+            {
+                history = Array.Empty<PotionRunHistoryEntry>();
+                floors = 0;
+                return false;
+            }
+
+            var source = _pendingCombat?.PotionHistory
+                ?? _currentRun.PotionHistory;
+            history = ClonePotionHistory(source);
+            floors = Math.Max(0, CurrentRunFloorLocked() ?? 0);
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Read-only chronological maximum-HP changes for the active run. Combat
+    /// changes are read from the same pending snapshot used by potion history,
+    /// so they appear immediately without being committed if combat is later
+    /// abandoned.
+    /// </summary>
+    public static IReadOnlyList<MaxHpRunHistoryEntry> GetEffectiveMaxHpHistory()
+    {
+        lock (_lock)
+        {
+            if (_currentRun == null) return Array.Empty<MaxHpRunHistoryEntry>();
+
+            var source = _pendingCombat?.MaxHpHistory ?? _currentRun.MaxHpHistory;
+            return CloneMaxHpHistory(source);
+        }
+    }
+
+    /// <summary>
+    /// Read-only current-run HP loss with the active combat overlaid. Returns
+    /// false outside a tracked run so the live top bar keeps its stock-only
+    /// hover behavior at the main menu.
+    /// </summary>
+    public static bool TryGetEffectiveHealthStats(
+        out RunHealthStats healthStats,
+        out int floors)
+    {
+        lock (_lock)
+        {
+            if (_currentRun == null)
+            {
+                healthStats = new RunHealthStats();
+                floors = 0;
+                return false;
+            }
+
+            healthStats = CloneHealthStats(_currentRun.HealthStats);
+            if (_pendingCombat != null)
+                MergeHealthStatsInto(healthStats, _pendingCombat.HealthStats);
+            floors = Math.Max(0, CurrentRunFloorLocked() ?? 0);
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Read-only current-run gold flow with the active combat overlaid.
+    /// </summary>
+    public static bool TryGetEffectiveGoldStats(
+        out RunGoldStats goldStats,
+        out int floors)
+    {
+        lock (_lock)
+        {
+            if (_currentRun == null)
+            {
+                goldStats = new RunGoldStats();
+                floors = 0;
+                return false;
+            }
+
+            goldStats = CloneGoldStats(_currentRun.GoldStats);
+            if (_pendingCombat != null)
+                MergeGoldStatsInto(goldStats, _pendingCombat.GoldStats);
+            floors = Math.Max(0, CurrentRunFloorLocked() ?? 0);
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Read-only current-run map-legend outcomes with the active combat
+    /// overlaid. This is the single source used by all six legend hover tips.
+    /// </summary>
+    public static bool TryGetEffectiveMapLegendStats(
+        out RunMapLegendStats mapStats,
+        out IReadOnlyList<PotionRunHistoryEntry> potionHistory,
+        out IReadOnlyList<MaxHpRunHistoryEntry> maxHpHistory)
+    {
+        lock (_lock)
+        {
+            if (_currentRun == null)
+            {
+                mapStats = new RunMapLegendStats();
+                potionHistory = Array.Empty<PotionRunHistoryEntry>();
+                maxHpHistory = Array.Empty<MaxHpRunHistoryEntry>();
+                return false;
+            }
+
+            mapStats = CloneMapLegendStats(_currentRun.MapLegendStats);
+            if (_pendingCombat != null)
+                MergeMapLegendStatsInto(mapStats, _pendingCombat.MapLegendStats);
+            potionHistory = ClonePotionHistory(
+                _pendingCombat?.PotionHistory ?? _currentRun.PotionHistory);
+            maxHpHistory = CloneMaxHpHistory(
+                _pendingCombat?.MaxHpHistory ?? _currentRun.MaxHpHistory);
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Read-only timer summary with the active combat overlaid. Sampling is
+    /// triggered by the timer UI immediately before this accessor so the live
+    /// page stays current to the same one-second precision as the stock clock.
+    /// </summary>
+    public static bool TryGetEffectiveRunTimeStats(out RunTimeStats timeStats)
+    {
+        lock (_lock)
+        {
+            if (_currentRun == null)
+            {
+                timeStats = new RunTimeStats();
+                return false;
+            }
+
+            timeStats = CloneRunTimeStats(_currentRun.TimeStats);
+            if (_pendingCombat != null)
+                MergeRunTimeStatsInto(timeStats, _pendingCombat.TimeStats);
+            return true;
+        }
+    }
+
+    internal static void SampleRunTimeStats(
+        RunTimeCategory currentCategory,
+        long currentRunTime,
+        bool saveOutsideCombat = true)
+    {
+        lock (_lock)
+        {
+            SampleRunTimeStatsLocked(
+                currentCategory,
+                currentRunTime,
+                saveOutsideCombat);
+        }
+    }
+
+    internal static void FlushRunTimeStats()
+    {
+        lock (_lock)
+        {
+            if (_currentRun == null || _unsavedRunTimeSeconds <= 0) return;
+
+            _currentRun.UpdatedAt = Now();
+            SaveCurrentRun();
+            _unsavedRunTimeSeconds = 0;
+        }
+    }
+
+    private static void SampleRunTimeStatsLocked(
+        RunTimeCategory currentCategory,
+        long currentRunTime,
+        bool saveOutsideCombat)
+    {
+        if (_currentRun == null) return;
+
+        _currentRun.TimeStats ??= new RunTimeStats();
+        var cursor = _currentRun.TimeStats;
+        currentRunTime = Math.Max(0L, currentRunTime);
+
+        if (!cursor.LastObservedRunTime.HasValue
+            || currentRunTime < cursor.LastObservedRunTime.Value)
+        {
+            cursor.LastObservedRunTime = currentRunTime;
+            cursor.ActiveCategory = RunTimeCategoryKey(currentCategory);
+            return;
+        }
+
+        var previousCategory = ParseRunTimeCategory(cursor.ActiveCategory);
+        var elapsed = currentRunTime - cursor.LastObservedRunTime.Value;
+        var addedOutsideCombat = false;
+        if (elapsed > 0)
+        {
+            switch (previousCategory)
+            {
+                case RunTimeCategory.Combat when _pendingCombat != null:
+                    _pendingCombat.TimeStats.CombatSeconds += elapsed;
+                    break;
+                case RunTimeCategory.RewardScreen:
+                    cursor.RewardScreenSeconds += elapsed;
+                    addedOutsideCombat = true;
+                    break;
+                case RunTimeCategory.Event:
+                    cursor.EventSeconds += elapsed;
+                    addedOutsideCombat = true;
+                    break;
+                case RunTimeCategory.Map:
+                    cursor.MapSeconds += elapsed;
+                    addedOutsideCombat = true;
+                    break;
+            }
+        }
+
+        var categoryChanged = previousCategory != currentCategory;
+        cursor.LastObservedRunTime = currentRunTime;
+        cursor.ActiveCategory = RunTimeCategoryKey(currentCategory);
+
+        if (!addedOutsideCombat || !saveOutsideCombat) return;
+
+        _unsavedRunTimeSeconds += elapsed;
+        if (categoryChanged || _unsavedRunTimeSeconds >= 30)
+        {
+            _currentRun.UpdatedAt = Now();
+            SaveCurrentRun();
+            _unsavedRunTimeSeconds = 0;
+        }
+    }
+
+    private static long CurrentGameRunTimeSeconds()
+    {
+        try
+        {
+            return Math.Max(0L, RunManager.Instance.RunTime);
+        }
+        catch
+        {
+            return 0L;
+        }
+    }
+
+    private static void FinalizePendingCombatRunTimeLocked()
+    {
+        if (_pendingCombat == null) return;
+
+        _pendingCombat.TimeStats.Combats = 1;
+        var player = GetTrackedRunPlayerLocked();
+        _pendingCombat.TimeStats.CombatTurns = Math.Max(
+            0,
+            player?.PlayerCombatState?.TurnNumber ?? 0);
+    }
+
+    private static string? RunTimeCategoryKey(RunTimeCategory category)
+        => category == RunTimeCategory.None ? null : category.ToString();
+
+    private static RunTimeCategory ParseRunTimeCategory(string? category)
+        => Enum.TryParse<RunTimeCategory>(category, out var parsed)
+            ? parsed
+            : RunTimeCategory.None;
+
+    /// <summary>
     /// Resolve any CardModel (combat clone or deck original) to its canonical
     /// per-deck reference. Combat clones have <c>DeckVersion</c> set to the
     /// original deck card by <c>Player.PopulateCombatState</c>
@@ -396,6 +705,35 @@ public static class RunTracker
         lock (_lock)
         {
             return _pendingCombat?.EtherealCardsPlayed;
+        }
+    }
+
+    /// <summary>
+    /// Return the same owner-scoped CardGeneratedEntry count Supermassive uses
+    /// as the multiplier for its calculated damage. This is intentionally
+    /// live-only: outside combat there is no meaningful "this combat" value.
+    /// </summary>
+    public static int? GetCardsCreatedThisCombat(Player? player)
+    {
+        if (player == null) return null;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (CombatManager.Instance?.IsInProgress != true) return null;
+                var entries = CombatManager.Instance.History?.Entries;
+                if (entries == null) return 0;
+
+                return entries
+                    .OfType<CardGeneratedEntry>()
+                    .Count(entry => entry.Creator == player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"GetCardsCreatedThisCombat failed: {e.Message}");
+                return null;
+            }
         }
     }
 
@@ -871,11 +1209,23 @@ public static class RunTracker
             // Co-op: CardPile.AddInternal(Deck) fires for BOTH decks; only mint
             // identity for the tracked player's cards.
             if (!IsTrackedCard(card)) return;
+            var aggregateCountBefore = _currentRun?.Aggregates?.Count ?? 0;
             GetOrAssignNumber(card);
+            var newPermanentCardRecorded = _currentRun != null
+                && _currentRun.Aggregates.Count > aggregateCountBefore;
+            var inCombat = CombatManager.Instance?.IsInProgress == true;
+            if (newPermanentCardRecorded)
+            {
+                var category = GetMapLegendCategoryForContextLocked(
+                    inCombat,
+                    RunManager.Instance?.State?.CurrentRoom?.RoomType);
+                if (category != null)
+                    category.CardsGained++;
+            }
             var deckCountsChanged =
                 RefreshStrikeDummyDeckCountsIfOwnedLocked()
                 | RefreshMiniatureCannonDeckCountsIfOwnedLocked();
-            if (deckCountsChanged)
+            if (deckCountsChanged || (newPermanentCardRecorded && !inCombat))
                 SaveCurrentRun();
         }
     }
@@ -1141,11 +1491,12 @@ public static class RunTracker
         // PendingCombat.Windows and reset with a fresh PendingCombat.
         // DEFERRED (not ported this pass — keep their own reset):
         _pendingAkabekoVigorAttribution = false;
-        _pendingPendulumDrawAttributions.Clear();
         _pendingParryingShieldDamageAttributions.Clear();
         _pendingKusarigamaDamageAttributions.Clear();
         _pendingFestivePopperDamageAttributions.Clear();
+        _pendingScreamingFlagonDamageAttributions.Clear();
         _pendingOrnamentalFanBlockAttributions.Clear();
+        _pendingOrnamentalFanBlockHistoryAttributions.Clear();
         _pendingIntimidatingHelmetBlockAttributions.Clear();
         _pendingDaughterOfTheWindBlockAttributions.Clear();
         _pendingDanseMacabreBlockAttributions.Clear();
@@ -1153,6 +1504,7 @@ public static class RunTracker
         _pendingMercuryHourglassDamageAttributions.Clear();
         _pendingMrStrugglesDamageAttributions.Clear();
         _pendingLostWispDamageAttributions.Clear();
+        _activeOutbreakPoisonTriggers.Clear();
         _bronzeScalesThornsContributions.Clear();
         _pendingBronzeScalesDamageAttributions.Clear();
         _pendingHornCleatBlockAttributions.Clear();
@@ -1180,6 +1532,7 @@ public static class RunTracker
     private static void ResetRewardContextState()
     {
         _pendingHeftyTabletChoicePlayers.Clear();
+        _pendingLeadPaperweightChoices.Clear();
         _paelSacrificeRewards.Clear();
         _fresnelLensRewards.Clear();
         _silkenTressRewards.Clear();
@@ -1189,6 +1542,7 @@ public static class RunTracker
         _whiteStarRewardRareCardsBeforeSelection.Clear();
         _prayerWheelRewardCardsBeforeSelection.Clear();
         _orreryRewardRegistrationRelic = null;
+        _smallCapsuleRewardRegistrationRelic = null;
         _silverCrucibleRestoreBatchScreenNumbers.Clear();
         _silverCrucibleRestoreBatchDepth = 0;
         _pendingRegalPillowRestHeals.Clear();
@@ -1288,6 +1642,8 @@ public static class RunTracker
     private static void AdoptRunLocked(RunData run, RunState? runState, string context, bool repairAggregates)
     {
         _currentRun = run;
+        _currentRun.TimeStats ??= new RunTimeStats();
+        _unsavedRunTimeSeconds = 0;
         // Re-derive the tracked local player on every adopt/resume/continue
         // (hot-reload, main-menu Continue, continue-after-restart).
         ResolveTrackedPlayerLocked(runState);
@@ -1339,6 +1695,8 @@ public static class RunTracker
 
         int deckCards = 0;
         var player = runState?.Players.FirstOrDefault();
+        bool potionHistoryChanged = RebindLivePotionHistoryLocked(
+            runState?.Players.FirstOrDefault(IsTrackedPlayer));
         if (player?.Deck != null)
         {
             foreach (var card in player.Deck.Cards)
@@ -1347,6 +1705,8 @@ public static class RunTracker
                 GetOrAssignNumber(card);
             }
         }
+        bool repairedYummyCookieUpgrades = repairAggregates
+            && RepairYummyCookieUpgradesLocked(run, GetTrackedRunPlayerLocked());
         bool strikeDummyDeckCountsChanged = RefreshStrikeDummyDeckCountsIfOwnedLocked();
         bool miniatureCannonDeckCountsChanged = RefreshMiniatureCannonDeckCountsIfOwnedLocked();
         bool dowsingRoomsChanged = RefreshDowsingRoomsRemainingIfOwnedLocked(player);
@@ -1429,12 +1789,19 @@ public static class RunTracker
             CoreMain.Logger.Info(
                 $"{context}: repaired offensive damage aggregates for run_id={run.RunId}");
         }
+        if (repairedYummyCookieUpgrades)
+        {
+            CoreMain.Logger.Info(
+                $"{context}: repaired Yummy Cookie upgraded cards for run_id={run.RunId}");
+        }
         if (repairedDamageAggregates
+            || repairedYummyCookieUpgrades
             || prunedGhosts > 0
             || strikeDummyDeckCountsChanged
             || miniatureCannonDeckCountsChanged
             || dowsingRoomsChanged
-            || paelsClawSnapshotChanged)
+            || paelsClawSnapshotChanged
+            || potionHistoryChanged)
         {
             SaveCurrentRun();
         }
@@ -1619,6 +1986,14 @@ public static class RunTracker
                 Character = runState.Players.FirstOrDefault()?.Character?.Id.ToString(),
                 Ascension = runState.AscensionLevel,
                 FloorReached = runState.TotalFloor,
+                GoldStats =
+                {
+                    GoldAcquired = Math.Max(
+                        0,
+                        runState.Players.FirstOrDefault(IsTrackedPlayer)?.Gold
+                            ?? runState.Players.FirstOrDefault()?.Gold
+                            ?? 0),
+                },
                 // The game's own run identifier (RunManager._startTime via
                 // Publicizer) — matches the filename it uses for its
                 // run-history save ({StartTime}.run). Enables M5 correlation.
@@ -1627,8 +2002,12 @@ public static class RunTracker
                 // RunStarted dispatch exactly when the first read failed.
                 GameStartTime = gameStartTime != 0 ? gameStartTime : null,
             };
+            _unsavedRunTimeSeconds = 0;
             UnsubscribeCardOrbEventsLocked();
             _pendingCombat = null;
+
+            RebindLivePotionHistoryLocked(
+                runState.Players.FirstOrDefault(IsTrackedPlayer));
 
             // Note: deck cards are NOT walked here. The RunStarted event
             // fires before the game finishes populating player.Deck.Cards
@@ -1658,6 +2037,13 @@ public static class RunTracker
         {
             if (_currentRun == null) return;
 
+            SampleRunTimeStatsLocked(
+                RunTimeCategory.None,
+                CurrentGameRunTimeSeconds(),
+                saveOutsideCombat: false);
+            if (_pendingCombat != null)
+                FinalizePendingCombatRunTimeLocked();
+
             // A loss reaches RunManager.OnEnded synchronously from the killing
             // action; the fatal combat's CombatEnded only fires LATER via
             // ProcessPendingLoss — after this handler has consumed the buffer.
@@ -1681,6 +2067,8 @@ public static class RunTracker
                 _currentRun.FloorReached = runState.TotalFloor;
             }
 
+            MarkPotionsHeldAtRunEndLocked(_currentRun.FloorReached);
+
             CoreMain.Logger.Info($"RunEnded: {_currentRun.RunId} outcome={outcome} floor={_currentRun.FloorReached}");
             SaveCurrentRun();
 
@@ -1690,6 +2078,7 @@ public static class RunTracker
             _currentRun = null;
             UnsubscribeCardOrbEventsLocked();
             _pendingCombat = null;
+            _unsavedRunTimeSeconds = 0;
             ResetCombatContextState();
             ResetRewardContextState();
             ResetDeckViewCachesLocked();
@@ -1704,12 +2093,30 @@ public static class RunTracker
         lock (_lock)
         {
             RuntimeOptionsProvider.Refresh();
+            EnsureLazyCurrentRunLocked();
+            SampleRunTimeStatsLocked(
+                RunTimeCategory.Combat,
+                CurrentGameRunTimeSeconds(),
+                saveOutsideCombat: true);
+            // Persist the category cursor before creating the pending combat.
+            // This cursor contains no combat result, but it prevents a
+            // Continue or Core reload from assigning early combat seconds to
+            // the map/event surface that preceded the fight.
+            SaveCurrentRun();
             // Fresh pending buffer for this combat. Anything accumulated from a prior
             // combat that didn't get a CombatEnded (shouldn't happen but defensive) is dropped.
             UnsubscribeCardOrbEventsLocked();
-            _pendingCombat = new PendingCombat();
+            _pendingCombat = new PendingCombat
+            {
+                HealthStats = { Combats = 1 },
+                GoldStats = { Combats = 1 },
+            };
+            PrepareMapLegendCombatLocked();
             ResetCombatContextState();
             RecordPantographCombatStartForTrackedPlayerLocked(state);
+            RecordPotionSlotRelicCombatStartForTrackedPlayerLocked(state);
+            RecordPumpkinCandleCombatStartForTrackedPlayerLocked(state);
+            ArmPetrifiedToadPotionProcurementForTrackedPlayerLocked(state);
             if (ShouldTrackCardStatsDuringCombatLocked())
             {
                 InitializeMetaPowerDeckEligibilityLocked(state);
@@ -1738,6 +2145,14 @@ public static class RunTracker
             // (e.g. mod loaded mid-run), create a minimal run record now so we
             // don't drop the combat's data.
             EnsureLazyCurrentRunLocked();
+
+            SampleRunTimeStatsLocked(
+                RunTimeCategory.RewardScreen,
+                CurrentGameRunTimeSeconds(),
+                saveOutsideCombat: false);
+            FinalizePendingCombatRunTimeLocked();
+
+            _pendingCombat.MapLegendCombatWon = true;
 
             PromotePendingCombatIntoRunLocked();
 
@@ -1779,11 +2194,14 @@ public static class RunTracker
         RecordEmberTeaActiveTurnForTrackedPlayerLocked();
         RecordRedSkullActivePeriodForTrackedPlayerLocked();
         RecordRippleBasinTurnForTrackedPlayerLocked();
+        RecordThreeAttackScalingRelicsTurnForTrackedPlayerLocked();
+        RecordOrnamentalFanTurnForTrackedPlayerLocked();
         RecordReptileTrinketTurnForTrackedPlayerLocked();
         RecordRainbowRingTurnForTrackedPlayerLocked();
         RecordBeatingRemnantTurnForTrackedPlayerLocked();
         RecordTungstenRodTurnForTrackedPlayerLocked();
         RecordForgottenSoulTurnForTrackedPlayerLocked();
+        RecordScreamingFlagonTurnForTrackedPlayerLocked();
         RecordStoneCrackerTurnForTrackedPlayerLocked();
         RecordPaperPhrogTurnForTrackedPlayerLocked();
         RecordRazorToothTurnForTrackedPlayerLocked();
@@ -1798,6 +2216,7 @@ public static class RunTracker
         RecordIronClubCombatEndChargeForTrackedPlayerLocked();
         RecordSparklingRougeCombatEndForTrackedPlayerLocked();
         RecordDarkEmbraceCombatTurnsForTrackedPlayerLocked();
+        FinalizeMapLegendCombatLocked();
 
         // Surviving player block at combat end never absorbed future
         // damage, so treat any remaining ledger as wasted before
@@ -1820,6 +2239,24 @@ public static class RunTracker
             MergeAggregateInto(runAgg, combatAgg);
         }
         run.Events.AddRange(pending.CombatEvents);
+
+        if (pending.PotionHistory != null)
+            run.PotionHistory = ClonePotionHistory(pending.PotionHistory);
+
+        if (pending.MaxHpHistory != null)
+            run.MaxHpHistory = CloneMaxHpHistory(pending.MaxHpHistory);
+
+        run.HealthStats ??= new RunHealthStats();
+        MergeHealthStatsInto(run.HealthStats, pending.HealthStats);
+
+        run.GoldStats ??= new RunGoldStats();
+        MergeGoldStatsInto(run.GoldStats, pending.GoldStats);
+
+        run.MapLegendStats ??= new RunMapLegendStats();
+        MergeMapLegendStatsInto(run.MapLegendStats, pending.MapLegendStats);
+
+        run.TimeStats ??= new RunTimeStats();
+        MergeRunTimeStatsInto(run.TimeStats, pending.TimeStats);
 
         foreach (var (relicId, pendingRelicAgg) in pending.RelicAggregates)
         {
@@ -1848,6 +2285,120 @@ public static class RunTracker
 
         MergeMetaStatsInto(run.MetaStats, pending.MetaStats);
     }
+
+    internal static void MergeHealthStatsInto(
+        RunHealthStats target,
+        RunHealthStats? source)
+    {
+        if (source == null) return;
+
+        target.HpLostInCombats += source.HpLostInCombats;
+        target.HpLostInEvents += source.HpLostInEvents;
+        target.Combats += source.Combats;
+    }
+
+    internal static void MergeGoldStatsInto(
+        RunGoldStats target,
+        RunGoldStats? source)
+    {
+        if (source == null) return;
+
+        target.GoldAcquired += source.GoldAcquired;
+        target.GoldSpent += source.GoldSpent;
+        target.GoldSpentInShops += source.GoldSpentInShops;
+        target.GoldSpentInEvents += source.GoldSpentInEvents;
+        target.GoldGainedInCombats += source.GoldGainedInCombats;
+        target.GoldGainedInEvents += source.GoldGainedInEvents;
+        target.ShopsVisited += source.ShopsVisited;
+        target.EventsVisited += source.EventsVisited;
+        target.Combats += source.Combats;
+        if (source.LastShopFloorCounted.HasValue)
+            target.LastShopFloorCounted = source.LastShopFloorCounted;
+        if (source.LastEventFloorCounted.HasValue)
+            target.LastEventFloorCounted = source.LastEventFloorCounted;
+    }
+
+    internal static void MergeRunTimeStatsInto(
+        RunTimeStats target,
+        RunTimeStats? source)
+    {
+        if (source == null) return;
+
+        target.CombatSeconds += source.CombatSeconds;
+        target.RewardScreenSeconds += source.RewardScreenSeconds;
+        target.EventSeconds += source.EventSeconds;
+        target.MapSeconds += source.MapSeconds;
+        target.Combats += source.Combats;
+        target.CombatTurns += source.CombatTurns;
+    }
+
+    internal static void MergeMapLegendStatsInto(
+        RunMapLegendStats target,
+        RunMapLegendStats? source)
+    {
+        if (target == null || source == null) return;
+
+        MergeMapLegendCategoryInto(target.Unknown ??= new(), source.Unknown);
+        MergeMapLegendCategoryInto(target.Shop ??= new(), source.Shop);
+        MergeMapLegendCategoryInto(target.Treasure ??= new(), source.Treasure);
+        MergeMapLegendCategoryInto(target.RestSite ??= new(), source.RestSite);
+        MergeMapLegendCategoryInto(target.Monster ??= new(), source.Monster);
+        MergeMapLegendCategoryInto(target.Elite ??= new(), source.Elite);
+
+        if (!string.IsNullOrWhiteSpace(source.CurrentPointType))
+            target.CurrentPointType = source.CurrentPointType;
+        if (source.CurrentPointFloor.HasValue)
+            target.CurrentPointFloor = source.CurrentPointFloor;
+    }
+
+    private static void MergeMapLegendCategoryInto(
+        MapLegendCategoryStats target,
+        MapLegendCategoryStats? source)
+    {
+        if (target == null || source == null) return;
+
+        target.Visits += source.Visits;
+        target.FirstVisitFloor = MinNullable(
+            target.FirstVisitFloor,
+            source.FirstVisitFloor);
+        target.LastVisitFloor = MaxNullable(
+            target.LastVisitFloor,
+            source.LastVisitFloor);
+        target.FloorsBetweenVisitsTotal += source.FloorsBetweenVisitsTotal;
+        target.FloorsBetweenVisitsSamples += source.FloorsBetweenVisitsSamples;
+        target.ResolvedEvents += source.ResolvedEvents;
+        target.ResolvedCombats += source.ResolvedCombats;
+        target.ResolvedElites += source.ResolvedElites;
+        target.ResolvedShops += source.ResolvedShops;
+        target.ResolvedTreasures += source.ResolvedTreasures;
+        target.ResolvedRestSites += source.ResolvedRestSites;
+        target.LastResolutionFloor = MaxNullable(
+            target.LastResolutionFloor,
+            source.LastResolutionFloor);
+        target.CombatsCompleted += source.CombatsCompleted;
+        target.CombatsWon += source.CombatsWon;
+        target.PerfectCombats += source.PerfectCombats;
+        target.CombatTurns += source.CombatTurns;
+        target.HpLost += source.HpLost;
+        target.HpHealed += source.HpHealed;
+        target.GoldGained += source.GoldGained;
+        target.GoldSpent += source.GoldSpent;
+        target.CardsGained += source.CardsGained;
+        target.CardsUpgraded += source.CardsUpgraded;
+        target.RelicsGained += source.RelicsGained;
+        target.PotionsOffered += source.PotionsOffered;
+        target.PotionsGained += source.PotionsGained;
+    }
+
+    private static int? MinNullable(int? left, int? right)
+        => !left.HasValue ? right
+            : !right.HasValue ? left
+            : Math.Min(left.Value, right.Value);
+
+    private static int? MaxNullable(int? left, int? right)
+        => !left.HasValue ? right
+            : !right.HasValue ? left
+            : Math.Max(left.Value, right.Value);
 
     /// <summary>
     /// Additive merge of one relic aggregate into another. The single home
@@ -1907,6 +2458,8 @@ public static class RunTracker
         target.PendulumCombatEndChargeTotal += source.PendulumCombatEndChargeTotal;
         target.PendulumCombatEndChargeCount += source.PendulumCombatEndChargeCount;
         target.AdditionalBlockGained += source.AdditionalBlockGained;
+        target.AdditionalBlockEffective += source.AdditionalBlockEffective;
+        target.AdditionalBlockWasted += source.AdditionalBlockWasted;
         target.CloakClaspTurns += source.CloakClaspTurns;
         target.CloakClaspCombats += source.CloakClaspCombats;
         target.PermafrostCombats += source.PermafrostCombats;
@@ -1948,6 +2501,7 @@ public static class RunTracker
         target.PlatingAdded += source.PlatingAdded;
         target.CardsUpgraded += source.CardsUpgraded;
         MergeUpgradedCardsInto(target, source);
+        MergeFishingRodFloorTrackingInto(target, source);
         target.StoneCrackerUpgradedCommons += source.StoneCrackerUpgradedCommons;
         target.StoneCrackerUpgradedUncommons += source.StoneCrackerUpgradedUncommons;
         target.StoneCrackerUpgradedRares += source.StoneCrackerUpgradedRares;
@@ -1975,11 +2529,31 @@ public static class RunTracker
         target.TotalHealingRestored += source.TotalHealingRestored;
         target.TotalHealingLost += source.TotalHealingLost;
         MergeHealingLostReasonsInto(target, source);
+        MergeEternalFeatherHealingActivations(target, source);
+        target.MeatOnTheBonePreTriggerHpMissingTotal +=
+            source.MeatOnTheBonePreTriggerHpMissingTotal;
+        target.MeatOnTheBonePreTriggerHpBelowHalfTotal +=
+            source.MeatOnTheBonePreTriggerHpBelowHalfTotal;
+        target.MeatOnTheBonePreTriggerHpBelowHalfSamples +=
+            source.MeatOnTheBonePreTriggerHpBelowHalfSamples;
+        target.MeatOnTheBonePreTriggerHpRelativeToHalfTotal +=
+            source.MeatOnTheBonePreTriggerHpRelativeToHalfTotal;
+        target.MeatOnTheBonePreTriggerHpRelativeToHalfSamples +=
+            source.MeatOnTheBonePreTriggerHpRelativeToHalfSamples;
+        target.MeatOnTheBonePreTriggerHpPercentTotal +=
+            source.MeatOnTheBonePreTriggerHpPercentTotal;
+        target.MeatOnTheBonePreTriggerHpSamples +=
+            source.MeatOnTheBonePreTriggerHpSamples;
         if (source.FloorAcquired.HasValue && !target.FloorAcquired.HasValue)
             target.FloorAcquired = source.FloorAcquired;
         if (source.FloorActivated.HasValue)
             target.FloorActivated = source.FloorActivated;
+        MergeSwordInTheStoneElitesSlain(target, source);
         target.MaxHpGained += source.MaxHpGained;
+        if (source.StartingHp.HasValue && !target.StartingHp.HasValue)
+            target.StartingHp = source.StartingHp;
+        if (source.ResultingHp.HasValue)
+            target.ResultingHp = source.ResultingHp;
         MergeRelicMaxHpActivations(target, source);
         if (source.OriginalMaxHp.HasValue && !target.OriginalMaxHp.HasValue)
             target.OriginalMaxHp = source.OriginalMaxHp;
@@ -1988,6 +2562,18 @@ public static class RunTracker
         target.DoomDeathTriggers += source.DoomDeathTriggers;
         target.DoomKills += source.DoomKills;
         target.EnergyGenerated += source.EnergyGenerated;
+        target.PumpkinCandleCombatStartChargeTotal +=
+            source.PumpkinCandleCombatStartChargeTotal;
+        target.PumpkinCandleCombatStartChargeSamples +=
+            source.PumpkinCandleCombatStartChargeSamples;
+        target.PumpkinCandleRekindles += source.PumpkinCandleRekindles;
+        target.SpikedGauntletsTaxedPowersPlayed +=
+            source.SpikedGauntletsTaxedPowersPlayed;
+        target.SpikedGauntletsPowerCostTotal +=
+            source.SpikedGauntletsPowerCostTotal;
+        target.SpikedGauntletsPowerEnergySpent +=
+            source.SpikedGauntletsPowerEnergySpent;
+        target.SpikedGauntletsTurns += source.SpikedGauntletsTurns;
         target.GoldGained += source.GoldGained;
         target.MawBankShopsSkipped += source.MawBankShopsSkipped;
         target.MawBankGoldSpentOutsideShops +=
@@ -2024,6 +2610,10 @@ public static class RunTracker
         target.TotalDamageBlocked += source.TotalDamageBlocked;
         target.TotalDamageOverkill += source.TotalDamageOverkill;
         target.Kills += source.Kills;
+        target.ScreamingFlagonTurnEndHandSizeTotal +=
+            source.ScreamingFlagonTurnEndHandSizeTotal;
+        target.ScreamingFlagonTurns += source.ScreamingFlagonTurns;
+        target.ScreamingFlagonCombats += source.ScreamingFlagonCombats;
         target.ForgottenSoulTurns += source.ForgottenSoulTurns;
         target.ForgottenSoulCombats += source.ForgottenSoulCombats;
         target.TotalTargets += source.TotalTargets;
@@ -2053,12 +2643,19 @@ public static class RunTracker
         target.TinyMailboxRarePotionsOffered += source.TinyMailboxRarePotionsOffered;
         target.TinyMailboxFruitJuicesOffered += source.TinyMailboxFruitJuicesOffered;
         target.TinyMailboxCampfiresNotRested += source.TinyMailboxCampfiresNotRested;
+        target.CombatStartPotionCountTotal += source.CombatStartPotionCountTotal;
+        target.CombatStartPotionCountSamples += source.CombatStartPotionCountSamples;
+        target.PetrifiedToadPotionsGiven += source.PetrifiedToadPotionsGiven;
+        target.PetrifiedToadPotionsBlockedByFullBelt +=
+            source.PetrifiedToadPotionsBlockedByFullBelt;
         target.RelicsAcquired += source.RelicsAcquired;
         target.CommonRelicsAcquired += source.CommonRelicsAcquired;
         target.UncommonRelicsAcquired += source.UncommonRelicsAcquired;
         target.RareRelicsAcquired += source.RareRelicsAcquired;
         target.CampfiresNotDug += source.CampfiresNotDug;
         MergeRelicsGranted(target.RelicsGranted, source.RelicsGranted);
+        MergeToyBoxWaxRelics(target, source);
+        MergeRelicRewardChoices(target, source);
         target.CommonCardsOffered += source.CommonCardsOffered;
         target.UncommonCardsOffered += source.UncommonCardsOffered;
         target.RareCardsOffered += source.RareCardsOffered;
@@ -2138,11 +2735,17 @@ public static class RunTracker
         target.OrnamentalFanTurnsEndedAt2Charges += source.OrnamentalFanTurnsEndedAt2Charges;
         target.OrnamentalFanTurnEndChargeTotal += source.OrnamentalFanTurnEndChargeTotal;
         target.OrnamentalFanTurnEndChargeCount += source.OrnamentalFanTurnEndChargeCount;
+        target.OrnamentalFanRateBlockGained += source.OrnamentalFanRateBlockGained;
+        target.OrnamentalFanTurns += source.OrnamentalFanTurns;
+        target.OrnamentalFanCombats += source.OrnamentalFanCombats;
         target.ShurikenAttacksPlayed += source.ShurikenAttacksPlayed;
         target.ShurikenTurnsEndedAt1Charge += source.ShurikenTurnsEndedAt1Charge;
         target.ShurikenTurnsEndedAt2Charges += source.ShurikenTurnsEndedAt2Charges;
         target.ShurikenTurnEndChargeTotal += source.ShurikenTurnEndChargeTotal;
         target.ShurikenTurnEndChargeCount += source.ShurikenTurnEndChargeCount;
+        target.ThreeAttackScalingRateActivations += source.ThreeAttackScalingRateActivations;
+        target.ThreeAttackScalingTurns += source.ThreeAttackScalingTurns;
+        target.ThreeAttackScalingCombats += source.ThreeAttackScalingCombats;
         target.PaperPhrogDamageAdded += source.PaperPhrogDamageAdded;
         target.PaperPhrogEnhancedAttacks += source.PaperPhrogEnhancedAttacks;
         target.PaperPhrogCombats += source.PaperPhrogCombats;
@@ -2150,6 +2753,20 @@ public static class RunTracker
         target.RegaliteCardsCreated += source.RegaliteCardsCreated;
         target.RegaliteCombats += source.RegaliteCombats;
         target.RegaliteTurns += source.RegaliteTurns;
+        target.MusicBoxAttacksCreated += source.MusicBoxAttacksCreated;
+        target.MusicBoxCommonAttacksCreated += source.MusicBoxCommonAttacksCreated;
+        target.MusicBoxUncommonAttacksCreated += source.MusicBoxUncommonAttacksCreated;
+        target.MusicBoxRareAttacksCreated += source.MusicBoxRareAttacksCreated;
+        target.MusicBoxAttacksExhaustedByEthereal += source.MusicBoxAttacksExhaustedByEthereal;
+        target.MusicBoxTurns += source.MusicBoxTurns;
+        target.MusicBoxCombats += source.MusicBoxCombats;
+        target.CrossbowAttacksGained += source.CrossbowAttacksGained;
+        target.CrossbowCommonAttacksGained += source.CrossbowCommonAttacksGained;
+        target.CrossbowUncommonAttacksGained += source.CrossbowUncommonAttacksGained;
+        target.CrossbowRareAttacksGained += source.CrossbowRareAttacksGained;
+        target.CrossbowDiscountGivenTotal += source.CrossbowDiscountGivenTotal;
+        target.CrossbowTurns += source.CrossbowTurns;
+        target.CrossbowCombats += source.CrossbowCombats;
         target.IntimidatingHelmetCombats += source.IntimidatingHelmetCombats;
         target.IntimidatingHelmetTurns += source.IntimidatingHelmetTurns;
         target.DaughterOfTheWindCombats += source.DaughterOfTheWindCombats;
@@ -2413,6 +3030,7 @@ public static class RunTracker
             RecordPaelsClawGoopyCardPlayedIfOwnedLocked(cardPlay.Card);
             RecordThrowingAxeExtraPlayLocked(cardPlay);
             RecordStampedeAutoPlayedAttackLocked(cardPlay);
+            RecordSpikedGauntletsPowerPlayedIfOwnedLocked(cardPlay);
 
             if (!ShouldTrackCardStatsDuringCombatLocked()) return;
             RecordMetaPowerCardPlayedLocked(cardPlay.Card);
@@ -3223,6 +3841,1110 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Record a concrete potion that was presented in a reward or shop. The
+    /// runtime source object and potion model both bind to the persisted
+    /// sequence through an AppDomain-owned weak table, so an open offer keeps
+    /// its identity across Core hot reloads without retaining skipped offers.
+    /// </summary>
+    public static void RecordPotionOffer(
+        object? offerSource,
+        PotionModel? potion,
+        Player? player,
+        string acquisitionMethod)
+    {
+        if (offerSource == null || potion == null || player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                EnsureLazyCurrentRunLocked();
+                var history = GetMutablePotionHistoryLocked();
+
+                if (TryGetPotionSequence(offerSource, out var existingSequence))
+                {
+                    var existing = history.FirstOrDefault(e => e.Sequence == existingSequence);
+                    if (existing != null)
+                    {
+                        if (PopulatePotionRarity(existing, potion))
+                            FinishPotionHistoryMutationLocked();
+                        BindPotionSequence(potion, existing.Sequence);
+                        return;
+                    }
+                }
+
+                var location = CapturePotionLocationLocked(player);
+                var potionId = potion.Id.ToString();
+                var rebound = history
+                    .LastOrDefault(e => !e.Acquired
+                        && e.PotionId == potionId
+                        && e.AcquisitionMethod == acquisitionMethod
+                        && e.SeenFloor == location.Floor
+                        && e.SeenLocationKind == location.Kind
+                        && e.SeenLocationName == location.Name);
+                if (rebound != null)
+                {
+                    if (PopulatePotionRarity(rebound, potion))
+                        FinishPotionHistoryMutationLocked();
+                    BindPotionSequence(offerSource, rebound.Sequence);
+                    BindPotionSequence(potion, rebound.Sequence);
+                    return;
+                }
+
+                var entry = new PotionRunHistoryEntry
+                {
+                    Sequence = NextPotionHistorySequence(history),
+                    PotionId = potionId,
+                    DisplayName = GetPotionDisplayName(potion),
+                    AcquisitionMethod = acquisitionMethod,
+                    Rarity = potion.Rarity.ToString(),
+                    SeenFloor = location.Floor,
+                    SeenLocationKind = location.Kind,
+                    SeenLocationName = location.Name,
+                    SeenTurn = location.Turn,
+                };
+                history.Add(entry);
+                var offerCategory = GetMapLegendCategoryForContextLocked(
+                    CombatManager.Instance?.IsInProgress == true,
+                    RunManager.Instance?.State?.CurrentRoom?.RoomType);
+                if (offerCategory != null)
+                    offerCategory.PotionsOffered++;
+                BindPotionSequence(offerSource, entry.Sequence);
+                BindPotionSequence(potion, entry.Sequence);
+                FinishPotionHistoryMutationLocked();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPotionOffer failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Marks a visible potion reward rejected only at its terminal skip
+    /// callback. Failed selection attempts and still-open rewards remain
+    /// unresolved.
+    /// </summary>
+    public static void RecordPotionRewardRejected(PotionReward? reward)
+    {
+        if (reward?.Player == null || reward.Potion == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(reward.Player)) return;
+                EnsureLazyCurrentRunLocked();
+                var history = GetMutablePotionHistoryLocked();
+                if (!TryGetPotionSequence(reward, out var sequence)
+                    && !TryGetPotionSequence(reward.Potion, out sequence))
+                {
+                    return;
+                }
+
+                var entry = history.FirstOrDefault(candidate =>
+                    candidate.Sequence == sequence);
+                if (entry == null
+                    || entry.Acquired
+                    || entry.RejectedAtRewardScreen)
+                {
+                    return;
+                }
+
+                PopulatePotionRarity(entry, reward.Potion);
+                entry.RejectedAtRewardScreen = true;
+                FinishPotionHistoryMutationLocked();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordPotionRewardRejected failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record the final observed belt insertion. Player.AddPotionInternal's
+    /// successful result is authoritative; full-belt and blocker failures do
+    /// not move a seen offer into the taken lane.
+    /// </summary>
+    public static void RecordPotionAcquired(
+        Player? player,
+        PotionModel? requestedPotion,
+        PotionProcureResult? result)
+    {
+        if (player == null || result?.success != true) return;
+        if (player.RunState is NullRunState) return;
+        var acquiredPotion = result.potion ?? requestedPotion;
+        if (acquiredPotion == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                EnsureLazyCurrentRunLocked();
+                var history = GetMutablePotionHistoryLocked();
+                var location = CapturePotionLocationLocked(player);
+
+                PotionRunHistoryEntry? entry = null;
+                if (TryGetPotionSequence(acquiredPotion, out var sequence)
+                    || requestedPotion != null
+                       && TryGetPotionSequence(requestedPotion, out sequence))
+                {
+                    entry = history.FirstOrDefault(e => e.Sequence == sequence);
+                }
+
+                var potionId = acquiredPotion.Id.ToString();
+                entry ??= history.LastOrDefault(e => !e.Acquired
+                    && e.PotionId == potionId
+                    && e.SeenFloor == location.Floor);
+
+                if (entry == null)
+                {
+                    entry = new PotionRunHistoryEntry
+                    {
+                        Sequence = NextPotionHistorySequence(history),
+                        PotionId = potionId,
+                        DisplayName = GetPotionDisplayName(acquiredPotion),
+                        AcquisitionMethod = InferDirectPotionAcquisitionMethodLocked(player),
+                        Rarity = acquiredPotion.Rarity.ToString(),
+                        SeenFloor = location.Floor,
+                        SeenLocationKind = location.Kind,
+                        SeenLocationName = location.Name,
+                        SeenTurn = location.Turn,
+                    };
+                    history.Add(entry);
+                }
+
+                var changed = PopulatePotionRarity(entry, acquiredPotion);
+                if (!entry.Acquired)
+                {
+                    entry.Acquired = true;
+                    entry.AcquiredFloor = location.Floor;
+                    entry.AcquiredLocationKind = location.Kind;
+                    entry.AcquiredLocationName = location.Name;
+                    entry.AcquiredTurn = location.Turn;
+                    var gainedCategory = GetMapLegendCategoryForContextLocked(
+                        CombatManager.Instance?.IsInProgress == true,
+                        RunManager.Instance?.State?.CurrentRoom?.RoomType);
+                    if (gainedCategory != null)
+                        gainedCategory.PotionsGained++;
+                    changed = true;
+                }
+
+                if (changed)
+                    FinishPotionHistoryMutationLocked();
+
+                BindPotionSequence(acquiredPotion, entry.Sequence);
+                if (requestedPotion != null)
+                    BindPotionSequence(requestedPotion, entry.Sequence);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPotionAcquired failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordPotionUsed(Player? player, PotionModel? potion)
+    {
+        RecordPotionDisposition(player, potion, used: true);
+    }
+
+    public static void RecordBloodPotionHealing(
+        BloodPotion? potion,
+        Player? player,
+        int initialHp,
+        int currentHp)
+    {
+        if (potion == null || player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)
+                    || !ReferenceEquals(potion.Owner, player))
+                {
+                    return;
+                }
+
+                EnsureLazyCurrentRunLocked();
+                var history = GetMutablePotionHistoryLocked();
+                if (!TryGetPotionSequence(potion, out var sequence)) return;
+                var entry = history.FirstOrDefault(candidate =>
+                    candidate.Sequence == sequence);
+                if (entry == null) return;
+
+                RecordPotionHealingForTest(entry, initialHp, currentHp);
+                FinishPotionHistoryMutationLocked();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordBloodPotionHealing failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordPotionHealingForTest(
+        PotionRunHistoryEntry entry,
+        int initialHp,
+        int currentHp)
+    {
+        if (entry == null) return;
+        entry.HpGained = Math.Max(0, currentHp - initialHp);
+    }
+
+    public static void RecordSwiftPotionDraw(
+        SwiftPotion? potion,
+        int cardsRequested,
+        IEnumerable<CardModel>? cards)
+    {
+        if (potion?.Owner == null || cards == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(potion.Owner)) return;
+
+                EnsureLazyCurrentRunLocked();
+                var history = GetMutablePotionHistoryLocked();
+                if (!TryGetPotionSequence(potion, out var sequence)) return;
+                var entry = history.FirstOrDefault(candidate =>
+                    candidate.Sequence == sequence);
+                if (entry == null) return;
+
+                var cardsDrawn = cards.Count(card => card != null);
+                RecordPotionCardDrawForTest(
+                    entry,
+                    cardsRequested,
+                    cardsDrawn);
+                FinishPotionHistoryMutationLocked();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordSwiftPotionDraw failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordPotionCardDrawForTest(
+        PotionRunHistoryEntry entry,
+        int cardsRequested,
+        int cardsDrawn)
+    {
+        if (entry == null) return;
+
+        var observed = Math.Max(0, cardsDrawn);
+        entry.CardsDrawn = observed;
+        entry.CardDrawsBlocked = Math.Max(0, cardsRequested - observed);
+    }
+
+    public static void RecordFortifierBlockGain(
+        Fortifier? potion,
+        decimal blockGained)
+    {
+        if (potion?.Owner == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(potion.Owner)) return;
+
+                EnsureLazyCurrentRunLocked();
+                if (!TryGetPotionSequence(potion, out var sequence)) return;
+                RecordPotionBlockGainedForSequenceLocked(
+                    sequence,
+                    Math.Max(0, (int)blockGained));
+                FinishPotionHistoryMutationLocked();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordFortifierBlockGain failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordPotionBlockGainForTest(
+        PotionRunHistoryEntry entry,
+        int blockGained)
+    {
+        if (entry == null) return;
+        entry.BlockGained = Math.Max(0, blockGained);
+        entry.BlockEffective ??= 0;
+        entry.BlockWasted ??= 0;
+    }
+
+    private static void RecordPotionBlockGainedForSequenceLocked(
+        int sequence,
+        int blockGained)
+    {
+        var entry = GetMutablePotionHistoryLocked().FirstOrDefault(candidate =>
+            candidate.Sequence == sequence);
+        if (entry == null) return;
+        RecordPotionBlockGainForTest(entry, blockGained);
+    }
+
+    public static void RecordExplosiveAmpouleDamage(
+        ExplosiveAmpoule? potion,
+        IEnumerable<DamageResult>? results)
+    {
+        if (potion?.Owner == null || results == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(potion.Owner)) return;
+
+                EnsureLazyCurrentRunLocked();
+                var history = GetMutablePotionHistoryLocked();
+                if (!TryGetPotionSequence(potion, out var sequence)) return;
+                var entry = history.FirstOrDefault(candidate =>
+                    candidate.Sequence == sequence);
+                if (entry == null) return;
+
+                RecordPotionAoeDamageForTest(
+                    entry,
+                    results.Where(result => result != null).Select(result =>
+                        (
+                            result.BlockedDamage,
+                            result.UnblockedDamage,
+                            result.OverkillDamage,
+                            result.WasTargetKilled)));
+                FinishPotionHistoryMutationLocked();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordExplosiveAmpouleDamage failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordPotionAoeDamageForTest(
+        PotionRunHistoryEntry entry,
+        IEnumerable<(
+            int BlockedDamage,
+            int UnblockedDamage,
+            int OverkillDamage,
+            bool WasTargetKilled)> results)
+    {
+        if (entry == null || results == null) return;
+
+        int attempted = 0;
+        int dealt = 0;
+        int blocked = 0;
+        int overkill = 0;
+        int kills = 0;
+        int targets = 0;
+        foreach (var result in results)
+        {
+            var damageTotals = ComputeEnemyDamageTotals(
+                result.BlockedDamage,
+                result.UnblockedDamage,
+                result.OverkillDamage);
+            attempted += damageTotals.IntendedDamage;
+            dealt += damageTotals.EffectiveDamage;
+            blocked += result.BlockedDamage;
+            overkill += result.OverkillDamage;
+            targets += 1;
+            if (result.WasTargetKilled) kills += 1;
+        }
+
+        entry.DamageAttempted = attempted;
+        entry.DamageDealt = dealt;
+        entry.DamageBlocked = blocked;
+        entry.DamageOverkill = overkill;
+        entry.Kills = kills;
+        entry.TargetsHit = targets;
+    }
+
+    public static void RecordPotionDiscarded(Player? player, PotionModel? potion)
+    {
+        RecordPotionDisposition(player, potion, used: false);
+    }
+
+    private static void RecordPotionDisposition(
+        Player? player,
+        PotionModel? potion,
+        bool used)
+    {
+        if (player == null || potion == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                EnsureLazyCurrentRunLocked();
+                var history = GetMutablePotionHistoryLocked();
+                var location = CapturePotionLocationLocked(player);
+                PotionRunHistoryEntry? entry = null;
+
+                if (TryGetPotionSequence(potion, out var sequence))
+                    entry = history.FirstOrDefault(e => e.Sequence == sequence);
+
+                var potionId = potion.Id.ToString();
+                entry ??= history.FirstOrDefault(e => e.Acquired
+                    && e.PotionId == potionId
+                    && !e.Used
+                    && !e.Discarded);
+
+                if (entry == null)
+                {
+                    entry = new PotionRunHistoryEntry
+                    {
+                        Sequence = NextPotionHistorySequence(history),
+                        PotionId = potionId,
+                        DisplayName = GetPotionDisplayName(potion),
+                        AcquisitionMethod = "Prior acquisition",
+                        Rarity = potion.Rarity.ToString(),
+                        Acquired = true,
+                    };
+                    history.Add(entry);
+                }
+
+                PopulatePotionRarity(entry, potion);
+
+                if (entry.Used || entry.Discarded) return;
+                if (used)
+                {
+                    entry.Used = true;
+                    entry.UsedFloor = location.Floor;
+                    entry.UsedLocationKind = location.Kind;
+                    entry.UsedLocationName = location.Name;
+                    entry.UsedTurn = location.Turn;
+                }
+                else
+                {
+                    entry.Discarded = true;
+                    entry.DiscardedFloor = location.Floor;
+                    entry.DiscardedLocationKind = location.Kind;
+                    entry.DiscardedLocationName = location.Name;
+                    entry.DiscardedTurn = location.Turn;
+                }
+
+                BindPotionSequence(potion, entry.Sequence);
+                FinishPotionHistoryMutationLocked();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPotionDisposition failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record an actually applied maximum-HP mutation. CreatureCmd.SetMaxHp's
+    /// postfix is the observed boundary, so clamping has already affected
+    /// <paramref name="newMaxHp"/>.
+    /// </summary>
+    public static void RecordMaxHpChanged(
+        Creature? creature,
+        int previousMaxHp,
+        int newMaxHp)
+    {
+        if (creature?.Player == null
+            || previousMaxHp <= 0
+            || previousMaxHp == newMaxHp)
+            return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(creature.Player)) return;
+                if (_currentRun == null && RunManager.Instance?.IsInProgress != true)
+                    return;
+
+                EnsureLazyCurrentRunLocked();
+                var history = GetMutableMaxHpHistoryLocked();
+                var location = CapturePotionLocationLocked(creature.Player);
+                var sourceCard = FindCurrentlyResolvingCardPlay()?.Card;
+                var sourceName = sourceCard != null
+                    && (sourceCard.Owner == null
+                        || ReferenceEquals(sourceCard.Owner, creature.Player))
+                        ? GetCardDisplayName(sourceCard)
+                        : null;
+
+                history.Add(new MaxHpRunHistoryEntry
+                {
+                    Sequence = history.Count == 0
+                        ? 1
+                        : history.Max(entry => entry.Sequence) + 1,
+                    Floor = Math.Max(0, location.Floor ?? CurrentRunFloorLocked() ?? 0),
+                    LocationKind = location.Kind,
+                    LocationName = location.Name,
+                    Turn = location.Turn,
+                    SourceName = sourceName,
+                    PreviousMaxHp = previousMaxHp,
+                    NewMaxHp = newMaxHp,
+                });
+
+                FinishMaxHpHistoryMutationLocked();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordMaxHpChanged failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Records an observed current-HP decrease after the game's own clamping
+    /// and prevention hooks. Combat loss remains in the pending combat buffer;
+    /// event loss is durable immediately because it happens outside combat.
+    /// </summary>
+    public static void RecordRunHpLost(
+        ICombatState? combatState,
+        Creature? creature,
+        decimal amount)
+    {
+        if (creature?.Player == null || amount <= 0m) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(creature.Player)) return;
+                if (_currentRun == null && RunManager.Instance?.IsInProgress != true)
+                    return;
+
+                EnsureLazyCurrentRunLocked();
+                var isCombat = combatState != null
+                    || CombatManager.Instance?.IsInProgress == true
+                    || RunManager.Instance?.State?.CurrentRoom is CombatRoom;
+                if (isCombat)
+                {
+                    _pendingCombat ??= new PendingCombat
+                    {
+                        HealthStats = { Combats = 1 },
+                    };
+                    _pendingCombat.HealthStats.HpLostInCombats += amount;
+                    var category = GetMapLegendCategoryForContextLocked(
+                        inCombat: true,
+                        RunManager.Instance?.State?.CurrentRoom?.RoomType);
+                    if (category != null)
+                        category.HpLost += amount;
+                }
+                else if (RunManager.Instance?.State?.CurrentRoom is EventRoom)
+                {
+                    _currentRun.HealthStats ??= new RunHealthStats();
+                    _currentRun.HealthStats.HpLostInEvents += amount;
+                    var category = GetMapLegendCategoryForContextLocked(
+                        inCombat: false,
+                        RoomType.Event);
+                    if (category != null)
+                        category.HpLost += amount;
+                    _currentRun.UpdatedAt = Now();
+                    RefreshCurrentRunMetadataLocked();
+                    SaveCurrentRun();
+                }
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordRunHpLost failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Records actual current-HP restoration against the map icon responsible
+    /// for the room. This is intentionally outcome-only: clamped healing at
+    /// full HP contributes zero because Hook.AfterCurrentHpChanged reports the
+    /// post-clamp delta.
+    /// </summary>
+    public static void RecordRunHpGained(
+        ICombatState? combatState,
+        Creature? creature,
+        decimal amount)
+    {
+        if (creature?.Player == null || amount <= 0m) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(creature.Player)) return;
+                if (_currentRun == null && RunManager.Instance?.IsInProgress != true)
+                    return;
+
+                EnsureLazyCurrentRunLocked();
+                var roomType = RunManager.Instance?.State?.CurrentRoom?.RoomType;
+                var inCombat = combatState != null
+                    || CombatManager.Instance?.IsInProgress == true;
+                if (inCombat && _pendingCombat == null)
+                    _pendingCombat = new PendingCombat();
+
+                var category = GetMapLegendCategoryForContextLocked(
+                    inCombat,
+                    roomType);
+                if (category == null) return;
+
+                category.HpHealed += amount;
+                if (!inCombat)
+                {
+                    _currentRun.UpdatedAt = Now();
+                    RefreshCurrentRunMetadataLocked();
+                    SaveCurrentRun();
+                }
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordRunHpGained failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void AnnotateMaxHpChanged(
+        Creature? creature,
+        int previousMaxHp,
+        int newMaxHp,
+        string sourceName)
+    {
+        if (creature?.Player == null || previousMaxHp == newMaxHp) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(creature.Player)) return;
+                AnnotateLatestMaxHpHistoryLocked(
+                    sourceName,
+                    previousMaxHp,
+                    newMaxHp);
+                if (_pendingCombat == null)
+                    SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"AnnotateMaxHpChanged failed: {e.Message}");
+            }
+        }
+    }
+
+    private static List<MaxHpRunHistoryEntry> GetMutableMaxHpHistoryLocked()
+    {
+        EnsureLazyCurrentRunLocked();
+        _currentRun.MaxHpHistory ??= new List<MaxHpRunHistoryEntry>();
+        if (_pendingCombat == null) return _currentRun.MaxHpHistory;
+
+        _pendingCombat.MaxHpHistory ??= CloneMaxHpHistory(_currentRun.MaxHpHistory);
+        return _pendingCombat.MaxHpHistory;
+    }
+
+    private static void FinishMaxHpHistoryMutationLocked()
+    {
+        if (_currentRun == null) return;
+        _currentRun.UpdatedAt = Now();
+        RefreshCurrentRunMetadataLocked();
+        if (_pendingCombat == null)
+            SaveCurrentRun();
+    }
+
+    private static void AnnotateLatestMaxHpHistoryLocked(
+        string sourceName,
+        decimal? previousMaxHp = null,
+        decimal? newMaxHp = null,
+        decimal? delta = null)
+    {
+        if (_currentRun == null || string.IsNullOrWhiteSpace(sourceName)) return;
+
+        var history = _pendingCombat?.MaxHpHistory ?? _currentRun.MaxHpHistory;
+        if (history == null || history.Count == 0) return;
+
+        var floor = CurrentRunFloorLocked();
+        var match = history
+            .OrderByDescending(entry => entry.Sequence)
+            .FirstOrDefault(entry =>
+                (!floor.HasValue || entry.Floor == floor.Value)
+                && (!previousMaxHp.HasValue
+                    || entry.PreviousMaxHp == (int)previousMaxHp.Value)
+                && (!newMaxHp.HasValue
+                    || entry.NewMaxHp == (int)newMaxHp.Value)
+                && (!delta.HasValue
+                    || entry.NewMaxHp - entry.PreviousMaxHp == (int)delta.Value));
+        if (match == null) return;
+
+        match.SourceName = sourceName;
+        _currentRun.UpdatedAt = Now();
+    }
+
+    private static List<PotionRunHistoryEntry> GetMutablePotionHistoryLocked()
+    {
+        EnsureLazyCurrentRunLocked();
+        _currentRun.PotionHistory ??= new List<PotionRunHistoryEntry>();
+        if (_pendingCombat == null) return _currentRun.PotionHistory;
+
+        _pendingCombat.PotionHistory ??= ClonePotionHistory(_currentRun.PotionHistory);
+        return _pendingCombat.PotionHistory;
+    }
+
+    private static void FinishPotionHistoryMutationLocked()
+    {
+        if (_currentRun == null) return;
+        _currentRun.UpdatedAt = Now();
+        RefreshCurrentRunMetadataLocked();
+        if (_pendingCombat == null)
+            SaveCurrentRun();
+    }
+
+    private static int NextPotionHistorySequence(
+        IReadOnlyCollection<PotionRunHistoryEntry> history)
+        => history.Count == 0 ? 1 : history.Max(e => e.Sequence) + 1;
+
+    private static bool TryGetPotionSequence(object key, out int sequence)
+    {
+        if (_potionHistorySequences.TryGetValue(key, out var value))
+        {
+            sequence = value.Item1;
+            return true;
+        }
+
+        sequence = 0;
+        return false;
+    }
+
+    private static void BindPotionSequence(object key, int sequence)
+    {
+        _potionHistorySequences.Remove(key);
+        _potionHistorySequences.Add(key, Tuple.Create(sequence));
+    }
+
+    private static string InferDirectPotionAcquisitionMethodLocked(Player player)
+    {
+        var currentCard = _currentPlayerCardPlay?.Card;
+        if (currentCard != null
+            && (currentCard.Owner == null || ReferenceEquals(currentCard.Owner, player)))
+        {
+            return $"Card — {GetCardDisplayName(currentCard)}";
+        }
+
+        var runState = RunManager.Instance?.State;
+        if ((runState?.TotalFloor ?? 0) <= 1 && runState?.CurrentRoom == null)
+            return "Starting potion";
+        if (CombatManager.Instance?.IsInProgress == true)
+            return "Combat effect";
+        if (runState?.CurrentRoom is EventRoom)
+            return "Event";
+        return "Relic or other effect";
+    }
+
+    private static PotionRunLocation CapturePotionLocationLocked(Player? player)
+    {
+        try
+        {
+            var runState = RunManager.Instance?.State;
+            var room = runState?.CurrentRoom;
+            var floor = runState?.TotalFloor ?? _currentRun?.FloorReached;
+            var turn = CombatManager.Instance?.IsInProgress == true
+                ? player?.PlayerCombatState?.TurnNumber
+                : null;
+            if (turn <= 0) turn = null;
+            if (room == null)
+                return new PotionRunLocation(
+                    floor,
+                    floor.GetValueOrDefault() <= 1 ? "Run start" : "Map",
+                    null,
+                    turn);
+
+            string kind = room.RoomType switch
+            {
+                RoomType.Monster => "Combat",
+                RoomType.Elite => "Elite combat",
+                RoomType.Boss => "Boss combat",
+                RoomType.Treasure => "Treasure",
+                RoomType.Shop => "Shop",
+                RoomType.Event => "Event",
+                RoomType.RestSite => "Rest site",
+                _ => room.RoomType.ToString(),
+            };
+
+            string? name = null;
+            if (room is CombatRoom combatRoom)
+            {
+                try { name = combatRoom.Encounter?.Title.GetFormattedText(); }
+                catch { name = combatRoom.ModelId.ToString(); }
+            }
+            else if (room is EventRoom eventRoom)
+            {
+                try
+                {
+                    name = (eventRoom.LocalMutableEvent ?? eventRoom.CanonicalEvent)
+                        ?.Title.GetFormattedText();
+                }
+                catch { name = eventRoom.ModelId.ToString(); }
+            }
+
+            return new PotionRunLocation(
+                floor,
+                kind,
+                string.IsNullOrWhiteSpace(name) ? null : name,
+                turn);
+        }
+        catch
+        {
+            return new PotionRunLocation(_currentRun?.FloorReached, "Unknown", null, null);
+        }
+    }
+
+    private static string GetPotionDisplayName(PotionModel potion)
+    {
+        try
+        {
+            var title = potion.Title.GetFormattedText();
+            if (!string.IsNullOrWhiteSpace(title)) return title;
+        }
+        catch { }
+        try
+        {
+            var title = potion.Title.GetRawText();
+            if (!string.IsNullOrWhiteSpace(title)) return title;
+        }
+        catch { }
+        return potion.Id.Entry;
+    }
+
+    private static bool PopulatePotionRarity(
+        PotionRunHistoryEntry entry,
+        PotionModel potion)
+    {
+        if (!string.IsNullOrWhiteSpace(entry.Rarity)) return false;
+        entry.Rarity = potion.Rarity.ToString();
+        return true;
+    }
+
+    private static List<PotionRunHistoryEntry> ClonePotionHistory(
+        IEnumerable<PotionRunHistoryEntry>? source)
+        => source?.Select(ClonePotionHistoryEntry).ToList() ?? new List<PotionRunHistoryEntry>();
+
+    private static List<MaxHpRunHistoryEntry> CloneMaxHpHistory(
+        IEnumerable<MaxHpRunHistoryEntry>? source)
+        => source?.Select(entry => new MaxHpRunHistoryEntry
+        {
+            Sequence = entry.Sequence,
+            Floor = entry.Floor,
+            LocationKind = entry.LocationKind,
+            LocationName = entry.LocationName,
+            Turn = entry.Turn,
+            SourceName = entry.SourceName,
+            PreviousMaxHp = entry.PreviousMaxHp,
+            NewMaxHp = entry.NewMaxHp,
+        }).ToList() ?? new List<MaxHpRunHistoryEntry>();
+
+    private static RunHealthStats CloneHealthStats(RunHealthStats? source)
+        => source == null
+            ? new RunHealthStats()
+            : new RunHealthStats
+            {
+                HpLostInCombats = source.HpLostInCombats,
+                HpLostInEvents = source.HpLostInEvents,
+                Combats = source.Combats,
+            };
+
+    private static RunGoldStats CloneGoldStats(RunGoldStats? source)
+        => source == null
+            ? new RunGoldStats()
+            : new RunGoldStats
+            {
+                GoldAcquired = source.GoldAcquired,
+                GoldSpent = source.GoldSpent,
+                GoldSpentInShops = source.GoldSpentInShops,
+                GoldSpentInEvents = source.GoldSpentInEvents,
+                GoldGainedInCombats = source.GoldGainedInCombats,
+                GoldGainedInEvents = source.GoldGainedInEvents,
+                ShopsVisited = source.ShopsVisited,
+                EventsVisited = source.EventsVisited,
+                Combats = source.Combats,
+                LastShopFloorCounted = source.LastShopFloorCounted,
+                LastEventFloorCounted = source.LastEventFloorCounted,
+            };
+
+    private static RunTimeStats CloneRunTimeStats(RunTimeStats? source)
+        => source == null
+            ? new RunTimeStats()
+            : new RunTimeStats
+            {
+                CombatSeconds = source.CombatSeconds,
+                RewardScreenSeconds = source.RewardScreenSeconds,
+                EventSeconds = source.EventSeconds,
+                MapSeconds = source.MapSeconds,
+                Combats = source.Combats,
+                CombatTurns = source.CombatTurns,
+                LastObservedRunTime = source.LastObservedRunTime,
+                ActiveCategory = source.ActiveCategory,
+            };
+
+    private static RunMapLegendStats CloneMapLegendStats(RunMapLegendStats? source)
+    {
+        source ??= new RunMapLegendStats();
+        return new RunMapLegendStats
+        {
+            Unknown = CloneMapLegendCategory(source.Unknown),
+            Shop = CloneMapLegendCategory(source.Shop),
+            Treasure = CloneMapLegendCategory(source.Treasure),
+            RestSite = CloneMapLegendCategory(source.RestSite),
+            Monster = CloneMapLegendCategory(source.Monster),
+            Elite = CloneMapLegendCategory(source.Elite),
+            CurrentPointType = source.CurrentPointType,
+            CurrentPointFloor = source.CurrentPointFloor,
+        };
+    }
+
+    private static MapLegendCategoryStats CloneMapLegendCategory(
+        MapLegendCategoryStats? source)
+    {
+        source ??= new MapLegendCategoryStats();
+        return new MapLegendCategoryStats
+        {
+            Visits = source.Visits,
+            FirstVisitFloor = source.FirstVisitFloor,
+            LastVisitFloor = source.LastVisitFloor,
+            FloorsBetweenVisitsTotal = source.FloorsBetweenVisitsTotal,
+            FloorsBetweenVisitsSamples = source.FloorsBetweenVisitsSamples,
+            ResolvedEvents = source.ResolvedEvents,
+            ResolvedCombats = source.ResolvedCombats,
+            ResolvedElites = source.ResolvedElites,
+            ResolvedShops = source.ResolvedShops,
+            ResolvedTreasures = source.ResolvedTreasures,
+            ResolvedRestSites = source.ResolvedRestSites,
+            LastResolutionFloor = source.LastResolutionFloor,
+            CombatsCompleted = source.CombatsCompleted,
+            CombatsWon = source.CombatsWon,
+            PerfectCombats = source.PerfectCombats,
+            CombatTurns = source.CombatTurns,
+            HpLost = source.HpLost,
+            HpHealed = source.HpHealed,
+            GoldGained = source.GoldGained,
+            GoldSpent = source.GoldSpent,
+            CardsGained = source.CardsGained,
+            CardsUpgraded = source.CardsUpgraded,
+            RelicsGained = source.RelicsGained,
+            PotionsOffered = source.PotionsOffered,
+            PotionsGained = source.PotionsGained,
+        };
+    }
+
+    private static PotionRunHistoryEntry ClonePotionHistoryEntry(PotionRunHistoryEntry source)
+        => new()
+        {
+            Sequence = source.Sequence,
+            PotionId = source.PotionId,
+            DisplayName = source.DisplayName,
+            AcquisitionMethod = source.AcquisitionMethod,
+            Rarity = source.Rarity,
+            SeenFloor = source.SeenFloor,
+            SeenLocationKind = source.SeenLocationKind,
+            SeenLocationName = source.SeenLocationName,
+            SeenTurn = source.SeenTurn,
+            Acquired = source.Acquired,
+            AcquiredFloor = source.AcquiredFloor,
+            AcquiredLocationKind = source.AcquiredLocationKind,
+            AcquiredLocationName = source.AcquiredLocationName,
+            AcquiredTurn = source.AcquiredTurn,
+            Used = source.Used,
+            UsedFloor = source.UsedFloor,
+            UsedLocationKind = source.UsedLocationKind,
+            UsedLocationName = source.UsedLocationName,
+            UsedTurn = source.UsedTurn,
+            HpGained = source.HpGained,
+            CardsDrawn = source.CardsDrawn,
+            CardDrawsBlocked = source.CardDrawsBlocked,
+            BlockGained = source.BlockGained,
+            BlockEffective = source.BlockEffective,
+            BlockWasted = source.BlockWasted,
+            DamageAttempted = source.DamageAttempted,
+            DamageDealt = source.DamageDealt,
+            DamageBlocked = source.DamageBlocked,
+            DamageOverkill = source.DamageOverkill,
+            Kills = source.Kills,
+            TargetsHit = source.TargetsHit,
+            Discarded = source.Discarded,
+            DiscardedFloor = source.DiscardedFloor,
+            DiscardedLocationKind = source.DiscardedLocationKind,
+            DiscardedLocationName = source.DiscardedLocationName,
+            DiscardedTurn = source.DiscardedTurn,
+            RejectedAtRewardScreen = source.RejectedAtRewardScreen,
+            HeldAtRunEnd = source.HeldAtRunEnd,
+            HeldAtRunEndFloor = source.HeldAtRunEndFloor,
+        };
+
+    private static bool RebindLivePotionHistoryLocked(Player? player)
+    {
+        if (_currentRun == null || player == null || !IsTrackedPlayer(player)) return false;
+        _currentRun.PotionHistory ??= new List<PotionRunHistoryEntry>();
+        var changed = false;
+        var candidates = _currentRun.PotionHistory
+            .Where(e => e.Acquired
+                && !e.Used
+                && !e.Discarded
+                && !e.HeldAtRunEnd)
+            .OrderBy(e => e.Sequence)
+            .ToList();
+
+        foreach (var potion in player.Potions)
+        {
+            if (potion == null) continue;
+            var potionId = potion.Id.ToString();
+            var entry = candidates.FirstOrDefault(e => e.PotionId == potionId);
+            if (entry != null)
+            {
+                candidates.Remove(entry);
+                BindPotionSequence(potion, entry.Sequence);
+                continue;
+            }
+
+            var floor = CurrentRunFloorLocked();
+            var isRunStart = floor.GetValueOrDefault() <= 1;
+            entry = new PotionRunHistoryEntry
+            {
+                Sequence = NextPotionHistorySequence(_currentRun.PotionHistory),
+                PotionId = potionId,
+                DisplayName = GetPotionDisplayName(potion),
+                Rarity = potion.Rarity.ToString(),
+                AcquisitionMethod = isRunStart
+                    ? "Starting potion"
+                    : "Present when tracking began",
+                SeenFloor = isRunStart ? floor : null,
+                SeenLocationKind = isRunStart ? "Run start" : null,
+                Acquired = true,
+                AcquiredFloor = isRunStart ? floor : null,
+                AcquiredLocationKind = isRunStart ? "Run start" : null,
+            };
+            _currentRun.PotionHistory.Add(entry);
+            BindPotionSequence(potion, entry.Sequence);
+            changed = true;
+        }
+
+        return changed;
+    }
+
+    private static void MarkPotionsHeldAtRunEndLocked(int? floor)
+    {
+        if (_currentRun?.PotionHistory == null) return;
+        foreach (var entry in _currentRun.PotionHistory)
+        {
+            if (!entry.Acquired
+                || entry.Used
+                || entry.Discarded)
+            {
+                continue;
+            }
+
+            entry.HeldAtRunEnd = true;
+            entry.HeldAtRunEndFloor = floor;
+        }
+    }
+
+    /// <summary>
     /// Capture Alchemize's physical source card while its owner-specific play
     /// is still resolving. The potion command finishes asynchronously, so the
     /// source must be captured before awaiting its result.
@@ -3252,6 +4974,79 @@ public static class RunTracker
             }
         }
     }
+
+    /// <summary>
+    /// Consume the combat-setup marker only for Petrified Toad's concrete
+    /// Potion Shaped Rock request. The shared potion command then supplies the
+    /// authoritative success or failure reason after its task resolves.
+    /// </summary>
+    internal static bool TryCapturePetrifiedToadPotionProcurement(
+        Player? player,
+        PotionModel? requestedPotion)
+    {
+        if (player == null || requestedPotion is not PotionShapedRock) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return false;
+                return _pendingCombat?.PendingPetrifiedToadPotionPlayers.Remove(player)
+                    == true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"TryCapturePetrifiedToadPotionProcurement failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    internal static void RecordPetrifiedToadPotionResult(
+        Player? player,
+        PotionProcureResult? result)
+    {
+        if (player == null || result == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player) || _pendingCombat == null) return;
+                var agg = GetOrCreatePendingRelicAggregateLocked(PetrifiedToadRelicId);
+                AccumulatePetrifiedToadPotionResult(
+                    agg,
+                    result.success,
+                    result.failureReason);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPetrifiedToadPotionResult failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void AccumulatePetrifiedToadPotionResult(
+        RelicAggregate agg,
+        bool success,
+        PotionProcureFailureReason failureReason)
+    {
+        if (success)
+        {
+            agg.PetrifiedToadPotionsGiven++;
+            return;
+        }
+
+        if (failureReason == PotionProcureFailureReason.TooFull)
+            agg.PetrifiedToadPotionsBlockedByFullBelt++;
+    }
+
+    internal static void RecordPetrifiedToadPotionResultForTest(
+        RelicAggregate agg,
+        bool success,
+        PotionProcureFailureReason failureReason)
+        => AccumulatePetrifiedToadPotionResult(agg, success, failureReason);
 
     /// <summary>
     /// Record the observed result returned by Alchemize's potion procurement.
@@ -4311,6 +6106,144 @@ public static class RunTracker
         if (agg == null || cardsDrawn <= 0) return;
         agg.ViciousCardsDrawn += cardsDrawn;
         agg.RateViciousCardsDrawn += cardsDrawn;
+    }
+
+    /// <summary>
+    /// Outbreak directly calls PoisonPower.Trigger for each enemy after its
+    /// own Poison applications finish. Arm that exact trigger only while a
+    /// tracked physical Outbreak card is the resolving player card.
+    /// </summary>
+    internal static PendingOutbreakPoisonTriggerAttribution?
+        ArmOutbreakPoisonTriggerAttribution(PoisonPower? poison)
+    {
+        if (poison?.Owner == null || poison.Owner.IsPlayer) return null;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return null;
+                if (CombatManager.Instance?.IsInProgress != true) return null;
+
+                var sourceCard = _currentPlayerCardPlay?.Card;
+                if (sourceCard == null || !IsTrackedCard(sourceCard)) return null;
+                if (sourceCard is not Outbreak
+                    && !string.Equals(
+                        sourceCard.Id.ToString(),
+                        "CARD.OUTBREAK",
+                        StringComparison.Ordinal))
+                {
+                    return null;
+                }
+
+                int triggerCount = poison.TriggerCount;
+                if (triggerCount <= 0) return null;
+
+                _pendingCombat ??= new PendingCombat();
+                var pending = new PendingOutbreakPoisonTriggerAttribution
+                {
+                    PendingCombat = _pendingCombat,
+                    Power = poison,
+                    SourceCardInstanceId = GetOrAssignInstanceId(sourceCard),
+                    RemainingDamageCommands = triggerCount,
+                };
+                _activeOutbreakPoisonTriggers.Add(pending);
+                return pending;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"ArmOutbreakPoisonTriggerAttribution failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+    internal static PendingOutbreakDamageAttribution?
+        TryConsumeOutbreakPoisonDamageAttribution(
+            Creature? target,
+            decimal amount,
+            ValueProp props,
+            CardModel? cardSource,
+            CardPlay? cardPlay)
+    {
+        const ValueProp poisonDamageProps =
+            ValueProp.Unblockable | ValueProp.Unpowered;
+        if (target == null
+            || props != poisonDamageProps
+            || cardSource != null
+            || cardPlay != null)
+        {
+            return null;
+        }
+
+        lock (_lock)
+        {
+            for (int i = _activeOutbreakPoisonTriggers.Count - 1; i >= 0; i--)
+            {
+                var trigger = _activeOutbreakPoisonTriggers[i];
+                if (!ReferenceEquals(trigger.PendingCombat, _pendingCombat)) continue;
+                if (!ReferenceEquals(trigger.Power.Owner, target)) continue;
+                if (trigger.RemainingDamageCommands <= 0) continue;
+                if (!AreClose(trigger.Power.Amount, amount)) continue;
+
+                trigger.RemainingDamageCommands--;
+                return new PendingOutbreakDamageAttribution
+                {
+                    PendingCombat = trigger.PendingCombat,
+                    SourceCardInstanceId = trigger.SourceCardInstanceId,
+                };
+            }
+
+            return null;
+        }
+    }
+
+    internal static void DisarmOutbreakPoisonTriggerAttribution(
+        PendingOutbreakPoisonTriggerAttribution? pending)
+    {
+        if (pending == null) return;
+        lock (_lock)
+            _activeOutbreakPoisonTriggers.Remove(pending);
+    }
+
+    internal static void RecordOutbreakPoisonTriggerDamage(
+        PendingOutbreakDamageAttribution? pending,
+        IEnumerable<DamageResult>? results)
+    {
+        if (pending == null || results == null) return;
+
+        int effectiveDamage = results
+            .Where(result => result != null)
+            .Sum(result => Math.Max(0, result.UnblockedDamage));
+        if (effectiveDamage <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ReferenceEquals(pending.PendingCombat, _pendingCombat)) return;
+                var agg = GetOrCreateAggregate(
+                    _pendingCombat!,
+                    pending.SourceCardInstanceId);
+                RecordOutbreakExtraPoisonTriggerDamageForTest(
+                    agg,
+                    effectiveDamage);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordOutbreakPoisonTriggerDamage failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordOutbreakExtraPoisonTriggerDamageForTest(
+        CardAggregate agg,
+        int effectiveDamage)
+    {
+        if (agg == null || effectiveDamage <= 0) return;
+        agg.OutbreakExtraPoisonTriggerDamage += effectiveDamage;
     }
 
     internal static PendingDarkEmbraceDraw?
@@ -5757,6 +7690,152 @@ public static class RunTracker
         => AccumulateFreeAttackUse(agg, energySaved, rarity);
 
     /// <summary>
+    /// Remember Free Skill's marginal reduction for the exact Skill. As with
+    /// Free Attack, repeated cost queries only update an offer snapshot; the
+    /// native charge decrement is the authoritative use boundary.
+    /// </summary>
+    internal static void RememberFreeSkillEnergySavings(
+        FreeSkillPower? power,
+        CardModel? card,
+        decimal originalCost,
+        decimal modifiedCost)
+    {
+        if (power?.Owner?.Player == null || card == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+                if (!IsTrackedPlayer(power.Owner.Player)) return;
+                if (!ReferenceEquals(card.Owner, power.Owner.Player)) return;
+                if (card.Type != CardType.Skill) return;
+                if (_pendingCombat == null) return;
+
+                _pendingCombat.FreeSkillEnergySavingsByCard[card] =
+                    Math.Max(0m, originalCost - modifiedCost);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RememberFreeSkillEnergySavings failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static PendingFreeSkillUse? CaptureFreeSkillUse(
+        FreeSkillPower? power,
+        CardPlay? cardPlay)
+    {
+        if (power?.Owner?.Player == null || cardPlay?.Card == null) return null;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return null;
+                if (!IsTrackedPlayer(power.Owner.Player)) return null;
+                if (!ReferenceEquals(cardPlay.Card.Owner, power.Owner.Player)) return null;
+                if (cardPlay.Card.Type != CardType.Skill) return null;
+                if (cardPlay.Card.Pile?.Type is not (PileType.Hand or PileType.Play)) return null;
+                if (power.Amount <= 0) return null;
+
+                _pendingCombat ??= new PendingCombat();
+                _pendingCombat.FreeSkillEnergySavingsByCard.Remove(
+                    cardPlay.Card,
+                    out var offeredEnergySavings);
+
+                return new PendingFreeSkillUse
+                {
+                    Power = power,
+                    Player = power.Owner.Player,
+                    Card = cardPlay.Card,
+                    StartingPowerAmount = power.Amount,
+                    OfferedEnergySavings = Math.Max(0m, offeredEnergySavings),
+                    IsAutoPlay = cardPlay.IsAutoPlay,
+                };
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"CaptureFreeSkillUse failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+    internal static void RecordFreeSkillUse(PendingFreeSkillUse? observation)
+    {
+        if (observation == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+                if (_pendingCombat == null || !IsTrackedPlayer(observation.Player)) return;
+                if (observation.Power.Amount >= observation.StartingPowerAmount) return;
+
+                var agg = GetOrCreatePowerAggregate(
+                    _pendingCombat.MetaStats,
+                    observation.Power.Id.ToString(),
+                    GetPowerDisplayName(observation.Power));
+                AccumulateFreeSkillUse(
+                    agg,
+                    observation.IsAutoPlay ? 0m : observation.OfferedEnergySavings,
+                    observation.Card.Rarity);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordFreeSkillUse failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void AccumulateFreeSkillGrant(PowerAggregate agg, int charges)
+    {
+        if (agg == null || charges <= 0) return;
+        agg.FreeSkillChargesGranted += charges;
+    }
+
+    private static void AccumulateFreeSkillUse(
+        PowerAggregate agg,
+        decimal energySaved,
+        CardRarity rarity)
+    {
+        if (agg == null) return;
+
+        var observedEnergySaved = Math.Max(0m, energySaved);
+        agg.FreeSkillChargesUsed++;
+        agg.FreeSkillEnergySaved += observedEnergySaved;
+        if (observedEnergySaved <= 0m)
+            agg.FreeSkillZeroEnergySavingsUses++;
+
+        switch (rarity)
+        {
+            case CardRarity.Basic:
+                agg.FreeSkillBasicSkillsDiscounted++;
+                break;
+            case CardRarity.Common:
+                agg.FreeSkillCommonSkillsDiscounted++;
+                break;
+            case CardRarity.Uncommon:
+                agg.FreeSkillUncommonSkillsDiscounted++;
+                break;
+            case CardRarity.Rare:
+                agg.FreeSkillRareSkillsDiscounted++;
+                break;
+        }
+    }
+
+    internal static void RecordFreeSkillGrantForTest(PowerAggregate agg, int charges)
+        => AccumulateFreeSkillGrant(agg, charges);
+
+    internal static void RecordFreeSkillUseForTest(
+        PowerAggregate agg,
+        decimal energySaved,
+        CardRarity rarity)
+        => AccumulateFreeSkillUse(agg, energySaved, rarity);
+
+    /// <summary>
     /// Capture Discovery at the exact SetToFreeThisTurn call it makes on the
     /// picked card. A skipped choice never reaches this boundary.
     /// </summary>
@@ -5869,6 +7948,109 @@ public static class RunTracker
             agg,
             rarity,
             type,
+            Math.Max(0, costBefore - costAfter));
+
+    /// <summary>
+    /// Capture Splash at the exact SetToFreeThisTurn call it makes on the
+    /// selected Attack. A skipped choice never reaches this boundary.
+    /// </summary>
+    internal static CardModel? CaptureSplashChoiceSource(CardModel? selectedCard)
+    {
+        if (selectedCard == null || selectedCard.Type != CardType.Attack)
+            return null;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return null;
+
+                var causingPlay = FindCurrentlyResolvingCardPlay();
+                var sourceCard = causingPlay?.Card;
+                if (sourceCard is not Splash) return null;
+                var player = sourceCard.Owner;
+                if (player == null || !IsTrackedPlayer(player)) return null;
+                if (selectedCard.Owner != null
+                    && !ReferenceEquals(selectedCard.Owner, player))
+                {
+                    return null;
+                }
+
+                return Canonical(sourceCard);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"CaptureSplashChoiceSource failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record the selected Attack after Splash makes it free. The discount is
+    /// the observed effective energy-cost reduction across that exact call.
+    /// </summary>
+    internal static void RecordSplashAttackTaken(
+        CardModel sourceCard,
+        CardModel? selectedCard,
+        int costBefore,
+        int costAfter)
+    {
+        if (selectedCard == null || selectedCard.Type != CardType.Attack) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+                if (sourceCard is not Splash) return;
+                if (!IsTrackedCard(sourceCard)) return;
+
+                _pendingCombat ??= new PendingCombat();
+                var instanceId = GetOrAssignInstanceId(sourceCard);
+                var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
+                AccumulateSplashAttackTaken(
+                    agg,
+                    selectedCard.Rarity,
+                    Math.Max(0, costBefore - costAfter));
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordSplashAttackTaken failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void AccumulateSplashAttackTaken(
+        CardAggregate agg,
+        CardRarity rarity,
+        int energyDiscount)
+    {
+        agg.SplashAttacksTaken++;
+        agg.SplashEnergyDiscountTotal += Math.Max(0, energyDiscount);
+
+        switch (rarity)
+        {
+            case CardRarity.Common:
+                agg.SplashCommonAttacksTaken++;
+                break;
+            case CardRarity.Uncommon:
+                agg.SplashUncommonAttacksTaken++;
+                break;
+            case CardRarity.Rare:
+                agg.SplashRareAttacksTaken++;
+                break;
+        }
+    }
+
+    internal static void RecordSplashAttackTakenForTest(
+        CardAggregate agg,
+        CardRarity rarity,
+        int costBefore,
+        int costAfter)
+        => AccumulateSplashAttackTaken(
+            agg,
+            rarity,
             Math.Max(0, costBefore - costAfter));
 
     private static void RecordArmamentsCardUpgradedLocked(CardModel upgradedCard)
@@ -6113,6 +8295,7 @@ public static class RunTracker
     // -------- Relic stat recording --------
 
     private const string BagOfPreparationRelicId = "RELIC.BAG_OF_PREPARATION";
+    private const string RingOfTheSnakeRelicId = "RELIC.RING_OF_THE_SNAKE";
     private const string BagOfMarblesRelicId = "RELIC.BAG_OF_MARBLES";
     private const string RedMaskRelicId = "RELIC.RED_MASK";
     private const string UnsettlingLampRelicId = "RELIC.UNSETTLING_LAMP";
@@ -6150,6 +8333,7 @@ public static class RunTracker
     private const string PendulumRelicId = "RELIC.PENDULUM";
     private const string ParryingShieldRelicId = "RELIC.PARRYING_SHIELD";
     private const string FestivePopperRelicId = "RELIC.FESTIVE_POPPER";
+    private const string ScreamingFlagonRelicId = "RELIC.SCREAMING_FLAGON";
     private const string MercuryHourglassRelicId = "RELIC.MERCURY_HOURGLASS";
     private const string MrStrugglesRelicId = "RELIC.MR_STRUGGLES";
     private const string LostWispRelicId = "RELIC.LOST_WISP";
@@ -6158,6 +8342,8 @@ public static class RunTracker
     private const string HornCleatRelicId = "RELIC.HORN_CLEAT";
     private const string CaptainsWheelRelicId = "RELIC.CAPTAINS_WHEEL";
     private const string PrismaticGemRelicId = "RELIC.PRISMATIC_GEM";
+    private const string PumpkinCandleRelicId = "RELIC.PUMPKIN_CANDLE";
+    private const string SpikedGauntletsRelicId = "RELIC.SPIKED_GAUNTLETS";
     private const string SealOfGoldRelicId = "RELIC.SEAL_OF_GOLD";
     private const string FresnelLensRelicId = "RELIC.FRESNEL_LENS";
     private const string WingCharmRelicId = "RELIC.WING_CHARM";
@@ -6178,6 +8364,7 @@ public static class RunTracker
     private const string StoneCrackerRelicId = "RELIC.STONE_CRACKER";
     private const string RazorToothRelicId = "RELIC.RAZOR_TOOTH";
     private const string WarHammerRelicId = "RELIC.WAR_HAMMER";
+    private const string SwordOfStoneRelicId = "RELIC.SWORD_OF_STONE";
     private const string WhetstoneRelicId = "RELIC.WHETSTONE";
     private const string YummyCookieRelicId = "RELIC.YUMMY_COOKIE";
     private const string WarPaintRelicId = "RELIC.WAR_PAINT";
@@ -6218,10 +8405,16 @@ public static class RunTracker
     private const string LeafyPoulticeRelicId = "RELIC.LEAFY_POULTICE";
     private const string RegalPillowRelicId = "RELIC.REGAL_PILLOW";
     private const string WhiteBeastStatueRelicId = "RELIC.WHITE_BEAST_STATUE";
+    private const string PotionBeltRelicId = "RELIC.POTION_BELT";
+    private const string AlchemicalCofferRelicId = "RELIC.ALCHEMICAL_COFFER";
+    private const string PhialHolsterRelicId = "RELIC.PHIAL_HOLSTER";
+    private const string PetrifiedToadRelicId = "RELIC.PETRIFIED_TOAD";
     private const string ShovelRelicId = "RELIC.SHOVEL";
     private const string TinyMailboxRelicId = "RELIC.TINY_MAILBOX";
+    private const string SmallCapsuleRelicId = "RELIC.SMALL_CAPSULE";
     private const string LargeCapsuleRelicId = "RELIC.LARGE_CAPSULE";
     private const string NeowsBonesRelicId = "RELIC.NEOWS_BONES";
+    private const string ToyBoxRelicId = "RELIC.TOY_BOX";
     private const string BoundPhylacteryRelicId = "RELIC.BOUND_PHYLACTERY";
     private const string PhylacteryUnboundRelicId = "RELIC.PHYLACTERY_UNBOUND";
     private const string ToolboxRelicId = "RELIC.TOOLBOX";
@@ -6245,6 +8438,8 @@ public static class RunTracker
     private const string ShurikenRelicId = "RELIC.SHURIKEN";
     private const string PaperPhrogRelicId = "RELIC.PAPER_PHROG";
     private const string RegaliteRelicId = "RELIC.REGALITE";
+    private const string MusicBoxRelicId = "RELIC.MUSIC_BOX";
+    private const string CrossbowRelicId = "RELIC.CROSSBOW";
     private const string IntimidatingHelmetRelicId = "RELIC.INTIMIDATING_HELMET";
     private const string DaughterOfTheWindRelicId = "RELIC.DAUGHTER_OF_THE_WIND";
     private const string SturdyClampRelicId = "RELIC.STURDY_CLAMP";
@@ -6261,7 +8456,9 @@ public static class RunTracker
     private const string JuzuBraceletRelicId = "RELIC.JUZU_BRACELET";
     private const string DowsingRodRelicId = "RELIC.DOWSING_ROD";
     private const string HeftyTabletRelicId = "RELIC.HEFTY_TABLET";
+    private const string LeadPaperweightRelicId = "RELIC.LEAD_PAPERWEIGHT";
     private const string ArcaneScrollRelicId = "RELIC.ARCANE_SCROLL";
+    private const string ScrollBoxesRelicId = "RELIC.SCROLL_BOXES";
     private const string VambraceRelicId = "RELIC.VAMBRACE";
     private const string GamblingChipRelicId = "RELIC.GAMBLING_CHIP";
     private const string CentennialPuzzleRelicId = "RELIC.CENTENNIAL_PUZZLE";
@@ -6404,6 +8601,23 @@ public static class RunTracker
     }
 
     private static ConditionalWeakTable<object, Tuple<int>>
+        GetSmallCapsuleRewardAttributions()
+    {
+        if (AppDomain.CurrentDomain.GetData(
+                SmallCapsuleRewardAttributionsAppDomainKey)
+            is ConditionalWeakTable<object, Tuple<int>> existing)
+        {
+            return existing;
+        }
+
+        var created = new ConditionalWeakTable<object, Tuple<int>>();
+        AppDomain.CurrentDomain.SetData(
+            SmallCapsuleRewardAttributionsAppDomainKey,
+            created);
+        return created;
+    }
+
+    private static ConditionalWeakTable<object, Tuple<int>>
         GetWhiteStarRewardAttributions()
     {
         if (AppDomain.CurrentDomain.GetData(
@@ -6471,6 +8685,20 @@ public static class RunTracker
         return created;
     }
 
+    private static ConditionalWeakTable<object, Tuple<int>>
+        GetPotionHistorySequences()
+    {
+        if (AppDomain.CurrentDomain.GetData(PotionHistorySequencesAppDomainKey)
+            is ConditionalWeakTable<object, Tuple<int>> existing)
+        {
+            return existing;
+        }
+
+        var created = new ConditionalWeakTable<object, Tuple<int>>();
+        AppDomain.CurrentDomain.SetData(PotionHistorySequencesAppDomainKey, created);
+        return created;
+    }
+
     /// <summary>
     /// Record Bag of Preparation when its owner-specific hand-draw modifier
     /// raises the first-turn draw count, then arm attribution for the eventual
@@ -6478,6 +8706,46 @@ public static class RunTracker
     /// </summary>
     public static void RecordBagOfPreparationActivation(
         BagOfPreparation? relic,
+        Player? player,
+        int cardsRequested)
+    {
+        RecordOpeningHandDrawRelicActivation(
+            relic,
+            player,
+            cardsRequested,
+            BagOfPreparationRelicId,
+            pending => pending.BagOfPreparationActivationCountedPlayers,
+            pending => pending.PendingBagOfPreparationDraws,
+            nameof(RecordBagOfPreparationActivation));
+    }
+
+    /// <summary>
+    /// Ring of the Snake uses the same first-turn hand-draw modifier contract
+    /// as Bag of Preparation, but records into its own relic aggregate.
+    /// </summary>
+    public static void RecordRingOfTheSnakeActivation(
+        RingOfTheSnake? relic,
+        Player? player,
+        int cardsRequested)
+    {
+        RecordOpeningHandDrawRelicActivation(
+            relic,
+            player,
+            cardsRequested,
+            RingOfTheSnakeRelicId,
+            pending => pending.RingOfTheSnakeActivationCountedPlayers,
+            pending => pending.PendingRingOfTheSnakeDraws,
+            nameof(RecordRingOfTheSnakeActivation));
+    }
+
+    /// <summary>
+    /// Pendulum contributes to the ordinary hand-draw request whenever its
+    /// persistent turn counter wraps. Unlike opening-hand relics, it can
+    /// activate repeatedly in one combat, so each positive modifier is a new
+    /// activation and replaces only the pending observation for that draw.
+    /// </summary>
+    public static void RecordPendulumActivation(
+        Pendulum? relic,
         Player? player,
         int cardsRequested)
     {
@@ -6491,16 +8759,47 @@ public static class RunTracker
                 if (!ReferenceEquals(relic.Owner, player)) return;
 
                 _pendingCombat ??= new PendingCombat();
-                if (!_pendingCombat.BagOfPreparationActivationCountedPlayers.Add(player)) return;
-
-                var agg = GetOrCreatePendingRelicAggregateLocked(BagOfPreparationRelicId);
-                RecordBagOfPreparationStatsForTest(agg, activations: 1, cardsDrawn: 0);
-                _pendingCombat.PendingBagOfPreparationDraws[player] =
-                    new PendingBagOfPreparationDraw(cardsRequested);
+                var agg = GetOrCreatePendingRelicAggregateLocked(PendulumRelicId);
+                agg.Activations += 1;
+                _pendingCombat.PendingPendulumDraws[player] =
+                    new PendingOpeningHandDrawRelicDraw(cardsRequested);
             }
             catch (Exception e)
             {
-                CoreMain.LogDebug($"RecordBagOfPreparationActivation failed: {e.Message}");
+                CoreMain.LogDebug($"RecordPendulumActivation failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void RecordOpeningHandDrawRelicActivation(
+        RelicModel? relic,
+        Player? player,
+        int cardsRequested,
+        string relicId,
+        Func<PendingCombat, HashSet<Player>> activationPlayers,
+        Func<PendingCombat, Dictionary<Player, PendingOpeningHandDrawRelicDraw>> pendingDraws,
+        string diagnosticName)
+    {
+        if (relic?.Owner == null || player == null || cardsRequested <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(player)) return;
+                if (!ReferenceEquals(relic.Owner, player)) return;
+
+                _pendingCombat ??= new PendingCombat();
+                if (!activationPlayers(_pendingCombat).Add(player)) return;
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(relicId);
+                AccumulateOpeningHandDrawRelicActivations(agg, 1);
+                pendingDraws(_pendingCombat)[player] =
+                    new PendingOpeningHandDrawRelicDraw(cardsRequested);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"{diagnosticName} failed: {e.Message}");
             }
         }
     }
@@ -6511,6 +8810,37 @@ public static class RunTracker
     /// </summary>
     public static void FinalizeBagOfPreparationHandDraw(Player? player, decimal finalHandDraw)
     {
+        FinalizeOpeningHandDrawRelic(
+            player,
+            finalHandDraw,
+            pending => pending.PendingBagOfPreparationDraws,
+            nameof(FinalizeBagOfPreparationHandDraw));
+    }
+
+    public static void FinalizeRingOfTheSnakeHandDraw(Player? player, decimal finalHandDraw)
+    {
+        FinalizeOpeningHandDrawRelic(
+            player,
+            finalHandDraw,
+            pending => pending.PendingRingOfTheSnakeDraws,
+            nameof(FinalizeRingOfTheSnakeHandDraw));
+    }
+
+    public static void FinalizePendulumHandDraw(Player? player, decimal finalHandDraw)
+    {
+        FinalizeOpeningHandDrawRelic(
+            player,
+            finalHandDraw,
+            pending => pending.PendingPendulumDraws,
+            nameof(FinalizePendulumHandDraw));
+    }
+
+    private static void FinalizeOpeningHandDrawRelic(
+        Player? player,
+        decimal finalHandDraw,
+        Func<PendingCombat, Dictionary<Player, PendingOpeningHandDrawRelicDraw>> pendingDraws,
+        string diagnosticName)
+    {
         if (player == null) return;
 
         lock (_lock)
@@ -6518,15 +8848,15 @@ public static class RunTracker
             try
             {
                 if (_pendingCombat == null) return;
-                if (!_pendingCombat.PendingBagOfPreparationDraws.TryGetValue(player, out var pending)) return;
+                if (!pendingDraws(_pendingCombat).TryGetValue(player, out var pending)) return;
 
-                pending.RawHandDrawWithoutBag =
+                pending.RawHandDrawWithoutRelic =
                     Math.Max(0m, finalHandDraw - pending.CardsRequested);
                 pending.ModifierChainCompleted = true;
             }
             catch (Exception e)
             {
-                CoreMain.LogDebug($"FinalizeBagOfPreparationHandDraw failed: {e.Message}");
+                CoreMain.LogDebug($"{diagnosticName} failed: {e.Message}");
             }
         }
     }
@@ -6536,7 +8866,48 @@ public static class RunTracker
         bool fromHandDraw,
         out decimal rawHandDrawWithoutBag)
     {
-        rawHandDrawWithoutBag = 0m;
+        return TryConsumeOpeningHandDrawRelicAttribution(
+            player,
+            fromHandDraw,
+            pending => pending.PendingBagOfPreparationDraws,
+            nameof(TryConsumeBagOfPreparationDrawAttribution),
+            out rawHandDrawWithoutBag);
+    }
+
+    public static bool TryConsumeRingOfTheSnakeDrawAttribution(
+        Player? player,
+        bool fromHandDraw,
+        out decimal rawHandDrawWithoutRing)
+    {
+        return TryConsumeOpeningHandDrawRelicAttribution(
+            player,
+            fromHandDraw,
+            pending => pending.PendingRingOfTheSnakeDraws,
+            nameof(TryConsumeRingOfTheSnakeDrawAttribution),
+            out rawHandDrawWithoutRing);
+    }
+
+    public static bool TryConsumePendulumDrawAttribution(
+        Player? player,
+        bool fromHandDraw,
+        out decimal rawHandDrawWithoutPendulum)
+    {
+        return TryConsumeOpeningHandDrawRelicAttribution(
+            player,
+            fromHandDraw,
+            pending => pending.PendingPendulumDraws,
+            nameof(TryConsumePendulumDrawAttribution),
+            out rawHandDrawWithoutPendulum);
+    }
+
+    private static bool TryConsumeOpeningHandDrawRelicAttribution(
+        Player? player,
+        bool fromHandDraw,
+        Func<PendingCombat, Dictionary<Player, PendingOpeningHandDrawRelicDraw>> pendingDraws,
+        string diagnosticName,
+        out decimal rawHandDrawWithoutRelic)
+    {
+        rawHandDrawWithoutRelic = 0m;
         if (player == null || !fromHandDraw) return false;
 
         lock (_lock)
@@ -6544,38 +8915,75 @@ public static class RunTracker
             try
             {
                 if (_pendingCombat == null) return false;
-                if (!_pendingCombat.PendingBagOfPreparationDraws.Remove(player, out var pending))
+                if (!pendingDraws(_pendingCombat).Remove(player, out var pending))
                     return false;
                 if (!pending.ModifierChainCompleted) return false;
 
-                rawHandDrawWithoutBag = pending.RawHandDrawWithoutBag;
+                rawHandDrawWithoutRelic = pending.RawHandDrawWithoutRelic;
                 return true;
             }
             catch (Exception e)
             {
-                CoreMain.LogDebug($"TryConsumeBagOfPreparationDrawAttribution failed: {e.Message}");
+                CoreMain.LogDebug($"{diagnosticName} failed: {e.Message}");
                 return false;
             }
         }
     }
 
-    public static void RecordBagOfPreparationCardsDrawn(int cardsDrawn)
+    public static void RecordBagOfPreparationDrawResult(
+        int cardsRequested,
+        int cardsDrawn)
     {
-        if (cardsDrawn <= 0) return;
+        RecordOpeningHandDrawRelicDrawResult(
+            BagOfPreparationRelicId,
+            cardsRequested,
+            cardsDrawn,
+            nameof(RecordBagOfPreparationDrawResult));
+    }
+
+    public static void RecordRingOfTheSnakeDrawResult(
+        int cardsRequested,
+        int cardsDrawn)
+    {
+        RecordOpeningHandDrawRelicDrawResult(
+            RingOfTheSnakeRelicId,
+            cardsRequested,
+            cardsDrawn,
+            nameof(RecordRingOfTheSnakeDrawResult));
+    }
+
+    public static void RecordPendulumDrawResult(
+        int cardsRequested,
+        int cardsDrawn)
+    {
+        RecordOpeningHandDrawRelicDrawResult(
+            PendulumRelicId,
+            cardsRequested,
+            cardsDrawn,
+            nameof(RecordPendulumDrawResult));
+    }
+
+    private static void RecordOpeningHandDrawRelicDrawResult(
+        string relicId,
+        int cardsRequested,
+        int cardsDrawn,
+        string diagnosticName)
+    {
+        if (cardsRequested <= 0) return;
 
         lock (_lock)
         {
             try
             {
-                var agg = GetOrCreatePendingRelicAggregateLocked(BagOfPreparationRelicId);
-                RecordBagOfPreparationStatsForTest(
+                var agg = GetOrCreatePendingRelicAggregateLocked(relicId);
+                AccumulateOpeningHandDrawRelicDrawResult(
                     agg,
-                    activations: 0,
-                    cardsDrawn: cardsDrawn);
+                    cardsRequested,
+                    cardsDrawn);
             }
             catch (Exception e)
             {
-                CoreMain.LogDebug($"RecordBagOfPreparationCardsDrawn failed: {e.Message}");
+                CoreMain.LogDebug($"{diagnosticName} failed: {e.Message}");
             }
         }
     }
@@ -6583,11 +8991,42 @@ public static class RunTracker
     internal static void RecordBagOfPreparationStatsForTest(
         RelicAggregate agg,
         int activations,
+        int cardsRequested,
         int cardsDrawn)
+    {
+        AccumulateOpeningHandDrawRelicActivations(agg, activations);
+        AccumulateOpeningHandDrawRelicDrawResult(agg, cardsRequested, cardsDrawn);
+    }
+
+    internal static void RecordRingOfTheSnakeStatsForTest(
+        RelicAggregate agg,
+        int activations,
+        int cardsRequested,
+        int cardsDrawn)
+    {
+        AccumulateOpeningHandDrawRelicActivations(agg, activations);
+        AccumulateOpeningHandDrawRelicDrawResult(agg, cardsRequested, cardsDrawn);
+    }
+
+    private static void AccumulateOpeningHandDrawRelicActivations(
+        RelicAggregate agg,
+        int activations)
     {
         if (agg == null) return;
         agg.Activations += Math.Max(0, activations);
-        agg.AdditionalCardsDrawn += Math.Max(0, cardsDrawn);
+    }
+
+    private static void AccumulateOpeningHandDrawRelicDrawResult(
+        RelicAggregate agg,
+        int cardsRequested,
+        int cardsDrawn)
+    {
+        if (agg == null) return;
+
+        var attempted = Math.Max(0, cardsRequested);
+        var observed = Math.Min(attempted, Math.Max(0, cardsDrawn));
+        agg.AdditionalCardsDrawn += observed;
+        agg.AdditionalCardDrawsBlocked += attempted - observed;
     }
 
     /// <summary>
@@ -9300,6 +11739,490 @@ public static class RunTracker
         }
     }
 
+    /// <summary>
+    /// Open the narrow synchronous registration window around Small Capsule's
+    /// pickup callback. It constructs one RelicReward and passes it to
+    /// RewardsCmd.OfferCustom before its first await.
+    /// </summary>
+    public static bool BeginSmallCapsuleRewardRegistration(SmallCapsule relic)
+    {
+        if (relic?.Owner == null) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(relic.Owner))
+                    return false;
+
+                _smallCapsuleRewardRegistrationRelic = relic;
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"BeginSmallCapsuleRewardRegistration failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    public static void EndSmallCapsuleRewardRegistration()
+    {
+        lock (_lock)
+        {
+            _smallCapsuleRewardRegistrationRelic = null;
+        }
+    }
+
+    /// <summary>
+    /// Bind only the RelicReward created by the active Small Capsule pickup.
+    /// The weak marker keeps the exact reward attributable across Core reloads
+    /// while its reward screen remains open.
+    /// </summary>
+    public static void RegisterSmallCapsuleCustomRewards(
+        Player player,
+        List<Reward> rewards)
+    {
+        if (player == null || rewards == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var relic = _smallCapsuleRewardRegistrationRelic;
+                if (relic?.Owner == null
+                    || !ReferenceEquals(relic.Owner, player)
+                    || !IsTrackedRelic(relic)
+                    || !IsTrackedPlayer(player))
+                {
+                    return;
+                }
+
+                var relicRewards = rewards
+                    .OfType<RelicReward>()
+                    .Where(reward => ReferenceEquals(reward.Player, player))
+                    .ToList();
+                if (rewards.Count != 1 || relicRewards.Count != 1)
+                {
+                    CoreMain.LogDebug(
+                        "RegisterSmallCapsuleCustomRewards expected one relic reward; "
+                        + $"observed {rewards.Count} rewards and {relicRewards.Count} relic rewards.");
+                    return;
+                }
+
+                var aggregate = GetOrCreateCurrentRunRelicAggregateLocked(
+                    SmallCapsuleRelicId);
+                var choiceNumber = (aggregate.RelicRewardChoices
+                        ?? new List<RelicRewardChoiceAggregate>())
+                    .Where(choice => choice != null)
+                    .Select(choice => choice.ChoiceNumber)
+                    .DefaultIfEmpty(0)
+                    .Max() + 1;
+                RecordSmallCapsuleRewardChoiceForTest(
+                    aggregate,
+                    choiceNumber,
+                    relicId: null,
+                    displayName: null,
+                    outcome: "pending");
+
+                var reward = relicRewards[0];
+                _smallCapsuleRewardAttributions.Remove(reward);
+                _smallCapsuleRewardAttributions.Add(
+                    reward,
+                    Tuple.Create(choiceNumber));
+
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RegisterSmallCapsuleCustomRewards failed: {e.Message}");
+            }
+        }
+    }
+
+    public static bool IsSmallCapsuleRelicReward(RelicReward reward)
+    {
+        if (reward == null) return false;
+
+        lock (_lock)
+        {
+            return _smallCapsuleRewardAttributions.TryGetValue(reward, out _);
+        }
+    }
+
+    public static void RecordSmallCapsuleRelicRewardOffered(RelicReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!RecordSmallCapsuleRelicRewardOfferedLocked(reward)) return;
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordSmallCapsuleRelicRewardOffered failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordSmallCapsuleRelicRewardClaimed(RelicReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_smallCapsuleRewardAttributions.TryGetValue(
+                        reward,
+                        out var attribution))
+                {
+                    return;
+                }
+
+                RecordSmallCapsuleRelicRewardOfferedLocked(reward);
+                var relic = reward.ClaimedRelic;
+                if (relic == null
+                    || reward.Player == null
+                    || !IsTrackedPlayer(reward.Player))
+                {
+                    return;
+                }
+
+                var aggregate = GetOrCreateCurrentRunRelicAggregateLocked(
+                    SmallCapsuleRelicId);
+                RecordSmallCapsuleRewardChoiceForTest(
+                    aggregate,
+                    attribution.Item1,
+                    relic.Id.ToString(),
+                    GetRelicDisplayName(relic),
+                    "taken");
+                _smallCapsuleRewardAttributions.Remove(reward);
+
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordSmallCapsuleRelicRewardClaimed failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordSmallCapsuleRelicRewardSkipped(RelicReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_smallCapsuleRewardAttributions.TryGetValue(
+                        reward,
+                        out var attribution))
+                {
+                    return;
+                }
+
+                RecordSmallCapsuleRelicRewardOfferedLocked(reward);
+                var relic = reward.Relic;
+                var aggregate = GetOrCreateCurrentRunRelicAggregateLocked(
+                    SmallCapsuleRelicId);
+                RecordSmallCapsuleRewardChoiceForTest(
+                    aggregate,
+                    attribution.Item1,
+                    relic?.Id.ToString(),
+                    relic == null ? null : GetRelicDisplayName(relic),
+                    "skipped");
+                _smallCapsuleRewardAttributions.Remove(reward);
+
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordSmallCapsuleRelicRewardSkipped failed: {e.Message}");
+            }
+        }
+    }
+
+    private static bool RecordSmallCapsuleRelicRewardOfferedLocked(
+        RelicReward reward)
+    {
+        if (!_smallCapsuleRewardAttributions.TryGetValue(
+                reward,
+                out var attribution))
+        {
+            return false;
+        }
+
+        var relic = reward.Relic;
+        if (relic == null || !IsTrackedPlayer(reward.Player)) return false;
+
+        var aggregate = GetOrCreateCurrentRunRelicAggregateLocked(
+            SmallCapsuleRelicId);
+        RecordSmallCapsuleRewardChoiceForTest(
+            aggregate,
+            attribution.Item1,
+            relic.Id.ToString(),
+            GetRelicDisplayName(relic),
+            "pending");
+        return true;
+    }
+
+    /// <summary>
+    /// Record the concrete wax relic that successfully completed the normal
+    /// relic-obtain command. Toy Box is the game's only producer of IsWax
+    /// relics; their ordinary behavior stats remain keyed by the relic's own
+    /// model id while this ordered ledger belongs to Toy Box.
+    /// </summary>
+    public static void RecordToyBoxWaxRelicBestowed(
+        RelicModel? relic,
+        Player? player)
+    {
+        if (relic?.IsWax != true || player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)
+                    || !ReferenceEquals(relic.Owner, player)
+                    || player.Relics?.Contains(relic) != true)
+                {
+                    return;
+                }
+
+                var effective = GetEffectiveToyBoxWaxRelicsLocked();
+                var relicId = relic.Id.ToString();
+                var floorBestowed = RelicFloorAddedToDeck(relic)
+                    ?? CurrentRunFloorLocked();
+                if (effective.Any(entry => entry != null
+                    && string.Equals(
+                        entry.RelicId,
+                        relicId,
+                        StringComparison.Ordinal)
+                    && entry.FloorBestowed == floorBestowed))
+                {
+                    return;
+                }
+
+                var sequence = effective
+                    .Select(entry => entry?.Sequence ?? 0)
+                    .DefaultIfEmpty(0)
+                    .Max() + 1;
+                var aggregate = GetOrCreateRelicAggregateForCurrentContextLocked(
+                    ToyBoxRelicId);
+                RecordToyBoxWaxRelicBestowedForTest(
+                    aggregate,
+                    relicId,
+                    GetRelicDisplayName(relic),
+                    floorBestowed,
+                    sequence);
+                FinishToyBoxWaxRelicMutationLocked();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordToyBoxWaxRelicBestowed failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record the exact wax relic after RelicCmd.Melt has changed its live
+    /// state. Combat-time melts remain pending until the normal combat
+    /// promotion boundary.
+    /// </summary>
+    public static void RecordToyBoxWaxRelicMelted(RelicModel? relic)
+    {
+        if (relic?.IsWax != true || relic.IsMelted != true) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var player = relic.Owner;
+                if (!IsTrackedPlayer(player)) return;
+
+                var relicId = relic.Id.ToString();
+                var effective = GetEffectiveToyBoxWaxRelicsLocked();
+                var existing = effective
+                    .Where(entry => entry != null
+                        && string.Equals(
+                            entry.RelicId,
+                            relicId,
+                            StringComparison.Ordinal)
+                        && !entry.FloorMelted.HasValue)
+                    .OrderBy(entry => entry.Sequence)
+                    .FirstOrDefault();
+                var sequence = existing?.Sequence
+                    ?? (effective
+                        .Select(entry => entry?.Sequence ?? 0)
+                        .DefaultIfEmpty(0)
+                        .Max() + 1);
+
+                var aggregate = GetOrCreateRelicAggregateForCurrentContextLocked(
+                    ToyBoxRelicId);
+                RecordToyBoxWaxRelicMeltedForTest(
+                    aggregate,
+                    relicId,
+                    existing?.DisplayName ?? GetRelicDisplayName(relic),
+                    existing?.FloorBestowed
+                        ?? RelicFloorAddedToDeck(relic)
+                        ?? CurrentRunFloorLocked(),
+                    CurrentRunFloorLocked(),
+                    sequence);
+                FinishToyBoxWaxRelicMutationLocked();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordToyBoxWaxRelicMelted failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordToyBoxWaxRelicBestowedForTest(
+        RelicAggregate aggregate,
+        string? relicId,
+        string? displayName,
+        int? floorBestowed,
+        int? sequence = null)
+    {
+        if (aggregate == null || string.IsNullOrWhiteSpace(relicId)) return;
+
+        aggregate.ToyBoxWaxRelics ??= new List<ToyBoxWaxRelicAggregate>();
+        var normalizedSequence = sequence.GetValueOrDefault();
+        if (normalizedSequence <= 0)
+        {
+            normalizedSequence = aggregate.ToyBoxWaxRelics
+                .Select(entry => entry?.Sequence ?? 0)
+                .DefaultIfEmpty(0)
+                .Max() + 1;
+        }
+
+        UpsertToyBoxWaxRelic(
+            aggregate.ToyBoxWaxRelics,
+            normalizedSequence,
+            relicId,
+            displayName,
+            floorBestowed,
+            floorMelted: null);
+    }
+
+    internal static void RecordToyBoxWaxRelicMeltedForTest(
+        RelicAggregate aggregate,
+        string? relicId,
+        string? displayName,
+        int? floorBestowed,
+        int? floorMelted,
+        int? sequence = null)
+    {
+        if (aggregate == null || string.IsNullOrWhiteSpace(relicId)) return;
+
+        aggregate.ToyBoxWaxRelics ??= new List<ToyBoxWaxRelicAggregate>();
+        var normalizedSequence = sequence.GetValueOrDefault();
+        if (normalizedSequence <= 0)
+        {
+            normalizedSequence = aggregate.ToyBoxWaxRelics
+                .Where(entry => entry != null
+                    && string.Equals(
+                        entry.RelicId,
+                        relicId,
+                        StringComparison.Ordinal)
+                    && !entry.FloorMelted.HasValue)
+                .OrderBy(entry => entry.Sequence)
+                .Select(entry => entry.Sequence)
+                .FirstOrDefault();
+        }
+        if (normalizedSequence <= 0)
+        {
+            normalizedSequence = aggregate.ToyBoxWaxRelics
+                .Select(entry => entry?.Sequence ?? 0)
+                .DefaultIfEmpty(0)
+                .Max() + 1;
+        }
+
+        UpsertToyBoxWaxRelic(
+            aggregate.ToyBoxWaxRelics,
+            normalizedSequence,
+            relicId,
+            displayName,
+            floorBestowed,
+            floorMelted);
+    }
+
+    private static List<ToyBoxWaxRelicAggregate>
+        GetEffectiveToyBoxWaxRelicsLocked()
+    {
+        var aggregate = new RelicAggregate();
+        if (_currentRun?.RelicAggregates.TryGetValue(
+                ToyBoxRelicId,
+                out var committed) == true)
+        {
+            MergeToyBoxWaxRelics(aggregate, committed);
+        }
+        if (_pendingCombat?.RelicAggregates.TryGetValue(
+                ToyBoxRelicId,
+                out var pending) == true)
+        {
+            MergeToyBoxWaxRelics(aggregate, pending);
+        }
+        return aggregate.ToyBoxWaxRelics;
+    }
+
+    private static void FinishToyBoxWaxRelicMutationLocked()
+    {
+        RefreshCurrentRunMetadataLocked();
+        if (_pendingCombat == null)
+            SaveCurrentRun();
+    }
+
+    private static void UpsertToyBoxWaxRelic(
+        List<ToyBoxWaxRelicAggregate> entries,
+        int sequence,
+        string relicId,
+        string? displayName,
+        int? floorBestowed,
+        int? floorMelted)
+    {
+        var entry = entries.FirstOrDefault(candidate =>
+            candidate != null && candidate.Sequence == sequence);
+        if (entry == null)
+        {
+            entry = new ToyBoxWaxRelicAggregate
+            {
+                Sequence = sequence,
+                RelicId = relicId,
+            };
+            entries.Add(entry);
+        }
+
+        if (string.IsNullOrWhiteSpace(entry.RelicId))
+            entry.RelicId = relicId;
+        if (!string.IsNullOrWhiteSpace(displayName))
+            entry.DisplayName = displayName;
+        if (floorBestowed.HasValue && !entry.FloorBestowed.HasValue)
+            entry.FloorBestowed = Math.Max(0, floorBestowed.Value);
+        if (floorMelted.HasValue)
+            entry.FloorMelted = Math.Max(0, floorMelted.Value);
+
+        entries.Sort((left, right) =>
+            (left?.Sequence ?? int.MaxValue).CompareTo(
+                right?.Sequence ?? int.MaxValue));
+    }
+
     public static bool BeginLargeCapsulePickup(
         LargeCapsule relic,
         out Player? player,
@@ -10283,10 +13206,14 @@ public static class RunTracker
 
     /// <summary>
     /// Record map-point stats from the original point type before the game
-    /// resolves it into a concrete room. This keeps Juzu's ? count and Cursed
-    /// Pearl's first-shop floor count tied to the visible map node.
+    /// resolves it into a concrete room. This keeps every legend visit tied
+    /// to the icon the player selected, while preserving the existing Juzu
+    /// and Cursed Pearl attribution boundaries.
     /// </summary>
-    public static void RecordMapPointEntered(MapPointType pointType, bool saveGame)
+    public static void RecordMapPointEntered(
+        MapPointType pointType,
+        bool saveGame,
+        bool advancesMapHistory = true)
     {
         if (!saveGame) return;
 
@@ -10297,7 +13224,34 @@ public static class RunTracker
                 var player = GetTrackedRunPlayerLocked();
                 if (player == null) return;
 
-                var changed = false;
+                EnsureLazyCurrentRunLocked();
+                _currentRun.MapLegendStats ??= new RunMapLegendStats();
+                var mapStats = _currentRun.MapLegendStats;
+                var floor = Math.Max(
+                    0,
+                    (CurrentRunFloorLocked() ?? 0)
+                    + (advancesMapHistory ? 1 : 0));
+                var categoryKey = MapLegendCategoryKey(pointType);
+                mapStats.CurrentPointType = pointType.ToString();
+                mapStats.CurrentPointFloor = floor;
+
+                var changed = true;
+                var category = GetMapLegendCategory(mapStats, categoryKey);
+                if (category != null && category.LastVisitFloor != floor)
+                {
+                    if (category.LastVisitFloor.HasValue)
+                    {
+                        category.FloorsBetweenVisitsTotal += Math.Max(
+                            0,
+                            floor - category.LastVisitFloor.Value);
+                        category.FloorsBetweenVisitsSamples++;
+                    }
+
+                    category.Visits++;
+                    category.FirstVisitFloor ??= floor;
+                    category.LastVisitFloor = floor;
+                }
+
                 if (pointType == MapPointType.Unknown && PlayerHasJuzuBracelet(player))
                 {
                     var agg = GetOrCreateCurrentRunRelicAggregateLocked(JuzuBraceletRelicId);
@@ -10310,15 +13264,239 @@ public static class RunTracker
                     var agg = GetOrCreateCurrentRunRelicAggregateLocked(CursedPearlRelicId);
                     changed |= RecordCursedPearlFloorsBeforeFirstShopForTest(
                         agg,
-                        CurrentRunFloorLocked() ?? 0);
+                        floor);
                 }
 
                 if (changed)
+                {
+                    _currentRun.UpdatedAt = Now();
+                    RefreshCurrentRunMetadataLocked();
                     SaveCurrentRun();
+                }
             }
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordMapPointEntered failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Records what an original ? map point actually became. The resolution
+    /// is a second dimension of the Unknown legend bucket; it does not turn
+    /// that visit into a direct combat/shop/treasure legend visit.
+    /// </summary>
+    public static void RecordMapLegendRoomEntered(
+        IRunState runState,
+        AbstractRoom room)
+    {
+        if (runState == null || room == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_currentRun == null && RunManager.Instance?.IsInProgress != true)
+                    return;
+
+                EnsureLazyCurrentRunLocked();
+                _currentRun.MapLegendStats ??= new RunMapLegendStats();
+                var mapStats = _currentRun.MapLegendStats;
+                var floor = Math.Max(0, runState.TotalFloor);
+                if (!string.Equals(
+                        mapStats.CurrentPointType,
+                        nameof(MapPointType.Unknown),
+                        StringComparison.Ordinal)
+                    || mapStats.CurrentPointFloor != floor)
+                {
+                    return;
+                }
+
+                var category = mapStats.Unknown ??= new MapLegendCategoryStats();
+                if (category.LastResolutionFloor == floor) return;
+
+                var resolved = true;
+                switch (room.RoomType)
+                {
+                    case RoomType.Event:
+                        category.ResolvedEvents++;
+                        break;
+                    case RoomType.Monster:
+                        category.ResolvedCombats++;
+                        break;
+                    case RoomType.Elite:
+                        category.ResolvedElites++;
+                        break;
+                    case RoomType.Shop:
+                        category.ResolvedShops++;
+                        break;
+                    case RoomType.Treasure:
+                        category.ResolvedTreasures++;
+                        break;
+                    case RoomType.RestSite:
+                        category.ResolvedRestSites++;
+                        break;
+                    default:
+                        resolved = false;
+                        break;
+                }
+
+                if (!resolved) return;
+                category.LastResolutionFloor = floor;
+                _currentRun.UpdatedAt = Now();
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordMapLegendRoomEntered failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void PrepareMapLegendCombatLocked()
+    {
+        if (_pendingCombat == null) return;
+
+        EnsureLazyCurrentRunLocked();
+        _currentRun.MapLegendStats ??= new RunMapLegendStats();
+        var roomType = RunManager.Instance?.State?.CurrentRoom?.RoomType;
+        var categoryKey = ResolveMapLegendCategoryKeyLocked(roomType);
+        _pendingCombat.MapLegendCategory = categoryKey;
+        _ = GetMapLegendCategory(
+            _pendingCombat.MapLegendStats,
+            categoryKey);
+    }
+
+    private static void FinalizeMapLegendCombatLocked()
+    {
+        if (_pendingCombat == null || _pendingCombat.MapLegendCombatFinalized)
+            return;
+
+        _pendingCombat.MapLegendCombatFinalized = true;
+        var category = GetMapLegendCategory(
+            _pendingCombat.MapLegendStats,
+            _pendingCombat.MapLegendCategory);
+        if (category == null) return;
+
+        category.CombatsCompleted++;
+        var player = GetTrackedRunPlayerLocked();
+        category.CombatTurns += Math.Max(
+            0,
+            player?.PlayerCombatState?.TurnNumber ?? 0);
+        if (!_pendingCombat.MapLegendCombatWon) return;
+
+        category.CombatsWon++;
+        if (category.HpLost <= 0m)
+            category.PerfectCombats++;
+    }
+
+    private static string? ResolveMapLegendCategoryKeyLocked(RoomType? roomType)
+    {
+        var mapStats = _currentRun?.MapLegendStats;
+        var floor = Math.Max(0, CurrentRunFloorLocked() ?? 0);
+        if (mapStats?.CurrentPointFloor == floor
+            && GetMapLegendCategory(mapStats, mapStats.CurrentPointType) != null)
+        {
+            return mapStats.CurrentPointType;
+        }
+
+        return roomType switch
+        {
+            RoomType.Monster => nameof(MapPointType.Monster),
+            RoomType.Elite => nameof(MapPointType.Elite),
+            RoomType.Shop => nameof(MapPointType.Shop),
+            RoomType.Treasure => nameof(MapPointType.Treasure),
+            RoomType.RestSite => nameof(MapPointType.RestSite),
+            RoomType.Event => nameof(MapPointType.Unknown),
+            _ => null,
+        };
+    }
+
+    private static MapLegendCategoryStats? GetMapLegendCategoryForContextLocked(
+        bool inCombat,
+        RoomType? roomType)
+    {
+        EnsureLazyCurrentRunLocked();
+        _currentRun.MapLegendStats ??= new RunMapLegendStats();
+        var categoryKey = ResolveMapLegendCategoryKeyLocked(roomType);
+        if (inCombat && _pendingCombat != null)
+        {
+            _pendingCombat.MapLegendCategory ??= categoryKey;
+            return GetMapLegendCategory(
+                _pendingCombat.MapLegendStats,
+                _pendingCombat.MapLegendCategory);
+        }
+
+        return GetMapLegendCategory(_currentRun.MapLegendStats, categoryKey);
+    }
+
+    private static string? MapLegendCategoryKey(MapPointType pointType)
+        => pointType switch
+        {
+            MapPointType.Unknown => nameof(MapPointType.Unknown),
+            MapPointType.Shop => nameof(MapPointType.Shop),
+            MapPointType.Treasure => nameof(MapPointType.Treasure),
+            MapPointType.RestSite => nameof(MapPointType.RestSite),
+            MapPointType.Monster => nameof(MapPointType.Monster),
+            MapPointType.Elite => nameof(MapPointType.Elite),
+            _ => null,
+        };
+
+    internal static MapLegendCategoryStats? GetMapLegendCategory(
+        RunMapLegendStats? stats,
+        string? categoryKey)
+    {
+        if (stats == null || string.IsNullOrWhiteSpace(categoryKey)) return null;
+        return categoryKey switch
+        {
+            nameof(MapPointType.Unknown) => stats.Unknown ??= new(),
+            nameof(MapPointType.Shop) => stats.Shop ??= new(),
+            nameof(MapPointType.Treasure) => stats.Treasure ??= new(),
+            nameof(MapPointType.RestSite) => stats.RestSite ??= new(),
+            nameof(MapPointType.Monster) => stats.Monster ??= new(),
+            nameof(MapPointType.Elite) => stats.Elite ??= new(),
+            _ => null,
+        };
+    }
+
+    /// <summary>
+    /// Counts successful permanent relic acquisitions against the map icon
+    /// responsible for the room. RelicCmd.Obtain's completed result is the
+    /// observation boundary, so failed/replaced reward attempts do not count.
+    /// </summary>
+    public static void RecordMapLegendRelicObtained(
+        RelicModel relic,
+        Player player)
+    {
+        if (relic == null || player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                if (_currentRun == null && RunManager.Instance?.IsInProgress != true)
+                    return;
+
+                EnsureLazyCurrentRunLocked();
+                var inCombat = CombatManager.Instance?.IsInProgress == true;
+                var category = GetMapLegendCategoryForContextLocked(
+                    inCombat,
+                    RunManager.Instance?.State?.CurrentRoom?.RoomType);
+                if (category == null) return;
+
+                category.RelicsGained++;
+                if (!inCombat)
+                {
+                    _currentRun.UpdatedAt = Now();
+                    RefreshCurrentRunMetadataLocked();
+                    SaveCurrentRun();
+                }
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordMapLegendRelicObtained failed: {e.Message}");
             }
         }
     }
@@ -10617,6 +13795,204 @@ public static class RunTracker
         AddRelicCardGranted(agg.CardsGranted, cardId, displayName ?? "", 1);
     }
 
+    /// <summary>
+    /// Begin Lead Paperweight's owner-specific pickup choice. The deck
+    /// snapshot lets completion confirm that the chosen option really reached
+    /// the permanent deck after all add modifiers and blockers ran.
+    /// </summary>
+    public static bool BeginLeadPaperweightChoice(
+        LeadPaperweight relic,
+        out Player? player)
+    {
+        player = null;
+        if (relic?.Owner == null) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(relic.Owner))
+                    return false;
+
+                player = relic.Owner;
+                _pendingLeadPaperweightChoices[player] = new PendingLeadPaperweightChoice
+                {
+                    Player = player,
+                    Floor = RelicFloorAddedToDeck(relic) ?? CurrentRunFloorLocked(),
+                    DeckBeforeChoice = new HashSet<CardModel>(
+                        SnapshotDeckCards(player),
+                        ReferenceEqualityComparer.Instance),
+                };
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"BeginLeadPaperweightChoice failed: {e.Message}");
+                player = null;
+                return false;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Capture the concrete options at the shared choose-card command. The
+    /// owner-specific pickup window prevents unrelated card selections from
+    /// entering Lead Paperweight's ledger.
+    /// </summary>
+    public static bool CaptureLeadPaperweightOptions(
+        Player player,
+        IReadOnlyList<CardModel> cards,
+        bool canSkip)
+    {
+        if (player == null || cards == null || cards.Count == 0 || !canSkip)
+            return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_pendingLeadPaperweightChoices.TryGetValue(player, out var pending))
+                    return false;
+                if (pending.Options.Count > 0) return false;
+
+                foreach (var card in cards)
+                {
+                    if (card == null) continue;
+                    pending.Options.Add(new PendingLeadPaperweightOption
+                    {
+                        Card = card,
+                        CardId = GetCardIdForStats(card),
+                        DisplayName = GetCardDisplayNameForStats(card),
+                        UpgradeLevel = Math.Max(0, card.CurrentUpgradeLevel),
+                    });
+                }
+
+                return pending.Options.Count > 0;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"CaptureLeadPaperweightOptions failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    public static void RecordLeadPaperweightSelection(
+        Player player,
+        CardModel? selectedCard)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_pendingLeadPaperweightChoices.TryGetValue(player, out var pending))
+                    return;
+
+                pending.SelectionResolved = true;
+                pending.SelectedCard = selectedCard;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordLeadPaperweightSelection failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void CompleteLeadPaperweightChoice(Player player, bool succeeded)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_pendingLeadPaperweightChoices.Remove(player, out var pending))
+                    return;
+                if (!succeeded || !IsTrackedPlayer(player)) return;
+
+                CardModel? receivedCard = null;
+                if (pending.SelectedCard != null)
+                {
+                    var addedCards = NewDeckCardsSince(player, pending.DeckBeforeChoice);
+                    receivedCard = addedCards.FirstOrDefault(card =>
+                            ReferenceEquals(card, pending.SelectedCard))
+                        ?? addedCards.FirstOrDefault(card =>
+                            string.Equals(
+                                GetCardIdForStats(card),
+                                GetCardIdForStats(pending.SelectedCard),
+                                StringComparison.Ordinal))
+                        ?? addedCards.FirstOrDefault();
+                }
+
+                var received = receivedCard != null;
+                var optionRows = pending.Options.Select(option =>
+                    new RelicCardRewardOptionAggregate
+                    {
+                        CardId = option.CardId,
+                        DisplayName = option.DisplayName,
+                        UpgradeLevel = option.UpgradeLevel,
+                        Taken = received
+                            && pending.SelectedCard != null
+                            && ReferenceEquals(option.Card, pending.SelectedCard),
+                    }).ToList();
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(LeadPaperweightRelicId);
+                RecordLeadPaperweightChoiceForTest(
+                    agg,
+                    pending.Floor,
+                    optionRows,
+                    receivedCard == null ? null : GetCardIdForStats(receivedCard),
+                    receivedCard == null ? null : GetCardDisplayNameForStats(receivedCard),
+                    pending.SelectionResolved && pending.SelectedCard == null);
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"CompleteLeadPaperweightChoice failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordLeadPaperweightChoiceForTest(
+        RelicAggregate agg,
+        int? floor,
+        IEnumerable<RelicCardRewardOptionAggregate>? options,
+        string? receivedCardId,
+        string? receivedDisplayName,
+        bool skipped)
+    {
+        if (agg == null) return;
+
+        RecordRelicFloorAcquiredForTest(agg, floor);
+        RecordRelicCardRewardScreenForTest(
+            agg,
+            new RelicCardRewardScreenAggregate
+            {
+                ScreenNumber = 1,
+                Floor = floor,
+                Resolved = true,
+                Cards = (options ?? Array.Empty<RelicCardRewardOptionAggregate>())
+                    .Where(card => card != null)
+                    .ToList(),
+            });
+
+        if (!string.IsNullOrWhiteSpace(receivedCardId))
+        {
+            AddRelicCardGranted(
+                agg.CardsGranted,
+                receivedCardId,
+                receivedDisplayName ?? "",
+                1);
+        }
+        else if (skipped)
+        {
+            agg.CardChoicesSkipped += 1;
+        }
+    }
+
     public static bool BeginArcaneScrollPickup(
         ArcaneScroll relic,
         out Player? player,
@@ -10689,6 +14065,93 @@ public static class RunTracker
     {
         if (agg == null || string.IsNullOrWhiteSpace(cardId)) return;
         AddRelicCardGranted(agg.CardsGranted, cardId, displayName ?? "", 1);
+    }
+
+    public static bool BeginScrollBoxesPickup(
+        ScrollBoxes relic,
+        out Player? player,
+        out IReadOnlyCollection<CardModel>? deckBeforePickup)
+    {
+        player = null;
+        deckBeforePickup = null;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic)) return false;
+                if (!IsTrackedPlayer(relic.Owner)) return false;
+
+                player = relic.Owner;
+                deckBeforePickup = SnapshotDeckCards(player);
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"BeginScrollBoxesPickup failed: {e.Message}");
+                player = null;
+                deckBeforePickup = null;
+                return false;
+            }
+        }
+    }
+
+    public static void CompleteScrollBoxesPickup(
+        Player? player,
+        IReadOnlyCollection<CardModel>? deckBeforePickup,
+        bool succeeded)
+    {
+        if (player == null || deckBeforePickup == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!succeeded || !IsTrackedPlayer(player)) return;
+
+                var before = deckBeforePickup as HashSet<CardModel>
+                    ?? new HashSet<CardModel>(
+                        deckBeforePickup,
+                        ReferenceEqualityComparer.Instance);
+                var cardsReceived = NewDeckCardsSince(player, before);
+                if (cardsReceived.Count == 0) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(ScrollBoxesRelicId);
+                RecordScrollBoxesBundleForTest(
+                    agg,
+                    cardsReceived.Select(card =>
+                        (card.Id.ToString(), GetCardDisplayName(card))));
+
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"CompleteScrollBoxesPickup failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordScrollBoxesBundleForTest(
+        RelicAggregate agg,
+        IEnumerable<(string CardId, string DisplayName)>? cardsReceived)
+    {
+        if (agg == null || cardsReceived == null) return;
+
+        var cards = cardsReceived
+            .Where(card => !string.IsNullOrWhiteSpace(card.CardId))
+            .ToList();
+        if (cards.Count == 0) return;
+
+        agg.Activations += 1;
+        foreach (var card in cards)
+        {
+            AddRelicCardGranted(
+                agg.CardsGranted,
+                card.CardId,
+                card.DisplayName,
+                1);
+        }
     }
 
     private static IReadOnlyCollection<CardModel> SnapshotDeckCards(Player player)
@@ -11089,6 +14552,10 @@ public static class RunTracker
                 var instanceId = GetOrAssignInstanceId(card);
                 var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
                 RecordBrightestFlameMaxHpLostForTest(agg, previousMaxHp, currentMaxHp);
+                AnnotateLatestMaxHpHistoryLocked(
+                    GetCardDisplayName(card),
+                    previousMaxHp,
+                    currentMaxHp);
             }
             catch (Exception e)
             {
@@ -11129,6 +14596,10 @@ public static class RunTracker
                 var instanceId = GetOrAssignInstanceId(card);
                 var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
                 RecordFeedMaxHpGainedForTest(agg, previousMaxHp, currentMaxHp);
+                AnnotateLatestMaxHpHistoryLocked(
+                    GetCardDisplayName(card),
+                    previousMaxHp,
+                    currentMaxHp);
             }
             catch (Exception e)
             {
@@ -11430,7 +14901,25 @@ public static class RunTracker
             MeatOnTheBoneRelicId,
             healedCreature,
             attemptedHealing,
-            nameof(RecordMeatOnTheBoneTrigger));
+            nameof(RecordMeatOnTheBoneTrigger),
+            configureAggregate: agg => RecordMeatOnTheBonePreTriggerHpForTest(
+                agg,
+                healedCreature.CurrentHp,
+                healedCreature.MaxHp));
+    }
+
+    internal static void RecordMeatOnTheBonePreTriggerHpForTest(
+        RelicAggregate agg,
+        decimal currentHp,
+        decimal maxHp)
+    {
+        if (agg == null || maxHp <= 0m) return;
+
+        agg.MeatOnTheBonePreTriggerHpRelativeToHalfTotal +=
+            currentHp - maxHp * 0.5m;
+        agg.MeatOnTheBonePreTriggerHpRelativeToHalfSamples++;
+        agg.MeatOnTheBonePreTriggerHpPercentTotal += 100m * currentHp / maxHp;
+        agg.MeatOnTheBonePreTriggerHpSamples++;
     }
 
     /// <summary>
@@ -11488,6 +14977,104 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Snapshot the actual number of potions held at combat setup for every
+    /// owned relic that increases potion capacity. Each relic receives its own
+    /// zero-inclusive sample so its average covers only its held combats.
+    /// </summary>
+    private static void RecordPotionSlotRelicCombatStartForTrackedPlayerLocked(
+        CombatState state)
+    {
+        if (_pendingCombat == null || state?.Players == null) return;
+
+        foreach (var player in state.Players)
+        {
+            if (!IsTrackedPlayer(player) || player?.Creature == null || player.Creature.IsDead)
+                continue;
+
+            var potionsHeld = player.Potions?.Count() ?? 0;
+            foreach (var relic in player.Relics)
+            {
+                if (!IsTrackedRelic(relic)) continue;
+
+                var relicId = relic switch
+                {
+                    PotionBelt => PotionBeltRelicId,
+                    AlchemicalCoffer => AlchemicalCofferRelicId,
+                    PhialHolster => PhialHolsterRelicId,
+                    _ => null,
+                };
+                if (relicId == null) continue;
+
+                RecordPotionSlotRelicCombatStartForTest(
+                    GetOrCreatePendingRelicAggregateLocked(relicId),
+                    potionsHeld);
+            }
+        }
+    }
+
+    internal static void RecordPotionSlotRelicCombatStartForTest(
+        RelicAggregate agg,
+        int potionsHeld)
+    {
+        agg.CombatStartPotionCountTotal += Math.Max(0, potionsHeld);
+        agg.CombatStartPotionCountSamples++;
+    }
+
+    /// <summary>
+    /// Snapshot Pumpkin Candle's live KindleCount at combat setup. Zero-charge
+    /// combats remain samples because they are part of the relic's held period
+    /// and contribute zero Ancient energy.
+    /// </summary>
+    private static void RecordPumpkinCandleCombatStartForTrackedPlayerLocked(
+        CombatState state)
+    {
+        if (_pendingCombat == null || state?.Players == null) return;
+
+        foreach (var player in state.Players)
+        {
+            if (!IsTrackedPlayer(player) || player?.Creature == null || player.Creature.IsDead)
+                continue;
+
+            var candle = player.Relics?.OfType<PumpkinCandle>().FirstOrDefault();
+            if (candle == null || !IsTrackedRelic(candle)) continue;
+
+            RecordPumpkinCandleCombatStartForTest(
+                GetOrCreatePendingRelicAggregateLocked(PumpkinCandleRelicId),
+                candle.KindleCount);
+        }
+    }
+
+    internal static void RecordPumpkinCandleCombatStartForTest(
+        RelicAggregate agg,
+        int charges)
+    {
+        if (agg == null) return;
+        agg.PumpkinCandleCombatStartChargeTotal += Math.Max(0, charges);
+        agg.PumpkinCandleCombatStartChargeSamples++;
+    }
+
+    /// <summary>
+    /// Arm one pending Potion Shaped Rock request for each tracked living
+    /// player who owns Petrified Toad at combat setup. The Toad is the only
+    /// game model that procures this potion type directly.
+    /// </summary>
+    private static void ArmPetrifiedToadPotionProcurementForTrackedPlayerLocked(
+        CombatState state)
+    {
+        if (_pendingCombat == null || state?.Players == null) return;
+
+        foreach (var player in state.Players)
+        {
+            if (!IsTrackedPlayer(player) || player?.Creature == null || player.Creature.IsDead)
+                continue;
+            if (player.Relics?.Any(relic => relic is PetrifiedToad) != true)
+                continue;
+
+            _pendingCombat.PendingPetrifiedToadPotionPlayers.Add(player);
+        }
+    }
+
+    /// <summary>
     /// Record Planisphere's ?-room heal and arm its observed healing window.
     /// This happens outside combat, so it normally writes directly to the
     /// committed run aggregate.
@@ -11533,7 +15120,8 @@ public static class RunTracker
             attemptedHealing,
             nameof(RecordEternalFeatherTrigger),
             forceDirectRunPersistence: true,
-            allowZeroAttempt: true);
+            allowZeroAttempt: true,
+            recordEternalFeatherActivation: true);
     }
 
     /// <summary>
@@ -11640,6 +15228,10 @@ public static class RunTracker
                 RecordPrecariousShearsPickupForTest(
                     agg,
                     pending.CardsRemoved,
+                    pending.StartingMaxHp,
+                    resultingMaxHp);
+                AnnotateLatestMaxHpHistoryLocked(
+                    "Precarious Shears",
                     pending.StartingMaxHp,
                     resultingMaxHp);
                 SaveCurrentRun();
@@ -11754,8 +15346,8 @@ public static class RunTracker
     }
 
     /// <summary>
-    /// Arm Yummy Cookie pickup attribution. Actual upgraded cards are observed
-    /// from <see cref="RecordUpgrade"/> while the pickup task resolves.
+    /// Arm Yummy Cookie pickup attribution. Exact permanent-deck upgrades are
+    /// observed from <see cref="RecordUpgrade"/> while the pickup task resolves.
     /// </summary>
     public static bool BeginYummyCookiePickup(RelicModel relic, out Player? player)
     {
@@ -11872,7 +15464,13 @@ public static class RunTracker
                 if (!IsTrackedPlayer(relic.Owner)) return false;
 
                 player = relic.Owner;
-                _pendingFragrantMushroomPickups[player] = new PendingFragrantMushroomPickup();
+                var creature = player.Creature;
+                if (creature == null) return false;
+
+                _pendingFragrantMushroomPickups[player] = new PendingFragrantMushroomPickup
+                {
+                    StartingHp = Math.Max(0m, creature.CurrentHp),
+                };
                 return true;
             }
             catch (Exception e)
@@ -11896,7 +15494,11 @@ public static class RunTracker
                 if (!succeeded) return;
 
                 var agg = GetOrCreateCurrentRunRelicAggregateLocked(FragrantMushroomRelicId);
-                RecordFragrantMushroomUpgradesForTest(agg, pending.UpgradedCards);
+                RecordFragrantMushroomPickupForTest(
+                    agg,
+                    pending.UpgradedCards,
+                    pending.StartingHp,
+                    player.Creature?.CurrentHp ?? pending.StartingHp);
                 SaveCurrentRun();
             }
             catch (Exception e)
@@ -11928,7 +15530,14 @@ public static class RunTracker
                 if (!IsTrackedPlayer(relic.Owner)) return false;
 
                 player = relic.Owner;
-                _pendingFishingRodUpgrades[player] = new PendingFishingRodUpgrade();
+                _pendingFishingRodUpgrades[player] = new PendingFishingRodUpgrade
+                {
+                    FloorAcquired = RelicFloorAddedToDeck(relic) ?? CurrentRunFloorLocked(),
+                    Floor = room.CombatState?.RunState?.TotalFloor
+                        ?? CurrentRunFloorLocked()
+                        ?? 0,
+                    IsFirstCombatSinceAcquisition = relic.CombatsSeen == 0,
+                };
                 return true;
             }
             catch (Exception e)
@@ -11949,10 +15558,24 @@ public static class RunTracker
             try
             {
                 if (!_pendingFishingRodUpgrades.Remove(player, out var pending)) return;
-                if (!succeeded || pending.UpgradedCards.Count == 0) return;
+                if (!succeeded) return;
 
                 var agg = GetOrCreateCurrentRunRelicAggregateLocked(FishingRodRelicId);
-                RecordFishingRodUpgradesForTest(agg, pending.UpgradedCards);
+                RecordRelicFloorAcquiredForTest(agg, pending.FloorAcquired);
+                RecordFishingRodCombatFloorForTest(
+                    agg,
+                    pending.Floor,
+                    pending.IsFirstCombatSinceAcquisition);
+
+                if (pending.UpgradedCards.Count > 0)
+                {
+                    RecordFishingRodUpgradeFloorForTest(
+                        agg,
+                        pending.Floor,
+                        includeAcquisitionInterval: agg.CardsUpgraded <= 0);
+                    RecordFishingRodUpgradesForTest(agg, pending.UpgradedCards);
+                }
+
                 SaveCurrentRun();
             }
             catch (Exception e)
@@ -12043,6 +15666,199 @@ public static class RunTracker
         }
     }
 
+    public static void RecordSwordOfStoneObtained(RelicModel relic, Player player)
+    {
+        if (relic is not SwordOfStone || player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ReferenceEquals(relic.Owner, player)
+                    || !IsTrackedRelic(relic)
+                    || !IsTrackedPlayer(player))
+                {
+                    return;
+                }
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(SwordOfStoneRelicId);
+                RecordRelicFloorAcquiredForTest(
+                    agg,
+                    RelicFloorAddedToDeck(relic) ?? CurrentRunFloorLocked());
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordSwordOfStoneObtained failed: {e.Message}");
+            }
+        }
+    }
+
+    public static bool BeginSwordOfStoneEliteVictory(
+        SwordOfStone relic,
+        CombatRoom room,
+        out int? floorAcquired,
+        out int floor,
+        out string encounterId,
+        out string displayName)
+    {
+        floorAcquired = null;
+        floor = 0;
+        encounterId = "";
+        displayName = "";
+        if (relic?.Owner == null || room == null || room.RoomType != RoomType.Elite)
+            return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(relic.Owner))
+                    return false;
+
+                _pendingCombat ??= new PendingCombat();
+                floorAcquired = RelicFloorAddedToDeck(relic) ?? CurrentRunFloorLocked();
+                floor = room.CombatState?.RunState?.TotalFloor
+                    ?? CurrentRunFloorLocked()
+                    ?? 0;
+                encounterId = room.Encounter?.Id.ToString() ?? room.ModelId.ToString();
+                try
+                {
+                    displayName = room.Encounter?.Title.GetFormattedText() ?? "";
+                }
+                catch
+                {
+                    displayName = "";
+                }
+
+                if (string.IsNullOrWhiteSpace(displayName))
+                    displayName = encounterId;
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"BeginSwordOfStoneEliteVictory failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    public static void CompleteSwordOfStoneEliteVictory(
+        int? floorAcquired,
+        int floor,
+        string encounterId,
+        string displayName,
+        bool succeeded)
+    {
+        if (!succeeded) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreatePendingRelicAggregateLocked(SwordOfStoneRelicId);
+                RecordRelicFloorAcquiredForTest(agg, floorAcquired);
+                RecordSwordOfStoneEliteSlainForTest(
+                    agg,
+                    floor,
+                    encounterId,
+                    displayName);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"CompleteSwordOfStoneEliteVictory failed: {e.Message}");
+            }
+        }
+    }
+
+    public static bool BeginSwordOfJadeStrengthGain(
+        SwordOfJade relic,
+        AbstractRoom room,
+        out Creature? ownerCreature,
+        out decimal strengthBefore)
+    {
+        ownerCreature = null;
+        strengthBefore = 0m;
+        if (relic?.Owner?.Creature == null || room is not CombatRoom) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(relic.Owner))
+                    return false;
+
+                _pendingCombat ??= new PendingCombat();
+                ownerCreature = relic.Owner.Creature;
+                strengthBefore = CurrentStrength(ownerCreature);
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"BeginSwordOfJadeStrengthGain failed: {e.Message}");
+                ownerCreature = null;
+                strengthBefore = 0m;
+                return false;
+            }
+        }
+    }
+
+    public static void CompleteSwordOfJadeStrengthGain(
+        Creature? ownerCreature,
+        decimal strengthBefore,
+        bool succeeded)
+    {
+        if (!succeeded || ownerCreature?.Player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(ownerCreature.Player)) return;
+
+                var strengthGained = Math.Max(
+                    0m,
+                    CurrentStrength(ownerCreature) - strengthBefore);
+                if (strengthGained <= 0m) return;
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(SwordOfStoneRelicId);
+                RecordSwordOfJadeStrengthGainForTest(agg, strengthGained);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"CompleteSwordOfJadeStrengthGain failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordSwordOfStoneEliteSlainForTest(
+        RelicAggregate agg,
+        int floor,
+        string? encounterId,
+        string? displayName)
+    {
+        if (agg == null || floor <= 0) return;
+
+        agg.SwordInTheStoneElitesSlain ??= new List<SwordInTheStoneEliteSlainAggregate>();
+        agg.SwordInTheStoneElitesSlain.Add(new SwordInTheStoneEliteSlainAggregate
+        {
+            Floor = floor,
+            EncounterId = encounterId ?? "",
+            DisplayName = string.IsNullOrWhiteSpace(displayName)
+                ? encounterId ?? "Unknown Elite"
+                : displayName,
+        });
+    }
+
+    internal static void RecordSwordOfJadeStrengthGainForTest(
+        RelicAggregate agg,
+        decimal strengthGained)
+    {
+        if (agg == null || strengthGained <= 0m) return;
+        agg.Activations += 1;
+        agg.StrengthAdded += strengthGained;
+    }
+
     /// <summary>
     /// Record Lee's Waffle's observed pickup HP gain. The relic first grants
     /// max HP, which itself heals, then heals to full; the full pickup delta is
@@ -12059,6 +15875,7 @@ public static class RunTracker
             {
                 var agg = GetOrCreateCurrentRunRelicAggregateLocked(LeesWaffleRelicId);
                 RecordLeesWafflePickupHpGainedForTest(agg, hpGained, originalMaxHp, newMaxHp);
+                AnnotateLatestMaxHpHistoryLocked("Lee's Waffle", originalMaxHp, newMaxHp);
                 SaveCurrentRun();
             }
             catch (Exception e)
@@ -12104,6 +15921,7 @@ public static class RunTracker
                 if (!IsTrackedPlayer(creature.Player)) return;
                 var agg = GetOrCreateCurrentRunRelicAggregateLocked(StrawberryRelicId);
                 RecordStrawberryMaxHpGainedForTest(agg, maxHpGained, originalMaxHp, newMaxHp);
+                AnnotateLatestMaxHpHistoryLocked("Strawberry", originalMaxHp, newMaxHp);
                 SaveCurrentRun();
             }
             catch (Exception e)
@@ -12132,6 +15950,7 @@ public static class RunTracker
                 if (!IsTrackedPlayer(creature.Player)) return;
                 var agg = GetOrCreateCurrentRunRelicAggregateLocked(PearRelicId);
                 RecordPearMaxHpGainedForTest(agg, maxHpGained, originalMaxHp, newMaxHp);
+                AnnotateLatestMaxHpHistoryLocked("Pear", originalMaxHp, newMaxHp);
                 SaveCurrentRun();
             }
             catch (Exception e)
@@ -12160,6 +15979,7 @@ public static class RunTracker
                 if (!IsTrackedPlayer(creature.Player)) return;
                 var agg = GetOrCreateCurrentRunRelicAggregateLocked(MangoRelicId);
                 RecordMangoMaxHpGainedForTest(agg, maxHpGained, originalMaxHp, newMaxHp);
+                AnnotateLatestMaxHpHistoryLocked("Mango", originalMaxHp, newMaxHp);
                 SaveCurrentRun();
             }
             catch (Exception e)
@@ -12192,6 +16012,7 @@ public static class RunTracker
                     maxHpGained,
                     originalMaxHp,
                     newMaxHp);
+                AnnotateLatestMaxHpHistoryLocked("Mango???", originalMaxHp, newMaxHp);
                 SaveCurrentRun();
             }
             catch (Exception e)
@@ -12220,6 +16041,10 @@ public static class RunTracker
                 if (!IsTrackedPlayer(creature.Player)) return;
                 var agg = GetOrCreateCurrentRunRelicAggregateLocked(NutritiousOysterRelicId);
                 RecordNutritiousOysterMaxHpGainedForTest(agg, maxHpGained, originalMaxHp, newMaxHp);
+                AnnotateLatestMaxHpHistoryLocked(
+                    "Nutritious Oyster",
+                    originalMaxHp,
+                    newMaxHp);
                 SaveCurrentRun();
             }
             catch (Exception e)
@@ -12250,6 +16075,10 @@ public static class RunTracker
 
                 var agg = GetOrCreateCurrentRunRelicAggregateLocked(StoneHumidifierRelicId);
                 RecordStoneHumidifierMaxHpGainForTest(agg, startingMaxHp, resultingMaxHp);
+                AnnotateLatestMaxHpHistoryLocked(
+                    "Stone Humidifier",
+                    startingMaxHp,
+                    resultingMaxHp);
                 SaveCurrentRun();
             }
             catch (Exception e)
@@ -12329,6 +16158,9 @@ public static class RunTracker
                 bool persistDirectlyToRun = _pendingCombat == null;
                 var agg = GetOrCreateRelicAggregateForCurrentContextLocked(ChosenCheeseRelicId);
                 RecordChosenCheeseMaxHpGainedForTest(agg, maxHpGained);
+                AnnotateLatestMaxHpHistoryLocked(
+                    "Chosen Cheese",
+                    delta: maxHpGained);
                 if (persistDirectlyToRun)
                     SaveCurrentRun();
             }
@@ -12355,6 +16187,10 @@ public static class RunTracker
             {
                 var agg = GetOrCreateCurrentRunRelicAggregateLocked(DarkstonePeriaptRelicId);
                 RecordDarkstonePeriaptCurseAcquiredForTest(agg, maxHpGained, originalMaxHp, newMaxHp);
+                AnnotateLatestMaxHpHistoryLocked(
+                    "Darkstone Periapt",
+                    originalMaxHp,
+                    newMaxHp);
                 SaveCurrentRun();
             }
             catch (Exception e)
@@ -12693,6 +16529,179 @@ public static class RunTracker
         }
     }
 
+    internal static GoldObservationContext CaptureGoldObservationContext(Player? player)
+    {
+        try
+        {
+            var runState = player?.RunState ?? RunManager.Instance?.State;
+            var room = runState?.BaseRoom ?? RunManager.Instance?.State?.CurrentRoom;
+            return new GoldObservationContext(
+                room?.RoomType,
+                Math.Max(0, runState?.TotalFloor ?? CurrentRunFloorLocked() ?? 0));
+        }
+        catch
+        {
+            return new GoldObservationContext(
+                null,
+                Math.Max(0, CurrentRunFloorLocked() ?? 0));
+        }
+    }
+
+    /// <summary>
+    /// Records the actual positive balance delta after the central gold-gain
+    /// command completes. The call-site room is captured before awaiting so a
+    /// later screen or room transition cannot reclassify the gain.
+    /// </summary>
+    internal static void RecordRunGoldGain(
+        Player player,
+        int initialGold,
+        int currentGold,
+        GoldObservationContext context)
+    {
+        var gained = Math.Max(0, currentGold - initialGold);
+        if (player == null || gained <= 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                if (_currentRun == null && RunManager.Instance?.IsInProgress != true)
+                    return;
+
+                EnsureLazyCurrentRunLocked();
+                var isCombat = IsCombatRoomType(context.RoomType);
+                if (isCombat && _pendingCombat == null
+                    && CombatManager.Instance?.IsInProgress == true)
+                {
+                    _pendingCombat = new PendingCombat
+                    {
+                        GoldStats = { Combats = 1 },
+                    };
+                }
+
+                var stats = isCombat && _pendingCombat != null
+                    ? _pendingCombat.GoldStats
+                    : _currentRun.GoldStats ??= new RunGoldStats();
+                RecordGoldGainForTest(stats, gained, context.RoomType);
+                var mapCategory = GetMapLegendCategoryForContextLocked(
+                    isCombat && _pendingCombat != null,
+                    context.RoomType);
+                if (mapCategory != null)
+                    mapCategory.GoldGained += gained;
+
+                RecordGoldRoomVisitForTest(stats, context.RoomType, context.Floor);
+                _currentRun.UpdatedAt = Now();
+                RefreshCurrentRunMetadataLocked();
+                if (!ReferenceEquals(stats, _pendingCombat?.GoldStats))
+                    SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordRunGoldGain failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Counts resolved Event and Merchant rooms once per floor. The persisted
+    /// last-floor markers keep Continue and Core reload callbacks idempotent.
+    /// </summary>
+    public static void RecordRunGoldRoomEntered(IRunState runState, AbstractRoom room)
+    {
+        if (runState == null
+            || room == null
+            || room.RoomType is not (RoomType.Event or RoomType.Shop))
+        {
+            return;
+        }
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_currentRun == null && RunManager.Instance?.IsInProgress != true)
+                    return;
+
+                EnsureLazyCurrentRunLocked();
+                _currentRun.GoldStats ??= new RunGoldStats();
+                if (!RecordGoldRoomVisitForTest(
+                        _currentRun.GoldStats,
+                        room.RoomType,
+                        Math.Max(0, runState.TotalFloor)))
+                {
+                    return;
+                }
+
+                _currentRun.UpdatedAt = Now();
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordRunGoldRoomEntered failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static bool RecordGoldRoomVisitForTest(
+        RunGoldStats stats,
+        RoomType? roomType,
+        int floor)
+    {
+        if (stats == null) return false;
+        floor = Math.Max(0, floor);
+
+        if (roomType == RoomType.Shop)
+        {
+            if (stats.LastShopFloorCounted == floor) return false;
+            stats.LastShopFloorCounted = floor;
+            stats.ShopsVisited++;
+            return true;
+        }
+
+        if (roomType == RoomType.Event)
+        {
+            if (stats.LastEventFloorCounted == floor) return false;
+            stats.LastEventFloorCounted = floor;
+            stats.EventsVisited++;
+            return true;
+        }
+
+        return false;
+    }
+
+    internal static void RecordGoldGainForTest(
+        RunGoldStats stats,
+        int gained,
+        RoomType? roomType)
+    {
+        if (stats == null || gained <= 0) return;
+
+        stats.GoldAcquired += gained;
+        if (IsCombatRoomType(roomType))
+            stats.GoldGainedInCombats += gained;
+        else if (roomType == RoomType.Event)
+            stats.GoldGainedInEvents += gained;
+    }
+
+    internal static void RecordGoldSpentForTest(
+        RunGoldStats stats,
+        int spent,
+        RoomType? roomType)
+    {
+        if (stats == null || spent <= 0) return;
+
+        stats.GoldSpent += spent;
+        if (roomType == RoomType.Shop)
+            stats.GoldSpentInShops += spent;
+        else if (roomType == RoomType.Event)
+            stats.GoldSpentInEvents += spent;
+    }
+
+    private static bool IsCombatRoomType(RoomType? roomType)
+        => roomType is RoomType.Monster or RoomType.Elite or RoomType.Boss;
+
     /// <summary>
     /// Starts Old Coin's FIFO attribution from its observed completed pickup
     /// effect. Gold already held by the owner is placed before the relic's
@@ -12756,9 +16765,40 @@ public static class RunTracker
             {
                 if (!IsTrackedPlayer(player)) return;
 
-                var inCombat = CombatManager.Instance?.IsInProgress == true;
+                var context = CaptureGoldObservationContext(player);
+                var inCombat = IsCombatRoomType(context.RoomType)
+                    && (_pendingCombat != null
+                        || CombatManager.Instance?.IsInProgress == true);
                 var countsAsSpent = goldLossType == GoldLossType.Spent;
                 var changed = false;
+
+                if (countsAsSpent)
+                {
+                    EnsureLazyCurrentRunLocked();
+                    if (inCombat && _pendingCombat == null)
+                    {
+                        _pendingCombat = new PendingCombat
+                        {
+                            GoldStats = { Combats = 1 },
+                        };
+                    }
+
+                    var goldStats = inCombat
+                        ? _pendingCombat!.GoldStats
+                        : _currentRun.GoldStats ??= new RunGoldStats();
+                    var spent = Math.Max(0, initialGold - currentGold);
+                    RecordGoldSpentForTest(goldStats, spent, context.RoomType);
+                    var mapCategory = GetMapLegendCategoryForContextLocked(
+                        inCombat,
+                        context.RoomType);
+                    if (mapCategory != null)
+                        mapCategory.GoldSpent += spent;
+                    RecordGoldRoomVisitForTest(
+                        goldStats,
+                        context.RoomType,
+                        context.Floor);
+                    changed = true;
+                }
 
                 var mawBank = player.GetRelic<MawBank>();
                 if (mawBank != null && IsTrackedRelic(mawBank))
@@ -12803,7 +16843,11 @@ public static class RunTracker
                 }
 
                 if (!inCombat && changed)
+                {
+                    _currentRun!.UpdatedAt = Now();
+                    RefreshCurrentRunMetadataLocked();
                     SaveCurrentRun();
+                }
             }
             catch (Exception e)
             {
@@ -13149,6 +17193,10 @@ public static class RunTracker
 
                 var agg = GetOrCreateCurrentRunRelicAggregateLocked(LeafyPoulticeRelicId);
                 RecordLeafyPoulticeMaxHpChangedForTest(agg, originalMaxHp, newMaxHp);
+                AnnotateLatestMaxHpHistoryLocked(
+                    "Leafy Poultice",
+                    originalMaxHp,
+                    newMaxHp);
                 SaveCurrentRun();
             }
             catch (Exception e)
@@ -13259,6 +17307,10 @@ public static class RunTracker
             {
                 var agg = GetOrCreateCurrentRunRelicAggregateLocked(LeafyPoulticeRelicId);
                 RecordLeafyPoulticeMaxHpChangedForTest(agg, originalMaxHp, newMaxHp);
+                AnnotateLatestMaxHpHistoryLocked(
+                    "Leafy Poultice",
+                    originalMaxHp,
+                    newMaxHp);
                 SaveCurrentRun();
             }
             catch (Exception e)
@@ -13783,10 +17835,67 @@ public static class RunTracker
         IEnumerable<string>? upgradedCards)
         => RecordRelicUpgradedCards(agg, upgradedCards);
 
+    internal static void RecordFragrantMushroomPickupForTest(
+        RelicAggregate agg,
+        IEnumerable<string>? upgradedCards,
+        decimal startingHp,
+        decimal resultingHp)
+    {
+        if (agg == null) return;
+
+        RecordRelicUpgradedCards(agg, upgradedCards);
+        agg.StartingHp ??= Math.Max(0m, startingHp);
+        agg.ResultingHp = Math.Max(0m, resultingHp);
+    }
+
     internal static void RecordFishingRodUpgradesForTest(
         RelicAggregate agg,
         IEnumerable<string>? upgradedCards)
         => RecordRelicUpgradedCards(agg, upgradedCards);
+
+    internal static void RecordFishingRodCombatFloorForTest(
+        RelicAggregate agg,
+        int floor,
+        bool includeAcquisitionInterval)
+    {
+        if (agg == null || floor <= 0) return;
+        if (agg.FishingRodLastCombatFloor == floor) return;
+
+        var previousFloor = agg.FishingRodLastCombatFloor;
+        if (!previousFloor.HasValue && includeAcquisitionInterval)
+            previousFloor = agg.FloorAcquired;
+
+        if (previousFloor.HasValue && previousFloor.Value > 0)
+        {
+            agg.FishingRodCombatFloorDistances ??= new List<int>();
+            agg.FishingRodCombatFloorDistances.Add(
+                Math.Max(0, floor - previousFloor.Value));
+        }
+
+        agg.FishingRodLastCombatFloor = floor;
+    }
+
+    internal static void RecordFishingRodUpgradeFloorForTest(
+        RelicAggregate agg,
+        int floor,
+        bool includeAcquisitionInterval)
+    {
+        if (agg == null || floor <= 0) return;
+        if (agg.FishingRodLastUpgradeFloor == floor) return;
+
+        var previousFloor = agg.FishingRodLastUpgradeFloor;
+        if (!previousFloor.HasValue && includeAcquisitionInterval)
+            previousFloor = agg.FloorAcquired;
+
+        if (previousFloor.HasValue && previousFloor.Value > 0)
+        {
+            agg.FishingRodUpgradeFloorDistances ??= new List<int>();
+            agg.FishingRodUpgradeFloorDistances.Add(
+                Math.Max(0, floor - previousFloor.Value));
+        }
+
+        agg.FishingRodLastUpgradeFloor = floor;
+    }
 
     internal static void RecordWarHammerActivationForTest(
         RelicAggregate agg,
@@ -14593,6 +18702,7 @@ public static class RunTracker
     {
         if (agg == null) return;
         agg.Activations += 1;
+        RecordThreeAttackScalingRateActivationForTest(agg);
         agg.KunaiDexterityGained += Math.Max(0, dexterityGained);
     }
 
@@ -14793,7 +18903,14 @@ public static class RunTracker
         {
             try
             {
-                return ConsumePendingCreatureAttribution(_pendingOrnamentalFanBlockAttributions, creature);
+                if (!ConsumePendingCreatureAttribution(_pendingOrnamentalFanBlockAttributions, creature))
+                    return false;
+
+                // Ornamental Fan invokes GainBlock with a null CardPlay. Carry
+                // its ownership into the resulting history entry so the shared
+                // block ledger credits the relic rather than the triggering Attack.
+                _pendingOrnamentalFanBlockHistoryAttributions.Add(creature);
+                return true;
             }
             catch (Exception e)
             {
@@ -14807,7 +18924,10 @@ public static class RunTracker
     {
         if (creature == null) return;
         lock (_lock)
+        {
             ConsumePendingCreatureAttribution(_pendingOrnamentalFanBlockAttributions, creature);
+            ConsumePendingCreatureAttribution(_pendingOrnamentalFanBlockHistoryAttributions, creature);
+        }
     }
 
     public static void RecordOrnamentalFanBlockGained(decimal amount)
@@ -14841,7 +18961,40 @@ public static class RunTracker
     internal static void RecordOrnamentalFanBlockGainedForTest(RelicAggregate agg, decimal amount)
     {
         if (agg == null || amount <= 0m) return;
-        agg.AdditionalBlockGained += (int)amount;
+        var gained = (int)amount;
+        agg.AdditionalBlockGained += gained;
+        agg.OrnamentalFanRateBlockGained += gained;
+    }
+
+    public static void RecordOrnamentalFanTurnStarted(Player player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                _pendingCombat ??= new PendingCombat();
+                RecordOrnamentalFanTurnForPlayerLocked(player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordOrnamentalFanTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordOrnamentalFanCombatForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.OrnamentalFanCombats += Math.Max(0, count);
+    }
+
+    internal static void RecordOrnamentalFanTurnForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.OrnamentalFanTurns += Math.Max(0, count);
     }
 
     internal static void RecordOrnamentalFanTurnEndChargeForTest(RelicAggregate agg, int charge)
@@ -14930,6 +19083,7 @@ public static class RunTracker
     {
         if (agg == null) return;
         agg.Activations += 1;
+        RecordThreeAttackScalingRateActivationForTest(agg);
         agg.StrengthAdded += Math.Max(0m, strengthGained);
     }
 
@@ -15008,6 +19162,48 @@ public static class RunTracker
         RecordOrnamentalFanTurnEndChargeForTest(agg, OrnamentalFanCharge(relic));
     }
 
+    private static void RecordOrnamentalFanCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null || !TryGetOrnamentalFan(player, out _)) return;
+        if (!_pendingCombat.OrnamentalFanCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(OrnamentalFanRelicId);
+        RecordOrnamentalFanCombatForTest(agg);
+    }
+
+    private static void RecordOrnamentalFanTurnForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordOrnamentalFanTurnForPlayerLocked(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordOrnamentalFanTurnForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordOrnamentalFanTurnForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null || !TryGetOrnamentalFan(player, out _)) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.OrnamentalFanTurnCountedTurns.TryGetValue(player, out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.OrnamentalFanTurnCountedTurns[player] = turnNumber;
+        RecordOrnamentalFanCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(OrnamentalFanRelicId);
+        RecordOrnamentalFanTurnForTest(agg);
+    }
+
     private static void RecordShurikenTurnEndChargeForPlayerLocked(Player player, int turnNumber)
     {
         if (_pendingCombat == null || !TryGetShuriken(player, out var relic) || relic == null) return;
@@ -15020,6 +19216,144 @@ public static class RunTracker
         _pendingCombat.ShurikenTurnEndChargeRecordedTurns[player] = turnNumber;
         var agg = GetOrCreatePendingRelicAggregateLocked(ShurikenRelicId);
         RecordShurikenTurnEndChargeForTest(agg, ShurikenCharge(relic));
+    }
+
+    /// <summary>
+    /// Count the shared zero-inclusive rate window for Kunai and Shuriken.
+    /// Both relics deliberately use the same persisted fields and lifecycle
+    /// helpers so their activation averages cannot drift independently.
+    /// </summary>
+    public static void RecordThreeAttackScalingRelicsTurnStarted(Player player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                _pendingCombat ??= new PendingCombat();
+                RecordThreeAttackScalingRelicsTurnForPlayerLocked(player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordThreeAttackScalingRelicsTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordThreeAttackScalingRateActivationForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.ThreeAttackScalingRateActivations += Math.Max(0, count);
+    }
+
+    internal static void RecordThreeAttackScalingTurnForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.ThreeAttackScalingTurns += Math.Max(0, count);
+    }
+
+    internal static void RecordThreeAttackScalingCombatForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.ThreeAttackScalingCombats += Math.Max(0, count);
+    }
+
+    private static void RecordThreeAttackScalingRelicsTurnForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordThreeAttackScalingRelicsTurnForPlayerLocked(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug(
+                $"RecordThreeAttackScalingRelicsTurnForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordThreeAttackScalingRelicsTurnForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+
+        if (TryGetKunai(player, out _))
+        {
+            RecordThreeAttackScalingRelicTurnLocked(
+                player,
+                turnNumber,
+                KunaiRelicId,
+                _pendingCombat.KunaiRateTurnCountedTurns);
+        }
+
+        if (TryGetShuriken(player, out _))
+        {
+            RecordThreeAttackScalingRelicTurnLocked(
+                player,
+                turnNumber,
+                ShurikenRelicId,
+                _pendingCombat.ShurikenRateTurnCountedTurns);
+        }
+    }
+
+    private static void RecordThreeAttackScalingRelicTurnLocked(
+        Player player,
+        int turnNumber,
+        string relicId,
+        Dictionary<Player, int> countedTurns)
+    {
+        if (countedTurns.TryGetValue(player, out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        countedTurns[player] = turnNumber;
+        var agg = GetOrCreatePendingRelicAggregateLocked(relicId);
+        RecordThreeAttackScalingTurnForTest(agg);
+    }
+
+    private static void RecordThreeAttackScalingRelicsCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+
+        if (TryGetKunai(player, out _))
+        {
+            RecordThreeAttackScalingRelicCombatLocked(
+                player,
+                KunaiRelicId,
+                _pendingCombat.KunaiRateCombatCountedPlayers);
+        }
+
+        if (TryGetShuriken(player, out _))
+        {
+            RecordThreeAttackScalingRelicCombatLocked(
+                player,
+                ShurikenRelicId,
+                _pendingCombat.ShurikenRateCombatCountedPlayers);
+        }
+    }
+
+    private static void RecordThreeAttackScalingRelicCombatLocked(
+        Player player,
+        string relicId,
+        HashSet<Player> countedPlayers)
+    {
+        if (!countedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(relicId);
+        RecordThreeAttackScalingCombatForTest(agg);
     }
 
     public static void RecordPaperPhrogVulnerableBonus(
@@ -15115,6 +19449,241 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordRegaliteTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static PendingMusicBoxCreationWindow? ArmMusicBoxCreationAttribution(
+        MusicBox? relic,
+        CardPlay? cardPlay)
+    {
+        if (relic?.Owner == null || cardPlay?.Card == null) return null;
+
+        lock (_lock)
+        {
+            try
+            {
+                var player = relic.Owner;
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(player)) return null;
+                if (CombatManager.Instance?.IsInProgress != true) return null;
+                if (!ReferenceEquals(cardPlay.Card.Owner, player)) return null;
+                if (cardPlay.Card.Type != CardType.Attack) return null;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordMusicBoxCombatForPlayerLocked(player);
+                RecordMusicBoxTurnForPlayerLocked(player);
+
+                var window = new PendingMusicBoxCreationWindow
+                {
+                    Player = player,
+                    SourceCardId = cardPlay.Card.Id.ToString(),
+                    RemainingAttempts = 1,
+                };
+                _pendingCombat.PendingMusicBoxCreationWindows[player] = window;
+                return window;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"ArmMusicBoxCreationAttribution failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+    internal static PendingMusicBoxCreationWindow? CaptureMusicBoxCreationAttempt(
+        CardModel? card,
+        Player? creator)
+    {
+        if (card == null || creator == null) return null;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null) return null;
+                if (!_pendingCombat.PendingMusicBoxCreationWindows.TryGetValue(
+                        creator,
+                        out var window))
+                {
+                    return null;
+                }
+
+                if (window.RemainingAttempts <= 0) return null;
+                if (card.Type != CardType.Attack) return null;
+                if (!string.Equals(
+                        card.Id.ToString(),
+                        window.SourceCardId,
+                        StringComparison.Ordinal))
+                {
+                    return null;
+                }
+
+                window.RemainingAttempts--;
+                return window;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"CaptureMusicBoxCreationAttempt failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+    internal static void RecordMusicBoxCreationResult(
+        PendingMusicBoxCreationWindow? window,
+        CardPileAddResult result)
+    {
+        if (window == null || !result.success || result.cardAdded == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null || !IsTrackedPlayer(window.Player)) return;
+                if (!_pendingCombat.PendingMusicBoxCreationWindows.TryGetValue(
+                        window.Player,
+                        out var activeWindow)
+                    || !ReferenceEquals(activeWindow, window))
+                {
+                    return;
+                }
+
+                if (!ReferenceEquals(result.cardAdded.Owner, window.Player)) return;
+                if (result.cardAdded.Type != CardType.Attack) return;
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(MusicBoxRelicId);
+                RecordMusicBoxAttackCreatedForTest(
+                    agg,
+                    success: true,
+                    result.cardAdded.Rarity);
+                _pendingCombat.MusicBoxGeneratedAttacks.Add(result.cardAdded);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordMusicBoxCreationResult failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void DisarmMusicBoxCreationAttribution(
+        PendingMusicBoxCreationWindow? window)
+    {
+        if (window == null) return;
+
+        lock (_lock)
+        {
+            if (_pendingCombat == null) return;
+            if (_pendingCombat.PendingMusicBoxCreationWindows.TryGetValue(
+                    window.Player,
+                    out var activeWindow)
+                && ReferenceEquals(activeWindow, window))
+            {
+                _pendingCombat.PendingMusicBoxCreationWindows.Remove(window.Player);
+            }
+        }
+    }
+
+    public static void RecordMusicBoxEtherealExhaust(
+        CardModel? card,
+        bool causedByEthereal)
+    {
+        if (card == null || !causedByEthereal) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null) return;
+                if (!_pendingCombat.MusicBoxGeneratedAttacks.Remove(card)) return;
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(MusicBoxRelicId);
+                RecordMusicBoxEtherealExhaustForTest(agg);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordMusicBoxEtherealExhaust failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void RecordMusicBoxTurnStarted(Player player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                _pendingCombat ??= new PendingCombat();
+                RecordMusicBoxTurnForPlayerLocked(player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordMusicBoxTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Count Crossbow's owner-turn opportunity and open its exact generation
+    /// scope only when the relic's owner belongs to the side that just began.
+    /// </summary>
+    internal static bool RecordCrossbowTurnStarted(
+        Crossbow? relic,
+        IReadOnlyList<Creature>? participants)
+    {
+        if (relic?.Owner?.Creature == null || participants == null) return false;
+        if (!participants.Contains(relic.Owner.Creature)) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                var player = relic.Owner;
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(player)) return false;
+                if (CombatManager.Instance?.IsInProgress != true) return false;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordCrossbowTurnForPlayerLocked(player);
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordCrossbowTurnStarted failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record a Crossbow Attack only after the generated-card command confirms
+    /// that the exact card entered combat.
+    /// </summary>
+    internal static void RecordCrossbowAttackGained(
+        Player? player,
+        CardModel? attack,
+        decimal observedDiscount)
+    {
+        if (player == null || attack == null || attack.Type != CardType.Attack) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null || !IsTrackedPlayer(player)) return;
+                if (!ReferenceEquals(attack.Owner, player)) return;
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(CrossbowRelicId);
+                RecordCrossbowAttackGainedForTest(
+                    agg,
+                    success: true,
+                    attack.Rarity,
+                    observedDiscount);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordCrossbowAttackGained failed: {e.Message}");
             }
         }
     }
@@ -15431,6 +20000,17 @@ public static class RunTracker
     /// modifier still exposes both the requested and doubled amounts.
     /// Completion is deferred until the game confirms the power application.
     /// </summary>
+    internal static bool IsRuinedHelmetStrengthTrackingWindow(
+        bool hasPendingCombat,
+        bool combatIsInProgress)
+    {
+        // Room-entry relics such as Red Skull apply Strength after CombatSetUp
+        // creates the pending buffer but before the turn loop marks combat as
+        // in progress. Keep the old active-combat fallback for unusual flows
+        // where CombatSetUp was not observed.
+        return hasPendingCombat || combatIsInProgress;
+    }
+
     public static void StageRuinedHelmetStrengthGain(
         RuinedHelmet relic,
         PowerModel canonicalPower,
@@ -15449,7 +20029,12 @@ public static class RunTracker
             try
             {
                 if (!IsTrackedRelic(relic) || !IsTrackedPlayer(relic.Owner)) return;
-                if (CombatManager.Instance?.IsInProgress != true) return;
+                if (!IsRuinedHelmetStrengthTrackingWindow(
+                        _pendingCombat != null,
+                        CombatManager.Instance?.IsInProgress == true))
+                {
+                    return;
+                }
 
                 _pendingCombat ??= new PendingCombat();
                 RecordRuinedHelmetCombatForPlayerLocked(relic.Owner);
@@ -15484,7 +20069,6 @@ public static class RunTracker
                 }
 
                 if (!IsTrackedRelic(relic) || !IsTrackedPlayer(relic.Owner)) return;
-                if (CombatManager.Instance?.IsInProgress != true) return;
 
                 var agg = GetOrCreatePendingRelicAggregateLocked(RuinedHelmetRelicId);
                 RecordRuinedHelmetStrengthGainForTest(agg, strengthAdded);
@@ -15513,6 +20097,71 @@ public static class RunTracker
                 CoreMain.LogDebug($"RecordMummifiedHandTurnStarted failed: {e.Message}");
             }
         }
+    }
+
+    public static void RecordSpikedGauntletsTurnStarted(Player? player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player) || _pendingCombat == null) return;
+                RecordSpikedGauntletsTurnForPlayerLocked(player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordSpikedGauntletsTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void RecordSpikedGauntletsPowerPlayedIfOwnedLocked(
+        CardPlay cardPlay)
+    {
+        if (_pendingCombat == null || cardPlay?.Card?.Owner == null) return;
+        if (cardPlay.Card.Type != CardType.Power) return;
+
+        var player = cardPlay.Card.Owner;
+        if (!PlayerHasSpikedGauntlets(player)) return;
+
+        RecordSpikedGauntletsCombatForPlayerLocked(player);
+        RecordSpikedGauntletsTurnForPlayerLocked(player);
+        var agg = GetOrCreatePendingRelicAggregateLocked(
+            SpikedGauntletsRelicId);
+        RecordSpikedGauntletsPowerPlayedForTest(
+            agg,
+            cardPlay.Resources.EnergyValue,
+            cardPlay.Resources.EnergySpent);
+    }
+
+    internal static void RecordSpikedGauntletsPowerPlayedForTest(
+        RelicAggregate agg,
+        decimal powerCost,
+        int energySpent)
+    {
+        if (agg == null) return;
+        agg.SpikedGauntletsTaxedPowersPlayed++;
+        agg.SpikedGauntletsPowerCostTotal += Math.Max(0m, powerCost);
+        agg.SpikedGauntletsPowerEnergySpent += Math.Max(0, energySpent);
+    }
+
+    internal static void RecordSpikedGauntletsCombatForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.EnergyGeneratedCombats += Math.Max(0, count);
+    }
+
+    internal static void RecordSpikedGauntletsTurnForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.SpikedGauntletsTurns += Math.Max(0, count);
     }
 
     internal static void RecordPaperPhrogVulnerableBonusForTest(
@@ -15554,6 +20203,84 @@ public static class RunTracker
     {
         if (agg == null) return;
         agg.RegaliteTurns += Math.Max(0, count);
+    }
+
+    internal static void RecordMusicBoxAttackCreatedForTest(
+        RelicAggregate agg,
+        bool success,
+        CardRarity? rarity)
+    {
+        if (agg == null || !success) return;
+
+        agg.MusicBoxAttacksCreated++;
+        switch (rarity)
+        {
+            case CardRarity.Common:
+                agg.MusicBoxCommonAttacksCreated++;
+                break;
+            case CardRarity.Uncommon:
+                agg.MusicBoxUncommonAttacksCreated++;
+                break;
+            case CardRarity.Rare:
+                agg.MusicBoxRareAttacksCreated++;
+                break;
+        }
+    }
+
+    internal static void RecordMusicBoxEtherealExhaustForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.MusicBoxAttacksExhaustedByEthereal += Math.Max(0, count);
+    }
+
+    internal static void RecordMusicBoxTurnForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.MusicBoxTurns += Math.Max(0, count);
+    }
+
+    internal static void RecordMusicBoxCombatForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.MusicBoxCombats += Math.Max(0, count);
+    }
+
+    internal static void RecordCrossbowAttackGainedForTest(
+        RelicAggregate agg,
+        bool success,
+        CardRarity? rarity,
+        decimal observedDiscount)
+    {
+        if (agg == null || !success) return;
+
+        agg.CrossbowAttacksGained++;
+        agg.CrossbowDiscountGivenTotal += Math.Max(0m, observedDiscount);
+        switch (rarity)
+        {
+            case CardRarity.Common:
+                agg.CrossbowCommonAttacksGained++;
+                break;
+            case CardRarity.Uncommon:
+                agg.CrossbowUncommonAttacksGained++;
+                break;
+            case CardRarity.Rare:
+                agg.CrossbowRareAttacksGained++;
+                break;
+        }
+    }
+
+    internal static void RecordCrossbowTurnForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.CrossbowTurns += Math.Max(0, count);
+    }
+
+    internal static void RecordCrossbowCombatForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.CrossbowCombats += Math.Max(0, count);
     }
 
     internal static bool IntimidatingHelmetEnergyValueQualifiesForTest(int energyValue, int threshold = 2)
@@ -15980,6 +20707,52 @@ public static class RunTracker
         AddRelicGranted(agg.RelicsGranted, relicId, displayName ?? "", 1);
     }
 
+    internal static void RecordSmallCapsuleRewardChoiceForTest(
+        RelicAggregate aggregate,
+        int choiceNumber,
+        string? relicId,
+        string? displayName,
+        string? outcome)
+    {
+        if (aggregate == null || choiceNumber < 1) return;
+
+        var normalizedOutcome = outcome?.Trim().ToLowerInvariant() switch
+        {
+            "taken" => "taken",
+            "skipped" => "skipped",
+            _ => "pending",
+        };
+        aggregate.RelicRewardChoices ??= new List<RelicRewardChoiceAggregate>();
+        var existing = aggregate.RelicRewardChoices.FirstOrDefault(choice =>
+            choice != null && choice.ChoiceNumber == choiceNumber);
+        if (existing == null)
+        {
+            existing = new RelicRewardChoiceAggregate
+            {
+                ChoiceNumber = choiceNumber,
+            };
+            aggregate.RelicRewardChoices.Add(existing);
+        }
+
+        if (!string.IsNullOrWhiteSpace(relicId))
+            existing.RelicId = relicId;
+        if (!string.IsNullOrWhiteSpace(displayName))
+            existing.DisplayName = displayName;
+        if (normalizedOutcome != "pending"
+            || string.IsNullOrWhiteSpace(existing.Outcome)
+            || string.Equals(
+                existing.Outcome,
+                "pending",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            existing.Outcome = normalizedOutcome;
+        }
+
+        aggregate.RelicRewardChoices.Sort((left, right) =>
+            (left?.ChoiceNumber ?? int.MaxValue).CompareTo(
+                right?.ChoiceNumber ?? int.MaxValue));
+    }
+
     internal static void RecordPaelsWingRelicGainedForTest(
         RelicAggregate agg,
         string? relicId,
@@ -16167,7 +20940,8 @@ public static class RunTracker
         string callerName,
         bool forceDirectRunPersistence = false,
         bool allowZeroAttempt = false,
-        Action<RelicAggregate>? configureAggregate = null)
+        Action<RelicAggregate>? configureAggregate = null,
+        bool recordEternalFeatherActivation = false)
     {
         if (healedCreature == null) return;
         if (attemptedHealing < 0m || (!allowZeroAttempt && attemptedHealing <= 0m)) return;
@@ -16182,9 +20956,16 @@ public static class RunTracker
                     : GetOrCreateRelicAggregateLocked(relicId);
                 configureAggregate?.Invoke(agg);
                 agg.Activations++;
+                int? activationFloor = recordEternalFeatherActivation
+                    ? CurrentRunFloorLocked()
+                    : null;
 
                 if (attemptedHealing <= 0m)
                 {
+                    AddEternalFeatherHealingActivationLocked(
+                        agg,
+                        activationFloor,
+                        restored: 0m);
                     if (persistDirectlyToRun)
                         SaveCurrentRun();
                     return;
@@ -16196,6 +20977,10 @@ public static class RunTracker
                 {
                     agg.TotalHealingLost += attemptedHealing;
                     AddHealingLostReasonLocked(agg, HealingLostFullHpReasonId, "full HP", attemptedHealing);
+                    AddEternalFeatherHealingActivationLocked(
+                        agg,
+                        activationFloor,
+                        restored: 0m);
                     if (persistDirectlyToRun)
                         SaveCurrentRun();
                     return;
@@ -16209,6 +20994,7 @@ public static class RunTracker
                     InitialCurrentHp = healedCreature.CurrentHp,
                     InitialMissingHp = initialMissingHp,
                     PersistDirectlyToRun = persistDirectlyToRun,
+                    EternalFeatherActivationFloor = activationFloor,
                 });
             }
             catch (Exception e)
@@ -16274,6 +21060,11 @@ public static class RunTracker
                     var restoredAgg = GetOrCreateRelicAggregateForHealingLocked(pending);
                     restoredAgg.TotalHealingRestored += observedRestoredDelta;
                 }
+
+                AddEternalFeatherHealingActivationLocked(
+                    GetOrCreateRelicAggregateForHealingLocked(pending),
+                    pending.EternalFeatherActivationFloor,
+                    observedRestored);
 
                 decimal lost = Math.Max(0m, pending.Attempted - observedRestored);
                 if (lost <= 0m)
@@ -17559,65 +22350,6 @@ public static class RunTracker
         }
     }
 
-    /// <summary>
-    /// Record Pendulum's owner-specific every-N-turns activation. The actual
-    /// number of cards drawn is observed from the draw command result.
-    /// </summary>
-    public static void ArmPendulumAttribution(Player owner)
-    {
-        if (owner == null) return;
-
-        lock (_lock)
-        {
-            try
-            {
-                var agg = GetOrCreateRelicAggregateLocked(PendulumRelicId);
-                agg.Activations += 1;
-                _pendingPendulumDrawAttributions.Add(owner);
-            }
-            catch (Exception e)
-            {
-                CoreMain.LogDebug($"ArmPendulumAttribution failed: {e.Message}");
-            }
-        }
-    }
-
-    public static bool TryConsumePendulumDrawAttribution(Player player)
-    {
-        if (player == null) return false;
-
-        lock (_lock)
-        {
-            try
-            {
-                return ConsumePendingGremlinHornAttribution(_pendingPendulumDrawAttributions, player);
-            }
-            catch (Exception e)
-            {
-                CoreMain.LogDebug($"TryConsumePendulumDrawAttribution failed: {e.Message}");
-                return false;
-            }
-        }
-    }
-
-    public static void RecordPendulumCardsDrawn(int cardsDrawn)
-    {
-        if (cardsDrawn <= 0) return;
-
-        lock (_lock)
-        {
-            try
-            {
-                var agg = GetOrCreateRelicAggregateLocked(PendulumRelicId);
-                agg.AdditionalCardsDrawn += cardsDrawn;
-            }
-            catch (Exception e)
-            {
-                CoreMain.LogDebug($"RecordPendulumCardsDrawn failed: {e.Message}");
-            }
-        }
-    }
-
     internal static void RecordPendulumCombatForTest(RelicAggregate agg, int count = 1)
     {
         if (agg == null) return;
@@ -17910,6 +22642,51 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Record Screaming Flagon's owner-specific empty-hand activation. The
+    /// damage split is observed from the damage command result.
+    /// </summary>
+    public static void ArmScreamingFlagonAttribution(Creature dealer)
+    {
+        if (dealer == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(ScreamingFlagonRelicId);
+                agg.Activations += 1;
+                _pendingScreamingFlagonDamageAttributions.Add(dealer);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"ArmScreamingFlagonAttribution failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record the owner's actual hand size at Screaming Flagon's player-turn
+    /// end callback, before the relic evaluates its empty-hand condition.
+    /// </summary>
+    public static void RecordScreamingFlagonTurnEnded(Player? player, int cardsHeld)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                RecordScreamingFlagonTurnForPlayerLocked(player, cardsHeld);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordScreamingFlagonTurnEnded failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Record Mercury Hourglass's owner-specific turn-start activation. The
     /// damage split is observed from the damage command result. Activations are
     /// counted once per combat so damage-per-combat has the expected denominator.
@@ -17946,6 +22723,24 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"TryConsumeFestivePopperDamageAttribution failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    public static bool TryConsumeScreamingFlagonDamageAttribution(Creature dealer)
+    {
+        if (dealer == null) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                return ConsumePendingCreatureAttribution(_pendingScreamingFlagonDamageAttributions, dealer);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"TryConsumeScreamingFlagonDamageAttribution failed: {e.Message}");
                 return false;
             }
         }
@@ -18153,6 +22948,24 @@ public static class RunTracker
         }
     }
 
+    public static void RecordScreamingFlagonDamage(IEnumerable<DamageResult>? results)
+    {
+        if (results == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(ScreamingFlagonRelicId);
+                AddRelicDamageResultsLocked(agg, results);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordScreamingFlagonDamage failed: {e.Message}");
+            }
+        }
+    }
+
     public static void RecordLostWispDamage(IEnumerable<DamageResult>? results)
     {
         if (results == null) return;
@@ -18346,6 +23159,36 @@ public static class RunTracker
                 result.OverkillDamage,
                 result.WasTargetKilled);
         }
+    }
+
+    internal static void RecordScreamingFlagonDamageForTest(
+        RelicAggregate agg,
+        IEnumerable<(int BlockedDamage, int UnblockedDamage, int OverkillDamage, bool WasTargetKilled)> results)
+    {
+        foreach (var result in results)
+        {
+            AddRelicDamageResultPartsLocked(
+                agg,
+                result.BlockedDamage,
+                result.UnblockedDamage,
+                result.OverkillDamage,
+                result.WasTargetKilled);
+        }
+    }
+
+    internal static void RecordScreamingFlagonTurnForTest(
+        RelicAggregate agg,
+        int cardsHeld)
+    {
+        agg.ScreamingFlagonTurnEndHandSizeTotal += Math.Max(0, cardsHeld);
+        agg.ScreamingFlagonTurns += 1;
+    }
+
+    internal static void RecordScreamingFlagonCombatForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        agg.ScreamingFlagonCombats += Math.Max(0, count);
     }
 
     internal static void RecordMercuryHourglassDamageForTest(
@@ -18782,6 +23625,42 @@ public static class RunTracker
             countRoundOneCombat: false);
     }
 
+    /// <summary>
+    /// Count Pumpkin Candle's max-energy contribution only while its live
+    /// charge is positive. The caller supplies the relic's current Energy
+    /// dynamic variable at the actual player energy-reset boundary.
+    /// </summary>
+    public static void RecordPumpkinCandleEnergyGenerated(
+        MegaCrit.Sts2.Core.Combat.ICombatState combatState,
+        Player player,
+        int amount)
+    {
+        RecordEnergyResetRelicEnergyGenerated(
+            PumpkinCandleRelicId,
+            combatState,
+            player,
+            amount,
+            countRoundOneCombat: false);
+    }
+
+    /// <summary>
+    /// Count Spiked Gauntlets' Ancient max-energy contribution at the actual
+    /// player energy-reset boundary. Held-combat counting is kept separate so
+    /// the per-combat average remains zero-inclusive.
+    /// </summary>
+    public static void RecordSpikedGauntletsEnergyGenerated(
+        MegaCrit.Sts2.Core.Combat.ICombatState combatState,
+        Player player,
+        int amount)
+    {
+        RecordEnergyResetRelicEnergyGenerated(
+            SpikedGauntletsRelicId,
+            combatState,
+            player,
+            amount,
+            countRoundOneCombat: false);
+    }
+
     public static void RecordBloodSoakedRoseEnergyGenerated(
         MegaCrit.Sts2.Core.Combat.ICombatState combatState,
         Player player,
@@ -18843,6 +23722,44 @@ public static class RunTracker
         agg.EnergyGenerated += amount;
         if (countCombat)
             agg.Activations += 1;
+    }
+
+    /// <summary>
+    /// Count a selected Kindle campfire option. Pumpkin Candle's initial
+    /// <c>AfterObtained</c> call also invokes <c>Rekindle</c>, so selection is
+    /// observed at the established rest-site exit boundary instead of patching
+    /// the shared method and accidentally counting pickup.
+    /// </summary>
+    public static void RecordPumpkinCandleRekindled(Player? owner)
+    {
+        if (owner == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(owner)) return;
+                var candle = owner.Relics?.OfType<PumpkinCandle>().FirstOrDefault();
+                if (candle == null || !IsTrackedRelic(candle)) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(
+                    PumpkinCandleRelicId);
+                RecordPumpkinCandleRekindledForTest(agg);
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordPumpkinCandleRekindled failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordPumpkinCandleRekindledForTest(
+        RelicAggregate agg)
+    {
+        if (agg == null) return;
+        agg.PumpkinCandleRekindles++;
     }
 
     /// <summary>
@@ -19110,6 +24027,10 @@ public static class RunTracker
 
                 var agg = GetOrCreateCurrentRunRelicAggregateLocked(FresnelLensRelicId);
                 RecordFresnelLensMaxHpChangedForTest(agg, originalMaxHp, newMaxHp);
+                AnnotateLatestMaxHpHistoryLocked(
+                    "Drowning Beacon",
+                    originalMaxHp,
+                    newMaxHp);
                 RefreshCurrentRunMetadataLocked();
                 SaveCurrentRun();
             }
@@ -19768,7 +24689,7 @@ public static class RunTracker
         }
     }
 
-    internal static void RecordSilverCrucibleRewardForTest(
+    internal static void RecordRelicCardRewardScreenForTest(
         RelicAggregate agg,
         RelicCardRewardScreenAggregate screen)
     {
@@ -19802,6 +24723,11 @@ public static class RunTracker
         agg.CardRewardScreens.Sort((left, right) =>
             (left?.ScreenNumber ?? int.MaxValue).CompareTo(right?.ScreenNumber ?? int.MaxValue));
     }
+
+    internal static void RecordSilverCrucibleRewardForTest(
+        RelicAggregate agg,
+        RelicCardRewardScreenAggregate screen)
+        => RecordRelicCardRewardScreenForTest(agg, screen);
 
     private static void CaptureSilverCrucibleRewardOptionsLocked(
         PendingSilverCrucibleReward pending,
@@ -20135,6 +25061,21 @@ public static class RunTracker
             }
 
             return result;
+        }
+    }
+
+    public static int? GetRelicActivationsThisCombat(string relicId)
+    {
+        if (string.IsNullOrWhiteSpace(relicId)) return null;
+
+        lock (_lock)
+        {
+            if (_pendingCombat == null || CombatManager.Instance?.IsInProgress != true)
+                return null;
+
+            return _pendingCombat.RelicAggregates.TryGetValue(relicId, out var aggregate)
+                ? Math.Max(0, aggregate.Activations)
+                : 0;
         }
     }
 
@@ -21059,6 +26000,30 @@ public static class RunTracker
         }
     }
 
+    private static bool PlayerHasMusicBox(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is MusicBox);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool PlayerHasCrossbow(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is Crossbow);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static bool PlayerHasIntimidatingHelmet(Player player)
     {
         try
@@ -21136,6 +26101,18 @@ public static class RunTracker
         try
         {
             return player.Relics.Any(r => r is ForgottenSoul);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool PlayerHasScreamingFlagon(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is ScreamingFlagon);
         }
         catch
         {
@@ -21312,15 +26289,21 @@ public static class RunTracker
             RecordWarHammerCombatForPlayerLocked(player);
             RecordTriBoomerangCombatForPlayerLocked(player);
             RecordRegaliteCombatForPlayerLocked(player);
+            RecordMusicBoxCombatForPlayerLocked(player);
+            RecordCrossbowCombatForPlayerLocked(player);
             RecordIntimidatingHelmetCombatForPlayerLocked(player);
             RecordDaughterOfTheWindCombatForPlayerLocked(player);
+            RecordThreeAttackScalingRelicsCombatForPlayerLocked(player);
+            RecordOrnamentalFanCombatForPlayerLocked(player);
             RecordSturdyClampCombatForPlayerLocked(player);
             RecordBeatingRemnantCombatForPlayerLocked(player);
             RecordWhisperingEarringCombatForPlayerLocked(player);
             RecordTungstenRodCombatForPlayerLocked(player);
             RecordForgottenSoulCombatForPlayerLocked(player);
+            RecordScreamingFlagonCombatForPlayerLocked(player);
             RecordRuinedHelmetCombatForPlayerLocked(player);
             RecordMummifiedHandCombatForPlayerLocked(player);
+            RecordSpikedGauntletsCombatForPlayerLocked(player);
             RecordBurningSticksCombatForPlayerLocked(player);
             RecordThrowingAxeCombatForPlayerLocked(player);
             RecordToastyMittensCombatForPlayerLocked(player);
@@ -21957,6 +26940,57 @@ public static class RunTracker
         RecordForgottenSoulTurnForTest(agg);
     }
 
+    private static void RecordScreamingFlagonCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasScreamingFlagon(player)) return;
+        if (!_pendingCombat.ScreamingFlagonCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(ScreamingFlagonRelicId);
+        RecordScreamingFlagonCombatForTest(agg);
+    }
+
+    private static void RecordScreamingFlagonTurnForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+
+            var cardsHeld = PileType.Hand.GetPile(player).Cards.Count;
+            RecordScreamingFlagonTurnForPlayerLocked(player, cardsHeld);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug(
+                $"RecordScreamingFlagonTurnForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordScreamingFlagonTurnForPlayerLocked(
+        Player player,
+        int cardsHeld)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasScreamingFlagon(player)) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.ScreamingFlagonTurnCountedTurns.TryGetValue(
+                player,
+                out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.ScreamingFlagonTurnCountedTurns[player] = turnNumber;
+        RecordScreamingFlagonCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(ScreamingFlagonRelicId);
+        RecordScreamingFlagonTurnForTest(agg, cardsHeld);
+    }
+
     private static void RecordBeatingRemnantTurnForTrackedPlayerLocked()
     {
         try
@@ -22237,6 +27271,70 @@ public static class RunTracker
         RecordRegaliteTurnForTest(agg);
     }
 
+    private static void RecordMusicBoxCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasMusicBox(player)) return;
+        if (!_pendingCombat.MusicBoxCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(MusicBoxRelicId);
+        RecordMusicBoxCombatForTest(agg);
+    }
+
+    private static void RecordMusicBoxTurnForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasMusicBox(player)) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.MusicBoxTurnCountedTurns.TryGetValue(
+                player,
+                out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.MusicBoxTurnCountedTurns[player] = turnNumber;
+        RecordMusicBoxCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(MusicBoxRelicId);
+        RecordMusicBoxTurnForTest(agg);
+    }
+
+    private static void RecordCrossbowCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasCrossbow(player)) return;
+        if (!_pendingCombat.CrossbowCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(CrossbowRelicId);
+        RecordCrossbowCombatForTest(agg);
+    }
+
+    private static void RecordCrossbowTurnForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasCrossbow(player)) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.CrossbowTurnCountedTurns.TryGetValue(
+                player,
+                out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.CrossbowTurnCountedTurns[player] = turnNumber;
+        RecordCrossbowCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(CrossbowRelicId);
+        RecordCrossbowTurnForTest(agg);
+    }
+
     private static void RecordIntimidatingHelmetCombatForPlayerLocked(Player player)
     {
         if (_pendingCombat == null) return;
@@ -22327,6 +27425,42 @@ public static class RunTracker
 
         var agg = GetOrCreatePendingRelicAggregateLocked(MummifiedHandRelicId);
         RecordMummifiedHandCombatForTest(agg);
+    }
+
+    private static void RecordSpikedGauntletsCombatForPlayerLocked(
+        Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasSpikedGauntlets(player)) return;
+        if (!_pendingCombat.SpikedGauntletsCombatCountedPlayers.Add(player))
+            return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(
+            SpikedGauntletsRelicId);
+        RecordSpikedGauntletsCombatForTest(agg);
+    }
+
+    private static void RecordSpikedGauntletsTurnForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasSpikedGauntlets(player)) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.SpikedGauntletsTurnCountedTurns.TryGetValue(
+                player,
+                out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.SpikedGauntletsTurnCountedTurns[player] = turnNumber;
+        RecordSpikedGauntletsCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(
+            SpikedGauntletsRelicId);
+        RecordSpikedGauntletsTurnForTest(agg);
     }
 
     private static void RecordBurningSticksCombatForPlayerLocked(Player player)
@@ -22879,6 +28013,18 @@ public static class RunTracker
         try
         {
             return player.Relics.Any(r => r is MummifiedHand);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool PlayerHasSpikedGauntlets(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is SpikedGauntlets);
         }
         catch
         {
@@ -23651,6 +28797,31 @@ public static class RunTracker
         target.UpgradedCards.AddRange(source.UpgradedCards.Where(card => !string.IsNullOrWhiteSpace(card)));
     }
 
+    private static void MergeFishingRodFloorTrackingInto(
+        RelicAggregate target,
+        RelicAggregate source)
+    {
+        if (source.FishingRodCombatFloorDistances?.Count > 0)
+        {
+            target.FishingRodCombatFloorDistances ??= new List<int>();
+            target.FishingRodCombatFloorDistances.AddRange(
+                source.FishingRodCombatFloorDistances.Where(distance => distance >= 0));
+        }
+
+        if (source.FishingRodLastCombatFloor.HasValue)
+            target.FishingRodLastCombatFloor = source.FishingRodLastCombatFloor;
+
+        if (source.FishingRodUpgradeFloorDistances?.Count > 0)
+        {
+            target.FishingRodUpgradeFloorDistances ??= new List<int>();
+            target.FishingRodUpgradeFloorDistances.AddRange(
+                source.FishingRodUpgradeFloorDistances.Where(distance => distance >= 0));
+        }
+
+        if (source.FishingRodLastUpgradeFloor.HasValue)
+            target.FishingRodLastUpgradeFloor = source.FishingRodLastUpgradeFloor;
+    }
+
     private static void MergeWarHammerUpgradedCardInstanceIdsInto(
         RelicAggregate target,
         RelicAggregate source)
@@ -23745,12 +28916,35 @@ public static class RunTracker
         }
     }
 
+    private static void MergeSwordInTheStoneElitesSlain(
+        RelicAggregate target,
+        RelicAggregate source)
+    {
+        if (source.SwordInTheStoneElitesSlain == null
+            || source.SwordInTheStoneElitesSlain.Count == 0)
+        {
+            return;
+        }
+
+        target.SwordInTheStoneElitesSlain ??= new List<SwordInTheStoneEliteSlainAggregate>();
+        foreach (var elite in source.SwordInTheStoneElitesSlain)
+        {
+            if (elite == null || elite.Floor <= 0) continue;
+            target.SwordInTheStoneElitesSlain.Add(new SwordInTheStoneEliteSlainAggregate
+            {
+                Floor = elite.Floor,
+                EncounterId = elite.EncounterId ?? "",
+                DisplayName = elite.DisplayName ?? "",
+            });
+        }
+    }
+
     private static void MergeCardRewardScreens(RelicAggregate target, RelicAggregate source)
     {
         if (source.CardRewardScreens == null || source.CardRewardScreens.Count == 0) return;
 
         foreach (var screen in source.CardRewardScreens)
-            RecordSilverCrucibleRewardForTest(target, screen);
+            RecordRelicCardRewardScreenForTest(target, screen);
     }
 
     private static void MergeOrreryRewards(RelicAggregate target, RelicAggregate source)
@@ -23850,6 +29044,69 @@ public static class RunTracker
         }
     }
 
+    private static void MergeToyBoxWaxRelics(
+        RelicAggregate target,
+        RelicAggregate source)
+    {
+        if (source.ToyBoxWaxRelics == null
+            || source.ToyBoxWaxRelics.Count == 0)
+        {
+            return;
+        }
+
+        target.ToyBoxWaxRelics ??= new List<ToyBoxWaxRelicAggregate>();
+        foreach (var waxRelic in source.ToyBoxWaxRelics
+                     .Where(entry => entry != null)
+                     .OrderBy(entry => entry.Sequence))
+        {
+            var sequence = waxRelic.Sequence;
+            if (sequence <= 0)
+            {
+                sequence = target.ToyBoxWaxRelics
+                    .Select(entry => entry?.Sequence ?? 0)
+                    .DefaultIfEmpty(0)
+                    .Max() + 1;
+            }
+
+            UpsertToyBoxWaxRelic(
+                target.ToyBoxWaxRelics,
+                sequence,
+                waxRelic.RelicId,
+                waxRelic.DisplayName,
+                waxRelic.FloorBestowed,
+                waxRelic.FloorMelted);
+        }
+    }
+
+    private static void MergeRelicRewardChoices(
+        RelicAggregate target,
+        RelicAggregate source)
+    {
+        if (source.RelicRewardChoices == null
+            || source.RelicRewardChoices.Count == 0)
+        {
+            return;
+        }
+
+        target.RelicRewardChoices ??= new List<RelicRewardChoiceAggregate>();
+        var nextChoiceNumber = target.RelicRewardChoices
+            .Where(choice => choice != null)
+            .Select(choice => choice.ChoiceNumber)
+            .DefaultIfEmpty(0)
+            .Max() + 1;
+        foreach (var choice in source.RelicRewardChoices
+                     .Where(choice => choice != null)
+                     .OrderBy(choice => choice.ChoiceNumber))
+        {
+            RecordSmallCapsuleRewardChoiceForTest(
+                target,
+                nextChoiceNumber++,
+                choice.RelicId,
+                choice.DisplayName,
+                choice.Outcome);
+        }
+    }
+
     private static void MergeGoldPlatedCablesOrbActivations(
         RelicAggregate target,
         RelicAggregate source)
@@ -23915,6 +29172,47 @@ public static class RunTracker
                 ResultingHp = Math.Max(0m, activation.ResultingHp),
             });
         }
+    }
+
+    private static void MergeEternalFeatherHealingActivations(
+        RelicAggregate target,
+        RelicAggregate source)
+    {
+        if (source.EternalFeatherHealingActivations == null
+            || source.EternalFeatherHealingActivations.Count == 0)
+        {
+            return;
+        }
+
+        target.EternalFeatherHealingActivations ??=
+            new List<EternalFeatherHealingActivationAggregate>();
+        foreach (var activation in source.EternalFeatherHealingActivations)
+        {
+            if (activation == null) continue;
+            target.EternalFeatherHealingActivations.Add(
+                new EternalFeatherHealingActivationAggregate
+                {
+                    Floor = Math.Max(0, activation.Floor),
+                    HpRestored = Math.Max(0m, activation.HpRestored),
+                });
+        }
+    }
+
+    private static void AddEternalFeatherHealingActivationLocked(
+        RelicAggregate aggregate,
+        int? floor,
+        decimal restored)
+    {
+        if (!floor.HasValue) return;
+
+        aggregate.EternalFeatherHealingActivations ??=
+            new List<EternalFeatherHealingActivationAggregate>();
+        aggregate.EternalFeatherHealingActivations.Add(
+            new EternalFeatherHealingActivationAggregate
+            {
+                Floor = Math.Max(0, floor.Value),
+                HpRestored = Math.Max(0m, restored),
+            });
     }
 
     private static void AddRelicCardGranted(
@@ -24176,7 +29474,7 @@ public static class RunTracker
     {
         lock (_lock)
         {
-            RecordPrecariousShearsCardRemovedLocked(card);
+            bool removedByPrecariousShears = RecordPrecariousShearsCardRemovedLocked(card);
             if (_currentRun == null) return;
 
             // Non-assigning: if we haven't seen this card enter the deck,
@@ -24186,11 +29484,16 @@ public static class RunTracker
             // removed must have entered the deck at some point.
             if (!TryGetInstanceId(card, out var instanceId)) return;
             var floor = RunManager.Instance.State?.TotalFloor;
+            var removalSource = CaptureCardRemovalSourceLocked(
+                card,
+                removedByPrecariousShears);
 
             if (_currentRun.Aggregates.TryGetValue(instanceId, out var agg))
             {
                 agg.Removed = true;
                 agg.RemovedAtFloor = floor;
+                agg.RemovalSource = removalSource.Source;
+                agg.RemovalGoldCost = removalSource.GoldCost;
 
                 // Snapshot the card's full state (upgrade, enchantment,
                 // props, floor_added) so we can reconstruct a matching
@@ -24208,7 +29511,10 @@ public static class RunTracker
                 Floor = floor,
             });
 
-            CoreMain.Logger.Info($"card_removed: {instanceId} floor={floor}");
+            CoreMain.Logger.Info(
+                $"card_removed: {instanceId} floor={floor} "
+                + $"source={removalSource.Source ?? "unknown"} "
+                + $"gold_cost={removalSource.GoldCost?.ToString() ?? "n/a"}");
 
             // Save immediately — removals happen OUTSIDE combat (Smith, events,
             // rest-site interactions, curse dispose). Without saving here, the
@@ -24221,22 +29527,108 @@ public static class RunTracker
         }
     }
 
-    private static void RecordPrecariousShearsCardRemovedLocked(CardModel card)
+    private static bool RecordPrecariousShearsCardRemovedLocked(CardModel card)
     {
         try
         {
-            if (card == null) return;
+            if (card == null) return false;
             var owner = card.Owner;
-            if (owner == null) return;
-            if (!_pendingPrecariousShearsPickups.TryGetValue(owner, out var pending)) return;
+            if (owner == null) return false;
+            if (!_pendingPrecariousShearsPickups.TryGetValue(owner, out var pending)) return false;
 
             pending.CardsRemoved.Add(GetCardDisplayNameForStats(card));
+            return true;
         }
         catch (Exception e)
         {
             CoreMain.LogDebug($"RecordPrecariousShearsCardRemovedLocked failed: {e.Message}");
+            return false;
         }
     }
+
+    private static CardRemovalSourceFrame CaptureCardRemovalSourceLocked(
+        CardModel card,
+        bool removedByPrecariousShears)
+    {
+        if (removedByPrecariousShears)
+            return new CardRemovalSourceFrame("Relic — Precarious Shears", null);
+
+        var explicitSource = _cardRemovalSourceFrame.Value;
+        if (explicitSource != null)
+            return explicitSource;
+
+        try
+        {
+            var currentCard = _currentPlayerCardPlay?.Card;
+            if (currentCard != null
+                && (currentCard.Owner == null
+                    || card.Owner == null
+                    || ReferenceEquals(currentCard.Owner, card.Owner)))
+            {
+                return new CardRemovalSourceFrame(
+                    $"Card — {GetCardDisplayNameForStats(currentCard)}",
+                    null);
+            }
+
+            var room = RunManager.Instance?.State?.CurrentRoom;
+            if (room is MerchantRoom)
+                return new CardRemovalSourceFrame("Shopkeeper", null);
+
+            if (room is EventRoom eventRoom)
+            {
+                string? eventName = null;
+                try
+                {
+                    eventName = (eventRoom.LocalMutableEvent ?? eventRoom.CanonicalEvent)
+                        ?.Title.GetFormattedText();
+                }
+                catch
+                {
+                    // The room category still gives us useful attribution.
+                }
+
+                return new CardRemovalSourceFrame(
+                    string.IsNullOrWhiteSpace(eventName)
+                        ? "Event"
+                        : $"Event — {eventName}",
+                    null);
+            }
+
+            if (room is RestSiteRoom)
+                return new CardRemovalSourceFrame("Rest site", null);
+
+            if (room != null)
+            {
+                string source = room.RoomType switch
+                {
+                    RoomType.Treasure => "Treasure room",
+                    RoomType.Monster => "Combat",
+                    RoomType.Elite => "Elite combat",
+                    RoomType.Boss => "Boss combat",
+                    _ => room.RoomType.ToString(),
+                };
+                return new CardRemovalSourceFrame(source, null);
+            }
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"CaptureCardRemovalSourceLocked failed: {e.Message}");
+        }
+
+        return new CardRemovalSourceFrame(null, null);
+    }
+
+    internal static CardRemovalSourceFrame? PushCardRemovalSource(
+        string source,
+        int? goldCost)
+    {
+        var previous = _cardRemovalSourceFrame.Value;
+        _cardRemovalSourceFrame.Value = new CardRemovalSourceFrame(source, goldCost);
+        return previous;
+    }
+
+    internal static void RestoreCardRemovalSource(CardRemovalSourceFrame? previous)
+        => _cardRemovalSourceFrame.Value = previous;
 
     private static string GetCardDisplayNameForStats(CardModel card)
     {
@@ -24350,7 +29742,6 @@ public static class RunTracker
             // mechanics, including temporary combat-copy upgrades.
             RecordSandCastleCardUpgradedLocked(card);
             RecordWhetstoneCardUpgradedLocked(card);
-            RecordYummyCookieCardUpgradedLocked(card);
             RecordWarPaintCardUpgradedLocked(card);
             RecordFragrantMushroomCardUpgradedLocked(card);
             RecordFishingRodCardUpgradedLocked(card);
@@ -24358,6 +29749,13 @@ public static class RunTracker
             RecordArmamentsCardUpgradedLocked(card);
             RecordDrainPowerCardUpgradedLocked(card);
             RecordAggressionCardUpgradedLocked(card);
+
+            // Yummy Cookie's pickup flow also invokes UpgradeInternal while
+            // constructing non-deck copies of cards that were already
+            // upgraded. Only an exact permanent-deck mutation is one of the
+            // cards Cookie actually upgraded.
+            if (isPermanentDeckUpgrade)
+                RecordYummyCookieCardUpgradedLocked(card);
 
             // Card lineage is different: only mutation of the exact object in
             // the permanent deck counts. Do not canonicalize a combat clone
@@ -24394,6 +29792,12 @@ public static class RunTracker
                 Floor = floor,
                 UpgradeLevel = newLevel,
             });
+
+            var upgradeCategory = GetMapLegendCategoryForContextLocked(
+                CombatManager.Instance?.IsInProgress == true,
+                RunManager.Instance?.State?.CurrentRoom?.RoomType);
+            if (upgradeCategory != null)
+                upgradeCategory.CardsUpgraded++;
 
             // Diagnostic for card-transform-on-upgrade investigation. Logs:
             //   - raw and canonical hashes so we can tell if the upgraded ref
@@ -24483,6 +29887,121 @@ public static class RunTracker
         {
             CoreMain.LogDebug($"RecordYummyCookieCardUpgradedLocked failed: {e.Message}");
         }
+    }
+
+    private static bool RepairYummyCookieUpgradesLocked(
+        RunData run,
+        Player? player)
+    {
+        try
+        {
+            if (player == null
+                || !run.RelicAggregates.TryGetValue(
+                    YummyCookieRelicId,
+                    out var aggregate)
+                || aggregate.CardsUpgraded <= 4)
+            {
+                return false;
+            }
+
+            var cookie = player.Relics.OfType<YummyCookie>().FirstOrDefault();
+            var pickupFloor = cookie == null
+                ? null
+                : RelicFloorAddedToDeck(cookie);
+            if (!pickupFloor.HasValue) return false;
+
+            var upgradeEvents = SelectYummyCookieUpgradeEventsForRepair(
+                run.Events,
+                pickupFloor.Value);
+            if (upgradeEvents.Count == 0) return false;
+
+            var repairedNames = upgradeEvents
+                .Select(GetUpgradeEventCardDisplayNameLocked)
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .ToList();
+            if (repairedNames.Count == 0) return false;
+
+            aggregate.UpgradedCards = repairedNames;
+            aggregate.CardsUpgraded = repairedNames.Count;
+            return true;
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug(
+                $"RepairYummyCookieUpgradesLocked failed: {e.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Legacy Yummy Cookie records can contain UpgradeInternal calls from
+    /// copied, already-upgraded cards. Its real permanent upgrades are the
+    /// final synchronous cluster on the pickup floor, after any earlier
+    /// combat-end upgrades on that same floor.
+    /// </summary>
+    internal static IReadOnlyList<CardEvent> SelectYummyCookieUpgradeEventsForRepair(
+        IEnumerable<CardEvent>? events,
+        int pickupFloor)
+    {
+        const int maximumCookieUpgrades = 4;
+        var candidates = events?
+            .Where(cardEvent =>
+                string.Equals(
+                    cardEvent.Type,
+                    "card_upgraded",
+                    StringComparison.Ordinal)
+                && cardEvent.Floor == pickupFloor
+                && cardEvent.UpgradeLevel > 0)
+            .ToList()
+            ?? new List<CardEvent>();
+        if (candidates.Count == 0
+            || !DateTimeOffset.TryParse(candidates[^1].T, out var latestTime))
+        {
+            return Array.Empty<CardEvent>();
+        }
+
+        var selected = new List<CardEvent>();
+        for (var index = candidates.Count - 1;
+             index >= 0 && selected.Count < maximumCookieUpgrades;
+             index--)
+        {
+            var candidate = candidates[index];
+            if (!DateTimeOffset.TryParse(candidate.T, out var candidateTime)
+                || latestTime - candidateTime > TimeSpan.FromSeconds(1))
+            {
+                break;
+            }
+
+            selected.Add(candidate);
+        }
+
+        selected.Reverse();
+        return selected;
+    }
+
+    private static string GetUpgradeEventCardDisplayNameLocked(CardEvent cardEvent)
+    {
+        foreach (var pair in _instanceNumbers)
+        {
+            if (string.Equals(
+                $"{pair.Key.Id}#{pair.Value}",
+                cardEvent.CardId,
+                StringComparison.Ordinal))
+            {
+                return GetCardDisplayNameForStats(pair.Key);
+            }
+        }
+
+        if (!TryParseAggregateKey(cardEvent.CardId, out var cardId, out _))
+            return "";
+
+        var displayName = FormatCardIdForDisplay(cardId);
+        return cardEvent.UpgradeLevel switch
+        {
+            1 => displayName + "+",
+            > 1 => $"{displayName}+{cardEvent.UpgradeLevel.Value}",
+            _ => displayName,
+        };
     }
 
     private static void RecordWarPaintCardUpgradedLocked(CardModel card)
@@ -26236,6 +31755,8 @@ public static class RunTracker
             {
                 if (!ShouldTrackCardStatsDuringCombatLocked()) return;
 
+                RecordAllForOneReturnedCardLocked(card, oldPile);
+
                 if (_pendingMakeItSoSummons.Count > 0
                     && card is MakeItSo
                     && oldPile != PileType.Hand)
@@ -26269,6 +31790,61 @@ public static class RunTracker
                 CoreMain.LogDebug($"RecordCardChangedPiles failed: {e.Message}");
             }
         }
+    }
+
+    private static void RecordAllForOneReturnedCardLocked(
+        CardModel card,
+        PileType oldPile)
+    {
+        var causingPlay = FindCurrentlyResolvingCardPlay();
+        var sourceCard = causingPlay?.Card;
+        if (sourceCard is not AllForOne) return;
+
+        var effectiveEnergyCost = card.EnergyCost.CostsX
+            ? 0
+            : card.EnergyCost.GetWithModifiers(CostModifiers.All);
+        if (!AllForOneReturnQualifiesForTest(
+                true,
+                oldPile,
+                card.Pile?.Type,
+                effectiveEnergyCost,
+                card.EnergyCost.CostsX,
+                card.Type,
+                ReferenceEquals(card.Owner, sourceCard.Owner)))
+        {
+            return;
+        }
+
+        _pendingCombat ??= new PendingCombat();
+        var sourceId = GetOrAssignInstanceId(sourceCard);
+        var agg = GetOrCreateAggregate(_pendingCombat, sourceId);
+        RecordAllForOneReturnForTest(agg);
+    }
+
+    internal static bool AllForOneReturnQualifiesForTest(
+        bool sourceIsAllForOne,
+        PileType oldPile,
+        PileType? newPile,
+        int effectiveEnergyCost,
+        bool costsX,
+        CardType cardType,
+        bool sameOwner)
+    {
+        return sourceIsAllForOne
+            && oldPile == PileType.Discard
+            && newPile == PileType.Hand
+            && effectiveEnergyCost == 0
+            && !costsX
+            && cardType is CardType.Attack or CardType.Skill or CardType.Power
+            && sameOwner;
+    }
+
+    internal static void RecordAllForOneReturnForTest(
+        CardAggregate agg,
+        int count = 1)
+    {
+        if (agg == null || count <= 0) return;
+        agg.AllForOneZeroCostCardsReturned += count;
     }
 
     private static void RecordBlockedDrawAttemptLocked(
@@ -26428,6 +32004,20 @@ public static class RunTracker
                         entry.Power.Id.ToString(),
                         GetPowerDisplayName(entry.Power));
                     AccumulateFreeAttackGrant(
+                        powerAgg,
+                        Math.Max(0, (int)Math.Floor(entry.Amount)));
+                }
+
+                if (target?.IsPlayer == true
+                    && entry.Amount > 0m
+                    && entry.Power is FreeSkillPower
+                    && causingPlay.Card is Pounce)
+                {
+                    var powerAgg = GetOrCreatePowerAggregate(
+                        _pendingCombat.MetaStats,
+                        entry.Power.Id.ToString(),
+                        GetPowerDisplayName(entry.Power));
+                    AccumulateFreeSkillGrant(
                         powerAgg,
                         Math.Max(0, (int)Math.Floor(entry.Amount)));
                 }
@@ -26602,17 +32192,50 @@ public static class RunTracker
         lock (_lock)
         {
             // Co-op: block gained by a partner (or their summon) must not enter
-            // our aggregates/ledger. Non-player receivers unaffected.
-            if (entry.Receiver.IsPlayer && !IsTrackedPlayerCreature(entry.Receiver)) return;
+            // our card/relic aggregates or shared local-player ledger. A
+            // tracked owner's Fortifier can target that partner, however, so
+            // its own observed gain is still retained without a later
+            // effective/wasted ledger claim.
+            bool isTrackedPlayerReceiver = entry.Receiver.IsPlayer
+                && IsTrackedPlayerCreature(entry.Receiver);
+            int? potionSequence = null;
+            if (entry.Receiver.IsPlayer
+                && Patches.FortifierBlockFrameTracker.TryGetActiveFortifier(
+                    entry.Receiver,
+                    out var fortifier)
+                && fortifier?.Owner != null
+                && IsTrackedPlayer(fortifier.Owner)
+                && TryGetPotionSequence(fortifier, out var activePotionSequence))
+            {
+                potionSequence = activePotionSequence;
+            }
+
+            if (entry.Receiver.IsPlayer
+                && !isTrackedPlayerReceiver
+                && !potionSequence.HasValue)
+            {
+                return;
+            }
+
             _pendingCombat ??= new PendingCombat();
 
             string? instanceId = null;
-            bool isFrostOrbBlock = TryRecordFrostOrbBlockLocked(entry);
-            if (!isFrostOrbBlock && entry.CardPlay?.Card != null)
+            bool isFrostOrbBlock = isTrackedPlayerReceiver
+                && TryRecordFrostOrbBlockLocked(entry);
+            bool isOrnamentalFanBlock = !isFrostOrbBlock
+                && isTrackedPlayerReceiver
+                && ConsumePendingCreatureAttribution(
+                    _pendingOrnamentalFanBlockHistoryAttributions,
+                    entry.Receiver);
+            string? relicId = isOrnamentalFanBlock ? OrnamentalFanRelicId : null;
+            bool hasKnownNonCardSource = isFrostOrbBlock
+                || isOrnamentalFanBlock
+                || potionSequence.HasValue;
+            if (!hasKnownNonCardSource && entry.CardPlay?.Card != null)
             {
                 instanceId = GetOrAssignInstanceId(entry.CardPlay.Card);
             }
-            else if (!isFrostOrbBlock && entry.Receiver.IsPlayer)
+            else if (!hasKnownNonCardSource && entry.Receiver.IsPlayer)
             {
                 var fallbackCard = FindLikelyBlockSourceCard(entry.Receiver);
                 if (fallbackCard != null)
@@ -26632,16 +32255,26 @@ public static class RunTracker
                     Blocked = entry.Amount,
                 });
             }
-            else if (!isFrostOrbBlock && entry.Receiver.IsPlayer)
+            else if (potionSequence.HasValue)
+            {
+                RecordPotionBlockGainedForSequenceLocked(
+                    potionSequence.Value,
+                    entry.Amount);
+            }
+            else if (!hasKnownNonCardSource && entry.Receiver.IsPlayer)
             {
                 var recvDesc = DescribeCreature(entry.Receiver);
                 CoreMain.LogDebug(
                     $"BlockGainedEntry unattributed receiver={recvDesc} amount={entry.Amount}");
             }
 
-            if (entry.Receiver.IsPlayer)
+            if (isTrackedPlayerReceiver)
             {
-                AppendPlayerBlockChunkLocked(instanceId, entry.Amount);
+                AppendPlayerBlockChunkLocked(
+                    instanceId,
+                    relicId,
+                    entry.Amount,
+                    potionSequence);
                 ReconcilePlayerBlockLedgerLocked(entry.Receiver);
             }
         }
@@ -26756,13 +32389,19 @@ public static class RunTracker
         }
     }
 
-    private static void AppendPlayerBlockChunkLocked(string? cardInstanceId, int amount)
+    private static void AppendPlayerBlockChunkLocked(
+        string? cardInstanceId,
+        string? relicId,
+        int amount,
+        int? potionSequence = null)
     {
         if (_pendingCombat == null || amount <= 0) return;
 
         _pendingCombat.PlayerBlockLedger.Add(new BlockChunk
         {
             CardInstanceId = cardInstanceId,
+            RelicId = relicId,
+            PotionSequence = potionSequence,
             Remaining = amount,
         });
     }
@@ -26785,6 +32424,18 @@ public static class RunTracker
             {
                 var agg = GetOrCreateAggregate(_pendingCombat, chunk.CardInstanceId);
                 agg.TotalBlockEffective += consumed;
+            }
+            else if (chunk.RelicId != null)
+            {
+                var agg = GetOrCreatePendingRelicAggregateLocked(chunk.RelicId);
+                agg.AdditionalBlockEffective += consumed;
+            }
+            else if (chunk.PotionSequence.HasValue)
+            {
+                var potion = _pendingCombat.PotionHistory?.FirstOrDefault(entry =>
+                    entry.Sequence == chunk.PotionSequence.Value);
+                if (potion != null)
+                    potion.BlockEffective = (potion.BlockEffective ?? 0) + consumed;
             }
         }
 
@@ -26809,6 +32460,18 @@ public static class RunTracker
                 var agg = GetOrCreateAggregate(_pendingCombat, chunk.CardInstanceId);
                 agg.TotalBlockWasted += wasted;
             }
+            else if (chunk.RelicId != null)
+            {
+                var agg = GetOrCreatePendingRelicAggregateLocked(chunk.RelicId);
+                agg.AdditionalBlockWasted += wasted;
+            }
+            else if (chunk.PotionSequence.HasValue)
+            {
+                var potion = _pendingCombat.PotionHistory?.FirstOrDefault(entry =>
+                    entry.Sequence == chunk.PotionSequence.Value);
+                if (potion != null)
+                    potion.BlockWasted = (potion.BlockWasted ?? 0) + wasted;
+            }
         }
 
         _pendingCombat.PlayerBlockLedger.RemoveAll(chunk => chunk.Remaining <= 0);
@@ -26820,7 +32483,7 @@ public static class RunTracker
     }
 
     /// <summary>
-    /// Test seam for the block-ledger attribution pipeline (issue #6). Runs the
+    /// Test seam for card-only block-ledger attribution (issue #6). Runs the
     /// real gain → absorb → clear sequence against a throwaway pending combat
     /// and returns it so the FIFO-absorb / LIFO-waste invariant can be pinned
     /// headlessly, without needing a live combat to feed BlockGainedEntry /
@@ -26831,25 +32494,80 @@ public static class RunTracker
         IEnumerable<(string? cardInstanceId, int amount)> gains,
         int blockedDamage,
         int clearedUnusedBlock)
+        => RunBlockLedgerWithSourcesForTest(
+            gains.Select(gain => (gain.cardInstanceId, relicId: (string?)null, gain.amount)),
+            blockedDamage,
+            clearedUnusedBlock);
+
+    internal static PendingCombat RunBlockLedgerWithSourcesForTest(
+        IEnumerable<(string? cardInstanceId, string? relicId, int amount)> gains,
+        int blockedDamage,
+        int clearedUnusedBlock)
+        => RunBlockLedgerWithAllSourcesForTest(
+            gains.Select(gain =>
+                (gain.cardInstanceId, gain.relicId, potionSequence: (int?)null, gain.amount)),
+            potionHistory: null,
+            blockedDamage,
+            clearedUnusedBlock);
+
+    internal static PendingCombat RunBlockLedgerWithPotionSourceForTest(
+        PotionRunHistoryEntry potion,
+        int amount,
+        int blockedDamage,
+        int clearedUnusedBlock)
+        => RunBlockLedgerWithAllSourcesForTest(
+            [(cardInstanceId: null, relicId: null, potionSequence: (int?)potion.Sequence, amount)],
+            [potion],
+            blockedDamage,
+            clearedUnusedBlock);
+
+    private static PendingCombat RunBlockLedgerWithAllSourcesForTest(
+        IEnumerable<(
+            string? cardInstanceId,
+            string? relicId,
+            int? potionSequence,
+            int amount)> gains,
+        List<PotionRunHistoryEntry>? potionHistory,
+        int blockedDamage,
+        int clearedUnusedBlock)
     {
         lock (_lock)
         {
             var previous = _pendingCombat;
             try
             {
-                var scratch = new PendingCombat();
-                _pendingCombat = scratch;
-                foreach (var (cardInstanceId, amount) in gains)
+                var scratch = new PendingCombat
                 {
-                    // Mirror the production block-gain pairing: a card-attributed
-                    // gain credits TotalBlockGained AND pushes a ledger chunk of
-                    // the same amount (see RecordBlockGainedEntry). Crediting it
-                    // here lets the conservation test assert the real invariant
-                    // gained == effective + wasted — the tooltip divides absorbed
-                    // and wasted percentages by TotalBlockGained.
+                    PotionHistory = potionHistory,
+                };
+                _pendingCombat = scratch;
+                foreach (var (cardInstanceId, relicId, potionSequence, amount) in gains)
+                {
+                    // Mirror the production block-gain pairing: the owner aggregate
+                    // receives the gain while the source-bearing ledger chunk later
+                    // receives its effective/wasted split.
                     if (cardInstanceId != null)
                         GetOrCreateAggregate(scratch, cardInstanceId).TotalBlockGained += amount;
-                    AppendPlayerBlockChunkLocked(cardInstanceId, amount);
+                    else if (relicId != null)
+                    {
+                        var relicAgg = GetOrCreatePendingRelicAggregateLocked(relicId);
+                        if (string.Equals(relicId, OrnamentalFanRelicId, StringComparison.Ordinal))
+                            RecordOrnamentalFanBlockGainedForTest(relicAgg, amount);
+                        else
+                            relicAgg.AdditionalBlockGained += amount;
+                    }
+                    else if (potionSequence.HasValue)
+                    {
+                        var potion = scratch.PotionHistory?.FirstOrDefault(entry =>
+                            entry.Sequence == potionSequence.Value);
+                        if (potion != null)
+                            RecordPotionBlockGainForTest(potion, amount);
+                    }
+                    AppendPlayerBlockChunkLocked(
+                        cardInstanceId,
+                        relicId,
+                        amount,
+                        potionSequence);
                 }
                 AttributeBlockedDamageLocked(blockedDamage);
                 AttributeUnusedBlockLocked(clearedUnusedBlock);
@@ -26875,7 +32593,10 @@ public static class RunTracker
         }
         else if (trackedBlock < actualBlock)
         {
-            AppendPlayerBlockChunkLocked(cardInstanceId: null, amount: actualBlock - trackedBlock);
+            AppendPlayerBlockChunkLocked(
+                cardInstanceId: null,
+                relicId: null,
+                amount: actualBlock - trackedBlock);
         }
     }
 
@@ -27246,6 +32967,8 @@ public static class RunTracker
             InitialUpgradeLevel = source.InitialUpgradeLevel,
             Removed = source.Removed,
             RemovedAtFloor = source.RemovedAtFloor,
+            RemovalSource = source.RemovalSource,
+            RemovalGoldCost = source.RemovalGoldCost,
             RemovedSnapshot = source.RemovedSnapshot,
         };
         MergeAggregateInto(clone, source);
@@ -27289,6 +33012,14 @@ public static class RunTracker
         target.DiscoverySkillsPicked += source.DiscoverySkillsPicked;
         target.DiscoveryPowersPicked += source.DiscoveryPowersPicked;
         target.DiscoveryEnergyDiscountTotal += source.DiscoveryEnergyDiscountTotal;
+        target.SplashAttacksTaken += source.SplashAttacksTaken;
+        target.SplashCommonAttacksTaken += source.SplashCommonAttacksTaken;
+        target.SplashUncommonAttacksTaken += source.SplashUncommonAttacksTaken;
+        target.SplashRareAttacksTaken += source.SplashRareAttacksTaken;
+        target.SplashEnergyDiscountTotal += source.SplashEnergyDiscountTotal;
+        target.AllForOneZeroCostCardsReturned += source.AllForOneZeroCostCardsReturned;
+        target.OutbreakExtraPoisonTriggerDamage +=
+            source.OutbreakExtraPoisonTriggerDamage;
         target.ArmamentsCardsUpgraded += source.ArmamentsCardsUpgraded;
         target.DrainPowerCardsUpgraded += source.DrainPowerCardsUpgraded;
         target.DrainPowerTurnsInDeck += source.DrainPowerTurnsInDeck;
@@ -27443,6 +33174,14 @@ public static class RunTracker
             targetAgg.FreeAttackCommonAttacksDiscounted += sourceAgg.FreeAttackCommonAttacksDiscounted;
             targetAgg.FreeAttackUncommonAttacksDiscounted += sourceAgg.FreeAttackUncommonAttacksDiscounted;
             targetAgg.FreeAttackRareAttacksDiscounted += sourceAgg.FreeAttackRareAttacksDiscounted;
+            targetAgg.FreeSkillChargesGranted += sourceAgg.FreeSkillChargesGranted;
+            targetAgg.FreeSkillChargesUsed += sourceAgg.FreeSkillChargesUsed;
+            targetAgg.FreeSkillZeroEnergySavingsUses += sourceAgg.FreeSkillZeroEnergySavingsUses;
+            targetAgg.FreeSkillEnergySaved += sourceAgg.FreeSkillEnergySaved;
+            targetAgg.FreeSkillBasicSkillsDiscounted += sourceAgg.FreeSkillBasicSkillsDiscounted;
+            targetAgg.FreeSkillCommonSkillsDiscounted += sourceAgg.FreeSkillCommonSkillsDiscounted;
+            targetAgg.FreeSkillUncommonSkillsDiscounted += sourceAgg.FreeSkillUncommonSkillsDiscounted;
+            targetAgg.FreeSkillRareSkillsDiscounted += sourceAgg.FreeSkillRareSkillsDiscounted;
             targetAgg.EntropyChainsOfBindingBroken +=
                 sourceAgg.EntropyChainsOfBindingBroken;
             targetAgg.EntropyCardsGenerated += sourceAgg.EntropyCardsGenerated;
@@ -27982,6 +33721,24 @@ internal sealed class PendingSilkenTressReward
     public IReadOnlyList<PendingSilkenTressOption> Options { get; }
 }
 
+internal sealed class PendingLeadPaperweightChoice
+{
+    public required Player Player { get; init; }
+    public int? Floor { get; init; }
+    public required HashSet<CardModel> DeckBeforeChoice { get; init; }
+    public List<PendingLeadPaperweightOption> Options { get; } = new();
+    public bool SelectionResolved { get; set; }
+    public CardModel? SelectedCard { get; set; }
+}
+
+internal sealed class PendingLeadPaperweightOption
+{
+    public required CardModel Card { get; init; }
+    public string CardId { get; init; } = "";
+    public string DisplayName { get; init; } = "";
+    public int UpgradeLevel { get; init; }
+}
+
 internal sealed class PendingSilverCrucibleReward
 {
     public PendingSilverCrucibleReward(int screenNumber, int? floor)
@@ -28050,9 +33807,26 @@ internal sealed class PendingBurningSticksDuplicateWindow
     public int RemainingAttempts { get; set; }
 }
 
+internal sealed class PendingMusicBoxCreationWindow
+{
+    public required Player Player { get; init; }
+    public string SourceCardId { get; init; } = "";
+    public int RemainingAttempts { get; set; }
+}
+
 internal sealed class PendingFreeAttackUse
 {
     public required FreeAttackPower Power { get; init; }
+    public required Player Player { get; init; }
+    public required CardModel Card { get; init; }
+    public int StartingPowerAmount { get; init; }
+    public decimal OfferedEnergySavings { get; init; }
+    public bool IsAutoPlay { get; init; }
+}
+
+internal sealed class PendingFreeSkillUse
+{
+    public required FreeSkillPower Power { get; init; }
     public required Player Player { get; init; }
     public required CardModel Card { get; init; }
     public int StartingPowerAmount { get; init; }
@@ -28076,6 +33850,20 @@ internal sealed class PendingFeelNoPainBlockAttribution
     public required string DisplayName { get; init; }
 }
 
+internal sealed class PendingOutbreakPoisonTriggerAttribution
+{
+    public required PendingCombat PendingCombat { get; init; }
+    public required PoisonPower Power { get; init; }
+    public required string SourceCardInstanceId { get; init; }
+    public int RemainingDamageCommands { get; set; }
+}
+
+internal sealed class PendingOutbreakDamageAttribution
+{
+    public required PendingCombat PendingCombat { get; init; }
+    public required string SourceCardInstanceId { get; init; }
+}
+
 internal sealed class PendingDarkEmbraceDraw
 {
     public required PendingCombat PendingCombat { get; init; }
@@ -28090,6 +33878,16 @@ internal sealed class PendingForgottenSoulDamageAttribution
     public required Creature Dealer { get; init; }
 }
 
+internal readonly record struct PotionRunLocation(
+    int? Floor,
+    string Kind,
+    string? Name,
+    int? Turn);
+
+internal readonly record struct GoldObservationContext(
+    RoomType? RoomType,
+    int Floor);
+
 internal sealed record CardOrbEventSubscription(
     Action PassiveHandler,
     Action<Creature[]> EvokeHandler);
@@ -28103,6 +33901,15 @@ internal class PendingCombat
     public int EtherealCardsPlayed { get; set; }
     public Dictionary<string, CardAggregate> CombatAggregates { get; } = new();
     public List<CardEvent> CombatEvents { get; } = new();
+    public List<PotionRunHistoryEntry>? PotionHistory { get; set; }
+    public List<MaxHpRunHistoryEntry>? MaxHpHistory { get; set; }
+    public RunHealthStats HealthStats { get; set; } = new();
+    public RunGoldStats GoldStats { get; set; } = new();
+    public RunMapLegendStats MapLegendStats { get; set; } = new();
+    public RunTimeStats TimeStats { get; set; } = new();
+    public string? MapLegendCategory { get; set; }
+    public bool MapLegendCombatWon { get; set; }
+    public bool MapLegendCombatFinalized { get; set; }
     public Dictionary<string, RelicAggregate> RelicAggregates { get; } = new();
     public Dictionary<string, EnemyAggregate> EnemyAggregates { get; } = new();
     public List<BlockChunk> PlayerBlockLedger { get; } = new();
@@ -28127,6 +33934,8 @@ internal class PendingCombat
     public HashSet<Player> PermafrostCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> BagOfPreparationActivationCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> RingOfTheSnakeActivationCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> StrikeDummyCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
@@ -28156,9 +33965,15 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> PocketwatchCardsPlayedThisTurn { get; }
         = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> PendingPetrifiedToadPotionPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
     public Dictionary<CardModel, int> NormalityTurnEndRecordedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
-    public Dictionary<Player, PendingBagOfPreparationDraw> PendingBagOfPreparationDraws { get; }
+    public Dictionary<Player, PendingOpeningHandDrawRelicDraw> PendingBagOfPreparationDraws { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, PendingOpeningHandDrawRelicDraw> PendingRingOfTheSnakeDraws { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, PendingOpeningHandDrawRelicDraw> PendingPendulumDraws { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> LetterOpenerCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
@@ -28216,6 +34031,10 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> ForgottenSoulTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> ScreamingFlagonCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> ScreamingFlagonTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
     public List<PendingForgottenSoulDamageAttribution> ForgottenSoulDamageAttributions { get; }
         = new();
     public HashSet<Player> ArtOfWarCombatCountedPlayers { get; }
@@ -28260,6 +34079,10 @@ internal class PendingCombat
     public HashSet<Player> MummifiedHandCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> MummifiedHandTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> SpikedGauntletsCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> SpikedGauntletsTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> BurningSticksCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
@@ -28320,6 +34143,8 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<CardModel, decimal> FreeAttackEnergySavingsByCard { get; }
         = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<CardModel, decimal> FreeSkillEnergySavingsByCard { get; }
+        = new(ReferenceEqualityComparer.Instance);
     public Dictionary<string, int> DrainPowerTurnCountedTurns { get; }
         = new(StringComparer.Ordinal);
     public Dictionary<CardModel, HashSet<string>> DrainPowerSourcesByUpgradedCard { get; }
@@ -28362,6 +34187,18 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> RegaliteTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> MusicBoxCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> MusicBoxTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, PendingMusicBoxCreationWindow> PendingMusicBoxCreationWindows { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<CardModel> MusicBoxGeneratedAttacks { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> CrossbowCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> CrossbowTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> IntimidatingHelmetCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> IntimidatingHelmetTurnCountedTurns { get; }
@@ -28386,11 +34223,23 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> KunaiTurnEndChargeRecordedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> KunaiRateCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> KunaiRateTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> KusarigamaTurnEndChargeRecordedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> OrnamentalFanCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> OrnamentalFanTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> OrnamentalFanTurnEndChargeRecordedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> ShurikenTurnEndChargeRecordedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> ShurikenRateCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> ShurikenRateTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> GamblingChipDiscardAttributionPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
@@ -28405,15 +34254,15 @@ internal class PendingCombat
     public AttributionWindowRegistry Windows { get; } = new();
 }
 
-internal sealed class PendingBagOfPreparationDraw
+internal sealed class PendingOpeningHandDrawRelicDraw
 {
-    public PendingBagOfPreparationDraw(int cardsRequested)
+    public PendingOpeningHandDrawRelicDraw(int cardsRequested)
     {
         CardsRequested = Math.Max(0, cardsRequested);
     }
 
     public int CardsRequested { get; }
-    public decimal RawHandDrawWithoutBag { get; set; }
+    public decimal RawHandDrawWithoutRelic { get; set; }
     public bool ModifierChainCompleted { get; set; }
 }
 
@@ -28552,8 +34401,9 @@ internal sealed class PendingToastyMittensActivation
 internal sealed class BlockChunk
 {
     public string? CardInstanceId { get; init; }
+    public string? RelicId { get; init; }
+    public int? PotionSequence { get; init; }
     public int Remaining { get; set; }
-    public bool CountsForCardStats => CardInstanceId != null;
 }
 
 internal sealed class PendingPowerChangeAttempt
@@ -28600,6 +34450,7 @@ internal sealed class PendingRelicHealing
     public required decimal InitialCurrentHp { get; init; }
     public required decimal InitialMissingHp { get; init; }
     public bool PersistDirectlyToRun { get; init; }
+    public int? EternalFeatherActivationFloor { get; init; }
     public decimal ActualRestored { get; set; }
 }
 
@@ -28616,6 +34467,10 @@ internal sealed class PendingPrecariousShearsPickup
     public required decimal StartingMaxHp { get; init; }
     public List<string> CardsRemoved { get; } = new();
 }
+
+internal sealed record CardRemovalSourceFrame(
+    string? Source,
+    int? GoldCost);
 
 internal sealed class PendingSandCastlePickup
 {
@@ -28639,11 +34494,15 @@ internal sealed class PendingWarPaintPickup
 
 internal sealed class PendingFragrantMushroomPickup
 {
+    public decimal StartingHp { get; init; }
     public List<string> UpgradedCards { get; } = new();
 }
 
 internal sealed class PendingFishingRodUpgrade
 {
+    public int? FloorAcquired { get; init; }
+    public int Floor { get; init; }
+    public bool IsFirstCombatSinceAcquisition { get; init; }
     public List<string> UpgradedCards { get; } = new();
 }
 

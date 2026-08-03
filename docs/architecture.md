@@ -38,6 +38,9 @@ For the stable Slay the Spire 2 runtime mental model behind the hook choices her
 - Combat history entries and selected hook patches feed into the tracker.
 - During combat, observations accumulate in `_pendingCombat`.
 - On combat end, `_pendingCombat` is promoted into the committed run aggregates and saved.
+- Potion history uses the same boundary: offers/acquisitions outside combat
+  save immediately, while combat-time acquisitions and uses update a pending
+  history snapshot that is merged only when the combat resolves.
 
 This combat-boundary rule is important:
 
@@ -94,6 +97,9 @@ When attribution is not naturally one-card-to-one-outcome, the code prefers:
 
 - [Core/Patches/ViewStatsInjectorPatch.cs](../Core/Patches/ViewStatsInjectorPatch.cs) injects the deck-view shortcut for the global SpireLens options menu.
 - [Core/SpireLensOptionsMenu.cs](../Core/SpireLensOptionsMenu.cs) owns the modal, screen-independent checkbox window and its keyboard/gamepad shortcuts. Its highlighted row is independent of Godot GUI focus so the underlying game selection remains untouched while the modal intercepts input.
+- [Core/Patches/PotionCompendiumRunHistoryPatch.cs](../Core/Patches/PotionCompendiumRunHistoryPatch.cs) adds the potion-gallery mode dropdown and replaces the rarity galleries with a two-column vertical timeline of native potion holders. Each holder's run details are appended through the shared native hover-tip augmentation path.
+- [Core/Patches/PotionRunHistoryTrackingPatch.cs](../Core/Patches/PotionRunHistoryTrackingPatch.cs) observes visible reward/shop offers plus final belt insertion, use, and discard outcomes.
+- [Core/Patches/PotionBeltStatsTooltip.cs](../Core/Patches/PotionBeltStatsTooltip.cs) derives the run-wide offer, rarity, rejection, purchase, activation, and discard summary from that provenance and appends it to every filled or empty native potion-belt holder.
 - [Core/Patches/RelicBarFilterPatch.cs](../Core/Patches/RelicBarFilterPatch.cs) optionally hides classified, already-resolved relics from the standard in-run relic bar without changing ownership, effects, or any other relic surface, then rewires top-bar controller navigation across the remaining visible relics.
 - [Core/RelicClassificationStore.cs](../Core/RelicClassificationStore.cs) loads the embedded combat/non-combat JSON, normalizes it against the current game relic database, persists the editable AppData copy, and applies compendium changes immediately.
 - [Core/Patches/RelicCompendiumClassificationPatch.cs](../Core/Patches/RelicCompendiumClassificationPatch.cs) turns compendium mouse/controller presses into classification toggles while edit mode is active and renders the classification badges.
@@ -102,8 +108,14 @@ When attribution is not naturally one-card-to-one-outcome, the code prefers:
 - [Core/Patches/CardHoverTooltipPatch.cs](../Core/Patches/CardHoverTooltipPatch.cs) builds compact and full tooltip bodies.
 - [Core/Patches/DeckViewNotInDeckPatch.cs](../Core/Patches/DeckViewNotInDeckPatch.cs) switches the native deck grid between current deck cards and the separate removed/meta-card collection; those two sets are never mixed.
 - [Core/Patches/NativeHoverTipAugmentationPatch.cs](../Core/Patches/NativeHoverTipAugmentationPatch.cs) appends owner-specific SpireLens data to the game's `IHoverTip` sequence immediately before `NHoverTipSet` renders it, then applies the SpireLens blue panel tint and brand to only the resulting native stats control.
-- [Core/Patches/StatsTooltipPinManager.cs](../Core/Patches/StatsTooltipPinManager.cs) pins one native card or relic tooltip set under a dedicated surrogate owner, including card and relic rows rebuilt inside run history, displays the game's top-panel lock icon on its source, and releases the pin on the next non-motion user action.
+- [Core/Patches/StatsTooltipPinManager.cs](../Core/Patches/StatsTooltipPinManager.cs) pins one native card, relic, or campfire-summary tooltip set under a dedicated surrogate owner, including card and relic rows rebuilt inside run history, displays the game's top-panel lock icon on its source, and releases the pin on the next non-motion user action.
+- [Core/StatsImageCapture.cs](../Core/StatsImageCapture.cs) composes the selected
+  card or isolated relic artwork with every rendered native and SpireLens
+  tooltip page, using logical-to-texture scaling for live viewport crops;
+  [Core/WindowsImageClipboard.cs](../Core/WindowsImageClipboard.cs) publishes
+  that image as an in-memory Windows DIB without a helper process or file.
 - [Core/RunHistoryDeckViewer.cs](../Core/RunHistoryDeckViewer.cs) adds a deck icon to the run-history Cards section and hosts the game's native deck-view scene over run history. It reconstructs the selected player's final deck from the game's individual `SerializableCard` entries and binds duplicate cards back to their SpireLens per-instance keys by saved deck rank.
+- [Core/RunHistoryCampfireSummary.cs](../Core/RunHistoryCampfireSummary.cs) adds one native campfire icon beneath the run-history act rows and presents the selected player's saved `rest_site_choices` plus the same map point's concrete outcome fields as a chronological hover tooltip. Rest and Smith therefore show actual healing and upgraded cards; Dig, Cook, Clone, Hatch, Lift, and Kindle receive action-specific result descriptions. It reads the game's history data directly and owns no additional tracking or persistence.
 - [Core/Patches/CardTooltipPinInputPatch.cs](../Core/Patches/CardTooltipPinInputPatch.cs) intercepts right press on every declared `NCardHolder.OnMousePressed` implementation before the game records an alternate-click action, but claims it only for holders inside passive card-pile or cards-view screens.
 - [Core/StatsTooltip.cs](../Core/StatsTooltip.cs) creates native `HoverTip` values with the established 20px stats typography and owns no scene-tree nodes or hover lifecycle.
 - [Config/SpireLensConfig.cs](../Config/SpireLensConfig.cs) provides the persistent mod-settings UI for runtime display options.
@@ -129,6 +141,9 @@ Current UI conventions:
 - native lifecycle does not erase visual ownership: SpireLens stats tips retain
   their larger body text, blue background treatment, and top-right brand while
   the game owns positioning, layering, and removal
+- pinned card and relic stats add one flat **Copy** action beside the brand;
+  its press is the only click that preserves the pin, and the button hides for
+  the rendered frame so it is not included in its own clipboard image
 
 ## Generated And Non-Deck Cards
 

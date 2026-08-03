@@ -358,6 +358,26 @@
         "description": "Hover this symbol beside a stat to read the row's full description."
       }
     },
+    "kill": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/ui/emote/skull.png"
+      },
+      "help": {
+        "label": "Kill",
+        "description": "An enemy killed by the tracked card, relic, or effect."
+      }
+    },
+    "hp": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/atlases/ui_atlas.sprites/top_bar/top_bar_heart.tres"
+      },
+      "help": {
+        "label": "Current HP",
+        "description": "The player's current HP at the observed moment."
+      }
+    },
     "max_hp": {
       "display": {
         "type": "game_resource",
@@ -422,7 +442,8 @@
     "potion_common": {
       "display": {
         "type": "game_resource",
-        "path": "res://images/packed/sprite_fonts/potion_icon.png"
+        "path": "res://images/packed/sprite_fonts/potion_icon.png",
+        "modulate": "#B5B5B5"
       },
       "help": {
         "label": "Common potion",
@@ -556,6 +577,16 @@
       "help": {
         "label": "Uncommon relic",
         "description": "An Uncommon relic or a count of Uncommon relics."
+      }
+    },
+    "shop": {
+      "display": {
+        "type": "game_resource",
+        "path": "res://images/atlases/ui_atlas.sprites/map/icons/map_shop.tres"
+      },
+      "help": {
+        "label": "Merchant",
+        "description": "A merchant room or a value measured across merchant visits."
       }
     },
     "skill": {

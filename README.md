@@ -53,6 +53,21 @@ the highlighted option. Any other non-direction controller button closes the
 menu. Mouse selection remains fully supported; Escape, Left Shift, or the
 window's Close button also closes it.
 
+The same modal includes **View current-run potion history**, which opens the
+game's Compendium → Potion Gallery directly in SpireLens's **Current run
+stats** mode. The potion gallery dropdown switches between the normal gallery
+and a three-column vertical timeline: potions seen but not taken on the left,
+acquisitions in the middle, and use or final disposition on the right. A used,
+discarded, or held-at-run-end potion repeats with the same per-potion-type
+instance number and a native connector back to its acquisition. Timeline
+entries remain the gallery's native hoverable potion holders; acquisition,
+use, discard, and held-at-run-end details appear in their ordinary hover
+tooltips. A used Blood Potion additionally reports the current HP it actually
+restored. A used Explosive Ampoule reports its observed damage attempted,
+damage dealt, damage blocked, overkill, kills, and targets hit. A used Swift
+Potion reports cards actually drawn and card draws blocked. A used Fortifier
+reports observed block gained, absorbed, and wasted.
+
 The optional, mutually exclusive relic-bar filters hide already-resolved relics
 while leaving them owned, functional, and visible on every other relic surface.
 The contextual mode filters during combat and combat pile overlays but restores
@@ -62,17 +77,25 @@ already-resolved max-HP relics, permanent inventory upgrades, card-reward
 upgrades, and other relics whose effects do not need combat-bar attention.
 
 Right-click an owned relic, a card in a passive pile view, a compendium relic,
-or a card or relic in run history with SpireLens stats to pin its complete
-native tooltip set. The game's compact top-panel lock icon appears on the pinned
-item, and the tooltip remains visible and mouse-interactive after the pointer
-leaves it. Right-clicking the locked item again always unlocks it. Pointer
-movement is allowed so inline help can be inspected; any other mouse click or
-wheel action, key press, or controller action removes the pin and continues to
-the game normally.
+a card or relic in run history, or the run-history Campfires summary to pin its
+complete native tooltip set. The game's compact top-panel lock icon appears on
+the pinned item, and the tooltip remains visible and mouse-interactive after the
+pointer leaves it. Right-clicking the locked item again always unlocks it. Pointer
+movement is allowed so inline help can be inspected. Pinned SpireLens panels
+also expose a camera button that captures the selected card or relic together
+with its complete native and SpireLens tooltip set, then places that composed
+image directly on the Windows clipboard without a temporary file or external
+process. Clicking that button preserves the pin; any other mouse click or wheel
+action, key press, or controller action removes the pin and continues to the
+game normally.
 
 Run history also has a deck icon beside its Cards section. It opens the
 selected player's final deck in the normal deck viewer, with duplicate cards
-kept as separate, inspectable card instances.
+kept as separate, inspectable card instances. A Campfires row beneath the act
+history uses the native campfire icon; hovering it lists that player's campfire
+choices and recorded outcomes in chronological floor order, including actual
+HP healed, cards upgraded/removed/cloned/transformed, relics dug up, Max HP
+gained, Lift progress, and Pumpkin Candle charges rekindled.
 
 The relic compendium's **Edit combat relevance** mode shows each discovered
 relic's classification with the game's enemy-map icon for combat or top-bar
@@ -143,7 +166,43 @@ The controls themselves are injected only into the in-run deck viewer for now (n
 | **M5b** | Run History integration - browse past-run stats | [#9](https://github.com/romaine-life/spirelens/issues/9) |
 | **M6** | Publish v0.1 to Nexus | - |
 
-Additional shipped: discard count, pile-top placements (from hand / from discard), exhaust-others attribution, self-exhaust count, current/max-HP lost from card costs, cards-drawn attribution, blocked-draw attempt/reason tracking, Regent star-resource tracking, forge granted tracking, observed card-sourced orb creation and exact passive/evoke/fizzle lifecycles with separate Frost block, observed Alchemize potion gains/failures with rarity splits, observed Jack of All Trades colorless-card additions with rarity/type and average-cost splits, observed Discovery selections with rarity/type and average-energy-discount splits, Debt and Seal of Gold triggers with attempted, actual, and blocked gold loss, Seal of Gold's generated-energy total and per-combat average, Art of War's observed energy total, held-turn/combat averages, and live turn/combat energy, Cracked Core's exact starting-Lightning passive, evoke, and fizzle lifecycle, Reptile Trinket's activation rates and exact-two/over-two per-turn distribution, Pendulum's observed draws and held-combat average, Mummified Hand trigger/discount efficiency with discounted-card type and rarity tracking, Ruined Helmet's observed bonus Strength total with per-activation and held-combat averages, Daughter of the Wind's and Ripple Basin's observed block totals with held-turn/combat averages, observed max-HP pickup tracking for Strawberry, Pear, Mango, and Nutritious Oyster, Gnarled Hammer's observed Sharp-enchanted card list, Stone Humidifier's observed max-HP gains with per-activation before/after snapshots, Sturdy Clamp's retained/capped block averages per turn and combat, Pael's Claw's Goopy play rates and earned enhancements per Goopy card, recurring summon-to-hand tracking, effect application summaries, Artifact-blocked debuff tracking, downstream poison damage attribution including stacked Noxious Fumes contributor preservation, Dowsing Rod's live `?`-room countdown, Fishing Rod's ordered list of cards actually upgraded, and Molten/Toxic/Frozen Egg counts for matching upgraded cards offered across rewards and shops.
+Additional shipped: discard count, pile-top placements (from hand / from discard), exhaust-others attribution, self-exhaust count, current/max-HP lost from card costs, cards-drawn attribution, blocked-draw attempt/reason tracking, Regent star-resource tracking, forge granted tracking, observed card-sourced orb creation and exact passive/evoke/fizzle lifecycles with separate Frost block, observed Alchemize potion gains/failures with rarity splits, observed Jack of All Trades colorless-card additions with rarity/type and average-cost splits, observed Discovery selections with rarity/type and average-energy-discount splits, All for One's successful zero-cost discard-to-hand returns and per-play/combat averages, Debt and Seal of Gold triggers with attempted, actual, and blocked gold loss, Seal of Gold's generated-energy total and per-combat average, Art of War's observed energy total, held-turn/combat averages, and live turn/combat energy, Cracked Core's exact starting-Lightning passive, evoke, and fizzle lifecycle, Reptile Trinket's activation rates and exact-two/over-two per-turn distribution, Pendulum's observed draws and held-combat average, Mummified Hand trigger/discount efficiency with discounted-card type and rarity tracking, Ruined Helmet's observed bonus Strength total with per-activation and held-combat averages, Daughter of the Wind's and Ripple Basin's observed block totals with held-turn/combat averages, observed max-HP pickup tracking for Strawberry, Pear, Mango, and Nutritious Oyster, Gnarled Hammer's observed Sharp-enchanted card list, Stone Humidifier's observed max-HP gains with per-activation before/after snapshots, Sturdy Clamp's retained/capped block averages per turn and combat, Pael's Claw's Goopy play rates and earned enhancements per Goopy card, recurring summon-to-hand tracking, effect application summaries, Artifact-blocked debuff tracking, downstream poison damage attribution including stacked Noxious Fumes contributor preservation, Dowsing Rod's live `?`-room countdown, Fishing Rod's ordered list of cards actually upgraded, and Molten/Toxic/Frozen Egg counts for matching upgraded cards offered across rewards and shops.
+Ornamental Fan additionally owns its gained, effective, and wasted block
+attribution, with zero-inclusive held-turn and held-combat averages.
+Kunai and Shuriken share one canonical three-Attack scaling presentation: the
+same lifetime, live-turn, live-combat, zero-inclusive average activation, and
+turn-end charge rows, differing only in Dexterity versus Strength gained.
+Ornamental Fan also shows live activation counts for the current turn and
+combat; fixed-value per-activation gain rows are omitted.
+Meat on the Bone records the HP it actually restores plus the signed average
+raw HP difference and signed average percentage-point difference from 50%
+(negative below, positive above) immediately before each qualifying combat-end
+trigger.
+Lead Paperweight records its pickup floor, both concrete Colorless card
+options, and which option actually resulted in a permanent-deck addition.
+Screaming Flagon records every empty-hand activation, its observed AOE damage
+split, and average turn-end hand size per held turn and combat.
+Fishing Rod also records average floor travel to the next qualifying normal
+combat and to each successful card upgrade.
+Potion Belt, Alchemical Coffer, and Phial Holster record the average number of
+potions held at combat start while each relic is owned.
+Petrified Toad records Potion Shaped Rocks successfully given and attempts
+blocked specifically by a full potion belt.
+Pumpkin Candle records its Ancient energy contribution, average combat-start
+charges, and campfire rekindles.
+Small Capsule records the exact relic rolled on its reward screen and whether
+that same reward was taken or left behind, with the relic remaining hoverable
+in the SpireLens tooltip.
+Toy Box records each wax relic it bestows, the floor where each relic melts,
+and average floors until melting. Wax relic hovers retain their ordinary relic
+stats and append their own bestowed/melted lifecycle rows.
+Musical Box records successfully created Attacks by rarity, averages them over
+all held turns and combats, and counts its exact generated Attacks that later
+exhaust because of Ethereal.
+Crossbow records only Attacks that successfully enter combat, splits them by
+rarity, and averages both Attack gains and their observed energy discount over
+its zero-inclusive held turns and combats.
+
 Drain Power additionally tracks its observed discard-pile upgrades and later
 plays of the exact combat cards it upgraded, with held-turn and held-combat
 averages per physical Drain Power.
@@ -158,7 +217,7 @@ Run outcome detection (win/loss/abandoned) is implemented ([#10](https://github.
 
 ## Storage
 
-Per-run JSON files at `%APPDATA%/SlayTheSpire2/SpireLens/runs/<run-id>.json` (Godot's `user://` path). Contains both aggregated stats (fast for UI) and a full event log (one entry per card-played / damage-received / card-upgraded / block-gained / card-removed event, for future analysis). The on-disk shape evolves additively and is detected structurally on load: files containing `instance_numbers_by_def` or `def_counters` use the per-instance shape, while older pooled-shape files lack both fields. Pooled-shape files are history-only; per-instance files remain resumable under the current loader. Session preferences are stored in the BaseLib-backed mod configuration.
+Per-run JSON files at `%APPDATA%/SlayTheSpire2/SpireLens/runs/<run-id>.json` (Godot's `user://` path). Contains aggregated stats (fast for UI), ordered potion provenance, and a full event log (one entry per card-played / damage-received / card-upgraded / block-gained / card-removed event, for future analysis). The on-disk shape evolves additively and is detected structurally on load: files containing `instance_numbers_by_def` or `def_counters` use the per-instance shape, while older pooled-shape files lack both fields. Pooled-shape files are history-only; per-instance files remain resumable under the current loader. Session preferences are stored in the BaseLib-backed mod configuration.
 
 ## Requirements
 
@@ -166,10 +225,10 @@ Per-run JSON files at `%APPDATA%/SlayTheSpire2/SpireLens/runs/<run-id>.json` (Go
 - [BaseLib](https://www.nexusmods.com/slaythespire2/mods/103) - required dependency
 
 > [!NOTE]
-> **Active Environment Reference (May 31, 2026)**
+> **Active Environment Reference (August 1, 2026)**
 >
-> The mod is verified working against **Slay the Spire 2 (v0.106.1)** on local dev setups with the following mod stack configuration:
-> - **BaseLib** (`v3.1.2`) — Modding utility dependency
+> The mod is built against **Slay the Spire 2 (v0.110.1)** on local dev setups with the following mod stack configuration:
+> - **BaseLib** (`v3.4.0+`) — Modding utility dependency
 > - **SpireLens** (`v0.0.0` loader / `v1.0.0` core) — Per-card stats attribution mod
 > - **SpireLens MCP** (`v0.3.4`) — MCP bridge running on port `15526` (`http://localhost:15526/`)
 

@@ -1,0 +1,44 @@
+{
+  "run_id": "fixture-hp-run-stats",
+  "started_at": "2026-08-02T18:00:00.0000000Z",
+  "updated_at": "2026-08-02T20:00:00.0000000Z",
+  "character": "CHARACTER.IRONCLAD",
+  "ascension": 3,
+  "floor_reached": 12,
+  "outcome": "in_progress",
+  "game_start_time": 1785693601,
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {},
+  "potion_history": [],
+  "max_hp_history": [
+    {
+      "sequence": 1,
+      "floor": 4,
+      "location_kind": "Event",
+      "location_name": "Drowning Beacon",
+      "source_name": "Drowning Beacon",
+      "previous_max_hp": 70,
+      "new_max_hp": 63
+    },
+    {
+      "sequence": 2,
+      "floor": 9,
+      "location_kind": "Combat",
+      "location_name": "Cultist",
+      "source_name": "Chosen Cheese",
+      "previous_max_hp": 63,
+      "new_max_hp": 66
+    }
+  ],
+  "health_stats": {
+    "hp_lost_in_combats": 31,
+    "hp_lost_in_events": 9,
+    "combats": 5
+  },
+  "gold_attribution_ledger": [],
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

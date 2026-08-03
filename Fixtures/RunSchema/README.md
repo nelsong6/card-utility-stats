@@ -104,6 +104,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `discovery-card-run.json`
   Adds Discovery picked-card totals, common/uncommon/rare and
   attack/skill/power splits, plus the numerator for average energy discount.
+- `splash-card-run.json`
+  Adds Splash selected-Attack totals, common/uncommon/rare splits, and the
+  numerator for average observed energy discount.
 - `feed-card-run.json`
   Adds Feed's observed maximum-HP gain to the physical card aggregate after
   its Fatal play callback completes successfully.
@@ -115,6 +118,10 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds a power-ID-keyed Vicious aggregate with the cards confirmed by its
   owner-applied-Vulnerable draw commands. Every Vicious card projects this
   shared power total.
+- `outbreak-card-run.json`
+  Adds per-instance Outbreak effective damage observed from the explicit
+  Poison triggers made by that physical card play. Ordinary side-turn Poison
+  damage remains separate.
 - `stampede-power-run.json`
   Adds a power-ID-keyed Stampede aggregate with confirmed direct Attack
   autoplays, rarity splits, and the resolved energy those free plays saved.
@@ -148,6 +155,10 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds a power-ID-keyed Free Attack aggregate with charges granted and used,
   observed energy savings, zero-savings uses, and discounted Attack rarity
   splits. Every Unrelenting card projects this shared power data.
+- `pounce-free-skill-power-run.json`
+  Adds Pounce's symmetric power-ID-keyed Free Skill aggregate with charges
+  granted and used, observed energy savings, zero-savings uses, and discounted
+  Skill rarity splits. Every Pounce card projects this shared power data.
 - `debt-card-run.json`
   Adds Debt end-of-turn trigger tracking with observed gold lost and the
   unaffordable portion blocked by the player being out of gold.
@@ -388,14 +399,22 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `sand-castle-relic-run.json`
   Adds Sand Castle pickup tracking: the actual cards upgraded by the relic.
 - `fragrant-mushroom-relic-run.json`
-  Adds Fragrant Mushroom pickup tracking: the actual cards upgraded by the relic.
+  Adds Fragrant Mushroom pickup tracking: the actual cards upgraded by the relic
+  plus observed current HP before and after its pickup damage.
 - `fishing-rod-relic-run.json`
   Adds Fishing Rod tracking: every card actually upgraded at its three-combat
   interval, retained in upgrade order.
+- `fishing-rod-floor-averages-run.json`
+  Adds Fishing Rod's completed floor-distance samples from acquisition and
+  between qualifying normal combats and successful card upgrades.
 - `war-hammer-relic-run.json`
   Adds War Hammer's Elite-victory activations, observed permanent-deck
   upgrades, stable upgraded-card instance IDs, later upgraded-card plays, and
   held turn/combat denominators.
+- `sword-in-the-stone-relic-run.json`
+  Adds Sword in the Stone's acquisition floor, ordered Elite-victory history,
+  and the observed Strength activations/gains retained after Sword of Jade
+  replaces it.
 - `egg-relic-offers-run.json`
   Adds Molten, Toxic, and Frozen Egg tracking: every matching choosable card
   option the egg actually upgraded across rewards, shops, and other offers,
@@ -428,6 +447,13 @@ New fixtures added going forward do not need a `v*-` prefix.
   Ornamental Fan, and Shuriken, including observed damage/block/Strength
   outcomes and 1/2 charge turn-end buckets with average charge samples.
   Ornamental Fan additionally preserves turns that ended at 0 charges.
+- `three-attack-scaling-rates-run.json`
+  Adds the shared Kunai/Shuriken activation-rate window: matching observed
+  activations plus zero-inclusive held turn and combat denominators. Both
+  relic aggregates deliberately use the same persisted rate fields.
+- `ornamental-fan-block-attribution-run.json`
+  Adds Ornamental Fan's relic-owned effective/wasted block outcomes, held
+  turn/combat denominators, and matching observation-era block numerator.
 - `tuning-fork-relic-run.json`
   Adds Tuning Fork owner Skill-play count, trigger count, observed block
   gained, held combat/turn denominators, and turn-end charge buckets.
@@ -465,6 +491,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `drain-power-card-run.json`
   Adds Drain Power's confirmed discard-pile upgrade count, held-turn
   denominator, and later plays of the exact combat cards it upgraded.
+- `all-for-one-card-run.json`
+  Adds All for One's successfully returned zero-cost discard-pile cards; its
+  ordinary play and combat counts provide the two average denominators.
 - `soul-pile-card-run.json`
   Adds per-source card tracking for generated or transformed Souls that
   actually arrived in the draw pile, hand, or discard pile.
@@ -505,6 +534,79 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `forgotten-soul-relic-run.json`
   Adds Forgotten Soul's same-owner exhaust activations, observed damage
   outcomes, and zero-inclusive held turn/combat denominators.
+- `potion-run-history.json`
+  Adds ordered per-potion offer, acquisition, use, and held-at-run-end
+  provenance for the potion gallery's current-run history view, plus concrete
+  rarity and terminal reward-screen rejection for run-wide belt statistics.
+- `max-hp-run-history.json`
+  Adds chronological observed maximum-HP changes with exact before/after
+  values plus floor, room, turn, and best-known source presentation context.
+- `hp-run-stats.json`
+  Adds run-wide current-HP loss split between combats and events, plus the
+  zero-inclusive completed-combat denominator used by HP-loss averages.
+- `gold-run-stats.json`
+  Adds observed run-wide gold acquisition and game-classified spending,
+  context splits, and zero-inclusive shop/event/combat rate denominators.
+- `map-legend-run-stats.json`
+  Adds per-icon map visit pacing, unknown-site resolutions, combat/elite
+  outcomes, and room-attributed HP, gold, card, upgrade, and relic results.
+- `run-time-stats.json`
+  Adds pause-aware time spent in combats, reward screens, events, and the map,
+  plus completed-combat and turn denominators and the resumable sample cursor.
+- `eternal-feather-campfire-healing-run.json`
+  Adds Eternal Feather's observed restored HP per campfire floor so native
+  combined rest-site healing can be split by source in run history.
+- `potion-run-history-turns.json`
+  Adds combat-turn timing for potion lifecycle points that occur during
+  combat, allowing same-turn acquisitions and uses to share a timeline row.
+- `blood-potion-run-history.json`
+  Adds Blood Potion's observed current-HP restoration to its exact used
+  potion-history entry.
+- `swift-potion-run-history.json`
+  Adds Swift Potion's observed cards drawn and unfulfilled card draws to its
+  exact used potion-history entry.
+- `fortifier-potion-run-history.json`
+  Adds Fortifier's observed block gain and its later absorbed/wasted
+  contributor-ledger outcomes to its exact used potion-history entry.
+- `explosive-ampoule-run-history.json`
+  Adds Explosive Ampoule's observed attempted, effective, blocked, and
+  overkill damage plus kills and targets hit to its exact used potion-history
+  entry.
+- `potion-slot-relic-combat-start-run.json`
+  Adds zero-inclusive combat-start potion-count totals and samples for Potion
+  Belt, Alchemical Coffer, and Phial Holster.
+- `screaming-flagon-hand-size-run.json`
+  Adds Screaming Flagon's turn-end hand-size total plus zero-inclusive held
+  turn and combat denominators.
+- `petrified-toad-relic-run.json`
+  Adds Petrified Toad's successful Potion Shaped Rocks and attempts rejected
+  specifically because the potion belt was full.
+- `pumpkin-candle-relic-run.json`
+  Adds Pumpkin Candle's generated Ancient energy, zero-inclusive combat-start
+  charge samples, and selected Kindle campfire options.
+- `spiked-gauntlets-relic-run.json`
+  Adds Spiked Gauntlets' taxed Power plays, resolved Power costs, actual
+  energy spent, zero-inclusive held turn/combat denominators, and generated
+  Ancient energy.
+- `small-capsule-relic-run.json`
+  Adds Small Capsule's concrete rolled relic plus the terminal taken/skipped
+  outcome for that exact reward.
+- `toy-box-wax-relic-run.json`
+  Adds Toy Box's ordered wax-relic ledger with observed bestowed and melted
+  floors while preserving each wax relic's ordinary effect aggregate by id.
+- `music-box-relic-run.json`
+  Adds Musical Box's successfully created Attacks, Common/Uncommon/Rare splits,
+  Ethereal exhausts, and zero-inclusive held turn/combat denominators.
+- `meat-on-the-bone-pre-trigger-hp-run.json`
+  Adds Meat on the Bone's qualifying combat-end signed HP difference from 50%,
+  normalized HP percentage used for the signed percentage-point difference,
+  and matching pre-trigger sample counts.
+- `crossbow-relic-run.json`
+  Adds Crossbow's successfully gained Attacks, rarity splits, observed energy
+  discount, and zero-inclusive held turn/combat denominators.
+- `card-removal-source-run.json`
+  Adds per-physical-card removal source attribution plus the exact gold charge
+  for cards removed by the shopkeeper.
 
 Why these exist:
 
