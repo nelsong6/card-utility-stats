@@ -12,6 +12,7 @@ using MegaCrit.Sts2.Core.Nodes.Relics;
 using MegaCrit.Sts2.Core.Nodes.Screens.PotionLab;
 using MegaCrit.Sts2.Core.Nodes.Screens.RelicCollection;
 using MegaCrit.Sts2.Core.Nodes.Screens.RunHistoryScreen;
+using MegaCrit.Sts2.Core.Nodes.Screens.Map;
 using MegaCrit.sts2.Core.Nodes.TopBar;
 
 namespace SpireLens.Core.Patches;
@@ -272,6 +273,11 @@ internal static class NativeStatsHoverTipFactory
 
             case NPotionHolder holder
                 when PotionBeltStatsTooltip.TryBuildNativeHoverTip(holder, out tip):
+                statsTip = tip;
+                return true;
+
+            case NMapLegendItem legendItem
+                when MapLegendStatsTooltip.TryBuildNativeHoverTip(legendItem, out tip):
                 statsTip = tip;
                 return true;
 

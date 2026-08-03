@@ -452,6 +452,36 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Read-only current-run map-legend outcomes with the active combat
+    /// overlaid. This is the single source used by all six legend hover tips.
+    /// </summary>
+    public static bool TryGetEffectiveMapLegendStats(
+        out RunMapLegendStats mapStats,
+        out IReadOnlyList<PotionRunHistoryEntry> potionHistory,
+        out IReadOnlyList<MaxHpRunHistoryEntry> maxHpHistory)
+    {
+        lock (_lock)
+        {
+            if (_currentRun == null)
+            {
+                mapStats = new RunMapLegendStats();
+                potionHistory = Array.Empty<PotionRunHistoryEntry>();
+                maxHpHistory = Array.Empty<MaxHpRunHistoryEntry>();
+                return false;
+            }
+
+            mapStats = CloneMapLegendStats(_currentRun.MapLegendStats);
+            if (_pendingCombat != null)
+                MergeMapLegendStatsInto(mapStats, _pendingCombat.MapLegendStats);
+            potionHistory = ClonePotionHistory(
+                _pendingCombat?.PotionHistory ?? _currentRun.PotionHistory);
+            maxHpHistory = CloneMaxHpHistory(
+                _pendingCombat?.MaxHpHistory ?? _currentRun.MaxHpHistory);
+            return true;
+        }
+    }
+
+    /// <summary>
     /// Resolve any CardModel (combat clone or deck original) to its canonical
     /// per-deck reference. Combat clones have <c>DeckVersion</c> set to the
     /// original deck card by <c>Player.PopulateCombatState</c>
@@ -999,11 +1029,23 @@ public static class RunTracker
             // Co-op: CardPile.AddInternal(Deck) fires for BOTH decks; only mint
             // identity for the tracked player's cards.
             if (!IsTrackedCard(card)) return;
+            var aggregateCountBefore = _currentRun?.Aggregates?.Count ?? 0;
             GetOrAssignNumber(card);
+            var newPermanentCardRecorded = _currentRun != null
+                && _currentRun.Aggregates.Count > aggregateCountBefore;
+            var inCombat = CombatManager.Instance?.IsInProgress == true;
+            if (newPermanentCardRecorded)
+            {
+                var category = GetMapLegendCategoryForContextLocked(
+                    inCombat,
+                    RunManager.Instance?.State?.CurrentRoom?.RoomType);
+                if (category != null)
+                    category.CardsGained++;
+            }
             var deckCountsChanged =
                 RefreshStrikeDummyDeckCountsIfOwnedLocked()
                 | RefreshMiniatureCannonDeckCountsIfOwnedLocked();
-            if (deckCountsChanged)
+            if (deckCountsChanged || (newPermanentCardRecorded && !inCombat))
                 SaveCurrentRun();
         }
     }
@@ -1859,6 +1901,7 @@ public static class RunTracker
                 HealthStats = { Combats = 1 },
                 GoldStats = { Combats = 1 },
             };
+            PrepareMapLegendCombatLocked();
             ResetCombatContextState();
             RecordPantographCombatStartForTrackedPlayerLocked(state);
             RecordPotionSlotRelicCombatStartForTrackedPlayerLocked(state);
@@ -1892,6 +1935,8 @@ public static class RunTracker
             // (e.g. mod loaded mid-run), create a minimal run record now so we
             // don't drop the combat's data.
             EnsureLazyCurrentRunLocked();
+
+            _pendingCombat.MapLegendCombatWon = true;
 
             PromotePendingCombatIntoRunLocked();
 
@@ -1955,6 +2000,7 @@ public static class RunTracker
         RecordIronClubCombatEndChargeForTrackedPlayerLocked();
         RecordSparklingRougeCombatEndForTrackedPlayerLocked();
         RecordDarkEmbraceCombatTurnsForTrackedPlayerLocked();
+        FinalizeMapLegendCombatLocked();
 
         // Surviving player block at combat end never absorbed future
         // damage, so treat any remaining ledger as wasted before
@@ -1989,6 +2035,9 @@ public static class RunTracker
 
         run.GoldStats ??= new RunGoldStats();
         MergeGoldStatsInto(run.GoldStats, pending.GoldStats);
+
+        run.MapLegendStats ??= new RunMapLegendStats();
+        MergeMapLegendStatsInto(run.MapLegendStats, pending.MapLegendStats);
 
         foreach (var (relicId, pendingRelicAgg) in pending.RelicAggregates)
         {
@@ -2049,6 +2098,74 @@ public static class RunTracker
         if (source.LastEventFloorCounted.HasValue)
             target.LastEventFloorCounted = source.LastEventFloorCounted;
     }
+
+    internal static void MergeMapLegendStatsInto(
+        RunMapLegendStats target,
+        RunMapLegendStats? source)
+    {
+        if (target == null || source == null) return;
+
+        MergeMapLegendCategoryInto(target.Unknown ??= new(), source.Unknown);
+        MergeMapLegendCategoryInto(target.Shop ??= new(), source.Shop);
+        MergeMapLegendCategoryInto(target.Treasure ??= new(), source.Treasure);
+        MergeMapLegendCategoryInto(target.RestSite ??= new(), source.RestSite);
+        MergeMapLegendCategoryInto(target.Monster ??= new(), source.Monster);
+        MergeMapLegendCategoryInto(target.Elite ??= new(), source.Elite);
+
+        if (!string.IsNullOrWhiteSpace(source.CurrentPointType))
+            target.CurrentPointType = source.CurrentPointType;
+        if (source.CurrentPointFloor.HasValue)
+            target.CurrentPointFloor = source.CurrentPointFloor;
+    }
+
+    private static void MergeMapLegendCategoryInto(
+        MapLegendCategoryStats target,
+        MapLegendCategoryStats? source)
+    {
+        if (target == null || source == null) return;
+
+        target.Visits += source.Visits;
+        target.FirstVisitFloor = MinNullable(
+            target.FirstVisitFloor,
+            source.FirstVisitFloor);
+        target.LastVisitFloor = MaxNullable(
+            target.LastVisitFloor,
+            source.LastVisitFloor);
+        target.FloorsBetweenVisitsTotal += source.FloorsBetweenVisitsTotal;
+        target.FloorsBetweenVisitsSamples += source.FloorsBetweenVisitsSamples;
+        target.ResolvedEvents += source.ResolvedEvents;
+        target.ResolvedCombats += source.ResolvedCombats;
+        target.ResolvedElites += source.ResolvedElites;
+        target.ResolvedShops += source.ResolvedShops;
+        target.ResolvedTreasures += source.ResolvedTreasures;
+        target.ResolvedRestSites += source.ResolvedRestSites;
+        target.LastResolutionFloor = MaxNullable(
+            target.LastResolutionFloor,
+            source.LastResolutionFloor);
+        target.CombatsCompleted += source.CombatsCompleted;
+        target.CombatsWon += source.CombatsWon;
+        target.PerfectCombats += source.PerfectCombats;
+        target.CombatTurns += source.CombatTurns;
+        target.HpLost += source.HpLost;
+        target.HpHealed += source.HpHealed;
+        target.GoldGained += source.GoldGained;
+        target.GoldSpent += source.GoldSpent;
+        target.CardsGained += source.CardsGained;
+        target.CardsUpgraded += source.CardsUpgraded;
+        target.RelicsGained += source.RelicsGained;
+        target.PotionsOffered += source.PotionsOffered;
+        target.PotionsGained += source.PotionsGained;
+    }
+
+    private static int? MinNullable(int? left, int? right)
+        => !left.HasValue ? right
+            : !right.HasValue ? left
+            : Math.Min(left.Value, right.Value);
+
+    private static int? MaxNullable(int? left, int? right)
+        => !left.HasValue ? right
+            : !right.HasValue ? left
+            : Math.Max(left.Value, right.Value);
 
     /// <summary>
     /// Additive merge of one relic aggregate into another. The single home
@@ -3543,6 +3660,11 @@ public static class RunTracker
                     SeenTurn = location.Turn,
                 };
                 history.Add(entry);
+                var offerCategory = GetMapLegendCategoryForContextLocked(
+                    CombatManager.Instance?.IsInProgress == true,
+                    RunManager.Instance?.State?.CurrentRoom?.RoomType);
+                if (offerCategory != null)
+                    offerCategory.PotionsOffered++;
                 BindPotionSequence(offerSource, entry.Sequence);
                 BindPotionSequence(potion, entry.Sequence);
                 FinishPotionHistoryMutationLocked();
@@ -3659,6 +3781,11 @@ public static class RunTracker
                     entry.AcquiredLocationKind = location.Kind;
                     entry.AcquiredLocationName = location.Name;
                     entry.AcquiredTurn = location.Turn;
+                    var gainedCategory = GetMapLegendCategoryForContextLocked(
+                        CombatManager.Instance?.IsInProgress == true,
+                        RunManager.Instance?.State?.CurrentRoom?.RoomType);
+                    if (gainedCategory != null)
+                        gainedCategory.PotionsGained++;
                     changed = true;
                 }
 
@@ -4057,11 +4184,21 @@ public static class RunTracker
                         HealthStats = { Combats = 1 },
                     };
                     _pendingCombat.HealthStats.HpLostInCombats += amount;
+                    var category = GetMapLegendCategoryForContextLocked(
+                        inCombat: true,
+                        RunManager.Instance?.State?.CurrentRoom?.RoomType);
+                    if (category != null)
+                        category.HpLost += amount;
                 }
                 else if (RunManager.Instance?.State?.CurrentRoom is EventRoom)
                 {
                     _currentRun.HealthStats ??= new RunHealthStats();
                     _currentRun.HealthStats.HpLostInEvents += amount;
+                    var category = GetMapLegendCategoryForContextLocked(
+                        inCombat: false,
+                        RoomType.Event);
+                    if (category != null)
+                        category.HpLost += amount;
                     _currentRun.UpdatedAt = Now();
                     RefreshCurrentRunMetadataLocked();
                     SaveCurrentRun();
@@ -4070,6 +4207,54 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordRunHpLost failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Records actual current-HP restoration against the map icon responsible
+    /// for the room. This is intentionally outcome-only: clamped healing at
+    /// full HP contributes zero because Hook.AfterCurrentHpChanged reports the
+    /// post-clamp delta.
+    /// </summary>
+    public static void RecordRunHpGained(
+        ICombatState? combatState,
+        Creature? creature,
+        decimal amount)
+    {
+        if (creature?.Player == null || amount <= 0m) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(creature.Player)) return;
+                if (_currentRun == null && RunManager.Instance?.IsInProgress != true)
+                    return;
+
+                EnsureLazyCurrentRunLocked();
+                var roomType = RunManager.Instance?.State?.CurrentRoom?.RoomType;
+                var inCombat = combatState != null
+                    || CombatManager.Instance?.IsInProgress == true;
+                if (inCombat && _pendingCombat == null)
+                    _pendingCombat = new PendingCombat();
+
+                var category = GetMapLegendCategoryForContextLocked(
+                    inCombat,
+                    roomType);
+                if (category == null) return;
+
+                category.HpHealed += amount;
+                if (!inCombat)
+                {
+                    _currentRun.UpdatedAt = Now();
+                    RefreshCurrentRunMetadataLocked();
+                    SaveCurrentRun();
+                }
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordRunHpGained failed: {e.Message}");
             }
         }
     }
@@ -4337,6 +4522,56 @@ public static class RunTracker
                 LastShopFloorCounted = source.LastShopFloorCounted,
                 LastEventFloorCounted = source.LastEventFloorCounted,
             };
+
+    private static RunMapLegendStats CloneMapLegendStats(RunMapLegendStats? source)
+    {
+        source ??= new RunMapLegendStats();
+        return new RunMapLegendStats
+        {
+            Unknown = CloneMapLegendCategory(source.Unknown),
+            Shop = CloneMapLegendCategory(source.Shop),
+            Treasure = CloneMapLegendCategory(source.Treasure),
+            RestSite = CloneMapLegendCategory(source.RestSite),
+            Monster = CloneMapLegendCategory(source.Monster),
+            Elite = CloneMapLegendCategory(source.Elite),
+            CurrentPointType = source.CurrentPointType,
+            CurrentPointFloor = source.CurrentPointFloor,
+        };
+    }
+
+    private static MapLegendCategoryStats CloneMapLegendCategory(
+        MapLegendCategoryStats? source)
+    {
+        source ??= new MapLegendCategoryStats();
+        return new MapLegendCategoryStats
+        {
+            Visits = source.Visits,
+            FirstVisitFloor = source.FirstVisitFloor,
+            LastVisitFloor = source.LastVisitFloor,
+            FloorsBetweenVisitsTotal = source.FloorsBetweenVisitsTotal,
+            FloorsBetweenVisitsSamples = source.FloorsBetweenVisitsSamples,
+            ResolvedEvents = source.ResolvedEvents,
+            ResolvedCombats = source.ResolvedCombats,
+            ResolvedElites = source.ResolvedElites,
+            ResolvedShops = source.ResolvedShops,
+            ResolvedTreasures = source.ResolvedTreasures,
+            ResolvedRestSites = source.ResolvedRestSites,
+            LastResolutionFloor = source.LastResolutionFloor,
+            CombatsCompleted = source.CombatsCompleted,
+            CombatsWon = source.CombatsWon,
+            PerfectCombats = source.PerfectCombats,
+            CombatTurns = source.CombatTurns,
+            HpLost = source.HpLost,
+            HpHealed = source.HpHealed,
+            GoldGained = source.GoldGained,
+            GoldSpent = source.GoldSpent,
+            CardsGained = source.CardsGained,
+            CardsUpgraded = source.CardsUpgraded,
+            RelicsGained = source.RelicsGained,
+            PotionsOffered = source.PotionsOffered,
+            PotionsGained = source.PotionsGained,
+        };
+    }
 
     private static PotionRunHistoryEntry ClonePotionHistoryEntry(PotionRunHistoryEntry source)
         => new()
@@ -12323,10 +12558,14 @@ public static class RunTracker
 
     /// <summary>
     /// Record map-point stats from the original point type before the game
-    /// resolves it into a concrete room. This keeps Juzu's ? count and Cursed
-    /// Pearl's first-shop floor count tied to the visible map node.
+    /// resolves it into a concrete room. This keeps every legend visit tied
+    /// to the icon the player selected, while preserving the existing Juzu
+    /// and Cursed Pearl attribution boundaries.
     /// </summary>
-    public static void RecordMapPointEntered(MapPointType pointType, bool saveGame)
+    public static void RecordMapPointEntered(
+        MapPointType pointType,
+        bool saveGame,
+        bool advancesMapHistory = true)
     {
         if (!saveGame) return;
 
@@ -12337,7 +12576,34 @@ public static class RunTracker
                 var player = GetTrackedRunPlayerLocked();
                 if (player == null) return;
 
-                var changed = false;
+                EnsureLazyCurrentRunLocked();
+                _currentRun.MapLegendStats ??= new RunMapLegendStats();
+                var mapStats = _currentRun.MapLegendStats;
+                var floor = Math.Max(
+                    0,
+                    (CurrentRunFloorLocked() ?? 0)
+                    + (advancesMapHistory ? 1 : 0));
+                var categoryKey = MapLegendCategoryKey(pointType);
+                mapStats.CurrentPointType = pointType.ToString();
+                mapStats.CurrentPointFloor = floor;
+
+                var changed = true;
+                var category = GetMapLegendCategory(mapStats, categoryKey);
+                if (category != null && category.LastVisitFloor != floor)
+                {
+                    if (category.LastVisitFloor.HasValue)
+                    {
+                        category.FloorsBetweenVisitsTotal += Math.Max(
+                            0,
+                            floor - category.LastVisitFloor.Value);
+                        category.FloorsBetweenVisitsSamples++;
+                    }
+
+                    category.Visits++;
+                    category.FirstVisitFloor ??= floor;
+                    category.LastVisitFloor = floor;
+                }
+
                 if (pointType == MapPointType.Unknown && PlayerHasJuzuBracelet(player))
                 {
                     var agg = GetOrCreateCurrentRunRelicAggregateLocked(JuzuBraceletRelicId);
@@ -12350,15 +12616,239 @@ public static class RunTracker
                     var agg = GetOrCreateCurrentRunRelicAggregateLocked(CursedPearlRelicId);
                     changed |= RecordCursedPearlFloorsBeforeFirstShopForTest(
                         agg,
-                        CurrentRunFloorLocked() ?? 0);
+                        floor);
                 }
 
                 if (changed)
+                {
+                    _currentRun.UpdatedAt = Now();
+                    RefreshCurrentRunMetadataLocked();
                     SaveCurrentRun();
+                }
             }
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordMapPointEntered failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Records what an original ? map point actually became. The resolution
+    /// is a second dimension of the Unknown legend bucket; it does not turn
+    /// that visit into a direct combat/shop/treasure legend visit.
+    /// </summary>
+    public static void RecordMapLegendRoomEntered(
+        IRunState runState,
+        AbstractRoom room)
+    {
+        if (runState == null || room == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_currentRun == null && RunManager.Instance?.IsInProgress != true)
+                    return;
+
+                EnsureLazyCurrentRunLocked();
+                _currentRun.MapLegendStats ??= new RunMapLegendStats();
+                var mapStats = _currentRun.MapLegendStats;
+                var floor = Math.Max(0, runState.TotalFloor);
+                if (!string.Equals(
+                        mapStats.CurrentPointType,
+                        nameof(MapPointType.Unknown),
+                        StringComparison.Ordinal)
+                    || mapStats.CurrentPointFloor != floor)
+                {
+                    return;
+                }
+
+                var category = mapStats.Unknown ??= new MapLegendCategoryStats();
+                if (category.LastResolutionFloor == floor) return;
+
+                var resolved = true;
+                switch (room.RoomType)
+                {
+                    case RoomType.Event:
+                        category.ResolvedEvents++;
+                        break;
+                    case RoomType.Monster:
+                        category.ResolvedCombats++;
+                        break;
+                    case RoomType.Elite:
+                        category.ResolvedElites++;
+                        break;
+                    case RoomType.Shop:
+                        category.ResolvedShops++;
+                        break;
+                    case RoomType.Treasure:
+                        category.ResolvedTreasures++;
+                        break;
+                    case RoomType.RestSite:
+                        category.ResolvedRestSites++;
+                        break;
+                    default:
+                        resolved = false;
+                        break;
+                }
+
+                if (!resolved) return;
+                category.LastResolutionFloor = floor;
+                _currentRun.UpdatedAt = Now();
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordMapLegendRoomEntered failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void PrepareMapLegendCombatLocked()
+    {
+        if (_pendingCombat == null) return;
+
+        EnsureLazyCurrentRunLocked();
+        _currentRun.MapLegendStats ??= new RunMapLegendStats();
+        var roomType = RunManager.Instance?.State?.CurrentRoom?.RoomType;
+        var categoryKey = ResolveMapLegendCategoryKeyLocked(roomType);
+        _pendingCombat.MapLegendCategory = categoryKey;
+        _ = GetMapLegendCategory(
+            _pendingCombat.MapLegendStats,
+            categoryKey);
+    }
+
+    private static void FinalizeMapLegendCombatLocked()
+    {
+        if (_pendingCombat == null || _pendingCombat.MapLegendCombatFinalized)
+            return;
+
+        _pendingCombat.MapLegendCombatFinalized = true;
+        var category = GetMapLegendCategory(
+            _pendingCombat.MapLegendStats,
+            _pendingCombat.MapLegendCategory);
+        if (category == null) return;
+
+        category.CombatsCompleted++;
+        var player = GetTrackedRunPlayerLocked();
+        category.CombatTurns += Math.Max(
+            0,
+            player?.PlayerCombatState?.TurnNumber ?? 0);
+        if (!_pendingCombat.MapLegendCombatWon) return;
+
+        category.CombatsWon++;
+        if (category.HpLost <= 0m)
+            category.PerfectCombats++;
+    }
+
+    private static string? ResolveMapLegendCategoryKeyLocked(RoomType? roomType)
+    {
+        var mapStats = _currentRun?.MapLegendStats;
+        var floor = Math.Max(0, CurrentRunFloorLocked() ?? 0);
+        if (mapStats?.CurrentPointFloor == floor
+            && GetMapLegendCategory(mapStats, mapStats.CurrentPointType) != null)
+        {
+            return mapStats.CurrentPointType;
+        }
+
+        return roomType switch
+        {
+            RoomType.Monster => nameof(MapPointType.Monster),
+            RoomType.Elite => nameof(MapPointType.Elite),
+            RoomType.Shop => nameof(MapPointType.Shop),
+            RoomType.Treasure => nameof(MapPointType.Treasure),
+            RoomType.RestSite => nameof(MapPointType.RestSite),
+            RoomType.Event => nameof(MapPointType.Unknown),
+            _ => null,
+        };
+    }
+
+    private static MapLegendCategoryStats? GetMapLegendCategoryForContextLocked(
+        bool inCombat,
+        RoomType? roomType)
+    {
+        EnsureLazyCurrentRunLocked();
+        _currentRun.MapLegendStats ??= new RunMapLegendStats();
+        var categoryKey = ResolveMapLegendCategoryKeyLocked(roomType);
+        if (inCombat && _pendingCombat != null)
+        {
+            _pendingCombat.MapLegendCategory ??= categoryKey;
+            return GetMapLegendCategory(
+                _pendingCombat.MapLegendStats,
+                _pendingCombat.MapLegendCategory);
+        }
+
+        return GetMapLegendCategory(_currentRun.MapLegendStats, categoryKey);
+    }
+
+    private static string? MapLegendCategoryKey(MapPointType pointType)
+        => pointType switch
+        {
+            MapPointType.Unknown => nameof(MapPointType.Unknown),
+            MapPointType.Shop => nameof(MapPointType.Shop),
+            MapPointType.Treasure => nameof(MapPointType.Treasure),
+            MapPointType.RestSite => nameof(MapPointType.RestSite),
+            MapPointType.Monster => nameof(MapPointType.Monster),
+            MapPointType.Elite => nameof(MapPointType.Elite),
+            _ => null,
+        };
+
+    internal static MapLegendCategoryStats? GetMapLegendCategory(
+        RunMapLegendStats? stats,
+        string? categoryKey)
+    {
+        if (stats == null || string.IsNullOrWhiteSpace(categoryKey)) return null;
+        return categoryKey switch
+        {
+            nameof(MapPointType.Unknown) => stats.Unknown ??= new(),
+            nameof(MapPointType.Shop) => stats.Shop ??= new(),
+            nameof(MapPointType.Treasure) => stats.Treasure ??= new(),
+            nameof(MapPointType.RestSite) => stats.RestSite ??= new(),
+            nameof(MapPointType.Monster) => stats.Monster ??= new(),
+            nameof(MapPointType.Elite) => stats.Elite ??= new(),
+            _ => null,
+        };
+    }
+
+    /// <summary>
+    /// Counts successful permanent relic acquisitions against the map icon
+    /// responsible for the room. RelicCmd.Obtain's completed result is the
+    /// observation boundary, so failed/replaced reward attempts do not count.
+    /// </summary>
+    public static void RecordMapLegendRelicObtained(
+        RelicModel relic,
+        Player player)
+    {
+        if (relic == null || player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                if (_currentRun == null && RunManager.Instance?.IsInProgress != true)
+                    return;
+
+                EnsureLazyCurrentRunLocked();
+                var inCombat = CombatManager.Instance?.IsInProgress == true;
+                var category = GetMapLegendCategoryForContextLocked(
+                    inCombat,
+                    RunManager.Instance?.State?.CurrentRoom?.RoomType);
+                if (category == null) return;
+
+                category.RelicsGained++;
+                if (!inCombat)
+                {
+                    _currentRun.UpdatedAt = Now();
+                    RefreshCurrentRunMetadataLocked();
+                    SaveCurrentRun();
+                }
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordMapLegendRelicObtained failed: {e.Message}");
             }
         }
     }
@@ -15436,6 +15926,11 @@ public static class RunTracker
                     ? _pendingCombat.GoldStats
                     : _currentRun.GoldStats ??= new RunGoldStats();
                 RecordGoldGainForTest(stats, gained, context.RoomType);
+                var mapCategory = GetMapLegendCategoryForContextLocked(
+                    isCombat && _pendingCombat != null,
+                    context.RoomType);
+                if (mapCategory != null)
+                    mapCategory.GoldGained += gained;
 
                 RecordGoldRoomVisitForTest(stats, context.RoomType, context.Floor);
                 _currentRun.UpdatedAt = Now();
@@ -15635,6 +16130,11 @@ public static class RunTracker
                         : _currentRun.GoldStats ??= new RunGoldStats();
                     var spent = Math.Max(0, initialGold - currentGold);
                     RecordGoldSpentForTest(goldStats, spent, context.RoomType);
+                    var mapCategory = GetMapLegendCategoryForContextLocked(
+                        inCombat,
+                        context.RoomType);
+                    if (mapCategory != null)
+                        mapCategory.GoldSpent += spent;
                     RecordGoldRoomVisitForTest(
                         goldStats,
                         context.RoomType,
@@ -28390,6 +28890,12 @@ public static class RunTracker
                 UpgradeLevel = newLevel,
             });
 
+            var upgradeCategory = GetMapLegendCategoryForContextLocked(
+                CombatManager.Instance?.IsInProgress == true,
+                RunManager.Instance?.State?.CurrentRoom?.RoomType);
+            if (upgradeCategory != null)
+                upgradeCategory.CardsUpgraded++;
+
             // Diagnostic for card-transform-on-upgrade investigation. Logs:
             //   - raw and canonical hashes so we can tell if the upgraded ref
             //     is the same object we saw pre-upgrade (in-place) or a
@@ -32326,6 +32832,10 @@ internal class PendingCombat
     public List<MaxHpRunHistoryEntry>? MaxHpHistory { get; set; }
     public RunHealthStats HealthStats { get; set; } = new();
     public RunGoldStats GoldStats { get; set; } = new();
+    public RunMapLegendStats MapLegendStats { get; set; } = new();
+    public string? MapLegendCategory { get; set; }
+    public bool MapLegendCombatWon { get; set; }
+    public bool MapLegendCombatFinalized { get; set; }
     public Dictionary<string, RelicAggregate> RelicAggregates { get; } = new();
     public Dictionary<string, EnemyAggregate> EnemyAggregates { get; } = new();
     public List<BlockChunk> PlayerBlockLedger { get; } = new();

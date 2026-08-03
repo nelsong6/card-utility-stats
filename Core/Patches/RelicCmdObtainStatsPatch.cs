@@ -54,8 +54,6 @@ public static class RelicCmdObtainStatsPatch
     {
         try
         {
-            if (!IsTrackedObtainStatsRelic(relic)) return;
-
             if (__result == null)
             {
                 RecordObtainStats(relic, player, __state);
@@ -83,19 +81,9 @@ public static class RelicCmdObtainStatsPatch
         }
     }
 
-    private static bool IsTrackedObtainStatsRelic(RelicModel relic)
-    {
-        return RunTracker.IsStrikeDummyStatsRelic(relic)
-            || RunTracker.IsMiniatureCannonStatsRelic(relic)
-            || RunTracker.IsLizardTailStatsRelic(relic)
-            || RunTracker.IsChosenCheeseStatsRelic(relic)
-            || relic is BookOfFiveRings
-            || relic is SwordOfStone
-            || relic?.IsWax == true;
-    }
-
     private static void RecordObtainStats(RelicModel relic, Player player, ChosenCheeseObtainState chosenCheeseState)
     {
+        RunTracker.RecordMapLegendRelicObtained(relic, player);
         RunTracker.RecordStrikeDummyObtained(relic, player);
         RunTracker.RecordMiniatureCannonObtained(relic, player);
         RunTracker.RecordLizardTailObtained(relic, player);

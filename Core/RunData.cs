@@ -81,6 +81,14 @@ public class RunData
     public RunGoldStats GoldStats { get; set; } = new();
 
     /// <summary>
+    /// Run outcomes grouped by the six selectable categories shown in the
+    /// map legend. Visits retain the original map-point type (so a ? remains
+    /// a ?), while the Unknown bucket also records what those sites resolved
+    /// into. Combat outcomes are buffered with the combat that produced them.
+    /// </summary>
+    public RunMapLegendStats MapLegendStats { get; set; } = new();
+
+    /// <summary>
     /// Ordered provenance for the portion of the player's gold balance that
     /// still matters to source attribution. Old Coin seeds the first tracked
     /// chunk; ordinary balance before and after it is represented by chunks
@@ -173,6 +181,61 @@ public class RunGoldStats
     public int Combats { get; set; }
     public int? LastShopFloorCounted { get; set; }
     public int? LastEventFloorCounted { get; set; }
+}
+
+/// <summary>
+/// Per-map-icon run summaries plus the currently entered original map point.
+/// The current point is persisted so Continue and Core hot reload preserve
+/// attribution while the player is still resolving that room.
+/// </summary>
+public class RunMapLegendStats
+{
+    public MapLegendCategoryStats Unknown { get; set; } = new();
+    public MapLegendCategoryStats Shop { get; set; } = new();
+    public MapLegendCategoryStats Treasure { get; set; } = new();
+    public MapLegendCategoryStats RestSite { get; set; } = new();
+    public MapLegendCategoryStats Monster { get; set; } = new();
+    public MapLegendCategoryStats Elite { get; set; } = new();
+
+    public string? CurrentPointType { get; set; }
+    public int? CurrentPointFloor { get; set; }
+}
+
+/// <summary>
+/// Observed outcomes attributable to one visible map-legend category.
+/// Zero-inclusive denominators (visits and completed combats) make the
+/// displayed averages useful even when a room produced no reward or loss.
+/// </summary>
+public class MapLegendCategoryStats
+{
+    public int Visits { get; set; }
+    public int? FirstVisitFloor { get; set; }
+    public int? LastVisitFloor { get; set; }
+    public int FloorsBetweenVisitsTotal { get; set; }
+    public int FloorsBetweenVisitsSamples { get; set; }
+
+    public int ResolvedEvents { get; set; }
+    public int ResolvedCombats { get; set; }
+    public int ResolvedElites { get; set; }
+    public int ResolvedShops { get; set; }
+    public int ResolvedTreasures { get; set; }
+    public int ResolvedRestSites { get; set; }
+    public int? LastResolutionFloor { get; set; }
+
+    public int CombatsCompleted { get; set; }
+    public int CombatsWon { get; set; }
+    public int PerfectCombats { get; set; }
+    public int CombatTurns { get; set; }
+
+    public decimal HpLost { get; set; }
+    public decimal HpHealed { get; set; }
+    public int GoldGained { get; set; }
+    public int GoldSpent { get; set; }
+    public int CardsGained { get; set; }
+    public int CardsUpgraded { get; set; }
+    public int RelicsGained { get; set; }
+    public int PotionsOffered { get; set; }
+    public int PotionsGained { get; set; }
 }
 
 /// <summary>

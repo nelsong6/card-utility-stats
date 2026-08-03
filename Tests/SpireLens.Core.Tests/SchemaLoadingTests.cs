@@ -5404,6 +5404,45 @@ public class SchemaLoadingTests
         Assert.Equal(11, run.GoldStats.LastEventFloorCounted);
     }
 
+    [Fact]
+    public void HistoricalLoad_AcceptsMapLegendRunStatsFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("map-legend-run-stats.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertMapLegendRunStatsFixture(loaded.Data);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsMapLegendRunStatsFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("map-legend-run-stats.json"));
+
+        Assert.NotNull(resumed);
+        AssertMapLegendRunStatsFixture(resumed!);
+    }
+
+    private static void AssertMapLegendRunStatsFixture(RunData run)
+    {
+        Assert.Equal(4, run.MapLegendStats.Unknown.Visits);
+        Assert.Equal(2, run.MapLegendStats.Unknown.ResolvedEvents);
+        Assert.Equal(1, run.MapLegendStats.Unknown.ResolvedCombats);
+        Assert.Equal(2, run.MapLegendStats.Unknown.PotionsOffered);
+        Assert.Equal(1, run.MapLegendStats.Unknown.PotionsGained);
+        Assert.Equal(233, run.MapLegendStats.Shop.GoldSpent);
+        Assert.Equal(2, run.MapLegendStats.Treasure.RelicsGained);
+        Assert.Equal(37m, run.MapLegendStats.RestSite.HpHealed);
+        Assert.Equal(2, run.MapLegendStats.RestSite.CardsUpgraded);
+        Assert.Equal(9, run.MapLegendStats.Monster.CombatsWon);
+        Assert.Equal(31, run.MapLegendStats.Monster.CombatTurns);
+        Assert.Equal(3, run.MapLegendStats.Elite.RelicsGained);
+        Assert.Equal(22, run.MapLegendStats.CurrentPointFloor);
+        Assert.Equal("Elite", run.MapLegendStats.CurrentPointType);
+    }
+
     private static void AssertMaxHpRunHistoryFixture(RunData run)
     {
         Assert.Equal(2, run.MaxHpHistory.Count);
