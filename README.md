@@ -82,11 +82,12 @@ complete native tooltip set. The game's compact top-panel lock icon appears on
 the pinned item, and the tooltip remains visible and mouse-interactive after the
 pointer leaves it. Right-clicking the locked item again always unlocks it. Pointer
 movement is allowed so inline help can be inspected. Pinned SpireLens panels
-also expose a **Copy** button that captures the rendered stats panel and places
-it directly on the Windows image clipboard without a temporary file or
-external process. Clicking that button preserves the pin; any other mouse
-click or wheel action, key press, or controller action removes the pin and
-continues to the game normally.
+also expose a camera button that captures the selected card or relic together
+with its complete native and SpireLens tooltip set, then places that composed
+image directly on the Windows clipboard without a temporary file or external
+process. Clicking that button preserves the pin; any other mouse click or wheel
+action, key press, or controller action removes the pin and continues to the
+game normally.
 
 Run history also has a deck icon beside its Cards section. It opens the
 selected player's final deck in the normal deck viewer, with duplicate cards

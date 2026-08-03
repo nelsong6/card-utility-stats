@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading.Tasks;
 using Godot;
 using MegaCrit.Sts2.Core.HoverTips;
@@ -27,7 +28,9 @@ internal static class StatsTooltipPinManager
         "res://images/ui/top_panel/reminder_lock.png";
     private const string HintOwnerNodeName = "SpireLensPinnedStatsHintOwner";
     private const string CopyImageButtonNodeName = "SpireLensCopyStatsImageButton";
-    private const string CopyImageButtonText = "Copy";
+    private const string CopyImageButtonTooltip = "Copy image";
+    private const string CopyImageIconResourceSuffix =
+        "Assets.stat-camera.svg";
     private const float CopyFeedbackDurationSeconds = 1.25f;
     private const float LockIconWidth = 24f;
     private const float LockIconHeight = 28f;
@@ -91,6 +94,8 @@ internal static class StatsTooltipPinManager
     private static object? _pinnedCardModel;
     private static Texture2D? _lockTexture;
     private static bool _lockLoadAttempted;
+    private static ImageTexture? _copyImageIconTexture;
+    private static bool _copyImageIconLoadAttempted;
     private static bool _suppressRightPressUntilRelease;
 
     public static void Attach(NRelicInventoryHolder? holder)
@@ -222,6 +227,8 @@ internal static class StatsTooltipPinManager
         RunHistoryContainerSubscriptions.Clear();
         _lockTexture = null;
         _lockLoadAttempted = false;
+        _copyImageIconTexture = null;
+        _copyImageIconLoadAttempted = false;
         _suppressRightPressUntilRelease = false;
     }
 
@@ -531,14 +538,17 @@ internal static class StatsTooltipPinManager
             return;
         }
 
+        var icon = GetCopyImageIcon();
         var button = new Button
         {
             Name = CopyImageButtonNodeName,
-            Text = CopyImageButtonText,
+            Text = icon == null ? "Copy" : string.Empty,
+            Icon = icon,
+            TooltipText = CopyImageButtonTooltip,
             Flat = true,
             FocusMode = Control.FocusModeEnum.None,
             MouseFilter = Control.MouseFilterEnum.Stop,
-            CustomMinimumSize = new Vector2(68f, 28f),
+            CustomMinimumSize = new Vector2(icon == null ? 68f : 34f, 28f),
             SizeFlagsHorizontal = Control.SizeFlags.ShrinkEnd,
             SizeFlagsVertical = Control.SizeFlags.ShrinkCenter,
         };
@@ -547,6 +557,10 @@ internal static class StatsTooltipPinManager
         button.AddThemeColorOverride("font_hover_color", Color.FromHtml("#E8EDF4"));
         button.AddThemeColorOverride("font_pressed_color", Color.FromHtml("#A9BCEB"));
         button.AddThemeColorOverride("font_disabled_color", Color.FromHtml("#94A0AE"));
+        button.AddThemeColorOverride("icon_normal_color", Color.FromHtml("#94A0AE"));
+        button.AddThemeColorOverride("icon_hover_color", Color.FromHtml("#E8EDF4"));
+        button.AddThemeColorOverride("icon_pressed_color", Color.FromHtml("#A9BCEB"));
+        button.AddThemeColorOverride("icon_disabled_color", Color.FromHtml("#94A0AE"));
 
         Action handler = OnCopyImageButtonPressed;
         button.Pressed += handler;
@@ -661,7 +675,7 @@ internal static class StatsTooltipPinManager
 
             if (generation == _copyImageGeneration && IsLive(button))
             {
-                button.Text = feedback;
+                button.TooltipText = feedback;
                 button.Visible = true;
                 button.Disabled = false;
             }
@@ -685,7 +699,7 @@ internal static class StatsTooltipPinManager
             var timer = tree.CreateTimer(CopyFeedbackDurationSeconds);
             await button.ToSignal(timer, SceneTreeTimer.SignalName.Timeout);
             if (generation == _copyImageGeneration && IsLive(button))
-                button.Text = CopyImageButtonText;
+                button.TooltipText = CopyImageButtonTooltip;
         }
         catch (Exception exception)
         {
@@ -1226,6 +1240,42 @@ internal static class StatsTooltipPinManager
         }
 
         return _lockTexture;
+    }
+
+    private static Texture2D? GetCopyImageIcon()
+    {
+        if (_copyImageIconLoadAttempted) return _copyImageIconTexture;
+        _copyImageIconLoadAttempted = true;
+
+        try
+        {
+            var assembly = typeof(StatsTooltipPinManager).Assembly;
+            var resourceName = Array.Find(
+                assembly.GetManifestResourceNames(),
+                name => name.EndsWith(
+                    CopyImageIconResourceSuffix,
+                    StringComparison.Ordinal));
+            if (resourceName == null)
+                throw new InvalidOperationException("embedded camera icon was not found");
+
+            using var stream = assembly.GetManifestResourceStream(resourceName)
+                ?? throw new InvalidOperationException("embedded camera icon could not be opened");
+            using var buffer = new MemoryStream();
+            stream.CopyTo(buffer);
+            using var image = Image.CreateEmpty(1, 1, false, Image.Format.Rgba8);
+            var loadError = image.LoadSvgFromBuffer(buffer.ToArray(), 1f);
+            if (loadError != Error.Ok)
+                throw new InvalidOperationException($"SVG loader returned {loadError}");
+
+            _copyImageIconTexture = ImageTexture.CreateFromImage(image);
+        }
+        catch (Exception exception)
+        {
+            CoreMain.Logger.Error(
+                $"Could not load stats image camera icon: {exception.Message}");
+        }
+
+        return _copyImageIconTexture;
     }
 
     private static void OnTargetTreeExiting(
