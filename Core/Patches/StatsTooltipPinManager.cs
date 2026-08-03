@@ -25,6 +25,7 @@ namespace SpireLens.Core.Patches;
 /// </summary>
 internal static class StatsTooltipPinManager
 {
+    private const float CardCaptureMargin = 10f;
     private const string PinOwnerNodeName = "SpireLensPinnedStatsTooltipOwner";
     private const string LockIconNodeName = "SpireLensStatsTooltipLock";
     private const string LockIconPath =
@@ -805,26 +806,14 @@ internal static class StatsTooltipPinManager
             return StatsImageCapture.GetViewportRect(visual);
 
         // NCard draws around a zero-sized Control origin, so its ordinary
-        // global rect is empty. Transform the known visual bounds instead.
-        var halfSize = NCard.defaultSize / 2f;
-        var transform = card.GetGlobalTransformWithCanvas();
-        var topLeft = transform * -halfSize;
-        var topRight = transform * new Vector2(halfSize.X, -halfSize.Y);
-        var bottomLeft = transform * new Vector2(-halfSize.X, halfSize.Y);
-        var bottomRight = transform * halfSize;
-        var left = Math.Min(
-            Math.Min(topLeft.X, topRight.X),
-            Math.Min(bottomLeft.X, bottomRight.X));
-        var top = Math.Min(
-            Math.Min(topLeft.Y, topRight.Y),
-            Math.Min(bottomLeft.Y, bottomRight.Y));
-        var right = Math.Max(
-            Math.Max(topLeft.X, topRight.X),
-            Math.Max(bottomLeft.X, bottomRight.X));
-        var bottom = Math.Max(
-            Math.Max(topLeft.Y, topRight.Y),
-            Math.Max(bottomLeft.Y, bottomRight.Y));
-        return new Rect2(left, top, right - left, bottom - top);
+        // global rect is empty. Its frame, cost badge, and shadow also extend
+        // slightly outside defaultSize; retain a small local-space margin so
+        // those details survive the viewport crop at every rendered scale.
+        var captureSize = NCard.defaultSize
+            + Vector2.One * (CardCaptureMargin * 2f);
+        return StatsImageCapture.TransformRect(
+            new Rect2(-captureSize / 2f, captureSize),
+            card.GetGlobalTransformWithCanvas());
     }
 
     private static bool TryBuildStatsTip(Control target, out HoverTip tip)
