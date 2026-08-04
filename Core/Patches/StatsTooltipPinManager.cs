@@ -580,7 +580,8 @@ internal static class StatsTooltipPinManager
             return;
         }
 
-        button!.MouseFilter = Control.MouseFilterEnum.Stop;
+        button!.Disabled = false;
+        button.MouseFilter = Control.MouseFilterEnum.Stop;
         button.TooltipText = CopyImageButtonTooltip;
         Action handler = OnCopyImageButtonPressed;
         button.Pressed += handler;
@@ -618,6 +619,7 @@ internal static class StatsTooltipPinManager
             Icon = icon,
             TooltipText = CopyImageButtonTooltip,
             Flat = true,
+            Disabled = true,
             FocusMode = Control.FocusModeEnum.None,
             MouseFilter = Control.MouseFilterEnum.Ignore,
             CustomMinimumSize = new Vector2(icon == null ? 68f : 34f, 28f),
@@ -659,8 +661,13 @@ internal static class StatsTooltipPinManager
         _copyImageButton = null;
         _copyImageButtonHandler = null;
 
-        if (IsLive(button) && handler != null)
-            button!.Pressed -= handler;
+        if (IsLive(button))
+        {
+            if (handler != null)
+                button!.Pressed -= handler;
+            button!.Disabled = true;
+            button.MouseFilter = Control.MouseFilterEnum.Ignore;
+        }
     }
 
     private static void OnCopyImageButtonPressed()
