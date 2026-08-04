@@ -68,7 +68,8 @@ public class BlockTooltipTests
         _ = AppendCompactBodyMethod.Invoke(null, new object?[] { sb, cardModel, agg });
         var text = sb.ToString();
 
-        Assert.Contains("[img=16x16]res://images/ui/combat/block.png[/img] gained", text);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("block"), text);
+        Assert.Contains("gained", text);
         Assert.Contains("[b]9[/b]", text);
     }
 
@@ -142,7 +143,7 @@ public class BlockTooltipTests
         _ = AppendCompactBodyMethod.Invoke(null, new object?[] { sb, cardModel, agg });
         var text = sb.ToString();
 
-        Assert.Contains("[img=16x16]res://images/atlases/power_atlas.sprites/draw_cards_next_turn_power.tres[/img] drawn", text);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("draw"), text);
         Assert.Contains("[b]4[/b]", text);
     }
 
@@ -162,9 +163,8 @@ public class BlockTooltipTests
         _ = AppendCompactBodyMethod.Invoke(null, new object?[] { sb, cardModel, agg });
         var text = sb.ToString();
 
-        Assert.Contains(
-            "[img=16x16]res://images/packed/sprite_fonts/ironclad_energy_icon.png[/img] gained",
-            text);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("energy"), text);
+        Assert.Contains("gained", text);
         Assert.Contains("[b]2[/b]", text);
     }
 
@@ -184,7 +184,8 @@ public class BlockTooltipTests
         _ = AppendCompactBodyMethod.Invoke(null, new object?[] { sb, cardModel, agg });
         var text = sb.ToString();
 
-        Assert.Contains("[img=16x16]res://images/packed/sprite_fonts/star_icon.png[/img] gained", text);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("stars"), text);
+        Assert.Contains("gained", text);
         Assert.Contains("[b]2[/b]", text);
     }
 
@@ -255,19 +256,15 @@ public class BlockTooltipTests
         Assert.Contains(
             "[img=16x16]res://images/orbs/frost.png[/img] created",
             text);
-        Assert.Contains(
-            "[img=16x16]res://images/orbs/frost.png[/img] passive activations",
-            text);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("activation"), text);
+        Assert.Contains("passive", text);
         Assert.Contains(
             "[img=16x16]res://images/orbs/frost.png[/img] evoked",
             text);
         Assert.Contains(
             "[img=16x16]res://images/orbs/frost.png[/img] fizzled",
             text);
-        Assert.Contains(
-            "[img=16x16]res://images/orbs/frost.png[/img] "
-            + "[img=16x16]res://images/ui/combat/block.png[/img]",
-            text);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("block"), text);
         Assert.Contains("[b]17[/b]", text);
     }
 
@@ -293,9 +290,10 @@ public class BlockTooltipTests
         _ = AppendCardDrawStatsMethod.Invoke(null, new object?[] { sb, agg });
         var text = sb.ToString();
 
-        Assert.Contains("[img=16x16]res://images/atlases/power_atlas.sprites/draw_cards_next_turn_power.tres[/img] drawn / tried", text);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("draw"), text);
+        Assert.Contains("tried", text);
         Assert.Contains("[b]1/3[/b]", text);
-        Assert.Contains("[img=16x16]res://images/atlases/power_atlas.sprites/draw_cards_next_turn_power.tres[/img] blocked by No Draw", text);
+        Assert.Contains("blocked by No", text);
         Assert.Contains("[b]2[/b]", text);
     }
 
@@ -312,9 +310,10 @@ public class BlockTooltipTests
         _ = AppendCardDrawStatsMethod.Invoke(null, new object?[] { sb, agg });
         var text = sb.ToString();
 
-        Assert.Contains("[img=16x16]res://images/atlases/power_atlas.sprites/draw_cards_next_turn_power.tres[/img] drawn / tried", text);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("draw"), text);
+        Assert.Contains("tried", text);
         Assert.Contains("[b]0/3[/b]", text);
-        Assert.Contains("[img=16x16]res://images/atlases/power_atlas.sprites/draw_cards_next_turn_power.tres[/img] blocked by other", text);
+        Assert.Contains("blocked by other", text);
     }
 
     [Fact]
@@ -339,7 +338,8 @@ public class BlockTooltipTests
         _ = AppendCardDrawStatsMethod.Invoke(null, new object?[] { sb, agg });
         var text = sb.ToString();
 
-        Assert.Contains("[img=16x16]res://images/atlases/power_atlas.sprites/draw_cards_next_turn_power.tres[/img] blocked by hand full", text);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("draw"), text);
+        Assert.Contains("blocked by hand full", text);
         Assert.Contains("[b]2[/b]", text);
     }
     private static CardModel CreateCardModel(CardType type)

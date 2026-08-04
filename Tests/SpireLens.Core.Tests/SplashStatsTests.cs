@@ -120,11 +120,17 @@ public class SplashStatsTests
         Assert.Contains(StatConceptGlossary.RenderHintedGlyph("attack_rare"), body);
         Assert.Contains(StatConceptGlossary.RenderHintedGlyph("taken"), body);
         Assert.DoesNotContain("[color=#e0e0e0]taken", body);
-        Assert.Contains("avg discount", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("energy"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("average"), body);
+        Assert.Contains("discount", body);
         Assert.Contains("[b]1.17[/b]", body);
         Assert.Contains(
             StatConceptGlossary.RenderInformationHint(
                 "Common Attacks selected from Splash."),
+            body);
+        Assert.Contains(
+            StatConceptGlossary.RenderInformationHint(
+                "Average energy-cost discount applied to Attacks selected from Splash."),
             body);
     }
 

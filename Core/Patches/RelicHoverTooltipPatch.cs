@@ -6465,7 +6465,7 @@ public static class RelicHoverShowPatch
         string fullDescription,
         string pct = "")
     {
-        var presentation = StatsTooltip.CreateStatRowPresentation(
+        var presentation = CreateRowPresentation(
             label,
             fullDescription,
             conceptIds,
@@ -6566,7 +6566,7 @@ public static class RelicHoverShowPatch
         string fullDescription,
         string pct = "")
     {
-        var presentation = StatsTooltip.CreateStatRowPresentation(
+        var presentation = CreateRowPresentation(
             label,
             fullDescription,
             conceptIds,
@@ -6593,6 +6593,33 @@ public static class RelicHoverShowPatch
         sb.Append("[/cell]");
         sb.Append(StatsTableClose);
     }
+
+    private static RelicStatRowPresentation CreateRowPresentation(
+        string label,
+        string fullDescription,
+        IReadOnlyList<string> conceptIds,
+        IReadOnlyList<string> denominatorConceptIds)
+    {
+        if (!IsPrecomposedLabelMarkup(label))
+        {
+            return StatsTooltip.CreateStatRowPresentation(
+                label,
+                fullDescription,
+                conceptIds,
+                denominatorConceptIds);
+        }
+
+        var presentation = StatsTooltip.CreateStatRowPresentation(
+            string.Empty,
+            fullDescription,
+            conceptIds,
+            denominatorConceptIds);
+        return presentation with { Label = label };
+    }
+
+    private static bool IsPrecomposedLabelMarkup(string label)
+        => label.StartsWith("[b]", StringComparison.Ordinal)
+           || label.StartsWith("[hint", StringComparison.Ordinal);
 
     private static void AppendConceptLabel(
         StringBuilder sb,
