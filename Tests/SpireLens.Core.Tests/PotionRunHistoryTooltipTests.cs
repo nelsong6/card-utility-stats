@@ -84,13 +84,15 @@ public class PotionRunHistoryTooltipTests
             ?? throw new InvalidOperationException("BuildTooltipTitle returned null."));
 
         Assert.Equal("Swift Potion 1", title);
-        Assert.Contains("Acquired  [b]Floor 5[/b]\n", acquiredBody);
+        Assert.Contains(
+            $"{StatConceptGlossary.RenderHintedGlyph("taken")}  [b]Floor 5[/b]\n",
+            acquiredBody);
         Assert.Contains("Shop  [b]Merchant[/b]\n", acquiredBody);
         Assert.DoesNotContain("Used  ", acquiredBody);
         Assert.Contains("Used  [b]Floor 7[/b]\n", usedBody);
         Assert.Contains("Elite combat  [b]Lagavulin[/b]\n", usedBody);
         Assert.Contains("Turn  [b]2[/b]", usedBody);
-        Assert.DoesNotContain("Acquired  ", usedBody);
+        Assert.DoesNotContain(StatConceptGlossary.RenderHintedGlyph("taken"), usedBody);
     }
 
     [Fact]

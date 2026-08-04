@@ -639,11 +639,12 @@ internal static class PotionCompendiumHistoryUi
         {
             AppendLocationRows(
                 body,
-                "Acquired",
+                StatConceptGlossary.RenderHintedGlyph("taken"),
                 entry.AcquiredFloor,
                 entry.AcquiredLocationKind,
                 entry.AcquiredLocationName,
-                entry.AcquiredTurn);
+                entry.AcquiredTurn,
+                timingLabelIsBbcode: true);
             AppendTooltipRow(body, "Method", entry.AcquisitionMethod);
             if (!entry.Used
                 && !entry.Discarded
@@ -762,7 +763,8 @@ internal static class PotionCompendiumHistoryUi
         string label,
         string value,
         string? fullDescription = null,
-        bool valueIsBbcode = false)
+        bool valueIsBbcode = false,
+        bool labelIsBbcode = false)
     {
         if (!string.IsNullOrWhiteSpace(fullDescription))
         {
@@ -780,7 +782,7 @@ internal static class PotionCompendiumHistoryUi
         }
         else
         {
-            body.Append(StatsTooltip.EscapeBbcode(label));
+            body.Append(labelIsBbcode ? label : StatsTooltip.EscapeBbcode(label));
         }
         body.Append("  [b]");
         body.Append(valueIsBbcode ? value : StatsTooltip.EscapeBbcode(value));
@@ -793,7 +795,8 @@ internal static class PotionCompendiumHistoryUi
         int? floor,
         string? kind,
         string? name,
-        int? turn)
+        int? turn,
+        bool timingLabelIsBbcode = false)
     {
         var hasKind = !string.IsNullOrWhiteSpace(kind);
         var hasName = !string.IsNullOrWhiteSpace(name);
@@ -804,7 +807,8 @@ internal static class PotionCompendiumHistoryUi
                 ? $"Floor {floor.Value}"
                 : hasKind || hasName
                     ? "Floor unknown"
-                    : "Unknown location");
+                    : "Unknown location",
+            labelIsBbcode: timingLabelIsBbcode);
 
         if (hasKind && hasName)
         {

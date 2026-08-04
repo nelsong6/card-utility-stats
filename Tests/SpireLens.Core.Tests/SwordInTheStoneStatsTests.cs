@@ -151,6 +151,7 @@ public class SwordInTheStoneStatsTests
         var body = BuildJadeBody(agg);
 
         Assert.Contains("Floor acquired", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("taken"), body);
         Assert.Contains("Elites slain", body);
         Assert.Contains("Average floors ascended between consecutive Elite victories", body);
         Assert.Contains("Gremlin Nob", body);
@@ -175,6 +176,7 @@ public class SwordInTheStoneStatsTests
         var body = BuildBody(PopulatedAggregate());
 
         Assert.Contains("Floor acquired", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("taken"), body);
         Assert.Contains("Elites slain", body);
         Assert.Contains("Average floors ascended between consecutive Elite victories", body);
         Assert.DoesNotContain("Times activated", body);

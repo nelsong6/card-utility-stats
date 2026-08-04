@@ -148,6 +148,9 @@ internal static class RelicStatRowVocabulary
         Rule("energy", @"\benergy\b"),
         Rule("elite", @"\belites?\b", true),
         Rule("exhaust", @"\bexhaust(?:ed|ing|s)?\b"),
+        Rule(
+            "taken",
+            @"\bfloors?\s+acquired\b|(?<!not\s)\b(?:acquired|taken)\b"),
         Rule("floor", @"\bfloors?\b", true),
         Rule("fruit_juice", @"\bfruit\s+juices?\b"),
         Rule("glam", @"\bglam\b"),
@@ -175,7 +178,6 @@ internal static class RelicStatRowVocabulary
         Rule("strength_gained", @"\bstrength\s+(?:added|gained)\b"),
         Rule("strength", @"\bstrength\b"),
         Rule("swift", @"\bswift\b"),
-        Rule("taken", @"(?<!not\s)\btaken\b"),
         Rule("targets_hit", @"\btargets?\s+hit\b"),
         Rule("turn", @"\bturns?\b", true),
         Rule(
