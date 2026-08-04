@@ -21577,6 +21577,30 @@ public static class RunTracker
         }
     }
 
+    public static void RecordCrackedCoreStartingOrbDamage(
+        OrbModel orb,
+        IEnumerable<DamageResult>? results)
+    {
+        if (orb == null || results == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat?.CrackedCoreStartingOrbs.Contains(orb) != true)
+                    return;
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(CrackedCoreRelicId);
+                AddRelicDamageResultsLocked(agg, results);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordCrackedCoreStartingOrbDamage failed: {e.Message}");
+            }
+        }
+    }
+
     public static void RecordCrackedCoreStartingOrbsFizzled(IEnumerable<OrbModel> removedOrbs)
     {
         if (removedOrbs == null) return;
@@ -21621,6 +21645,26 @@ public static class RunTracker
     {
         if (agg == null) return;
         agg.CrackedCoreOrbFizzles += Math.Max(0, count);
+    }
+
+    internal static void RecordCrackedCoreOrbDamageForTest(
+        RelicAggregate agg,
+        IEnumerable<(
+            int BlockedDamage,
+            int UnblockedDamage,
+            int OverkillDamage,
+            bool WasTargetKilled)> results)
+    {
+        if (agg == null || results == null) return;
+        foreach (var result in results)
+        {
+            AddRelicDamageResultPartsLocked(
+                agg,
+                result.BlockedDamage,
+                result.UnblockedDamage,
+                result.OverkillDamage,
+                result.WasTargetKilled);
+        }
     }
 
     /// <summary>

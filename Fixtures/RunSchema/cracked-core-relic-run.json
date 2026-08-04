@@ -13,7 +13,13 @@
     "RELIC.CRACKED_CORE": {
       "cracked_core_orb_evokes": 3,
       "cracked_core_orb_passive_triggers": 7,
-      "cracked_core_orb_fizzles": 1
+      "cracked_core_orb_fizzles": 1,
+      "total_damage_attempted": 15,
+      "total_damage_dealt": 10,
+      "total_damage_blocked": 2,
+      "total_damage_overkill": 3,
+      "kills": 1,
+      "total_targets": 2
     }
   },
   "enemy_aggregates": {},

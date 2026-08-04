@@ -4870,6 +4870,12 @@ public class SchemaLoadingTests
         Assert.Equal(3, relicAgg.CrackedCoreOrbEvokes);
         Assert.Equal(7, relicAgg.CrackedCoreOrbPassiveTriggers);
         Assert.Equal(1, relicAgg.CrackedCoreOrbFizzles);
+        Assert.Equal(15, relicAgg.TotalDamageAttempted);
+        Assert.Equal(10, relicAgg.TotalDamageDealt);
+        Assert.Equal(2, relicAgg.TotalDamageBlocked);
+        Assert.Equal(3, relicAgg.TotalDamageOverkill);
+        Assert.Equal(1, relicAgg.Kills);
+        Assert.Equal(2, relicAgg.TotalTargets);
     }
 
     private static void AssertSymbioticVirusFixture(RelicAggregate relicAgg)

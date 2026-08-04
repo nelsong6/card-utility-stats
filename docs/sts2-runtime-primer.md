@@ -1430,7 +1430,12 @@ around that completed callback and retain the exact newly added mutable
 multi-evoke effects therefore count every actual evoke. The gameplay
 non-evoke removal path is `OrbQueue.RemoveCapacity`, currently used by Bulk
 Up, so compare raw queue references around that method for fizzles. Normal
-combat cleanup uses `OrbQueue.Clear` and must not count as a fizzle.
+combat cleanup uses `OrbQueue.Clear` and must not count as a fizzle. For damage,
+scope Lightning's private `ApplyLightningDamage` call to that exact tracked orb
+and observe the returned `DamageResult` values from its five-parameter
+`CreatureCmd.Damage` command. This preserves the actual attempted, effective,
+blocked, overkill, kill, and target outcomes without claiming damage from other
+Lightning orbs owned at the same time.
 
 Symbiotic Virus follows the same exact-reference lifecycle with its
 owner-specific `AfterSideTurnStart` callback and the newly queued mutable

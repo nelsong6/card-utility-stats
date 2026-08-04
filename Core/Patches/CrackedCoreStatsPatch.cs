@@ -1,14 +1,18 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using HarmonyLib;
+using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Entities.Orbs;
+using MegaCrit.Sts2.Core.GameActions.Multiplayer;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Orbs;
 using MegaCrit.Sts2.Core.Models.Relics;
+using MegaCrit.Sts2.Core.ValueProps;
 
 namespace SpireLens.Core.Patches;
 
@@ -166,6 +170,114 @@ public static class CrackedCoreStartingOrbEvokeStatsPatch
         var targets = await inner;
         RunTracker.RecordCrackedCoreStartingOrbEvoked(orb);
         return targets;
+    }
+}
+
+/// <summary>
+/// Establishes a synchronous scope around Lightning's private damage routine.
+/// The routine invokes CreatureCmd.Damage before reaching its first await, so
+/// the exact command can identify which tracked orb caused it without claiming
+/// damage from any other Lightning orb owned at the same time.
+/// </summary>
+[HarmonyPatch]
+public static class CrackedCoreLightningDamageScopePatch
+{
+    private const string ApplyLightningDamageMethodName = "ApplyLightningDamage";
+
+    [ThreadStatic]
+    private static LightningOrb? _activeTrackedOrb;
+
+    private static MethodBase TargetMethod()
+    {
+        return AccessTools.DeclaredMethod(
+                   typeof(LightningOrb),
+                   ApplyLightningDamageMethodName,
+                   [
+                       typeof(decimal),
+                       typeof(Creature),
+                       typeof(PlayerChoiceContext),
+                       typeof(bool),
+                   ])
+               ?? throw new MissingMethodException(
+                   typeof(LightningOrb).FullName,
+                   ApplyLightningDamageMethodName);
+    }
+
+    [HarmonyPrefix]
+    public static void Prefix(LightningOrb __instance, out LightningOrb? __state)
+    {
+        __state = _activeTrackedOrb;
+        _activeTrackedOrb = RunTracker.IsTrackedCrackedCoreStartingOrb(__instance)
+            ? __instance
+            : null;
+    }
+
+    [HarmonyFinalizer]
+    public static Exception? Finalizer(Exception? __exception, LightningOrb? __state)
+    {
+        _activeTrackedOrb = __state;
+        return __exception;
+    }
+
+    internal static LightningOrb? GetActiveTrackedOrb(Creature? dealer)
+    {
+        var orb = _activeTrackedOrb;
+        return orb != null
+               && ReferenceEquals(orb.Owner?.Creature, dealer)
+            ? orb
+            : null;
+    }
+}
+
+/// <summary>
+/// Captures the resolved damage split from the exact CreatureCmd.Damage call
+/// made by a tracked Cracked Core Lightning orb.
+/// </summary>
+[HarmonyPatch(
+    typeof(CreatureCmd),
+    nameof(CreatureCmd.Damage),
+    [
+        typeof(PlayerChoiceContext),
+        typeof(IEnumerable<Creature>),
+        typeof(decimal),
+        typeof(ValueProp),
+        typeof(Creature),
+    ])]
+public static class CrackedCoreLightningDamageResultPatch
+{
+    [HarmonyPrefix]
+    public static void Prefix(Creature dealer, out LightningOrb? __state)
+    {
+        __state = CrackedCoreLightningDamageScopePatch.GetActiveTrackedOrb(dealer);
+    }
+
+    [HarmonyPostfix]
+    public static void Postfix(
+        LightningOrb? __state,
+        ref Task<IEnumerable<DamageResult>> __result)
+    {
+        if (__state == null || __result == null) return;
+        __result = ObserveDamageAsync(__result, __state);
+    }
+
+    private static async Task<IEnumerable<DamageResult>> ObserveDamageAsync(
+        Task<IEnumerable<DamageResult>> inner,
+        LightningOrb orb)
+    {
+        try
+        {
+            var results = await inner.ConfigureAwait(false);
+            var materialized = results as IReadOnlyList<DamageResult>
+                ?? results.ToList();
+            RunTracker.RecordCrackedCoreStartingOrbDamage(orb, materialized);
+            return materialized;
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug(
+                $"CrackedCoreLightningDamageResultPatch observation failed: {e.Message}");
+            throw;
+        }
     }
 }
 

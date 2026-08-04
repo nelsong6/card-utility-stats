@@ -2169,6 +2169,12 @@ public static class RelicHoverShowPatch
             agg.CrackedCoreOrbPassiveTriggers.ToString(),
             "");
         Row3(sb, "Times orb fizzled", agg.CrackedCoreOrbFizzles.ToString(), "");
+        Row3(sb, "Damage attempted", agg.TotalDamageAttempted.ToString(), "");
+        Row3(sb, "Damage dealt", agg.TotalDamageDealt.ToString(), "");
+        Row3(sb, "Damage blocked", agg.TotalDamageBlocked.ToString(), "");
+        Row3(sb, "Overkill", agg.TotalDamageOverkill.ToString(), "");
+        Row3(sb, "Kills", agg.Kills.ToString(), "");
+        Row3(sb, "Targets hit", agg.TotalTargets.ToString(), "");
         return sb.ToString();
     }
 

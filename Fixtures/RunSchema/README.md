@@ -380,7 +380,9 @@ New fixtures added going forward do not need a `v*-` prefix.
   for its total and average rows.
 - `cracked-core-relic-run.json`
   Adds lifecycle tracking for the exact Lightning orb Cracked Core channels:
-  completed evokes, passive triggers, and non-evoke slot-removal fizzles.
+  completed evokes, passive triggers, non-evoke slot-removal fizzles, and the
+  observed attempted/dealt/blocked/overkill/kill/target damage split from that
+  exact orb.
 - `symbiotic-virus-relic-run.json`
   Adds lifecycle tracking for the exact Dark orb Symbiotic Virus channels:
   completed evokes, passive triggers, and non-evoke slot-removal fizzles.

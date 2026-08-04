@@ -2,11 +2,13 @@ using System;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Entities.Orbs;
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
 using MegaCrit.Sts2.Core.Models.Orbs;
 using MegaCrit.Sts2.Core.Models.Relics;
+using MegaCrit.Sts2.Core.ValueProps;
 using SpireLens.Core;
 using SpireLens.Core.Patches;
 using Xunit;
@@ -36,6 +38,44 @@ public class CrackedCoreStatsTests
         Assert.NotNull(typeof(OrbQueue).GetMethod(
             nameof(OrbQueue.RemoveCapacity),
             new[] { typeof(int) }));
+
+        var applyLightningDamage = typeof(LightningOrb).GetMethod(
+            "ApplyLightningDamage",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(applyLightningDamage);
+        Assert.Equal(
+            new[]
+            {
+                typeof(decimal),
+                typeof(Creature),
+                typeof(PlayerChoiceContext),
+                typeof(bool),
+            },
+            applyLightningDamage!.GetParameters()
+                .Select(parameter => parameter.ParameterType)
+                .ToArray());
+        Assert.Equal(
+            new[] { "value", "target", "choiceContext", "isEvoke" },
+            applyLightningDamage.GetParameters()
+                .Select(parameter => parameter.Name)
+                .ToArray());
+
+        var damage = typeof(CreatureCmd).GetMethod(
+            nameof(CreatureCmd.Damage),
+            new[]
+            {
+                typeof(PlayerChoiceContext),
+                typeof(IEnumerable<Creature>),
+                typeof(decimal),
+                typeof(ValueProp),
+                typeof(Creature),
+            });
+        Assert.NotNull(damage);
+        Assert.Equal(
+            new[] { "choiceContext", "targets", "amount", "props", "dealer" },
+            damage!.GetParameters()
+                .Select(parameter => parameter.Name)
+                .ToArray());
     }
 
     [Fact]
@@ -46,6 +86,12 @@ public class CrackedCoreStatsTests
         Assert.Equal(0, agg.CrackedCoreOrbEvokes);
         Assert.Equal(0, agg.CrackedCoreOrbPassiveTriggers);
         Assert.Equal(0, agg.CrackedCoreOrbFizzles);
+        Assert.Equal(0, agg.TotalDamageAttempted);
+        Assert.Equal(0, agg.TotalDamageDealt);
+        Assert.Equal(0, agg.TotalDamageBlocked);
+        Assert.Equal(0, agg.TotalDamageOverkill);
+        Assert.Equal(0, agg.Kills);
+        Assert.Equal(0, agg.TotalTargets);
     }
 
     [Fact]
@@ -60,18 +106,25 @@ public class CrackedCoreStatsTests
         Assert.Contains("\"cracked_core_orb_evokes\"", json);
         Assert.Contains("\"cracked_core_orb_passive_triggers\"", json);
         Assert.Contains("\"cracked_core_orb_fizzles\"", json);
+        Assert.Contains("\"total_damage_attempted\"", json);
+        Assert.Contains("\"total_damage_dealt\"", json);
+        Assert.Contains("\"total_damage_blocked\"", json);
+        Assert.Contains("\"total_damage_overkill\"", json);
+        Assert.Contains("\"kills\"", json);
+        Assert.Contains("\"total_targets\"", json);
         Assert.NotNull(restored);
         AssertPopulatedAggregate(restored!.RelicAggregates[CrackedCoreRelicId]);
     }
 
     [Fact]
-    public void RunTracker_CrackedCoreHelpers_AccumulateLifecycleOutcomes()
+    public void RunTracker_CrackedCoreHelpers_AccumulateLifecycleAndDamageOutcomes()
     {
         var agg = new RelicAggregate();
 
         RunTracker.RecordCrackedCoreOrbEvokedForTest(agg, 3);
         RunTracker.RecordCrackedCoreOrbPassiveForTest(agg, 7);
         RunTracker.RecordCrackedCoreOrbFizzledForTest(agg);
+        RecordRepresentativeDamage(agg);
 
         AssertPopulatedAggregate(agg);
     }
@@ -100,6 +153,12 @@ public class CrackedCoreStatsTests
         Assert.Equal(6, target.CrackedCoreOrbEvokes);
         Assert.Equal(14, target.CrackedCoreOrbPassiveTriggers);
         Assert.Equal(2, target.CrackedCoreOrbFizzles);
+        Assert.Equal(30, target.TotalDamageAttempted);
+        Assert.Equal(20, target.TotalDamageDealt);
+        Assert.Equal(4, target.TotalDamageBlocked);
+        Assert.Equal(6, target.TotalDamageOverkill);
+        Assert.Equal(2, target.Kills);
+        Assert.Equal(4, target.TotalTargets);
     }
 
     [Fact]
@@ -113,6 +172,16 @@ public class CrackedCoreStatsTests
         Assert.Contains("[b]7[/b]", body);
         Assert.Contains("Times orb fizzled", body);
         Assert.Contains("[b]1[/b]", body);
+        Assert.Contains("Damage attempted", body);
+        Assert.Contains("[b]15[/b]", body);
+        Assert.Contains("Damage dealt", body);
+        Assert.Contains("[b]10[/b]", body);
+        Assert.Contains("Damage blocked", body);
+        Assert.Contains("[b]2[/b]", body);
+        Assert.Contains("Overkill", body);
+        Assert.Contains("[b]3[/b]", body);
+        Assert.Contains("Kills", body);
+        Assert.Contains("Targets hit", body);
     }
 
     [Fact]
@@ -142,6 +211,12 @@ public class CrackedCoreStatsTests
         Assert.Equal(0, agg!.CrackedCoreOrbEvokes);
         Assert.Equal(0, agg.CrackedCoreOrbPassiveTriggers);
         Assert.Equal(0, agg.CrackedCoreOrbFizzles);
+        Assert.Equal(0, agg.TotalDamageAttempted);
+        Assert.Equal(0, agg.TotalDamageDealt);
+        Assert.Equal(0, agg.TotalDamageBlocked);
+        Assert.Equal(0, agg.TotalDamageOverkill);
+        Assert.Equal(0, agg.Kills);
+        Assert.Equal(0, agg.TotalTargets);
     }
 
     private static RelicAggregate PopulatedAggregate()
@@ -150,7 +225,26 @@ public class CrackedCoreStatsTests
         RunTracker.RecordCrackedCoreOrbEvokedForTest(agg, 3);
         RunTracker.RecordCrackedCoreOrbPassiveForTest(agg, 7);
         RunTracker.RecordCrackedCoreOrbFizzledForTest(agg);
+        RecordRepresentativeDamage(agg);
         return agg;
+    }
+
+    private static void RecordRepresentativeDamage(RelicAggregate agg)
+    {
+        RunTracker.RecordCrackedCoreOrbDamageForTest(
+            agg,
+            [
+                (
+                    BlockedDamage: 2,
+                    UnblockedDamage: 6,
+                    OverkillDamage: 0,
+                    WasTargetKilled: false),
+                (
+                    BlockedDamage: 0,
+                    UnblockedDamage: 4,
+                    OverkillDamage: 3,
+                    WasTargetKilled: true),
+            ]);
     }
 
     private static void AssertPopulatedAggregate(RelicAggregate agg)
@@ -158,6 +252,12 @@ public class CrackedCoreStatsTests
         Assert.Equal(3, agg.CrackedCoreOrbEvokes);
         Assert.Equal(7, agg.CrackedCoreOrbPassiveTriggers);
         Assert.Equal(1, agg.CrackedCoreOrbFizzles);
+        Assert.Equal(15, agg.TotalDamageAttempted);
+        Assert.Equal(10, agg.TotalDamageDealt);
+        Assert.Equal(2, agg.TotalDamageBlocked);
+        Assert.Equal(3, agg.TotalDamageOverkill);
+        Assert.Equal(1, agg.Kills);
+        Assert.Equal(2, agg.TotalTargets);
     }
 
     private static string BuildBody(RelicAggregate agg)
