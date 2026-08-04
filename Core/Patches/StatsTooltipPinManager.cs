@@ -604,7 +604,11 @@ internal static class StatsTooltipPinManager
             return null;
 
         var existing = header.GetNodeOrNull<Button>(CopyImageButtonNodeName);
-        if (IsLive(existing)) return existing;
+        if (IsLive(existing))
+        {
+            MoveCopyImageButtonBeforeBrand(header, existing!);
+            return existing;
+        }
 
         var icon = GetCopyImageIcon();
         var button = new Button
@@ -631,7 +635,18 @@ internal static class StatsTooltipPinManager
         button.AddThemeColorOverride("icon_disabled_color", Color.FromHtml("#94A0AE"));
 
         header.AddChild(button);
+        MoveCopyImageButtonBeforeBrand(header, button);
         return button;
+    }
+
+    private static void MoveCopyImageButtonBeforeBrand(
+        HBoxContainer header,
+        Button button)
+    {
+        var brand = header.GetNodeOrNull<Label>(
+            NativeStatsHoverTipStyler.BrandNodeName);
+        if (IsLive(brand) && button.GetIndex() > brand!.GetIndex())
+            header.MoveChild(button, brand.GetIndex());
     }
 
     private static void DetachCopyImageButton()

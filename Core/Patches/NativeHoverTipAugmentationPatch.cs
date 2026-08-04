@@ -94,7 +94,7 @@ internal static class NativeHoverTipCreateStatsPatch
 /// </summary>
 internal static class NativeStatsHoverTipStyler
 {
-    private const string BrandNodeName = "SpireLensBrand";
+    internal const string BrandNodeName = "SpireLensBrand";
     private const string BrandSpacerNodeName = "SpireLensBrandSpacer";
     private const string RegularFontPath =
         "res://themes/kreon_regular_glyph_space_one.tres";
@@ -156,8 +156,8 @@ internal static class NativeStatsHoverTipStyler
 
         // The native hover-tip scene is a MarginContainer whose header is an
         // HBoxContainer. Preserve every native title setting and give the
-        // header a separate expanding spacer; that pushes only the brand to
-        // the right edge without widening or re-aligning the title control.
+        // header a separate expanding spacer; that pushes the camera/brand
+        // pair to the right edge without re-aligning the title control.
         var spacer = new Control
         {
             Name = BrandSpacerNodeName,
