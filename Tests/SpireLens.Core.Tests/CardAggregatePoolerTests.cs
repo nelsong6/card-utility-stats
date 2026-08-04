@@ -32,6 +32,12 @@ public class CardAggregatePoolerTests
             Created = 2,
             PassiveActivations = 4,
             Evokes = 1,
+            DamageAttempted = 10,
+            DamageDealt = 8,
+            DamageBlocked = 1,
+            DamageOverkill = 1,
+            Kills = 1,
+            TargetsHit = 2,
         };
         first.AppliedEffects["POWER.ARTIFACT"] = new AppliedEffectAggregate
         {
@@ -91,6 +97,12 @@ public class CardAggregatePoolerTests
             PassiveActivations = 6,
             Evokes = 2,
             Fizzles = 1,
+            DamageAttempted = 20,
+            DamageDealt = 15,
+            DamageBlocked = 3,
+            DamageOverkill = 2,
+            Kills = 2,
+            TargetsHit = 4,
         };
         second.AppliedEffects["POWER.VULNERABLE"] = new AppliedEffectAggregate
         {
@@ -152,6 +164,12 @@ public class CardAggregatePoolerTests
         Assert.Equal(10, pooled.OrbOutcomes["ORB.LIGHTNING"].PassiveActivations);
         Assert.Equal(3, pooled.OrbOutcomes["ORB.LIGHTNING"].Evokes);
         Assert.Equal(1, pooled.OrbOutcomes["ORB.LIGHTNING"].Fizzles);
+        Assert.Equal(30, pooled.OrbOutcomes["ORB.LIGHTNING"].DamageAttempted);
+        Assert.Equal(23, pooled.OrbOutcomes["ORB.LIGHTNING"].DamageDealt);
+        Assert.Equal(4, pooled.OrbOutcomes["ORB.LIGHTNING"].DamageBlocked);
+        Assert.Equal(3, pooled.OrbOutcomes["ORB.LIGHTNING"].DamageOverkill);
+        Assert.Equal(3, pooled.OrbOutcomes["ORB.LIGHTNING"].Kills);
+        Assert.Equal(6, pooled.OrbOutcomes["ORB.LIGHTNING"].TargetsHit);
         Assert.Equal(4, pooled.TimesCardsDrawAttempted);
         Assert.Equal(3, pooled.TimesCardsDrawBlocked);
         Assert.Equal(18, pooled.TotalOstyHpAttackBonus);

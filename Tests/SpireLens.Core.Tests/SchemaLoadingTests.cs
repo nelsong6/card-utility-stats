@@ -5373,6 +5373,52 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsBallLightningOrbDamageFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("ball-lightning-orb-damage-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertBallLightningOrbDamageFixture(
+            loaded.Data.Aggregates["CARD.BALL_LIGHTNING#1"]);
+        Assert.Equal(4, loaded.Data.Events.Count(entry =>
+            entry.Type == "orb_damage"
+            && entry.OrbId == "ORB.LIGHTNING"));
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsBallLightningOrbDamageFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("ball-lightning-orb-damage-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertBallLightningOrbDamageFixture(
+            resumed!.Aggregates["CARD.BALL_LIGHTNING#1"]);
+    }
+
+    private static void AssertBallLightningOrbDamageFixture(
+        CardAggregate aggregate)
+    {
+        Assert.Equal(2, aggregate.TotalOrbsCreated);
+        Assert.Equal(0, aggregate.TotalIntended);
+        Assert.Equal(0, aggregate.TotalEffective);
+        var lightning = aggregate.OrbOutcomes["ORB.LIGHTNING"];
+        Assert.Equal("ORB.LIGHTNING", lightning.OrbId);
+        Assert.Equal(2, lightning.Created);
+        Assert.Equal(3, lightning.PassiveActivations);
+        Assert.Equal(1, lightning.Evokes);
+        Assert.Equal(0, lightning.Fizzles);
+        Assert.Equal(18, lightning.DamageAttempted);
+        Assert.Equal(12, lightning.DamageDealt);
+        Assert.Equal(4, lightning.DamageBlocked);
+        Assert.Equal(2, lightning.DamageOverkill);
+        Assert.Equal(1, lightning.Kills);
+        Assert.Equal(4, lightning.TargetsHit);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsPotionRunHistoryFixture()
     {
         var loaded = RunStorage.LoadHistorical(

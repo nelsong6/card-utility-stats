@@ -680,6 +680,16 @@ public class CardOrbAggregate
     // Observed block created by this orb type. This remains separate from the
     // originating card's direct block totals and provenance ledger.
     public int BlockGained { get; set; }
+
+    // Observed damage created by this orb type. These remain separate from the
+    // originating card's direct Attack damage so cards such as Ball Lightning
+    // expose both values without blending them.
+    public int DamageAttempted { get; set; }
+    public int DamageDealt { get; set; }
+    public int DamageBlocked { get; set; }
+    public int DamageOverkill { get; set; }
+    public int Kills { get; set; }
+    public int TargetsHit { get; set; }
 }
 
 public class RunMetaStats
@@ -1998,7 +2008,7 @@ public readonly record struct CardRewardCategoryObservation(string Key, string D
 public class CardEvent
 {
     public string T { get; set; } = "";          // ISO-8601 UTC timestamp
-    public string Type { get; set; } = "";       // "card_played" | "damage_received" | "energy_gained" | "stars_gained" | "forge_gained" | "orb_created" | "orb_passive" | "orb_evoked" | "orb_fizzled" | "orb_block_gained"
+    public string Type { get; set; } = "";       // "card_played" | "damage_received" | "energy_gained" | "stars_gained" | "forge_gained" | "orb_created" | "orb_passive" | "orb_evoked" | "orb_fizzled" | "orb_block_gained" | "orb_damage"
     public string CardId { get; set; } = "";
 
     // card_played fields
@@ -2017,7 +2027,7 @@ public class CardEvent
     public int? Floor { get; set; }
     public int? UpgradeLevel { get; set; }
 
-    // damage_received fields (only populated when Type == "damage_received" with a CardSource)
+    // damage_received / orb_damage fields
     public string? Receiver { get; set; }
     public int? Blocked { get; set; }
     public int? Unblocked { get; set; }

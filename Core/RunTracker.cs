@@ -3573,6 +3573,59 @@ public static class RunTracker
         }
     }
 
+    public static void RecordCardSourcedOrbDamage(
+        OrbModel? orb,
+        IEnumerable<DamageResult>? results)
+    {
+        if (orb == null || results == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null
+                    || !_pendingCombat.CardSourceByOrb.TryGetValue(
+                        orb,
+                        out var instanceId))
+                {
+                    return;
+                }
+
+                var aggregate = GetOrCreateAggregate(_pendingCombat, instanceId);
+                var orbId = orb.Id.ToString();
+                var outcome = GetOrCreateCardOrbAggregate(aggregate, orbId);
+                foreach (var result in results)
+                {
+                    if (result == null) continue;
+                    AddCardOrbDamageResultPartsLocked(
+                        outcome,
+                        result.BlockedDamage,
+                        result.UnblockedDamage,
+                        result.OverkillDamage,
+                        result.WasTargetKilled);
+                    _pendingCombat.CombatEvents.Add(new CardEvent
+                    {
+                        T = Now(),
+                        Type = "orb_damage",
+                        CardId = instanceId,
+                        OrbId = orbId,
+                        Receiver = result.Receiver == null
+                            ? "MONSTER.UNKNOWN"
+                            : GetEnemyId(result.Receiver),
+                        Blocked = result.BlockedDamage,
+                        Unblocked = result.UnblockedDamage,
+                        Overkill = result.OverkillDamage,
+                        Killed = result.WasTargetKilled,
+                    });
+                }
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordCardSourcedOrbDamage failed: {e.Message}");
+            }
+        }
+    }
+
     private static void RecordCardSourcedOrbPassiveActivated(OrbModel? orb)
     {
         RecordCardSourcedOrbLifecycle(
@@ -3695,6 +3748,46 @@ public static class RunTracker
 
         if (string.IsNullOrWhiteSpace(outcome.OrbId))
             outcome.OrbId = orbId;
+        return outcome;
+    }
+
+    private static void AddCardOrbDamageResultPartsLocked(
+        CardOrbAggregate outcome,
+        int blockedDamage,
+        int unblockedDamage,
+        int overkillDamage,
+        bool wasTargetKilled)
+    {
+        var blocked = Math.Max(0, blockedDamage);
+        var dealt = Math.Max(0, unblockedDamage);
+        var overkill = Math.Max(0, overkillDamage);
+        outcome.DamageAttempted += blocked + dealt + overkill;
+        outcome.DamageDealt += dealt;
+        outcome.DamageBlocked += blocked;
+        outcome.DamageOverkill += overkill;
+        outcome.TargetsHit += 1;
+        if (wasTargetKilled) outcome.Kills += 1;
+    }
+
+    internal static CardOrbAggregate RecordCardSourcedOrbDamageForTest(
+        CardAggregate aggregate,
+        string orbId,
+        IEnumerable<(
+            int BlockedDamage,
+            int UnblockedDamage,
+            int OverkillDamage,
+            bool WasTargetKilled)> results)
+    {
+        var outcome = GetOrCreateCardOrbAggregate(aggregate, orbId);
+        foreach (var result in results)
+        {
+            AddCardOrbDamageResultPartsLocked(
+                outcome,
+                result.BlockedDamage,
+                result.UnblockedDamage,
+                result.OverkillDamage,
+                result.WasTargetKilled);
+        }
         return outcome;
     }
 
@@ -33365,6 +33458,12 @@ public static class RunTracker
             targetOutcome.Evokes += sourceOutcome.Evokes;
             targetOutcome.Fizzles += sourceOutcome.Fizzles;
             targetOutcome.BlockGained += sourceOutcome.BlockGained;
+            targetOutcome.DamageAttempted += sourceOutcome.DamageAttempted;
+            targetOutcome.DamageDealt += sourceOutcome.DamageDealt;
+            targetOutcome.DamageBlocked += sourceOutcome.DamageBlocked;
+            targetOutcome.DamageOverkill += sourceOutcome.DamageOverkill;
+            targetOutcome.Kills += sourceOutcome.Kills;
+            targetOutcome.TargetsHit += sourceOutcome.TargetsHit;
         }
     }
 

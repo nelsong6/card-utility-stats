@@ -75,6 +75,8 @@ Examples already implemented:
 - Alchemize potions actually procured, failed procurements, and gained rarity splits
 - Discovery cards actually selected, including rarity/type and observed energy discount
 - observed cards drawn from draw effects
+- observed Lightning-orb damage retained on the exact card that channeled it,
+  separate from that card's direct Attack damage
 - blocked draw attempts, categorized blocked reasons, and effect-side downstream blocked counts
 - successful self-summons to hand for recurring cards like Make It So
 - Osty summon HP, current-body absorbed damage, and Unleash's Osty-HP payoff damage

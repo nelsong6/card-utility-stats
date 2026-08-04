@@ -2393,7 +2393,8 @@ public static class CardHoverShowPatch
                     || outcome.PassiveActivations > 0
                     || outcome.Evokes > 0
                     || outcome.Fizzles > 0
-                    || outcome.BlockGained > 0))
+                    || outcome.BlockGained > 0
+                    || HasOrbDamageStats(outcome)))
             .OrderBy(outcome => outcome.OrbId, StringComparer.Ordinal)
             .ToList()
             ?? new List<CardOrbAggregate>();
@@ -2431,6 +2432,40 @@ public static class CardHoverShowPatch
                 outcome.Fizzles.ToString(),
                 "");
 
+            if (IsLightningOrbId(orbId) || HasOrbDamageStats(outcome))
+            {
+                Row3(
+                    sb,
+                    GetOrbStatLabel(orbId, "damage attempted"),
+                    outcome.DamageAttempted.ToString(),
+                    "");
+                Row3(
+                    sb,
+                    GetOrbStatLabel(orbId, "damage dealt"),
+                    outcome.DamageDealt.ToString(),
+                    "");
+                Row3(
+                    sb,
+                    GetOrbStatLabel(orbId, "damage blocked"),
+                    outcome.DamageBlocked.ToString(),
+                    "");
+                Row3(
+                    sb,
+                    GetOrbStatLabel(orbId, "overkill"),
+                    outcome.DamageOverkill.ToString(),
+                    "");
+                Row3(
+                    sb,
+                    GetOrbStatLabel(orbId, "kills"),
+                    outcome.Kills.ToString(),
+                    "");
+                Row3(
+                    sb,
+                    GetOrbStatLabel(orbId, "targets hit"),
+                    outcome.TargetsHit.ToString(),
+                    "");
+            }
+
             if (IsFrostOrbId(orbId))
             {
                 Row3(
@@ -2459,6 +2494,22 @@ public static class CardHoverShowPatch
     {
         return orbId.EndsWith(".FROST", StringComparison.OrdinalIgnoreCase)
             || string.Equals(orbId, "FROST", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsLightningOrbId(string orbId)
+    {
+        return orbId.EndsWith(".LIGHTNING", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(orbId, "LIGHTNING", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool HasOrbDamageStats(CardOrbAggregate outcome)
+    {
+        return outcome.DamageAttempted > 0
+            || outcome.DamageDealt > 0
+            || outcome.DamageBlocked > 0
+            || outcome.DamageOverkill > 0
+            || outcome.Kills > 0
+            || outcome.TargetsHit > 0;
     }
 
     private static string GetOrbIconPath(string orbId)

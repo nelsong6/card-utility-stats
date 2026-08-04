@@ -177,10 +177,12 @@ public static class CrackedCoreStartingOrbEvokeStatsPatch
 /// Establishes a synchronous scope around Lightning's private damage routine.
 /// The routine invokes CreatureCmd.Damage before reaching its first await, so
 /// the exact command can identify which tracked orb caused it without claiming
-/// damage from any other Lightning orb owned at the same time.
+/// damage from any other Lightning orb owned at the same time. The scope is
+/// shared by exact Cracked Core orbs and card-sourced orbs such as the one
+/// created by Ball Lightning.
 /// </summary>
 [HarmonyPatch]
-public static class CrackedCoreLightningDamageScopePatch
+public static class TrackedLightningOrbDamageScopePatch
 {
     private const string ApplyLightningDamageMethodName = "ApplyLightningDamage";
 
@@ -207,7 +209,8 @@ public static class CrackedCoreLightningDamageScopePatch
     public static void Prefix(LightningOrb __instance, out LightningOrb? __state)
     {
         __state = _activeTrackedOrb;
-        _activeTrackedOrb = RunTracker.IsTrackedCrackedCoreStartingOrb(__instance)
+        _activeTrackedOrb = (RunTracker.IsTrackedCrackedCoreStartingOrb(__instance)
+                             || RunTracker.IsTrackedCardSourcedOrb(__instance))
             ? __instance
             : null;
     }
@@ -231,7 +234,8 @@ public static class CrackedCoreLightningDamageScopePatch
 
 /// <summary>
 /// Captures the resolved damage split from the exact CreatureCmd.Damage call
-/// made by a tracked Cracked Core Lightning orb.
+/// made by an exact tracked Lightning orb, then routes the results to whichever
+/// relic/card ledger owns that orb reference.
 /// </summary>
 [HarmonyPatch(
     typeof(CreatureCmd),
@@ -243,12 +247,12 @@ public static class CrackedCoreLightningDamageScopePatch
         typeof(ValueProp),
         typeof(Creature),
     ])]
-public static class CrackedCoreLightningDamageResultPatch
+public static class TrackedLightningOrbDamageResultPatch
 {
     [HarmonyPrefix]
     public static void Prefix(Creature dealer, out LightningOrb? __state)
     {
-        __state = CrackedCoreLightningDamageScopePatch.GetActiveTrackedOrb(dealer);
+        __state = TrackedLightningOrbDamageScopePatch.GetActiveTrackedOrb(dealer);
     }
 
     [HarmonyPostfix]
@@ -270,12 +274,13 @@ public static class CrackedCoreLightningDamageResultPatch
             var materialized = results as IReadOnlyList<DamageResult>
                 ?? results.ToList();
             RunTracker.RecordCrackedCoreStartingOrbDamage(orb, materialized);
+            RunTracker.RecordCardSourcedOrbDamage(orb, materialized);
             return materialized;
         }
         catch (Exception e)
         {
             CoreMain.LogDebug(
-                $"CrackedCoreLightningDamageResultPatch observation failed: {e.Message}");
+                $"TrackedLightningOrbDamageResultPatch observation failed: {e.Message}");
             throw;
         }
     }

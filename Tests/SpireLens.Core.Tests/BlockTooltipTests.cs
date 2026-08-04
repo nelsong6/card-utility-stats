@@ -269,6 +269,59 @@ public class BlockTooltipTests
     }
 
     [Fact]
+    public void AppendOrbCreationStats_ShowsLightningDamageOutcomesSeparately()
+    {
+        var agg = new CardAggregate
+        {
+            TotalOrbsCreated = 2,
+        };
+        agg.OrbOutcomes["ORB.LIGHTNING"] = new CardOrbAggregate
+        {
+            OrbId = "ORB.LIGHTNING",
+            Created = 2,
+            PassiveActivations = 3,
+            Evokes = 1,
+            DamageAttempted = 18,
+            DamageDealt = 12,
+            DamageBlocked = 4,
+            DamageOverkill = 2,
+            Kills = 1,
+            TargetsHit = 4,
+        };
+
+        var sb = new StringBuilder();
+        _ = AppendOrbCreationStatsMethod.Invoke(
+            null,
+            new object?[] { sb, agg, false });
+        var text = sb.ToString();
+
+        Assert.Contains("res://images/orbs/lightning.png", text);
+        Assert.Contains(
+            StatConceptGlossary.RenderInformationHint("damage attempted"),
+            text);
+        Assert.Contains(
+            StatConceptGlossary.RenderInformationHint("damage dealt"),
+            text);
+        Assert.Contains(
+            StatConceptGlossary.RenderInformationHint("damage blocked"),
+            text);
+        Assert.Contains(
+            StatConceptGlossary.RenderInformationHint("overkill"),
+            text);
+        Assert.Contains(
+            StatConceptGlossary.RenderInformationHint("kills"),
+            text);
+        Assert.Contains(
+            StatConceptGlossary.RenderInformationHint("targets hit"),
+            text);
+        Assert.Contains("[b]18[/b]", text);
+        Assert.Contains("[b]12[/b]", text);
+        Assert.Contains("[b]4[/b]", text);
+        Assert.Contains("[b]2[/b]", text);
+        Assert.Contains("[b]1[/b]", text);
+    }
+
+    [Fact]
     public void AppendCardDrawStats_ShowsActualVersusAttemptedWhenGapExists()
     {
         var agg = new CardAggregate

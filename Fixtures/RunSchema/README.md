@@ -98,6 +98,10 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds successfully channeled orbs to the physical card aggregate, preserves
   exact-orb lifecycle outcomes by type, and keeps Frost block separate from
   the source card's direct block totals.
+- `ball-lightning-orb-damage-run.json`
+  Adds the observed attempted/dealt/blocked/overkill/kill/target damage split
+  from Ball Lightning's exact channeled Lightning orb, kept separate from the
+  card's direct Attack damage totals.
 - `jack-of-all-trades-card-run.json`
   Adds Jack of All Trades generated colorless-card totals, uncommon/rare and
   attack/skill/power splits, plus the numerator for average added-card cost.

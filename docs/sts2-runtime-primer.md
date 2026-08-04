@@ -545,6 +545,14 @@ to the Frost-orb bucket and bypasses the generic current/recent-card fallback.
 Otherwise a Glacier-created Frost orb can incorrectly add its block to
 Glacier—or to an unrelated recently completed card—as direct card block.
 
+Lightning orbs likewise call `CreatureCmd.Damage` without a `CardSource`.
+When Lightning's private `ApplyLightningDamage` routine belongs to an exact
+card-sourced orb, observe that command's returned `DamageResult` values and
+write the attempted, effective, blocked, overkill, kill, and target outcomes
+to the source card's orb-type bucket. Keep these separate from the card's
+direct Attack totals: Ball Lightning's own hit and the lifetime damage from
+the Lightning orb it channeled are distinct value streams.
+
 ## Effects And Powers
 
 Power/effect attribution needs two layers:
