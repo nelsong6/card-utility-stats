@@ -125,6 +125,7 @@ internal static class NativeStatsHoverTipStyler
             description.HintUnderlined = false;
 
         AddBrand(statsTip);
+        StatsTooltipPinManager.EnsureCopyImageButton(statsTip);
     }
 
     public static RichTextLabel? GetLastStatsDescription(NHoverTipSet tipSet)

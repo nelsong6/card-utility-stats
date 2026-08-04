@@ -572,14 +572,39 @@ internal static class StatsTooltipPinManager
         DetachCopyImageButton();
         if (!IsLive(_pinnedStatsControl)) return;
 
-        var title = _pinnedStatsControl!
-            .GetNodeOrNull<Control>("%Title");
-        if (title?.GetParent() is not HBoxContainer header)
+        var button = EnsureCopyImageButton(_pinnedStatsControl!);
+        if (!IsLive(button))
         {
             CoreMain.LogDebug(
                 "Stats image copy button skipped: tooltip title header was not found.");
             return;
         }
+
+        button!.MouseFilter = Control.MouseFilterEnum.Stop;
+        button.TooltipText = CopyImageButtonTooltip;
+        Action handler = OnCopyImageButtonPressed;
+        button.Pressed += handler;
+
+        _copyImageButton = button;
+        _copyImageButtonHandler = handler;
+        _copyImageGeneration++;
+        _copyImageInProgress = false;
+    }
+
+    /// <summary>
+    /// Gives every rendered SpireLens panel the same final header geometry.
+    /// The ordinary hover-tip instance is visual only because it disappears
+    /// when the pointer leaves its owner; pinning activates that instance
+    /// instead of inserting a new control and remeasuring the panel.
+    /// </summary>
+    internal static Button? EnsureCopyImageButton(Control statsControl)
+    {
+        var title = statsControl.GetNodeOrNull<Control>("%Title");
+        if (title?.GetParent() is not HBoxContainer header)
+            return null;
+
+        var existing = header.GetNodeOrNull<Button>(CopyImageButtonNodeName);
+        if (IsLive(existing)) return existing;
 
         var icon = GetCopyImageIcon();
         var button = new Button
@@ -590,7 +615,7 @@ internal static class StatsTooltipPinManager
             TooltipText = CopyImageButtonTooltip,
             Flat = true,
             FocusMode = Control.FocusModeEnum.None,
-            MouseFilter = Control.MouseFilterEnum.Stop,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
             CustomMinimumSize = new Vector2(icon == null ? 68f : 34f, 28f),
             SizeFlagsHorizontal = Control.SizeFlags.ShrinkEnd,
             SizeFlagsVertical = Control.SizeFlags.ShrinkCenter,
@@ -605,14 +630,8 @@ internal static class StatsTooltipPinManager
         button.AddThemeColorOverride("icon_pressed_color", Color.FromHtml("#A9BCEB"));
         button.AddThemeColorOverride("icon_disabled_color", Color.FromHtml("#94A0AE"));
 
-        Action handler = OnCopyImageButtonPressed;
-        button.Pressed += handler;
         header.AddChild(button);
-
-        _copyImageButton = button;
-        _copyImageButtonHandler = handler;
-        _copyImageGeneration++;
-        _copyImageInProgress = false;
+        return button;
     }
 
     private static void DetachCopyImageButton()

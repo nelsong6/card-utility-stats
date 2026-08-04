@@ -205,8 +205,8 @@ internal static class RunTimerStatsTooltip
     /// Native left/right alignment touches the tooltip edge directly to the
     /// owner's anchor. Timer glyph outlines extend to that edge, so enforce a
     /// real gap after the tooltip has measured its rendered width. Repeat on
-    /// the deferred layout pass because pinning adds the camera control after
-    /// the native hover-tip set is first constructed.
+    /// the deferred layout pass after the native containers complete their
+    /// first measurement.
     /// </summary>
     internal static void AlignClearOfTarget(
         Control target,
