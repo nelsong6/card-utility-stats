@@ -133,8 +133,9 @@ Current UI conventions:
   a narrow numeric column; do not use character-count wrapping heuristics
 - loud section headers are discouraged unless they add real clarity
 - inline icons are preferred for keyword-like effects when they improve scanning
-- rows phrased as “per <recognized concept>” render `/` immediately before
-  the denominator icon; fully icon-driven “in” and “this” scopes render `∈`,
+- rows phrased as “per <recognized concept>” render the hinted **Per** (`/`)
+  concept immediately before the denominator icon; fully icon-driven “in” and
+  “this” scopes render `∈`,
   and an aggregate over every member of a plural scope renders `∈ ∀` before
   the scope icon; mixed prose stays readable instead of forcing relation
   symbols ahead of its remaining words

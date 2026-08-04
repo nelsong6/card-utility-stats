@@ -449,6 +449,16 @@
         "description": "An increase to Osty's summon amount."
       }
     },
+    "per": {
+      "display": {
+        "type": "embedded_image",
+        "resource": "Assets.stat-per.svg"
+      },
+      "help": {
+        "label": "Per",
+        "description": "Divides the preceding stat by each instance of the concept that follows."
+      }
+    },
     "potion": {
       "display": {
         "type": "game_resource",

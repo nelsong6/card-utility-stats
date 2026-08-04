@@ -100,7 +100,8 @@ public static class StatsTooltip
                     conceptIds[index],
                     StringComparer.Ordinal))
             {
-                body.Append("[color=#b5b5b5]/[/color] ");
+                body.Append(StatConceptGlossary.RenderHintedGlyph("per"))
+                    .Append(' ');
             }
             body.Append(StatConceptGlossary.RenderHintedGlyph(conceptIds[index]));
         }

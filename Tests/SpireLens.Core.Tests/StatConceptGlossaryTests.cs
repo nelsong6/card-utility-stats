@@ -54,6 +54,7 @@ public class StatConceptGlossaryTests
                 "nimble",
                 "offered",
                 "osty_summon_gained",
+                "per",
                 "potion",
                 "potion_gained",
                 "power",
@@ -154,6 +155,7 @@ public class StatConceptGlossaryTests
         var nimble = StatConceptGlossary.RenderHintedGlyph("nimble");
         var offered = StatConceptGlossary.RenderHintedGlyph("offered");
         var summon = StatConceptGlossary.RenderHintedGlyph("osty_summon_gained");
+        var per = StatConceptGlossary.RenderHintedGlyph("per");
         var power = StatConceptGlossary.RenderHintedGlyph("power");
         var commonRelic = StatConceptGlossary.RenderHintedGlyph("relic_common");
         var rareRelic = StatConceptGlossary.RenderHintedGlyph("relic_rare");
@@ -202,6 +204,7 @@ public class StatConceptGlossaryTests
             nimble,
             offered,
             summon,
+            per,
             power,
             commonRelic,
             rareRelic,
@@ -324,6 +327,10 @@ public class StatConceptGlossaryTests
         Assert.Contains(
             "res://images/atlases/relic_atlas.sprites/bound_phylactery.tres",
             summon);
+        Assert.Contains("[hint=\"Per:", per);
+        Assert.Contains(
+            "user://SpireLens/generated-icons/per-",
+            per);
         Assert.Contains("[hint=\"Power:", power);
         Assert.Contains(
             "res://images/packed/card_library/type_sort_power.png",
