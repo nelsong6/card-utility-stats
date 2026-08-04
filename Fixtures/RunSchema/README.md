@@ -604,6 +604,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `crossbow-relic-run.json`
   Adds Crossbow's successfully gained Attacks, rarity splits, observed energy
   discount, and zero-inclusive held turn/combat denominators.
+- `game-piece-relic-run.json`
+  Adds Game Piece's qualifying Power plays, observed and blocked draws, and
+  zero-inclusive held turn/combat denominators.
 - `card-removal-source-run.json`
   Adds per-physical-card removal source attribution plus the exact gold charge
   for cards removed by the shopkeeper.

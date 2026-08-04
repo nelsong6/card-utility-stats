@@ -797,6 +797,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is GamePiece)
+        {
+            title = "Game Piece";
+            body = BuildGamePieceBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is ForgottenSoul)
         {
             title = "Forgotten Soul";
@@ -2463,6 +2470,49 @@ public static class RelicHoverShowPatch
         Row3(sb, "Kills", agg.Kills.ToString(), "");
         Row3(sb, "Targets hit", agg.TotalTargets.ToString(), "");
         Row3(sb, "Avg damage per Power", FormatDecimal(damagePerPower), "");
+        return sb.ToString();
+    }
+
+    private static string BuildGamePieceBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        var cardsDrawnPerTurn = agg.GamePieceTurns <= 0
+            ? 0m
+            : (decimal)agg.AdditionalCardsDrawn / agg.GamePieceTurns;
+        var cardsDrawnPerCombat = agg.GamePieceCombats <= 0
+            ? 0m
+            : (decimal)agg.AdditionalCardsDrawn / agg.GamePieceCombats;
+
+        Row3(
+            sb,
+            "Powers played",
+            agg.Activations.ToString(),
+            "",
+            "Power cards played by Game Piece's owner while it could activate.");
+        Row3(
+            sb,
+            DrawLabel("Cards drawn"),
+            agg.AdditionalCardsDrawn.ToString(),
+            "",
+            "Cards drawn — cards that actually reached the hand from Game Piece's direct draw.");
+        Row3(
+            sb,
+            DrawLabel("Card draws blocked"),
+            agg.AdditionalCardDrawsBlocked.ToString(),
+            "",
+            "Card draws blocked — Game Piece draws prevented by draw limits, a full hand, or draw-prevention effects.");
+        Row3(
+            sb,
+            DrawLabel("Avg cards drawn per turn"),
+            FormatDecimal(cardsDrawnPerTurn),
+            "",
+            "Average cards drawn per turn — observed Game Piece cards drawn divided by player turns while held.");
+        Row3(
+            sb,
+            DrawLabel("Avg cards drawn per combat"),
+            FormatDecimal(cardsDrawnPerCombat),
+            "",
+            "Average cards drawn per combat — observed Game Piece cards drawn divided by combats while held.");
         return sb.ToString();
     }
 

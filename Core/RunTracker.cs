@@ -84,6 +84,7 @@ public static class RunTracker
     private const string CursedPearlCurseDefinitionId = "CARD.GREED";
     private const string NormalityDefinitionId = "CARD.NORMALITY";
     private const string DarkEmbracePowerId = "POWER.DARK_EMBRACE";
+    private const string GamePieceRelicId = "RELIC.GAME_PIECE";
     private const string ShivDefinitionId = "CARD.SHIV";
     private const string SoulDefinitionId = "CARD.SOUL";
     private const string SovereignBladeLegacyDefinitionToken = "SOVEREIGN_BLADE";
@@ -2187,6 +2188,7 @@ public static class RunTracker
         RecordPocketwatchTurnForTrackedPlayerLocked();
         RecordPollinousCoreTurnForTrackedPlayerLocked();
         RecordJossPaperTurnForTrackedPlayerLocked();
+        RecordGamePieceTurnForTrackedPlayerLocked();
         RecordStrikeDummyTurnForTrackedPlayerLocked();
         RecordLetterOpenerTurnForTrackedPlayerLocked();
         RecordTuningForkTurnForTrackedPlayerLocked();
@@ -2415,6 +2417,8 @@ public static class RunTracker
         target.WeakApplied += source.WeakApplied;
         MergeAppliedEffectsInto(target.AppliedEffects, source.AppliedEffects);
         target.AdditionalCardsDrawn += source.AdditionalCardsDrawn;
+        target.GamePieceTurns += source.GamePieceTurns;
+        target.GamePieceCombats += source.GamePieceCombats;
         target.CentennialPuzzleActivationTurnTotal +=
             source.CentennialPuzzleActivationTurnTotal;
         target.CentennialPuzzleActivationTurnSamples +=
@@ -6106,6 +6110,232 @@ public static class RunTracker
         if (agg == null || cardsDrawn <= 0) return;
         agg.ViciousCardsDrawn += cardsDrawn;
         agg.RateViciousCardsDrawn += cardsDrawn;
+    }
+
+    internal static PendingGamePieceDraw? ArmGamePieceDrawAttribution(
+        GamePiece? relic,
+        CardPlay? cardPlay)
+    {
+        if (relic?.Owner == null || cardPlay?.Card == null) return null;
+
+        lock (_lock)
+        {
+            try
+            {
+                var owner = relic.Owner;
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(owner)) return null;
+                if (!ReferenceEquals(cardPlay.Card.Owner, owner)) return null;
+                if (cardPlay.Card.Type != CardType.Power) return null;
+                if (CombatManager.Instance?.IsInProgress != true) return null;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordGamePieceCombatForPlayerLocked(owner);
+                RecordGamePieceTurnForPlayerLocked(owner);
+                var pending = new PendingGamePieceDraw
+                {
+                    PendingCombat = _pendingCombat,
+                    Owner = owner,
+                };
+                _pendingCombat.PendingGamePieceDraws[owner] = pending;
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(GamePieceRelicId);
+                RecordGamePieceStatsForTest(
+                    agg,
+                    powersPlayed: 1,
+                    cardsRequested: 0,
+                    cardsDrawn: 0);
+                return pending;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"ArmGamePieceDrawAttribution failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+    internal static bool TryConsumeGamePieceDrawAttribution(
+        Player? player,
+        decimal count,
+        bool fromHandDraw,
+        out PendingGamePieceDraw? pending)
+    {
+        pending = null;
+        if (player == null || fromHandDraw) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null) return false;
+                if (!_pendingCombat.PendingGamePieceDraws.Remove(player, out pending))
+                    return false;
+                if (!ReferenceEquals(pending.PendingCombat, _pendingCombat))
+                {
+                    pending = null;
+                    return false;
+                }
+
+                pending.CardsRequested = count > 0m
+                    ? (int)Math.Ceiling(count)
+                    : 0;
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"TryConsumeGamePieceDrawAttribution failed: {e.Message}");
+                pending = null;
+                return false;
+            }
+        }
+    }
+
+    internal static void RecordGamePieceDrawResult(
+        PendingGamePieceDraw? pending,
+        int cardsDrawn)
+    {
+        if (pending == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null
+                    || !ReferenceEquals(pending.PendingCombat, _pendingCombat)
+                    || !IsTrackedPlayer(pending.Owner))
+                {
+                    return;
+                }
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(GamePieceRelicId);
+                RecordGamePieceStatsForTest(
+                    agg,
+                    powersPlayed: 0,
+                    cardsRequested: pending.CardsRequested,
+                    cardsDrawn: cardsDrawn);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordGamePieceDrawResult failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void DisarmGamePieceDrawAttribution(PendingGamePieceDraw? pending)
+    {
+        if (pending == null) return;
+
+        lock (_lock)
+        {
+            if (_pendingCombat == null) return;
+            if (_pendingCombat.PendingGamePieceDraws.TryGetValue(
+                    pending.Owner,
+                    out var active)
+                && ReferenceEquals(active, pending))
+            {
+                _pendingCombat.PendingGamePieceDraws.Remove(pending.Owner);
+            }
+        }
+    }
+
+    internal static void RecordGamePieceStatsForTest(
+        RelicAggregate agg,
+        int powersPlayed,
+        int cardsRequested,
+        int cardsDrawn)
+    {
+        if (agg == null) return;
+
+        var requested = Math.Max(0, cardsRequested);
+        var observed = Math.Max(0, cardsDrawn);
+        agg.Activations += Math.Max(0, powersPlayed);
+        agg.AdditionalCardsDrawn += observed;
+        agg.AdditionalCardDrawsBlocked += Math.Max(0, requested - observed);
+    }
+
+    public static void RecordGamePieceTurnStarted(Player? player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                RecordGamePieceTurnForPlayerLocked(player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordGamePieceTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void RecordGamePieceTurnForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordGamePieceTurnForPlayerLocked(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug(
+                $"RecordGamePieceTurnForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordGamePieceTurnForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasGamePiece(player)) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.GamePieceTurnCountedTurns.TryGetValue(
+                player,
+                out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.GamePieceTurnCountedTurns[player] = turnNumber;
+        RecordGamePieceCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(GamePieceRelicId);
+        RecordGamePieceTurnForTest(agg);
+    }
+
+    private static void RecordGamePieceCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasGamePiece(player)) return;
+        if (!_pendingCombat.GamePieceCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(GamePieceRelicId);
+        RecordGamePieceCombatForTest(agg);
+    }
+
+    private static bool PlayerHasGamePiece(Player player)
+        => PlayerHasRelic(player, GamePieceRelicId, relic => relic is GamePiece);
+
+    internal static void RecordGamePieceTurnForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.GamePieceTurns += Math.Max(0, count);
+    }
+
+    internal static void RecordGamePieceCombatForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.GamePieceCombats += Math.Max(0, count);
     }
 
     /// <summary>
@@ -26264,6 +26494,7 @@ public static class RunTracker
             RecordPocketwatchCombatForPlayerLocked(player);
             RecordPollinousCoreCombatForPlayerLocked(player);
             RecordJossPaperCombatForPlayerLocked(player);
+            RecordGamePieceCombatForPlayerLocked(player);
             RecordLetterOpenerCombatForPlayerLocked(player);
             RecordTuningForkCombatForPlayerLocked(player);
             RecordCloakClaspCombatForPlayerLocked(player);
@@ -34119,6 +34350,12 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, PendingViciousDraw> PendingViciousDraws { get; }
         = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, PendingGamePieceDraw> PendingGamePieceDraws { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> GamePieceCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> GamePieceTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, PendingDarkEmbraceDraw> PendingDarkEmbraceDraws { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> DarkEmbracePowerCombatCountedPlayers { get; }
@@ -34282,6 +34519,13 @@ internal sealed class PendingViciousDraw
     public required Player Owner { get; init; }
     public required string PowerId { get; init; }
     public required string DisplayName { get; init; }
+}
+
+internal sealed class PendingGamePieceDraw
+{
+    public required PendingCombat PendingCombat { get; init; }
+    public required Player Owner { get; init; }
+    public int CardsRequested { get; set; }
 }
 
 internal sealed class PendingStampedeCallback

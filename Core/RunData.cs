@@ -920,10 +920,15 @@ public class RelicAggregate
     // relic-attributed requests that did not produce a card.
     // Used by Pocketwatch (draws 3 extra cards when 3 or fewer cards were
     // played last turn), Gremlin Horn (draws after enemy death), Pendulum
-    // (draws every N turns), and Booming Conch (draws extra cards at Elite
-    // combat start).
+    // (draws every N turns), Game Piece (draws after an owner Power), and
+    // Booming Conch (draws extra cards at Elite combat start).
     public int AdditionalCardsDrawn { get; set; }
     public int AdditionalCardDrawsBlocked { get; set; }
+
+    // Game Piece's zero-inclusive held-period denominators. Its observed
+    // draw total uses AdditionalCardsDrawn.
+    public int GamePieceTurns { get; set; }
+    public int GamePieceCombats { get; set; }
 
     // Centennial Puzzle's once-per-combat activation context. The turn total
     // is summed at the exact HP-loss callback and uses the owning player's

@@ -6182,6 +6182,38 @@ public class SchemaLoadingTests
             });
     }
 
+    [Fact]
+    public void HistoricalLoad_AcceptsGamePieceRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("game-piece-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertGamePieceFixture(
+            loaded.Data.RelicAggregates["RELIC.GAME_PIECE"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsGamePieceRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("game-piece-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertGamePieceFixture(
+            resumed!.RelicAggregates["RELIC.GAME_PIECE"]);
+    }
+
+    private static void AssertGamePieceFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(5, relicAgg.Activations);
+        Assert.Equal(4, relicAgg.AdditionalCardsDrawn);
+        Assert.Equal(1, relicAgg.AdditionalCardDrawsBlocked);
+        Assert.Equal(8, relicAgg.GamePieceTurns);
+        Assert.Equal(2, relicAgg.GamePieceCombats);
+    }
+
     private static void AssertSplashFixture(CardAggregate cardAgg)
     {
         Assert.Equal(6, cardAgg.SplashAttacksTaken);

@@ -955,6 +955,16 @@ then consume the window at the immediately emitted decimal-plus-`ValueProp`
 multi-target `CreatureCmd.Damage` overload. The resolved results are
 authoritative for blocked damage, overkill, kills, and targets hit.
 
+Game Piece also owns an `AfterCardPlayed` callback for each same-owner Power
+played while combat remains in progress. Count that qualifying Power at the
+owner callback, then consume the callback's direct non-hand
+`CardPileCmd.Draw` call and count the non-null cards returned by its completed
+task. The requested-minus-returned difference is the blocked draw total, so No
+Draw, a full hand, and pile exhaustion remain observed zero-value outcomes.
+Count every distinct player turn and combat while Game Piece is held as its
+zero-inclusive cards-drawn rate denominators, and reconcile the current turn
+at combat promotion so a combat-ending turn is not omitted.
+
 Forgotten Soul owns `AfterCardExhausted` and flashes for every same-owner card
 exhaust, even when no hittable enemy remains. Count that callback as the
 activation, then keep a callback-scoped window around the exact single-target

@@ -208,6 +208,9 @@ exhaust because of Ethereal.
 Crossbow records only Attacks that successfully enter combat, splits them by
 rarity, and averages both Attack gains and their observed energy discount over
 its zero-inclusive held turns and combats.
+Game Piece records qualifying Power plays, cards its direct draw actually adds
+to hand, draws that were blocked, and average observed cards drawn per held
+turn and combat.
 
 Drain Power additionally tracks its observed discard-pile upgrades and later
 plays of the exact combat cards it upgraded, with held-turn and held-combat

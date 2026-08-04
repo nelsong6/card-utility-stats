@@ -1,0 +1,25 @@
+{
+  "run_id": "game-piece-relic-fixture",
+  "started_at": "2026-08-03T20:00:00Z",
+  "updated_at": "2026-08-03T20:20:00Z",
+  "character": "CHAR.IRONCLAD",
+  "ascension": 8,
+  "floor_reached": 24,
+  "outcome": "in_progress",
+  "game_start_time": 1785783600,
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.GAME_PIECE": {
+      "activations": 5,
+      "additional_cards_drawn": 4,
+      "additional_card_draws_blocked": 1,
+      "game_piece_turns": 8,
+      "game_piece_combats": 2
+    }
+  },
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}
