@@ -197,6 +197,7 @@ public class PaelsEyeStatsTests
         Assert.Contains("Average cards exhausted per combat", body);
         Assert.Contains("Average activation turn", body);
         Assert.Contains("Cards exhausted total", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("all"), body);
         Assert.Contains("Strikes and Defends exhausted", body);
         Assert.Contains("Statuses exhausted", body);
         Assert.Contains("Curses exhausted", body);

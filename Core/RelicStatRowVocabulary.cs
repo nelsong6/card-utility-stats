@@ -118,6 +118,7 @@ internal static class RelicStatRowVocabulary
         Rule(
             "healing_gained",
             @"(?<!max\s)\bhp\s+(?:healed|gained|restored)\b|\bhealing\s+(?:gained|restored)\b"),
+        Rule("all", @"\b(?:all|total)\b"),
         Rule("average", @"\b(?:avg|average)\b"),
         Rule("activation", @"\b(?:activations?|activated|triggers?|triggered)\b", true),
         Rule("attack_rare", @"\brare\s+attacks?\b"),

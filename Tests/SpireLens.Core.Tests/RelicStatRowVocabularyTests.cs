@@ -48,8 +48,8 @@ public class RelicStatRowVocabularyTests
         "")]
     [InlineData(
         "Cards drawn total",
-        "total",
-        "draw",
+        "",
+        "draw,all",
         "")]
     [InlineData(
         "Avg cards drawn per combat",
@@ -138,8 +138,8 @@ public class RelicStatRowVocabularyTests
         "")]
     [InlineData(
         "Total damage dealt",
-        "Total dealt",
-        "damage",
+        "dealt",
+        "all,damage",
         "")]
     [InlineData(
         "Strength gained per activation",
@@ -193,8 +193,8 @@ public class RelicStatRowVocabularyTests
         "")]
     [InlineData(
         "Total block gained",
-        "Total",
-        "block_gained",
+        "",
+        "all,block_gained",
         "")]
     [InlineData(
         "Avg energy gained per combat",
