@@ -115,6 +115,8 @@ public class EnemyStatusStatsTests
         Assert.Contains("[b]7[/b]", body);
         Assert.Contains("[b]6[/b]", body);
         Assert.Contains("54%", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("damage"), body);
+        Assert.DoesNotContain("[color=#e0e0e0]Damage ", body);
     }
 
     [Fact]
@@ -152,6 +154,9 @@ public class EnemyStatusStatsTests
         Assert.Contains("Burn", body);
         Assert.Contains("[b]2[/b]", body);
         Assert.Contains("[b]1[/b]", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("card"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("draw"), body);
+        Assert.DoesNotContain("[color=#e0e0e0]Status cards", body);
     }
 
     [Fact]

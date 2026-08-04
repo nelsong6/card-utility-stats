@@ -13,9 +13,9 @@ internal sealed record RelicStatRowPresentation(
     IReadOnlyList<string> DenominatorConceptIds);
 
 /// <summary>
-/// Converts the established relic-stat wording into the shared symbol
-/// vocabulary. The original wording remains in the information hint while
-/// repeated concepts are removed from the visible label.
+/// Converts established stat-row wording into the shared symbol vocabulary.
+/// The original wording remains in the information hint while repeated
+/// concepts are removed from the visible label.
 /// </summary>
 internal static class RelicStatRowVocabulary
 {
@@ -65,6 +65,37 @@ internal static class RelicStatRowVocabulary
             ["vigor_gained"] = "vigor",
         };
 
+    private static readonly IReadOnlyDictionary<string, IReadOnlyList<string>>
+        ImpliedConceptIds =
+            new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
+            {
+                ["attack"] = ["card"],
+                ["attack_common"] = ["attack", "card"],
+                ["attack_rare"] = ["attack", "card"],
+                ["attack_uncommon"] = ["attack", "card"],
+                ["card_rare"] = ["card"],
+                ["card_uncommon"] = ["card"],
+                ["discard"] = ["card"],
+                ["draw"] = ["card"],
+                ["elite"] = ["combat"],
+                ["exhaust"] = ["card"],
+                ["potion_common"] = ["potion"],
+                ["potion_rare"] = ["potion"],
+                ["potion_uncommon"] = ["potion"],
+                ["power"] = ["card"],
+                ["power_common"] = ["power", "card"],
+                ["power_rare"] = ["power", "card"],
+                ["power_uncommon"] = ["power", "card"],
+                ["relic_common"] = ["relic"],
+                ["relic_rare"] = ["relic"],
+                ["relic_uncommon"] = ["relic"],
+                ["skill"] = ["card"],
+                ["skill_common"] = ["skill", "card"],
+                ["skill_rare"] = ["skill", "card"],
+                ["skill_uncommon"] = ["skill", "card"],
+                ["upgraded"] = ["card"],
+            };
+
     private static readonly IReadOnlyList<ConceptRule> Rules =
     [
         Rule(
@@ -87,34 +118,58 @@ internal static class RelicStatRowVocabulary
             @"(?<!max\s)\bhp\s+(?:healed|gained|restored)\b|\bhealing\s+(?:gained|restored)\b"),
         Rule("average", @"\b(?:avg|average)\b"),
         Rule("activation", @"\b(?:activations?|activated|triggers?|triggered)\b", true),
+        Rule("attack_rare", @"\brare\s+attacks?\b"),
+        Rule("attack_uncommon", @"\buncommon\s+attacks?\b"),
+        Rule("attack_common", @"\bcommon\s+attacks?\b"),
         Rule("attack", @"\battacks?\b"),
         Rule("block_gained", @"\bblock\s+gained\b"),
         Rule("block", @"\bblock\b"),
         Rule("potion_rare", @"\brare\s+potions?\b"),
         Rule("potion_uncommon", @"\buncommon\s+potions?\b"),
         Rule("potion_common", @"\bcommon\s+potions?\b"),
-        Rule("card_rare", @"\brare(?:s|\s+cards?)?\b"),
-        Rule("card_uncommon", @"\buncommon(?:s|\s+cards?)?\b"),
-        Rule("card", @"\bcards?\b|\bcommons?\b"),
+        Rule(
+            "card_rare",
+            @"\brare(?:s|\s+cards?)?\b(?!\s+(?:attacks?|powers?|relics?|skills?))"),
+        Rule(
+            "card_uncommon",
+            @"\buncommon(?:s|\s+cards?)?\b(?!\s+(?:attacks?|powers?|relics?|skills?))"),
+        Rule(
+            "card",
+            @"\bcards?\b|\bcommons?\b(?!\s+(?:attacks?|powers?|relics?|skills?))"),
+        Rule("campfire", @"\b(?:campfires?|rest[ -]sites?)\b"),
         Rule("charge", @"\bcharges?\b"),
         Rule("combat", @"\bcombats?\b", true),
-        Rule("damage", @"\bdamage\b"),
+        Rule("damage", @"\bdamage\b|\bhp\s+lost\b"),
         Rule("dexterity_gained", @"\bdexterity\s+(?:added|gained)\b"),
         Rule("dexterity", @"\bdexterity\b"),
         Rule("discard", @"\bdiscard(?:ed|ing|s)?\b"),
         Rule("draw", @"\b(?:draw|drawn|drawing|draws)\b"),
         Rule("energy_gained", @"\benergy\s+gained\b"),
         Rule("energy", @"\benergy\b"),
+        Rule("elite", @"\belites?\b"),
         Rule("exhaust", @"\bexhaust(?:ed|ing|s)?\b"),
         Rule("floor", @"\bfloors?\b", true),
+        Rule("fruit_juice", @"\bfruit\s+juices?\b"),
+        Rule("glam", @"\bglam\b"),
         Rule("gold_gained", @"\bgold\s+gained\b"),
         Rule("gold", @"\bgold\b"),
         Rule("kill", @"\b(?:kills?|killed|slain)\b"),
+        Rule("nimble", @"\bnimble\b"),
         Rule("potion_gained", @"\bpotions?\s+gained\b"),
         Rule("potion", @"\bpotions?\b"),
+        Rule("power_rare", @"\brare\s+powers?\b"),
+        Rule("power_uncommon", @"\buncommon\s+powers?\b"),
+        Rule("power_common", @"\bcommon\s+powers?\b"),
         Rule("power", @"\bpowers?\b"),
+        Rule("relic_rare", @"\brare\s+relics?\b"),
+        Rule("relic_uncommon", @"\buncommon\s+relics?\b"),
+        Rule("relic_common", @"\bcommon\s+relics?\b"),
         Rule("relic_gained", @"\brelics?\s+gained\b"),
         Rule("relic", @"\brelics?\b"),
+        Rule("shop", @"\b(?:merchants?|shops?)\b"),
+        Rule("skill_rare", @"\brare\s+skills?\b"),
+        Rule("skill_uncommon", @"\buncommon\s+skills?\b"),
+        Rule("skill_common", @"\bcommon\s+skills?\b"),
         Rule("skill", @"\bskills?\b"),
         Rule("stars", @"\bstars?\b"),
         Rule("strength_gained", @"\bstrength\s+(?:added|gained)\b"),
@@ -122,6 +177,9 @@ internal static class RelicStatRowVocabulary
         Rule("swift", @"\bswift\b"),
         Rule("taken", @"(?<!not\s)\btaken\b"),
         Rule("turn", @"\bturns?\b", true),
+        Rule(
+            "unknown_room",
+            @"\bunknown(?:\s+rooms?|[ -]sites?)\b|\bevents?\b"),
         Rule("upgraded", @"(?<!non-)\b(?:upgrade|upgraded|upgrades)\b"),
         Rule("vigor_gained", @"\bvigor\s+gained\b"),
         Rule("vigor", @"\bvigor\b"),
@@ -230,26 +288,11 @@ internal static class RelicStatRowVocabulary
             }
         }
 
-        var conceptIds = occurrences
+        var conceptIds = NormalizeConceptIds(occurrences
             .OrderBy(occurrence => occurrence.Position)
             .Select(occurrence => occurrence.Id)
             .Distinct(StringComparer.Ordinal)
-            .ToArray();
-        if (conceptIds.Contains("draw", StringComparer.Ordinal))
-        {
-            conceptIds = conceptIds
-                .Where(id => !string.Equals(id, "card", StringComparison.Ordinal))
-                .ToArray();
-        }
-        foreach (var (gainedConceptId, baseConceptId) in GainedConceptBaseIds)
-        {
-            if (!conceptIds.Contains(gainedConceptId, StringComparer.Ordinal))
-                continue;
-
-            conceptIds = conceptIds
-                .Where(id => !string.Equals(id, baseConceptId, StringComparison.Ordinal))
-                .ToArray();
-        }
+            .ToArray());
         var denominatorConceptIds = occurrences
             .Where(occurrence => occurrence.IsDenominator)
             .OrderBy(occurrence => occurrence.Position)
@@ -273,6 +316,48 @@ internal static class RelicStatRowVocabulary
             description,
             conceptIds,
             denominatorConceptIds);
+    }
+
+    internal static RelicStatRowPresentation MergeConcepts(
+        RelicStatRowPresentation presentation,
+        IReadOnlyList<string> conceptIds,
+        IReadOnlyList<string> denominatorConceptIds)
+    {
+        var mergedConceptIds = NormalizeConceptIds(conceptIds
+            .Concat(presentation.ConceptIds)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray());
+        var mergedDenominatorConceptIds = denominatorConceptIds
+            .Concat(presentation.DenominatorConceptIds)
+            .Where(id => mergedConceptIds.Contains(id, StringComparer.Ordinal))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        return presentation with
+        {
+            ConceptIds = mergedConceptIds,
+            DenominatorConceptIds = mergedDenominatorConceptIds,
+        };
+    }
+
+    private static string[] NormalizeConceptIds(IReadOnlyList<string> conceptIds)
+    {
+        var normalized = conceptIds
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        foreach (var (gainedConceptId, baseConceptId) in GainedConceptBaseIds)
+        {
+            if (normalized.Contains(gainedConceptId, StringComparer.Ordinal))
+                normalized.RemoveAll(id => string.Equals(id, baseConceptId, StringComparison.Ordinal));
+        }
+        foreach (var (conceptId, impliedIds) in ImpliedConceptIds)
+        {
+            if (!normalized.Contains(conceptId, StringComparer.Ordinal))
+                continue;
+
+            normalized.RemoveAll(id => impliedIds.Contains(id, StringComparer.Ordinal));
+        }
+
+        return normalized.ToArray();
     }
 
     private static ConceptRule Rule(
@@ -363,6 +448,14 @@ internal static class RelicStatRowVocabulary
             " ",
             RegexOptions.CultureInvariant);
         cleaned = NormalizeSpaces(cleaned);
+
+        if (Regex.IsMatch(
+                cleaned,
+                @"^(?:(?:at|between|from|in|of|per|this|to)\s*)+$",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+        {
+            return string.Empty;
+        }
 
         return NormalizeSpaces(cleaned);
     }

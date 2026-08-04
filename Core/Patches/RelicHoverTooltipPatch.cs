@@ -2832,10 +2832,8 @@ public static class RelicHoverShowPatch
     {
         var actionExpression = action switch
         {
-            "offered" or "taken" =>
-                StatConceptGlossary.RenderHintedGlyph(action),
-            "not taken" =>
-                $"not {StatConceptGlossary.RenderHintedGlyph("taken")}",
+            "offered" => StatConceptGlossary.RenderHintedGlyph("offered"),
+            "taken" or "not taken" => RenderTakenOutcome(action),
             _ => StatsTooltip.EscapeBbcode(action),
         };
         var iconExpression =
@@ -2992,7 +2990,11 @@ public static class RelicHoverShowPatch
         var cards = screen.Cards ?? new List<RelicCardRewardOptionAggregate>();
         if (cards.Count == 0)
         {
-            TextValueRow(sb, "Card choice", "no cards offered", "");
+            TextValueRow(
+                sb,
+                "Card choice",
+                $"no {StatConceptGlossary.RenderHintedGlyph("offered")}",
+                "");
             return sb.ToString();
         }
 
@@ -3033,7 +3035,11 @@ public static class RelicHoverShowPatch
             var cards = screen.Cards ?? new List<RelicCardRewardOptionAggregate>();
             if (cards.Count == 0)
             {
-                TextValueRow(sb, $"Card reward {screenNumber}", "no cards offered", "");
+                TextValueRow(
+                    sb,
+                    $"Card reward {screenNumber}",
+                    $"no {StatConceptGlossary.RenderHintedGlyph("offered")}",
+                    "");
                 continue;
             }
 
@@ -3074,8 +3080,17 @@ public static class RelicHoverShowPatch
             ["card"],
             [],
             $"[b]{displayName}[/b]",
-            outcome,
+            RenderTakenOutcome(outcome),
             $"This card was offered by {relicName} and was {outcome}.");
+    }
+
+    private static string RenderTakenOutcome(string outcome)
+    {
+        if (string.Equals(outcome, "taken", StringComparison.OrdinalIgnoreCase))
+            return StatConceptGlossary.RenderHintedGlyph("taken");
+        if (string.Equals(outcome, "not taken", StringComparison.OrdinalIgnoreCase))
+            return $"not {StatConceptGlossary.RenderHintedGlyph("taken")}";
+        return StatsTooltip.EscapeBbcode(outcome);
     }
 
     private static string BuildOrreryBodyBBCode(RelicAggregate agg)
@@ -3100,7 +3115,7 @@ public static class RelicHoverShowPatch
     private static string FormatOrreryRewardOutcome(OrreryRewardAggregate reward)
     {
         if (string.Equals(reward.Outcome, "skipped", StringComparison.OrdinalIgnoreCase))
-            return "skipped";
+            return RenderTakenOutcome("not taken");
 
         if (string.Equals(reward.Outcome, "alternative", StringComparison.OrdinalIgnoreCase))
         {
@@ -3137,15 +3152,15 @@ public static class RelicHoverShowPatch
                 })
                 .ToList();
             return cards.Count == 0
-                ? "obtained card"
-                : $"obtained {string.Join(", ", cards)}";
+                ? $"{RenderTakenOutcome("taken")} {StatConceptGlossary.RenderHintedGlyph("card")}"
+                : $"{RenderTakenOutcome("taken")} {string.Join(", ", cards)}";
         }
 
         if (string.Equals(
                 reward.Outcome,
                 "completed_without_card",
                 StringComparison.OrdinalIgnoreCase))
-            return "completed without obtaining a card";
+            return RenderTakenOutcome("not taken");
 
         return "pending";
     }
@@ -4906,7 +4921,7 @@ public static class RelicHoverShowPatch
                 [],
                 [],
                 icon,
-                outcome,
+                RenderTakenOutcome(outcome),
                 $"{displayName} was offered by Small Capsule and was {outcome}.");
         }
 
@@ -6395,16 +6410,22 @@ public static class RelicHoverShowPatch
         string fullDescription,
         string pct = "")
     {
+        var presentation = StatsTooltip.CreateStatRowPresentation(
+            label,
+            fullDescription,
+            conceptIds,
+            denominatorConceptIds);
         BeginOrContinueScalarTable(sb);
         sb.Append("[cell expand=0 padding=0,0,10,0]");
-        sb.Append(StatConceptGlossary.RenderInformationHint(fullDescription));
+        sb.Append(StatConceptGlossary.RenderInformationHint(
+            presentation.FullDescription));
         sb.Append("[/cell]");
         sb.Append("[cell expand=4 padding=0,0,12,0]");
         AppendConceptLabel(
             sb,
-            conceptIds,
-            denominatorConceptIds,
-            label);
+            presentation.ConceptIds,
+            presentation.DenominatorConceptIds,
+            presentation.Label);
         sb.Append("[/cell]");
         sb.Append($"[cell expand=0 padding=0,0,12,0][right][b]{value}[/b][/right][/cell]");
         sb.Append($"[cell expand=0 padding=0,0,4,0][right][color=#b5b5b5]{pct}[/color][/right][/cell]");
@@ -6490,16 +6511,22 @@ public static class RelicHoverShowPatch
         string fullDescription,
         string pct = "")
     {
+        var presentation = StatsTooltip.CreateStatRowPresentation(
+            label,
+            fullDescription,
+            conceptIds,
+            denominatorConceptIds);
         sb.Append("[table=2]");
         sb.Append("[cell expand=0 padding=0,0,10,0]");
-        sb.Append(StatConceptGlossary.RenderInformationHint(fullDescription));
+        sb.Append(StatConceptGlossary.RenderInformationHint(
+            presentation.FullDescription));
         sb.Append("[/cell]");
         sb.Append("[cell expand=4 padding=0,0,4,0]");
         AppendConceptLabel(
             sb,
-            conceptIds,
-            denominatorConceptIds,
-            label);
+            presentation.ConceptIds,
+            presentation.DenominatorConceptIds,
+            presentation.Label);
         if (!string.IsNullOrEmpty(value))
         {
             sb.Append($"  [b]{value}[/b]");
@@ -6517,23 +6544,12 @@ public static class RelicHoverShowPatch
         IReadOnlyList<string> conceptIds,
         IReadOnlyList<string> denominatorConceptIds,
         string label)
-    {
-        for (var index = 0; index < conceptIds.Count; index++)
-        {
-            if (index > 0) sb.Append(' ');
-            if (denominatorConceptIds.Contains(
-                    conceptIds[index],
-                    StringComparer.Ordinal))
-            {
-                sb.Append("[color=#b5b5b5]/[/color] ");
-            }
-            sb.Append(StatConceptGlossary.RenderHintedGlyph(conceptIds[index]));
-        }
-
-        if (string.IsNullOrWhiteSpace(label)) return;
-
-        if (conceptIds.Count > 0) sb.Append(' ');
-        sb.Append($"[color=#e0e0e0]{label}[/color]");
-    }
+        => StatsTooltip.AppendConceptLabel(
+            sb,
+            conceptIds,
+            denominatorConceptIds,
+            string.IsNullOrWhiteSpace(label)
+                ? string.Empty
+                : $"[color=#e0e0e0]{label}[/color]");
 
 }

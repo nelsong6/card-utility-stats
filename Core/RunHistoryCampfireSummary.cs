@@ -231,6 +231,7 @@ internal static class RunHistoryCampfireSummary
     {
         choiceFormatter ??= FormatChoice;
         var floorIcon = StatConceptGlossary.RenderHintedGlyph("floor");
+        var healingIcon = StatConceptGlossary.RenderHintedGlyph("healing_gained");
         var body = new StringBuilder();
         var liftNumber = 0;
 
@@ -253,9 +254,11 @@ internal static class RunHistoryCampfireSummary
             if (entry.EternalFeatherHealing.HasValue)
             {
                 body.Append('\n')
-                    .Append("      Eternal Feather — healed ")
+                    .Append("      ")
+                    .Append(healingIcon)
+                    .Append(" Eternal Feather   [b]")
                     .Append(FormatHealing(entry.EternalFeatherHealing.Value))
-                    .Append(" HP");
+                    .Append("[/b]");
             }
         }
 

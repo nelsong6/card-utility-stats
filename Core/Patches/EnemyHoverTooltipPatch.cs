@@ -116,11 +116,19 @@ public static class EnemyHoverShowPatch
 
     private static void Row3(StringBuilder sb, string label, string value, string pct)
     {
+        var presentation = StatsTooltip.CreateStatRowPresentation(label);
         sb.Append("[table=4]");
         sb.Append("[cell expand=0 padding=0,0,10,0]");
-        sb.Append(StatsTooltip.RenderRowInformationHint(label));
+        sb.Append(StatConceptGlossary.RenderInformationHint(
+            presentation.FullDescription));
         sb.Append("[/cell]");
-        sb.Append($"[cell expand=4 padding=0,0,12,0][color=#e0e0e0]{label}[/color][/cell]");
+        sb.Append("[cell expand=4 padding=0,0,12,0][color=#e0e0e0]");
+        StatsTooltip.AppendConceptLabel(
+            sb,
+            presentation.ConceptIds,
+            presentation.DenominatorConceptIds,
+            presentation.Label);
+        sb.Append("[/color][/cell]");
         sb.Append($"[cell expand=1 padding=0,0,12,0][right][b]{value}[/b][/right][/cell]");
         sb.Append($"[cell expand=1 padding=0,0,4,0][right][color=#b5b5b5]{pct}[/color][/right][/cell]");
         sb.Append("[/table]\n");

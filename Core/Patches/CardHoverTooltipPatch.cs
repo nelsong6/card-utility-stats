@@ -1197,19 +1197,19 @@ public static class CardHoverShowPatch
 
         Row3(
             sb,
-            "Commons taken",
+            "Common Attacks taken",
             agg.SplashCommonAttacksTaken.ToString(),
             "",
             "Common Attacks selected from Splash.");
         Row3(
             sb,
-            "Uncommons taken",
+            "Uncommon Attacks taken",
             agg.SplashUncommonAttacksTaken.ToString(),
             "",
             "Uncommon Attacks selected from Splash.");
         Row3(
             sb,
-            "Rares taken",
+            "Rare Attacks taken",
             agg.SplashRareAttacksTaken.ToString(),
             "",
             "Rare Attacks selected from Splash.");
@@ -1957,11 +1957,21 @@ public static class CardHoverShowPatch
         string pct,
         string? fullDescription = null)
     {
+        var presentation = StatsTooltip.CreateStatRowPresentation(
+            label,
+            fullDescription);
         sb.Append("[table=4]");
         sb.Append("[cell expand=0 padding=0,0,10,0]");
-        sb.Append(StatsTooltip.RenderRowInformationHint(label, fullDescription));
+        sb.Append(StatConceptGlossary.RenderInformationHint(
+            presentation.FullDescription));
         sb.Append("[/cell]");
-        sb.Append($"[cell expand=4 padding=0,0,12,0][color=#e0e0e0]{label}[/color][/cell]");
+        sb.Append("[cell expand=4 padding=0,0,12,0][color=#e0e0e0]");
+        StatsTooltip.AppendConceptLabel(
+            sb,
+            presentation.ConceptIds,
+            presentation.DenominatorConceptIds,
+            presentation.Label);
+        sb.Append("[/color][/cell]");
         sb.Append($"[cell expand=1 padding=0,0,12,0][right][b]{value}[/b][/right][/cell]");
         sb.Append($"[cell expand=1 padding=0,0,4,0][right][color=#b5b5b5]{pct}[/color][/right][/cell]");
         sb.Append("[/table]\n");
@@ -1975,16 +1985,32 @@ public static class CardHoverShowPatch
     /// </summary>
     private static void RowDual(StringBuilder sb, string leftLabel, string leftValue, string rightLabel, string rightValue)
     {
+        var leftPresentation = StatsTooltip.CreateStatRowPresentation(leftLabel);
+        var rightPresentation = StatsTooltip.CreateStatRowPresentation(rightLabel);
         sb.Append("[table=6]");
         sb.Append("[cell expand=0 padding=0,0,10,0]");
-        sb.Append(StatsTooltip.RenderRowInformationHint(leftLabel));
+        sb.Append(StatConceptGlossary.RenderInformationHint(
+            leftPresentation.FullDescription));
         sb.Append("[/cell]");
-        sb.Append($"[cell expand=3 padding=0,0,12,0][color=#e0e0e0]{leftLabel}[/color][/cell]");
+        sb.Append("[cell expand=3 padding=0,0,12,0][color=#e0e0e0]");
+        StatsTooltip.AppendConceptLabel(
+            sb,
+            leftPresentation.ConceptIds,
+            leftPresentation.DenominatorConceptIds,
+            leftPresentation.Label);
+        sb.Append("[/color][/cell]");
         sb.Append($"[cell expand=1 padding=0,0,18,0][right][b]{leftValue}[/b][/right][/cell]");
         sb.Append("[cell expand=0 padding=0,0,10,0]");
-        sb.Append(StatsTooltip.RenderRowInformationHint(rightLabel));
+        sb.Append(StatConceptGlossary.RenderInformationHint(
+            rightPresentation.FullDescription));
         sb.Append("[/cell]");
-        sb.Append($"[cell expand=3 padding=0,0,12,0][color=#e0e0e0]{rightLabel}[/color][/cell]");
+        sb.Append("[cell expand=3 padding=0,0,12,0][color=#e0e0e0]");
+        StatsTooltip.AppendConceptLabel(
+            sb,
+            rightPresentation.ConceptIds,
+            rightPresentation.DenominatorConceptIds,
+            rightPresentation.Label);
+        sb.Append("[/color][/cell]");
         sb.Append($"[cell expand=1 padding=0,0,4,0][right][b]{rightValue}[/b][/right][/cell]");
         sb.Append("[/table]\n");
     }

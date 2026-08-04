@@ -29,7 +29,7 @@ public class RelicStatRowVocabularyTests
     [InlineData(
         "Cards upgraded",
         "",
-        "card,upgraded",
+        "upgraded",
         "")]
     [InlineData(
         "Attacks upgraded",
@@ -159,8 +159,13 @@ public class RelicStatRowVocabularyTests
     [InlineData(
         "Cards exhausted per combat",
         "",
-        "card,exhaust,combat",
+        "exhaust,combat",
         "combat")]
+    [InlineData(
+        "Cards discarded",
+        "",
+        "discard",
+        "")]
     [InlineData(
         "Potions gained",
         "",
@@ -226,6 +231,46 @@ public class RelicStatRowVocabularyTests
         "not taken",
         "swift,card",
         "")]
+    [InlineData(
+        "Rare Attacks offered",
+        "",
+        "attack_rare,offered",
+        "")]
+    [InlineData(
+        "Rare Powers offered",
+        "",
+        "power_rare,offered",
+        "")]
+    [InlineData(
+        "Common Skills offered",
+        "",
+        "skill_common,offered",
+        "")]
+    [InlineData(
+        "Elites slain",
+        "",
+        "elite,kill",
+        "")]
+    [InlineData(
+        "Merchants visited",
+        "visited",
+        "shop",
+        "")]
+    [InlineData(
+        "Campfires not rested",
+        "not rested",
+        "campfire",
+        "")]
+    [InlineData(
+        "HP lost in events",
+        "",
+        "damage,unknown_room",
+        "")]
+    [InlineData(
+        "Avg floors between merchants",
+        "",
+        "average,floor,shop",
+        "")]
     public void Create_ReplacesKnownRelicConceptWords(
         string label,
         string expectedLabel,
@@ -281,5 +326,21 @@ public class RelicStatRowVocabularyTests
             presentation.ConceptIds);
         Assert.Equal(["combat"], presentation.DenominatorConceptIds);
         Assert.Contains("energy", presentation.FullDescription);
+    }
+
+    [Fact]
+    public void SharedRowPresentation_DeduplicatesExplicitIconsAndLabelProse()
+    {
+        var presentation = StatsTooltip.CreateStatRowPresentation(
+            "Potions offered",
+            "Potions offered in combat rewards.",
+            ["combat", "offered", "potion"],
+            []);
+
+        Assert.Equal("", presentation.Label);
+        Assert.Equal(
+            ["combat", "offered", "potion"],
+            presentation.ConceptIds);
+        Assert.Empty(presentation.DenominatorConceptIds);
     }
 }

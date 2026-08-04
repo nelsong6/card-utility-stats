@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Collections.Generic;
 using System.Text;
 using MegaCrit.sts2.Core.Nodes.TopBar;
 using MegaCrit.Sts2.Core.HoverTips;
@@ -40,61 +41,62 @@ internal static class GoldStatsTooltip
         int floors)
     {
         goldStats ??= new RunGoldStats();
-        var goldIcon = StatConceptGlossary.RenderHintedGlyph("gold");
-        var goldGainedIcon = StatConceptGlossary.RenderHintedGlyph("gold_gained");
-        var averageIcon = StatConceptGlossary.RenderHintedGlyph("average");
-        var floorIcon = StatConceptGlossary.RenderHintedGlyph("floor");
-        var combatIcon = StatConceptGlossary.RenderHintedGlyph("combat");
-        var eventIcon = StatConceptGlossary.RenderHintedGlyph("unknown_room");
-        var shopIcon = StatConceptGlossary.RenderHintedGlyph("shop");
         var body = new StringBuilder();
 
         AppendStatRow(
             body,
-            goldGainedIcon,
-            "Acquired",
+            ["gold_gained"],
+            [],
+            string.Empty,
             goldStats.GoldAcquired,
             "All gold acquired this run.");
         AppendStatRow(
             body,
-            goldIcon,
+            ["gold"],
+            [],
             "Spent",
             goldStats.GoldSpent,
             "All gold spent this run.");
         AppendStatRow(
             body,
-            $"{shopIcon} {goldIcon}",
+            ["shop", "gold"],
+            [],
             "Spent",
             goldStats.GoldSpentInShops,
             "Gold spent in shops this run.");
         AppendStatRow(
             body,
-            $"{averageIcon} {shopIcon} {goldIcon}",
+            ["average", "shop", "gold"],
+            ["shop"],
             "Spent",
             Divide(goldStats.GoldSpentInShops, goldStats.ShopsVisited),
             "Average gold spent per shop visited.");
         AppendStatRow(
             body,
-            $"{eventIcon} {goldIcon}",
+            ["unknown_room", "gold"],
+            [],
             "Spent",
             goldStats.GoldSpentInEvents,
             "Gold spent in events this run.");
         AppendStatRow(
             body,
-            $"{averageIcon} {floorIcon} {goldGainedIcon}",
-            "Gained",
+            ["average", "floor", "gold_gained"],
+            ["floor"],
+            "Gold gained",
             Divide(goldStats.GoldAcquired, floors),
             "Average gold acquired per floor reached.");
         AppendStatRow(
             body,
-            $"{averageIcon} {combatIcon} {goldGainedIcon}",
-            "Gained",
+            ["average", "combat", "gold_gained"],
+            ["combat"],
+            "Gold gained",
             Divide(goldStats.GoldGainedInCombats, goldStats.Combats),
             "Average gold gained per combat.");
         AppendStatRow(
             body,
-            $"{averageIcon} {eventIcon} {goldGainedIcon}",
-            "Gained",
+            ["average", "unknown_room", "gold_gained"],
+            ["unknown_room"],
+            "Gold gained",
             Divide(goldStats.GoldGainedInEvents, goldStats.EventsVisited),
             "Average gold gained per event visited.");
 
@@ -103,41 +105,49 @@ internal static class GoldStatsTooltip
 
     private static void AppendStatRow(
         StringBuilder body,
-        string icon,
+        IReadOnlyList<string> conceptIds,
+        IReadOnlyList<string> denominatorConceptIds,
         string label,
         int value,
         string fullDescription)
         => AppendStatRow(
             body,
-            icon,
+            conceptIds,
+            denominatorConceptIds,
             label,
             value.ToString(CultureInfo.InvariantCulture),
             fullDescription);
 
     private static void AppendStatRow(
         StringBuilder body,
-        string icon,
+        IReadOnlyList<string> conceptIds,
+        IReadOnlyList<string> denominatorConceptIds,
         string label,
         decimal value,
         string fullDescription)
-        => AppendStatRow(body, icon, label, FormatDecimal(value), fullDescription);
+        => AppendStatRow(
+            body,
+            conceptIds,
+            denominatorConceptIds,
+            label,
+            FormatDecimal(value),
+            fullDescription);
 
     private static void AppendStatRow(
         StringBuilder body,
-        string icon,
+        IReadOnlyList<string> conceptIds,
+        IReadOnlyList<string> denominatorConceptIds,
         string label,
         string value,
         string fullDescription)
     {
-        if (body.Length > 0) body.Append('\n');
-        body.Append(StatsTooltip.RenderRowInformationHint(label, fullDescription))
-            .Append(' ')
-            .Append(icon)
-            .Append(' ')
-            .Append(label)
-            .Append("   [b]")
-            .Append(value)
-            .Append("[/b]");
+        StatsTooltip.AppendInlineStatRow(
+            body,
+            conceptIds,
+            denominatorConceptIds,
+            label,
+            value,
+            fullDescription);
     }
 
     private static decimal Divide(int numerator, int denominator)

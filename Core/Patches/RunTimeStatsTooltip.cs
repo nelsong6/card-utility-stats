@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text;
 using MegaCrit.Sts2.Core.HoverTips;
 
@@ -32,52 +33,51 @@ internal static class RunTimeStatsTooltip
     {
         stats ??= new RunTimeStats();
         var body = new StringBuilder();
-        var average = Icon("average");
-        var combat = Icon("combat");
-        var turn = Icon("turn");
-
         AppendRow(
             body,
-            combat,
+            ["combat"],
+            [],
             "Time spent in combats",
             Format(stats.CombatSeconds),
             "Total time spent in combats this run.");
         AppendRow(
             body,
-            $"{average} {turn}",
+            ["average", "turn", "combat"],
+            ["turn"],
             "Avg time per turn in combat",
             FormatAverage(stats.CombatSeconds, stats.CombatTurns),
             "Average combat time per player turn.");
         AppendRow(
             body,
-            $"{average} {combat}",
+            ["average", "combat"],
+            ["combat"],
             "Avg time per combat",
             FormatAverage(stats.CombatSeconds, stats.Combats),
             "Average time spent per combat.");
         AppendRow(
             body,
-            Icon("offered"),
+            ["offered"],
+            [],
             "Time spent at reward screens",
             Format(stats.RewardScreenSeconds),
             "Total time spent viewing reward screens this run.");
         AppendRow(
             body,
-            Icon("unknown_room"),
+            ["unknown_room"],
+            [],
             "Time spent in events",
             Format(stats.EventSeconds),
             "Total time spent in events this run.");
         AppendRow(
             body,
-            Icon("floor"),
+            ["floor"],
+            [],
             "Time spent on the map",
             Format(stats.MapSeconds),
             "Total time spent viewing the map this run.");
 
         return body.ToString();
     }
-
-    private static string Icon(string concept)
-        => StatConceptGlossary.RenderHintedGlyph(concept);
 
     private static string Format(long seconds)
     {
@@ -99,19 +99,18 @@ internal static class RunTimeStatsTooltip
 
     private static void AppendRow(
         StringBuilder body,
-        string icon,
+        IReadOnlyList<string> conceptIds,
+        IReadOnlyList<string> denominatorConceptIds,
         string label,
         string value,
         string fullDescription)
     {
-        if (body.Length > 0) body.Append('\n');
-        body.Append(StatsTooltip.RenderRowInformationHint(label, fullDescription))
-            .Append(' ')
-            .Append(icon)
-            .Append(' ')
-            .Append(label)
-            .Append("   [b]")
-            .Append(value)
-            .Append("[/b]");
+        StatsTooltip.AppendInlineStatRow(
+            body,
+            conceptIds,
+            denominatorConceptIds,
+            label,
+            value,
+            fullDescription);
     }
 }

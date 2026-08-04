@@ -115,9 +115,11 @@ public class SplashStatsTests
         AppendSplashStats(sb, CreateRepresentativeAggregate());
         var body = sb.ToString();
 
-        Assert.Contains("Commons taken", body);
-        Assert.Contains("Uncommons taken", body);
-        Assert.Contains("Rares taken", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("attack_common"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("attack_uncommon"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("attack_rare"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("taken"), body);
+        Assert.DoesNotContain("[color=#e0e0e0]taken", body);
         Assert.Contains("avg discount", body);
         Assert.Contains("[b]1.17[/b]", body);
         Assert.Contains(

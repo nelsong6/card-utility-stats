@@ -92,7 +92,10 @@ public class RunHistoryCampfireSummaryTests
             choice => choice == "HEAL" ? "Rest" : choice);
 
         Assert.Contains("Rest — healed 22 HP", body);
-        Assert.Contains("\n      Eternal Feather — healed 9 HP", body);
+        Assert.Contains(
+            $"\n      {StatConceptGlossary.RenderHintedGlyph("healing_gained")} Eternal Feather   [b]9[/b]",
+            body);
+        Assert.DoesNotContain("Eternal Feather — healed", body);
         Assert.DoesNotContain("Rest — healed 31 HP", body);
     }
 

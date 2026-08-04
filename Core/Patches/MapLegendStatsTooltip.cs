@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Collections.Generic;
 using System.Text;
 using MegaCrit.Sts2.Core.HoverTips;
 using MegaCrit.Sts2.Core.Map;
@@ -71,52 +72,56 @@ internal static class MapLegendStatsTooltip
     {
         category ??= new MapLegendCategoryStats();
         var body = new StringBuilder();
-        var average = Icon("average");
-        var floor = Icon("floor");
-        var combat = Icon(pointType == MapPointType.Elite ? "elite" : "combat");
-        var gold = Icon("gold");
-        var goldGained = Icon("gold_gained");
-        var healing = Icon("healing_gained");
-        var damage = Icon("damage");
-        var card = Icon("card");
-        var relic = Icon("relic");
-        var potion = Icon("potion");
-        var offered = Icon("offered");
-        var upgraded = Icon("upgraded");
-        var maxHp = Icon("max_hp");
-        var maxHpGainedIcon = Icon("max_hp_gained");
-        var kill = Icon("kill");
 
-        AppendRow(body, LegendIcon(pointType), VisitLabel(pointType), category.Visits);
         AppendRow(
             body,
-            $"{average} {floor}",
+            [LegendConcept(pointType)],
+            [],
+            VisitLabel(pointType),
+            category.Visits);
+        AppendRow(
+            body,
+            ["average", "floor"],
+            ["floor"],
             $"Avg floors between {VisitNoun(pointType)}",
             Divide(category.FloorsBetweenVisitsTotal, category.FloorsBetweenVisitsSamples));
 
         if (pointType == MapPointType.Unknown)
         {
-            AppendRow(body, Icon("unknown_room"), "Events found", category.ResolvedEvents);
-            AppendRow(body, Icon("combat"), "Combats found", category.ResolvedCombats);
-            AppendRow(body, Icon("elite"), "Elites found", category.ResolvedElites);
-            AppendRow(body, gold, "Merchants found", category.ResolvedShops);
-            AppendRow(body, relic, "Treasure rooms found", category.ResolvedTreasures);
-            AppendRow(body, Icon("campfire"), "Rest sites found", category.ResolvedRestSites);
+            AppendRow(body, ["unknown_room"], [], "Events found", category.ResolvedEvents);
+            AppendRow(body, ["combat"], [], "Combats found", category.ResolvedCombats);
+            AppendRow(body, ["elite"], [], "Elites found", category.ResolvedElites);
+            AppendRow(body, ["shop"], [], "Merchants found", category.ResolvedShops);
+            AppendRow(body, ["relic"], [], "Treasure rooms found", category.ResolvedTreasures);
+            AppendRow(body, ["campfire"], [], "Rest sites found", category.ResolvedRestSites);
         }
 
         if (pointType is MapPointType.Monster or MapPointType.Elite)
         {
-            AppendRow(body, combat, "Combats completed", category.CombatsCompleted);
-            AppendRow(body, kill, pointType == MapPointType.Elite ? "Elites slain" : "Combats won", category.CombatsWon);
+            var combatConcept = pointType == MapPointType.Elite ? "elite" : "combat";
+            AppendRow(body, [combatConcept], [], "Combats completed", category.CombatsCompleted);
             AppendRow(
                 body,
-                $"{average} {kill}",
+                [combatConcept, "kill"],
+                [],
+                pointType == MapPointType.Elite ? "Elites slain" : "Combats won",
+                category.CombatsWon);
+            AppendRow(
+                body,
+                ["average", "kill"],
+                [],
                 "Win rate",
                 Percent(category.CombatsWon, category.CombatsCompleted));
-            AppendRow(body, $"{combat} {healing}", "Perfect combats", category.PerfectCombats);
             AppendRow(
                 body,
-                $"{average} {Icon("turn")}",
+                [combatConcept, "healing_gained"],
+                [],
+                "Perfect combats",
+                category.PerfectCombats);
+            AppendRow(
+                body,
+                ["average", "turn", combatConcept],
+                [combatConcept],
                 "Avg turns per combat",
                 Divide(category.CombatTurns, category.CombatsCompleted));
         }
@@ -124,14 +129,15 @@ internal static class MapLegendStatsTooltip
         if (category.HpLost != 0m
             || pointType is MapPointType.Unknown or MapPointType.Monster or MapPointType.Elite)
         {
-            AppendRow(body, damage, "HP lost", category.HpLost);
+            AppendRow(body, ["damage"], [], "HP lost", category.HpLost);
         }
 
         if (pointType is MapPointType.Monster or MapPointType.Elite)
         {
             AppendRow(
                 body,
-                $"{average} {damage}",
+                ["average", "damage", pointType == MapPointType.Elite ? "elite" : "combat"],
+                [pointType == MapPointType.Elite ? "elite" : "combat"],
                 "Avg HP lost per combat",
                 Divide(category.HpLost, category.CombatsCompleted));
         }
@@ -140,55 +146,58 @@ internal static class MapLegendStatsTooltip
             || pointType is MapPointType.Shop or MapPointType.RestSite
                 or MapPointType.Monster or MapPointType.Elite)
         {
-            AppendRow(body, healing, "HP restored", category.HpHealed);
+            AppendRow(body, ["healing_gained"], [], "HP restored", category.HpHealed);
         }
 
         if (pointType == MapPointType.RestSite)
         {
             AppendRow(
                 body,
-                $"{average} {healing}",
+                ["average", "healing_gained", "campfire"],
+                ["campfire"],
                 "Avg HP restored per rest site",
                 Divide(category.HpHealed, category.Visits));
         }
 
         if (category.CardsUpgraded != 0 || pointType == MapPointType.RestSite)
-            AppendRow(body, upgraded, "Cards upgraded", category.CardsUpgraded);
+            AppendRow(body, ["upgraded"], [], "Cards upgraded", category.CardsUpgraded);
 
         if (category.GoldGained != 0
             || pointType is MapPointType.Unknown or MapPointType.Shop
                 or MapPointType.Treasure or MapPointType.Monster or MapPointType.Elite)
         {
-            AppendRow(body, goldGained, "Gold gained", category.GoldGained);
+            AppendRow(body, ["gold_gained"], [], "Gold gained", category.GoldGained);
         }
 
         if (pointType is MapPointType.Monster or MapPointType.Elite)
         {
             AppendRow(
                 body,
-                $"{average} {goldGained}",
+                ["average", "gold_gained", pointType == MapPointType.Elite ? "elite" : "combat"],
+                [pointType == MapPointType.Elite ? "elite" : "combat"],
                 "Avg gold gained per combat",
                 Divide(category.GoldGained, category.CombatsCompleted));
         }
 
         if (category.GoldSpent != 0 || pointType is MapPointType.Unknown or MapPointType.Shop)
-            AppendRow(body, gold, "Gold spent", category.GoldSpent);
+            AppendRow(body, ["gold"], [], "Gold spent", category.GoldSpent);
 
         if (pointType == MapPointType.Shop)
         {
             AppendRow(
                 body,
-                $"{average} {gold}",
+                ["average", "gold", "shop"],
+                ["shop"],
                 "Avg gold spent per merchant",
                 Divide(category.GoldSpent, category.Visits));
         }
 
-        AppendRow(body, card, "Cards gained", category.CardsGained);
-        AppendRow(body, relic, "Relics gained", category.RelicsGained);
-        AppendRow(body, $"{offered} {potion}", "Potions offered", potionsOffered);
-        AppendRow(body, potion, "Potions gained", potionsGained);
-        AppendRow(body, maxHpGainedIcon, "Max HP gained", maxHpGained);
-        AppendRow(body, maxHp, "Max HP lost", maxHpLost);
+        AppendRow(body, ["card"], [], "Cards gained", category.CardsGained);
+        AppendRow(body, ["relic_gained"], [], "Relics gained", category.RelicsGained);
+        AppendRow(body, ["offered", "potion"], [], "Potions offered", potionsOffered);
+        AppendRow(body, ["potion_gained"], [], "Potions gained", potionsGained);
+        AppendRow(body, ["max_hp_gained"], [], "Max HP gained", maxHpGained);
+        AppendRow(body, ["max_hp"], [], "Max HP lost", maxHpLost);
 
         return body.ToString();
     }
@@ -262,52 +271,58 @@ internal static class MapLegendStatsTooltip
             _ => "visits",
         };
 
-    private static string LegendIcon(MapPointType pointType)
-        => Icon(pointType switch
+    private static string LegendConcept(MapPointType pointType)
+        => pointType switch
         {
             MapPointType.Unknown => "unknown_room",
-            MapPointType.Shop => "gold",
+            MapPointType.Shop => "shop",
             MapPointType.Treasure => "relic",
             MapPointType.RestSite => "campfire",
             MapPointType.Monster => "combat",
             MapPointType.Elite => "elite",
             _ => "floor",
-        });
-
-    private static string Icon(string id)
-        => StatConceptGlossary.RenderHintedGlyph(id);
+        };
 
     private static void AppendRow(
         StringBuilder body,
-        string icon,
+        IReadOnlyList<string> conceptIds,
+        IReadOnlyList<string> denominatorConceptIds,
         string label,
         int value)
-        => AppendRow(body, icon, label, value.ToString(CultureInfo.InvariantCulture));
+        => AppendRow(
+            body,
+            conceptIds,
+            denominatorConceptIds,
+            label,
+            value.ToString(CultureInfo.InvariantCulture));
 
     private static void AppendRow(
         StringBuilder body,
-        string icon,
+        IReadOnlyList<string> conceptIds,
+        IReadOnlyList<string> denominatorConceptIds,
         string label,
         decimal value)
-        => AppendRow(body, icon, label, FormatDecimal(value));
+        => AppendRow(
+            body,
+            conceptIds,
+            denominatorConceptIds,
+            label,
+            FormatDecimal(value));
 
     private static void AppendRow(
         StringBuilder body,
-        string icon,
+        IReadOnlyList<string> conceptIds,
+        IReadOnlyList<string> denominatorConceptIds,
         string label,
         string value)
     {
-        if (body.Length > 0) body.Append('\n');
-        body.Append(StatsTooltip.RenderRowInformationHint(
-                label,
-                DescribeRow(label)))
-            .Append(' ')
-            .Append(icon)
-            .Append(' ')
-            .Append(label)
-            .Append("   [b]")
-            .Append(value)
-            .Append("[/b]");
+        StatsTooltip.AppendInlineStatRow(
+            body,
+            conceptIds,
+            denominatorConceptIds,
+            label,
+            value,
+            DescribeRow(label));
     }
 
     private static string DescribeRow(string label)

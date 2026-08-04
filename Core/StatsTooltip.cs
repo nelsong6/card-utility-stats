@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
+using System.Text;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.HoverTips;
 
@@ -69,6 +72,70 @@ public static class StatsTooltip
             label,
             fullDescription).FullDescription;
         return StatConceptGlossary.RenderInformationHint(description);
+    }
+
+    internal static RelicStatRowPresentation CreateStatRowPresentation(
+        string label,
+        string? fullDescription = null,
+        IReadOnlyList<string>? conceptIds = null,
+        IReadOnlyList<string>? denominatorConceptIds = null)
+    {
+        var inferred = RelicStatRowVocabulary.Create(label, fullDescription);
+        return RelicStatRowVocabulary.MergeConcepts(
+            inferred,
+            conceptIds ?? Array.Empty<string>(),
+            denominatorConceptIds ?? Array.Empty<string>());
+    }
+
+    internal static void AppendConceptLabel(
+        StringBuilder body,
+        IReadOnlyList<string> conceptIds,
+        IReadOnlyList<string> denominatorConceptIds,
+        string label)
+    {
+        for (var index = 0; index < conceptIds.Count; index++)
+        {
+            if (index > 0) body.Append(' ');
+            if (denominatorConceptIds.Contains(
+                    conceptIds[index],
+                    StringComparer.Ordinal))
+            {
+                body.Append("[color=#b5b5b5]/[/color] ");
+            }
+            body.Append(StatConceptGlossary.RenderHintedGlyph(conceptIds[index]));
+        }
+
+        if (string.IsNullOrWhiteSpace(label)) return;
+
+        if (conceptIds.Count > 0) body.Append(' ');
+        body.Append(label);
+    }
+
+    internal static void AppendInlineStatRow(
+        StringBuilder body,
+        IReadOnlyList<string> conceptIds,
+        IReadOnlyList<string> denominatorConceptIds,
+        string label,
+        string value,
+        string fullDescription)
+    {
+        var presentation = CreateStatRowPresentation(
+            label,
+            fullDescription,
+            conceptIds,
+            denominatorConceptIds);
+        if (body.Length > 0) body.Append('\n');
+        body.Append(StatConceptGlossary.RenderInformationHint(
+                presentation.FullDescription))
+            .Append(' ');
+        AppendConceptLabel(
+            body,
+            presentation.ConceptIds,
+            presentation.DenominatorConceptIds,
+            presentation.Label);
+        body.Append("   [b]")
+            .Append(value)
+            .Append("[/b]");
     }
 
     /// <summary>

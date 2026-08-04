@@ -137,6 +137,7 @@ Current UI conventions:
   the denominator icon; “in” and “this” indicate scope and do not receive a
   slash
 - every icon-driven stat row can pair a left-side information hint for the full row meaning with a separate semantic concept hint; the central compendium glossary describes those same concept symbols
+- card, enemy, relic, potion, and run-summary stat rows all pass through the shared row vocabulary; established concepts render as glossary icons, and equivalent prose is retained only in the information hint rather than repeated visibly beside the icon
 - when the game already exposes a recognizable asset, prefer the in-game block/draw/energy/star iconography over generic text-only rows
 - native lifecycle does not erase visual ownership: SpireLens stats tips retain
   their larger body text, blue background treatment, and top-right brand while

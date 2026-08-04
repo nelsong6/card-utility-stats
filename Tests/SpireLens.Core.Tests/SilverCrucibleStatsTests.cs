@@ -128,8 +128,11 @@ public class SilverCrucibleStatsTests
         Assert.Contains("reward 1", body);
         Assert.Contains("Bash+", body);
         Assert.Contains("Shrug It Off+", body);
-        Assert.Contains("taken", body);
-        Assert.Contains("not taken", body);
+        var takenIcon = StatConceptGlossary.RenderHintedGlyph("taken");
+        Assert.Contains($"[b]{takenIcon}[/b]", body);
+        Assert.Contains($"[b]not {takenIcon}[/b]", body);
+        Assert.DoesNotContain("[b]taken[/b]", body);
+        Assert.DoesNotContain("[b]not taken[/b]", body);
         Assert.Contains("reward 2", body);
         Assert.Contains("not seen yet", body);
         Assert.Contains("reward 3", body);

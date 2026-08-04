@@ -99,55 +99,61 @@ public class PotionBeltStatsTooltipTests
             });
 
         var rows = body.Split('\n');
+        var offered = StatConceptGlossary.RenderHintedGlyph("offered");
+        var activation = StatConceptGlossary.RenderHintedGlyph("activation");
         Assert.Equal(12, rows.Length);
 
         Assert.Contains(rows, row => row.Contains("Combat:")
             && row.Contains("Offered:")
             && row.Contains("Potion:")
-            && row.Contains("Offered   [b]4[/b]"));
+            && row.EndsWith("   [b]4[/b]"));
         Assert.Contains(rows, row => row.Contains("Average:")
             && row.Contains("Floor:")
             && row.Contains("Offered:")
             && row.Contains("Potion:")
-            && row.Contains("Offered   [b]0.88[/b]"));
+            && row.EndsWith("   [b]0.88[/b]"));
         Assert.Contains(rows, row => row.Contains("Combat:")
             && row.Contains("Offered:")
             && row.Contains("Common potion:")
-            && row.Contains("Offered   [b]1[/b]"));
+            && row.EndsWith("   [b]1[/b]"));
         Assert.Contains(rows, row => row.Contains("Combat:")
             && row.Contains("Offered:")
             && row.Contains("Uncommon potion:")
-            && row.Contains("Offered   [b]1[/b]"));
+            && row.EndsWith("   [b]1[/b]"));
         Assert.Contains(rows, row => row.Contains("Combat:")
             && row.Contains("Offered:")
             && row.Contains("Rare potion:")
-            && row.Contains("Offered   [b]2[/b]"));
+            && row.EndsWith("   [b]2[/b]"));
         Assert.Contains(rows, row => row.Contains("Combat:")
             && row.Contains("Offered:")
             && row.Contains("Fruit Juice:")
-            && row.Contains("Offered   [b]1[/b]"));
+            && row.EndsWith("   [b]1[/b]"));
         Assert.Contains(rows, row => row.Contains("Offered:")
             && row.Contains("Wasted:")
             && row.Contains("Potion:")
-            && row.Contains("Rejected   [b]2[/b]"));
+            && row.EndsWith("   [b]2[/b]"));
         Assert.Contains(rows, row => row.Contains("Unknown room:")
             && row.Contains("Offered:")
             && row.Contains("Potion:")
-            && row.Contains("Offered   [b]1[/b]"));
+            && row.EndsWith("   [b]1[/b]"));
         Assert.Contains(rows, row => row.Contains("Merchant:")
             && row.Contains("Offered:")
             && row.Contains("Potion:")
-            && row.Contains("Offered   [b]2[/b]"));
+            && row.EndsWith("   [b]2[/b]"));
         Assert.Contains(rows, row => row.Contains("Merchant:")
             && row.Contains("Taken:")
             && row.Contains("Potion:")
-            && row.Contains("Purchased   [b]1[/b]"));
+            && row.EndsWith("   [b]1[/b]"));
         Assert.Contains(rows, row => row.Contains("Activation:")
             && row.Contains("Potion:")
-            && row.Contains("Activated   [b]3[/b]"));
+            && row.EndsWith("   [b]3[/b]"));
         Assert.Contains(rows, row => row.Contains("Wasted:")
             && row.Contains("Potion:")
-            && row.Contains("Discarded   [b]1[/b]"));
+            && row.EndsWith("   [b]1[/b]"));
+        Assert.DoesNotContain($"{offered} Offered", body);
+        Assert.DoesNotContain($"{activation} Activated", body);
+        Assert.DoesNotContain("Rejected   [b]", body);
+        Assert.DoesNotContain("Purchased   [b]", body);
 
         Assert.Contains(
             StatConceptGlossary.RenderInformationHint(
