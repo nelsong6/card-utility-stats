@@ -96,22 +96,23 @@ public class MaxHpHistoryTests
             && row.Contains("In:")
             && row.Contains("All:")
             && row.Contains("Combat:")
-            && row.EndsWith("   [b]30[/b]"));
+            && row.Contains("[b]30[/b]"));
         Assert.Contains(rows, row => row.Contains("Damage:")
             && row.Contains("In:")
             && row.Contains("All:")
             && row.Contains("Unknown room:")
-            && row.EndsWith("   [b]10[/b]"));
+            && row.Contains("[b]10[/b]"));
         Assert.Contains(rows, row => row.Contains("Average:")
             && row.Contains("Floor:")
-            && row.EndsWith("   [b]5[/b]"));
+            && row.Contains("[b]5[/b]"));
         Assert.Contains(rows, row => row.Contains("Average:")
             && row.Contains("Combat:")
-            && row.EndsWith("   [b]10[/b]"));
+            && row.Contains("[b]10[/b]"));
         Assert.Contains(rows, row => row.Contains("Maximum HP gained:")
-            && row.EndsWith("   [b]14[/b]"));
+            && row.Contains("[b]14[/b]"));
         Assert.Contains(rows, row => row.Contains("Max HP:")
-            && row.Contains("lost   [b]7[/b]"));
+            && row.Contains("lost")
+            && row.Contains("[b]7[/b]"));
         Assert.DoesNotContain("Max HP gained   [b]", body);
         Assert.Contains(
             StatConceptGlossary.RenderInformationHint("HP lost to combat damage this run."),

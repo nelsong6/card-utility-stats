@@ -131,6 +131,9 @@ Current UI conventions:
   columns; card names, relic names, destinations, and other textual outcomes
   render inline in the expanding label cell so Godot cannot squeeze them into
   a narrow numeric column; do not use character-count wrapping heuristics
+- run-summary rows share one natural-width table: the widest semantic label
+  establishes the value column, and every value is left-aligned at that same
+  horizontal position
 - loud section headers are discouraged unless they add real clarity
 - inline icons are preferred for keyword-like effects when they improve scanning
 - rows phrased as “per <recognized concept>” render the hinted **Per** (`/`)

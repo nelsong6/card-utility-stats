@@ -17,6 +17,9 @@ namespace SpireLens.Core;
 /// </summary>
 public static class StatsTooltip
 {
+    private const string InlineStatTableOpen = "[table=3]";
+    private const string InlineStatTableClose = "[/table]";
+
     private const string NativeStatsTipId = "SPIRELENS.STATS";
     private const string NativeHintTipId = "SPIRELENS.HINT";
     private const int BodyFontSize = 20;
@@ -125,18 +128,53 @@ public static class StatsTooltip
             fullDescription,
             conceptIds,
             denominatorConceptIds);
-        if (body.Length > 0) body.Append('\n');
-        body.Append(StatConceptGlossary.RenderInformationHint(
+        BeginOrContinueInlineStatTable(body);
+        body.Append("[cell expand=0 padding=0,0,8,0]")
+            .Append(StatConceptGlossary.RenderInformationHint(
                 presentation.FullDescription))
-            .Append(' ');
+            .Append("[/cell]")
+            .Append("[cell expand=0 padding=0,0,12,0]");
         AppendConceptLabel(
             body,
             presentation.ConceptIds,
             presentation.DenominatorConceptIds,
             presentation.Label);
-        body.Append("   [b]")
+        body.Append("[/cell]")
+            .Append("[cell expand=0 padding=0,0,0,0][left][b]")
             .Append(value)
-            .Append("[/b]");
+            .Append("[/b][/left][/cell]")
+            .Append(InlineStatTableClose);
+    }
+
+    private static void BeginOrContinueInlineStatTable(StringBuilder body)
+    {
+        if (body.Length == 0)
+        {
+            body.Append(InlineStatTableOpen);
+            return;
+        }
+
+        if (EndsWith(body, InlineStatTableClose))
+        {
+            body.Length -= InlineStatTableClose.Length;
+            body.Append('\n');
+            return;
+        }
+
+        body.Append('\n').Append(InlineStatTableOpen);
+    }
+
+    private static bool EndsWith(StringBuilder body, string suffix)
+    {
+        if (body.Length < suffix.Length) return false;
+
+        var start = body.Length - suffix.Length;
+        for (var index = 0; index < suffix.Length; index++)
+        {
+            if (body[start + index] != suffix[index]) return false;
+        }
+
+        return true;
     }
 
     /// <summary>

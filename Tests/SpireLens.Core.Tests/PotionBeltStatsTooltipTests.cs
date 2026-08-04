@@ -107,7 +107,7 @@ public class PotionBeltStatsTooltipTests
 
         var allCombatOffers = Assert.Single(
             rows,
-            row => row.EndsWith("   [b]4[/b]"));
+            row => row.Contains("[b]4[/b]"));
         AssertConceptOrder(
             allCombatOffers,
             "potion",
@@ -119,45 +119,50 @@ public class PotionBeltStatsTooltipTests
             && row.Contains("Floor:")
             && row.Contains("Offered:")
             && row.Contains("Potion:")
-            && row.EndsWith("   [b]0.88[/b]"));
+            && row.Contains("[b]0.88[/b]"));
         Assert.Contains(rows, row => row.Contains("Combat:")
             && row.Contains("Offered:")
             && row.Contains("Common potion:")
-            && row.EndsWith("   [b]1[/b]"));
+            && row.Contains("[b]1[/b]"));
         Assert.Contains(rows, row => row.Contains("Combat:")
             && row.Contains("Offered:")
             && row.Contains("Uncommon potion:")
-            && row.EndsWith("   [b]1[/b]"));
+            && row.Contains("[b]1[/b]"));
         Assert.Contains(rows, row => row.Contains("Combat:")
             && row.Contains("Offered:")
             && row.Contains("Rare potion:")
-            && row.EndsWith("   [b]2[/b]"));
+            && row.Contains("[b]2[/b]"));
         Assert.Contains(rows, row => row.Contains("Combat:")
             && row.Contains("Offered:")
             && row.Contains("Fruit Juice:")
-            && row.EndsWith("   [b]1[/b]"));
+            && row.Contains("[b]1[/b]"));
         Assert.Contains(rows, row => row.Contains("Offered:")
             && row.Contains("Wasted:")
             && row.Contains("Potion:")
-            && row.EndsWith("   [b]2[/b]"));
+            && row.Contains("[b]2[/b]"));
         Assert.Contains(rows, row => row.Contains("Unknown room:")
             && row.Contains("Offered:")
             && row.Contains("Potion:")
-            && row.EndsWith("   [b]1[/b]"));
+            && row.Contains("[b]1[/b]"));
         Assert.Contains(rows, row => row.Contains("Merchant:")
             && row.Contains("Offered:")
             && row.Contains("Potion:")
-            && row.EndsWith("   [b]2[/b]"));
+            && row.Contains("[b]2[/b]"));
         Assert.Contains(rows, row => row.Contains("Merchant:")
             && row.Contains("Taken:")
             && row.Contains("Potion:")
-            && row.EndsWith("   [b]1[/b]"));
+            && row.Contains("[b]1[/b]"));
         Assert.Contains(rows, row => row.Contains("Activation:")
             && row.Contains("Potion:")
-            && row.EndsWith("   [b]3[/b]"));
+            && row.Contains("[b]3[/b]"));
         Assert.Contains(rows, row => row.Contains("Wasted:")
             && row.Contains("Potion:")
-            && row.EndsWith("   [b]1[/b]"));
+            && row.Contains("[b]1[/b]"));
+        Assert.StartsWith("[table=3]", body);
+        Assert.EndsWith("[/table]", body);
+        Assert.Equal(1, CountOccurrences(body, "[table=3]"));
+        Assert.Equal(36, CountOccurrences(body, "[cell "));
+        Assert.Equal(12, CountOccurrences(body, "[left]"));
         Assert.DoesNotContain($"{offered} Offered", body);
         Assert.DoesNotContain($"{activation} Activated", body);
         Assert.DoesNotContain("Rejected   [b]", body);
@@ -188,6 +193,9 @@ public class PotionBeltStatsTooltipTests
             previousIndex = index;
         }
     }
+
+    private static int CountOccurrences(string value, string token)
+        => value.Split(token, StringSplitOptions.None).Length - 1;
 
     private static PotionRunHistoryEntry Entry(
         string potionId,
