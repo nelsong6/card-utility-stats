@@ -658,14 +658,14 @@ internal static class StatsTooltipPinManager
         var feedback = "Copy failed";
         _copyImageInProgress = true;
         button.Disabled = true;
-        button.Visible = false;
         if (lockIconWasVisible)
             lockIcon!.Visible = false;
 
         try
         {
-            // Wait until the next completed draw so the hidden button is not
-            // present in the viewport texture being captured.
+            // Wait until the next completed draw so the hidden lock icon is
+            // not present in the viewport texture being captured. The camera
+            // button intentionally remains visible in the shared image.
             await statsControl.ToSignal(
                 RenderingServer.Singleton,
                 RenderingServer.SignalName.FramePostDraw);
@@ -719,7 +719,6 @@ internal static class StatsTooltipPinManager
             if (generation == _copyImageGeneration && IsLive(button))
             {
                 button.TooltipText = feedback;
-                button.Visible = true;
                 button.Disabled = false;
             }
 
