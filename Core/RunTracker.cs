@@ -2694,6 +2694,11 @@ public static class RunTracker
         target.PaelsClawGoopyCards = Math.Max(target.PaelsClawGoopyCards, source.PaelsClawGoopyCards);
         target.PaelsClawTurns += source.PaelsClawTurns;
         target.PaelsClawCombats += source.PaelsClawCombats;
+        target.PaelsEyeCardsExhausted += source.PaelsEyeCardsExhausted;
+        target.PaelsEyeStrikesAndDefendsExhausted += source.PaelsEyeStrikesAndDefendsExhausted;
+        target.PaelsEyeActivationTurnTotal += source.PaelsEyeActivationTurnTotal;
+        target.PaelsEyeActivationTurnSamples += source.PaelsEyeActivationTurnSamples;
+        target.PaelsEyeCombats += source.PaelsEyeCombats;
         target.StatusCardsExhausted += source.StatusCardsExhausted;
         target.CurseCardsExhausted += source.CurseCardsExhausted;
         target.CombatsWithoutActivation += source.CombatsWithoutActivation;
@@ -17805,7 +17810,12 @@ public static class RunTracker
         }
     }
 
-    public static void RecordPaelsEyeActivation(int statusesExhausted, int cursesExhausted)
+    public static void RecordPaelsEyeActivation(
+        int cardsExhausted,
+        int strikesAndDefendsExhausted,
+        int statusesExhausted,
+        int cursesExhausted,
+        int activationTurn)
     {
         lock (_lock)
         {
@@ -17813,7 +17823,13 @@ public static class RunTracker
             {
                 var persistDirectlyToRun = _pendingCombat == null;
                 var agg = GetOrCreateRelicAggregateForCurrentContextLocked(PaelsEyeRelicId);
-                RecordPaelsEyeActivationForTest(agg, statusesExhausted, cursesExhausted);
+                RecordPaelsEyeActivationForTest(
+                    agg,
+                    cardsExhausted,
+                    strikesAndDefendsExhausted,
+                    statusesExhausted,
+                    cursesExhausted,
+                    activationTurn);
                 if (persistDirectlyToRun)
                     SaveCurrentRun();
             }
@@ -17835,7 +17851,7 @@ public static class RunTracker
                 if (_pendingCombat == null) return;
                 if (!IsTrackedPlayer(player)) return;
 
-                _pendingCombat.PaelsEyeCombatCountedPlayers.Add(player);
+                RecordPaelsEyeCombatForPlayerLocked(player);
                 _pendingCombat.PaelsEyeActivationStartedPlayers.Add(player);
                 GetOrCreatePendingRelicAggregateLocked(PaelsEyeRelicId);
             }
@@ -17912,14 +17928,31 @@ public static class RunTracker
 
     internal static void RecordPaelsEyeActivationForTest(
         RelicAggregate agg,
+        int cardsExhausted,
+        int strikesAndDefendsExhausted,
         int statusesExhausted,
-        int cursesExhausted)
+        int cursesExhausted,
+        int activationTurn)
     {
         if (agg == null) return;
 
         agg.Activations += 1;
+        agg.PaelsEyeCardsExhausted += Math.Max(0, cardsExhausted);
+        agg.PaelsEyeStrikesAndDefendsExhausted += Math.Max(0, strikesAndDefendsExhausted);
         agg.StatusCardsExhausted += Math.Max(0, statusesExhausted);
         agg.CurseCardsExhausted += Math.Max(0, cursesExhausted);
+        if (activationTurn > 0)
+        {
+            agg.PaelsEyeActivationTurnTotal += activationTurn;
+            agg.PaelsEyeActivationTurnSamples += 1;
+        }
+    }
+
+    internal static void RecordPaelsEyeCombatForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+
+        agg.PaelsEyeCombats += Math.Max(0, count);
     }
 
     internal static void RecordPaelsEyeCombatWithoutActivationForTest(RelicAggregate agg, int count = 1)
@@ -28318,7 +28351,8 @@ public static class RunTracker
         if (!PlayerHasPaelsEye(player)) return;
         if (!_pendingCombat.PaelsEyeCombatCountedPlayers.Add(player)) return;
 
-        GetOrCreatePendingRelicAggregateLocked(PaelsEyeRelicId);
+        RecordPaelsEyeCombatForTest(
+            GetOrCreatePendingRelicAggregateLocked(PaelsEyeRelicId));
     }
 
     private static void RecordPaelsEyeCombatsWithoutActivationForTrackedPlayerLocked()

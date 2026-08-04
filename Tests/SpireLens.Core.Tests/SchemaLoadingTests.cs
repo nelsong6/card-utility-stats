@@ -3543,6 +3543,11 @@ public class SchemaLoadingTests
         Assert.True(loaded!.SupportsResume);
         var relicAgg = loaded.Data.RelicAggregates["RELIC.PAELS_EYE"];
         Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(11, relicAgg.PaelsEyeCardsExhausted);
+        Assert.Equal(3, relicAgg.PaelsEyeStrikesAndDefendsExhausted);
+        Assert.Equal(7, relicAgg.PaelsEyeActivationTurnTotal);
+        Assert.Equal(3, relicAgg.PaelsEyeActivationTurnSamples);
+        Assert.Equal(8, relicAgg.PaelsEyeCombats);
         Assert.Equal(4, relicAgg.StatusCardsExhausted);
         Assert.Equal(2, relicAgg.CurseCardsExhausted);
         Assert.Equal(5, relicAgg.CombatsWithoutActivation);
@@ -3556,6 +3561,11 @@ public class SchemaLoadingTests
         Assert.NotNull(resumed);
         var relicAgg = resumed!.RelicAggregates["RELIC.PAELS_EYE"];
         Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(11, relicAgg.PaelsEyeCardsExhausted);
+        Assert.Equal(3, relicAgg.PaelsEyeStrikesAndDefendsExhausted);
+        Assert.Equal(7, relicAgg.PaelsEyeActivationTurnTotal);
+        Assert.Equal(3, relicAgg.PaelsEyeActivationTurnSamples);
+        Assert.Equal(8, relicAgg.PaelsEyeCombats);
         Assert.Equal(4, relicAgg.StatusCardsExhausted);
         Assert.Equal(2, relicAgg.CurseCardsExhausted);
         Assert.Equal(5, relicAgg.CombatsWithoutActivation);

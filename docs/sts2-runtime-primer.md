@@ -800,6 +800,16 @@ ledger. Derive the displayed sacrifice rate from exact recorded opportunities:
 pickup; that incorrectly counts acquisition or non-reward floors where Sacrifice
 was never offered.
 
+Pael's Eye can activate at most once per combat through its owner-specific
+`BeforeSideTurnEndEarly` callback. Snapshot the exact cards in its owner's hand
+and the owner's current `PlayerCombatState.TurnNumber` after the native
+`ShouldTakeExtraTurn` condition succeeds, then wait for the callback to finish.
+Count only snapshot cards whose final pile is Exhaust; classify starter Strikes
+and Defends with the game's `IsBasicStrikeOrDefend` property. Held combats are
+a separate zero-inclusive denominator, while activation-turn samples include
+only completed activations, so combats where the relic did not fire do not
+pull the average activation turn toward zero.
+
 Pael's Tooth is a separate pickup-and-return mechanic. Its native `CardTitles`
 text is rebuilt from only the `SerializableCards` still held by the relic, so a
 card intentionally disappears from that text when it is returned. At combat

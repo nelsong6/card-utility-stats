@@ -40,14 +40,18 @@ public static class PaelsEyeBeforeSideTurnEndEarlyStatsPatch
             if (participants == null || !participants.Contains(ownerCreature)) return;
             if (!__instance.ShouldTakeExtraTurn(owner)) return;
 
-            RunTracker.NotePaelsEyeActivationStarted(owner);
-
             var cards = owner.PlayerCombatState?.Hand?.Cards?
                 .Where(card => card != null)
-                .Select(card => new PaelsEyeCardSnapshot(card, card.Type))
+                .Select(card => new PaelsEyeCardSnapshot(
+                    card,
+                    card.Type,
+                    card.IsBasicStrikeOrDefend))
                 .ToList() ?? new List<PaelsEyeCardSnapshot>();
 
-            __state = new PaelsEyeActivationSnapshot(cards);
+            RunTracker.NotePaelsEyeActivationStarted(owner);
+            __state = new PaelsEyeActivationSnapshot(
+                cards,
+                owner.PlayerCombatState?.TurnNumber ?? 0);
         }
         catch (Exception e)
         {
@@ -94,12 +98,18 @@ public static class PaelsEyeBeforeSideTurnEndEarlyStatsPatch
     {
         try
         {
+            var total = 0;
+            var strikesAndDefends = 0;
             var statuses = 0;
             var curses = 0;
 
             foreach (var cardSnapshot in snapshot.Cards)
             {
                 if (cardSnapshot.Card?.Pile?.Type != PileType.Exhaust) continue;
+
+                total += 1;
+                if (cardSnapshot.IsBasicStrikeOrDefend)
+                    strikesAndDefends += 1;
 
                 switch (cardSnapshot.Type)
                 {
@@ -112,7 +122,12 @@ public static class PaelsEyeBeforeSideTurnEndEarlyStatsPatch
                 }
             }
 
-            RunTracker.RecordPaelsEyeActivation(statuses, curses);
+            RunTracker.RecordPaelsEyeActivation(
+                total,
+                strikesAndDefends,
+                statuses,
+                curses,
+                snapshot.TurnNumber);
         }
         catch (Exception e)
         {
@@ -120,7 +135,12 @@ public static class PaelsEyeBeforeSideTurnEndEarlyStatsPatch
         }
     }
 
-    public sealed record PaelsEyeActivationSnapshot(IReadOnlyList<PaelsEyeCardSnapshot> Cards);
+    public sealed record PaelsEyeActivationSnapshot(
+        IReadOnlyList<PaelsEyeCardSnapshot> Cards,
+        int TurnNumber);
 
-    public sealed record PaelsEyeCardSnapshot(CardModel Card, CardType Type);
+    public sealed record PaelsEyeCardSnapshot(
+        CardModel Card,
+        CardType Type,
+        bool IsBasicStrikeOrDefend);
 }

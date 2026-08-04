@@ -18,6 +18,11 @@
   "relic_aggregates": {
     "RELIC.PAELS_EYE": {
       "activations": 3,
+      "paels_eye_cards_exhausted": 11,
+      "paels_eye_strikes_and_defends_exhausted": 3,
+      "paels_eye_activation_turn_total": 7,
+      "paels_eye_activation_turn_samples": 3,
+      "paels_eye_combats": 8,
       "status_cards_exhausted": 4,
       "curse_cards_exhausted": 2,
       "combats_without_activation": 5

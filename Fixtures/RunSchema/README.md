@@ -228,9 +228,9 @@ New fixtures added going forward do not need a `v*-` prefix.
   duplicate definitions, final display names, post-return upgrade levels, and
   the floors climbed before each card was returned.
 - `paels-eye-relic-run.json`
-  Adds Pael's Eye activation tracking plus counts of status and curse cards
-  actually exhausted by its extra-turn callback, and combats where it was held
-  without activating.
+  Adds Pael's Eye activation tracking, observed total/Strike-and-Defend/Status/
+  Curse exhaust counts, activation-turn samples, and held-combat denominators
+  including combats where it did not activate.
 - `strike-dummy-relic-run.json`
   Adds Strike Dummy tracked Strike-card plays since pickup plus current
   permanent-deck counts for base Strikes and non-base Strike-tagged cards.

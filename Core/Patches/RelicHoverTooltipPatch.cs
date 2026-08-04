@@ -5124,9 +5124,35 @@ public static class RelicHoverShowPatch
     private static string BuildPaelsEyeBodyBBCode(RelicAggregate agg, bool activatedThisCombat = false)
     {
         var sb = new StringBuilder();
+        var cardsExhaustedPerCombat = agg.PaelsEyeCombats <= 0
+            ? 0m
+            : (decimal)agg.PaelsEyeCardsExhausted / agg.PaelsEyeCombats;
+        var averageActivationTurn = agg.PaelsEyeActivationTurnSamples <= 0
+            ? 0m
+            : (decimal)agg.PaelsEyeActivationTurnTotal
+                / agg.PaelsEyeActivationTurnSamples;
+
         RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, "Activated this combat", activatedThisCombat ? "true" : "false", "");
         Row3(sb, "Combats without activation", agg.CombatsWithoutActivation.ToString(), "");
+        Row3(
+            sb,
+            "Avg cards exhausted per combat",
+            FormatDecimal(cardsExhaustedPerCombat),
+            "",
+            "Average cards exhausted per combat — cards observed in Exhaust after Pael's Eye activated divided by every combat where it was held, including combats without an activation.");
+        Row3(
+            sb,
+            "Avg activation turn",
+            FormatDecimal(averageActivationTurn),
+            "",
+            "Average activation turn — the average player turn number when Pael's Eye activated; combats without an activation are excluded.");
+        Row3(sb, "Cards exhausted total", agg.PaelsEyeCardsExhausted.ToString(), "");
+        Row3(
+            sb,
+            "Strikes and Defends exhausted",
+            agg.PaelsEyeStrikesAndDefendsExhausted.ToString(),
+            "");
         Row3(sb, "Statuses exhausted", agg.StatusCardsExhausted.ToString(), "");
         Row3(sb, "Curses exhausted", agg.CurseCardsExhausted.ToString(), "");
         return sb.ToString();

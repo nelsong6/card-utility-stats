@@ -1519,7 +1519,14 @@ public class RelicAggregate
     public int PaelsClawTurns { get; set; }
     public int PaelsClawCombats { get; set; }
 
-    // Status/curse cards exhausted by Pael's Eye when it takes an extra turn.
+    // Cards observed in Exhaust after Pael's Eye's extra-turn callback.
+    // ActivationTurnSamples excludes held combats where the relic did not
+    // activate. Combats is the zero-inclusive denominator for cards/combat.
+    public int PaelsEyeCardsExhausted { get; set; }
+    public int PaelsEyeStrikesAndDefendsExhausted { get; set; }
+    public int PaelsEyeActivationTurnTotal { get; set; }
+    public int PaelsEyeActivationTurnSamples { get; set; }
+    public int PaelsEyeCombats { get; set; }
     public int StatusCardsExhausted { get; set; }
     public int CurseCardsExhausted { get; set; }
     public int CombatsWithoutActivation { get; set; }
