@@ -233,8 +233,18 @@ public class RelicStatRowVocabularyTests
         "")]
     [InlineData(
         "Curses acquired",
-        "Curses",
-        "taken",
+        "",
+        "curse,taken",
+        "")]
+    [InlineData(
+        "Statuses exhausted",
+        "",
+        "status,exhaust",
+        "")]
+    [InlineData(
+        "Status cards added",
+        "added",
+        "status",
         "")]
     [InlineData(
         "Targets hit per activation",

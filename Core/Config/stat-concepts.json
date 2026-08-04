@@ -166,6 +166,16 @@
         "description": "A combat encounter or a value measured across combats."
       }
     },
+    "curse": {
+      "display": {
+        "type": "embedded_image",
+        "resource": "Assets.stat-curse.svg"
+      },
+      "help": {
+        "label": "Curse",
+        "description": "A Curse card or a count of Curse cards."
+      }
+    },
     "damage": {
       "display": {
         "type": "game_resource",
@@ -669,6 +679,16 @@
       "help": {
         "label": "Stars",
         "description": "Regent Stars gained, spent, saved, or otherwise measured by a stat."
+      }
+    },
+    "status": {
+      "display": {
+        "type": "embedded_image",
+        "resource": "Assets.stat-status.svg"
+      },
+      "help": {
+        "label": "Status",
+        "description": "A Status card or a count of Status cards."
       }
     },
     "strength": {

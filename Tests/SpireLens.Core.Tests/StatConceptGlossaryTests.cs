@@ -27,6 +27,7 @@ public class StatConceptGlossaryTests
                 "relic_common",
                 "skill_common",
                 "hp",
+                "curse",
                 "damage",
                 "dexterity",
                 "dexterity_gained",
@@ -68,6 +69,7 @@ public class StatConceptGlossaryTests
                 "relic_gained",
                 "skill",
                 "stars",
+                "status",
                 "strength",
                 "strength_gained",
                 "swift",
@@ -98,6 +100,13 @@ public class StatConceptGlossaryTests
         Assert.Equal(
             StatConceptDisplayType.EmbeddedImage,
             StatConceptGlossary.Concepts.Single(concept => concept.Id == "healing_gained").Display.Type);
+        Assert.All(
+            ["curse", "status"],
+            conceptId => Assert.Equal(
+                StatConceptDisplayType.EmbeddedImage,
+                StatConceptGlossary.Concepts
+                    .Single(concept => concept.Id == conceptId)
+                    .Display.Type));
         Assert.Equal(
             StatConceptDisplayType.GameResourceBadge,
             StatConceptGlossary.Concepts.Single(concept => concept.Id == "dexterity_gained").Display.Type);
@@ -143,6 +152,7 @@ public class StatConceptGlossaryTests
         var uncommonPotion = StatConceptGlossary.RenderHintedGlyph("potion_uncommon");
         var charge = StatConceptGlossary.RenderHintedGlyph("charge");
         var combat = StatConceptGlossary.RenderHintedGlyph("combat");
+        var curse = StatConceptGlossary.RenderHintedGlyph("curse");
         var dexterityGained = StatConceptGlossary.RenderHintedGlyph("dexterity_gained");
         var elite = StatConceptGlossary.RenderHintedGlyph("elite");
         var floor = StatConceptGlossary.RenderHintedGlyph("floor");
@@ -164,6 +174,7 @@ public class StatConceptGlossaryTests
         var skill = StatConceptGlossary.RenderHintedGlyph("skill");
         var shop = StatConceptGlossary.RenderHintedGlyph("shop");
         var strengthGained = StatConceptGlossary.RenderHintedGlyph("strength_gained");
+        var status = StatConceptGlossary.RenderHintedGlyph("status");
         var swift = StatConceptGlossary.RenderHintedGlyph("swift");
         var taken = StatConceptGlossary.RenderHintedGlyph("taken");
         var targetsHit = StatConceptGlossary.RenderHintedGlyph("targets_hit");
@@ -194,6 +205,7 @@ public class StatConceptGlossaryTests
             uncommonPotion,
             charge,
             combat,
+            curse,
             dexterityGained,
             elite,
             floor,
@@ -215,6 +227,7 @@ public class StatConceptGlossaryTests
             skill,
             shop,
             strengthGained,
+            status,
             swift,
             taken,
             targetsHit,
@@ -282,6 +295,10 @@ public class StatConceptGlossaryTests
         Assert.Contains(
             "res://images/atlases/ui_atlas.sprites/map/icons/map_monster.tres",
             combat);
+        Assert.Contains("[hint=\"Curse:", curse);
+        Assert.Contains(
+            "user://SpireLens/generated-icons/curse-",
+            curse);
         Assert.Contains("[hint=\"Dexterity gained:", dexterityGained);
         Assert.Contains(
             "user://SpireLens/generated-icons/dexterity_gained-",
@@ -358,6 +375,10 @@ public class StatConceptGlossaryTests
         Assert.Contains(
             "user://SpireLens/generated-icons/strength_gained-",
             strengthGained);
+        Assert.Contains("[hint=\"Status:", status);
+        Assert.Contains(
+            "user://SpireLens/generated-icons/status-",
+            status);
         Assert.Contains("[hint=\"Swift:", swift);
         Assert.Contains("res://images/enchantments/swift.png", swift);
         Assert.Contains("[hint=\"Taken:", taken);

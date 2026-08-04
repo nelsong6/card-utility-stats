@@ -75,6 +75,7 @@ internal static class RelicStatRowVocabulary
                 ["attack_uncommon"] = ["attack", "card"],
                 ["card_rare"] = ["card"],
                 ["card_uncommon"] = ["card"],
+                ["curse"] = ["card"],
                 ["discard"] = ["card"],
                 ["draw"] = ["card"],
                 ["elite"] = ["combat"],
@@ -93,6 +94,7 @@ internal static class RelicStatRowVocabulary
                 ["skill_common"] = ["skill", "card"],
                 ["skill_rare"] = ["skill", "card"],
                 ["skill_uncommon"] = ["skill", "card"],
+                ["status"] = ["card"],
                 ["upgraded"] = ["card"],
             };
 
@@ -139,6 +141,7 @@ internal static class RelicStatRowVocabulary
         Rule("campfire", @"\b(?:campfires?|rest[ -]sites?)\b", true),
         Rule("charge", @"\bcharges?\b"),
         Rule("combat", @"\bcombats?\b", true),
+        Rule("curse", @"\bcurses?\b", true),
         Rule("damage", @"\bdamage\b|\bhp\s+lost\b"),
         Rule("dexterity_gained", @"\bdexterity\s+(?:added|gained)\b"),
         Rule("dexterity", @"\bdexterity\b"),
@@ -175,6 +178,7 @@ internal static class RelicStatRowVocabulary
         Rule("skill_common", @"\bcommon\s+skills?\b"),
         Rule("skill", @"\bskills?\b"),
         Rule("stars", @"\bstars?\b"),
+        Rule("status", @"\bstatus(?:es)?\b", true),
         Rule("strength_gained", @"\bstrength\s+(?:added|gained)\b"),
         Rule("strength", @"\bstrength\b"),
         Rule("swift", @"\bswift\b"),

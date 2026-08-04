@@ -2,6 +2,7 @@ using System;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using SpireLens.Core;
 using SpireLens.Core.Patches;
 using Xunit;
 
@@ -196,6 +197,8 @@ public class PaelsEyeStatsTests
         Assert.Contains("Strikes and Defends exhausted", body);
         Assert.Contains("Statuses exhausted", body);
         Assert.Contains("Curses exhausted", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("status"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("curse"), body);
         Assert.Equal(8, CountOccurrences(body, "[b]0[/b]"));
         Assert.Equal(1, CountOccurrences(body, "[table=4]"));
         Assert.Contains("[left][b]false[/b][/left]", body);
