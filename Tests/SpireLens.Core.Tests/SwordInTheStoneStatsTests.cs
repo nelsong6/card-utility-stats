@@ -24,6 +24,12 @@ public class SwordInTheStoneStatsTests
             BindingFlags.NonPublic | BindingFlags.Static)
         ?? throw new InvalidOperationException("BuildSwordInTheStoneBodyBBCode not found.");
 
+    private static readonly MethodInfo BuildJadeBodyMethod =
+        typeof(RelicHoverShowPatch).GetMethod(
+            "BuildSwordOfJadeBodyBBCode",
+            BindingFlags.NonPublic | BindingFlags.Static)
+        ?? throw new InvalidOperationException("BuildSwordOfJadeBodyBBCode not found.");
+
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
@@ -137,12 +143,12 @@ public class SwordInTheStoneStatsTests
     }
 
     [Fact]
-    public void TooltipShowsRequestedProgressionAndStrengthRows()
+    public void SwordOfJadeTooltipAddsStrengthRowsAfterProgression()
     {
         var agg = PopulatedAggregate();
         agg.SwordInTheStoneStrengthAddedThisCombat = 3m;
 
-        var body = BuildBody(agg);
+        var body = BuildJadeBody(agg);
 
         Assert.Contains("Floor acquired", body);
         Assert.Contains("Elites slain", body);
@@ -164,9 +170,25 @@ public class SwordInTheStoneStatsTests
     }
 
     [Fact]
+    public void SwordInTheStoneTooltipShowsProgressionWithoutStrengthRows()
+    {
+        var body = BuildBody(PopulatedAggregate());
+
+        Assert.Contains("Floor acquired", body);
+        Assert.Contains("Elites slain", body);
+        Assert.Contains("Average floors ascended between consecutive Elite victories", body);
+        Assert.DoesNotContain("Times activated", body);
+        Assert.DoesNotContain("Activated this combat", body);
+        Assert.DoesNotContain("Total strength gained", body);
+        Assert.DoesNotContain("Strength gained this combat", body);
+        Assert.DoesNotContain("Avg strength gained per activation", body);
+        Assert.DoesNotContain("Avg strength gained per combat", body);
+    }
+
+    [Fact]
     public void TooltipKeepsHistoricStrengthOutOfTheNewCombatRateWindow()
     {
-        var body = BuildBody(new RelicAggregate
+        var body = BuildJadeBody(new RelicAggregate
         {
             Activations = 3,
             StrengthAdded = 9,
@@ -264,9 +286,17 @@ public class SwordInTheStoneStatsTests
         Assert.True(recognized);
         Assert.Equal(expectedTitle, title);
         Assert.Contains("Average floors ascended between consecutive Elite victories", body);
+        if (relic is SwordOfJade)
+            Assert.Contains("Total strength gained", body);
+        else
+            Assert.DoesNotContain("Total strength gained", body);
     }
 
     private static string BuildBody(RelicAggregate agg)
         => (string)(BuildBodyMethod.Invoke(null, new object?[] { agg, null })
             ?? throw new InvalidOperationException("BuildSwordInTheStoneBodyBBCode returned null."));
+
+    private static string BuildJadeBody(RelicAggregate agg)
+        => (string)(BuildJadeBodyMethod.Invoke(null, new object?[] { agg })
+            ?? throw new InvalidOperationException("BuildSwordOfJadeBodyBBCode returned null."));
 }

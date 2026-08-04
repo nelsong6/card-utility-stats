@@ -711,12 +711,13 @@ public static class RelicHoverShowPatch
 
         if (relicModel is SwordOfStone or SwordOfJade)
         {
-            title = relicModel is SwordOfJade ? "Sword of Jade" : "Sword in the Stone";
-            body = BuildSwordInTheStoneBodyBBCode(
-                agg,
-                relicModel is SwordOfStone
-                    ? RelicFloorAddedToDeck(relicModel)
-                    : null);
+            var isSwordOfJade = relicModel is SwordOfJade;
+            title = isSwordOfJade ? "Sword of Jade" : "Sword in the Stone";
+            body = isSwordOfJade
+                ? BuildSwordOfJadeBodyBBCode(agg)
+                : BuildSwordInTheStoneBodyBBCode(
+                    agg,
+                    RelicFloorAddedToDeck(relicModel));
             return true;
         }
 
@@ -5566,6 +5567,12 @@ public static class RelicHoverShowPatch
                 "");
         }
 
+        return sb.ToString();
+    }
+
+    private static string BuildSwordOfJadeBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder(BuildSwordInTheStoneBodyBBCode(agg));
         AppendStrengthIncreaseRelicStats(
             sb,
             agg.Activations,
