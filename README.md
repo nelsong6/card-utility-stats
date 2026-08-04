@@ -108,9 +108,13 @@ dropdown. A finite relic moves to effective non-combat status for the rest of
 the combat as soon as its native activation fires; the selected turn is also
 an exclusive fallback cutoff for non-flashing activations and Core reloads.
 For example, **Until turn 2** shows the relic on turn 1 and no later than the
-start of turn 2. Limited-use relics likewise become effectively non-combat as
-soon as the game reports that all uses are spent. These runtime transitions do
-not change the saved classification for the next combat. The same assignment controls appear
+start of turn 2. Relics with a native terminal combat state likewise leave the
+filtered bar as soon as their one available activation fires—or, for Lava
+Lamp, as soon as qualifying damage permanently disqualifies its reward upgrade
+for that combat—even when their duration remains **Always**. Limited-use relics
+become effectively non-combat when the game reports that all uses are spent.
+These runtime transitions do not change the saved classification for the next
+combat. The same assignment controls appear
 when inspecting an owned relic from the in-run relic bar. The duration dropdown
 stays available for both categories; choosing a duration also selects Combat.
 Changes apply immediately and are saved under

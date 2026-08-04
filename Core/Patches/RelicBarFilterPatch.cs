@@ -8,6 +8,7 @@ using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Hooks;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Models.Relics;
 using MegaCrit.Sts2.Core.Nodes;
 using MegaCrit.Sts2.Core.Nodes.CommonUi;
 using MegaCrit.Sts2.Core.Nodes.Potions;
@@ -27,7 +28,7 @@ namespace SpireLens.Core.Patches;
 [HarmonyPatch(typeof(NRelicInventoryHolder), nameof(NRelicInventoryHolder._Ready))]
 public static class RelicBarFilterPatch
 {
-    private static readonly HashSet<RelicModel> FiredFiniteRelics =
+    private static readonly HashSet<RelicModel> ResolvedCombatRelics =
         new(ReferenceEqualityComparer.Instance);
     private static bool _hooksInitialized;
     private static NMapScreen? _hookedMapScreen;
@@ -65,7 +66,7 @@ public static class RelicBarFilterPatch
     public static void TeardownHooks()
     {
         DetachMapScreenHooks();
-        FiredFiniteRelics.Clear();
+        ResolvedCombatRelics.Clear();
         if (!_hooksInitialized) return;
 
         DetachCombatBeganHook();
@@ -115,7 +116,8 @@ public static class RelicBarFilterPatch
         => IsEffectivelyNonCombat(
             RelicClassificationStore.IsNonCombat(relicModel),
             relicModel.IsUsedUp,
-            FiredFiniteRelics.Contains(relicModel));
+            ResolvedCombatRelics.Contains(relicModel)
+            || HasNativeTerminalCombatState(relicModel));
 
     internal static bool IsEffectivelyNonCombat(
         bool isClassifiedNonCombat,
@@ -128,8 +130,13 @@ public static class RelicBarFilterPatch
         try
         {
             if (relicModel == null) return;
-            if (!RelicClassificationStore.GetCombatRelevantUntilTurn(relicModel).HasValue) return;
-            if (!FiredFiniteRelics.Add(relicModel)) return;
+            if (!RelicClassificationStore.GetCombatRelevantUntilTurn(relicModel).HasValue
+                && !IsTerminalCombatRelic(relicModel))
+            {
+                return;
+            }
+
+            if (!ResolvedCombatRelics.Add(relicModel)) return;
 
             var relicId = RelicClassificationStore.GetRelicId(relicModel);
             CoreMain.LogDebug(
@@ -142,6 +149,42 @@ public static class RelicBarFilterPatch
             CoreMain.LogDebug($"Could not mark fired relic non-combat: {e.Message}");
         }
     }
+
+    /// <summary>
+    /// Relics whose remaining combat value ends at a native, combat-local
+    /// terminal state. Unlike finite-turn relics, these have no turn fallback:
+    /// activation or irreversible disqualification is the only resolution
+    /// signal, and the game resets the state for the next combat.
+    /// </summary>
+    internal static bool IsTerminalCombatRelic(RelicModel relicModel)
+        => relicModel is BurningSticks
+            or CentennialPuzzle
+            or LavaLamp
+            or PaelsEye
+            or Permafrost
+            or RuinedHelmet
+            or ThrowingAxe
+            or UnsettlingLamp
+            or Vambrace;
+
+    /// <summary>
+    /// Reads the game's authoritative state as well as the transient Flash
+    /// ledger so a Core reload during combat reconstructs the same projection.
+    /// </summary>
+    internal static bool HasNativeTerminalCombatState(RelicModel relicModel)
+        => relicModel switch
+        {
+            BurningSticks relic => relic.WasUsedThisCombat,
+            CentennialPuzzle relic => relic.UsedThisCombat,
+            LavaLamp relic => relic.TookDamageThisCombat,
+            PaelsEye relic => relic.UsedThisCombat,
+            Permafrost relic => relic.ActivatedThisCombat,
+            RuinedHelmet relic => relic.UsedThisCombat,
+            ThrowingAxe relic => relic.UsedThisCombat,
+            UnsettlingLamp relic => relic.IsFinishedTriggering,
+            Vambrace relic => relic.BlockGainedThisCombat,
+            _ => false,
+        };
 
     internal static void RefreshIfRelicUsedUp(RelicModel? relicModel)
     {
@@ -423,7 +466,7 @@ public static class RelicBarFilterPatch
 
     private static void OnCombatSetUp(CombatState _)
     {
-        FiredFiniteRelics.Clear();
+        ResolvedCombatRelics.Clear();
         RefreshAll("combat set up");
     }
 
@@ -431,7 +474,7 @@ public static class RelicBarFilterPatch
 
     private static void OnCombatEnded(CombatRoom _)
     {
-        FiredFiniteRelics.Clear();
+        ResolvedCombatRelics.Clear();
         RefreshAll("combat ended");
     }
 
@@ -471,9 +514,9 @@ public static class RelicBarFilterPatch
 }
 
 /// <summary>
-/// A finite-combat relic becomes presentation-only non-combat as soon as its
-/// native activation flash fires. The configured turn remains a fallback for
-/// non-flashing relics and for Core reloads after the activation.
+/// A configured finite-turn relic or a native terminal-combat relic becomes
+/// presentation-only non-combat as soon as its activation flash fires. Turn
+/// cutoffs remain fallback behavior only for relics explicitly given one.
 /// </summary>
 [HarmonyPatch(
     typeof(RelicModel),
@@ -484,6 +527,22 @@ public static class RelicBarFilterRelicFlashPatch
     [HarmonyPostfix]
     public static void Postfix(RelicModel __instance)
         => RelicBarFilterPatch.MarkRelicFired(__instance);
+}
+
+/// <summary>
+/// Lava Lamp has no positive activation flash. Qualifying damage permanently
+/// disqualifies its reward upgrade for the current combat, so the game's saved
+/// combat-local flag is its terminal visibility signal.
+/// </summary>
+[HarmonyPatch(typeof(LavaLamp), nameof(LavaLamp.AfterDamageReceived))]
+public static class RelicBarFilterLavaLampDamagePatch
+{
+    [HarmonyPostfix]
+    public static void Postfix(LavaLamp __instance)
+    {
+        if (__instance.TookDamageThisCombat)
+            RelicBarFilterPatch.MarkRelicFired(__instance);
+    }
 }
 
 /// <summary>

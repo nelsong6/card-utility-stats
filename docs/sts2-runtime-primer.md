@@ -622,6 +622,18 @@ leave the transient set at combat end and remain combat-classified for the
 next fight. This state is presentation-only and never removes or disables a
 relic.
 
+Terminal combat relevance is a separate no-turn-fallback path. Burning Sticks,
+Centennial Puzzle, Pael's Eye, Permafrost, Ruined Helmet, Throwing Axe,
+Unsettling Lamp, and Vambrace have one native activation per combat; their
+activation flash resolves their filtered-bar relevance immediately. Lava Lamp
+has the equivalent irreversible failure state: its `TookDamageThisCombat` flag
+permanently disqualifies its reward upgrade until the next combat. Read each
+relic's authoritative native boolean in addition to the transient flash set so
+a Core reload during combat reconstructs the terminal state without inventing
+a turn cutoff. Reversible states such as Belt Buckle, Meat on the Bone, and Red
+Skull are deliberately excluded because they can become relevant again in the
+same combat.
+
 Bag of Preparation raises its owner's first-turn hand-draw request inside
 `ModifyHandDraw`; the game then finishes the complete normal/late modifier
 chain, raises the first hand to any larger eligible Innate count, clamps it to

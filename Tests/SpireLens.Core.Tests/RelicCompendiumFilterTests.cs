@@ -1,7 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
+using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Models.Relics;
 using SpireLens.Core.Patches;
 using Xunit;
 
@@ -44,6 +48,46 @@ public class RelicCompendiumFilterTests
             isClassifiedNonCombat: false,
             isUsedUp: false,
             firedThisCombat: false));
+    }
+
+    [Theory]
+    [InlineData(typeof(BurningSticks), "_wasUsedThisCombat")]
+    [InlineData(typeof(CentennialPuzzle), "_usedThisCombat")]
+    [InlineData(typeof(LavaLamp), "_tookDamageThisCombat")]
+    [InlineData(typeof(PaelsEye), "_usedThisCombat")]
+    [InlineData(typeof(Permafrost), "_activatedThisCombat")]
+    [InlineData(typeof(RuinedHelmet), "_usedThisCombat")]
+    [InlineData(typeof(ThrowingAxe), "_usedThisCombat")]
+    [InlineData(typeof(UnsettlingLamp), "_isFinishedTriggering")]
+    [InlineData(typeof(Vambrace), "_blockGainedThisCombat")]
+    public void TerminalCombatRelics_ReadTheirAuthoritativeNativeState(
+        Type relicType,
+        string stateFieldName)
+    {
+        var relic = (RelicModel)RuntimeHelpers.GetUninitializedObject(relicType);
+
+        Assert.True(RelicBarFilterPatch.IsTerminalCombatRelic(relic));
+        Assert.False(RelicBarFilterPatch.HasNativeTerminalCombatState(relic));
+
+        var stateField = relicType.GetField(
+            stateFieldName,
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(stateField);
+        stateField!.SetValue(relic, true);
+
+        Assert.True(RelicBarFilterPatch.HasNativeTerminalCombatState(relic));
+    }
+
+    [Theory]
+    [InlineData(typeof(BeltBuckle))]
+    [InlineData(typeof(MeatOnTheBone))]
+    [InlineData(typeof(RedSkull))]
+    public void ReversibleCombatStates_AreNotTerminal(Type relicType)
+    {
+        var relic = (RelicModel)RuntimeHelpers.GetUninitializedObject(relicType);
+
+        Assert.False(RelicBarFilterPatch.IsTerminalCombatRelic(relic));
+        Assert.False(RelicBarFilterPatch.HasNativeTerminalCombatState(relic));
     }
 
     [Theory]
