@@ -129,10 +129,12 @@ Current UI conventions:
 - card tooltips on every surface are display-only opt-in; disabling them does not disable attribution
 - deck-view tooltips can be fuller and include lineage/context
 - rows should be self-describing
-- numeric relic-row values and percentages use the right-aligned value
-  columns; card names, relic names, destinations, and other textual outcomes
-  render inline in the expanding label cell so Godot cannot squeeze them into
-  a narrow numeric column; do not use character-count wrapping heuristics
+- ordinary card, relic, and enemy scalar rows share a natural-width table: the
+  widest semantic label establishes the value column, and every value and
+  percentage is left-aligned at its column's shared horizontal position; card
+  names, relic names, destinations, and other textual outcomes render inline
+  with their label so Godot cannot squeeze them into a narrow scalar column;
+  do not use character-count wrapping heuristics
 - run-summary rows share one natural-width table: the widest semantic label
   establishes the value column, and every value is left-aligned at that same
   horizontal position

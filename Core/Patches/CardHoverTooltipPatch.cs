@@ -93,7 +93,10 @@ public static class CardHoverShowPatch
         bool compact = holder is NHandCardHolder
             && !RuntimeOptionsProvider.Current.UseVerboseHandStats;
         var body = BuildBodyBBCode(cardModel, displayName, compact);
-        statsTip = StatsTooltip.CreateNativeTip(displayName, body);
+        statsTip = StatsTooltip.CreateNativeTip(
+            displayName,
+            body,
+            stretchHorizontally: StatsTooltip.ContainsScalarStatTable(body));
         return true;
     }
 
@@ -1935,20 +1938,10 @@ public static class CardHoverShowPatch
     }
 
     /// <summary>
-    /// Emit a single stat row in the canonical 4-column layout used for
-    /// every stat line in the tooltip. <paramref name="pct"/> can be empty
-    /// — the cell's still present so the label and value columns align
-    /// vertically with rows that DO have a percentage (Overkill, Blocked,
-    /// Played/Drawn). The cell padding keeps adjacent columns from
-    /// crowding visually (fixes "Played/Drawn1/1100%"-style crowding).
-    ///
-    /// The first compact column holds the informational hover icon. Column
-    /// weights after that are label=4, value=1, percent=1. Label dominates
-    /// (~66% of width) so the label text always fits; numeric columns
-    /// are narrow since their content is typically 1-5 chars.
-    /// Padding: label gets right-padding (12px), value gets right-padding
-    /// (12px) so it sits off the percent column, percent gets left-side
-    /// padding from value's right-padding and small right-padding (4px).
+    /// Emit a single stat row in the canonical natural-width scalar table.
+    /// Consecutive rows share the table, so the widest label establishes one
+    /// left-aligned value column. <paramref name="pct"/> can be empty; its
+    /// cell remains present so percentage-bearing rows retain the same shape.
     /// </summary>
     private static void Row3(
         StringBuilder sb,
@@ -1960,21 +1953,12 @@ public static class CardHoverShowPatch
         var presentation = StatsTooltip.CreateStatRowPresentation(
             label,
             fullDescription);
-        sb.Append("[table=4]");
-        sb.Append("[cell expand=0 padding=0,0,10,0]");
-        sb.Append(StatConceptGlossary.RenderInformationHint(
-            presentation.FullDescription));
-        sb.Append("[/cell]");
-        sb.Append("[cell expand=4 padding=0,0,12,0][color=#e0e0e0]");
-        StatsTooltip.AppendConceptLabel(
+        StatsTooltip.AppendScalarStatRow(
             sb,
-            presentation.ConceptIds,
-            presentation.DenominatorConceptIds,
-            presentation.Label);
-        sb.Append("[/color][/cell]");
-        sb.Append($"[cell expand=1 padding=0,0,12,0][right][b]{value}[/b][/right][/cell]");
-        sb.Append($"[cell expand=1 padding=0,0,4,0][right][color=#b5b5b5]{pct}[/color][/right][/cell]");
-        sb.Append("[/table]\n");
+            presentation,
+            value,
+            pct,
+            labelColor: "#e0e0e0");
     }
 
     /// <summary>

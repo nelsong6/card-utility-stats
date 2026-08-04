@@ -43,6 +43,31 @@ public class BlockTooltipTests
         typeof(CardHoverShowPatch).GetMethod("AppendOrbCreationStats", BindingFlags.NonPublic | BindingFlags.Static)
         ?? throw new InvalidOperationException("AppendOrbCreationStats not found.");
 
+    private static readonly MethodInfo Row3Method =
+        typeof(CardHoverShowPatch).GetMethod("Row3", BindingFlags.NonPublic | BindingFlags.Static)
+        ?? throw new InvalidOperationException("Row3 not found.");
+
+    [Fact]
+    public void CardScalarRows_ShareNaturalWidthTableAndLeftAlignValues()
+    {
+        var body = new StringBuilder();
+        _ = Row3Method.Invoke(null, new object?[] { body, "Short", "0", "", null });
+        _ = Row3Method.Invoke(null, new object?[]
+        {
+            body,
+            "The longest semantic label",
+            "false",
+            "100%",
+            null,
+        });
+        var markup = body.ToString();
+
+        Assert.Equal(1, markup.Split("[table=4]", StringSplitOptions.None).Length - 1);
+        Assert.Contains("[left][b]0[/b][/left]", markup);
+        Assert.Contains("[left][b]false[/b][/left]", markup);
+        Assert.DoesNotContain("[right]", markup);
+    }
+
     [Fact]
     public void GetBlockStatLabel_UsesShieldIcon()
     {

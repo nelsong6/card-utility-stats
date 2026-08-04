@@ -19,6 +19,8 @@ public static class StatsTooltip
 {
     private const string InlineStatTableOpen = "[table=3]";
     private const string InlineStatTableClose = "[/table]";
+    private const string ScalarStatTableOpen = "[table=4]";
+    private const string ScalarStatTableClose = "[/table]\n";
 
     private const string NativeStatsTipId = "SPIRELENS.STATS";
     private const string NativeHintTipId = "SPIRELENS.HINT";
@@ -146,6 +148,60 @@ public static class StatsTooltip
             .Append(InlineStatTableClose);
     }
 
+    /// <summary>
+    /// Appends a scalar row to the canonical natural-width stats table.
+    /// Consecutive rows share one table, so the widest semantic label sets a
+    /// single left edge for every value (and the widest value does not push
+    /// shorter values sideways).
+    /// </summary>
+    internal static void AppendScalarStatRow(
+        StringBuilder body,
+        RelicStatRowPresentation presentation,
+        string value,
+        string pct = "",
+        string? labelColor = null)
+    {
+        BeginOrContinueScalarStatTable(body);
+        body.Append("[cell expand=0 padding=0,0,10,0]")
+            .Append(StatConceptGlossary.RenderInformationHint(
+                presentation.FullDescription))
+            .Append("[/cell]")
+            .Append("[cell expand=0 padding=0,0,12,0]");
+        if (!string.IsNullOrEmpty(labelColor))
+            body.Append("[color=").Append(labelColor).Append(']');
+        AppendConceptLabel(
+            body,
+            presentation.ConceptIds,
+            presentation.DenominatorConceptIds,
+            presentation.Label);
+        if (!string.IsNullOrEmpty(labelColor))
+            body.Append("[/color]");
+        body.Append("[/cell]")
+            .Append("[cell expand=0 padding=0,0,12,0][left][b]")
+            .Append(value)
+            .Append("[/b][/left][/cell]")
+            .Append("[cell expand=0 padding=0,0,4,0][left][color=#b5b5b5]")
+            .Append(pct)
+            .Append("[/color][/left][/cell]")
+            .Append(ScalarStatTableClose);
+    }
+
+    internal static bool ContainsScalarStatTable(string? body)
+        => !string.IsNullOrEmpty(body)
+           && body.Contains(ScalarStatTableOpen, StringComparison.Ordinal);
+
+    private static void BeginOrContinueScalarStatTable(StringBuilder body)
+    {
+        if (EndsWith(body, ScalarStatTableClose)
+            && LastTableStartsWith(body, ScalarStatTableOpen))
+        {
+            body.Length -= ScalarStatTableClose.Length;
+            return;
+        }
+
+        body.Append(ScalarStatTableOpen);
+    }
+
     private static void BeginOrContinueInlineStatTable(StringBuilder body)
     {
         if (body.Length == 0)
@@ -172,6 +228,29 @@ public static class StatsTooltip
         for (var index = 0; index < suffix.Length; index++)
         {
             if (body[start + index] != suffix[index]) return false;
+        }
+
+        return true;
+    }
+
+    private static bool LastTableStartsWith(StringBuilder body, string tableOpen)
+    {
+        for (var start = body.Length - tableOpen.Length; start >= 0; start--)
+        {
+            if (MatchesAt(body, start, "[table="))
+                return MatchesAt(body, start, tableOpen);
+        }
+
+        return false;
+    }
+
+    private static bool MatchesAt(StringBuilder body, int start, string value)
+    {
+        if (start < 0 || start + value.Length > body.Length) return false;
+
+        for (var index = 0; index < value.Length; index++)
+        {
+            if (body[start + index] != value[index]) return false;
         }
 
         return true;

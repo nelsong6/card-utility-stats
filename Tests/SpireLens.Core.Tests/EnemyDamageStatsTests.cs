@@ -78,6 +78,9 @@ public class EnemyDamageStatsTests
         Assert.Contains("[b]20[/b]", body);
         Assert.Contains("[b]12[/b]", body);
         Assert.Contains("[b]8[/b]", body);
+        Assert.Equal(1, body.Split("[table=4]", StringSplitOptions.None).Length - 1);
+        Assert.Contains("[left][b]20[/b][/left]", body);
+        Assert.DoesNotContain("[right]", body);
     }
 
     [Fact]

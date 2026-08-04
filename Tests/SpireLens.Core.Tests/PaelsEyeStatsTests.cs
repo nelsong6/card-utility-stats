@@ -124,6 +124,9 @@ public class PaelsEyeStatsTests
         Assert.Contains("Statuses exhausted", body);
         Assert.Contains("Curses exhausted", body);
         Assert.Equal(4, CountOccurrences(body, "[b]0[/b]"));
+        Assert.Equal(1, CountOccurrences(body, "[table=4]"));
+        Assert.Contains("[left][b]false[/b][/left]", body);
+        Assert.DoesNotContain("[right]", body);
     }
 
     [Fact]

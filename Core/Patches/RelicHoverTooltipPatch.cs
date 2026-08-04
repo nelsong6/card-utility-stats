@@ -42,7 +42,6 @@ internal readonly record struct ThreeAttackScalingRelicStats(
 /// </summary>
 public static class RelicHoverShowPatch
 {
-    private const string ScalarStatsTableOpen = "[table=4]";
     private const string StatsTableClose = "[/table]\n";
     private const string EnthralledDefinitionId = "CARD.ENTHRALLED";
     private const string CursedPearlCurseDefinitionId = "CARD.GREED";
@@ -359,10 +358,7 @@ public static class RelicHoverShowPatch
         // shrink table columns, so allow the native control to grow to that
         // calculated width instead of clipping the aligned value columns.
         return GetPreferredStatsTooltipWidth(relicModel).HasValue
-               || (!string.IsNullOrEmpty(bodyBBCode)
-                   && bodyBBCode.Contains(
-                       ScalarStatsTableOpen,
-                       StringComparison.Ordinal));
+               || StatsTooltip.ContainsScalarStatTable(bodyBBCode);
     }
 
     internal static bool TryBuildBodyBBCode(
@@ -6510,78 +6506,7 @@ public static class RelicHoverShowPatch
             fullDescription,
             conceptIds,
             denominatorConceptIds);
-        BeginOrContinueScalarTable(sb);
-        sb.Append("[cell expand=0 padding=0,0,10,0]");
-        sb.Append(StatConceptGlossary.RenderInformationHint(
-            presentation.FullDescription));
-        sb.Append("[/cell]");
-        sb.Append("[cell expand=4 padding=0,0,12,0]");
-        AppendConceptLabel(
-            sb,
-            presentation.ConceptIds,
-            presentation.DenominatorConceptIds,
-            presentation.Label);
-        sb.Append("[/cell]");
-        sb.Append($"[cell expand=0 padding=0,0,12,0][right][b]{value}[/b][/right][/cell]");
-        sb.Append($"[cell expand=0 padding=0,0,4,0][right][color=#b5b5b5]{pct}[/color][/right][/cell]");
-        sb.Append(StatsTableClose);
-    }
-
-    private static void BeginOrContinueScalarTable(StringBuilder sb)
-    {
-        if (TryReopenTrailingScalarTable(sb))
-            return;
-
-        sb.Append(ScalarStatsTableOpen);
-    }
-
-    private static bool TryReopenTrailingScalarTable(StringBuilder sb)
-    {
-        if (!EndsWith(sb, StatsTableClose))
-            return false;
-
-        var lastTableStart = LastIndexOf(sb, "[table=");
-        if (lastTableStart < 0
-            || !MatchesAt(sb, lastTableStart, ScalarStatsTableOpen))
-        {
-            return false;
-        }
-
-        sb.Length -= StatsTableClose.Length;
-        return true;
-    }
-
-    private static bool EndsWith(StringBuilder sb, string suffix)
-    {
-        if (sb.Length < suffix.Length)
-            return false;
-
-        return MatchesAt(sb, sb.Length - suffix.Length, suffix);
-    }
-
-    private static int LastIndexOf(StringBuilder sb, string value)
-    {
-        for (var start = sb.Length - value.Length; start >= 0; start--)
-        {
-            if (MatchesAt(sb, start, value))
-                return start;
-        }
-
-        return -1;
-    }
-
-    private static bool MatchesAt(StringBuilder sb, int start, string value)
-    {
-        if (start < 0 || start + value.Length > sb.Length)
-            return false;
-
-        for (var index = 0; index < value.Length; index++)
-        {
-            if (sb[start + index] != value[index])
-                return false;
-        }
-
-        return true;
+        StatsTooltip.AppendScalarStatRow(sb, presentation, value, pct);
     }
 
     private static void TextValueRow(StringBuilder sb, string label, string value, string pct)
