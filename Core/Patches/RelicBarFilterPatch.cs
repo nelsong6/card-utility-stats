@@ -5,6 +5,7 @@ using System.Reflection;
 using Godot;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Combat;
+using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Hooks;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Nodes;
@@ -26,6 +27,8 @@ namespace SpireLens.Core.Patches;
 [HarmonyPatch(typeof(NRelicInventoryHolder), nameof(NRelicInventoryHolder._Ready))]
 public static class RelicBarFilterPatch
 {
+    private static readonly HashSet<RelicModel> FiredFiniteRelics =
+        new(ReferenceEqualityComparer.Instance);
     private static bool _hooksInitialized;
     private static NMapScreen? _hookedMapScreen;
     private static EventInfo? _combatBeganEvent;
@@ -51,18 +54,22 @@ public static class RelicBarFilterPatch
         }
 
         AttachCombatBeganHook();
+        CombatManager.Instance.CombatSetUp += OnCombatSetUp;
         CombatManager.Instance.CombatEnded += OnCombatEnded;
         _hooksInitialized = true;
         AttachMapScreenHooks();
-        CoreMain.Logger.Info("Relic bar filter hooks wired (CombatBegan, CombatEnded, map Opened/Closed).");
+        CoreMain.Logger.Info(
+            "Relic bar filter hooks wired (CombatSetUp, CombatBegan, CombatEnded, map Opened/Closed).");
     }
 
     public static void TeardownHooks()
     {
         DetachMapScreenHooks();
+        FiredFiniteRelics.Clear();
         if (!_hooksInitialized) return;
 
         DetachCombatBeganHook();
+        CombatManager.Instance.CombatSetUp -= OnCombatSetUp;
         CombatManager.Instance.CombatEnded -= OnCombatEnded;
         _hooksInitialized = false;
         CoreMain.Logger.Info("Relic bar filter hooks unwired.");
@@ -105,7 +112,49 @@ public static class RelicBarFilterPatch
     }
 
     internal static bool IsNonCombatRelic(RelicModel relicModel)
-        => RelicClassificationStore.IsNonCombat(relicModel);
+        => IsEffectivelyNonCombat(
+            RelicClassificationStore.IsNonCombat(relicModel),
+            relicModel.IsUsedUp,
+            FiredFiniteRelics.Contains(relicModel));
+
+    internal static bool IsEffectivelyNonCombat(
+        bool isClassifiedNonCombat,
+        bool isUsedUp,
+        bool firedThisCombat)
+        => isClassifiedNonCombat || isUsedUp || firedThisCombat;
+
+    internal static void MarkRelicFired(RelicModel? relicModel)
+    {
+        try
+        {
+            if (relicModel == null) return;
+            if (!RelicClassificationStore.GetCombatRelevantUntilTurn(relicModel).HasValue) return;
+            if (!FiredFiniteRelics.Add(relicModel)) return;
+
+            var relicId = RelicClassificationStore.GetRelicId(relicModel);
+            CoreMain.LogDebug(
+                $"Relic combat relevance resolved for this combat: {relicId} fired.");
+            if (_hooksInitialized)
+                RefreshAll($"{relicId} fired");
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"Could not mark fired relic non-combat: {e.Message}");
+        }
+    }
+
+    internal static void RefreshIfRelicUsedUp(RelicModel? relicModel)
+    {
+        try
+        {
+            if (relicModel?.IsUsedUp != true || !_hooksInitialized) return;
+            RefreshAll($"{RelicClassificationStore.GetRelicId(relicModel)} used up");
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"Could not refresh used-up relic state: {e.Message}");
+        }
+    }
 
     internal static bool IsCombatRelevantNow(RelicModel relicModel, int currentTurn)
     {
@@ -372,9 +421,19 @@ public static class RelicBarFilterPatch
         return players.Max(player => player.PlayerCombatState?.TurnNumber ?? 0);
     }
 
+    private static void OnCombatSetUp(CombatState _)
+    {
+        FiredFiniteRelics.Clear();
+        RefreshAll("combat set up");
+    }
+
     private static void OnCombatBegan(CombatState _) => RefreshAll("combat began");
 
-    private static void OnCombatEnded(CombatRoom _) => RefreshAll("combat ended");
+    private static void OnCombatEnded(CombatRoom _)
+    {
+        FiredFiniteRelics.Clear();
+        RefreshAll("combat ended");
+    }
 
     private static void AttachCombatBeganHook()
     {
@@ -409,6 +468,35 @@ public static class RelicBarFilterPatch
     private static void OnMapOpened() => RefreshAll("act map opened");
 
     private static void OnMapClosed() => RefreshAll("act map closed");
+}
+
+/// <summary>
+/// A finite-combat relic becomes presentation-only non-combat as soon as its
+/// native activation flash fires. The configured turn remains a fallback for
+/// non-flashing relics and for Core reloads after the activation.
+/// </summary>
+[HarmonyPatch(
+    typeof(RelicModel),
+    nameof(RelicModel.Flash),
+    new[] { typeof(IEnumerable<Creature>) })]
+public static class RelicBarFilterRelicFlashPatch
+{
+    [HarmonyPostfix]
+    public static void Postfix(RelicModel __instance)
+        => RelicBarFilterPatch.MarkRelicFired(__instance);
+}
+
+/// <summary>
+/// Limited-use relics expose their terminal state through IsUsedUp and switch
+/// to Disabled through this setter. Refresh the projection at that exact state
+/// change so they leave the filtered combat bar immediately.
+/// </summary>
+[HarmonyPatch(typeof(RelicModel), nameof(RelicModel.Status), MethodType.Setter)]
+public static class RelicBarFilterRelicStatusPatch
+{
+    [HarmonyPostfix]
+    public static void Postfix(RelicModel __instance)
+        => RelicBarFilterPatch.RefreshIfRelicUsedUp(__instance);
 }
 
 [HarmonyPatch(typeof(Hook), nameof(Hook.AfterPlayerTurnStart))]

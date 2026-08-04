@@ -23,6 +23,30 @@ public class RelicCompendiumFilterTests
     }
 
     [Theory]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(false, false, true)]
+    public void EffectiveNonCombatState_IncludesClassificationUseUpAndCombatFire(
+        bool classifiedNonCombat,
+        bool usedUp,
+        bool firedThisCombat)
+    {
+        Assert.True(RelicBarFilterPatch.IsEffectivelyNonCombat(
+            classifiedNonCombat,
+            usedUp,
+            firedThisCombat));
+    }
+
+    [Fact]
+    public void EffectiveNonCombatState_RemainsCombatBeforeAnyResolutionSignal()
+    {
+        Assert.False(RelicBarFilterPatch.IsEffectivelyNonCombat(
+            isClassifiedNonCombat: false,
+            isUsedUp: false,
+            firedThisCombat: false));
+    }
+
+    [Theory]
     [InlineData(false, false, true)]
     [InlineData(true, false, false)]
     [InlineData(false, true, false)]
