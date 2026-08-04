@@ -601,6 +601,19 @@ This is intentionally outcome-shaped but still simple. It assumes the relic appl
 
 Relic aggregates live in `RunData.RelicAggregates`, keyed by relic id. Fields are shared across relics; each relic uses only relevant fields.
 
+The filtered relic bar treats combat relevance as an effective live state,
+not a mutation of the saved classification. A relic with a finite combat
+duration enters a per-model, combat-local resolved set when its native
+`RelicModel.Flash(IEnumerable<Creature>)` activation fires. Bag of Preparation,
+Ring of the Snake, and Symbiotic Virus do not flash, so their established
+owner-specific activation hooks mark the same state directly. The configured
+turn is retained as an exclusive fallback cutoff, which also reconstructs the
+right projection after a Core hot reload. Any relic whose native `IsUsedUp`
+becomes true is effectively non-combat immediately; recurring finite relics
+leave the transient set at combat end and remain combat-classified for the
+next fight. This state is presentation-only and never removes or disables a
+relic.
+
 Bag of Preparation raises its owner's first-turn hand-draw request inside
 `ModifyHandDraw`; the game then finishes the complete normal/late modifier
 chain, raises the first hand to any larger eligible Innate count, clamps it to

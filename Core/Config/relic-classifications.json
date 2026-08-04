@@ -302,5 +302,19 @@
     "RELIC.STRAWBERRY",
     "RELIC.TOXIC_EGG"
   ],
-  "combat_relevant_until_turn": {}
+  "combat_relevant_until_turn": {
+    "RELIC.ANCHOR": 1,
+    "RELIC.BAG_OF_PREPARATION": 1,
+    "RELIC.CANDELABRA": 2,
+    "RELIC.CAPTAINS_WHEEL": 3,
+    "RELIC.CHANDELIER": 3,
+    "RELIC.FAKE_ANCHOR": 1,
+    "RELIC.FAKE_VENERABLE_TEA_SET": 1,
+    "RELIC.HORN_CLEAT": 2,
+    "RELIC.LANTERN": 1,
+    "RELIC.RING_OF_THE_SNAKE": 1,
+    "RELIC.SPARKLING_ROUGE": 3,
+    "RELIC.SYMBIOTIC_VIRUS": 1,
+    "RELIC.VERY_HOT_COCOA": 1
+  }
 }

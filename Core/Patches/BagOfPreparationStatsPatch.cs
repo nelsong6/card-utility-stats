@@ -33,6 +33,7 @@ public static class BagOfPreparationModifyHandDrawPatch
             var added = __result - count;
             if (added <= 0m) return;
 
+            RelicBarFilterPatch.MarkRelicFired(__instance);
             RunTracker.RecordBagOfPreparationActivation(
                 __instance,
                 player,
@@ -64,6 +65,7 @@ public static class RingOfTheSnakeModifyHandDrawPatch
             var added = __result - count;
             if (added <= 0m) return;
 
+            RelicBarFilterPatch.MarkRelicFired(__instance);
             RunTracker.RecordRingOfTheSnakeActivation(
                 __instance,
                 player,
