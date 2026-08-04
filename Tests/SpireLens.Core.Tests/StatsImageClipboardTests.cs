@@ -39,6 +39,16 @@ public class StatsImageClipboardTests
     }
 
     [Fact]
+    public void CalculateShareBounds_PreservesVisibleRelativePlacement()
+    {
+        var result = StatsImageCapture.CalculateShareBounds(
+            new CaptureFloatRect(700f, 100f, 100f, 150f),
+            new CaptureFloatRect(100f, 250f, 400f, 300f));
+
+        Assert.Equal(new CaptureFloatRect(90f, 90f, 720f, 470f), result);
+    }
+
+    [Fact]
     public void BuildDib_WritesHeaderAndBottomUpBgraPixels()
     {
         // Top row: red, green. Bottom row: blue, white.

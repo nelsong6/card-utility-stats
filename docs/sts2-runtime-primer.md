@@ -1675,7 +1675,8 @@ Important surfaces:
   one native event. The pinned stats page's **Copy** button is the sole click
   exception: the global input pass preserves the pin when the press lands in
   that button, then the button hides through a completed render frame while
-  `StatsImageCapture` crops the panel from the viewport texture. The resulting
+  `StatsImageCapture` crops the selected item and complete tooltip set from the
+  viewport texture in their existing visible arrangement. The resulting
   RGBA image is converted entirely in process to a bottom-up Windows DIB and
   transferred to the OS clipboard; no temporary file, process, or companion
   service participates. Do not correlate input phases with

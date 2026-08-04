@@ -680,7 +680,6 @@ internal static class StatsTooltipPinManager
             if (!StatsImageCapture.TryCaptureShareImage(
                     statsControl,
                     GetRenderedSubjectRect(pinnedTarget),
-                    GetIsolatedSubjectTexture(pinnedTarget),
                     GetTooltipCaptureGroups(pinnedTipSet),
                     out var image,
                     out var captureError))
@@ -768,22 +767,6 @@ internal static class StatsTooltipPinManager
         }
 
         return groups;
-    }
-
-    private static Texture2D? GetIsolatedSubjectTexture(Control target)
-    {
-        var relicModel = target switch
-        {
-            NRelicInventoryHolder holder => holder.Relic.Model,
-            NRelicCollectionEntry entry
-                when CompendiumRelicStatsContext.TryGetRelicModel(entry, out var model)
-                => model,
-            NRelicBasicHolder holder when IsLive(holder.Relic)
-                => holder.Relic.Model,
-            _ => null,
-        };
-
-        return relicModel?.BigIcon ?? relicModel?.Icon;
     }
 
     private static Rect2 GetRenderedSubjectRect(Control target)

@@ -83,9 +83,10 @@ the pinned item, and the tooltip remains visible and mouse-interactive after the
 pointer leaves it. Right-clicking the locked item again always unlocks it. Pointer
 movement is allowed so inline help can be inspected. Pinned SpireLens panels
 also expose a camera button that captures the selected card or relic together
-with its complete native and SpireLens tooltip set, then places that composed
-image directly on the Windows clipboard without a temporary file or external
-process. Clicking that button preserves the pin; any other mouse click or wheel
+with its complete native and SpireLens tooltip set in their exact visible
+arrangement, then places that viewport crop directly on the Windows clipboard
+without a temporary file or external process. Clicking that button preserves
+the pin; any other mouse click or wheel
 action, key press, or controller action removes the pin and continues to the
 game normally.
 
