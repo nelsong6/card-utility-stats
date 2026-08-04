@@ -227,6 +227,11 @@ public class RelicStatRowVocabularyTests
         "card_uncommon,taken",
         "")]
     [InlineData(
+        "Targets hit per activation",
+        "",
+        "targets_hit,activation",
+        "activation")]
+    [InlineData(
         "Swift cards not taken",
         "not taken",
         "swift,card",

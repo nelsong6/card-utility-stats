@@ -314,6 +314,9 @@ public class BlockTooltipTests
         Assert.Contains(
             StatConceptGlossary.RenderInformationHint("targets hit"),
             text);
+        Assert.Contains(
+            StatConceptGlossary.RenderHintedGlyph("targets_hit"),
+            text);
         Assert.Contains("[b]18[/b]", text);
         Assert.Contains("[b]12[/b]", text);
         Assert.Contains("[b]4[/b]", text);

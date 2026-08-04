@@ -712,6 +712,16 @@
         "description": "An offered item or reward selected by the player."
       }
     },
+    "targets_hit": {
+      "display": {
+        "type": "embedded_image",
+        "resource": "Assets.stat-targets-hit.svg"
+      },
+      "help": {
+        "label": "Targets hit",
+        "description": "Distinct enemies or other targets hit by the tracked card, relic, potion, or effect."
+      }
+    },
     "turn": {
       "display": {
         "type": "embedded_image",

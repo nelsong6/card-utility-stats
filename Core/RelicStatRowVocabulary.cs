@@ -176,6 +176,7 @@ internal static class RelicStatRowVocabulary
         Rule("strength", @"\bstrength\b"),
         Rule("swift", @"\bswift\b"),
         Rule("taken", @"(?<!not\s)\btaken\b"),
+        Rule("targets_hit", @"\btargets?\s+hit\b"),
         Rule("turn", @"\bturns?\b", true),
         Rule(
             "unknown_room",

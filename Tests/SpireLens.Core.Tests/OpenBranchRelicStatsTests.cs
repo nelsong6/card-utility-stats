@@ -266,7 +266,9 @@ public class OpenBranchRelicStatsTests
             "BuildLetterOpenerBodyBBCode",
             new RelicAggregate { Activations = 3, TotalDamageAttempted = 45, TotalTargets = 9 });
         Assert.Contains("Damage attempted", letterOpenerBody);
-        Assert.Contains("Targets hit", letterOpenerBody);
+        Assert.Contains(
+            StatConceptGlossary.RenderHintedGlyph("targets_hit"),
+            letterOpenerBody);
         Assert.Contains("[b]45[/b]", letterOpenerBody);
 
         var akabekoBody = InvokeTooltipBuilder(
@@ -334,7 +336,9 @@ public class OpenBranchRelicStatsTests
         Assert.Contains("Damage blocked", parryingShieldBody);
         Assert.Contains("Overkill", parryingShieldBody);
         Assert.Contains("Kills", parryingShieldBody);
-        Assert.Contains("Targets hit", parryingShieldBody);
+        Assert.Contains(
+            StatConceptGlossary.RenderHintedGlyph("targets_hit"),
+            parryingShieldBody);
         Assert.Contains("Damage per activation", parryingShieldBody);
         Assert.Contains("[b]17[/b]", parryingShieldBody);
         Assert.Contains("[b]11[/b]", parryingShieldBody);

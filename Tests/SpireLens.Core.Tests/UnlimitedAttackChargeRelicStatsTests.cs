@@ -332,7 +332,9 @@ public class UnlimitedAttackChargeRelicStatsTests
         Assert.Contains("Damage blocked", kusarigamaBody);
         Assert.Contains("Overkill", kusarigamaBody);
         Assert.Contains("Kills", kusarigamaBody);
-        Assert.Contains("Targets hit", kusarigamaBody);
+        Assert.Contains(
+            StatConceptGlossary.RenderHintedGlyph("targets_hit"),
+            kusarigamaBody);
         Assert.Contains("Damage per activation", kusarigamaBody);
         Assert.Contains("Turns ended at 0 charges", kusarigamaBody);
         Assert.Contains("Turns ended at 1 charge", kusarigamaBody);

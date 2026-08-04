@@ -102,7 +102,7 @@ public class MercuryHourglassStatsTests
         Assert.Contains("Damage blocked", body);
         Assert.Contains("Overkill", body);
         Assert.Contains("Kills", body);
-        Assert.Contains("Targets hit", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("targets_hit"), body);
         Assert.Contains("Damage per combat", body);
         Assert.Contains("[b]2[/b]", body);
         Assert.Contains("[b]33[/b]", body);

@@ -399,7 +399,10 @@ public class PotionRunHistoryTooltipTests
         Assert.Contains("Overkill  [b]7[/b]", usedBody);
         Assert.Contains(StatConceptGlossary.RenderHintedGlyph("kill"), usedBody);
         Assert.Contains("  [b]1[/b]", usedBody);
-        Assert.Contains("Targets hit  [b]2[/b]", usedBody);
+        Assert.Contains(
+            StatConceptGlossary.RenderHintedGlyph("targets_hit"),
+            usedBody);
+        Assert.Contains("  [b]2[/b]", usedBody);
     }
 
     private static string BuildBody(

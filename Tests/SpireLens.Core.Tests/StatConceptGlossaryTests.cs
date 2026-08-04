@@ -72,6 +72,7 @@ public class StatConceptGlossaryTests
                 "strength_gained",
                 "swift",
                 "taken",
+                "targets_hit",
                 "turn",
                 "attack_uncommon",
                 "card_uncommon",
@@ -165,6 +166,7 @@ public class StatConceptGlossaryTests
         var strengthGained = StatConceptGlossary.RenderHintedGlyph("strength_gained");
         var swift = StatConceptGlossary.RenderHintedGlyph("swift");
         var taken = StatConceptGlossary.RenderHintedGlyph("taken");
+        var targetsHit = StatConceptGlossary.RenderHintedGlyph("targets_hit");
         var turn = StatConceptGlossary.RenderHintedGlyph("turn");
         var unknownRoom = StatConceptGlossary.RenderHintedGlyph("unknown_room");
         var upgraded = StatConceptGlossary.RenderHintedGlyph("upgraded");
@@ -215,6 +217,7 @@ public class StatConceptGlossaryTests
             strengthGained,
             swift,
             taken,
+            targetsHit,
             turn,
             unknownRoom,
             upgraded,
@@ -361,6 +364,10 @@ public class StatConceptGlossaryTests
         Assert.Contains(
             "user://SpireLens/generated-icons/taken-",
             taken);
+        Assert.Contains("[hint=\"Targets hit:", targetsHit);
+        Assert.Contains(
+            "user://SpireLens/generated-icons/targets_hit-",
+            targetsHit);
         Assert.Contains("[hint=\"Turn:", turn);
         Assert.Contains(
             "user://SpireLens/generated-icons/turn-",

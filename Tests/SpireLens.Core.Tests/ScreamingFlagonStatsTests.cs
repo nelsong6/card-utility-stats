@@ -161,7 +161,7 @@ public class ScreamingFlagonStatsTests
         Assert.Contains("Damage blocked", body);
         Assert.Contains("Overkill", body);
         Assert.Contains("Kills", body);
-        Assert.Contains("Targets hit", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("targets_hit"), body);
         Assert.Contains("Damage per activation", body);
         Assert.Contains("[b]18.33[/b]", body);
         Assert.Contains("turn end per turn", body);

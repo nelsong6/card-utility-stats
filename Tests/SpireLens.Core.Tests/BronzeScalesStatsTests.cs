@@ -111,7 +111,7 @@ public class BronzeScalesStatsTests
         Assert.Contains("Damage blocked", body);
         Assert.Contains("Overkill", body);
         Assert.Contains("Kills", body);
-        Assert.Contains("Targets hit", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("targets_hit"), body);
         Assert.Contains("Damage per trigger", body);
         Assert.Contains("[b]0[/b]", body);
         Assert.Equal(1, CountOccurrences(body, "[table=4]"));

@@ -181,7 +181,7 @@ public class CrackedCoreStatsTests
         Assert.Contains("Overkill", body);
         Assert.Contains("[b]3[/b]", body);
         Assert.Contains("Kills", body);
-        Assert.Contains("Targets hit", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("targets_hit"), body);
     }
 
     [Fact]
