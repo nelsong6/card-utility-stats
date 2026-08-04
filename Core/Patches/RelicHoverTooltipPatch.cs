@@ -5417,6 +5417,11 @@ public static class RelicHoverShowPatch
             sb,
             agg.Activations.ToString(),
             "Times activated — the number of times this relic has activated.");
+        Row3(
+            sb,
+            "Activated this combat",
+            agg.RuinedHelmetStrengthAddedThisCombat > 0m ? "true" : "false",
+            "");
         Row3(sb, "Total strength gained", FormatDecimal(agg.StrengthAdded), "");
         Row3(
             sb,

@@ -139,6 +139,8 @@ public class RuinedHelmetStatsTests
 
         Assert.Contains("Times activated", body);
         Assert.Contains("[b]2[/b]", body);
+        Assert.Contains("Activated this combat", body);
+        Assert.Contains("[b]true[/b]", body);
         Assert.Contains("Total strength gained", body);
         Assert.Contains("[b]7.5[/b]", body);
         Assert.Contains("Strength gained this combat", body);
@@ -155,6 +157,8 @@ public class RuinedHelmetStatsTests
         var body = BuildBody(new RelicAggregate { StrengthAdded = 4m });
 
         Assert.Contains("Times activated", body);
+        Assert.Contains("Activated this combat", body);
+        Assert.Contains("[b]false[/b]", body);
         Assert.Contains("Total strength gained", body);
         Assert.Contains("[b]4[/b]", body);
         Assert.Contains("Strength gained this combat", body);
