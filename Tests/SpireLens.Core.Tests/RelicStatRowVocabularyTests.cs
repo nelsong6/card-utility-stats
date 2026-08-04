@@ -22,6 +22,11 @@ public class RelicStatRowVocabularyTests
         "average,activation,combat",
         "combat")]
     [InlineData(
+        "Combats activations = 0",
+        "= 0",
+        "combat,activation",
+        "")]
+    [InlineData(
         "Turns ended at 1 charge",
         "ended at 1",
         "turn,charge",

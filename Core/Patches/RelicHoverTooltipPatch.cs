@@ -5134,7 +5134,12 @@ public static class RelicHoverShowPatch
 
         RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, "Activated this combat", activatedThisCombat ? "true" : "false", "");
-        Row3(sb, "Combats without activation", agg.CombatsWithoutActivation.ToString(), "");
+        Row3(
+            sb,
+            "Combats activations = 0",
+            agg.CombatsWithoutActivation.ToString(),
+            "",
+            "Combats without activation.");
         Row3(
             sb,
             "Avg cards exhausted per combat",
