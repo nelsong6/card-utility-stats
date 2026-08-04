@@ -6065,6 +6065,42 @@ public class SchemaLoadingTests
         Assert.Equal("ENCOUNTER.GREMLIN_LEADER", relicAgg.SwordInTheStoneElitesSlain[2].EncounterId);
         Assert.Equal(2, relicAgg.Activations);
         Assert.Equal(6, relicAgg.StrengthAdded);
+        Assert.Equal(0m, relicAgg.SwordInTheStoneStrengthRateAdded);
+        Assert.Equal(0, relicAgg.SwordInTheStoneStrengthCombats);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsSwordInTheStoneStrengthRatesFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("sword-in-the-stone-strength-rates-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertSwordInTheStoneStrengthRatesFixture(
+            loaded.Data.RelicAggregates["RELIC.SWORD_OF_STONE"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsSwordInTheStoneStrengthRatesFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("sword-in-the-stone-strength-rates-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertSwordInTheStoneStrengthRatesFixture(
+            resumed!.RelicAggregates["RELIC.SWORD_OF_STONE"]);
+    }
+
+    private static void AssertSwordInTheStoneStrengthRatesFixture(
+        RelicAggregate relicAgg)
+    {
+        Assert.Equal(8, relicAgg.FloorAcquired);
+        Assert.Equal(3, relicAgg.SwordInTheStoneElitesSlain.Count);
+        Assert.Equal(4, relicAgg.Activations);
+        Assert.Equal(12m, relicAgg.StrengthAdded);
+        Assert.Equal(9m, relicAgg.SwordInTheStoneStrengthRateAdded);
+        Assert.Equal(4, relicAgg.SwordInTheStoneStrengthCombats);
     }
 
     [Fact]

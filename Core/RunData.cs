@@ -1027,7 +1027,7 @@ public class RelicAggregate
     public int BlockedTriggers { get; set; }
 
     // Total Strength this relic added. Used by Reptile Trinket, Shuriken,
-    // Ruined Helmet, and Toasty Mittens.
+    // Ruined Helmet, Sword of Jade, and Toasty Mittens.
     public decimal StrengthAdded { get; set; }
 
     // Toasty Mittens outcomes and its zero-inclusive held-combat denominator.
@@ -1197,6 +1197,17 @@ public class RelicAggregate
     // The history survives its replacement by Sword of Jade so the transformed
     // relic can continue presenting the original acquisition/progression story.
     public List<SwordInTheStoneEliteSlainAggregate> SwordInTheStoneElitesSlain { get; set; } = new();
+
+    // Sword of Jade's matching observation-era Strength numerator and
+    // zero-inclusive held-combat denominator. Lifetime StrengthAdded predates
+    // these fields, so it must not be divided by only newly observed combats.
+    // Pre-transformation Sword in the Stone combats are deliberately excluded.
+    public decimal SwordInTheStoneStrengthRateAdded { get; set; }
+    public int SwordInTheStoneStrengthCombats { get; set; }
+
+    // Tooltip-only projection populated from the live pending combat aggregate.
+    // Internal properties are not part of the persisted System.Text.Json shape.
+    internal decimal SwordInTheStoneStrengthAddedThisCombat { get; set; }
 
     // Total observed maximum HP gained by pickup max-HP relics and Chosen Cheese.
     public decimal MaxHpGained { get; set; }

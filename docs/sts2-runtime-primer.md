@@ -746,7 +746,12 @@ Keep both relic forms under the original `RELIC.SWORD_OF_STONE` stats identity.
 Sword of Jade's `AfterRoomEntered(AbstractRoom)` applies Strength on combat-room
 entry; measure the owner's Strength before and after that completed callback so
 the shared aggregate records the observed gain rather than its listed base
-value.
+value. Count every combat in which Sword of Jade is held as the zero-inclusive
+Strength-rate denominator, but exclude pre-transformation Sword in the Stone
+combats because that form cannot grant Strength. Keep a matching
+observation-era Strength numerator for this denominator: lifetime Strength
+totals can predate combat-rate tracking and must not be divided by only newly
+observed combats.
 
 Molten Egg, Toxic Egg, and Frozen Egg share `EggRelicHelper.UpgradeValidCards`
 for both late card-reward modification and merchant inventory modification.

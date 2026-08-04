@@ -5477,35 +5477,57 @@ public static class RelicHoverShowPatch
     private static string BuildRuinedHelmetBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        var strengthPerActivation = agg.Activations <= 0
+        AppendStrengthIncreaseRelicStats(
+            sb,
+            agg.Activations,
+            agg.StrengthAdded,
+            agg.RuinedHelmetStrengthAddedThisCombat,
+            agg.StrengthAdded,
+            agg.RuinedHelmetCombats);
+        return sb.ToString();
+    }
+
+    private static void AppendStrengthIncreaseRelicStats(
+        StringBuilder sb,
+        int activations,
+        decimal strengthGained,
+        decimal strengthGainedThisCombat,
+        decimal combatRateStrengthGained,
+        int combats)
+    {
+        var strengthPerActivation = activations <= 0
             ? 0m
-            : agg.StrengthAdded / agg.Activations;
-        var strengthPerCombat = agg.RuinedHelmetCombats <= 0
+            : strengthGained / activations;
+        var strengthPerCombat = combats <= 0
             ? 0m
-            : agg.StrengthAdded / agg.RuinedHelmetCombats;
+            : combatRateStrengthGained / combats;
 
         RelicActivationRow(
             sb,
-            agg.Activations.ToString(),
+            activations.ToString(),
             "Times activated — the number of times this relic has activated.");
         Row3(
             sb,
             "Activated this combat",
-            agg.RuinedHelmetStrengthAddedThisCombat > 0m ? "true" : "false",
+            strengthGainedThisCombat > 0m ? "true" : "false",
             "");
-        Row3(sb, "Total strength gained", FormatDecimal(agg.StrengthAdded), "");
+        Row3(sb, "Total strength gained", FormatDecimal(strengthGained), "");
         Row3(
             sb,
             "Strength gained this combat",
-            FormatDecimal(agg.RuinedHelmetStrengthAddedThisCombat),
+            FormatDecimal(strengthGainedThisCombat),
             "");
         Row3(
             sb,
             "Avg strength gained per activation",
             FormatDecimal(strengthPerActivation),
             "");
-        Row3(sb, "Avg strength gained per combat", FormatDecimal(strengthPerCombat), "");
-        return sb.ToString();
+        Row3(
+            sb,
+            "Avg strength gained per combat",
+            FormatDecimal(strengthPerCombat),
+            "",
+            "Average Strength gained per combat — observed Strength divided by combats in which this relic could grant Strength during the same tracking window.");
     }
 
     private static string BuildSwordInTheStoneBodyBBCode(
@@ -5544,8 +5566,13 @@ public static class RelicHoverShowPatch
                 "");
         }
 
-        Row3(sb, "Strength activations", agg.Activations.ToString(), "");
-        Row3(sb, "Strength gained", FormatDecimal(agg.StrengthAdded), "");
+        AppendStrengthIncreaseRelicStats(
+            sb,
+            agg.Activations,
+            agg.StrengthAdded,
+            agg.SwordInTheStoneStrengthAddedThisCombat,
+            agg.SwordInTheStoneStrengthRateAdded,
+            agg.SwordInTheStoneStrengthCombats);
         return sb.ToString();
     }
 

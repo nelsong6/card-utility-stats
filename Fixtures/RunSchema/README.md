@@ -421,6 +421,9 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds Sword in the Stone's acquisition floor, ordered Elite-victory history,
   and the observed Strength activations/gains retained after Sword of Jade
   replaces it.
+- `sword-in-the-stone-strength-rates-run.json`
+  Adds Sword of Jade's observation-era Strength numerator and zero-inclusive
+  held-combat denominator for the shared Strength-relic family presentation.
 - `egg-relic-offers-run.json`
   Adds Molten, Toxic, and Frozen Egg tracking: every matching choosable card
   option the egg actually upgraded across rewards, shops, and other offers,

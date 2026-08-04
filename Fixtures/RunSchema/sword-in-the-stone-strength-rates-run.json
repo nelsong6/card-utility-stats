@@ -1,0 +1,42 @@
+{
+  "run_id": "sword-in-the-stone-strength-rates-fixture",
+  "started_at": "2026-08-04T20:00:00Z",
+  "updated_at": "2026-08-04T20:30:00Z",
+  "character": "CHARACTER.IRONCLAD",
+  "ascension": 8,
+  "floor_reached": 36,
+  "outcome": "in_progress",
+  "game_start_time": 1785873600,
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.SWORD_OF_STONE": {
+      "floor_acquired": 8,
+      "sword_in_the_stone_elites_slain": [
+        {
+          "floor": 12,
+          "encounter_id": "ENCOUNTER.GREMLIN_NOB",
+          "display_name": "Gremlin Nob"
+        },
+        {
+          "floor": 18,
+          "encounter_id": "ENCOUNTER.LAGAVULIN",
+          "display_name": "Lagavulin"
+        },
+        {
+          "floor": 23,
+          "encounter_id": "ENCOUNTER.GREMLIN_LEADER",
+          "display_name": "Gremlin Leader"
+        }
+      ],
+      "activations": 4,
+      "strength_added": 12,
+      "sword_in_the_stone_strength_rate_added": 9,
+      "sword_in_the_stone_strength_combats": 4
+    }
+  },
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

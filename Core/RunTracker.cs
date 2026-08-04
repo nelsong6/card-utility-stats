@@ -2469,6 +2469,10 @@ public static class RunTracker
         target.PermafrostCombats += source.PermafrostCombats;
         target.BlockedTriggers += source.BlockedTriggers;
         target.StrengthAdded += source.StrengthAdded;
+        target.SwordInTheStoneStrengthRateAdded +=
+            source.SwordInTheStoneStrengthRateAdded;
+        target.SwordInTheStoneStrengthCombats +=
+            source.SwordInTheStoneStrengthCombats;
         target.ToastyMittensCardsExhausted += source.ToastyMittensCardsExhausted;
         target.ToastyMittensCombats += source.ToastyMittensCombats;
         target.ReptileTrinketTurns += source.ReptileTrinketTurns;
@@ -16112,6 +16116,7 @@ public static class RunTracker
                     return false;
 
                 _pendingCombat ??= new PendingCombat();
+                RecordSwordInTheStoneStrengthCombatForPlayerLocked(relic.Owner);
                 ownerCreature = relic.Owner.Creature;
                 strengthBefore = CurrentStrength(ownerCreature);
                 return true;
@@ -16180,6 +16185,15 @@ public static class RunTracker
         if (agg == null || strengthGained <= 0m) return;
         agg.Activations += 1;
         agg.StrengthAdded += strengthGained;
+        agg.SwordInTheStoneStrengthRateAdded += strengthGained;
+    }
+
+    internal static void RecordSwordInTheStoneStrengthCombatForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.SwordInTheStoneStrengthCombats += Math.Max(0, count);
     }
 
     /// <summary>
@@ -25411,6 +25425,8 @@ public static class RunTracker
                 MergeRelicAggregateInto(result, pending);
                 if (string.Equals(relicId, RuinedHelmetRelicId, StringComparison.Ordinal))
                     result.RuinedHelmetStrengthAddedThisCombat = pending.StrengthAdded;
+                if (string.Equals(relicId, SwordOfStoneRelicId, StringComparison.Ordinal))
+                    result.SwordInTheStoneStrengthAddedThisCombat = pending.StrengthAdded;
                 if (string.Equals(relicId, ArtOfWarRelicId, StringComparison.Ordinal))
                 {
                     result.ArtOfWarEnergyAddedThisCombat = pending.EnergyGenerated;
@@ -26499,6 +26515,18 @@ public static class RunTracker
         }
     }
 
+    private static bool PlayerHasSwordOfJade(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is SwordOfJade);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static bool PlayerHasJuzuBracelet(Player player)
     {
         try
@@ -26670,6 +26698,7 @@ public static class RunTracker
             RecordForgottenSoulCombatForPlayerLocked(player);
             RecordScreamingFlagonCombatForPlayerLocked(player);
             RecordRuinedHelmetCombatForPlayerLocked(player);
+            RecordSwordInTheStoneStrengthCombatForPlayerLocked(player);
             RecordMummifiedHandCombatForPlayerLocked(player);
             RecordSpikedGauntletsCombatForPlayerLocked(player);
             RecordBurningSticksCombatForPlayerLocked(player);
@@ -27783,6 +27812,18 @@ public static class RunTracker
 
         var agg = GetOrCreatePendingRelicAggregateLocked(RuinedHelmetRelicId);
         RecordRuinedHelmetCombatForTest(agg);
+    }
+
+    private static void RecordSwordInTheStoneStrengthCombatForPlayerLocked(
+        Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasSwordOfJade(player)) return;
+        if (!_pendingCombat.SwordInTheStoneStrengthCombatCountedPlayers.Add(player))
+            return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(SwordOfStoneRelicId);
+        RecordSwordInTheStoneStrengthCombatForTest(agg);
     }
 
     private static void RecordMummifiedHandCombatForPlayerLocked(Player player)
@@ -34449,6 +34490,8 @@ internal class PendingCombat
     public HashSet<Player> RuinedHelmetCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<RuinedHelmet, decimal> PendingRuinedHelmetStrengthGains { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> SwordInTheStoneStrengthCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> MummifiedHandCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

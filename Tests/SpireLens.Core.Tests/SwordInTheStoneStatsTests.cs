@@ -58,6 +58,9 @@ public class SwordInTheStoneStatsTests
         var restored = JsonSerializer.Deserialize<RunData>(json, SerializerOptions);
 
         Assert.Contains("sword_in_the_stone_elites_slain", json);
+        Assert.Contains("sword_in_the_stone_strength_rate_added", json);
+        Assert.Contains("sword_in_the_stone_strength_combats", json);
+        Assert.DoesNotContain("sword_in_the_stone_strength_added_this_combat", json);
         Assert.NotNull(restored);
         AssertAggregate(restored!.RelicAggregates[RelicId]);
     }
@@ -76,6 +79,7 @@ public class SwordInTheStoneStatsTests
             agg, 23, "ENCOUNTER.GREMLIN_LEADER", "Gremlin Leader");
         RunTracker.RecordSwordOfJadeStrengthGainForTest(agg, 3);
         RunTracker.RecordSwordOfJadeStrengthGainForTest(agg, 3);
+        RunTracker.RecordSwordInTheStoneStrengthCombatForTest(agg, 3);
 
         AssertAggregate(agg);
         Assert.Equal(
@@ -92,6 +96,8 @@ public class SwordInTheStoneStatsTests
             FloorAcquired = 8,
             Activations = 1,
             StrengthAdded = 3,
+            SwordInTheStoneStrengthRateAdded = 3,
+            SwordInTheStoneStrengthCombats = 1,
             SwordInTheStoneElitesSlain =
             {
                 new SwordInTheStoneEliteSlainAggregate
@@ -106,6 +112,8 @@ public class SwordInTheStoneStatsTests
         {
             Activations = 1,
             StrengthAdded = 3,
+            SwordInTheStoneStrengthRateAdded = 3,
+            SwordInTheStoneStrengthCombats = 2,
             SwordInTheStoneElitesSlain =
             {
                 new SwordInTheStoneEliteSlainAggregate
@@ -131,7 +139,10 @@ public class SwordInTheStoneStatsTests
     [Fact]
     public void TooltipShowsRequestedProgressionAndStrengthRows()
     {
-        var body = BuildBody(PopulatedAggregate());
+        var agg = PopulatedAggregate();
+        agg.SwordInTheStoneStrengthAddedThisCombat = 3m;
+
+        var body = BuildBody(agg);
 
         Assert.Contains("Floor acquired", body);
         Assert.Contains("Elites slain", body);
@@ -139,10 +150,48 @@ public class SwordInTheStoneStatsTests
         Assert.Contains("Gremlin Nob", body);
         Assert.Contains("Lagavulin", body);
         Assert.Contains("Gremlin Leader", body);
-        Assert.Contains("Strength activations", body);
-        Assert.Contains("Strength gained", body);
-        Assert.DoesNotContain("Avg strength gained per activation", body);
+        Assert.Contains("Times activated", body);
+        Assert.Contains("Activated this combat", body);
+        Assert.Contains("Total strength gained", body);
+        Assert.Contains("Strength gained this combat", body);
+        Assert.Contains("Avg strength gained per activation", body);
+        Assert.Contains("Avg strength gained per combat", body);
+        Assert.Contains("same tracking window", body);
+        Assert.Contains("[b]true[/b]", body);
+        Assert.Contains("[b]3[/b]", body);
+        Assert.Contains("[b]2[/b]", body);
         Assert.Contains("[b]5.5[/b]", body);
+    }
+
+    [Fact]
+    public void TooltipKeepsHistoricStrengthOutOfTheNewCombatRateWindow()
+    {
+        var body = BuildBody(new RelicAggregate
+        {
+            Activations = 3,
+            StrengthAdded = 9,
+            SwordInTheStoneStrengthRateAdded = 3,
+            SwordInTheStoneStrengthCombats = 2,
+        });
+
+        Assert.Contains("Avg strength gained per activation", body);
+        Assert.Contains("Avg strength gained per combat", body);
+        Assert.Contains("[b]3[/b]", body);
+        Assert.Contains("[b]1.5[/b]", body);
+    }
+
+    [Fact]
+    public void OlderAggregateWithoutStrengthRateFieldsDefaultsToZero()
+    {
+        var agg = JsonSerializer.Deserialize<RelicAggregate>(
+            """{"activations":2,"strength_added":6}""",
+            SerializerOptions);
+
+        Assert.NotNull(agg);
+        Assert.Equal(2, agg!.Activations);
+        Assert.Equal(6m, agg.StrengthAdded);
+        Assert.Equal(0m, agg.SwordInTheStoneStrengthRateAdded);
+        Assert.Equal(0, agg.SwordInTheStoneStrengthCombats);
     }
 
     [Fact]
@@ -162,6 +211,8 @@ public class SwordInTheStoneStatsTests
         FloorAcquired = 8,
         Activations = 2,
         StrengthAdded = 6,
+        SwordInTheStoneStrengthRateAdded = 6,
+        SwordInTheStoneStrengthCombats = 3,
         SwordInTheStoneElitesSlain =
         {
             new SwordInTheStoneEliteSlainAggregate
@@ -193,6 +244,8 @@ public class SwordInTheStoneStatsTests
         Assert.Equal("Gremlin Leader", agg.SwordInTheStoneElitesSlain[2].DisplayName);
         Assert.Equal(2, agg.Activations);
         Assert.Equal(6, agg.StrengthAdded);
+        Assert.Equal(6, agg.SwordInTheStoneStrengthRateAdded);
+        Assert.Equal(3, agg.SwordInTheStoneStrengthCombats);
     }
 
     private static void AssertTooltipDispatch(RelicModel relic, string expectedTitle)
