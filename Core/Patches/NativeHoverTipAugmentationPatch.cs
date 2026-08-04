@@ -70,19 +70,25 @@ internal static class NativeHoverTipCreateStatsPatch
     }
 
     [HarmonyPostfix]
-    public static void Postfix(NHoverTipSet? __result, bool __state)
+    public static void Postfix(
+        Control owner,
+        NHoverTipSet? __result,
+        bool __state)
     {
         if (!__state || __result == null) return;
 
         try
         {
             NativeStatsHoverTipStyler.ApplyToLastTextTip(__result);
+            if (owner is NMapLegendItem legendItem)
+                MapLegendStatsTooltip.KeepInsideViewport(legendItem, __result);
         }
         catch (Exception e)
         {
-            // Visual identity is supplemental. A styling failure must not
-            // interfere with the native tooltip or its owner lifecycle.
-            CoreMain.Logger.Error($"Native stats hover-tip styling failed: {e}");
+            // Visual presentation is supplemental. A styling or positioning
+            // failure must not interfere with the native tooltip lifecycle.
+            CoreMain.Logger.Error(
+                $"Native stats hover-tip presentation failed: {e}");
         }
     }
 }

@@ -1,18 +1,23 @@
 using System.Globalization;
 using System.Collections.Generic;
 using System.Text;
+using Godot;
 using MegaCrit.Sts2.Core.HoverTips;
 using MegaCrit.Sts2.Core.Map;
+using MegaCrit.Sts2.Core.Nodes.HoverTips;
 using MegaCrit.Sts2.Core.Nodes.Screens.Map;
 
 namespace SpireLens.Core.Patches;
 
 /// <summary>
 /// Run summaries appended to the game's six native map-legend hover tips.
-/// The legend item keeps ownership of focus/unfocus and positioning.
+/// The legend item keeps ownership of focus/unfocus and native positioning;
+/// SpireLens only clamps the resulting stack to the visible viewport.
 /// </summary>
 internal static class MapLegendStatsTooltip
 {
+    private const float ViewportMargin = 8f;
+
     internal static bool TryBuildNativeHoverTip(
         NMapLegendItem owner,
         out HoverTip tip)
@@ -61,6 +66,65 @@ internal static class MapLegendStatsTooltip
             stretchHorizontally: true);
         return true;
     }
+
+    /// <summary>
+    /// Native map-legend tips are anchored below the legend sheet. Once the
+    /// appended stats page makes that stack wider or taller, the native anchor
+    /// can leave part of it outside the viewport. Clamp the measured text-tip
+    /// container now and once more after Godot's deferred layout pass.
+    /// </summary>
+    internal static void KeepInsideViewport(
+        NMapLegendItem owner,
+        NHoverTipSet tipSet)
+    {
+        ApplyViewportBounds(owner, tipSet);
+        Callable.From(() =>
+        {
+            if (IsLive(owner) && IsLive(tipSet))
+                ApplyViewportBounds(owner, tipSet);
+        }).CallDeferred();
+    }
+
+    private static void ApplyViewportBounds(
+        NMapLegendItem owner,
+        NHoverTipSet tipSet)
+    {
+        var container = tipSet._textHoverTipContainer;
+        if (!IsLive(owner) || !IsLive(container)) return;
+
+        var viewportRect = owner.GetViewport()?.GetVisibleRect() ?? default;
+        if (viewportRect.Size.X <= 0f || viewportRect.Size.Y <= 0f) return;
+
+        var size = container.Size;
+        if (size.X <= 0f || size.Y <= 0f) return;
+
+        container.GlobalPosition = ClampInsideViewport(
+            container.GlobalPosition,
+            size,
+            viewportRect);
+    }
+
+    internal static Vector2 ClampInsideViewport(
+        Vector2 position,
+        Vector2 size,
+        Rect2 viewportRect)
+    {
+        var minimumX = viewportRect.Position.X + ViewportMargin;
+        var minimumY = viewportRect.Position.Y + ViewportMargin;
+        var maximumX = Math.Max(
+            minimumX,
+            viewportRect.End.X - ViewportMargin - size.X);
+        var maximumY = Math.Max(
+            minimumY,
+            viewportRect.End.Y - ViewportMargin - size.Y);
+
+        return new Vector2(
+            Math.Clamp(position.X, minimumX, maximumX),
+            Math.Clamp(position.Y, minimumY, maximumY));
+    }
+
+    private static bool IsLive(GodotObject? value)
+        => value != null && GodotObject.IsInstanceValid(value);
 
     internal static string BuildBodyBBCode(
         MapPointType pointType,
