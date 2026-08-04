@@ -134,8 +134,10 @@ Current UI conventions:
 - loud section headers are discouraged unless they add real clarity
 - inline icons are preferred for keyword-like effects when they improve scanning
 - rows phrased as “per <recognized concept>” render `/` immediately before
-  the denominator icon; “in” and “this” indicate scope and do not receive a
-  slash
+  the denominator icon; fully icon-driven “in” and “this” scopes render `∈`,
+  and an aggregate over every member of a plural scope renders `∈ ∀` before
+  the scope icon; mixed prose stays readable instead of forcing relation
+  symbols ahead of its remaining words
 - every icon-driven stat row can pair a left-side information hint for the full row meaning with a separate semantic concept hint; the central compendium glossary describes those same concept symbols
 - card, enemy, relic, potion, and run-summary stat rows all pass through the shared row vocabulary; established concepts render as glossary icons, and equivalent prose is retained only in the information hint rather than repeated visibly beside the icon
 - when the game already exposes a recognizable asset, prefer the in-game block/draw/energy/star iconography over generic text-only rows

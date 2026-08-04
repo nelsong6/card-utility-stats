@@ -110,84 +110,84 @@ internal static class PotionBeltStatsTooltip
 
         AppendRow(
             body,
-            ["combat", "offered", "potion"],
+            ["potion", "offered", "in", "all", "combat"],
             [],
-            "Offered",
+            "Potions offered in all combats",
             summary.CombatRewardPotionsOffered,
             "Potions offered in combat rewards this run.");
         AppendRow(
             body,
-            ["average", "floor", "offered", "potion"],
+            ["average", "potion", "offered", "floor"],
             ["floor"],
-            "Offered",
+            "Average potions offered per floor",
             Divide(summary.TotalPotionsOffered, summary.Floors),
             "Average potions offered per floor reached.");
         AppendRow(
             body,
-            ["combat", "offered", "potion_common"],
+            ["potion_common", "offered", "in", "all", "combat"],
             [],
-            "Offered",
+            "Common potions offered in all combats",
             summary.CommonCombatRewardPotions,
             "Common potions offered in combat rewards.");
         AppendRow(
             body,
-            ["combat", "offered", "potion_uncommon"],
+            ["potion_uncommon", "offered", "in", "all", "combat"],
             [],
-            "Offered",
+            "Uncommon potions offered in all combats",
             summary.UncommonCombatRewardPotions,
             "Uncommon potions offered in combat rewards.");
         AppendRow(
             body,
-            ["combat", "offered", "potion_rare"],
+            ["potion_rare", "offered", "in", "all", "combat"],
             [],
-            "Offered",
+            "Rare potions offered in all combats",
             summary.RareCombatRewardPotions,
             "Rare potions offered in combat rewards.");
         AppendRow(
             body,
-            ["combat", "offered", "fruit_juice"],
+            ["fruit_juice", "offered", "in", "all", "combat"],
             [],
-            "Offered",
+            "Fruit Juices offered in all combats",
             summary.FruitJuicesInCombatRewards,
             "Fruit Juices offered in combat rewards.");
         AppendRow(
             body,
-            ["offered", "wasted", "potion"],
+            ["potion", "offered", "wasted"],
             [],
             string.Empty,
             summary.RejectedPotionsAtRewardScreen,
             "Potions rejected at reward screens.");
         AppendRow(
             body,
-            ["unknown_room", "offered", "potion"],
+            ["potion", "offered", "in", "all", "unknown_room"],
             [],
-            "Offered",
+            "Potions offered in all events",
             summary.PotionsOfferedInEvents,
             "Potions offered in events.");
         AppendRow(
             body,
-            ["shop", "offered", "potion"],
+            ["potion", "offered", "in", "all", "shop"],
             [],
-            "Offered",
+            "Potions offered in all shops",
             summary.PotionsOfferedInShops,
             "Potions offered in shops.");
         AppendRow(
             body,
-            ["shop", "taken", "potion"],
+            ["potion", "taken", "in", "all", "shop"],
             [],
             string.Empty,
             summary.PotionsPurchasedInShops,
             "Potions purchased in shops.");
         AppendRow(
             body,
-            ["activation", "potion"],
+            ["potion", "activation"],
             [],
             "Activated",
             summary.TotalPotionActivations,
             "Potions activated this run.");
         AppendRow(
             body,
-            ["wasted", "potion"],
+            ["potion", "wasted"],
             [],
             string.Empty,
             summary.TotalPotionDiscards,

@@ -59,7 +59,7 @@ public class RelicStatRowVocabularyTests
     [InlineData(
         "Triggered this combat",
         "",
-        "activation,combat",
+        "activation,in,combat",
         "")]
     [InlineData(
         "HP healed",
@@ -264,7 +264,7 @@ public class RelicStatRowVocabularyTests
     [InlineData(
         "HP lost in events",
         "",
-        "damage,unknown_room",
+        "damage,in,all,unknown_room",
         "")]
     [InlineData(
         "Avg floors between merchants",
@@ -332,14 +332,14 @@ public class RelicStatRowVocabularyTests
     public void SharedRowPresentation_DeduplicatesExplicitIconsAndLabelProse()
     {
         var presentation = StatsTooltip.CreateStatRowPresentation(
-            "Potions offered",
+            "Potions offered in all combats",
             "Potions offered in combat rewards.",
-            ["combat", "offered", "potion"],
+            ["potion", "offered", "in", "all", "combat"],
             []);
 
         Assert.Equal("", presentation.Label);
         Assert.Equal(
-            ["combat", "offered", "potion"],
+            ["potion", "offered", "in", "all", "combat"],
             presentation.ConceptIds);
         Assert.Empty(presentation.DenominatorConceptIds);
     }

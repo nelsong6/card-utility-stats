@@ -11,6 +11,7 @@ public class StatConceptGlossaryTests
         Assert.Equal(
             [
                 "activation",
+                "all",
                 "attack",
                 "average",
                 "block",
@@ -44,6 +45,7 @@ public class StatConceptGlossaryTests
                 "healing_blocked",
                 "healing_gained",
                 "healing_wasted",
+                "in",
                 "information",
                 "kill",
                 "max_hp",
@@ -125,6 +127,7 @@ public class StatConceptGlossaryTests
     public void Glossary_RenderersIncludeNativeHintsAndConfiguredGlyphs()
     {
         var activation = StatConceptGlossary.RenderHintedGlyph("activation");
+        var all = StatConceptGlossary.RenderHintedGlyph("all");
         var attack = StatConceptGlossary.RenderHintedGlyph("attack");
         var average = StatConceptGlossary.RenderHintedGlyph("average");
         var block = StatConceptGlossary.RenderHintedGlyph("block");
@@ -145,6 +148,7 @@ public class StatConceptGlossaryTests
         var healingBlocked = StatConceptGlossary.RenderHintedGlyph("healing_blocked");
         var healingGained = StatConceptGlossary.RenderHintedGlyph("healing_gained");
         var healingWasted = StatConceptGlossary.RenderHintedGlyph("healing_wasted");
+        var inScope = StatConceptGlossary.RenderHintedGlyph("in");
         var informationConcept = StatConceptGlossary.RenderHintedGlyph("information");
         var kill = StatConceptGlossary.RenderHintedGlyph("kill");
         var nimble = StatConceptGlossary.RenderHintedGlyph("nimble");
@@ -171,6 +175,7 @@ public class StatConceptGlossaryTests
         var defaultGlyphs = new[]
         {
             activation,
+            all,
             attack,
             average,
             block,
@@ -191,6 +196,7 @@ public class StatConceptGlossaryTests
             healingBlocked,
             healingGained,
             healingWasted,
+            inScope,
             informationConcept,
             kill,
             nimble,
@@ -223,6 +229,10 @@ public class StatConceptGlossaryTests
         Assert.Contains(
             "user://SpireLens/generated-icons/activation-",
             activation);
+        Assert.Contains("[hint=\"All:", all);
+        Assert.Contains(
+            "user://SpireLens/generated-icons/all-",
+            all);
         Assert.Contains("[hint=\"Attack:", attack);
         Assert.Contains(
             "res://images/packed/card_library/type_sort_attack.png",
@@ -295,6 +305,10 @@ public class StatConceptGlossaryTests
         Assert.Contains(
             "user://SpireLens/generated-icons/healing_wasted-",
             healingWasted);
+        Assert.Contains("[hint=\"In:", inScope);
+        Assert.Contains(
+            "user://SpireLens/generated-icons/in-",
+            inScope);
         Assert.Contains("[hint=\"Information:", informationConcept);
         Assert.Contains(
             "user://SpireLens/generated-icons/information-",

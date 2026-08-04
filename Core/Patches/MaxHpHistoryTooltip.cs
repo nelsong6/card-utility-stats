@@ -69,14 +69,14 @@ internal static class MaxHpHistoryTooltip
 
         AppendStatRow(
             body,
-            ["damage", "combat"],
+            ["damage", "in", "all", "combat"],
             [],
             "HP lost in combats",
             FormatDecimal(healthStats.HpLostInCombats),
             "HP lost to combat damage this run.");
         AppendStatRow(
             body,
-            ["damage", "unknown_room"],
+            ["damage", "in", "all", "unknown_room"],
             [],
             "HP lost in events",
             FormatDecimal(healthStats.HpLostInEvents),

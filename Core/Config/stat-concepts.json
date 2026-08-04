@@ -11,6 +11,16 @@
         "description": "An activation occurs when an effect successfully triggers."
       }
     },
+    "all": {
+      "display": {
+        "type": "embedded_image",
+        "resource": "Assets.stat-all.svg"
+      },
+      "help": {
+        "label": "All",
+        "description": "All relevant instances of the concept that follows."
+      }
+    },
     "attack": {
       "display": {
         "type": "game_resource",
@@ -376,6 +386,16 @@
       "help": {
         "label": "Current HP",
         "description": "The player's current HP at the observed moment."
+      }
+    },
+    "in": {
+      "display": {
+        "type": "embedded_image",
+        "resource": "Assets.stat-in.svg"
+      },
+      "help": {
+        "label": "In",
+        "description": "Scopes the preceding stat to the concept that follows."
       }
     },
     "max_hp": {

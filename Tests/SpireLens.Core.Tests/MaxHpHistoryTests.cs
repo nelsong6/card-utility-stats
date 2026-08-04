@@ -93,9 +93,13 @@ public class MaxHpHistoryTests
 
         var rows = body.Split('\n');
         Assert.Contains(rows, row => row.Contains("Damage:")
+            && row.Contains("In:")
+            && row.Contains("All:")
             && row.Contains("Combat:")
             && row.EndsWith("   [b]30[/b]"));
         Assert.Contains(rows, row => row.Contains("Damage:")
+            && row.Contains("In:")
+            && row.Contains("All:")
             && row.Contains("Unknown room:")
             && row.EndsWith("   [b]10[/b]"));
         Assert.Contains(rows, row => row.Contains("Average:")

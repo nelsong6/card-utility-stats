@@ -50,7 +50,7 @@ internal static class RelicStatRowVocabulary
         RegexOptions.CultureInvariant);
 
     private static readonly Regex PrecedingConceptPrefixRegex = new(
-        @"(?:\b(?:per|in|this)\s*|/\s*)$",
+        @"(?:\b(?:per|in(?:\s+all)?|this)\s*|/\s*)$",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     private static readonly IReadOnlyDictionary<string, string> GainedConceptBaseIds =
@@ -136,7 +136,7 @@ internal static class RelicStatRowVocabulary
         Rule(
             "card",
             @"\bcards?\b|\bcommons?\b(?!\s+(?:attacks?|powers?|relics?|skills?))"),
-        Rule("campfire", @"\b(?:campfires?|rest[ -]sites?)\b"),
+        Rule("campfire", @"\b(?:campfires?|rest[ -]sites?)\b", true),
         Rule("charge", @"\bcharges?\b"),
         Rule("combat", @"\bcombats?\b", true),
         Rule("damage", @"\bdamage\b|\bhp\s+lost\b"),
@@ -146,7 +146,7 @@ internal static class RelicStatRowVocabulary
         Rule("draw", @"\b(?:draw|drawn|drawing|draws)\b"),
         Rule("energy_gained", @"\benergy\s+gained\b"),
         Rule("energy", @"\benergy\b"),
-        Rule("elite", @"\belites?\b"),
+        Rule("elite", @"\belites?\b", true),
         Rule("exhaust", @"\bexhaust(?:ed|ing|s)?\b"),
         Rule("floor", @"\bfloors?\b", true),
         Rule("fruit_juice", @"\bfruit\s+juices?\b"),
@@ -166,7 +166,7 @@ internal static class RelicStatRowVocabulary
         Rule("relic_common", @"\bcommon\s+relics?\b"),
         Rule("relic_gained", @"\brelics?\s+gained\b"),
         Rule("relic", @"\brelics?\b"),
-        Rule("shop", @"\b(?:merchants?|shops?)\b"),
+        Rule("shop", @"\b(?:merchants?|shops?)\b", true),
         Rule("skill_rare", @"\brare\s+skills?\b"),
         Rule("skill_uncommon", @"\buncommon\s+skills?\b"),
         Rule("skill_common", @"\bcommon\s+skills?\b"),
@@ -179,7 +179,8 @@ internal static class RelicStatRowVocabulary
         Rule("turn", @"\bturns?\b", true),
         Rule(
             "unknown_room",
-            @"\bunknown(?:\s+rooms?|[ -]sites?)\b|\bevents?\b"),
+            @"\bunknown(?:\s+rooms?|[ -]sites?)\b|\bevents?\b",
+            true),
         Rule("upgraded", @"(?<!non-)\b(?:upgrade|upgraded|upgrades)\b"),
         Rule("vigor_gained", @"\bvigor\s+gained\b"),
         Rule("vigor", @"\bvigor\b"),
@@ -263,6 +264,27 @@ internal static class RelicStatRowVocabulary
                         removalStart = conceptPrefix.Index;
                         isDenominator = hasDenominatorPrefix;
                     }
+
+                    if (hasSupportedScopePrefix)
+                    {
+                        occurrences.Add(new ConceptOccurrence(
+                            "in",
+                            conceptPrefix.Index,
+                            IsDenominator: false));
+                        if (conceptPrefixText.StartsWith(
+                                "in all",
+                                StringComparison.OrdinalIgnoreCase)
+                            || (conceptPrefixText.StartsWith(
+                                    "in",
+                                    StringComparison.OrdinalIgnoreCase)
+                                && IsPluralScope(match.Value)))
+                        {
+                            occurrences.Add(new ConceptOccurrence(
+                                "all",
+                                conceptPrefix.Index,
+                                IsDenominator: false));
+                        }
+                    }
                 }
 
                 MarkRemoved(removed, removalStart, match.Index + match.Length - removalStart);
@@ -304,6 +326,12 @@ internal static class RelicStatRowVocabulary
         var remainingText = CleanupRemainingText(
             BuildRemainingText(workingText, removed),
             conceptIds);
+        if (!string.IsNullOrWhiteSpace(remainingText))
+        {
+            conceptIds = conceptIds
+                .Where(id => id is not ("in" or "all"))
+                .ToArray();
+        }
         var renderedLabel = string.Join(
             " ",
             preservedImages
@@ -474,6 +502,9 @@ internal static class RelicStatRowVocabulary
 
     private static string NormalizeSpaces(string value)
         => Regex.Replace(value, @"\s+", " ").Trim();
+
+    private static bool IsPluralScope(string value)
+        => value.TrimEnd().EndsWith('s');
 
     private static bool ContainsPath(string image, string pathFragment)
         => image.Contains(pathFragment, StringComparison.OrdinalIgnoreCase);

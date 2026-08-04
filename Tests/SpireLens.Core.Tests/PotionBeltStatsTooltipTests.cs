@@ -101,12 +101,20 @@ public class PotionBeltStatsTooltipTests
         var rows = body.Split('\n');
         var offered = StatConceptGlossary.RenderHintedGlyph("offered");
         var activation = StatConceptGlossary.RenderHintedGlyph("activation");
+        var inScope = StatConceptGlossary.RenderHintedGlyph("in");
+        var all = StatConceptGlossary.RenderHintedGlyph("all");
         Assert.Equal(12, rows.Length);
 
-        Assert.Contains(rows, row => row.Contains("Combat:")
-            && row.Contains("Offered:")
-            && row.Contains("Potion:")
-            && row.EndsWith("   [b]4[/b]"));
+        var allCombatOffers = Assert.Single(
+            rows,
+            row => row.EndsWith("   [b]4[/b]"));
+        AssertConceptOrder(
+            allCombatOffers,
+            "potion",
+            "offered",
+            "in",
+            "all",
+            "combat");
         Assert.Contains(rows, row => row.Contains("Average:")
             && row.Contains("Floor:")
             && row.Contains("Offered:")
@@ -154,6 +162,8 @@ public class PotionBeltStatsTooltipTests
         Assert.DoesNotContain($"{activation} Activated", body);
         Assert.DoesNotContain("Rejected   [b]", body);
         Assert.DoesNotContain("Purchased   [b]", body);
+        Assert.Contains(inScope, body);
+        Assert.Contains(all, body);
 
         Assert.Contains(
             StatConceptGlossary.RenderInformationHint(
@@ -163,6 +173,20 @@ public class PotionBeltStatsTooltipTests
             StatConceptGlossary.RenderInformationHint(
                 "Potions discarded without being used this run."),
             body);
+    }
+
+    private static void AssertConceptOrder(string row, params string[] conceptIds)
+    {
+        var previousIndex = -1;
+        foreach (var conceptId in conceptIds)
+        {
+            var glyph = StatConceptGlossary.RenderHintedGlyph(conceptId);
+            var index = row.IndexOf(glyph, StringComparison.Ordinal);
+            Assert.True(
+                index > previousIndex,
+                $"Expected '{conceptId}' after index {previousIndex} in row: {row}");
+            previousIndex = index;
+        }
     }
 
     private static PotionRunHistoryEntry Entry(
