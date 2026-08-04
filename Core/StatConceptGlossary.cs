@@ -76,6 +76,7 @@ internal static class StatConceptGlossary
         new(StringComparer.Ordinal);
     private static readonly Dictionary<string, Texture2D> GlossaryTextures =
         new(StringComparer.OrdinalIgnoreCase);
+    private static bool _runtimeResourcesInitialized;
 
     private sealed record ContextualGeneratedIcon(
         string GeneratedPath,
@@ -89,10 +90,12 @@ internal static class StatConceptGlossary
 
     public static void Initialize()
     {
+        _runtimeResourcesInitialized = false;
         GlossaryTextures.Clear();
         ContextualEnergyGainedIcons.Clear();
         BuildGeneratedConceptImages();
         BuildGameResourceRegions();
+        _runtimeResourcesInitialized = true;
         CoreMain.Logger.Info(
             $"Stat concept glossary loaded: concepts={Concepts.Count}, "
             + $"generated_images={GeneratedImagePaths.Count}, "
@@ -129,6 +132,12 @@ internal static class StatConceptGlossary
         }
 
         var isContextualEnergy = IsContextualEnergyConcept(concept.Id);
+        if (isContextualEnergy && !_runtimeResourcesInitialized)
+        {
+            display = null!;
+            return false;
+        }
+
         if (isContextualEnergy
             || !GlossaryTextures.TryGetValue(concept.Id, out var texture))
         {
@@ -540,6 +549,9 @@ internal static class StatConceptGlossary
         StatConcept concept,
         int size)
     {
+        if (!_runtimeResourcesInitialized)
+            return RenderFallbackEnergyGained(size);
+
         try
         {
             var generated = GetOrBuildContextualEnergyGainedIcon(concept);
@@ -551,10 +563,13 @@ internal static class StatConceptGlossary
             // have no initialized Godot resource filesystem. Keep tooltip
             // markup usable there, and degrade safely in-game if generating
             // the badged texture ever fails.
-            return $"{RenderImage(StatEnergyIcon.GetCurrentPath(), size)}"
-                   + "[b][color=#8FE34F]+[/color][/b]";
+            return RenderFallbackEnergyGained(size);
         }
     }
+
+    private static string RenderFallbackEnergyGained(int size)
+        => $"{RenderImage(StatEnergyIcon.GetCurrentPath(), size)}"
+           + "[b][color=#8FE34F]+[/color][/b]";
 
     private static ContextualGeneratedIcon GetOrBuildContextualEnergyGainedIcon(
         StatConcept concept)

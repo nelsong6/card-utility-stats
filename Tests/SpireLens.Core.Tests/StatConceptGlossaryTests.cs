@@ -169,6 +169,7 @@ public class StatConceptGlossaryTests
         var unknownRoom = StatConceptGlossary.RenderHintedGlyph("unknown_room");
         var upgraded = StatConceptGlossary.RenderHintedGlyph("upgraded");
         var energy = StatConceptGlossary.RenderHintedGlyph("energy");
+        var energyGained = StatConceptGlossary.RenderHintedGlyph("energy_gained");
         var energyWasted = StatConceptGlossary.RenderHintedGlyph("energy_wasted");
         var wasted = StatConceptGlossary.RenderHintedGlyph("wasted");
         var information = StatConceptGlossary.RenderInformationHint(
@@ -218,6 +219,7 @@ public class StatConceptGlossaryTests
             unknownRoom,
             upgraded,
             energy,
+            energyGained,
             energyWasted,
             wasted,
         };
@@ -375,6 +377,11 @@ public class StatConceptGlossaryTests
         Assert.Contains(
             "res://images/packed/sprite_fonts/ironclad_energy_icon.png",
             energy);
+        Assert.Contains("[hint=\"Energy gained:", energyGained);
+        Assert.Contains(
+            "res://images/packed/sprite_fonts/ironclad_energy_icon.png",
+            energyGained);
+        Assert.Contains("[color=#8FE34F]+", energyGained);
         Assert.Contains("[hint=\"Energy wasted:", energyWasted);
         Assert.Contains(
             "user://SpireLens/generated-icons/energy_wasted-",
