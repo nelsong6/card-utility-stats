@@ -249,9 +249,15 @@ public class PotionRunHistoryTooltipTests
     }
 
     [Fact]
-    public void FortifierBlockPatches_TargetPotionUseAndFinalGainBlockCommand()
+    public void BlockPotionPatches_TargetPotionUsesAndFinalGainBlockCommand()
     {
-        var useTarget = typeof(Fortifier).GetMethod(
+        var blockPotionUseTarget = typeof(BlockPotion).GetMethod(
+            "OnUse",
+            BindingFlags.NonPublic | BindingFlags.Instance,
+            binder: null,
+            types: [typeof(PlayerChoiceContext), typeof(Creature)],
+            modifiers: null);
+        var fortifierUseTarget = typeof(Fortifier).GetMethod(
             "OnUse",
             BindingFlags.NonPublic | BindingFlags.Instance,
             binder: null,
@@ -271,14 +277,16 @@ public class PotionRunHistoryTooltipTests
             ],
             modifiers: null);
 
-        Assert.NotNull(useTarget);
-        Assert.Equal(typeof(Task), useTarget!.ReturnType);
+        Assert.NotNull(blockPotionUseTarget);
+        Assert.Equal(typeof(Task), blockPotionUseTarget!.ReturnType);
+        Assert.NotNull(fortifierUseTarget);
+        Assert.Equal(typeof(Task), fortifierUseTarget!.ReturnType);
         Assert.NotNull(blockTarget);
         Assert.Equal(typeof(Task<decimal>), blockTarget!.ReturnType);
     }
 
     [Fact]
-    public void FortifierBlockGain_RecordsObservedAmountAndZeroOutcomes()
+    public void BlockPotionBlockGain_RecordsObservedAmountAndZeroOutcomes()
     {
         var entry = new PotionRunHistoryEntry();
 
@@ -290,12 +298,12 @@ public class PotionRunHistoryTooltipTests
     }
 
     [Fact]
-    public void FortifierUsedTooltip_ShowsBlockRowsOnlyAtUse()
+    public void BlockPotionUsedTooltip_ShowsBlockRowsOnlyAtUse()
     {
         var entry = new PotionRunHistoryEntry
         {
-            PotionId = "POTION.FORTIFIER",
-            DisplayName = "Fortifier",
+            PotionId = "POTION.BLOCK_POTION",
+            DisplayName = "Block Potion",
             Acquired = true,
             Used = true,
             UsedFloor = 8,

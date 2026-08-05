@@ -4252,8 +4252,8 @@ public static class RunTracker
         entry.CardDrawsBlocked = Math.Max(0, cardsRequested - observed);
     }
 
-    public static void RecordFortifierBlockGain(
-        Fortifier? potion,
+    public static void RecordPotionBlockGain(
+        PotionModel? potion,
         decimal blockGained)
     {
         if (potion?.Owner == null) return;
@@ -4274,7 +4274,7 @@ public static class RunTracker
             catch (Exception e)
             {
                 CoreMain.LogDebug(
-                    $"RecordFortifierBlockGain failed: {e.Message}");
+                    $"RecordPotionBlockGain failed: {e.Message}");
             }
         }
     }
@@ -33084,19 +33084,19 @@ public static class RunTracker
         {
             // Co-op: block gained by a partner (or their summon) must not enter
             // our card/relic aggregates or shared local-player ledger. A
-            // tracked owner's Fortifier can target that partner, however, so
-            // its own observed gain is still retained without a later
+            // tracked owner's block potion can target that partner, however,
+            // so its own observed gain is still retained without a later
             // effective/wasted ledger claim.
             bool isTrackedPlayerReceiver = entry.Receiver.IsPlayer
                 && IsTrackedPlayerCreature(entry.Receiver);
             int? potionSequence = null;
             if (entry.Receiver.IsPlayer
-                && Patches.FortifierBlockFrameTracker.TryGetActiveFortifier(
+                && Patches.PotionBlockFrameTracker.TryGetActivePotion(
                     entry.Receiver,
-                    out var fortifier)
-                && fortifier?.Owner != null
-                && IsTrackedPlayer(fortifier.Owner)
-                && TryGetPotionSequence(fortifier, out var activePotionSequence))
+                    out var blockPotion)
+                && blockPotion?.Owner != null
+                && IsTrackedPlayer(blockPotion.Owner)
+                && TryGetPotionSequence(blockPotion, out var activePotionSequence))
             {
                 potionSequence = activePotionSequence;
             }
