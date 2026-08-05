@@ -1891,6 +1891,20 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void ResumableLoad_AcceptsDingyRugRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("dingy-rug-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.DINGY_RUG"];
+        Assert.Equal(3, relicAgg.CardRewardsAffected);
+        Assert.Equal(6, relicAgg.CardRewardCategories["ironclad"].Count);
+        Assert.Equal("Ironclad", relicAgg.CardRewardCategories["ironclad"].DisplayName);
+        Assert.Equal(3, relicAgg.CardRewardCategories["colorless"].Count);
+        Assert.Equal("Colorless", relicAgg.CardRewardCategories["colorless"].DisplayName);
+    }
+
+    [Fact]
     public void ResumableLoad_AcceptsV32EnemyDamageFixture()
     {
         var resumed = RunStorage.LoadResumable(FixturePath("v32-enemy-damage-run.json"));

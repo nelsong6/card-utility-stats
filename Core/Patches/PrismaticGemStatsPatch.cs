@@ -62,9 +62,41 @@ public static class PrismaticGemModifyCardRewardCreationOptionsPatch
 }
 
 /// <summary>
+/// Counts each ordinary card reward whose creation options Dingy Rug modifies
+/// by adding the Colorless card pool. The native eligibility checks are
+/// repeated here so unrelated reward-option queries are not counted.
+/// </summary>
+[HarmonyPatch(typeof(DingyRug), nameof(DingyRug.ModifyCardRewardCreationOptions))]
+public static class DingyRugModifyCardRewardCreationOptionsPatch
+{
+    [HarmonyPostfix]
+    public static void Postfix(
+        DingyRug __instance,
+        Player player,
+        CardCreationOptions options,
+        CardCreationOptions __result)
+    {
+        try
+        {
+            if (__instance == null || player == null || options == null || __result == null) return;
+            if (__instance.Owner != player) return;
+            if (options.Flags.HasFlag(CardCreationFlags.NoCardPoolModifications)) return;
+            if (!options.Flags.HasFlag(CardCreationFlags.IsCardReward)) return;
+
+            RunTracker.RecordDingyRugCardRewardAffected();
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"DingyRugModifyCardRewardCreationOptionsPatch failed: {e.Message}");
+        }
+    }
+}
+
+/// <summary>
 /// Records the final visible card-option categories in generated card rewards
-/// while Prismatic Gem is owned. This is intentionally observed/meta: another
-/// reward modifier may also have added colorless or off-class options.
+/// while Prismatic Gem or Dingy Rug is owned. This is intentionally
+/// observed/meta: another reward modifier may also have added colorless or
+/// off-class options.
 /// </summary>
 [HarmonyPatch(typeof(Hook), nameof(Hook.TryModifyCardRewardOptions))]
 public static class HookTryModifyCardRewardOptionsPrismaticGemPatch
@@ -75,14 +107,19 @@ public static class HookTryModifyCardRewardOptionsPrismaticGemPatch
         try
         {
             if (player == null || cardRewardOptions == null || cardRewardOptions.Count == 0) return;
-            if (!player.Relics.Any(r => r is PrismaticGem)) return;
+            var hasPrismaticGem = player.Relics.Any(r => r is PrismaticGem);
+            var hasDingyRug = player.Relics.Any(r => r is DingyRug);
+            if (!hasPrismaticGem && !hasDingyRug) return;
 
             var categories = cardRewardOptions
                 .Select(option => ToCategory(option.Card))
                 .Where(category => !string.IsNullOrWhiteSpace(category.Key))
                 .ToList();
 
-            RunTracker.RecordPrismaticGemObservedCardRewardCategories(categories);
+            if (hasPrismaticGem)
+                RunTracker.RecordPrismaticGemObservedCardRewardCategories(categories);
+            if (hasDingyRug)
+                RunTracker.RecordDingyRugObservedCardRewardCategories(categories);
         }
         catch (Exception e)
         {

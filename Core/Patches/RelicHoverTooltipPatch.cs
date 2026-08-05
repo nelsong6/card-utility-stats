@@ -86,7 +86,7 @@ public static class RelicHoverShowPatch
         AccessTools.Field(typeof(OrnamentalFan), "_attacksPlayedThisTurn");
     private static readonly System.Reflection.FieldInfo? ShurikenAttacksPlayedThisTurnField =
         AccessTools.Field(typeof(Shuriken), "_attacksPlayedThisTurn");
-    private static readonly (string Key, string DisplayName)[] PrismaticGemCardPools =
+    private static readonly (string Key, string DisplayName)[] ObservedCardRewardPools =
     [
         ("ironclad", "Ironclad"),
         ("silent", "Silent"),
@@ -910,6 +910,13 @@ public static class RelicHoverShowPatch
         {
             title = "Prismatic Gem";
             body = BuildPrismaticGemBodyBBCode(agg);
+            return true;
+        }
+
+        if (relicModel is DingyRug)
+        {
+            title = "Dingy Rug";
+            body = BuildDingyRugBodyBBCode(agg);
             return true;
         }
 
@@ -2753,21 +2760,37 @@ public static class RelicHoverShowPatch
         var sb = new StringBuilder();
         AppendEnergyGeneratedStats(sb, agg);
         Row3(sb, "Card rewards affected", agg.CardRewardsAffected.ToString(), "");
-        foreach (var (key, displayName) in PrismaticGemCardPools)
+        AppendObservedCardRewardPoolRows(sb, agg, "Prismatic Gem");
+        return sb.ToString();
+    }
+
+    private static string BuildDingyRugBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(sb, "Card rewards affected", agg.CardRewardsAffected.ToString(), "");
+        AppendObservedCardRewardPoolRows(sb, agg, "Dingy Rug");
+        return sb.ToString();
+    }
+
+    private static void AppendObservedCardRewardPoolRows(
+        StringBuilder sb,
+        RelicAggregate agg,
+        string relicName)
+    {
+        foreach (var (key, displayName) in ObservedCardRewardPools)
         {
-            var count = GetPrismaticGemCardPoolOfferCount(agg, key);
+            var count = GetObservedCardRewardPoolOfferCount(agg, key);
             DescribedIconRow(
                 sb,
                 ["card", "offered"],
                 [],
                 displayName,
                 count.ToString(),
-                $"{displayName} cards offered — final visible {displayName} card options in rewards while Prismatic Gem was held.");
+                $"{displayName} cards offered — final visible {displayName} card options in rewards while {relicName} was held.");
         }
-        return sb.ToString();
     }
 
-    private static int GetPrismaticGemCardPoolOfferCount(RelicAggregate agg, string key)
+    private static int GetObservedCardRewardPoolOfferCount(RelicAggregate agg, string key)
     {
         var legacyKey = $"{key}_card_pool";
         return agg.CardRewardCategories

@@ -640,6 +640,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `gremlin-horn-relic-run.json`
   Adds Gremlin Horn's tracking-window activation numerator and zero-inclusive
   held turn/combat denominators alongside its observed Energy and card draws.
+- `dingy-rug-relic-run.json`
+  Adds Dingy Rug's affected card rewards and final visible card offers split
+  across the five character pools and the Colorless pool.
 
 Why these exist:
 

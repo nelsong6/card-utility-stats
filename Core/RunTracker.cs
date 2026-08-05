@@ -9332,6 +9332,7 @@ public static class RunTracker
     private const string HornCleatRelicId = "RELIC.HORN_CLEAT";
     private const string CaptainsWheelRelicId = "RELIC.CAPTAINS_WHEEL";
     private const string PrismaticGemRelicId = "RELIC.PRISMATIC_GEM";
+    private const string DingyRugRelicId = "RELIC.DINGY_RUG";
     private const string PumpkinCandleRelicId = "RELIC.PUMPKIN_CANDLE";
     private const string SpikedGauntletsRelicId = "RELIC.SPIKED_GAUNTLETS";
     private const string SealOfGoldRelicId = "RELIC.SEAL_OF_GOLD";
@@ -26401,6 +26402,15 @@ public static class RunTracker
     /// committed run instead of waiting for a combat boundary.
     /// </summary>
     public static void RecordPrismaticGemCardRewardAffected()
+        => RecordCardPoolRelicCardRewardAffected(PrismaticGemRelicId, nameof(RecordPrismaticGemCardRewardAffected));
+
+    /// <summary>
+    /// Record that Dingy Rug modified one card reward's creation options.
+    /// </summary>
+    public static void RecordDingyRugCardRewardAffected()
+        => RecordCardPoolRelicCardRewardAffected(DingyRugRelicId, nameof(RecordDingyRugCardRewardAffected));
+
+    private static void RecordCardPoolRelicCardRewardAffected(string relicId, string operationName)
     {
         lock (_lock)
         {
@@ -26408,10 +26418,10 @@ public static class RunTracker
             {
                 EnsureLazyCurrentRunLocked();
 
-                if (!_currentRun.RelicAggregates.TryGetValue(PrismaticGemRelicId, out var agg))
+                if (!_currentRun.RelicAggregates.TryGetValue(relicId, out var agg))
                 {
                     agg = new RelicAggregate();
-                    _currentRun.RelicAggregates[PrismaticGemRelicId] = agg;
+                    _currentRun.RelicAggregates[relicId] = agg;
                 }
 
                 agg.CardRewardsAffected += 1;
@@ -26420,7 +26430,7 @@ public static class RunTracker
             }
             catch (Exception e)
             {
-                CoreMain.LogDebug($"RecordPrismaticGemCardRewardAffected failed: {e.Message}");
+                CoreMain.LogDebug($"{operationName} failed: {e.Message}");
             }
         }
     }
@@ -26431,6 +26441,26 @@ public static class RunTracker
     /// may also have participated in producing the final visible options.
     /// </summary>
     public static void RecordPrismaticGemObservedCardRewardCategories(IEnumerable<CardRewardCategoryObservation> categories)
+        => RecordCardPoolRelicObservedCardRewardCategories(
+            PrismaticGemRelicId,
+            categories,
+            nameof(RecordPrismaticGemObservedCardRewardCategories));
+
+    /// <summary>
+    /// Record final visible card reward options by pool/category while Dingy
+    /// Rug is owned. As with Prismatic Gem, this is observed/meta rather than
+    /// sole relic attribution.
+    /// </summary>
+    public static void RecordDingyRugObservedCardRewardCategories(IEnumerable<CardRewardCategoryObservation> categories)
+        => RecordCardPoolRelicObservedCardRewardCategories(
+            DingyRugRelicId,
+            categories,
+            nameof(RecordDingyRugObservedCardRewardCategories));
+
+    private static void RecordCardPoolRelicObservedCardRewardCategories(
+        string relicId,
+        IEnumerable<CardRewardCategoryObservation> categories,
+        string operationName)
     {
         lock (_lock)
         {
@@ -26438,10 +26468,10 @@ public static class RunTracker
             {
                 EnsureLazyCurrentRunLocked();
 
-                if (!_currentRun.RelicAggregates.TryGetValue(PrismaticGemRelicId, out var agg))
+                if (!_currentRun.RelicAggregates.TryGetValue(relicId, out var agg))
                 {
                     agg = new RelicAggregate();
-                    _currentRun.RelicAggregates[PrismaticGemRelicId] = agg;
+                    _currentRun.RelicAggregates[relicId] = agg;
                 }
 
                 foreach (var category in categories)
@@ -26454,7 +26484,7 @@ public static class RunTracker
             }
             catch (Exception e)
             {
-                CoreMain.LogDebug($"RecordPrismaticGemObservedCardRewardCategories failed: {e.Message}");
+                CoreMain.LogDebug($"{operationName} failed: {e.Message}");
             }
         }
     }
