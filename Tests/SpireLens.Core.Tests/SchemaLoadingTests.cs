@@ -6499,6 +6499,37 @@ public class SchemaLoadingTests
         Assert.Equal(1, relic.LastingCandyRarePowersRejected);
     }
 
+    [Fact]
+    public void HistoricalLoad_AcceptsGremlinHornRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("gremlin-horn-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertGremlinHornFixture(loaded.Data);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsGremlinHornRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("gremlin-horn-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertGremlinHornFixture(resumed!);
+    }
+
+    private static void AssertGremlinHornFixture(RunData run)
+    {
+        var relic = run.RelicAggregates["RELIC.GREMLIN_HORN"];
+        Assert.Equal(6, relic.Activations);
+        Assert.Equal(5, relic.EnergyGenerated);
+        Assert.Equal(4, relic.AdditionalCardsDrawn);
+        Assert.Equal(8, relic.GremlinHornTurns);
+        Assert.Equal(3, relic.GremlinHornCombats);
+    }
+
     private static void AssertSplashFixture(CardAggregate cardAgg)
     {
         Assert.Equal(6, cardAgg.SplashAttacksTaken);

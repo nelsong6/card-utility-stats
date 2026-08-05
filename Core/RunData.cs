@@ -1003,6 +1003,11 @@ public class RelicAggregate
     public int AdditionalCardsDrawn { get; set; }
     public int AdditionalCardDrawsBlocked { get; set; }
 
+    // Gremlin Horn's zero-inclusive held-period denominators. Activations,
+    // observed Energy, and observed draws use the shared fields above/below.
+    public int GremlinHornTurns { get; set; }
+    public int GremlinHornCombats { get; set; }
+
     // Game Piece's zero-inclusive held-period denominators. Its observed
     // draw total uses AdditionalCardsDrawn.
     public int GamePieceTurns { get; set; }

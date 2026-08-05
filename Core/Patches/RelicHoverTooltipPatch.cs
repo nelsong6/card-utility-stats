@@ -2445,9 +2445,28 @@ public static class RelicHoverShowPatch
     private static string BuildGremlinHornBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
+        var activationsPerTurn = agg.GremlinHornTurns <= 0
+            ? 0m
+            : (decimal)agg.Activations / agg.GremlinHornTurns;
+        var activationsPerCombat = agg.GremlinHornCombats <= 0
+            ? 0m
+            : (decimal)agg.Activations / agg.GremlinHornCombats;
+
         RelicActivationRow(sb, agg.Activations.ToString());
-        AppendEnergyGeneratedStats(sb, agg);
+        AppendEnergyGeneratedStats(sb, agg, totalLabel: "Energy gained");
         Row3(sb, "Cards drawn", agg.AdditionalCardsDrawn.ToString(), "");
+        Row3(
+            sb,
+            "Avg activations per turn",
+            FormatDecimal(activationsPerTurn),
+            "",
+            "Average activations per turn — observed Gremlin Horn activations divided by player turns in which it was held, including zero-activation turns.");
+        Row3(
+            sb,
+            "Avg activations per combat",
+            FormatDecimal(activationsPerCombat),
+            "",
+            "Average activations per combat — observed Gremlin Horn activations divided by combats in which it was held, including zero-activation combats.");
         return sb.ToString();
     }
 

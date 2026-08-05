@@ -2365,6 +2365,7 @@ public static class RunTracker
         RecordRippleBasinTurnForTrackedPlayerLocked();
         RecordThreeAttackScalingRelicsTurnForTrackedPlayerLocked();
         RecordOrnamentalFanTurnForTrackedPlayerLocked();
+        RecordGremlinHornTurnForTrackedPlayerLocked();
         RecordReptileTrinketTurnForTrackedPlayerLocked();
         RecordRainbowRingTurnForTrackedPlayerLocked();
         RecordBeatingRemnantTurnForTrackedPlayerLocked();
@@ -2584,6 +2585,8 @@ public static class RunTracker
         target.WeakApplied += source.WeakApplied;
         MergeAppliedEffectsInto(target.AppliedEffects, source.AppliedEffects);
         target.AdditionalCardsDrawn += source.AdditionalCardsDrawn;
+        target.GremlinHornTurns += source.GremlinHornTurns;
+        target.GremlinHornCombats += source.GremlinHornCombats;
         target.GamePieceTurns += source.GamePieceTurns;
         target.GamePieceCombats += source.GamePieceCombats;
         target.CentennialPuzzleActivationTurnTotal +=
@@ -23609,7 +23612,8 @@ public static class RunTracker
             try
             {
                 _pendingCombat ??= new PendingCombat();
-                var agg = GetOrCreateRelicAggregateLocked(GremlinHornRelicId);
+                RecordGremlinHornTurnForPlayerLocked(owner);
+                var agg = GetOrCreatePendingRelicAggregateLocked(GremlinHornRelicId);
                 agg.Activations += 1;
                 int hc = CurrentHistoryCountLocked();
                 // Owner-keyed one-shot energy + draw windows (resolve async after
@@ -23624,6 +23628,47 @@ public static class RunTracker
                 CoreMain.LogDebug($"ArmGremlinHornAttribution failed: {e.Message}");
             }
         }
+    }
+
+    /// <summary>
+    /// Counts every player turn where Gremlin Horn is held, including turns
+    /// with no eligible enemy-death activation.
+    /// </summary>
+    public static void RecordGremlinHornTurnStarted(Player player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                if (CombatManager.Instance?.IsInProgress != true) return;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordGremlinHornTurnForPlayerLocked(player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordGremlinHornTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordGremlinHornTurnForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.GremlinHornTurns += Math.Max(0, count);
+    }
+
+    internal static void RecordGremlinHornCombatForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.GremlinHornCombats += Math.Max(0, count);
     }
 
     /// <summary>Single arbitration point for player energy gains at
@@ -27770,6 +27815,7 @@ public static class RunTracker
             RecordDaughterOfTheWindCombatForPlayerLocked(player);
             RecordThreeAttackScalingRelicsCombatForPlayerLocked(player);
             RecordOrnamentalFanCombatForPlayerLocked(player);
+            RecordGremlinHornCombatForPlayerLocked(player);
             RecordSturdyClampCombatForPlayerLocked(player);
             RecordBeatingRemnantCombatForPlayerLocked(player);
             RecordWhisperingEarringCombatForPlayerLocked(player);
@@ -28279,6 +28325,52 @@ public static class RunTracker
 
         var agg = GetOrCreatePendingRelicAggregateLocked(RippleBasinRelicId);
         RecordRippleBasinTurnForTest(agg);
+    }
+
+    private static void RecordGremlinHornCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasGremlinHorn(player)) return;
+        if (!_pendingCombat.GremlinHornCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(GremlinHornRelicId);
+        RecordGremlinHornCombatForTest(agg);
+    }
+
+    private static void RecordGremlinHornTurnForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordGremlinHornTurnForPlayerLocked(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordGremlinHornTurnForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordGremlinHornTurnForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasGremlinHorn(player)) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.GremlinHornTurnCountedTurns.TryGetValue(
+                player,
+                out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.GremlinHornTurnCountedTurns[player] = turnNumber;
+        RecordGremlinHornCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(GremlinHornRelicId);
+        RecordGremlinHornTurnForTest(agg);
     }
 
     private static void RecordReptileTrinketCombatForPlayerLocked(Player player)
@@ -29752,6 +29844,18 @@ public static class RunTracker
         try
         {
             return player.Relics.Any(r => r is Permafrost);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool PlayerHasGremlinHorn(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is GremlinHorn);
         }
         catch
         {
@@ -35711,6 +35815,10 @@ internal class PendingCombat
     public HashSet<Player> RippleBasinCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> RippleBasinTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> GremlinHornCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> GremlinHornTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> ReptileTrinketCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

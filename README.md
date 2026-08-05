@@ -205,6 +205,8 @@ Lift count across every floor held, and average floor travel from acquisition
 to the first Lift and between later Lifts.
 Lasting Candy records each exact Power it adds to a combat card reward and
 whether that option was taken or rejected, with Uncommon and Rare splits.
+Gremlin Horn records its exact activations, observed Energy and card draws,
+plus average activations across zero-inclusive held turns and combats.
 Small Capsule records the exact relic rolled on its reward screen and whether
 that same reward was taken or left behind, with the relic remaining hoverable
 in the SpireLens tooltip.

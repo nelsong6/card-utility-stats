@@ -20,5 +20,6 @@ internal static class HookAfterPlayerTurnStartMetaPowerStatsPatch
         RunTracker.RecordOrnamentalFanTurnStarted(player);
         RunTracker.RecordSpikedGauntletsTurnStarted(player);
         RunTracker.RecordGamePieceTurnStarted(player);
+        RunTracker.RecordGremlinHornTurnStarted(player);
     }
 }
