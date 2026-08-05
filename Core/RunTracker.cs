@@ -3070,6 +3070,8 @@ public static class RunTracker
         target.LastingCandyRarePowersOffered += source.LastingCandyRarePowersOffered;
         target.LastingCandyRarePowersTaken += source.LastingCandyRarePowersTaken;
         target.LastingCandyRarePowersRejected += source.LastingCandyRarePowersRejected;
+        target.LastingCandyEliteActivations += source.LastingCandyEliteActivations;
+        target.LastingCandyBossActivations += source.LastingCandyBossActivations;
         MergeCardRewardScreens(target, source);
         MergeOrreryRewards(target, source);
         MergeCardRewardCategories(target.CardRewardCategories, source.CardRewardCategories);
@@ -25431,7 +25433,12 @@ public static class RunTracker
                 if (!IsTrackedPlayer(reward.Player)) return;
                 if (_lastingCandyRewards.ContainsKey(reward)) return;
 
-                var pending = PendingLastingCandyReward.FromReward(reward);
+                var runState = reward.Player?.RunState ?? RunManager.Instance?.State;
+                var room = runState?.BaseRoom
+                           ?? RunManager.Instance?.State?.CurrentRoom;
+                var pending = PendingLastingCandyReward.FromReward(
+                    reward,
+                    room?.RoomType);
                 if (pending.Options.Count > 0)
                     _lastingCandyRewards[reward] = pending;
             }
@@ -25468,7 +25475,8 @@ public static class RunTracker
                     RecordLastingCandyPowerOutcomeForTest(
                         agg,
                         option.Rarity,
-                        taken: !remaining.Contains(option.Result));
+                        taken: !remaining.Contains(option.Result),
+                        roomType: pending.RoomType);
                 }
 
                 RefreshCurrentRunMetadataLocked();
@@ -25491,7 +25499,8 @@ public static class RunTracker
     internal static void RecordLastingCandyPowerOutcomeForTest(
         RelicAggregate agg,
         CardRarity rarity,
-        bool taken)
+        bool taken,
+        RoomType? roomType = null)
     {
         if (agg == null) return;
 
@@ -25500,6 +25509,11 @@ public static class RunTracker
             agg.LastingCandyPowersTaken += 1;
         else
             agg.LastingCandyPowersRejected += 1;
+
+        if (roomType == RoomType.Elite)
+            agg.LastingCandyEliteActivations += 1;
+        else if (roomType == RoomType.Boss)
+            agg.LastingCandyBossActivations += 1;
 
         switch (rarity)
         {
@@ -35483,10 +35497,13 @@ internal sealed record PendingLastingCandyOption(
 internal sealed class PendingLastingCandyReward
 {
     public List<PendingLastingCandyOption> Options { get; } = new();
+    public RoomType? RoomType { get; private init; }
 
-    public static PendingLastingCandyReward FromReward(CardReward? reward)
+    public static PendingLastingCandyReward FromReward(
+        CardReward? reward,
+        RoomType? roomType)
     {
-        var pending = new PendingLastingCandyReward();
+        var pending = new PendingLastingCandyReward { RoomType = roomType };
         if (reward == null) return pending;
 
         foreach (var option in reward._cards)

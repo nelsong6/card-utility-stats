@@ -6497,6 +6497,8 @@ public class SchemaLoadingTests
         Assert.Equal(2, relic.LastingCandyRarePowersOffered);
         Assert.Equal(1, relic.LastingCandyRarePowersTaken);
         Assert.Equal(1, relic.LastingCandyRarePowersRejected);
+        Assert.Equal(2, relic.LastingCandyEliteActivations);
+        Assert.Equal(1, relic.LastingCandyBossActivations);
     }
 
     [Fact]

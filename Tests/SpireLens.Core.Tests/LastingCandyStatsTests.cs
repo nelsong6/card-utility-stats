@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Models.Relics;
+using MegaCrit.Sts2.Core.Rooms;
 using SpireLens.Core;
 using SpireLens.Core.Patches;
 using Xunit;
@@ -53,6 +54,8 @@ public class LastingCandyStatsTests
         Assert.Contains("\"lasting_candy_powers_rejected\"", json);
         Assert.Contains("\"lasting_candy_uncommon_powers_offered\"", json);
         Assert.Contains("\"lasting_candy_rare_powers_rejected\"", json);
+        Assert.Contains("\"lasting_candy_elite_activations\"", json);
+        Assert.Contains("\"lasting_candy_boss_activations\"", json);
         Assert.NotNull(restored);
         AssertAggregate(restored!.RelicAggregates[RelicId], expectedScale: 1);
     }
@@ -63,15 +66,15 @@ public class LastingCandyStatsTests
         var agg = new RelicAggregate();
 
         RunTracker.RecordLastingCandyPowerOutcomeForTest(
-            agg, CardRarity.Uncommon, taken: true);
+            agg, CardRarity.Uncommon, taken: true, roomType: RoomType.Elite);
         RunTracker.RecordLastingCandyPowerOutcomeForTest(
-            agg, CardRarity.Uncommon, taken: false);
+            agg, CardRarity.Uncommon, taken: false, roomType: RoomType.Boss);
         RunTracker.RecordLastingCandyPowerOutcomeForTest(
-            agg, CardRarity.Uncommon, taken: false);
+            agg, CardRarity.Uncommon, taken: false, roomType: RoomType.Monster);
         RunTracker.RecordLastingCandyPowerOutcomeForTest(
-            agg, CardRarity.Rare, taken: true);
+            agg, CardRarity.Rare, taken: true, roomType: RoomType.Elite);
         RunTracker.RecordLastingCandyPowerOutcomeForTest(
-            agg, CardRarity.Rare, taken: false);
+            agg, CardRarity.Rare, taken: false, roomType: RoomType.Monster);
 
         AssertAggregate(agg, expectedScale: 1);
     }
@@ -96,17 +99,25 @@ public class LastingCandyStatsTests
         Assert.Contains(StatConceptGlossary.RenderHintedGlyph("power_rare"), body);
         Assert.Contains(StatConceptGlossary.RenderHintedGlyph("offered"), body);
         Assert.Contains(StatConceptGlossary.RenderHintedGlyph("taken"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("activation"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("in"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("all"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("elite"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("combat"), body);
         Assert.Contains(RenderNotTaken(), body);
         Assert.Contains("Powers offered", body);
         Assert.Contains("Powers taken", body);
         Assert.Contains("Powers rejected", body);
         Assert.Contains("Uncommon Powers offered", body);
         Assert.Contains("Rare Lasting Candy Powers rejected", body);
+        Assert.Contains("Elite activations", body);
+        Assert.Contains("Boss activations", body);
+        Assert.Contains("Boss", body);
         Assert.Contains("[b]5[/b]", body);
         Assert.Contains("[b]3[/b]", body);
         Assert.Contains("[b]2[/b]", body);
         Assert.Equal(1, body.Split("[table=4]", StringSplitOptions.None).Length - 1);
-        Assert.Equal(9, body.Split("[left][b]", StringSplitOptions.None).Length - 1);
+        Assert.Equal(11, body.Split("[left][b]", StringSplitOptions.None).Length - 1);
         Assert.DoesNotContain("[table=2]", body);
         Assert.DoesNotContain("not ", body);
     }
@@ -144,6 +155,8 @@ public class LastingCandyStatsTests
         LastingCandyRarePowersOffered = 2,
         LastingCandyRarePowersTaken = 1,
         LastingCandyRarePowersRejected = 1,
+        LastingCandyEliteActivations = 2,
+        LastingCandyBossActivations = 1,
     };
 
     private static void AssertAggregate(RelicAggregate agg, int expectedScale)
@@ -157,6 +170,8 @@ public class LastingCandyStatsTests
         Assert.Equal(2 * expectedScale, agg.LastingCandyRarePowersOffered);
         Assert.Equal(1 * expectedScale, agg.LastingCandyRarePowersTaken);
         Assert.Equal(1 * expectedScale, agg.LastingCandyRarePowersRejected);
+        Assert.Equal(2 * expectedScale, agg.LastingCandyEliteActivations);
+        Assert.Equal(1 * expectedScale, agg.LastingCandyBossActivations);
     }
 
     private static string RenderNotTaken()

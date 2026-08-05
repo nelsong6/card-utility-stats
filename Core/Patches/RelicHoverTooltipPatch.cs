@@ -2994,6 +2994,20 @@ public static class RelicHoverShowPatch
             "rejected",
             agg.LastingCandyPowersRejected,
             "Powers rejected — Lasting Candy Power options not taken before their reward resolved or rerolled.");
+        DescribedIconRow(
+            sb,
+            ["activation", "in", "all", "elite"],
+            [],
+            "",
+            agg.LastingCandyEliteActivations.ToString(),
+            "Elite activations — Lasting Candy Power options added to card rewards after Elite combats.");
+        DescribedIconRow(
+            sb,
+            ["activation"],
+            [],
+            $"{StatConceptGlossary.RenderHintedGlyph("in")} {StatConceptGlossary.RenderHintedGlyph("all")} Boss {StatConceptGlossary.RenderHintedGlyph("combat")}",
+            agg.LastingCandyBossActivations.ToString(),
+            "Boss activations — Lasting Candy Power options added to card rewards after Boss combats.");
         LastingCandyPowerRow(
             sb,
             "power_uncommon",

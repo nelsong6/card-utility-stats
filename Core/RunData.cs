@@ -1943,7 +1943,8 @@ public class RelicAggregate
     // Lasting Candy card-reward outcomes. Each count comes from the exact
     // Power CardCreationResult the relic appended to a triggering combat
     // reward; rejected means that result remained when the reward resolved or
-    // was replaced by a reroll.
+    // was replaced by a reroll. Elite/Boss activations classify those exact
+    // appended options by the combat room that produced their reward.
     public int LastingCandyPowersOffered { get; set; }
     public int LastingCandyPowersTaken { get; set; }
     public int LastingCandyPowersRejected { get; set; }
@@ -1953,6 +1954,8 @@ public class RelicAggregate
     public int LastingCandyRarePowersOffered { get; set; }
     public int LastingCandyRarePowersTaken { get; set; }
     public int LastingCandyRarePowersRejected { get; set; }
+    public int LastingCandyEliteActivations { get; set; }
+    public int LastingCandyBossActivations { get; set; }
 
     // Ordered relic-owned card-choice offers. Silver Crucible uses its
     // one-based use number (1-3); Lead Paperweight uses screen 1. Cards keeps

@@ -15,7 +15,9 @@
       "lasting_candy_uncommon_powers_rejected": 2,
       "lasting_candy_rare_powers_offered": 2,
       "lasting_candy_rare_powers_taken": 1,
-      "lasting_candy_rare_powers_rejected": 1
+      "lasting_candy_rare_powers_rejected": 1,
+      "lasting_candy_elite_activations": 2,
+      "lasting_candy_boss_activations": 1
     }
   },
   "meta_stats": {},

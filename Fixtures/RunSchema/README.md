@@ -635,7 +635,7 @@ New fixtures added going forward do not need a `v*-` prefix.
   floor counter samples, and successful-Lift floor pacing.
 - `lasting-candy-relic-run.json`
   Adds Lasting Candy's exact Power offers and terminal taken/rejected outcomes,
-  split into Uncommon and Rare rarity buckets.
+  split into Uncommon/Rare rarity buckets and Elite/Boss activation contexts.
 - `gremlin-horn-relic-run.json`
   Adds Gremlin Horn's tracking-window activation numerator and zero-inclusive
   held turn/combat denominators alongside its observed Energy and card draws.
