@@ -6312,6 +6312,62 @@ public class SchemaLoadingTests
         Assert.Equal(2, relicAgg.GamePieceCombats);
     }
 
+    [Fact]
+    public void HistoricalLoad_AcceptsRandomCardGenerationFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("random-card-generation-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertRandomCardGenerationFixture(loaded.Data);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsRandomCardGenerationFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("random-card-generation-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertRandomCardGenerationFixture(resumed!);
+    }
+
+    private static void AssertRandomCardGenerationFixture(RunData run)
+    {
+        var cardGeneration = run.Aggregates["CARD.METAMORPHOSIS#1"]
+            .RandomCardGeneration!;
+        Assert.Equal(6, cardGeneration.CardsGenerated);
+        Assert.Equal(4, cardGeneration.GeneratedCardsPlayed);
+        Assert.Equal(5, cardGeneration.GeneratedCardPlays);
+        Assert.Equal(2, cardGeneration.CommonCardsGenerated);
+        Assert.Equal(3, cardGeneration.UncommonCardsGenerated);
+        Assert.Equal(1, cardGeneration.RareCardsGenerated);
+        Assert.Equal(6, cardGeneration.AttacksGenerated);
+        Assert.Equal(3, cardGeneration.UpgradedCardsGenerated);
+        Assert.Equal(11, cardGeneration.EnergyCostBeforeDiscountTotal);
+        Assert.Equal(11, cardGeneration.EnergyDiscountGrantedTotal);
+        Assert.Equal(6, cardGeneration.CardsAddedToDrawPile);
+        Assert.Equal(
+            3,
+            cardGeneration.CardsById["CARD.STRIKE_IRONCLAD"].Plays);
+
+        var power = run.MetaStats.PowerAggregates["POWER.CREATIVE_AI"];
+        Assert.Equal(10, power.MetaDeckTurns);
+        Assert.Equal(7, power.MetaActiveTurns);
+        Assert.Equal(11, power.MetaActiveApplicationTurns);
+        var powerGeneration = power.RandomCardGeneration!;
+        Assert.Equal(7, powerGeneration.CardsGenerated);
+        Assert.Equal(3, powerGeneration.GeneratedCardsPlayed);
+        Assert.Equal(4, powerGeneration.GeneratedCardPlays);
+        Assert.Equal(7, powerGeneration.PowersGenerated);
+        Assert.Equal(17, powerGeneration.EnergyCostBeforeDiscountTotal);
+        Assert.Equal(7, powerGeneration.CardsAddedToHand);
+        Assert.Equal(
+            2,
+            powerGeneration.CardsById["CARD.ECHO_FORM"].Plays);
+    }
+
     private static void AssertSplashFixture(CardAggregate cardAgg)
     {
         Assert.Equal(6, cardAgg.SplashAttacksTaken);

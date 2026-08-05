@@ -111,6 +111,10 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `splash-card-run.json`
   Adds Splash selected-Attack totals, common/uncommon/rare splits, and the
   numerator for average observed energy discount.
+- `random-card-generation-run.json`
+  Adds the shared successful-arrival, exact generated-card utilization,
+  rarity/type/cost/discount/destination, and per-definition ledger shape for
+  direct random generators and recurring shared Power generators.
 - `feed-card-run.json`
   Adds Feed's observed maximum-HP gain to the physical card aggregate after
   its Fatal play callback completes successfully.

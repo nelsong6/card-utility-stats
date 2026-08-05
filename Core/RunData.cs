@@ -359,6 +359,58 @@ public class PotionRunHistoryEntry
     public int? HeldAtRunEndFloor { get; set; }
 }
 
+/// <summary>
+/// One definition within a random-generator outcome ledger. Generated counts
+/// successful arrivals; generated-cards-played counts distinct physical
+/// generated cards used at least once; plays includes replays.
+/// </summary>
+public class GeneratedCardOutcomeAggregate
+{
+    public string CardId { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public int Generated { get; set; }
+    public int GeneratedCardsPlayed { get; set; }
+    public int Plays { get; set; }
+}
+
+/// <summary>
+/// Shared observed-outcome shape for cards and Powers that select a random
+/// combat card. Exact generated-card objects are followed only within their
+/// combat; this additive aggregate is the durable run summary.
+/// </summary>
+public class RandomCardGenerationAggregate
+{
+    public int CardsGenerated { get; set; }
+    public int GeneratedCardsPlayed { get; set; }
+    public int GeneratedCardPlays { get; set; }
+
+    public int BasicCardsGenerated { get; set; }
+    public int CommonCardsGenerated { get; set; }
+    public int UncommonCardsGenerated { get; set; }
+    public int RareCardsGenerated { get; set; }
+    public int StatusCardsGenerated { get; set; }
+    public int CurseCardsGenerated { get; set; }
+    public int OtherRarityCardsGenerated { get; set; }
+
+    public int AttacksGenerated { get; set; }
+    public int SkillsGenerated { get; set; }
+    public int PowersGenerated { get; set; }
+    public int OtherTypeCardsGenerated { get; set; }
+
+    public int UpgradedCardsGenerated { get; set; }
+    public int XCostCardsGenerated { get; set; }
+    public int EnergyCostBeforeDiscountTotal { get; set; }
+    public int EnergyDiscountGrantedTotal { get; set; }
+
+    public int CardsAddedToHand { get; set; }
+    public int CardsAddedToDrawPile { get; set; }
+    public int CardsAddedToDiscardPile { get; set; }
+    public int CardsAddedElsewhere { get; set; }
+
+    public Dictionary<string, GeneratedCardOutcomeAggregate> CardsById { get; set; }
+        = new();
+}
+
 /// <summary>Aggregated per-card attribution stats for this run.</summary>
 public class CardAggregate
 {
@@ -417,6 +469,11 @@ public class CardAggregate
     public int UncommonPotionsGained { get; set; }
     public int RarePotionsGained { get; set; }
     public int PotionsSkipped { get; set; }
+
+    // Shared random-card generation outcomes. This supplements bespoke
+    // choice-screen details (Discovery and Splash) with one consistent,
+    // successful-arrival and later-utilization model across the whole family.
+    public RandomCardGenerationAggregate? RandomCardGeneration { get; set; }
 
     // Jack of All Trades generated-card outcomes. The total counts only cards
     // that the combat pile command confirms were added. Rarity/type buckets
@@ -725,6 +782,12 @@ public class PowerAggregate
     public int MetaDeckTurns { get; set; }
     public int MetaActiveTurns { get; set; }
     public int MetaActiveApplicationTurns { get; set; }
+
+    // Random cards created by recurring Power callbacks. These belong to the
+    // shared Power identity rather than whichever physical card first applied
+    // the stack. MetaActiveTurns and MetaActiveApplicationTurns provide the
+    // zero-inclusive denominators.
+    public RandomCardGenerationAggregate? RandomCardGeneration { get; set; }
 
     // Matching observation-era numerators for the three meta-power rate
     // denominators above. Lifetime totals predate these denominators in saved

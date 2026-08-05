@@ -380,6 +380,7 @@ public static class CardHoverShowPatch
         AppendSoulPileStats(sb, agg);
         AppendPhysicalMetaPowerSummary(sb, cardModel, metaStats);
         AppendAlchemizePotionStats(sb, cardModel, agg, compact: false);
+        AppendRandomCardGenerationStats(sb, cardModel, agg, compact: false);
         AppendJackOfAllTradesStats(sb, cardModel, agg, compact: false);
         AppendDiscoveryStats(sb, cardModel, agg, compact: false);
         AppendSplashStats(sb, cardModel, agg);
@@ -608,6 +609,7 @@ public static class CardHoverShowPatch
         AppendSoulPileStats(sb, agg);
         AppendPhysicalMetaPowerSummary(sb, cardModel, metaStats);
         AppendAlchemizePotionStats(sb, cardModel, agg, compact: true);
+        AppendRandomCardGenerationStats(sb, cardModel, agg, compact: true);
         AppendJackOfAllTradesStats(sb, cardModel, agg, compact: true);
         AppendDiscoveryStats(sb, cardModel, agg, compact: true);
         AppendSplashStats(sb, cardModel, agg);
@@ -823,6 +825,17 @@ public static class CardHoverShowPatch
         RunMetaStats metaStats,
         bool detailed)
     {
+        if (RandomCardGenerationRegistry.IsRecurringPowerId(
+                definition.PowerId))
+        {
+            AppendRandomCardGenerationOutcomeStats(
+                sb,
+                aggregate.RandomCardGeneration,
+                compact: !detailed,
+                combatsInDeck: 0,
+                metaPowerAggregate: aggregate);
+        }
+
         switch (definition.PowerId)
         {
             case JugglingPowerId:
@@ -1104,6 +1117,196 @@ public static class CardHoverShowPatch
         Row3(sb, "rare potions", agg.RarePotionsGained.ToString(), "");
     }
 
+    private static void AppendRandomCardGenerationStats(
+        StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel card,
+        CardAggregate agg,
+        bool compact)
+    {
+        if (!RandomCardGenerationRegistry.IsDirectGenerator(card)) return;
+
+        AppendRandomCardGenerationOutcomeStats(
+            sb,
+            agg.RandomCardGeneration,
+            compact,
+            agg.CombatsInDeck,
+            metaPowerAggregate: null);
+    }
+
+    private static void AppendRandomCardGenerationOutcomeStats(
+        StringBuilder sb,
+        RandomCardGenerationAggregate? generation,
+        bool compact,
+        int combatsInDeck,
+        PowerAggregate? metaPowerAggregate)
+    {
+        generation ??= new RandomCardGenerationAggregate();
+        var utilization = generation.CardsGenerated <= 0
+            ? 0m
+            : 100m * generation.GeneratedCardsPlayed / generation.CardsGenerated;
+
+        Row3(
+            sb,
+            "Cards generated",
+            generation.CardsGenerated.ToString(),
+            "",
+            "Cards that successfully entered a combat pile from this random-card generator.");
+        Row3(
+            sb,
+            "Generated cards played",
+            generation.GeneratedCardsPlayed.ToString(),
+            $"{utilization:0}%",
+            "Distinct physical generated cards that completed at least one play; the percentage is generated-card utilization.");
+
+        if (compact) return;
+
+        if (generation.GeneratedCardPlays > generation.GeneratedCardsPlayed)
+        {
+            Row3(
+                sb,
+                "All generated card plays",
+                generation.GeneratedCardPlays.ToString(),
+                "",
+                "Every completed play of a generated card, including replays of the same physical card.");
+        }
+
+        if (metaPowerAggregate == null)
+        {
+            var generatedPerCombat = combatsInDeck <= 0
+                ? 0m
+                : (decimal)generation.CardsGenerated / combatsInDeck;
+            Row3(
+                sb,
+                "Avg cards generated per combat",
+                FormatDecimal(generatedPerCombat),
+                "",
+                "Average successful generated-card arrivals across every combat this physical source card was in the deck, including combats with none.");
+        }
+        else
+        {
+            Row3(
+                sb,
+                "Avg cards generated per turn",
+                FormatDecimal(DivideMetaPowerRate(
+                    generation.CardsGenerated,
+                    metaPowerAggregate.MetaDeckTurns)),
+                "",
+                "Average generated cards per turn in combats where this Power card was in the permanent deck, including turns before activation.");
+            Row3(
+                sb,
+                "Avg cards generated while active per turn",
+                FormatDecimal(DivideMetaPowerRate(
+                    generation.CardsGenerated,
+                    metaPowerAggregate.MetaActiveTurns)),
+                "",
+                "Average generated cards per turn while at least one stack of the shared Power was active, including zero-output active turns.");
+            Row3(
+                sb,
+                "Avg cards generated per turn each active application",
+                FormatDecimal(DivideMetaPowerRate(
+                    generation.CardsGenerated,
+                    metaPowerAggregate.MetaActiveApplicationTurns)),
+                "",
+                "Average generated cards per active Power application per turn, so stacked applications contribute separately to the denominator.");
+        }
+
+        if (generation.CardsGenerated > 0
+            && (generation.EnergyCostBeforeDiscountTotal > 0
+                || generation.XCostCardsGenerated > 0))
+        {
+            var nonXCards = Math.Max(
+                1,
+                generation.CardsGenerated - generation.XCostCardsGenerated);
+            var averageCost = (decimal)generation.EnergyCostBeforeDiscountTotal
+                              / nonXCards;
+            Row3(
+                sb,
+                GetEnergyStatLabel("avg generated-card cost before discount"),
+                FormatDecimal(averageCost),
+                "");
+        }
+
+        if (generation.EnergyDiscountGrantedTotal > 0)
+        {
+            var averageDiscount = generation.CardsGenerated <= 0
+                ? 0m
+                : (decimal)generation.EnergyDiscountGrantedTotal
+                  / generation.CardsGenerated;
+            Row3(
+                sb,
+                GetEnergyStatLabel("avg discount granted"),
+                FormatDecimal(averageDiscount),
+                "");
+        }
+
+        if (generation.UpgradedCardsGenerated > 0)
+            Row3(sb, "Upgraded cards generated", generation.UpgradedCardsGenerated.ToString(), "");
+        if (generation.XCostCardsGenerated > 0)
+            Row3(sb, "X-cost cards generated", generation.XCostCardsGenerated.ToString(), "");
+
+        var positiveRarityBuckets = new[]
+        {
+            generation.BasicCardsGenerated,
+            generation.CommonCardsGenerated,
+            generation.UncommonCardsGenerated,
+            generation.RareCardsGenerated,
+            generation.StatusCardsGenerated,
+            generation.CurseCardsGenerated,
+            generation.OtherRarityCardsGenerated,
+        }.Count(value => value > 0);
+        if (positiveRarityBuckets > 1 || generation.OtherRarityCardsGenerated > 0)
+        {
+            if (generation.BasicCardsGenerated > 0)
+                Row3(sb, "Basic cards generated", generation.BasicCardsGenerated.ToString(), "");
+            if (generation.CommonCardsGenerated > 0)
+                Row3(sb, "Common cards generated", generation.CommonCardsGenerated.ToString(), "");
+            if (generation.UncommonCardsGenerated > 0)
+                Row3(sb, "Uncommon cards generated", generation.UncommonCardsGenerated.ToString(), "");
+            if (generation.RareCardsGenerated > 0)
+                Row3(sb, "Rare cards generated", generation.RareCardsGenerated.ToString(), "");
+            if (generation.StatusCardsGenerated > 0)
+                Row3(sb, "Statuses generated", generation.StatusCardsGenerated.ToString(), "");
+            if (generation.CurseCardsGenerated > 0)
+                Row3(sb, "Curses generated", generation.CurseCardsGenerated.ToString(), "");
+            if (generation.OtherRarityCardsGenerated > 0)
+                Row3(sb, "Other cards generated", generation.OtherRarityCardsGenerated.ToString(), "");
+        }
+
+        var positiveTypeBuckets = new[]
+        {
+            generation.AttacksGenerated,
+            generation.SkillsGenerated,
+            generation.PowersGenerated,
+            generation.OtherTypeCardsGenerated,
+        }.Count(value => value > 0);
+        if (positiveTypeBuckets > 1)
+        {
+            if (generation.AttacksGenerated > 0)
+                Row3(sb, "Attacks generated", generation.AttacksGenerated.ToString(), "");
+            if (generation.SkillsGenerated > 0)
+                Row3(sb, "Skills generated", generation.SkillsGenerated.ToString(), "");
+            if (generation.PowersGenerated > 0)
+                Row3(sb, "Powers generated", generation.PowersGenerated.ToString(), "");
+            if (generation.OtherTypeCardsGenerated > 0)
+                Row3(sb, "Other cards generated", generation.OtherTypeCardsGenerated.ToString(), "");
+        }
+
+        var nonHandDestinations = generation.CardsAddedToDrawPile
+                                  + generation.CardsAddedToDiscardPile
+                                  + generation.CardsAddedElsewhere;
+        if (nonHandDestinations > 0)
+        {
+            if (generation.CardsAddedToHand > 0)
+                Row3(sb, "Cards added to hand", generation.CardsAddedToHand.ToString(), "");
+            if (generation.CardsAddedToDrawPile > 0)
+                Row3(sb, "Cards added to draw pile", generation.CardsAddedToDrawPile.ToString(), "");
+            if (generation.CardsAddedToDiscardPile > 0)
+                Row3(sb, "Cards added to discard pile", generation.CardsAddedToDiscardPile.ToString(), "");
+            if (generation.CardsAddedElsewhere > 0)
+                Row3(sb, "Cards added elsewhere", generation.CardsAddedElsewhere.ToString(), "");
+        }
+    }
+
     private static void AppendJackOfAllTradesStats(
         StringBuilder sb,
         MegaCrit.Sts2.Core.Models.CardModel card,
@@ -1111,6 +1314,11 @@ public static class CardHoverShowPatch
         bool compact)
     {
         if (card is not JackOfAllTrades && !IsCardId(card, "CARD.JACK_OF_ALL_TRADES")) return;
+
+        // The common generator aggregate supersedes Jack's original exact-add
+        // rows once new observation-era data exists. Keep the legacy display
+        // for older run files instead of showing two copies of the same facts.
+        if (agg.RandomCardGeneration?.CardsGenerated > 0) return;
 
         Row3(sb, "Colorless cards added", agg.JackColorlessCardsAdded.ToString(), "");
         if (compact) return;

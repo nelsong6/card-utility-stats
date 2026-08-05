@@ -3047,6 +3047,7 @@ public static class RunTracker
 
             if (!ShouldTrackCardStatsDuringCombatLocked()) return;
             RecordMetaPowerCardPlayedLocked(cardPlay.Card);
+            RecordRandomGeneratedCardPlayedLocked(cardPlay.Card);
             RecordDrainPowerUpgradedCardPlayedLocked(cardPlay.Card);
 
             // Per-instance tracking: each physical card in the deck gets its
@@ -5218,6 +5219,453 @@ public static class RunTracker
         bool success,
         PotionRarity? rarity)
         => AccumulateAlchemizePotionResult(agg, success, rarity);
+
+    /// <summary>
+    /// Keep recurring random-card creation attached to the shared Power while
+    /// its async callback is in flight. The previous frame makes nested hook
+    /// execution safe without widening attribution to unrelated generation.
+    /// </summary>
+    internal static RandomCardGenerationPowerWindow? ArmRandomCardGenerationPower(
+        PowerModel? power)
+    {
+        if (power?.Owner?.Player == null
+            || !MetaPowerRegistry.TryGetByPower(power, out var definition)
+            || definition == null)
+        {
+            return null;
+        }
+
+        if (!RandomCardGenerationRegistry.IsRecurringPowerId(
+                definition.PowerId))
+        {
+            return null;
+        }
+
+        lock (_lock)
+        {
+            if (!ShouldTrackCardStatsDuringCombatLocked()
+                || !IsTrackedPlayer(power.Owner.Player))
+            {
+                return null;
+            }
+        }
+
+        lock (_lock)
+        {
+            _pendingCombat ??= new PendingCombat();
+            _pendingCombat.RandomCardGenerationPowerWindows.TryGetValue(
+                power.Owner.Player,
+                out var previous);
+            var window = new RandomCardGenerationPowerWindow(
+                power.Owner.Player,
+                definition.PowerId,
+                definition.DisplayName,
+                previous);
+            _pendingCombat.RandomCardGenerationPowerWindows[
+                power.Owner.Player] = window;
+            return window;
+        }
+    }
+
+    internal static void DisarmRandomCardGenerationPower(
+        RandomCardGenerationPowerWindow? window)
+    {
+        if (window == null) return;
+
+        lock (_lock)
+        {
+            if (_pendingCombat == null
+                || !_pendingCombat.RandomCardGenerationPowerWindows.TryGetValue(
+                    window.Player,
+                    out var active)
+                || !ReferenceEquals(active, window))
+            {
+                return;
+            }
+
+            if (window.Previous == null)
+            {
+                _pendingCombat.RandomCardGenerationPowerWindows.Remove(
+                    window.Player);
+            }
+            else
+            {
+                _pendingCombat.RandomCardGenerationPowerWindows[
+                    window.Player] = window.Previous;
+            }
+        }
+    }
+
+    internal static RandomCardDiscountObservation? CaptureRandomCardDiscount(
+        CardModel? generatedCard)
+    {
+        if (generatedCard == null) return null;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return null;
+                var sourceCard = FindCurrentlyResolvingCardPlay()?.Card;
+                if (!RandomCardGenerationRegistry.IsDirectGenerator(sourceCard))
+                    return null;
+                if (sourceCard?.Owner != null
+                    && generatedCard.Owner != null
+                    && !ReferenceEquals(sourceCard.Owner, generatedCard.Owner))
+                {
+                    return null;
+                }
+
+                return new RandomCardDiscountObservation(
+                    generatedCard,
+                    GetRandomGeneratedCardEnergyCost(generatedCard));
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"CaptureRandomCardDiscount failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+    internal static void RecordRandomCardDiscount(
+        RandomCardDiscountObservation? observation)
+    {
+        if (observation == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+                _pendingCombat ??= new PendingCombat();
+                var after = GetRandomGeneratedCardEnergyCost(observation.Card);
+                _pendingCombat.RandomCardDiscountsByCard[observation.Card] =
+                    Math.Max(0, observation.CostBefore - after);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordRandomCardDiscount failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Observe a generated card only after the game's final generated-card
+    /// hook says it entered combat. The exact returned object is retained so
+    /// later finished plays can measure utilization and replays.
+    /// </summary>
+    internal static void RecordRandomCardGenerated(
+        CardModel? generatedCard,
+        Player? creator)
+    {
+        if (generatedCard == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+                _pendingCombat ??= new PendingCombat();
+                if (_pendingCombat.RandomGeneratedCardSources.ContainsKey(generatedCard))
+                    return;
+
+                PendingRandomCardGenerationSource? source = null;
+                RandomCardGenerationPowerWindow? powerWindow = null;
+                var powerWindowPlayer = creator ?? generatedCard.Owner;
+                if (powerWindowPlayer != null)
+                {
+                    _pendingCombat.RandomCardGenerationPowerWindows.TryGetValue(
+                        powerWindowPlayer,
+                        out powerWindow);
+                }
+                if (powerWindow != null
+                    && IsTrackedPlayer(powerWindow.Player)
+                    && (creator == null || ReferenceEquals(creator, powerWindow.Player)))
+                {
+                    source = new PendingRandomCardGenerationSource(
+                        CardInstanceId: null,
+                        powerWindow.PowerId,
+                        powerWindow.DisplayName);
+                }
+                else
+                {
+                    var sourceCard = FindCurrentlyResolvingCardPlay()?.Card;
+                    if (!RandomCardGenerationRegistry.IsDirectGenerator(sourceCard)
+                        || sourceCard == null
+                        || !IsTrackedCard(sourceCard)
+                        || (creator != null
+                            && sourceCard.Owner != null
+                            && !ReferenceEquals(sourceCard.Owner, creator)))
+                    {
+                        return;
+                    }
+
+                    source = new PendingRandomCardGenerationSource(
+                        GetOrAssignInstanceId(Canonical(sourceCard)),
+                        PowerId: null,
+                        DisplayName: sourceCard.Title);
+                }
+
+                _pendingCombat.RandomCardDiscountsByCard.Remove(
+                    generatedCard,
+                    out var discount);
+                var aggregate = GetRandomCardGenerationAggregateLocked(source);
+                AccumulateRandomCardGenerated(
+                    aggregate,
+                    generatedCard,
+                    discount,
+                    generatedCard.Pile?.Type);
+                _pendingCombat.RandomGeneratedCardSources[generatedCard] = source;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordRandomCardGenerated failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void RecordRandomGeneratedCardPlayedLocked(CardModel card)
+    {
+        if (_pendingCombat == null
+            || !_pendingCombat.RandomGeneratedCardSources.TryGetValue(
+                card,
+                out var source))
+        {
+            return;
+        }
+
+        var aggregate = GetRandomCardGenerationAggregateLocked(source);
+        aggregate.GeneratedCardPlays++;
+        var cardId = SafeCardId(card);
+        var outcome = GetOrCreateGeneratedCardOutcome(
+            aggregate,
+            cardId,
+            card.Title);
+        outcome.Plays++;
+
+        if (_pendingCombat.RandomGeneratedCardsPlayed.Add(card))
+        {
+            aggregate.GeneratedCardsPlayed++;
+            outcome.GeneratedCardsPlayed++;
+        }
+    }
+
+    private static RandomCardGenerationAggregate GetRandomCardGenerationAggregateLocked(
+        PendingRandomCardGenerationSource source)
+    {
+        _pendingCombat ??= new PendingCombat();
+        if (!string.IsNullOrWhiteSpace(source.PowerId))
+        {
+            return GetOrCreatePowerAggregate(
+                _pendingCombat.MetaStats,
+                source.PowerId,
+                source.DisplayName).RandomCardGeneration ??= new();
+        }
+
+        return GetOrCreateAggregate(
+            _pendingCombat,
+            source.CardInstanceId!).RandomCardGeneration ??= new();
+    }
+
+    private static void AccumulateRandomCardGenerated(
+        RandomCardGenerationAggregate aggregate,
+        CardModel card,
+        int discount,
+        PileType? finalPile)
+    {
+        aggregate.CardsGenerated++;
+        discount = Math.Max(0, discount);
+        aggregate.EnergyDiscountGrantedTotal += discount;
+
+        if (card.EnergyCost?.CostsX == true)
+        {
+            aggregate.XCostCardsGenerated++;
+        }
+        else
+        {
+            aggregate.EnergyCostBeforeDiscountTotal +=
+                GetRandomGeneratedCardEnergyCost(card) + discount;
+        }
+
+        if (card.CurrentUpgradeLevel > 0)
+            aggregate.UpgradedCardsGenerated++;
+
+        switch (card.Rarity)
+        {
+            case CardRarity.Basic:
+                aggregate.BasicCardsGenerated++;
+                break;
+            case CardRarity.Common:
+                aggregate.CommonCardsGenerated++;
+                break;
+            case CardRarity.Uncommon:
+                aggregate.UncommonCardsGenerated++;
+                break;
+            case CardRarity.Rare:
+                aggregate.RareCardsGenerated++;
+                break;
+            case CardRarity.Status:
+                aggregate.StatusCardsGenerated++;
+                break;
+            case CardRarity.Curse:
+                aggregate.CurseCardsGenerated++;
+                break;
+            default:
+                aggregate.OtherRarityCardsGenerated++;
+                break;
+        }
+
+        switch (card.Type)
+        {
+            case CardType.Attack:
+                aggregate.AttacksGenerated++;
+                break;
+            case CardType.Skill:
+                aggregate.SkillsGenerated++;
+                break;
+            case CardType.Power:
+                aggregate.PowersGenerated++;
+                break;
+            default:
+                aggregate.OtherTypeCardsGenerated++;
+                break;
+        }
+
+        switch (finalPile)
+        {
+            case PileType.Hand:
+                aggregate.CardsAddedToHand++;
+                break;
+            case PileType.Draw:
+                aggregate.CardsAddedToDrawPile++;
+                break;
+            case PileType.Discard:
+                aggregate.CardsAddedToDiscardPile++;
+                break;
+            default:
+                aggregate.CardsAddedElsewhere++;
+                break;
+        }
+
+        var outcome = GetOrCreateGeneratedCardOutcome(
+            aggregate,
+            SafeCardId(card),
+            card.Title);
+        outcome.Generated++;
+    }
+
+    private static GeneratedCardOutcomeAggregate GetOrCreateGeneratedCardOutcome(
+        RandomCardGenerationAggregate aggregate,
+        string cardId,
+        string? displayName)
+    {
+        aggregate.CardsById ??= new Dictionary<string, GeneratedCardOutcomeAggregate>();
+        if (!aggregate.CardsById.TryGetValue(cardId, out var outcome))
+        {
+            outcome = new GeneratedCardOutcomeAggregate
+            {
+                CardId = cardId,
+                DisplayName = displayName ?? cardId,
+            };
+            aggregate.CardsById[cardId] = outcome;
+        }
+        else if (string.IsNullOrWhiteSpace(outcome.DisplayName)
+                 && !string.IsNullOrWhiteSpace(displayName))
+        {
+            outcome.DisplayName = displayName;
+        }
+
+        return outcome;
+    }
+
+    private static string SafeCardId(CardModel card)
+    {
+        try { return card.Id.ToString(); }
+        catch { return card.GetType().FullName ?? card.GetType().Name; }
+    }
+
+    private static int GetRandomGeneratedCardEnergyCost(CardModel card)
+    {
+        try
+        {
+            if (card.EnergyCost == null || card.EnergyCost.CostsX) return 0;
+            return Math.Max(
+                0,
+                card.EnergyCost.GetWithModifiers(CostModifiers.All));
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
+    internal static void RecordRandomCardGeneratedForTest(
+        RandomCardGenerationAggregate aggregate,
+        string cardId,
+        string displayName,
+        CardRarity rarity,
+        CardType type,
+        int energyCostBeforeDiscount,
+        int discount,
+        int upgradeLevel,
+        PileType finalPile)
+    {
+        if (aggregate == null || string.IsNullOrWhiteSpace(cardId)) return;
+
+        aggregate.CardsGenerated++;
+        aggregate.EnergyCostBeforeDiscountTotal +=
+            Math.Max(0, energyCostBeforeDiscount);
+        aggregate.EnergyDiscountGrantedTotal += Math.Max(0, discount);
+        if (upgradeLevel > 0) aggregate.UpgradedCardsGenerated++;
+
+        switch (rarity)
+        {
+            case CardRarity.Basic: aggregate.BasicCardsGenerated++; break;
+            case CardRarity.Common: aggregate.CommonCardsGenerated++; break;
+            case CardRarity.Uncommon: aggregate.UncommonCardsGenerated++; break;
+            case CardRarity.Rare: aggregate.RareCardsGenerated++; break;
+            case CardRarity.Status: aggregate.StatusCardsGenerated++; break;
+            case CardRarity.Curse: aggregate.CurseCardsGenerated++; break;
+            default: aggregate.OtherRarityCardsGenerated++; break;
+        }
+
+        switch (type)
+        {
+            case CardType.Attack: aggregate.AttacksGenerated++; break;
+            case CardType.Skill: aggregate.SkillsGenerated++; break;
+            case CardType.Power: aggregate.PowersGenerated++; break;
+            default: aggregate.OtherTypeCardsGenerated++; break;
+        }
+
+        switch (finalPile)
+        {
+            case PileType.Hand: aggregate.CardsAddedToHand++; break;
+            case PileType.Draw: aggregate.CardsAddedToDrawPile++; break;
+            case PileType.Discard: aggregate.CardsAddedToDiscardPile++; break;
+            default: aggregate.CardsAddedElsewhere++; break;
+        }
+
+        GetOrCreateGeneratedCardOutcome(aggregate, cardId, displayName).Generated++;
+    }
+
+    internal static void RecordRandomGeneratedCardPlayForTest(
+        RandomCardGenerationAggregate aggregate,
+        string cardId,
+        string displayName,
+        bool firstPlay)
+    {
+        if (aggregate == null || string.IsNullOrWhiteSpace(cardId)) return;
+        aggregate.GeneratedCardPlays++;
+        var outcome = GetOrCreateGeneratedCardOutcome(
+            aggregate,
+            cardId,
+            displayName);
+        outcome.Plays++;
+        if (!firstPlay) return;
+        aggregate.GeneratedCardsPlayed++;
+        outcome.GeneratedCardsPlayed++;
+    }
 
     /// <summary>
     /// Capture Jack of All Trades while its generated-card add command is
@@ -33440,6 +33888,10 @@ public static class RunTracker
         target.UncommonPotionsGained += source.UncommonPotionsGained;
         target.RarePotionsGained += source.RarePotionsGained;
         target.PotionsSkipped += source.PotionsSkipped;
+        target.RandomCardGeneration ??= new RandomCardGenerationAggregate();
+        MergeRandomCardGenerationInto(
+            target.RandomCardGeneration,
+            source.RandomCardGeneration);
         target.JackColorlessCardsAdded += source.JackColorlessCardsAdded;
         target.JackUncommonCardsAdded += source.JackUncommonCardsAdded;
         target.JackRareCardsAdded += source.JackRareCardsAdded;
@@ -33542,6 +33994,68 @@ public static class RunTracker
         }
     }
 
+    private static void MergeRandomCardGenerationInto(
+        RandomCardGenerationAggregate target,
+        RandomCardGenerationAggregate? source)
+    {
+        if (source == null) return;
+
+        target.CardsGenerated += source.CardsGenerated;
+        target.GeneratedCardsPlayed += source.GeneratedCardsPlayed;
+        target.GeneratedCardPlays += source.GeneratedCardPlays;
+        target.BasicCardsGenerated += source.BasicCardsGenerated;
+        target.CommonCardsGenerated += source.CommonCardsGenerated;
+        target.UncommonCardsGenerated += source.UncommonCardsGenerated;
+        target.RareCardsGenerated += source.RareCardsGenerated;
+        target.StatusCardsGenerated += source.StatusCardsGenerated;
+        target.CurseCardsGenerated += source.CurseCardsGenerated;
+        target.OtherRarityCardsGenerated += source.OtherRarityCardsGenerated;
+        target.AttacksGenerated += source.AttacksGenerated;
+        target.SkillsGenerated += source.SkillsGenerated;
+        target.PowersGenerated += source.PowersGenerated;
+        target.OtherTypeCardsGenerated += source.OtherTypeCardsGenerated;
+        target.UpgradedCardsGenerated += source.UpgradedCardsGenerated;
+        target.XCostCardsGenerated += source.XCostCardsGenerated;
+        target.EnergyCostBeforeDiscountTotal +=
+            source.EnergyCostBeforeDiscountTotal;
+        target.EnergyDiscountGrantedTotal +=
+            source.EnergyDiscountGrantedTotal;
+        target.CardsAddedToHand += source.CardsAddedToHand;
+        target.CardsAddedToDrawPile += source.CardsAddedToDrawPile;
+        target.CardsAddedToDiscardPile += source.CardsAddedToDiscardPile;
+        target.CardsAddedElsewhere += source.CardsAddedElsewhere;
+
+        target.CardsById ??= new Dictionary<string, GeneratedCardOutcomeAggregate>();
+        if (source.CardsById == null) return;
+
+        foreach (var (cardId, sourceOutcome) in source.CardsById)
+        {
+            if (!target.CardsById.TryGetValue(cardId, out var targetOutcome))
+            {
+                targetOutcome = new GeneratedCardOutcomeAggregate
+                {
+                    CardId = string.IsNullOrWhiteSpace(sourceOutcome.CardId)
+                        ? cardId
+                        : sourceOutcome.CardId,
+                    DisplayName = sourceOutcome.DisplayName,
+                };
+                target.CardsById[cardId] = targetOutcome;
+            }
+            else
+            {
+                if (string.IsNullOrWhiteSpace(targetOutcome.CardId))
+                    targetOutcome.CardId = sourceOutcome.CardId;
+                if (string.IsNullOrWhiteSpace(targetOutcome.DisplayName))
+                    targetOutcome.DisplayName = sourceOutcome.DisplayName;
+            }
+
+            targetOutcome.Generated += sourceOutcome.Generated;
+            targetOutcome.GeneratedCardsPlayed +=
+                sourceOutcome.GeneratedCardsPlayed;
+            targetOutcome.Plays += sourceOutcome.Plays;
+        }
+    }
+
     private static void MergeMetaStatsInto(RunMetaStats target, RunMetaStats? source)
     {
         if (source == null) return;
@@ -33585,6 +34099,10 @@ public static class RunTracker
             targetAgg.MetaActiveTurns += sourceAgg.MetaActiveTurns;
             targetAgg.MetaActiveApplicationTurns +=
                 sourceAgg.MetaActiveApplicationTurns;
+            targetAgg.RandomCardGeneration ??= new RandomCardGenerationAggregate();
+            MergeRandomCardGenerationInto(
+                targetAgg.RandomCardGeneration,
+                sourceAgg.RandomCardGeneration);
             targetAgg.RateAttacksCopied += sourceAgg.RateAttacksCopied;
             targetAgg.RateTimesTriggered += sourceAgg.RateTimesTriggered;
             targetAgg.RateBlockGained += sourceAgg.RateBlockGained;
@@ -34349,6 +34867,16 @@ internal class PendingCombat
 {
     public int EtherealCardsPlayed { get; set; }
     public Dictionary<string, CardAggregate> CombatAggregates { get; } = new();
+    public Dictionary<CardModel, PendingRandomCardGenerationSource>
+        RandomGeneratedCardSources { get; }
+            = new(ReferenceEqualityComparer.Instance);
+    public HashSet<CardModel> RandomGeneratedCardsPlayed { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<CardModel, int> RandomCardDiscountsByCard { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, RandomCardGenerationPowerWindow>
+        RandomCardGenerationPowerWindows { get; }
+            = new(ReferenceEqualityComparer.Instance);
     public List<CardEvent> CombatEvents { get; } = new();
     public List<PotionRunHistoryEntry>? PotionHistory { get; set; }
     public List<MaxHpRunHistoryEntry>? MaxHpHistory { get; set; }
@@ -34710,6 +35238,21 @@ internal class PendingCombat
     /// PendingCombat (setup/end, run boundary) starts empty, so this IS the reset.</summary>
     public AttributionWindowRegistry Windows { get; } = new();
 }
+
+internal sealed record PendingRandomCardGenerationSource(
+    string? CardInstanceId,
+    string? PowerId,
+    string DisplayName);
+
+internal sealed record RandomCardDiscountObservation(
+    CardModel Card,
+    int CostBefore);
+
+internal sealed record RandomCardGenerationPowerWindow(
+    Player Player,
+    string PowerId,
+    string DisplayName,
+    RandomCardGenerationPowerWindow? Previous);
 
 internal sealed class PendingOpeningHandDrawRelicDraw
 {

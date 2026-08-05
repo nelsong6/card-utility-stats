@@ -1,0 +1,98 @@
+{
+  "run_id": "random-card-generation-fixture",
+  "started_at": "2026-08-04T18:00:00Z",
+  "updated_at": "2026-08-04T18:20:00Z",
+  "character": "SILENT",
+  "ascension": 7,
+  "floor_reached": 18,
+  "outcome": "in_progress",
+  "game_start_time": 1785866400,
+  "aggregates": {
+    "CARD.METAMORPHOSIS#1": {
+      "combats_in_deck": 3,
+      "plays": 2,
+      "times_drawn": 2,
+      "random_card_generation": {
+        "cards_generated": 6,
+        "generated_cards_played": 4,
+        "generated_card_plays": 5,
+        "common_cards_generated": 2,
+        "uncommon_cards_generated": 3,
+        "rare_cards_generated": 1,
+        "attacks_generated": 6,
+        "upgraded_cards_generated": 3,
+        "energy_cost_before_discount_total": 11,
+        "energy_discount_granted_total": 11,
+        "cards_added_to_draw_pile": 6,
+        "cards_by_id": {
+          "CARD.STRIKE_IRONCLAD": {
+            "card_id": "CARD.STRIKE_IRONCLAD",
+            "display_name": "Strike",
+            "generated": 2,
+            "generated_cards_played": 2,
+            "plays": 3
+          },
+          "CARD.CLOTHESLINE": {
+            "card_id": "CARD.CLOTHESLINE",
+            "display_name": "Clothesline",
+            "generated": 4,
+            "generated_cards_played": 2,
+            "plays": 2
+          }
+        }
+      },
+      "floor_added": 6,
+      "initial_upgrade_level": 0
+    }
+  },
+  "events": [],
+  "relic_aggregates": {},
+  "enemy_aggregates": {},
+  "meta_stats": {
+    "power_aggregates": {
+      "POWER.CREATIVE_AI": {
+        "power_id": "POWER.CREATIVE_AI",
+        "display_name": "Creative AI",
+        "power_cards_played": 2,
+        "successful_applications": 2,
+        "meta_deck_turns": 10,
+        "meta_active_turns": 7,
+        "meta_active_application_turns": 11,
+        "random_card_generation": {
+          "cards_generated": 7,
+          "generated_cards_played": 3,
+          "generated_card_plays": 4,
+          "uncommon_cards_generated": 4,
+          "rare_cards_generated": 3,
+          "powers_generated": 7,
+          "energy_cost_before_discount_total": 17,
+          "cards_added_to_hand": 7,
+          "cards_by_id": {
+            "CARD.ECHO_FORM": {
+              "card_id": "CARD.ECHO_FORM",
+              "display_name": "Echo Form",
+              "generated": 2,
+              "generated_cards_played": 1,
+              "plays": 2
+            },
+            "CARD.BUFFER": {
+              "card_id": "CARD.BUFFER",
+              "display_name": "Buffer",
+              "generated": 5,
+              "generated_cards_played": 2,
+              "plays": 2
+            }
+          }
+        }
+      }
+    }
+  },
+  "instance_numbers_by_def": {
+    "CARD.METAMORPHOSIS": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.METAMORPHOSIS": 1
+  }
+}

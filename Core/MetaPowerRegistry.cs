@@ -19,12 +19,17 @@ internal static class MetaPowerRegistry
     internal static readonly IReadOnlyList<MetaPowerDefinition> All =
     [
         new("CARD.AGGRESSION", "POWER.AGGRESSION", "Aggression"),
+        new("CARD.CALAMITY", "POWER.CALAMITY", "Calamity"),
+        new("CARD.CALL_OF_THE_VOID", "POWER.CALL_OF_THE_VOID", "Call of the Void"),
+        new("CARD.CREATIVE_AI", "POWER.CREATIVE_AI", "Creative AI"),
         new("CARD.DANSE_MACABRE", "POWER.DANSE_MACABRE", "Danse Macabre"),
         new("CARD.DARK_EMBRACE", "POWER.DARK_EMBRACE", "Dark Embrace"),
         new("CARD.ENTROPY", "POWER.ENTROPY", "Entropy"),
         new("CARD.FEEL_NO_PAIN", "POWER.FEEL_NO_PAIN", "Feel No Pain"),
+        new("CARD.HELLO_WORLD", "POWER.HELLO_WORLD", "Hello World"),
         new("CARD.JUGGLING", "POWER.JUGGLING", "Juggling"),
         new("CARD.RUPTURE", "POWER.RUPTURE", "Rupture"),
+        new("CARD.SPECTRUM_SHIFT", "POWER.SPECTRUM_SHIFT", "Spectrum Shift"),
         new("CARD.STAMPEDE", "POWER.STAMPEDE", "Stampede"),
         new("CARD.UNMOVABLE", "POWER.UNMOVABLE", "Unmovable"),
         new("CARD.VICIOUS", "POWER.VICIOUS", "Vicious"),
