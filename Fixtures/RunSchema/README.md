@@ -623,6 +623,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `card-removal-source-run.json`
   Adds per-physical-card removal source attribution plus the exact gold charge
   for cards removed by the shopkeeper.
+- `golden-pearl-relic-run.json`
+  Adds Golden Pearl's floor distance from acquisition to the first observed
+  positive gold loss classified by the game as spending.
 
 Why these exist:
 

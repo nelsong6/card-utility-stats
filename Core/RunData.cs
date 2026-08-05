@@ -1869,6 +1869,11 @@ public class RelicAggregate
     // completed zero-floor result.
     public int? FloorsTraveledUntilNextShop { get; set; }
 
+    // Distance from Golden Pearl's pickup floor to the first observed gold
+    // loss classified by the game as spending. Nullable distinguishes no
+    // expense yet from a same-floor expense.
+    public int? FloorsBeforeFirstGoldExpense { get; set; }
+
     // Ordered off-path destinations reached by spending Winged Boots charges.
     // UseNumber comes from the relic's own saved TimesUsed counter so tracking
     // remains correctly numbered when the mod is hot-reloaded mid-run.

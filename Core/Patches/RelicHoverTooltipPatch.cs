@@ -1312,6 +1312,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is GoldenPearl)
+        {
+            title = "Golden Pearl";
+            body = BuildGoldenPearlBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is BookOfFiveRings)
         {
             title = "Book of Five Rings";
@@ -4425,6 +4432,18 @@ public static class RelicHoverShowPatch
             $"{agg.OldCoinGoldSpent}/{agg.OldCoinGoldGranted}",
             "",
             "Granted gold spent — how much of Old Coin's observed gold grant was later consumed by purchases.");
+        return sb.ToString();
+    }
+
+    private static string BuildGoldenPearlBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        Row3(
+            sb,
+            "Floors before first gold expense",
+            agg.FloorsBeforeFirstGoldExpense?.ToString() ?? "not yet",
+            "",
+            "Floors before first gold expense — floors traveled from receiving Golden Pearl to the first positive gold loss classified by the game as spending; lost or stolen gold does not count.");
         return sb.ToString();
     }
 

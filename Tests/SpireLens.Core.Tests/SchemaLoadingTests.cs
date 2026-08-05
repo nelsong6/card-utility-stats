@@ -6368,6 +6368,35 @@ public class SchemaLoadingTests
             powerGeneration.CardsById["CARD.ECHO_FORM"].Plays);
     }
 
+    [Fact]
+    public void HistoricalLoad_AcceptsGoldenPearlRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("golden-pearl-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertGoldenPearlFixture(loaded.Data);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsGoldenPearlRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("golden-pearl-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertGoldenPearlFixture(resumed!);
+    }
+
+    private static void AssertGoldenPearlFixture(RunData run)
+    {
+        Assert.Equal(
+            5,
+            run.RelicAggregates["RELIC.GOLDEN_PEARL"]
+                .FloorsBeforeFirstGoldExpense);
+    }
+
     private static void AssertSplashFixture(CardAggregate cardAgg)
     {
         Assert.Equal(6, cardAgg.SplashAttacksTaken);

@@ -2851,6 +2851,8 @@ public static class RunTracker
             target.FloorsAscendedBeforeFirstShop = source.FloorsAscendedBeforeFirstShop;
         if (source.FloorsTraveledUntilNextShop.HasValue && !target.FloorsTraveledUntilNextShop.HasValue)
             target.FloorsTraveledUntilNextShop = source.FloorsTraveledUntilNextShop;
+        if (source.FloorsBeforeFirstGoldExpense.HasValue && !target.FloorsBeforeFirstGoldExpense.HasValue)
+            target.FloorsBeforeFirstGoldExpense = source.FloorsBeforeFirstGoldExpense;
         MergeWingedBootsDestinations(target, source);
         MergeCardsRemovedInto(target, source);
         if (source.StartingMaxHp.HasValue) target.StartingMaxHp = source.StartingMaxHp;
@@ -9182,6 +9184,7 @@ public static class RunTracker
         "RELIC.WONGOS_MYSTERY_TICKET";
     private const string MawBankRelicId = "RELIC.MAW_BANK";
     private const string OldCoinRelicId = "RELIC.OLD_COIN";
+    private const string GoldenPearlRelicId = "RELIC.GOLDEN_PEARL";
     private const string LeafyPoulticeRelicId = "RELIC.LEAFY_POULTICE";
     private const string RegalPillowRelicId = "RELIC.REGAL_PILLOW";
     private const string WhiteBeastStatueRelicId = "RELIC.WHITE_BEAST_STATUE";
@@ -14400,6 +14403,17 @@ public static class RunTracker
         return true;
     }
 
+    internal static bool RecordGoldenPearlFirstGoldExpenseForTest(
+        RelicAggregate agg,
+        int pickupFloor,
+        int expenseFloor)
+    {
+        if (agg == null || agg.FloorsBeforeFirstGoldExpense.HasValue) return false;
+
+        agg.FloorsBeforeFirstGoldExpense = Math.Max(0, expenseFloor - pickupFloor);
+        return true;
+    }
+
     /// <summary>
     /// Persist the original map-point category reached by a confirmed Winged
     /// Boots charge. TimesUsed is the authoritative use number and is saved by
@@ -17587,6 +17601,28 @@ public static class RunTracker
                         goldStats,
                         context.RoomType,
                         context.Floor);
+
+                    var goldenPearl = player.GetRelic<GoldenPearl>();
+                    if (goldenPearl != null
+                        && IsTrackedRelic(goldenPearl)
+                        && !HasRecordedGoldenPearlFirstExpenseLocked())
+                    {
+                        var pickupFloor =
+                            RelicFloorAddedToDeckIncludingRunStart(goldenPearl);
+                        if (pickupFloor.HasValue)
+                        {
+                            var goldenPearlAggregate = inCombat
+                                ? GetOrCreatePendingRelicAggregateLocked(
+                                    GoldenPearlRelicId)
+                                : GetOrCreateCurrentRunRelicAggregateLocked(
+                                    GoldenPearlRelicId);
+                            changed |= RecordGoldenPearlFirstGoldExpenseForTest(
+                                goldenPearlAggregate,
+                                pickupFloor.Value,
+                                context.Floor);
+                        }
+                    }
+
                     changed = true;
                 }
 
@@ -17677,6 +17713,22 @@ public static class RunTracker
         _pendingCombat.GoldAttributionLedger =
             CloneGoldAttributionLedger(_currentRun.GoldAttributionLedger);
         return _pendingCombat.GoldAttributionLedger;
+    }
+
+    private static bool HasRecordedGoldenPearlFirstExpenseLocked()
+    {
+        if (_currentRun?.RelicAggregates.TryGetValue(
+                GoldenPearlRelicId,
+                out var committed) == true
+            && committed.FloorsBeforeFirstGoldExpense.HasValue)
+        {
+            return true;
+        }
+
+        return _pendingCombat?.RelicAggregates.TryGetValue(
+                   GoldenPearlRelicId,
+                   out var pending) == true
+               && pending.FloorsBeforeFirstGoldExpense.HasValue;
     }
 
     private static void BeginOldCoinGoldAttribution(
