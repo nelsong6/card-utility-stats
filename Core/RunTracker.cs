@@ -2642,6 +2642,8 @@ public static class RunTracker
         target.StrengthAdded += source.StrengthAdded;
         target.GiryaStrengthRateAdded += source.GiryaStrengthRateAdded;
         target.GiryaStrengthCombats += source.GiryaStrengthCombats;
+        target.GiryaAttacksPlayed += source.GiryaAttacksPlayed;
+        target.GiryaAttackHits += source.GiryaAttackHits;
         target.GiryaCountFloorTotal += source.GiryaCountFloorTotal;
         target.GiryaFloorSamples += source.GiryaFloorSamples;
         if (source.GiryaLastFloorSampled.HasValue
@@ -3243,6 +3245,7 @@ public static class RunTracker
             RecordNutritiousSoupEnchantedStrikePlayedIfOwnedLocked(cardPlay.Card);
             RecordMiniatureCannonUpgradedAttackPlayedIfOwnedLocked(cardPlay.Card);
             RecordVajraAttackPlayedIfOwnedLocked(cardPlay.Card);
+            RecordGiryaAttackPlayedIfActiveLocked(cardPlay.Card);
             RecordEmberTeaAttackPlayedIfActiveLocked(cardPlay.Card);
             RecordRedSkullAttackPlayedIfStartedActiveLocked(cardPlay);
             RecordBurningSticksGeneratedCardPlayedLocked(cardPlay.Card);
@@ -17108,6 +17111,22 @@ public static class RunTracker
         agg.GiryaStrengthCombats += Math.Max(0, count);
     }
 
+    internal static void RecordGiryaAttackPlayedForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.GiryaAttacksPlayed += Math.Max(0, count);
+    }
+
+    internal static void RecordGiryaAttackHitForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.GiryaAttackHits += Math.Max(0, count);
+    }
+
     /// <summary>
     /// Record Lee's Waffle's observed pickup HP gain. The relic first grants
     /// max HP, which itself heals, then heals to full; the full pickup delta is
@@ -27107,6 +27126,28 @@ public static class RunTracker
         RecordVajraAttackHitForTest(agg);
     }
 
+    private static void RecordGiryaAttackPlayedIfActiveLocked(CardModel card)
+    {
+        if (card.Type != CardType.Attack) return;
+
+        var owner = card.Owner;
+        if (owner == null || !IsTrackedPlayer(owner) || !PlayerHasActiveGirya(owner)) return;
+
+        var agg = GetOrCreateRelicAggregateForCurrentContextLocked(GiryaRelicId);
+        RecordGiryaAttackPlayedForTest(agg);
+    }
+
+    private static void RecordGiryaAttackHitIfActiveLocked(CardModel card)
+    {
+        if (card.Type != CardType.Attack) return;
+
+        var owner = card.Owner;
+        if (owner == null || !IsTrackedPlayer(owner) || !PlayerHasActiveGirya(owner)) return;
+
+        var agg = GetOrCreateRelicAggregateLocked(GiryaRelicId);
+        RecordGiryaAttackHitForTest(agg);
+    }
+
     private static void RecordEmberTeaAttackPlayedIfActiveLocked(CardModel card)
     {
         if (card.Type != CardType.Attack) return;
@@ -27453,6 +27494,20 @@ public static class RunTracker
         try
         {
             return player.Relics.Any(r => r is Vajra);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool PlayerHasActiveGirya(Player player)
+    {
+        try
+        {
+            return player.Relics
+                .OfType<Girya>()
+                .Any(relic => relic.TimesLifted > 0);
         }
         catch
         {
@@ -34334,6 +34389,7 @@ public static class RunTracker
             {
                 RecordMiniatureCannonUpgradedAttackHitIfOwnedLocked(entry.CardSource!);
                 RecordVajraAttackHitIfOwnedLocked(entry.CardSource!);
+                RecordGiryaAttackHitIfActiveLocked(entry.CardSource!);
                 RecordEmberTeaAttackHitIfActiveLocked(entry.CardSource!);
                 RecordRedSkullAttackHitIfActiveLocked(entry.CardSource!);
             }

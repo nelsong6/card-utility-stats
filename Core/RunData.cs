@@ -1300,6 +1300,12 @@ public class RelicAggregate
     public int? GiryaLastUseFloor { get; set; }
     public int GiryaLastObservedLiftCount { get; set; }
 
+    // Downstream use while Girya is providing Strength. Mirrors Vajra's
+    // Attack-play and resolved enemy-hit counters, but excludes the pre-Lift
+    // period when Girya has not added any Strength yet.
+    public int GiryaAttacksPlayed { get; set; }
+    public int GiryaAttackHits { get; set; }
+
     // Tooltip-only projection populated from the live pending combat aggregate.
     internal decimal GiryaStrengthAddedThisCombat { get; set; }
 

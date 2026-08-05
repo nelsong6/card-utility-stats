@@ -6455,6 +6455,8 @@ public class SchemaLoadingTests
         Assert.Equal(6m, relic.StrengthAdded);
         Assert.Equal(6m, relic.GiryaStrengthRateAdded);
         Assert.Equal(4, relic.GiryaStrengthCombats);
+        Assert.Equal(7, relic.GiryaAttacksPlayed);
+        Assert.Equal(12, relic.GiryaAttackHits);
         Assert.Equal(11, relic.GiryaCountFloorTotal);
         Assert.Equal(10, relic.GiryaFloorSamples);
         Assert.Equal(14, relic.GiryaLastFloorSampled);

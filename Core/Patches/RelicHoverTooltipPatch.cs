@@ -5730,6 +5730,18 @@ public static class RelicHoverShowPatch
             agg.GiryaStrengthAddedThisCombat,
             agg.GiryaStrengthRateAdded,
             agg.GiryaStrengthCombats);
+        Row3(
+            sb,
+            "Attacks played",
+            agg.GiryaAttacksPlayed.ToString(),
+            "",
+            "The number of Attack cards played while Girya's Strength was active.");
+        Row3(
+            sb,
+            "Attack hits",
+            agg.GiryaAttackHits.ToString(),
+            "",
+            "Resolved enemy damage hits from Attack cards while Girya's Strength was active; multi-hit Attacks count once per hit.");
 
         var averageCountPerFloor = agg.GiryaFloorSamples <= 0
             ? 0m

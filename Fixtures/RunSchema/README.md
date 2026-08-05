@@ -632,7 +632,8 @@ New fixtures added going forward do not need a `v*-` prefix.
   positive gold loss classified by the game as spending.
 - `girya-relic-run.json`
   Adds Girya's observed Strength, eligible-combat denominator, time-weighted
-  floor counter samples, and successful-Lift floor pacing.
+  floor counter samples, successful-Lift floor pacing, and Attack plays/hits
+  while its Strength is active.
 - `lasting-candy-relic-run.json`
   Adds Lasting Candy's exact Power offers and terminal taken/rejected outcomes,
   split into Uncommon/Rare rarity buckets and Elite/Boss activation contexts.

@@ -200,9 +200,10 @@ Petrified Toad records Potion Shaped Rocks successfully given and attempts
 blocked specifically by a full potion belt.
 Pumpkin Candle records its Ancient energy contribution, average combat-start
 charges, and campfire rekindles.
-Girya records the Strength it actually adds at combat entry, the average saved
-Lift count across every floor held, and average floor travel from acquisition
-to the first Lift and between later Lifts.
+Girya records the Strength it actually adds at combat entry, Attack plays and
+resolved enemy hits while that Strength is active, the average saved Lift count
+across every floor held, and average floor travel from acquisition to the first
+Lift and between later Lifts.
 Lasting Candy records each exact Power it adds to a combat card reward and
 whether that option was taken or rejected, with Uncommon/Rare splits and
 activation counts for Elite and Boss combat rewards.

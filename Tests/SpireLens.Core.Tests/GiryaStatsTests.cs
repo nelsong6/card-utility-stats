@@ -51,6 +51,8 @@ public class GiryaStatsTests
         var restored = JsonSerializer.Deserialize<RunData>(json, SerializerOptions);
 
         Assert.Contains("girya_strength_rate_added", json);
+        Assert.Contains("girya_attacks_played", json);
+        Assert.Contains("girya_attack_hits", json);
         Assert.Contains("girya_count_floor_total", json);
         Assert.Contains("girya_use_floor_distance_total", json);
         Assert.Contains("girya_last_observed_lift_count", json);
@@ -84,6 +86,10 @@ public class GiryaStatsTests
         RunTracker.RecordGiryaStrengthGainForTest(agg, 1);
         RunTracker.RecordGiryaStrengthGainForTest(agg, 2);
         RunTracker.RecordGiryaStrengthCombatForTest(agg, 4);
+        RunTracker.RecordGiryaAttackPlayedForTest(agg, 7);
+        RunTracker.RecordGiryaAttackHitForTest(agg, 12);
+        RunTracker.RecordGiryaAttackPlayedForTest(agg, -1);
+        RunTracker.RecordGiryaAttackHitForTest(agg, -1);
 
         AssertAggregate(agg);
     }
@@ -97,6 +103,8 @@ public class GiryaStatsTests
             StrengthAdded = 1,
             GiryaStrengthRateAdded = 1,
             GiryaStrengthCombats = 1,
+            GiryaAttacksPlayed = 2,
+            GiryaAttackHits = 4,
             GiryaCountFloorTotal = 3,
             GiryaFloorSamples = 4,
             GiryaLastFloorSampled = 8,
@@ -111,6 +119,8 @@ public class GiryaStatsTests
             StrengthAdded = 5,
             GiryaStrengthRateAdded = 5,
             GiryaStrengthCombats = 3,
+            GiryaAttacksPlayed = 5,
+            GiryaAttackHits = 8,
             GiryaCountFloorTotal = 8,
             GiryaFloorSamples = 6,
             GiryaLastFloorSampled = 14,
@@ -126,6 +136,8 @@ public class GiryaStatsTests
         Assert.Equal(6m, target.StrengthAdded);
         Assert.Equal(6m, target.GiryaStrengthRateAdded);
         Assert.Equal(4, target.GiryaStrengthCombats);
+        Assert.Equal(7, target.GiryaAttacksPlayed);
+        Assert.Equal(12, target.GiryaAttackHits);
         Assert.Equal(11, target.GiryaCountFloorTotal);
         Assert.Equal(10, target.GiryaFloorSamples);
         Assert.Equal(14, target.GiryaLastFloorSampled);
@@ -149,6 +161,8 @@ public class GiryaStatsTests
         Assert.Contains("Strength gained this combat", body);
         Assert.Contains("Avg strength gained per activation", body);
         Assert.Contains("Avg strength gained per combat", body);
+        Assert.Contains("Attack cards played while Girya's Strength was active", body);
+        Assert.Contains("Resolved enemy damage hits from Attack cards", body);
         Assert.Contains(StatConceptGlossary.RenderHintedGlyph("average"), body);
         Assert.Contains(StatConceptGlossary.RenderHintedGlyph("charge"), body);
         Assert.Contains(StatConceptGlossary.RenderHintedGlyph("floor"), body);
@@ -191,6 +205,8 @@ public class GiryaStatsTests
         Assert.NotNull(agg);
         Assert.Equal(0m, agg!.GiryaStrengthRateAdded);
         Assert.Equal(0, agg.GiryaStrengthCombats);
+        Assert.Equal(0, agg.GiryaAttacksPlayed);
+        Assert.Equal(0, agg.GiryaAttackHits);
         Assert.Equal(0, agg.GiryaFloorSamples);
         Assert.Equal(0, agg.GiryaUseFloorDistanceSamples);
         Assert.Null(agg.GiryaLastFloorSampled);
@@ -205,6 +221,8 @@ public class GiryaStatsTests
         StrengthAdded = 6,
         GiryaStrengthRateAdded = 6,
         GiryaStrengthCombats = 4,
+        GiryaAttacksPlayed = 7,
+        GiryaAttackHits = 12,
         GiryaCountFloorTotal = 11,
         GiryaFloorSamples = 10,
         GiryaLastFloorSampled = 14,
@@ -221,6 +239,8 @@ public class GiryaStatsTests
         Assert.Equal(6m, agg.StrengthAdded);
         Assert.Equal(6m, agg.GiryaStrengthRateAdded);
         Assert.Equal(4, agg.GiryaStrengthCombats);
+        Assert.Equal(7, agg.GiryaAttacksPlayed);
+        Assert.Equal(12, agg.GiryaAttackHits);
         Assert.Equal(11, agg.GiryaCountFloorTotal);
         Assert.Equal(10, agg.GiryaFloorSamples);
         Assert.Equal(14, agg.GiryaLastFloorSampled);
