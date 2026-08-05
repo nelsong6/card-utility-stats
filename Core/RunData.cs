@@ -1094,8 +1094,8 @@ public class RelicAggregate
     // has block at end of turn.
     public int BlockedTriggers { get; set; }
 
-    // Total Strength this relic added. Used by Reptile Trinket, Shuriken,
-    // Ruined Helmet, Sword of Jade, and Toasty Mittens.
+    // Total Strength this relic added. Used by Girya, Reptile Trinket,
+    // Shuriken, Ruined Helmet, Sword of Jade, and Toasty Mittens.
     public decimal StrengthAdded { get; set; }
 
     // Toasty Mittens outcomes and its zero-inclusive held-combat denominator.
@@ -1276,6 +1276,24 @@ public class RelicAggregate
     // Tooltip-only projection populated from the live pending combat aggregate.
     // Internal properties are not part of the persisted System.Text.Json shape.
     internal decimal SwordInTheStoneStrengthAddedThisCombat { get; set; }
+
+    // Girya's matching observation-era Strength numerator and eligible-combat
+    // denominator. The floor samples are one counter snapshot per entered floor
+    // while held (including its acquisition floor), so time spent at each Lift
+    // count is weighted naturally. Use distances run from acquisition to the
+    // first Lift and then between consecutive successful Lifts.
+    public decimal GiryaStrengthRateAdded { get; set; }
+    public int GiryaStrengthCombats { get; set; }
+    public int GiryaCountFloorTotal { get; set; }
+    public int GiryaFloorSamples { get; set; }
+    public int? GiryaLastFloorSampled { get; set; }
+    public int GiryaUseFloorDistanceTotal { get; set; }
+    public int GiryaUseFloorDistanceSamples { get; set; }
+    public int? GiryaLastUseFloor { get; set; }
+    public int GiryaLastObservedLiftCount { get; set; }
+
+    // Tooltip-only projection populated from the live pending combat aggregate.
+    internal decimal GiryaStrengthAddedThisCombat { get; set; }
 
     // Total observed maximum HP gained by pickup max-HP relics and Chosen Cheese.
     public decimal MaxHpGained { get; set; }

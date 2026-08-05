@@ -6426,6 +6426,44 @@ public class SchemaLoadingTests
                 .FloorsBeforeFirstGoldExpense);
     }
 
+    [Fact]
+    public void HistoricalLoad_AcceptsGiryaRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("girya-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertGiryaFixture(loaded.Data);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsGiryaRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("girya-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertGiryaFixture(resumed!);
+    }
+
+    private static void AssertGiryaFixture(RunData run)
+    {
+        var relic = run.RelicAggregates["RELIC.GIRYA"];
+        Assert.Equal(5, relic.FloorAcquired);
+        Assert.Equal(3, relic.Activations);
+        Assert.Equal(6m, relic.StrengthAdded);
+        Assert.Equal(6m, relic.GiryaStrengthRateAdded);
+        Assert.Equal(4, relic.GiryaStrengthCombats);
+        Assert.Equal(11, relic.GiryaCountFloorTotal);
+        Assert.Equal(10, relic.GiryaFloorSamples);
+        Assert.Equal(14, relic.GiryaLastFloorSampled);
+        Assert.Equal(9, relic.GiryaUseFloorDistanceTotal);
+        Assert.Equal(3, relic.GiryaUseFloorDistanceSamples);
+        Assert.Equal(14, relic.GiryaLastUseFloor);
+        Assert.Equal(3, relic.GiryaLastObservedLiftCount);
+    }
+
     private static void AssertSplashFixture(CardAggregate cardAgg)
     {
         Assert.Equal(6, cardAgg.SplashAttacksTaken);

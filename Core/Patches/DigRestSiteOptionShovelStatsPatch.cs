@@ -136,6 +136,9 @@ public static class RestSiteSynchronizerShovelStatsPatch
             if (chosenOption is KindleRestSiteOption)
                 RunTracker.RecordPumpkinCandleRekindled(__instance.LocalPlayer);
 
+            if (chosenOption is LiftRestSiteOption)
+                RunTracker.RecordGiryaLift(__instance.LocalPlayer);
+
             if (options.Any(option => option is DigRestSiteOption)
                 && chosenOption is not DigRestSiteOption)
             {

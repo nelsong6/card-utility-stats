@@ -1517,6 +1517,19 @@ model and intentionally overlaps the Rare offer bucket. Actual campfires where
 Rest was available but another option was chosen can share Shovel's
 `RestSiteSynchronizer.BeforeLocalRestSiteExited` observation point.
 
+Girya's saved `TimesLifted` counter is incremented inside
+`LiftRestSiteOption.OnSelect`, before the rest site exits. Observe a selected
+`LiftRestSiteOption` at `RestSiteSynchronizer.BeforeLocalRestSiteExited`; the
+counter is then the completed result and can make the floor-distance update
+idempotent across reloads. Sample that counter once at the successful relic
+obtain boundary and once for each later `RunManager.EnterMapPointInternal`
+destination floor. Sampling before the destination room acts means a Lift at a
+rest site begins weighting the next floor, while count zero still weights the
+acquisition and pre-Lift floors. Girya applies Strength only from its awaited
+`AfterRoomEntered` callback for combat rooms with `TimesLifted > 0`; measure the
+owner's actual Strength before and after that callback rather than assuming the
+saved count was fully applied.
+
 Fresnel Lens applies Nimble from its owner-specific
 `TryModifyCardRewardOptionsLate` callback. Count the final option only when its
 `CardCreationResult` is still Nimble and names Fresnel Lens in

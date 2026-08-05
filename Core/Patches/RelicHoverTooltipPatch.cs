@@ -738,6 +738,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is Girya)
+        {
+            title = "Girya";
+            body = BuildGiryaBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is SwordOfStone or SwordOfJade)
         {
             var isSwordOfJade = relicModel is SwordOfJade;
@@ -5564,6 +5571,42 @@ public static class RelicHoverShowPatch
             agg.RuinedHelmetStrengthAddedThisCombat,
             agg.StrengthAdded,
             agg.RuinedHelmetCombats);
+        return sb.ToString();
+    }
+
+    private static string BuildGiryaBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        AppendStrengthIncreaseRelicStats(
+            sb,
+            agg.Activations,
+            agg.StrengthAdded,
+            agg.GiryaStrengthAddedThisCombat,
+            agg.GiryaStrengthRateAdded,
+            agg.GiryaStrengthCombats);
+
+        var averageCountPerFloor = agg.GiryaFloorSamples <= 0
+            ? 0m
+            : (decimal)agg.GiryaCountFloorTotal / agg.GiryaFloorSamples;
+        var averageFloorsPerUse = agg.GiryaUseFloorDistanceSamples <= 0
+            ? 0m
+            : (decimal)agg.GiryaUseFloorDistanceTotal
+                / agg.GiryaUseFloorDistanceSamples;
+
+        DescribedIconRow(
+            sb,
+            ["average", "charge"],
+            ["floor"],
+            string.Empty,
+            FormatDecimal(averageCountPerFloor),
+            "Average Girya Lift count per sampled floor while held, including count zero on its acquisition floor.");
+        DescribedIconRow(
+            sb,
+            ["average", "floor"],
+            ["activation"],
+            "Lift",
+            FormatDecimal(averageFloorsPerUse),
+            "Average floors from acquiring Girya to its first successful Lift, then between consecutive successful Lifts.");
         return sb.ToString();
     }
 

@@ -630,6 +630,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `golden-pearl-relic-run.json`
   Adds Golden Pearl's floor distance from acquisition to the first observed
   positive gold loss classified by the game as spending.
+- `girya-relic-run.json`
+  Adds Girya's observed Strength, eligible-combat denominator, time-weighted
+  floor counter samples, and successful-Lift floor pacing.
 
 Why these exist:
 

@@ -89,6 +89,8 @@ public static class RelicCmdObtainStatsPatch
         RunTracker.RecordLizardTailObtained(relic, player);
         if (relic is BookOfFiveRings bookOfFiveRings)
             RunTracker.RecordBookOfFiveRingsObtained(bookOfFiveRings, player);
+        if (relic is Girya girya)
+            RunTracker.RecordGiryaObtained(girya, player);
         RunTracker.RecordSwordOfStoneObtained(relic, player);
         RunTracker.RecordToyBoxWaxRelicBestowed(relic, player);
 

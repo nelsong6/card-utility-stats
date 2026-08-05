@@ -2634,6 +2634,27 @@ public static class RunTracker
         target.PermafrostCombats += source.PermafrostCombats;
         target.BlockedTriggers += source.BlockedTriggers;
         target.StrengthAdded += source.StrengthAdded;
+        target.GiryaStrengthRateAdded += source.GiryaStrengthRateAdded;
+        target.GiryaStrengthCombats += source.GiryaStrengthCombats;
+        target.GiryaCountFloorTotal += source.GiryaCountFloorTotal;
+        target.GiryaFloorSamples += source.GiryaFloorSamples;
+        if (source.GiryaLastFloorSampled.HasValue
+            && (!target.GiryaLastFloorSampled.HasValue
+                || source.GiryaLastFloorSampled.Value > target.GiryaLastFloorSampled.Value))
+        {
+            target.GiryaLastFloorSampled = source.GiryaLastFloorSampled;
+        }
+        target.GiryaUseFloorDistanceTotal += source.GiryaUseFloorDistanceTotal;
+        target.GiryaUseFloorDistanceSamples += source.GiryaUseFloorDistanceSamples;
+        if (source.GiryaLastUseFloor.HasValue
+            && (!target.GiryaLastUseFloor.HasValue
+                || source.GiryaLastUseFloor.Value > target.GiryaLastUseFloor.Value))
+        {
+            target.GiryaLastUseFloor = source.GiryaLastUseFloor;
+        }
+        target.GiryaLastObservedLiftCount = Math.Max(
+            target.GiryaLastObservedLiftCount,
+            source.GiryaLastObservedLiftCount);
         target.SwordInTheStoneStrengthRateAdded +=
             source.SwordInTheStoneStrengthRateAdded;
         target.SwordInTheStoneStrengthCombats +=
@@ -9314,6 +9335,7 @@ public static class RunTracker
     private const string RazorToothRelicId = "RELIC.RAZOR_TOOTH";
     private const string WarHammerRelicId = "RELIC.WAR_HAMMER";
     private const string SwordOfStoneRelicId = "RELIC.SWORD_OF_STONE";
+    private const string GiryaRelicId = "RELIC.GIRYA";
     private const string WhetstoneRelicId = "RELIC.WHETSTONE";
     private const string YummyCookieRelicId = "RELIC.YUMMY_COOKIE";
     private const string WarPaintRelicId = "RELIC.WAR_PAINT";
@@ -14217,6 +14239,19 @@ public static class RunTracker
                         floor);
                 }
 
+                var girya = player.Relics.OfType<Girya>().FirstOrDefault();
+                if (girya != null)
+                {
+                    var agg = GetOrCreateCurrentRunRelicAggregateLocked(GiryaRelicId);
+                    RecordRelicFloorAcquiredForTest(
+                        agg,
+                        RelicFloorAddedToDeck(girya) ?? floor);
+                    changed |= RecordGiryaFloorSampleForTest(
+                        agg,
+                        floor,
+                        girya.TimesLifted);
+                }
+
                 if (changed)
                 {
                     _currentRun.UpdatedAt = Now();
@@ -16845,6 +16880,214 @@ public static class RunTracker
     {
         if (agg == null) return;
         agg.SwordInTheStoneStrengthCombats += Math.Max(0, count);
+    }
+
+    /// <summary>
+    /// Record Girya at the successful obtain boundary. Count zero on the
+    /// acquisition floor is a meaningful part of its time-weighted average.
+    /// </summary>
+    public static void RecordGiryaObtained(Girya relic, Player player)
+    {
+        if (relic == null || player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ReferenceEquals(relic.Owner, player)
+                    || !IsTrackedRelic(relic)
+                    || !IsTrackedPlayer(player))
+                {
+                    return;
+                }
+
+                var floor = RelicFloorAddedToDeck(relic) ?? CurrentRunFloorLocked();
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(GiryaRelicId);
+                RecordRelicFloorAcquiredForTest(agg, floor);
+                if (floor.HasValue)
+                {
+                    RecordGiryaFloorSampleForTest(
+                        agg,
+                        floor.Value,
+                        relic.TimesLifted);
+                }
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordGiryaObtained failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record a completed Lift from the rest-site exit boundary, after Girya's
+    /// native saved counter has incremented.
+    /// </summary>
+    public static void RecordGiryaLift(Player player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                var girya = player.Relics.OfType<Girya>().FirstOrDefault();
+                if (girya == null || !IsTrackedRelic(girya)) return;
+
+                var floor = CurrentRunFloorLocked();
+                if (!floor.HasValue) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(GiryaRelicId);
+                RecordRelicFloorAcquiredForTest(
+                    agg,
+                    RelicFloorAddedToDeck(girya) ?? floor);
+                RecordGiryaLiftForTest(
+                    agg,
+                    floor.Value,
+                    girya.TimesLifted);
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordGiryaLift failed: {e.Message}");
+            }
+        }
+    }
+
+    public static bool BeginGiryaStrengthGain(
+        Girya relic,
+        AbstractRoom room,
+        out Creature? ownerCreature,
+        out decimal strengthBefore)
+    {
+        ownerCreature = null;
+        strengthBefore = 0m;
+        if (relic?.Owner?.Creature == null
+            || room is not CombatRoom
+            || relic.TimesLifted <= 0)
+        {
+            return false;
+        }
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(relic.Owner))
+                    return false;
+
+                _pendingCombat ??= new PendingCombat();
+                RecordGiryaStrengthCombatForPlayerLocked(relic.Owner);
+                ownerCreature = relic.Owner.Creature;
+                strengthBefore = CurrentStrength(ownerCreature);
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"BeginGiryaStrengthGain failed: {e.Message}");
+                ownerCreature = null;
+                strengthBefore = 0m;
+                return false;
+            }
+        }
+    }
+
+    public static void CompleteGiryaStrengthGain(
+        Creature? ownerCreature,
+        decimal strengthBefore,
+        bool succeeded)
+    {
+        if (!succeeded || ownerCreature?.Player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(ownerCreature.Player)) return;
+                var strengthGained = Math.Max(
+                    0m,
+                    CurrentStrength(ownerCreature) - strengthBefore);
+                if (strengthGained <= 0m) return;
+
+                var agg = GetOrCreatePendingRelicAggregateLocked(GiryaRelicId);
+                RecordGiryaStrengthGainForTest(agg, strengthGained);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"CompleteGiryaStrengthGain failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static bool RecordGiryaFloorSampleForTest(
+        RelicAggregate agg,
+        int floor,
+        int count)
+    {
+        if (agg == null
+            || floor < 0
+            || (agg.GiryaLastFloorSampled.HasValue
+                && floor <= agg.GiryaLastFloorSampled.Value))
+        {
+            return false;
+        }
+
+        agg.GiryaCountFloorTotal += Math.Clamp(count, 0, Girya.maxLifts);
+        agg.GiryaFloorSamples += 1;
+        agg.GiryaLastFloorSampled = floor;
+        agg.GiryaLastUseFloor ??= floor;
+        agg.GiryaLastObservedLiftCount = Math.Max(
+            agg.GiryaLastObservedLiftCount,
+            Math.Clamp(count, 0, Girya.maxLifts));
+        return true;
+    }
+
+    internal static bool RecordGiryaLiftForTest(
+        RelicAggregate agg,
+        int floor,
+        int currentLiftCount)
+    {
+        if (agg == null
+            || floor < 0
+            || currentLiftCount <= agg.GiryaLastObservedLiftCount)
+        {
+            return false;
+        }
+
+        if (agg.GiryaLastUseFloor.HasValue)
+        {
+            agg.GiryaUseFloorDistanceTotal += Math.Max(
+                0,
+                floor - agg.GiryaLastUseFloor.Value);
+            agg.GiryaUseFloorDistanceSamples += 1;
+        }
+
+        agg.GiryaLastUseFloor = floor;
+        agg.GiryaLastObservedLiftCount = Math.Clamp(
+            currentLiftCount,
+            0,
+            Girya.maxLifts);
+        return true;
+    }
+
+    internal static void RecordGiryaStrengthGainForTest(
+        RelicAggregate agg,
+        decimal strengthGained)
+    {
+        if (agg == null || strengthGained <= 0m) return;
+        agg.Activations += 1;
+        agg.StrengthAdded += strengthGained;
+        agg.GiryaStrengthRateAdded += strengthGained;
+    }
+
+    internal static void RecordGiryaStrengthCombatForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        agg.GiryaStrengthCombats += Math.Max(0, count);
     }
 
     /// <summary>
@@ -26144,6 +26387,8 @@ public static class RunTracker
                     result.RuinedHelmetStrengthAddedThisCombat = pending.StrengthAdded;
                 if (string.Equals(relicId, SwordOfStoneRelicId, StringComparison.Ordinal))
                     result.SwordInTheStoneStrengthAddedThisCombat = pending.StrengthAdded;
+                if (string.Equals(relicId, GiryaRelicId, StringComparison.Ordinal))
+                    result.GiryaStrengthAddedThisCombat = pending.StrengthAdded;
                 if (string.Equals(relicId, ArtOfWarRelicId, StringComparison.Ordinal))
                 {
                     result.ArtOfWarEnergyAddedThisCombat = pending.EnergyGenerated;
@@ -28615,6 +28860,17 @@ public static class RunTracker
 
         var agg = GetOrCreatePendingRelicAggregateLocked(SwordOfStoneRelicId);
         RecordSwordInTheStoneStrengthCombatForTest(agg);
+    }
+
+    private static void RecordGiryaStrengthCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!player.Relics.OfType<Girya>().Any(relic => relic.TimesLifted > 0))
+            return;
+        if (!_pendingCombat.GiryaStrengthCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(GiryaRelicId);
+        RecordGiryaStrengthCombatForTest(agg);
     }
 
     private static void RecordMummifiedHandCombatForPlayerLocked(Player player)
@@ -35369,6 +35625,8 @@ internal class PendingCombat
     public Dictionary<RuinedHelmet, decimal> PendingRuinedHelmetStrengthGains { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> SwordInTheStoneStrengthCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> GiryaStrengthCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> MummifiedHandCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

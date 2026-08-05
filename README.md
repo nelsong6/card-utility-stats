@@ -200,6 +200,9 @@ Petrified Toad records Potion Shaped Rocks successfully given and attempts
 blocked specifically by a full potion belt.
 Pumpkin Candle records its Ancient energy contribution, average combat-start
 charges, and campfire rekindles.
+Girya records the Strength it actually adds at combat entry, the average saved
+Lift count across every floor held, and average floor travel from acquisition
+to the first Lift and between later Lifts.
 Small Capsule records the exact relic rolled on its reward screen and whether
 that same reward was taken or left behind, with the relic remaining hoverable
 in the SpireLens tooltip.
