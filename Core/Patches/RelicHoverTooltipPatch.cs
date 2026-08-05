@@ -3025,10 +3025,10 @@ public static class RelicHoverShowPatch
         {
             "offered" => StatConceptGlossary.RenderHintedGlyph("offered"),
             "taken" => StatConceptGlossary.RenderHintedGlyph("taken"),
-            "rejected" => RenderTakenOutcome("not taken"),
+            "rejected" => $"¬ {StatConceptGlossary.RenderHintedGlyph("taken")}",
             _ => StatsTooltip.EscapeBbcode(outcome),
         };
-        DescribedIconFlowRow(
+        DescribedIconRow(
             sb,
             [powerConceptId],
             [],

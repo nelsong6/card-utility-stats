@@ -105,6 +105,10 @@ public class LastingCandyStatsTests
         Assert.Contains("[b]5[/b]", body);
         Assert.Contains("[b]3[/b]", body);
         Assert.Contains("[b]2[/b]", body);
+        Assert.Equal(1, body.Split("[table=4]", StringSplitOptions.None).Length - 1);
+        Assert.Equal(9, body.Split("[left][b]", StringSplitOptions.None).Length - 1);
+        Assert.DoesNotContain("[table=2]", body);
+        Assert.DoesNotContain("not ", body);
     }
 
     [Fact]
@@ -156,7 +160,7 @@ public class LastingCandyStatsTests
     }
 
     private static string RenderNotTaken()
-        => $"not {StatConceptGlossary.RenderHintedGlyph("taken")}";
+        => $"¬ {StatConceptGlossary.RenderHintedGlyph("taken")}";
 
     private static string BuildBody(RelicAggregate agg)
         => (string)(BuildBodyMethod.Invoke(null, new object?[] { agg })
