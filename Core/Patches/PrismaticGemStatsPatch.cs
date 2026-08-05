@@ -111,7 +111,11 @@ public static class HookTryModifyCardRewardOptionsPrismaticGemPatch
     private static string NormalizeKey(string? value)
     {
         if (string.IsNullOrWhiteSpace(value)) return "unknown";
-        return value.Trim().Replace(' ', '_').Replace('-', '_').ToLowerInvariant();
+        var key = value.Trim().Replace(' ', '_').Replace('-', '_').ToLowerInvariant();
+        const string cardPoolSuffix = "_card_pool";
+        return key.EndsWith(cardPoolSuffix, StringComparison.Ordinal)
+            ? key[..^cardPoolSuffix.Length]
+            : key;
     }
 
     private static string ToDisplayName(string key)

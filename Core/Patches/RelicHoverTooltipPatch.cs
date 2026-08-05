@@ -86,6 +86,15 @@ public static class RelicHoverShowPatch
         AccessTools.Field(typeof(OrnamentalFan), "_attacksPlayedThisTurn");
     private static readonly System.Reflection.FieldInfo? ShurikenAttacksPlayedThisTurnField =
         AccessTools.Field(typeof(Shuriken), "_attacksPlayedThisTurn");
+    private static readonly (string Key, string DisplayName)[] PrismaticGemCardPools =
+    [
+        ("ironclad", "Ironclad"),
+        ("silent", "Silent"),
+        ("regent", "Regent"),
+        ("necrobinder", "Necrobinder"),
+        ("defect", "Defect"),
+        ("colorless", "Colorless"),
+    ];
 
     internal static bool TryBuildNativeHoverTip(
         NRelicInventoryHolder holder,
@@ -2744,14 +2753,28 @@ public static class RelicHoverShowPatch
         var sb = new StringBuilder();
         AppendEnergyGeneratedStats(sb, agg);
         Row3(sb, "Card rewards affected", agg.CardRewardsAffected.ToString(), "");
-        foreach (var category in agg.CardRewardCategories
-            .Where(kvp => kvp.Value.Count > 0)
-            .OrderBy(kvp => kvp.Key == "colorless" ? 1 : 0)
-            .ThenBy(kvp => kvp.Value.DisplayName, StringComparer.OrdinalIgnoreCase))
+        foreach (var (key, displayName) in PrismaticGemCardPools)
         {
-            Row3(sb, $"{StatsTooltip.EscapeBbcode(category.Value.DisplayName)} rewards", category.Value.Count.ToString(), "");
+            var count = GetPrismaticGemCardPoolOfferCount(agg, key);
+            DescribedIconRow(
+                sb,
+                ["card", "offered"],
+                [],
+                displayName,
+                count.ToString(),
+                $"{displayName} cards offered — final visible {displayName} card options in rewards while Prismatic Gem was held.");
         }
         return sb.ToString();
+    }
+
+    private static int GetPrismaticGemCardPoolOfferCount(RelicAggregate agg, string key)
+    {
+        var legacyKey = $"{key}_card_pool";
+        return agg.CardRewardCategories
+            .Where(category =>
+                string.Equals(category.Key, key, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(category.Key, legacyKey, StringComparison.OrdinalIgnoreCase))
+            .Sum(category => Math.Max(0, category.Value.Count));
     }
 
     private static string BuildPumpkinCandleBodyBBCode(RelicAggregate agg)
