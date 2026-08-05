@@ -633,6 +633,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `girya-relic-run.json`
   Adds Girya's observed Strength, eligible-combat denominator, time-weighted
   floor counter samples, and successful-Lift floor pacing.
+- `lasting-candy-relic-run.json`
+  Adds Lasting Candy's exact Power offers and terminal taken/rejected outcomes,
+  split into Uncommon and Rare rarity buckets.
 
 Why these exist:
 

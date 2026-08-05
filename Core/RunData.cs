@@ -1932,6 +1932,20 @@ public class RelicAggregate
     public int WingCharmUncommonSwiftCardsOffered { get; set; }
     public int WingCharmRareSwiftCardsOffered { get; set; }
 
+    // Lasting Candy card-reward outcomes. Each count comes from the exact
+    // Power CardCreationResult the relic appended to a triggering combat
+    // reward; rejected means that result remained when the reward resolved or
+    // was replaced by a reroll.
+    public int LastingCandyPowersOffered { get; set; }
+    public int LastingCandyPowersTaken { get; set; }
+    public int LastingCandyPowersRejected { get; set; }
+    public int LastingCandyUncommonPowersOffered { get; set; }
+    public int LastingCandyUncommonPowersTaken { get; set; }
+    public int LastingCandyUncommonPowersRejected { get; set; }
+    public int LastingCandyRarePowersOffered { get; set; }
+    public int LastingCandyRarePowersTaken { get; set; }
+    public int LastingCandyRarePowersRejected { get; set; }
+
     // Ordered relic-owned card-choice offers. Silver Crucible uses its
     // one-based use number (1-3); Lead Paperweight uses screen 1. Cards keeps
     // the visible left-to-right option order and, once resolved, explicit

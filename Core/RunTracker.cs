@@ -189,6 +189,7 @@ public static class RunTracker
     private static readonly Dictionary<CardReward, PendingFresnelLensReward> _fresnelLensRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, PendingSilkenTressReward> _silkenTressRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, PendingWingCharmReward> _wingCharmRewards = new(ReferenceEqualityComparer.Instance);
+    private static readonly Dictionary<CardReward, PendingLastingCandyReward> _lastingCandyRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, PendingSilverCrucibleReward> _silverCrucibleRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, PendingOrreryReward> _orreryRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, int> _whiteStarRewardRareCardsBeforeSelection =
@@ -1550,6 +1551,7 @@ public static class RunTracker
         _fresnelLensRewards.Clear();
         _silkenTressRewards.Clear();
         _wingCharmRewards.Clear();
+        _lastingCandyRewards.Clear();
         _silverCrucibleRewards.Clear();
         _orreryRewards.Clear();
         _whiteStarRewardRareCardsBeforeSelection.Clear();
@@ -3055,6 +3057,15 @@ public static class RunTracker
         target.WingCharmCommonSwiftCardsOffered += source.WingCharmCommonSwiftCardsOffered;
         target.WingCharmUncommonSwiftCardsOffered += source.WingCharmUncommonSwiftCardsOffered;
         target.WingCharmRareSwiftCardsOffered += source.WingCharmRareSwiftCardsOffered;
+        target.LastingCandyPowersOffered += source.LastingCandyPowersOffered;
+        target.LastingCandyPowersTaken += source.LastingCandyPowersTaken;
+        target.LastingCandyPowersRejected += source.LastingCandyPowersRejected;
+        target.LastingCandyUncommonPowersOffered += source.LastingCandyUncommonPowersOffered;
+        target.LastingCandyUncommonPowersTaken += source.LastingCandyUncommonPowersTaken;
+        target.LastingCandyUncommonPowersRejected += source.LastingCandyUncommonPowersRejected;
+        target.LastingCandyRarePowersOffered += source.LastingCandyRarePowersOffered;
+        target.LastingCandyRarePowersTaken += source.LastingCandyRarePowersTaken;
+        target.LastingCandyRarePowersRejected += source.LastingCandyRarePowersRejected;
         MergeCardRewardScreens(target, source);
         MergeOrreryRewards(target, source);
         MergeCardRewardCategories(target.CardRewardCategories, source.CardRewardCategories);
@@ -9317,6 +9328,7 @@ public static class RunTracker
     private const string SealOfGoldRelicId = "RELIC.SEAL_OF_GOLD";
     private const string FresnelLensRelicId = "RELIC.FRESNEL_LENS";
     private const string WingCharmRelicId = "RELIC.WING_CHARM";
+    private const string LastingCandyRelicId = "RELIC.LASTING_CANDY";
     private const string SilverCrucibleRelicId = "RELIC.SILVER_CRUCIBLE";
     private const string OrreryRelicId = "RELIC.ORRERY";
     private const string BloodSoakedRoseRelicId = "RELIC.BLOOD_SOAKED_ROSE";
@@ -25348,6 +25360,111 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Snapshot the exact Power option appended by Lasting Candy. Registration
+    /// is safe at Populate, reward open, and after reroll; an existing snapshot
+    /// is preserved until that visible option set reaches a terminal outcome.
+    /// </summary>
+    public static void NoteLastingCandyReward(CardReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(reward.Player)) return;
+                if (_lastingCandyRewards.ContainsKey(reward)) return;
+
+                var pending = PendingLastingCandyReward.FromReward(reward);
+                if (pending.Options.Count > 0)
+                    _lastingCandyRewards[reward] = pending;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"NoteLastingCandyReward failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Resolve the Candy-tagged result against the reward's remaining result
+    /// objects. Only successful deck entry removes that exact object; all
+    /// terminal alternatives, skips, other-card choices, and rerolls reject it.
+    /// </summary>
+    public static void RecordLastingCandyRewardResolved(CardReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_lastingCandyRewards.Remove(reward, out var pending)) return;
+                if (!IsTrackedPlayer(reward.Player)) return;
+
+                var remaining = new HashSet<CardCreationResult>(
+                    reward._cards,
+                    ReferenceEqualityComparer.Instance);
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(
+                    LastingCandyRelicId);
+                foreach (var option in pending.Options)
+                {
+                    RecordLastingCandyPowerOutcomeForTest(
+                        agg,
+                        option.Rarity,
+                        taken: !remaining.Contains(option.Result));
+                }
+
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordLastingCandyRewardResolved failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void CancelLastingCandyReward(CardReward reward)
+    {
+        if (reward == null) return;
+        lock (_lock)
+            _lastingCandyRewards.Remove(reward);
+    }
+
+    internal static void RecordLastingCandyPowerOutcomeForTest(
+        RelicAggregate agg,
+        CardRarity rarity,
+        bool taken)
+    {
+        if (agg == null) return;
+
+        agg.LastingCandyPowersOffered += 1;
+        if (taken)
+            agg.LastingCandyPowersTaken += 1;
+        else
+            agg.LastingCandyPowersRejected += 1;
+
+        switch (rarity)
+        {
+            case CardRarity.Uncommon:
+                agg.LastingCandyUncommonPowersOffered += 1;
+                if (taken)
+                    agg.LastingCandyUncommonPowersTaken += 1;
+                else
+                    agg.LastingCandyUncommonPowersRejected += 1;
+                break;
+            case CardRarity.Rare:
+                agg.LastingCandyRarePowersOffered += 1;
+                if (taken)
+                    agg.LastingCandyRarePowersTaken += 1;
+                else
+                    agg.LastingCandyRarePowersRejected += 1;
+                break;
+        }
+    }
+
+    /// <summary>
     /// Record Drowning Beacon's observed max-HP cost across the full climb
     /// option. The event loses max HP before obtaining Fresnel Lens, so the
     /// relic's own pickup callbacks cannot recover the original value.
@@ -35232,6 +35349,46 @@ internal sealed class PendingWingCharmReward
                     continue;
 
                 pending.Options.Add(new PendingWingCharmOption(
+                    option,
+                    card.Rarity));
+            }
+            catch
+            {
+            }
+        }
+
+        return pending;
+    }
+}
+
+internal sealed record PendingLastingCandyOption(
+    CardCreationResult Result,
+    CardRarity Rarity);
+
+internal sealed class PendingLastingCandyReward
+{
+    public List<PendingLastingCandyOption> Options { get; } = new();
+
+    public static PendingLastingCandyReward FromReward(CardReward? reward)
+    {
+        var pending = new PendingLastingCandyReward();
+        if (reward == null) return pending;
+
+        foreach (var option in reward._cards)
+        {
+            try
+            {
+                var card = option?.Card;
+                if (option == null
+                    || card?.Type != CardType.Power
+                    || !option.ModifyingRelics.Any(relic =>
+                        relic is LastingCandy
+                        && ReferenceEquals(relic.Owner, reward.Player)))
+                {
+                    continue;
+                }
+
+                pending.Options.Add(new PendingLastingCandyOption(
                     option,
                     card.Rarity));
             }

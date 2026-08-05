@@ -939,6 +939,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is LastingCandy)
+        {
+            title = "Lasting Candy";
+            body = BuildLastingCandyBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is FishingRod)
         {
             title = "Fishing Rod";
@@ -2943,6 +2950,89 @@ public static class RelicHoverShowPatch
             new[] { cardConceptId },
             Array.Empty<string>(),
             iconExpression,
+            value.ToString(),
+            fullDescription);
+    }
+
+    private static string BuildLastingCandyBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        LastingCandyPowerRow(
+            sb,
+            "power",
+            "offered",
+            agg.LastingCandyPowersOffered,
+            "Powers offered — Power options added to combat card rewards by Lasting Candy.");
+        LastingCandyPowerRow(
+            sb,
+            "power",
+            "taken",
+            agg.LastingCandyPowersTaken,
+            "Powers taken — Lasting Candy Power options that successfully entered the permanent deck.");
+        LastingCandyPowerRow(
+            sb,
+            "power",
+            "rejected",
+            agg.LastingCandyPowersRejected,
+            "Powers rejected — Lasting Candy Power options not taken before their reward resolved or rerolled.");
+        LastingCandyPowerRow(
+            sb,
+            "power_uncommon",
+            "offered",
+            agg.LastingCandyUncommonPowersOffered,
+            "Uncommon Powers offered by Lasting Candy.");
+        LastingCandyPowerRow(
+            sb,
+            "power_uncommon",
+            "taken",
+            agg.LastingCandyUncommonPowersTaken,
+            "Uncommon Lasting Candy Powers successfully taken.");
+        LastingCandyPowerRow(
+            sb,
+            "power_uncommon",
+            "rejected",
+            agg.LastingCandyUncommonPowersRejected,
+            "Uncommon Lasting Candy Powers rejected.");
+        LastingCandyPowerRow(
+            sb,
+            "power_rare",
+            "offered",
+            agg.LastingCandyRarePowersOffered,
+            "Rare Powers offered by Lasting Candy.");
+        LastingCandyPowerRow(
+            sb,
+            "power_rare",
+            "taken",
+            agg.LastingCandyRarePowersTaken,
+            "Rare Lasting Candy Powers successfully taken.");
+        LastingCandyPowerRow(
+            sb,
+            "power_rare",
+            "rejected",
+            agg.LastingCandyRarePowersRejected,
+            "Rare Lasting Candy Powers rejected.");
+        return sb.ToString();
+    }
+
+    private static void LastingCandyPowerRow(
+        StringBuilder sb,
+        string powerConceptId,
+        string outcome,
+        int value,
+        string fullDescription)
+    {
+        var outcomeExpression = outcome switch
+        {
+            "offered" => StatConceptGlossary.RenderHintedGlyph("offered"),
+            "taken" => StatConceptGlossary.RenderHintedGlyph("taken"),
+            "rejected" => RenderTakenOutcome("not taken"),
+            _ => StatsTooltip.EscapeBbcode(outcome),
+        };
+        DescribedIconFlowRow(
+            sb,
+            [powerConceptId],
+            [],
+            outcomeExpression,
             value.ToString(),
             fullDescription);
     }

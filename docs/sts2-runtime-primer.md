@@ -1554,6 +1554,17 @@ or outer skip with the result remaining is not taken. A reroll visibly offered
 the old Swift option, so resolve that option before `_cards` is cleared, then
 register the newly generated Swift option after repopulation.
 
+Lasting Candy's owner-specific `TryModifyCardRewardOptions` appends one Power
+as a new `CardCreationResult` and records itself in that result's
+`ModifyingRelics`. Snapshot that exact result after `CardReward.Populate` (or
+when an already-populated reward opens after a Core reload). A successful deck
+add removes the result object, so its absence at terminal resolution is an
+observed taken outcome; choosing another card, an outer skip, a terminal
+alternative, or a Driftwood reroll leaves it present and therefore rejects it.
+Resolve the old Candy option before reroll clears `_cards`, then register the
+new Candy-tagged result after repopulation. Inner card-screen Skip is not
+terminal and must preserve the pending snapshot.
+
 Silver Crucible's first, second, and third reward numbers are generation order,
 not click order. `CardReward.Populate` runs before the outer rewards page is
 shown, and `SilverCrucible.AfterModifyingCardRewardOptions` synchronously

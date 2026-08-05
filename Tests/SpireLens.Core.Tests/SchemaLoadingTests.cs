@@ -6464,6 +6464,41 @@ public class SchemaLoadingTests
         Assert.Equal(3, relic.GiryaLastObservedLiftCount);
     }
 
+    [Fact]
+    public void HistoricalLoad_AcceptsLastingCandyRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("lasting-candy-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertLastingCandyFixture(loaded.Data);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsLastingCandyRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("lasting-candy-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertLastingCandyFixture(resumed!);
+    }
+
+    private static void AssertLastingCandyFixture(RunData run)
+    {
+        var relic = run.RelicAggregates["RELIC.LASTING_CANDY"];
+        Assert.Equal(5, relic.LastingCandyPowersOffered);
+        Assert.Equal(2, relic.LastingCandyPowersTaken);
+        Assert.Equal(3, relic.LastingCandyPowersRejected);
+        Assert.Equal(3, relic.LastingCandyUncommonPowersOffered);
+        Assert.Equal(1, relic.LastingCandyUncommonPowersTaken);
+        Assert.Equal(2, relic.LastingCandyUncommonPowersRejected);
+        Assert.Equal(2, relic.LastingCandyRarePowersOffered);
+        Assert.Equal(1, relic.LastingCandyRarePowersTaken);
+        Assert.Equal(1, relic.LastingCandyRarePowersRejected);
+    }
+
     private static void AssertSplashFixture(CardAggregate cardAgg)
     {
         Assert.Equal(6, cardAgg.SplashAttacksTaken);
