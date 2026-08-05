@@ -1773,6 +1773,7 @@ public static class RunTracker
         }
 
         int prunedGhosts = PruneGhostAggregates(run, run.DefCounters, BuildLiveInstanceIdSetLocked());
+        var recoveredSoulUsage = RecoverSoulUsageFromLiveCombatHistoryLocked();
 
         CoreMain.Logger.Info(
             $"{context}: resumed run_id={run.RunId} " +
@@ -1780,6 +1781,14 @@ public static class RunTracker
             $"reconstructed_removed={reconstructedRemoved} " +
             $"restored_numbers={restored} unmatched_in_deck={unmatched} " +
             $"pending_rank_restores={_pendingRankRestores.Count} pruned_ghosts={prunedGhosts}");
+
+        if (recoveredSoulUsage.HasActivity)
+        {
+            CoreMain.Logger.Info(
+                $"{context}: recovered live Soul usage after mid-combat reload " +
+                $"plays={recoveredSoulUsage.Plays} drawn={recoveredSoulUsage.TimesDrawn} " +
+                $"exhausted={recoveredSoulUsage.TimesExhausted}");
+        }
 
         RefreshShivAvailabilityLocked();
         RefreshSoulAvailabilityLocked();
@@ -1806,6 +1815,149 @@ public static class RunTracker
         {
             SaveCurrentRun();
         }
+    }
+
+    /// <summary>
+    /// A Core hot reload deliberately drops the general pending-combat buffer,
+    /// but the game's CombatHistory survives. Rebuild the pooled Soul card's
+    /// directly observable usage so its synthetic "all Soul usage" surface
+    /// does not fall back to only previously committed combats. This is a
+    /// narrow recovery, not a claim that arbitrary mid-combat attribution can
+    /// be reconstructed after source windows have disappeared.
+    /// </summary>
+    private static SoulCombatUsageSnapshot RecoverSoulUsageFromLiveCombatHistoryLocked()
+    {
+        if (CombatManager.Instance?.IsInProgress != true
+            || !ShouldTrackCardStatsDuringCombatLocked())
+            return default;
+
+        var entries = CombatManager.Instance.History?.Entries;
+        if (entries == null) return default;
+
+        var activePlays = new List<CardPlay>();
+        var recovered = new SoulCombatUsageSnapshot();
+
+        foreach (var entry in entries)
+        {
+            switch (entry)
+            {
+                case CardPlayStartedEntry started
+                    when started.CardPlay?.Card != null
+                         && IsTrackedCard(started.CardPlay.Card):
+                    activePlays.Add(started.CardPlay);
+                    break;
+
+                case CardPlayFinishedEntry finished
+                    when finished.CardPlay?.Card != null:
+                {
+                    var cardPlay = finished.CardPlay;
+                    if (cardPlay.Card is Soul && IsTrackedCard(cardPlay.Card))
+                    {
+                        recovered.Plays++;
+                        recovered.TotalEnergySpent +=
+                            Math.Max(0, cardPlay.Resources.EnergySpent);
+                        recovered.TotalStarsSpent +=
+                            Math.Max(0, cardPlay.Resources.StarsSpent);
+                    }
+
+                    RemoveActiveCardPlay(activePlays, cardPlay);
+                    break;
+                }
+
+                case CardDrawnEntry drawn when IsTrackedSoul(drawn.Card):
+                    recovered.TimesDrawn++;
+                    if (!drawn.FromHandDraw
+                        && ActivePlayIsSoulDrawingAnotherCard(
+                            activePlays,
+                            drawn.Card))
+                    {
+                        recovered.TimesCardsDrawn++;
+                    }
+                    break;
+
+                case CardDrawnEntry drawn
+                    when !drawn.FromHandDraw
+                         && IsTrackedCard(drawn.Card)
+                         && ActivePlayIsSoulDrawingAnotherCard(
+                             activePlays,
+                             drawn.Card):
+                    recovered.TimesCardsDrawn++;
+                    break;
+
+                case CardDiscardedEntry discarded
+                    when IsTrackedSoul(discarded.Card):
+                    recovered.TimesDiscarded++;
+                    break;
+
+                case CardExhaustedEntry exhausted
+                    when IsTrackedSoul(exhausted.Card):
+                    recovered.TimesExhausted++;
+                    break;
+            }
+        }
+
+        if (!recovered.HasActivity) return recovered;
+
+        _pendingCombat ??= new PendingCombat();
+        _defCounters.TryGetValue(SoulDefinitionId, out var soulCounter);
+        _defCounters[SoulDefinitionId] = Math.Max(1, soulCounter);
+        var aggregate = GetOrCreateAggregate(
+            _pendingCombat,
+            SoulRecoveryAggregateIdLocked());
+        ApplyRecoveredSoulUsageForTest(aggregate, recovered);
+        _soulAvailableThisRun = true;
+        return recovered;
+    }
+
+    private static bool IsTrackedSoul(CardModel? card)
+        => card is Soul && IsTrackedCard(card);
+
+    private static bool ActivePlayIsSoulDrawingAnotherCard(
+        IReadOnlyList<CardPlay> activePlays,
+        CardModel drawnCard)
+    {
+        if (activePlays.Count == 0) return false;
+
+        var sourceCard = activePlays[^1].Card;
+        return sourceCard is Soul
+               && IsTrackedCard(sourceCard)
+               && !ReferenceEquals(Canonical(sourceCard), Canonical(drawnCard));
+    }
+
+    private static void RemoveActiveCardPlay(
+        List<CardPlay> activePlays,
+        CardPlay finishedPlay)
+    {
+        for (var index = activePlays.Count - 1; index >= 0; index--)
+        {
+            if (!ReferenceEquals(activePlays[index], finishedPlay)) continue;
+            activePlays.RemoveAt(index);
+            return;
+        }
+    }
+
+    private static string SoulRecoveryAggregateIdLocked()
+    {
+        var existing = _currentRun?.Aggregates.Keys.FirstOrDefault(key =>
+            CardAggregatePooler.IsAggregateForDefinition(
+                key,
+                SoulDefinitionId));
+        return existing ?? $"{SoulDefinitionId}#1";
+    }
+
+    internal static void ApplyRecoveredSoulUsageForTest(
+        CardAggregate aggregate,
+        SoulCombatUsageSnapshot recovered)
+    {
+        if (aggregate == null) return;
+
+        aggregate.Plays += Math.Max(0, recovered.Plays);
+        aggregate.TimesDrawn += Math.Max(0, recovered.TimesDrawn);
+        aggregate.TimesDiscarded += Math.Max(0, recovered.TimesDiscarded);
+        aggregate.TimesExhausted += Math.Max(0, recovered.TimesExhausted);
+        aggregate.TimesCardsDrawn += Math.Max(0, recovered.TimesCardsDrawn);
+        aggregate.TotalEnergySpent += Math.Max(0, recovered.TotalEnergySpent);
+        aggregate.TotalStarsSpent += Math.Max(0, recovered.TotalStarsSpent);
     }
 
     /// <summary>
@@ -34690,6 +34842,26 @@ internal sealed class PendingFresnelLensReward
 internal sealed record PendingWingCharmOption(
     CardCreationResult Result,
     CardRarity Rarity);
+
+internal struct SoulCombatUsageSnapshot
+{
+    public int Plays { get; set; }
+    public int TimesDrawn { get; set; }
+    public int TimesDiscarded { get; set; }
+    public int TimesExhausted { get; set; }
+    public int TimesCardsDrawn { get; set; }
+    public int TotalEnergySpent { get; set; }
+    public int TotalStarsSpent { get; set; }
+
+    public readonly bool HasActivity =>
+        Plays > 0
+        || TimesDrawn > 0
+        || TimesDiscarded > 0
+        || TimesExhausted > 0
+        || TimesCardsDrawn > 0
+        || TotalEnergySpent > 0
+        || TotalStarsSpent > 0;
+}
 
 internal sealed class PendingWingCharmReward
 {

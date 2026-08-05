@@ -1600,6 +1600,12 @@ Examples:
 
 - Shiv data is pooled under a synthetic Shiv meta-card once a Shiv has been generated.
 - Soul data is pooled under a synthetic Soul meta-card once a Soul has been generated.
+- A Core hot reload during combat loses the ordinary pending-combat buffer, but
+  the game's live `CombatHistory` remains intact. On resume, SpireLens narrowly
+  rebuilds directly observable Soul usage (completed plays, draws, discards,
+  exhausts, paid resources, and cards actually drawn during Soul resolution)
+  into the pooled Soul aggregate. This does not make general mid-combat restore
+  supported; source windows and outcomes absent from history remain lost.
 - Sovereign Blade gets a pooled meta-card once forged/generated behavior makes it relevant.
 - Each Status definition that reaches a combat pile gets one pooled meta-card
   whose tooltip merges every observed instance of that Status.
