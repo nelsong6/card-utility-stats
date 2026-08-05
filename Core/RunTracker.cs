@@ -3097,8 +3097,10 @@ public static class RunTracker
                     break;
                 case CardDrawnEntry cde:
                     // Draw-hook validation is complete; keep the trace debug-gated.
+                    // Hook.AfterCardDrawn is the one authoritative counter path.
+                    // Some runtimes also deliver this history entry through Add;
+                    // counting it here would double every successful draw.
                     CoreMain.LogDebug($"CardDrawnEntry card='{cde.Card?.Title ?? "null"}' fromHandDraw={cde.FromHandDraw}");
-                    if (trackCardStats && cde.Card != null) RecordCardDrawn(cde);
                     break;
                 case CardDiscardedEntry cdisc when cdisc.Card != null:
                     RecordCardDiscarded(cdisc.Card);
@@ -31582,24 +31584,6 @@ public static class RunTracker
         }
 
         return result;
-    }
-
-    private static void RecordCardDrawn(CardDrawnEntry entry)
-    {
-        lock (_lock)
-        {
-            if (!ShouldTrackCardStatsDuringCombatLocked()) return;
-
-            _pendingCombat ??= new PendingCombat();
-            var instanceId = GetOrAssignInstanceId(entry.Card);
-            var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
-            agg.TimesDrawn++;
-
-            // Don't bloat the events log with a draw entry per card draw —
-            // every combat draws ~5 cards/turn × ~5-10 turns so we'd emit
-            // 25-50 events just for draws. Aggregate counter is enough.
-            // If per-draw forensics becomes useful later, add it here.
-        }
     }
 
     /// <summary>

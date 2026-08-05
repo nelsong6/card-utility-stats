@@ -194,6 +194,10 @@ But do not assume every small `CombatHistory.*` wrapper is safe to patch. The re
 - Harmony patches on that wrapper did not fire in diagnostic runs.
 - `CardDrawnEntry` also did not appear through the generic `Observe` distribution during confirmed draws.
 - The reliable draw hook is `Hook.AfterCardDrawn`, not `CombatHistory.CardDrawn`.
+- Other runtime/JIT states can expose `CardDrawnEntry` through the generic
+  history observer after all. Treat it as recovery/diagnostic evidence only;
+  `Hook.AfterCardDrawn` remains the single live counter path, or successful
+  draws will be counted twice.
 
 When a future stat seems obvious from combat history but never appears, suspect inlining, alternate code paths, or late async flow. Add a focused diagnostic hook only long enough to prove the path, then promote the reliable hook or document the trap.
 

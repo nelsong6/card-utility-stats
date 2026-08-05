@@ -17,9 +17,12 @@ namespace SpireLens.Core.Patches;
 /// loop — it iterates every game model and calls their
 /// <c>AfterCardDrawnEarly</c> / <c>AfterCardDrawn</c> virtuals. That
 /// iteration is substantive enough the JIT won't inline it, so our patch
-/// lands reliably. It's also async but with no complex return value we
-/// care about — a prefix is enough since by the time Hook.AfterCardDrawn
-/// is invoked, the card is already in the hand pile.
+/// lands reliably. It remains the single authoritative counter path even
+/// on runtimes where the generic history observer also sees
+/// <c>CardDrawnEntry</c>; counting both paths would double every draw. It's
+/// also async but with no complex return value we care about — a prefix is
+/// enough since by the time Hook.AfterCardDrawn is invoked, the card is
+/// already in the hand pile.
 ///
 /// Signature: <c>Hook.AfterCardDrawn(CombatState, PlayerChoiceContext, CardModel, bool)</c>.
 /// We pull <c>card</c> and <c>fromHandDraw</c> and forward to the tracker.
