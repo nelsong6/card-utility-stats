@@ -2447,10 +2447,10 @@ public static class RelicHoverShowPatch
         var sb = new StringBuilder();
         var activationsPerTurn = agg.GremlinHornTurns <= 0
             ? 0m
-            : (decimal)agg.Activations / agg.GremlinHornTurns;
+            : (decimal)agg.GremlinHornRateActivations / agg.GremlinHornTurns;
         var activationsPerCombat = agg.GremlinHornCombats <= 0
             ? 0m
-            : (decimal)agg.Activations / agg.GremlinHornCombats;
+            : (decimal)agg.GremlinHornRateActivations / agg.GremlinHornCombats;
 
         RelicActivationRow(sb, agg.Activations.ToString());
         AppendEnergyGeneratedStats(sb, agg, totalLabel: "Energy gained");

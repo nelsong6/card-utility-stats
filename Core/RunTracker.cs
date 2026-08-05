@@ -2585,6 +2585,7 @@ public static class RunTracker
         target.WeakApplied += source.WeakApplied;
         MergeAppliedEffectsInto(target.AppliedEffects, source.AppliedEffects);
         target.AdditionalCardsDrawn += source.AdditionalCardsDrawn;
+        target.GremlinHornRateActivations += source.GremlinHornRateActivations;
         target.GremlinHornTurns += source.GremlinHornTurns;
         target.GremlinHornCombats += source.GremlinHornCombats;
         target.GamePieceTurns += source.GamePieceTurns;
@@ -23614,7 +23615,7 @@ public static class RunTracker
                 _pendingCombat ??= new PendingCombat();
                 RecordGremlinHornTurnForPlayerLocked(owner);
                 var agg = GetOrCreatePendingRelicAggregateLocked(GremlinHornRelicId);
-                agg.Activations += 1;
+                RecordGremlinHornActivationForTest(agg);
                 int hc = CurrentHistoryCountLocked();
                 // Owner-keyed one-shot energy + draw windows (resolve async after
                 // AfterDeath returns, so maxHistoryAdvance=-1).
@@ -23661,6 +23662,16 @@ public static class RunTracker
     {
         if (agg == null) return;
         agg.GremlinHornTurns += Math.Max(0, count);
+    }
+
+    internal static void RecordGremlinHornActivationForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        if (agg == null) return;
+        var activations = Math.Max(0, count);
+        agg.Activations += activations;
+        agg.GremlinHornRateActivations += activations;
     }
 
     internal static void RecordGremlinHornCombatForTest(

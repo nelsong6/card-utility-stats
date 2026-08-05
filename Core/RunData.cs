@@ -1003,8 +1003,11 @@ public class RelicAggregate
     public int AdditionalCardsDrawn { get; set; }
     public int AdditionalCardDrawsBlocked { get; set; }
 
-    // Gremlin Horn's zero-inclusive held-period denominators. Activations,
-    // observed Energy, and observed draws use the shared fields above/below.
+    // Gremlin Horn's zero-inclusive held-period denominators. Lifetime
+    // activations, observed Energy, and observed draws use shared fields.
+    // RateActivations is separate from the legacy lifetime activation total
+    // so upgraded runs do not divide historical triggers by new denominators.
+    public int GremlinHornRateActivations { get; set; }
     public int GremlinHornTurns { get; set; }
     public int GremlinHornCombats { get; set; }
 

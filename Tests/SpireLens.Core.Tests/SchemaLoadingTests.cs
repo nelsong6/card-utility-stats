@@ -6526,6 +6526,7 @@ public class SchemaLoadingTests
         Assert.Equal(6, relic.Activations);
         Assert.Equal(5, relic.EnergyGenerated);
         Assert.Equal(4, relic.AdditionalCardsDrawn);
+        Assert.Equal(6, relic.GremlinHornRateActivations);
         Assert.Equal(8, relic.GremlinHornTurns);
         Assert.Equal(3, relic.GremlinHornCombats);
     }

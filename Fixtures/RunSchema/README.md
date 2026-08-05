@@ -637,8 +637,8 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds Lasting Candy's exact Power offers and terminal taken/rejected outcomes,
   split into Uncommon and Rare rarity buckets.
 - `gremlin-horn-relic-run.json`
-  Adds Gremlin Horn's zero-inclusive held turn and combat denominators for
-  activation-rate stats alongside its observed Energy and card draws.
+  Adds Gremlin Horn's tracking-window activation numerator and zero-inclusive
+  held turn/combat denominators alongside its observed Energy and card draws.
 
 Why these exist:
 

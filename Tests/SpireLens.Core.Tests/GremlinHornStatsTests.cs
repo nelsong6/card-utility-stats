@@ -30,6 +30,7 @@ public class GremlinHornStatsTests
         Assert.Equal(0, agg.Activations);
         Assert.Equal(0, agg.EnergyGenerated);
         Assert.Equal(0, agg.AdditionalCardsDrawn);
+        Assert.Equal(0, agg.GremlinHornRateActivations);
         Assert.Equal(0, agg.GremlinHornTurns);
         Assert.Equal(0, agg.GremlinHornCombats);
     }
@@ -43,6 +44,7 @@ public class GremlinHornStatsTests
             Activations = 3,
             EnergyGenerated = 3,
             AdditionalCardsDrawn = 2,
+            GremlinHornRateActivations = 3,
             GremlinHornTurns = 5,
             GremlinHornCombats = 2,
         };
@@ -52,6 +54,7 @@ public class GremlinHornStatsTests
         Assert.Contains("activations", json);
         Assert.Contains("energy_generated", json);
         Assert.Contains("additional_cards_drawn", json);
+        Assert.Contains("gremlin_horn_rate_activations", json);
         Assert.Contains("gremlin_horn_turns", json);
         Assert.Contains("gremlin_horn_combats", json);
 
@@ -62,6 +65,7 @@ public class GremlinHornStatsTests
         Assert.Equal(3, agg.Activations);
         Assert.Equal(3, agg.EnergyGenerated);
         Assert.Equal(2, agg.AdditionalCardsDrawn);
+        Assert.Equal(3, agg.GremlinHornRateActivations);
         Assert.Equal(5, agg.GremlinHornTurns);
         Assert.Equal(2, agg.GremlinHornCombats);
     }
@@ -74,6 +78,7 @@ public class GremlinHornStatsTests
             Activations = 6,
             EnergyGenerated = 5,
             AdditionalCardsDrawn = 4,
+            GremlinHornRateActivations = 6,
             GremlinHornTurns = 8,
             GremlinHornCombats = 3,
         };
@@ -97,11 +102,13 @@ public class GremlinHornStatsTests
     {
         var target = new RelicAggregate
         {
+            GremlinHornRateActivations = 2,
             GremlinHornTurns = 3,
             GremlinHornCombats = 1,
         };
         var source = new RelicAggregate
         {
+            GremlinHornRateActivations = 4,
             GremlinHornTurns = 5,
             GremlinHornCombats = 2,
         };
@@ -110,8 +117,20 @@ public class GremlinHornStatsTests
         RunTracker.RecordGremlinHornCombatForTest(target);
         RunTracker.MergeRelicAggregateInto(target, source);
 
+        Assert.Equal(6, target.GremlinHornRateActivations);
         Assert.Equal(10, target.GremlinHornTurns);
         Assert.Equal(4, target.GremlinHornCombats);
+    }
+
+    [Fact]
+    public void Activation_IncrementsLifetimeAndMatchingRateWindowNumerators()
+    {
+        var agg = new RelicAggregate { Activations = 7 };
+
+        RunTracker.RecordGremlinHornActivationForTest(agg, 2);
+
+        Assert.Equal(9, agg.Activations);
+        Assert.Equal(2, agg.GremlinHornRateActivations);
     }
 
     [Fact]
@@ -140,6 +159,7 @@ public class GremlinHornStatsTests
         Assert.Equal(0, agg.Activations);
         Assert.Equal(0, agg.EnergyGenerated);
         Assert.Equal(0, agg.AdditionalCardsDrawn);
+        Assert.Equal(0, agg.GremlinHornRateActivations);
         Assert.Equal(0, agg.GremlinHornTurns);
         Assert.Equal(0, agg.GremlinHornCombats);
     }

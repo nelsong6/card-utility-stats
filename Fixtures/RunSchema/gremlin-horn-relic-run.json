@@ -10,6 +10,7 @@
       "activations": 6,
       "energy_generated": 5,
       "additional_cards_drawn": 4,
+      "gremlin_horn_rate_activations": 6,
       "gremlin_horn_turns": 8,
       "gremlin_horn_combats": 3
     }
