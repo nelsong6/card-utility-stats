@@ -23,7 +23,7 @@ public static class OstyCmdSummonPatch
         PlayerChoiceContext choiceContext,
         Player summoner,
         decimal amount,
-        AbstractModel source)
+        AbstractModel? source)
     {
         try
         {
@@ -41,7 +41,7 @@ public static class OstyCmdSummonPatch
     private static async Task<SummonResult> ObserveSummonAsync(
         Task<SummonResult> inner,
         Player player,
-        AbstractModel source)
+        AbstractModel? source)
     {
         var result = await inner.ConfigureAwait(false);
         try
@@ -51,7 +51,7 @@ public static class OstyCmdSummonPatch
             if (source is MegaCrit.Sts2.Core.Models.CardModel sourceCard && result.Amount > 0m)
                 RunTracker.RecordOstySummoned(player, sourceCard, result.Creature, result.Amount);
             else
-                RunTracker.RecordRelicOstySummon(source, result.Amount);
+                RunTracker.RecordNonCardOstySummon(player, source, result.Amount);
         }
         catch (Exception e)
         {

@@ -751,8 +751,13 @@ public class CardOrbAggregate
 
 public class RunMetaStats
 {
+    // Shared Osty-body facts. Bound Phylactery and Phylactery Unbound both
+    // project these values so upgrading the relic never resets its history.
     public decimal TotalOstyHpSummoned { get; set; }
+    public decimal TotalOstyHpWhenUnleashPlayed { get; set; }
     public decimal TotalOstyDamageAbsorbed { get; set; }
+    public int OstyBodyTurns { get; set; }
+    public int OstyBodyCombats { get; set; }
     public decimal ExtraBlockGainedFromUnmovablePower { get; set; }
 
     // Power-owned outcomes that should not be attributed to one physical

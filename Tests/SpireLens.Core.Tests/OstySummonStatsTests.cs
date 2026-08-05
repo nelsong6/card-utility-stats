@@ -31,7 +31,10 @@ public class OstySummonStatsTests
         Assert.Equal(0, agg.TimesOstySummoned);
         Assert.Equal(0m, agg.TotalOstyHpSummoned);
         Assert.Equal(0m, meta.TotalOstyHpSummoned);
+        Assert.Equal(0m, meta.TotalOstyHpWhenUnleashPlayed);
         Assert.Equal(0m, meta.TotalOstyDamageAbsorbed);
+        Assert.Equal(0, meta.OstyBodyTurns);
+        Assert.Equal(0, meta.OstyBodyCombats);
     }
 
     [Fact]

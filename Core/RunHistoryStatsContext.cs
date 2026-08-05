@@ -278,6 +278,7 @@ internal static class RunHistoryStatsContext
             cursedPearlCurseAgg,
             neowsBonesCurseAggs,
             storybookBrightestFlameAgg,
+            run.MetaStats,
             out title,
             out body);
         if (relicModel.IsWax)

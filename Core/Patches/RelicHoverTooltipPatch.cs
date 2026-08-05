@@ -123,6 +123,7 @@ public static class RelicHoverShowPatch
         CardAggregate? cursedPearlCurseAgg = null;
         CardAggregate? storybookBrightestFlameAgg = null;
         IReadOnlyDictionary<string, CardAggregate>? neowsBonesCurseAggs = null;
+        RunMetaStats? phylacteryOstyStats = null;
         int? floorCount = null;
 
         if (useEndedRun)
@@ -130,6 +131,8 @@ public static class RelicHoverShowPatch
             RunTracker.TryLoadLastEndedRunForCurrentGameStartTime();
             aggregate = RunTracker.GetLastEndedRelicAggregate(relicId);
             floorCount = RunTracker.GetLastEndedFloorForRateStats();
+            if (relicModel is BoundPhylactery or PhylacteryUnbound)
+                phylacteryOstyStats = RunTracker.GetLastEndedMetaStats();
             if (relicModel is BloodSoakedRose)
             {
                 bloodSoakedRoseCurseAgg =
@@ -188,6 +191,8 @@ public static class RelicHoverShowPatch
         }
 
         floorCount ??= RunTracker.GetCurrentFloorForRateStats();
+        if (!useEndedRun && relicModel is BoundPhylactery or PhylacteryUnbound)
+            phylacteryOstyStats = RunTracker.GetEffectiveMetaStats();
 
         var liveActivationCounts = useEndedRun
             ? null
@@ -201,6 +206,7 @@ public static class RelicHoverShowPatch
             cursedPearlCurseAgg,
             neowsBonesCurseAggs,
             storybookBrightestFlameAgg,
+            phylacteryOstyStats,
             liveActivationCounts,
             out title,
             out body);
@@ -394,6 +400,31 @@ public static class RelicHoverShowPatch
         out string title,
         out string body)
     {
+        return TryBuildBodyBBCode(
+            relicModel,
+            agg,
+            floorCount,
+            bloodSoakedRoseCurseAgg,
+            cursedPearlCurseAgg,
+            neowsBonesCurseAggs,
+            storybookBrightestFlameAgg,
+            null,
+            out title,
+            out body);
+    }
+
+    internal static bool TryBuildBodyBBCode(
+        RelicModel relicModel,
+        RelicAggregate agg,
+        int? floorCount,
+        CardAggregate? bloodSoakedRoseCurseAgg,
+        CardAggregate? cursedPearlCurseAgg,
+        IReadOnlyDictionary<string, CardAggregate>? neowsBonesCurseAggs,
+        CardAggregate? storybookBrightestFlameAgg,
+        RunMetaStats? phylacteryOstyStats,
+        out string title,
+        out string body)
+    {
         return TryBuildBodyBBCodeWithLiveActivationCounts(
             relicModel,
             agg,
@@ -402,6 +433,7 @@ public static class RelicHoverShowPatch
             cursedPearlCurseAgg,
             neowsBonesCurseAggs,
             storybookBrightestFlameAgg,
+            phylacteryOstyStats,
             null,
             out title,
             out body);
@@ -415,6 +447,7 @@ public static class RelicHoverShowPatch
         CardAggregate? cursedPearlCurseAgg,
         IReadOnlyDictionary<string, CardAggregate>? neowsBonesCurseAggs,
         CardAggregate? storybookBrightestFlameAgg,
+        RunMetaStats? phylacteryOstyStats,
         RelicLiveActivationCounts? liveActivationCounts,
         out string title,
         out string body)
@@ -1607,14 +1640,14 @@ public static class RelicHoverShowPatch
         if (relicModel is BoundPhylactery)
         {
             title = "Bound Phylactery";
-            body = BuildPhylacteryBodyBBCode(agg);
+            body = BuildPhylacteryBodyBBCode(phylacteryOstyStats ?? new RunMetaStats());
             return true;
         }
 
         if (relicModel is PhylacteryUnbound)
         {
             title = "Phylactery Unbound";
-            body = BuildPhylacteryBodyBBCode(agg);
+            body = BuildPhylacteryBodyBBCode(phylacteryOstyStats ?? new RunMetaStats());
             return true;
         }
 
@@ -6142,19 +6175,64 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
-    private static string BuildPhylacteryBodyBBCode(RelicAggregate agg)
+    private static string BuildPhylacteryBodyBBCode(RunMetaStats stats)
     {
         var sb = new StringBuilder();
-        ConceptRow(
+        var summonPerTurn = stats.OstyBodyTurns <= 0
+            ? 0m
+            : stats.TotalOstyHpSummoned / stats.OstyBodyTurns;
+        var summonPerCombat = stats.OstyBodyCombats <= 0
+            ? 0m
+            : stats.TotalOstyHpSummoned / stats.OstyBodyCombats;
+        var absorbedPerTurn = stats.OstyBodyTurns <= 0
+            ? 0m
+            : stats.TotalOstyDamageAbsorbed / stats.OstyBodyTurns;
+        var absorbedPerCombat = stats.OstyBodyCombats <= 0
+            ? 0m
+            : stats.TotalOstyDamageAbsorbed / stats.OstyBodyCombats;
+
+        DescribedIconRow(
             sb,
-            "activation",
-            agg.Activations.ToString(),
-            "Times this relic has been activated.");
-        ConceptRow(
+            ["average", "osty_summon_gained"],
+            ["turn"],
+            string.Empty,
+            FormatDecimal(summonPerTurn),
+            "Average observed Osty summon gained per player turn while either form of the Phylactery was held, including zero-summon turns.");
+        DescribedIconRow(
             sb,
-            "osty_summon_gained",
-            FormatDecimal(agg.TotalOstyHpSummoned),
-            "Total Osty summon gained from this relic.");
+            ["average", "osty_summon_gained"],
+            ["combat"],
+            string.Empty,
+            FormatDecimal(summonPerCombat),
+            "Average observed Osty summon gained per combat while either form of the Phylactery was held, including zero-summon combats.");
+        DescribedIconRow(
+            sb,
+            ["all", "osty_summon_gained", "attack"],
+            [],
+            "Unleash",
+            FormatDecimal(stats.TotalOstyHpWhenUnleashPlayed),
+            "Sum of Osty's current HP whenever Unleash was played; this is the Summon contribution added to Unleash's base damage.");
+        DescribedIconRow(
+            sb,
+            ["all", "damage"],
+            [],
+            "absorbed",
+            FormatDecimal(stats.TotalOstyDamageAbsorbed),
+            "Total HP lost by the tracked player's Osty bodies; this is damage they absorbed.");
+        DescribedIconRow(
+            sb,
+            ["average", "damage"],
+            ["turn"],
+            "absorbed",
+            FormatDecimal(absorbedPerTurn),
+            "Average damage absorbed by Osty per player turn while either form of the Phylactery was held, including zero-damage turns.");
+        DescribedIconRow(
+            sb,
+            ["average", "damage"],
+            ["combat"],
+            "absorbed",
+            FormatDecimal(absorbedPerCombat),
+            "Average damage absorbed by Osty per combat while either form of the Phylactery was held, including zero-damage combats.");
         return sb.ToString();
     }
 

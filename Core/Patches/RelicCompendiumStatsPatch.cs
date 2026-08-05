@@ -164,6 +164,7 @@ internal static class CompendiumRelicStatsContext
             cursedPearlCurseAgg,
             neowsBonesCurseAggs,
             storybookBrightestFlameAgg,
+            run.MetaStats,
             out title,
             out body);
     }

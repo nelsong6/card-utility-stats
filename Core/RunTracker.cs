@@ -692,11 +692,23 @@ public static class RunTracker
     {
         lock (_lock)
         {
+            RecordOstyBodyTurnForTrackedPlayerLocked();
             var result = new RunMetaStats();
             if (_currentRun != null)
                 MergeMetaStatsInto(result, _currentRun.MetaStats);
             if (_pendingCombat != null)
                 MergeMetaStatsInto(result, _pendingCombat.MetaStats);
+            return result;
+        }
+    }
+
+    internal static RunMetaStats GetLastEndedMetaStats()
+    {
+        lock (_lock)
+        {
+            var result = new RunMetaStats();
+            if (_lastEndedRun != null)
+                MergeMetaStatsInto(result, _lastEndedRun.MetaStats);
             return result;
         }
     }
@@ -2337,6 +2349,7 @@ public static class RunTracker
     {
         if (_pendingCombat == null || _currentRun == null) return;
         RecordHeldCombatRelicBaselinesForTrackedPlayerLocked(requireActiveCombat: false, createPendingIfNeeded: false);
+        RecordOstyBodyTurnForTrackedPlayerLocked();
         RecordPocketwatchTurnForTrackedPlayerLocked();
         RecordPollinousCoreTurnForTrackedPlayerLocked();
         RecordJossPaperTurnForTrackedPlayerLocked();
@@ -15578,9 +15591,12 @@ public static class RunTracker
         {
             try
             {
-                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+                if (!IsTrackedCard(card)) return;
 
                 _pendingCombat ??= new PendingCombat();
+                _pendingCombat.MetaStats.TotalOstyHpWhenUnleashPlayed += ostyHpBonus;
+
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
                 var instanceId = GetOrAssignInstanceId(card);
                 var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
                 agg.TotalOstyHpAttackBonus += ostyHpBonus;
@@ -15601,20 +15617,22 @@ public static class RunTracker
     public static void RecordOstySummoned(Player player, CardModel sourceCard, Creature? ostyCreature, decimal amount)
     {
         if (player == null || sourceCard == null || amount <= 0m) return;
-        if (sourceCard.Owner != null && !ReferenceEquals(sourceCard.Owner, player)) return;
 
         lock (_lock)
         {
             try
             {
-                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+                if (!IsTrackedPlayer(player)) return;
 
                 _pendingCombat ??= new PendingCombat();
+                _pendingCombat.MetaStats.TotalOstyHpSummoned += amount;
+
+                if (sourceCard.Owner != null && !ReferenceEquals(sourceCard.Owner, player)) return;
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
                 var instanceId = GetOrAssignInstanceId(sourceCard);
                 var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
                 agg.TimesOstySummoned++;
                 agg.TotalOstyHpSummoned += amount;
-                _pendingCombat.MetaStats.TotalOstyHpSummoned += amount;
             }
             catch (Exception e)
             {
@@ -15624,32 +15642,44 @@ public static class RunTracker
     }
 
     /// <summary>
-    /// Record a relic-owned Osty summon/revive after the shared summon command
-    /// completes. Activation count follows the command completion; amount is
-    /// the observed HP actually added.
+    /// Record a successful non-card Osty summon/revive after the shared summon
+    /// command completes. Every source contributes to the shared body ledger;
+    /// the two Phylactery forms additionally retain their legacy direct-source
+    /// activation and summon totals.
     /// </summary>
-    public static void RecordRelicOstySummon(AbstractModel sourceRelic, decimal amount)
+    public static void RecordNonCardOstySummon(Player player, AbstractModel? source, decimal amount)
     {
-        var relicId = sourceRelic switch
+        if (player == null) return;
+
+        var relicId = source switch
         {
             MegaCrit.Sts2.Core.Models.Relics.BoundPhylactery => BoundPhylacteryRelicId,
             MegaCrit.Sts2.Core.Models.Relics.PhylacteryUnbound => PhylacteryUnboundRelicId,
             _ => null,
         };
-        if (relicId == null) return;
 
         lock (_lock)
         {
             try
             {
+                if (!IsTrackedPlayer(player)) return;
+
+                _pendingCombat ??= new PendingCombat();
+                if (amount > 0m)
+                    _pendingCombat.MetaStats.TotalOstyHpSummoned += amount;
+
+                if (relicId == null || !IsTrackedRelic(source as RelicModel)) return;
+
                 var agg = GetOrCreateRelicAggregateLocked(relicId);
                 agg.Activations++;
                 if (amount > 0m)
+                {
                     agg.TotalOstyHpSummoned += amount;
+                }
             }
             catch (Exception e)
             {
-                CoreMain.LogDebug($"RecordRelicOstySummon failed: {e.Message}");
+                CoreMain.LogDebug($"RecordNonCardOstySummon failed: {e.Message}");
             }
         }
     }
@@ -15666,7 +15696,7 @@ public static class RunTracker
         {
             try
             {
-                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+                if (!IsTrackedPlayer(creature.PetOwner)) return;
 
                 _pendingCombat ??= new PendingCombat();
                 _pendingCombat.MetaStats.TotalOstyDamageAbsorbed += hpLost;
@@ -27391,12 +27421,86 @@ public static class RunTracker
             RecordBurningSticksCombatForPlayerLocked(player);
             RecordThrowingAxeCombatForPlayerLocked(player);
             RecordToastyMittensCombatForPlayerLocked(player);
+            RecordOstyBodyCombatForPlayerLocked(player);
         }
         catch (Exception e)
         {
             CoreMain.LogDebug($"RecordHeldCombatRelicBaselinesForTrackedPlayerLocked failed: {e.Message}");
         }
     }
+
+    /// <summary>
+    /// Count one zero-inclusive player turn toward the shared Osty-body rates
+    /// while either form of the Phylactery is held.
+    /// </summary>
+    public static void RecordOstyBodyTurnStarted(Player? player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                RecordOstyBodyTurnForPlayerLocked(player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordOstyBodyTurnStarted failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void RecordOstyBodyTurnForTrackedPlayerLocked()
+    {
+        try
+        {
+            var player = GetTrackedRunPlayerLocked();
+            if (player == null) return;
+            RecordOstyBodyTurnForPlayerLocked(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"RecordOstyBodyTurnForTrackedPlayerLocked failed: {e.Message}");
+        }
+    }
+
+    private static void RecordOstyBodyTurnForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasPhylacteryFamily(player)) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.OstyBodyTurnCountedTurns.TryGetValue(player, out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.OstyBodyTurnCountedTurns[player] = turnNumber;
+        RecordOstyBodyCombatForPlayerLocked(player);
+        _pendingCombat.MetaStats.OstyBodyTurns++;
+    }
+
+    private static void RecordOstyBodyCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasPhylacteryFamily(player)) return;
+        if (!_pendingCombat.OstyBodyCombatCountedPlayers.Add(player)) return;
+
+        _pendingCombat.MetaStats.OstyBodyCombats++;
+    }
+
+    private static bool PlayerHasPhylacteryFamily(Player player)
+        => PlayerHasRelic(
+                player,
+                BoundPhylacteryRelicId,
+                relic => relic is MegaCrit.Sts2.Core.Models.Relics.BoundPhylactery)
+            || PlayerHasRelic(
+                player,
+                PhylacteryUnboundRelicId,
+                relic => relic is MegaCrit.Sts2.Core.Models.Relics.PhylacteryUnbound);
 
     private static void RecordStrikeDummyCombatForPlayerLocked(Player player)
     {
@@ -34249,7 +34353,10 @@ public static class RunTracker
         if (source == null) return;
 
         target.TotalOstyHpSummoned += source.TotalOstyHpSummoned;
+        target.TotalOstyHpWhenUnleashPlayed += source.TotalOstyHpWhenUnleashPlayed;
         target.TotalOstyDamageAbsorbed += source.TotalOstyDamageAbsorbed;
+        target.OstyBodyTurns += source.OstyBodyTurns;
+        target.OstyBodyCombats += source.OstyBodyCombats;
         target.ExtraBlockGainedFromUnmovablePower += source.ExtraBlockGainedFromUnmovablePower;
         MergePowerAggregatesInto(target.PowerAggregates, source.PowerAggregates);
     }
@@ -35399,6 +35506,10 @@ internal class PendingCombat
     public HashSet<Player> DaughterOfTheWindCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> DaughterOfTheWindTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> OstyBodyCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> OstyBodyTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> PaelsEyeCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);

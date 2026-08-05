@@ -79,7 +79,8 @@ Examples already implemented:
   separate from that card's direct Attack damage
 - blocked draw attempts, categorized blocked reasons, and effect-side downstream blocked counts
 - successful self-summons to hand for recurring cards like Make It So
-- Osty summon HP, current-body absorbed damage, and Unleash's Osty-HP payoff damage
+- Osty summon HP, current-body absorbed damage, Unleash's Osty-HP payoff
+  damage, and the upgrade-continuous Phylactery family rates
 - effect applications credited back to the source card
 - Artifact-blocked debuffs
 - downstream poison damage and poison overkill

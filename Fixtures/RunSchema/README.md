@@ -179,6 +179,10 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `phylactery-relic-run.json`
   Adds Bound Phylactery and Phylactery Unbound activation tracking plus actual
   Osty summon HP gained from the shared summon command result.
+- `phylactery-osty-body-run.json`
+  Adds the shared, upgrade-continuous Osty-body ledger surfaced by both
+  Phylactery forms: all successful summon HP, Unleash-play HP, absorbed damage,
+  and zero-inclusive held turn/combat denominators.
 - `v32-enemy-damage-run.json`
   Adds per-enemy observed damage output aggregates: attempted damage, HP damage
   dealt, and damage blocked by player block.

@@ -831,6 +831,22 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsPhylacteryOstyBodyFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("phylactery-osty-body-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        var stats = loaded.Data.MetaStats;
+        Assert.Equal(42m, stats.TotalOstyHpSummoned);
+        Assert.Equal(27m, stats.TotalOstyHpWhenUnleashPlayed);
+        Assert.Equal(30m, stats.TotalOstyDamageAbsorbed);
+        Assert.Equal(6, stats.OstyBodyTurns);
+        Assert.Equal(2, stats.OstyBodyCombats);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsEnemyStatusPollutionFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("enemy-status-pollution-run.json"));
@@ -1703,6 +1719,19 @@ public class SchemaLoadingTests
         var unboundAgg = resumed.RelicAggregates["RELIC.PHYLACTERY_UNBOUND"];
         Assert.Equal(4, unboundAgg.Activations);
         Assert.Equal(20m, unboundAgg.TotalOstyHpSummoned);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsPhylacteryOstyBodyFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("phylactery-osty-body-run.json"));
+
+        Assert.NotNull(resumed);
+        Assert.Equal(42m, resumed!.MetaStats.TotalOstyHpSummoned);
+        Assert.Equal(27m, resumed.MetaStats.TotalOstyHpWhenUnleashPlayed);
+        Assert.Equal(30m, resumed.MetaStats.TotalOstyDamageAbsorbed);
+        Assert.Equal(6, resumed.MetaStats.OstyBodyTurns);
+        Assert.Equal(2, resumed.MetaStats.OstyBodyCombats);
     }
 
     [Fact]

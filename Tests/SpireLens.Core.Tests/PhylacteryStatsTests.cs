@@ -59,24 +59,63 @@ public class PhylacteryStatsTests
     [Fact]
     public void RelicTooltip_PhylacteryFields_ShowConceptIconsAndFullRowHelp()
     {
-        var agg = new RelicAggregate
+        var stats = new RunMetaStats
         {
-            Activations = 4,
-            TotalOstyHpSummoned = 17m,
+            TotalOstyHpSummoned = 24m,
+            TotalOstyHpWhenUnleashPlayed = 31m,
+            TotalOstyDamageAbsorbed = 18m,
+            OstyBodyTurns = 6,
+            OstyBodyCombats = 2,
         };
 
-        var body = (string)(BuildPhylacteryBodyMethod.Invoke(null, new object?[] { agg })
+        var body = (string)(BuildPhylacteryBodyMethod.Invoke(null, new object?[] { stats })
             ?? throw new InvalidOperationException("BuildPhylacteryBodyBBCode returned null."));
 
         Assert.Contains("generated-icons/information-", body);
-        Assert.Contains("Times this relic has been activated.", body);
-        Assert.Contains("generated-icons/activation-", body);
+        Assert.Contains("Average observed Osty summon gained per player turn", body);
+        Assert.Contains("Average observed Osty summon gained per combat", body);
+        Assert.Contains("Sum of Osty's current HP whenever Unleash was played", body);
+        Assert.Contains("Total HP lost by the tracked player's Osty bodies", body);
+        Assert.Contains("Average damage absorbed by Osty per player turn", body);
+        Assert.Contains("Average damage absorbed by Osty per combat", body);
+        Assert.Contains("generated-icons/stat-average-", body);
+        Assert.Contains("generated-icons/stat-all-", body);
+        Assert.Contains("generated-icons/stat-per-", body);
         Assert.Contains("[b]4[/b]", body);
-        Assert.Contains("Total Osty summon gained from this relic.", body);
+        Assert.Contains("[b]12[/b]", body);
+        Assert.Contains("[b]31[/b]", body);
+        Assert.Contains("[b]18[/b]", body);
+        Assert.Contains("[b]3[/b]", body);
+        Assert.Contains("[b]9[/b]", body);
         Assert.Contains(
             "res://images/atlases/relic_atlas.sprites/bound_phylactery.tres",
             body);
-        Assert.Contains("[b]17[/b]", body);
+    }
+
+    [Fact]
+    public void RunMetaStats_PhylacteryFamilyFields_JsonRoundtrip_PreserveFields()
+    {
+        var run = new RunData
+        {
+            MetaStats = new RunMetaStats
+            {
+                TotalOstyHpSummoned = 42m,
+                TotalOstyHpWhenUnleashPlayed = 27m,
+                TotalOstyDamageAbsorbed = 30m,
+                OstyBodyTurns = 6,
+                OstyBodyCombats = 2,
+            },
+        };
+
+        var json = JsonSerializer.Serialize(run, SerializerOptions);
+        var restored = JsonSerializer.Deserialize<RunData>(json, SerializerOptions);
+
+        Assert.NotNull(restored);
+        Assert.Equal(42m, restored!.MetaStats.TotalOstyHpSummoned);
+        Assert.Equal(27m, restored.MetaStats.TotalOstyHpWhenUnleashPlayed);
+        Assert.Equal(30m, restored.MetaStats.TotalOstyDamageAbsorbed);
+        Assert.Equal(6, restored.MetaStats.OstyBodyTurns);
+        Assert.Equal(2, restored.MetaStats.OstyBodyCombats);
     }
 
     [Fact]

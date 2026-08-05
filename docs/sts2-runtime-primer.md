@@ -436,20 +436,24 @@ than exact Storybook-grant lineage.
 Necrobinder has both investment cards that create or maintain Osty and payoff
 cards that spend the resulting board state. Track those as different signals.
 
-- Patch `OstyCmd.Summon`, not individual card text, for successful card-sourced
-  Osty summons. The command carries the source model and returns the
+- Patch `OstyCmd.Summon`, not individual card text, for all successful Osty
+  summons. The command carries the source model and summoner and returns the
   game-observed summon amount.
 - Attribute the summon amount to the source card. That is the card's own
   contribution. Tooltip label: `Summon gained`.
-- Also add successful summon amount to run-level Osty meta stats. Tooltip
-  label: `All Osty total summon`.
+- Also add every successful summon amount for the tracked player's Osty to
+  run-level Osty meta stats, including card, Power, Potion, and either
+  Phylactery source.
 - Attribute Osty HP lost through `Hook.AfterCurrentHpChanged` negative deltas
   on any Osty creature into run-level meta stats. Do not assign all later Osty
   damage absorbed to the card that happened to summon most recently. Tooltip
   label: `All Osty damage absorbed`.
-- Keep payoff tracking separate. For example, Unleash's Osty-current-HP attack
-  bonus belongs on Unleash, while HP summoned belongs on the summon card, and
-  all-Osty totals are meta stats surfaced on related summon cards.
+- Keep payoff tracking separate. Unleash's Osty-current-HP attack bonus belongs
+  on the physical Unleash card, while the same observed play-time HP also
+  contributes to the run-level Phylactery family total.
+- Bound Phylactery and Phylactery Unbound share one Osty-body presentation.
+  Count zero-inclusive turns and combats while either form is held; never
+  restart those denominators when the relic upgrades.
 
 ## Block Attribution
 

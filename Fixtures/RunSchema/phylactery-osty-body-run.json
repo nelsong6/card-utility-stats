@@ -1,0 +1,47 @@
+{
+  "run_id": "fixture-phylactery-osty-body",
+  "started_at": "2026-08-04T18:00:00Z",
+  "updated_at": "2026-08-04T18:12:00Z",
+  "ended_at": "2026-08-04T18:15:00Z",
+  "character": "NECROBINDER",
+  "ascension": 5,
+  "floor_reached": 12,
+  "outcome": "win",
+  "game_start_time": 1785866400,
+  "aggregates": {
+    "CARD.UNLEASH#1": {
+      "plays": 2,
+      "total_osty_hp_attack_bonus": 27,
+      "times_osty_hp_attack_bonus_applied": 2,
+      "floor_added": 1,
+      "initial_upgrade_level": 0,
+      "removed": false
+    }
+  },
+  "relic_aggregates": {
+    "RELIC.BOUND_PHYLACTERY": {
+      "activations": 5,
+      "total_osty_hp_summoned": 9
+    },
+    "RELIC.PHYLACTERY_UNBOUND": {
+      "activations": 7,
+      "total_osty_hp_summoned": 19
+    }
+  },
+  "meta_stats": {
+    "total_osty_hp_summoned": 42,
+    "total_osty_hp_when_unleash_played": 27,
+    "total_osty_damage_absorbed": 30,
+    "osty_body_turns": 6,
+    "osty_body_combats": 2
+  },
+  "events": [],
+  "instance_numbers_by_def": {
+    "CARD.UNLEASH": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.UNLEASH": 1
+  }
+}

@@ -107,7 +107,11 @@ public class PendingCombatPromotionTests
             DamageDealt = 11,
             DamageBlocked = 5,
         };
+        pending.MetaStats.TotalOstyHpSummoned = 12;
+        pending.MetaStats.TotalOstyHpWhenUnleashPlayed = 15;
         pending.MetaStats.TotalOstyDamageAbsorbed = 4;
+        pending.MetaStats.OstyBodyTurns = 3;
+        pending.MetaStats.OstyBodyCombats = 1;
         pending.MetaStats.ExtraBlockGainedFromUnmovablePower = 9;
 
         var run = new RunData();
@@ -118,7 +122,11 @@ public class PendingCombatPromotionTests
         Assert.Equal(16, enemy.DamageAttempted);
         Assert.Equal(11, enemy.DamageDealt);
         Assert.Equal(5, enemy.DamageBlocked);
+        Assert.Equal(12, run.MetaStats.TotalOstyHpSummoned);
+        Assert.Equal(15, run.MetaStats.TotalOstyHpWhenUnleashPlayed);
         Assert.Equal(4, run.MetaStats.TotalOstyDamageAbsorbed);
+        Assert.Equal(3, run.MetaStats.OstyBodyTurns);
+        Assert.Equal(1, run.MetaStats.OstyBodyCombats);
         Assert.Equal(9, run.MetaStats.ExtraBlockGainedFromUnmovablePower);
     }
 }
