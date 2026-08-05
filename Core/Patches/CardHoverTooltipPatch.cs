@@ -368,6 +368,10 @@ public static class CardHoverShowPatch
             Row3(sb, "Played/Drawn", $"{agg.Plays}/{agg.TimesDrawn}", $"{playRate:F0}%");
         }
 
+        AppendDeathMarchStats(
+            sb,
+            cardModel,
+            RunTracker.GetDeathMarchCardsDrawnThisTurn(cardModel));
         Row3(sb, "Combats in deck", agg.CombatsInDeck.ToString(), "");
 
         if (etherealCardsPlayedThisCombat.HasValue)
@@ -585,6 +589,10 @@ public static class CardHoverShowPatch
             Row3(sb, "Played/Drawn", $"{agg.Plays}/{agg.TimesDrawn}", $"{playRate:F0}%");
         }
 
+        AppendDeathMarchStats(
+            sb,
+            cardModel,
+            RunTracker.GetDeathMarchCardsDrawnThisTurn(cardModel));
         bool hasDedicatedPoison = AppendDedicatedPoisonStats(sb, agg, compact: true);
         AppendAppliedEffects(sb, agg, compact: true, excludePoison: hasDedicatedPoison);
 
@@ -2330,6 +2338,25 @@ public static class CardHoverShowPatch
             "avg gained" => "Forge avg",
             _ => $"Forge {suffix}",
         };
+    }
+
+    private static void AppendDeathMarchStats(
+        StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel cardModel,
+        int cardsDrawnThisTurn)
+    {
+        if (cardModel is not DeathMarch
+            && !IsCardId(cardModel, "CARD.DEATH_MARCH"))
+        {
+            return;
+        }
+
+        Row3(
+            sb,
+            "Cards drawn this turn",
+            Math.Max(0, cardsDrawnThisTurn).ToString(),
+            "",
+            "Cards drawn this turn — successful draws by this card's owner during the current turn, excluding the automatic opening-hand draw to match Death March's damage scaling.");
     }
 
     private static void AppendMakeItSoStats(

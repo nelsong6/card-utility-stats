@@ -31154,6 +31154,38 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Returns Death March's live damage-scaling count. This intentionally
+    /// mirrors the card's own multiplier: successful draws by its owner this
+    /// turn, excluding the automatic opening-hand draw.
+    /// </summary>
+    public static int GetDeathMarchCardsDrawnThisTurn(CardModel? card)
+    {
+        lock (_lock)
+        {
+            try
+            {
+                if (card?.Owner?.Creature == null || card.CombatState == null) return 0;
+                if (CombatManager.Instance == null || !CombatManager.Instance.IsInProgress) return 0;
+
+                var history = CombatManager.Instance.History?.Entries;
+                if (history == null) return 0;
+
+                return history
+                    .OfType<CardDrawnEntry>()
+                    .Count(entry =>
+                        entry.HappenedThisTurn(card.CombatState)
+                        && ReferenceEquals(entry.Actor, card.Owner.Creature)
+                        && !entry.FromHandDraw);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"GetDeathMarchCardsDrawnThisTurn failed: {e.Message}");
+                return 0;
+            }
+        }
+    }
+
+    /// <summary>
     /// Log a card upgrade to the run's event stream. Called from the
     /// <see cref="Patches.CardUpgradePatch"/> Harmony postfix — fires for
     /// every upgrade path (rest site, Armaments in combat, events that
