@@ -280,15 +280,15 @@ public class BlockTooltipTests
         var text = sb.ToString();
 
         Assert.Contains(
-            "[img=16x16]res://images/orbs/frost.png[/img] created",
+            "[img width=16 height=16 color=#FFFFFF align=center]res://images/orbs/frost.png[/img] created",
             text);
         Assert.Contains(StatConceptGlossary.RenderHintedGlyph("activation"), text);
         Assert.Contains("passive", text);
         Assert.Contains(
-            "[img=16x16]res://images/orbs/frost.png[/img] evoked",
+            "[img width=16 height=16 color=#FFFFFF align=center]res://images/orbs/frost.png[/img] evoked",
             text);
         Assert.Contains(
-            "[img=16x16]res://images/orbs/frost.png[/img] fizzled",
+            "[img width=16 height=16 color=#FFFFFF align=center]res://images/orbs/frost.png[/img] fizzled",
             text);
         Assert.Contains(StatConceptGlossary.RenderHintedGlyph("block"), text);
         Assert.Contains("[b]17[/b]", text);

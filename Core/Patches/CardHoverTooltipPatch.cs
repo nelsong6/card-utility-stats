@@ -2873,7 +2873,7 @@ public static class CardHoverShowPatch
 
     private static string GetOrbStatLabel(string orbId, string suffix)
     {
-        return GetInlineIconStatLabel(GetOrbIconPath(orbId), suffix);
+        return $"{GetOrbInlineIcon(orbId)} {suffix}";
     }
 
     private static string GetOrbGroupStatLabel(
@@ -2884,32 +2884,33 @@ public static class CardHoverShowPatch
             .Where(orbId => !string.IsNullOrWhiteSpace(orbId))
             .Distinct(StringComparer.Ordinal)
             .OrderBy(orbId => orbId, StringComparer.Ordinal)
-            .Select(orbId =>
-                $"[img={InlineKeywordIconSize}x{InlineKeywordIconSize}]"
-                + $"{GetOrbIconPath(orbId)}[/img]")
+            .Select(GetOrbInlineIcon)
             .ToList();
         if (icons.Count == 0)
-        {
-            icons.Add(
-                $"[img={InlineKeywordIconSize}x{InlineKeywordIconSize}]"
-                + $"{GetOrbIconPath("ORB.UNKNOWN")}[/img]");
-        }
+            icons.Add(GetOrbInlineIcon("ORB.UNKNOWN"));
 
         return $"{string.Join(" ", icons)} {suffix}";
     }
 
+    private static string GetOrbInlineIcon(string orbId)
+    {
+        // Godot 4's RichTextLabel uses named width/height attributes. The old
+        // [img=16x16] form survives the vocabulary parser but renders as an
+        // empty slot, which is why the screenshot showed only the semantic
+        // activation/damage icons.
+        return StatConceptGlossary.RenderInlineImage(GetOrbIconPath(orbId));
+    }
+
     private static string GetFrostOrbBlockStatLabel()
     {
-        return $"[img={InlineKeywordIconSize}x{InlineKeywordIconSize}]"
-            + $"{GetOrbIconPath("ORB.FROST")}[/img] "
+        return $"{GetOrbInlineIcon("ORB.FROST")} "
             + $"[img={InlineKeywordIconSize}x{InlineKeywordIconSize}]"
             + $"{BlockIconPath}[/img]";
     }
 
     private static string GetPlasmaOrbEnergyStatLabel()
     {
-        return $"[img={InlineKeywordIconSize}x{InlineKeywordIconSize}]"
-            + $"{GetOrbIconPath("ORB.PLASMA")}[/img] "
+        return $"{GetOrbInlineIcon("ORB.PLASMA")} "
             + GetEnergyStatLabel("");
     }
 
