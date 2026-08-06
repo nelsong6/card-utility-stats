@@ -1437,8 +1437,9 @@ public class RelicAggregate
     internal int ArtOfWarEnergyAddedThisTurn { get; set; }
     internal int ArtOfWarTurnsThisCombat { get; set; }
 
-    // Lifecycle outcomes for the exact Lightning orb instance created by
-    // Cracked Core at the start of combat.
+    // Lifecycle outcomes for exact starting Lightning orb instances created
+    // by Cracked Core or Infused Core. Property names retain the original
+    // Cracked Core prefix for schema compatibility.
     public int CrackedCoreOrbEvokes { get; set; }
     public int CrackedCoreOrbPassiveTriggers { get; set; }
     public int CrackedCoreOrbFizzles { get; set; }

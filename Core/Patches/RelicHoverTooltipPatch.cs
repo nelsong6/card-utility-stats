@@ -626,10 +626,10 @@ public static class RelicHoverShowPatch
             return true;
         }
 
-        if (relicModel is CrackedCore)
+        if (relicModel is CrackedCore or InfusedCore)
         {
-            title = "Cracked Core";
-            body = BuildCrackedCoreBodyBBCode(agg);
+            title = relicModel is InfusedCore ? "Infused Core" : "Cracked Core";
+            body = BuildStartingLightningCoreBodyBBCode(agg);
             return true;
         }
 
@@ -2226,7 +2226,7 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
-    private static string BuildCrackedCoreBodyBBCode(RelicAggregate agg)
+    private static string BuildStartingLightningCoreBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
         Row3(sb, "Times orb was evoked", agg.CrackedCoreOrbEvokes.ToString(), "");

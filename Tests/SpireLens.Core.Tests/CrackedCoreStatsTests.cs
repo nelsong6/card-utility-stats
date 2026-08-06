@@ -2,6 +2,7 @@ using System;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Entities.Orbs;
@@ -18,17 +19,33 @@ namespace SpireLens.Core.Tests;
 public class CrackedCoreStatsTests
 {
     private const string CrackedCoreRelicId = "RELIC.CRACKED_CORE";
+    private const string InfusedCoreRelicId = "RELIC.INFUSED_CORE";
 
-    private static readonly MethodInfo BuildCrackedCoreBodyMethod =
+    private static readonly MethodInfo BuildStartingLightningCoreBodyMethod =
         typeof(RelicHoverShowPatch).GetMethod(
-            "BuildCrackedCoreBodyBBCode",
+            "BuildStartingLightningCoreBodyBBCode",
             BindingFlags.NonPublic | BindingFlags.Static)
-        ?? throw new InvalidOperationException("BuildCrackedCoreBodyBBCode not found.");
+        ?? throw new InvalidOperationException(
+            "BuildStartingLightningCoreBodyBBCode not found.");
 
     [Fact]
-    public void Patches_TargetCrackedCoreAndOrbLifecycleMethods()
+    public void Patches_TargetStartingCoresAndOrbLifecycleMethods()
     {
         Assert.NotNull(typeof(CrackedCore).GetMethod(nameof(CrackedCore.BeforeSideTurnStart)));
+        var infusedCoreStart = typeof(InfusedCore).GetMethod(
+            nameof(InfusedCore.AfterSideTurnStart),
+            new[]
+            {
+                typeof(CombatSide),
+                typeof(IReadOnlyList<Creature>),
+                typeof(ICombatState),
+            });
+        Assert.NotNull(infusedCoreStart);
+        Assert.Equal(
+            new[] { "side", "participants", "combatState" },
+            infusedCoreStart!.GetParameters()
+                .Select(parameter => parameter.Name)
+                .ToArray());
         Assert.NotNull(typeof(LightningOrb).GetMethod(
             nameof(LightningOrb.Passive),
             new[] { typeof(PlayerChoiceContext), typeof(Creature) }));
@@ -114,6 +131,19 @@ public class CrackedCoreStatsTests
         Assert.Contains("\"total_targets\"", json);
         Assert.NotNull(restored);
         AssertPopulatedAggregate(restored!.RelicAggregates[CrackedCoreRelicId]);
+    }
+
+    [Fact]
+    public void RelicAggregate_InfusedCore_UsesStartingLightningCoreFields()
+    {
+        var run = new RunData();
+        run.RelicAggregates[InfusedCoreRelicId] = PopulatedAggregate();
+
+        var json = JsonSerializer.Serialize(run, RunStorage.Options);
+        var restored = JsonSerializer.Deserialize<RunData>(json, RunStorage.Options);
+
+        Assert.NotNull(restored);
+        AssertPopulatedAggregate(restored!.RelicAggregates[InfusedCoreRelicId]);
     }
 
     [Fact]
@@ -203,6 +233,26 @@ public class CrackedCoreStatsTests
     }
 
     [Fact]
+    [Trait("Category", "RequiresLiveGame")]
+    public void RelicTooltip_InfusedCore_DispatchesForModel()
+    {
+        var relic = (InfusedCore)RuntimeHelpers.GetUninitializedObject(
+            typeof(InfusedCore));
+
+        var recognized = RelicHoverShowPatch.TryBuildBodyBBCode(
+            relic,
+            new RelicAggregate(),
+            floorCount: null,
+            out var title,
+            out var body);
+
+        Assert.True(recognized);
+        Assert.Equal("Infused Core", title);
+        Assert.Contains("Times orb was evoked", body);
+        Assert.Contains("Damage dealt", body);
+    }
+
+    [Fact]
     public void RelicAggregate_OlderShapeWithoutCrackedCoreFields_DefaultsToZero()
     {
         var agg = JsonSerializer.Deserialize<RelicAggregate>("{}", RunStorage.Options);
@@ -261,6 +311,9 @@ public class CrackedCoreStatsTests
     }
 
     private static string BuildBody(RelicAggregate agg)
-        => (string)(BuildCrackedCoreBodyMethod.Invoke(null, new object?[] { agg })
-            ?? throw new InvalidOperationException("BuildCrackedCoreBodyBBCode returned null."));
+        => (string)(BuildStartingLightningCoreBodyMethod.Invoke(
+                null,
+                new object?[] { agg })
+            ?? throw new InvalidOperationException(
+                "BuildStartingLightningCoreBodyBBCode returned null."));
 }

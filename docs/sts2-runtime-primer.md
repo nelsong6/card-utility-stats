@@ -1475,20 +1475,23 @@ be queried without granting a turn's energy. Snapshot `KindleCount` at
 `KindleRestSiteOption` at the established local rest-site exit boundary; do not
 count the pickup call as a rekindle.
 
-Cracked Core channels its starting Lightning orb from its owner-specific
-`BeforeSideTurnStart` callback on turn one. Snapshot the owner's orb queue
-around that completed callback and retain the exact newly added mutable
-`LightningOrb` reference for the combat. Count each successfully completed
-`LightningOrb.Passive` and `LightningOrb.Evoke` call carrying that reference;
-multi-evoke effects therefore count every actual evoke. The gameplay
-non-evoke removal path is `OrbQueue.RemoveCapacity`, currently used by Bulk
-Up, so compare raw queue references around that method for fizzles. Normal
-combat cleanup uses `OrbQueue.Clear` and must not count as a fizzle. For damage,
-scope Lightning's private `ApplyLightningDamage` call to that exact tracked orb
-and observe the returned `DamageResult` values from its five-parameter
-`CreatureCmd.Damage` command. This preserves the actual attempted, effective,
-blocked, overkill, kill, and target outcomes without claiming damage from other
-Lightning orbs owned at the same time.
+Cracked Core and Infused Core channel their starting Lightning orbs from their
+owner-specific turn-one callbacks: `CrackedCore.BeforeSideTurnStart` and
+`InfusedCore.AfterSideTurnStart`, respectively. Snapshot the owner's orb queue
+around the completed callback and retain every exact newly added mutable
+`LightningOrb` reference with the source relic id for the combat. Count each
+successfully completed `LightningOrb.Passive` and `LightningOrb.Evoke` call
+carrying one of those references; multi-evoke effects therefore count every
+actual evoke. The gameplay non-evoke removal path is
+`OrbQueue.RemoveCapacity`, currently used by Bulk Up, so compare raw queue
+references around that method for fizzles. Normal combat cleanup uses
+`OrbQueue.Clear` and must not count as a fizzle. For damage, scope Lightning's
+private `ApplyLightningDamage` call to that exact tracked orb and observe the
+returned `DamageResult` values from its five-parameter `CreatureCmd.Damage`
+command. This preserves the actual attempted, effective, blocked, overkill,
+kill, and target outcomes under the correct source relic without claiming
+damage from other Lightning orbs owned at the same time. Infused Core's native
+Lightning value modifier is naturally reflected in those observed results.
 
 Symbiotic Virus follows the same exact-reference lifecycle with its
 owner-specific `AfterSideTurnStart` callback and the newly queued mutable

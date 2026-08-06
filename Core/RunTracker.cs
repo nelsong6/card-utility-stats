@@ -9762,6 +9762,7 @@ public static class RunTracker
     private const string FragrantMushroomRelicId = "RELIC.FRAGRANT_MUSHROOM";
     private const string ArtOfWarRelicId = "RELIC.ART_OF_WAR";
     private const string CrackedCoreRelicId = "RELIC.CRACKED_CORE";
+    private const string InfusedCoreRelicId = "RELIC.INFUSED_CORE";
     private const string SymbioticVirusRelicId = "RELIC.SYMBIOTIC_VIRUS";
     private const string GoldPlatedCablesRelicId = "RELIC.GOLD_PLATED_CABLES";
     private const string FishingRodRelicId = "RELIC.FISHING_ROD";
@@ -22992,17 +22993,23 @@ public static class RunTracker
     }
 
     /// <summary>
-    /// Retain the exact mutable Lightning orb instances created during
-    /// Cracked Core's owner callback. Later orb callbacks are attributed only
-    /// when they carry one of these references.
+    /// Retain the exact mutable Lightning orb instances created during a
+    /// starting Core relic's owner callback. Later orb callbacks are
+    /// attributed only when they carry one of these references.
     /// </summary>
-    public static void TrackCrackedCoreStartingOrbs(
-        CrackedCore relic,
+    public static void TrackStartingLightningRelicOrbs(
+        RelicModel relic,
         IEnumerable<OrbModel> orbs)
     {
         var owner = relic?.Owner;
         var orbQueue = owner?.PlayerCombatState?.OrbQueue;
-        if (owner == null || orbQueue == null || orbs == null) return;
+        if (owner == null
+            || orbQueue == null
+            || orbs == null
+            || !TryGetStartingLightningRelicId(relic, out var relicId))
+        {
+            return;
+        }
 
         lock (_lock)
         {
@@ -23020,27 +23027,29 @@ public static class RunTracker
                     {
                         continue;
                     }
-                    _pendingCombat.CrackedCoreStartingOrbs.Add(orb);
+                    _pendingCombat.StartingLightningRelicIdsByOrb[orb] = relicId;
                 }
             }
             catch (Exception e)
             {
-                CoreMain.LogDebug($"TrackCrackedCoreStartingOrbs failed: {e.Message}");
+                CoreMain.LogDebug(
+                    $"TrackStartingLightningRelicOrbs failed: {e.Message}");
             }
         }
     }
 
-    public static bool IsTrackedCrackedCoreStartingOrb(OrbModel orb)
+    public static bool IsTrackedStartingLightningRelicOrb(OrbModel orb)
     {
         if (orb == null) return false;
 
         lock (_lock)
         {
-            return _pendingCombat?.CrackedCoreStartingOrbs.Contains(orb) == true;
+            return _pendingCombat?.StartingLightningRelicIdsByOrb.ContainsKey(orb)
+                == true;
         }
     }
 
-    public static void RecordCrackedCoreStartingOrbPassive(OrbModel orb)
+    public static void RecordStartingLightningRelicOrbPassive(OrbModel orb)
     {
         if (orb == null) return;
 
@@ -23048,19 +23057,26 @@ public static class RunTracker
         {
             try
             {
-                if (_pendingCombat?.CrackedCoreStartingOrbs.Contains(orb) != true) return;
+                if (_pendingCombat == null
+                    || !_pendingCombat.StartingLightningRelicIdsByOrb.TryGetValue(
+                        orb,
+                        out var relicId))
+                {
+                    return;
+                }
 
-                var agg = GetOrCreatePendingRelicAggregateLocked(CrackedCoreRelicId);
+                var agg = GetOrCreatePendingRelicAggregateLocked(relicId);
                 RecordCrackedCoreOrbPassiveForTest(agg);
             }
             catch (Exception e)
             {
-                CoreMain.LogDebug($"RecordCrackedCoreStartingOrbPassive failed: {e.Message}");
+                CoreMain.LogDebug(
+                    $"RecordStartingLightningRelicOrbPassive failed: {e.Message}");
             }
         }
     }
 
-    public static void RecordCrackedCoreStartingOrbEvoked(OrbModel orb)
+    public static void RecordStartingLightningRelicOrbEvoked(OrbModel orb)
     {
         if (orb == null) return;
 
@@ -23068,19 +23084,26 @@ public static class RunTracker
         {
             try
             {
-                if (_pendingCombat?.CrackedCoreStartingOrbs.Contains(orb) != true) return;
+                if (_pendingCombat == null
+                    || !_pendingCombat.StartingLightningRelicIdsByOrb.TryGetValue(
+                        orb,
+                        out var relicId))
+                {
+                    return;
+                }
 
-                var agg = GetOrCreatePendingRelicAggregateLocked(CrackedCoreRelicId);
+                var agg = GetOrCreatePendingRelicAggregateLocked(relicId);
                 RecordCrackedCoreOrbEvokedForTest(agg);
             }
             catch (Exception e)
             {
-                CoreMain.LogDebug($"RecordCrackedCoreStartingOrbEvoked failed: {e.Message}");
+                CoreMain.LogDebug(
+                    $"RecordStartingLightningRelicOrbEvoked failed: {e.Message}");
             }
         }
     }
 
-    public static void RecordCrackedCoreStartingOrbDamage(
+    public static void RecordStartingLightningRelicOrbDamage(
         OrbModel orb,
         IEnumerable<DamageResult>? results)
     {
@@ -23090,21 +23113,27 @@ public static class RunTracker
         {
             try
             {
-                if (_pendingCombat?.CrackedCoreStartingOrbs.Contains(orb) != true)
+                if (_pendingCombat == null
+                    || !_pendingCombat.StartingLightningRelicIdsByOrb.TryGetValue(
+                        orb,
+                        out var relicId))
+                {
                     return;
+                }
 
-                var agg = GetOrCreatePendingRelicAggregateLocked(CrackedCoreRelicId);
+                var agg = GetOrCreatePendingRelicAggregateLocked(relicId);
                 AddRelicDamageResultsLocked(agg, results);
             }
             catch (Exception e)
             {
                 CoreMain.LogDebug(
-                    $"RecordCrackedCoreStartingOrbDamage failed: {e.Message}");
+                    $"RecordStartingLightningRelicOrbDamage failed: {e.Message}");
             }
         }
     }
 
-    public static void RecordCrackedCoreStartingOrbsFizzled(IEnumerable<OrbModel> removedOrbs)
+    public static void RecordStartingLightningRelicOrbsFizzled(
+        IEnumerable<OrbModel> removedOrbs)
     {
         if (removedOrbs == null) return;
 
@@ -23114,22 +23143,47 @@ public static class RunTracker
             {
                 if (_pendingCombat == null) return;
 
-                var fizzled = 0;
+                var fizzlesByRelicId = new Dictionary<string, int>(
+                    StringComparer.Ordinal);
                 foreach (var orb in removedOrbs)
                 {
-                    if (orb != null && _pendingCombat.CrackedCoreStartingOrbs.Remove(orb))
-                        fizzled++;
+                    if (orb == null
+                        || !_pendingCombat.StartingLightningRelicIdsByOrb.Remove(
+                            orb,
+                            out var relicId))
+                    {
+                        continue;
+                    }
+
+                    fizzlesByRelicId.TryGetValue(relicId, out var current);
+                    fizzlesByRelicId[relicId] = current + 1;
                 }
 
-                if (fizzled <= 0) return;
-                var agg = GetOrCreatePendingRelicAggregateLocked(CrackedCoreRelicId);
-                RecordCrackedCoreOrbFizzledForTest(agg, fizzled);
+                foreach (var (relicId, fizzles) in fizzlesByRelicId)
+                {
+                    var agg = GetOrCreatePendingRelicAggregateLocked(relicId);
+                    RecordCrackedCoreOrbFizzledForTest(agg, fizzles);
+                }
             }
             catch (Exception e)
             {
-                CoreMain.LogDebug($"RecordCrackedCoreStartingOrbsFizzled failed: {e.Message}");
+                CoreMain.LogDebug(
+                    $"RecordStartingLightningRelicOrbsFizzled failed: {e.Message}");
             }
         }
+    }
+
+    private static bool TryGetStartingLightningRelicId(
+        RelicModel? relic,
+        out string relicId)
+    {
+        relicId = relic switch
+        {
+            CrackedCore => CrackedCoreRelicId,
+            InfusedCore => InfusedCoreRelicId,
+            _ => "",
+        };
+        return relicId.Length > 0;
     }
 
     internal static void RecordCrackedCoreOrbPassiveForTest(RelicAggregate agg, int count = 1)
@@ -36431,7 +36485,7 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> ArtOfWarEnergyAddedThisTurn { get; }
         = new(ReferenceEqualityComparer.Instance);
-    public HashSet<OrbModel> CrackedCoreStartingOrbs { get; }
+    public Dictionary<OrbModel, string> StartingLightningRelicIdsByOrb { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<OrbModel> SymbioticVirusStartingOrbs { get; }
         = new(ReferenceEqualityComparer.Instance);
