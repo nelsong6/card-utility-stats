@@ -81,7 +81,9 @@ a card or relic in run history, or the run-history Campfires summary to pin its
 complete native tooltip set. The game's compact top-panel lock icon appears on
 the pinned item, and the tooltip remains visible and mouse-interactive after the
 pointer leaves it. Right-clicking the locked item again always unlocks it. Pointer
-movement is allowed so inline help can be inspected. Every SpireLens panel keeps
+movement is allowed so inline help can be inspected. Each pinned panel blocks
+covered game elements from raising their own hover tooltips, while uncovered
+elements remain normally hoverable. Every SpireLens panel keeps
 a camera button in the same header position so pinning never changes the
 tooltip's measured size. Once pinned, that button captures the selected card or
 relic together with its complete native and SpireLens tooltip set in their exact
