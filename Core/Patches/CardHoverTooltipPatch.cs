@@ -2731,10 +2731,32 @@ public static class CardHoverShowPatch
             .OrderBy(outcome => outcome.OrbId, StringComparer.Ordinal)
             .ToList();
 
-        if (compact || outcomes.Count == 0)
+        if (compact)
         {
             if (totalOrbsCreated > 0 || expectedOrbIds.Count > 0)
-                Row3(sb, "Orbs created", totalOrbsCreated.ToString(), "");
+            {
+                var compactOrbIds = outcomes.Count > 0
+                    ? outcomes.Select(outcome => outcome.OrbId)
+                    : expectedOrbIds;
+                Row3(
+                    sb,
+                    GetOrbGroupStatLabel(compactOrbIds, "created"),
+                    totalOrbsCreated.ToString(),
+                    "");
+            }
+            return;
+        }
+
+        if (outcomes.Count == 0)
+        {
+            if (totalOrbsCreated > 0 || expectedOrbIds.Count > 0)
+            {
+                Row3(
+                    sb,
+                    GetOrbGroupStatLabel(expectedOrbIds, "created"),
+                    totalOrbsCreated.ToString(),
+                    "");
+            }
             return;
         }
 
@@ -2852,6 +2874,28 @@ public static class CardHoverShowPatch
     private static string GetOrbStatLabel(string orbId, string suffix)
     {
         return GetInlineIconStatLabel(GetOrbIconPath(orbId), suffix);
+    }
+
+    private static string GetOrbGroupStatLabel(
+        IEnumerable<string> orbIds,
+        string suffix)
+    {
+        var icons = orbIds
+            .Where(orbId => !string.IsNullOrWhiteSpace(orbId))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(orbId => orbId, StringComparer.Ordinal)
+            .Select(orbId =>
+                $"[img={InlineKeywordIconSize}x{InlineKeywordIconSize}]"
+                + $"{GetOrbIconPath(orbId)}[/img]")
+            .ToList();
+        if (icons.Count == 0)
+        {
+            icons.Add(
+                $"[img={InlineKeywordIconSize}x{InlineKeywordIconSize}]"
+                + $"{GetOrbIconPath("ORB.UNKNOWN")}[/img]");
+        }
+
+        return $"{string.Join(" ", icons)} {suffix}";
     }
 
     private static string GetFrostOrbBlockStatLabel()

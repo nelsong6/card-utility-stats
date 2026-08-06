@@ -404,6 +404,51 @@ public class BlockTooltipTests
     }
 
     [Fact]
+    public void AppendOrbCreationStats_CompactCreatedRowUsesOrbIcon()
+    {
+        var sb = new StringBuilder();
+        _ = AppendOrbCreationStatsMethod.Invoke(
+            null,
+            new object?[]
+            {
+                sb,
+                new Darkness(),
+                new CardAggregate(),
+                new RunMetaStats(),
+                true,
+            });
+        var text = sb.ToString();
+
+        Assert.Contains("res://images/orbs/dark.png", text);
+        Assert.Contains("created", text);
+        Assert.DoesNotContain("Orbs created", text);
+    }
+
+    [Fact]
+    public void AppendOrbCreationStats_RandomFallbackShowsEligibleOrbIcons()
+    {
+        var sb = new StringBuilder();
+        _ = AppendOrbCreationStatsMethod.Invoke(
+            null,
+            new object?[]
+            {
+                sb,
+                new Chaos(),
+                new CardAggregate(),
+                new RunMetaStats(),
+                false,
+            });
+        var text = sb.ToString();
+
+        Assert.Contains("res://images/orbs/dark.png", text);
+        Assert.Contains("res://images/orbs/frost.png", text);
+        Assert.Contains("res://images/orbs/glass.png", text);
+        Assert.Contains("res://images/orbs/lightning.png", text);
+        Assert.Contains("res://images/orbs/plasma.png", text);
+        Assert.Contains("created", text);
+    }
+
+    [Fact]
     public void AppendCardDrawStats_ShowsActualVersusAttemptedWhenGapExists()
     {
         var agg = new CardAggregate
