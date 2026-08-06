@@ -120,9 +120,9 @@ public class PendingCombatPromotionTests
             TotalOrbsCreated = 2,
             OrbOutcomes =
             {
-                ["ORB.LIGHTNING"] = new CardOrbAggregate
+                ["ORB.LIGHTNING_ORB"] = new CardOrbAggregate
                 {
-                    OrbId = "ORB.LIGHTNING",
+                    OrbId = "ORB.LIGHTNING_ORB",
                     Created = 2,
                     PassiveActivations = 3,
                     DamageDealt = 9,
@@ -146,8 +146,8 @@ public class PendingCombatPromotionTests
         Assert.Equal(9, run.MetaStats.ExtraBlockGainedFromUnmovablePower);
         var storm = run.MetaStats.PowerAggregates["POWER.STORM"];
         Assert.Equal(2, storm.TotalOrbsCreated);
-        Assert.Equal(2, storm.OrbOutcomes["ORB.LIGHTNING"].Created);
-        Assert.Equal(3, storm.OrbOutcomes["ORB.LIGHTNING"].PassiveActivations);
-        Assert.Equal(9, storm.OrbOutcomes["ORB.LIGHTNING"].DamageDealt);
+        Assert.Equal(2, storm.OrbOutcomes["ORB.LIGHTNING_ORB"].Created);
+        Assert.Equal(3, storm.OrbOutcomes["ORB.LIGHTNING_ORB"].PassiveActivations);
+        Assert.Equal(9, storm.OrbOutcomes["ORB.LIGHTNING_ORB"].DamageDealt);
     }
 }

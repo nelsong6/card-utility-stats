@@ -2849,7 +2849,8 @@ public static class CardHoverShowPatch
         foreach (var (key, value) in source)
         {
             if (value == null) continue;
-            var orbId = string.IsNullOrWhiteSpace(value.OrbId) ? key : value.OrbId;
+            var orbId = NormalizeOrbId(
+                string.IsNullOrWhiteSpace(value.OrbId) ? key : value.OrbId);
             if (!target.TryGetValue(orbId, out var combined))
             {
                 combined = new CardOrbAggregate { OrbId = orbId };
@@ -2903,37 +2904,48 @@ public static class CardHoverShowPatch
 
     private static string GetFrostOrbBlockStatLabel()
     {
-        return $"{GetOrbInlineIcon("ORB.FROST")} "
+        return $"{GetOrbInlineIcon(OrbCardRegistry.FrostOrbId)} "
             + $"[img={InlineKeywordIconSize}x{InlineKeywordIconSize}]"
             + $"{BlockIconPath}[/img]";
     }
 
     private static string GetPlasmaOrbEnergyStatLabel()
     {
-        return $"{GetOrbInlineIcon("ORB.PLASMA")} "
+        return $"{GetOrbInlineIcon(OrbCardRegistry.PlasmaOrbId)} "
             + GetEnergyStatLabel("");
     }
 
     private static bool IsFrostOrbId(string orbId)
     {
-        return orbId.EndsWith(".FROST", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(orbId, "FROST", StringComparison.OrdinalIgnoreCase);
+        return string.Equals(
+            NormalizeOrbId(orbId),
+            OrbCardRegistry.FrostOrbId,
+            StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsDamageOrbId(string orbId)
     {
-        return orbId.EndsWith(".LIGHTNING", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(orbId, "LIGHTNING", StringComparison.OrdinalIgnoreCase)
-            || orbId.EndsWith(".DARK", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(orbId, "DARK", StringComparison.OrdinalIgnoreCase)
-            || orbId.EndsWith(".GLASS", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(orbId, "GLASS", StringComparison.OrdinalIgnoreCase);
+        var normalized = NormalizeOrbId(orbId);
+        return string.Equals(
+                   normalized,
+                   OrbCardRegistry.LightningOrbId,
+                   StringComparison.OrdinalIgnoreCase)
+            || string.Equals(
+                normalized,
+                OrbCardRegistry.DarkOrbId,
+                StringComparison.OrdinalIgnoreCase)
+            || string.Equals(
+                normalized,
+                OrbCardRegistry.GlassOrbId,
+                StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsPlasmaOrbId(string orbId)
     {
-        return orbId.EndsWith(".PLASMA", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(orbId, "PLASMA", StringComparison.OrdinalIgnoreCase);
+        return string.Equals(
+            NormalizeOrbId(orbId),
+            OrbCardRegistry.PlasmaOrbId,
+            StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool HasOrbDamageStats(CardOrbAggregate outcome)
@@ -2948,6 +2960,7 @@ public static class CardHoverShowPatch
 
     private static string GetOrbIconPath(string orbId)
     {
+        orbId = NormalizeOrbId(orbId);
         var separator = orbId.LastIndexOf('.');
         var entry = separator >= 0 && separator < orbId.Length - 1
             ? orbId[(separator + 1)..]
@@ -2963,6 +2976,26 @@ public static class CardHoverShowPatch
             safeEntry = "unknown";
 
         return $"res://images/orbs/{safeEntry}.png";
+    }
+
+    private static string NormalizeOrbId(string? orbId)
+    {
+        if (string.IsNullOrWhiteSpace(orbId)) return "ORB.UNKNOWN";
+
+        var separator = orbId.LastIndexOf('.');
+        var entry = separator >= 0 && separator < orbId.Length - 1
+            ? orbId[(separator + 1)..]
+            : orbId;
+        var canonicalEntry = entry.ToUpperInvariant() switch
+        {
+            "DARK" or "DARK_ORB" => "DARK_ORB",
+            "FROST" or "FROST_ORB" => "FROST_ORB",
+            "GLASS" or "GLASS_ORB" => "GLASS_ORB",
+            "LIGHTNING" or "LIGHTNING_ORB" => "LIGHTNING_ORB",
+            "PLASMA" or "PLASMA_ORB" => "PLASMA_ORB",
+            _ => entry,
+        };
+        return $"ORB.{canonicalEntry}";
     }
 
     private static void AppendBlockedDrawReasonRows(StringBuilder sb, CardAggregate agg, int blockedGap)

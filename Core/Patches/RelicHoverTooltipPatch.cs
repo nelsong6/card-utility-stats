@@ -2280,11 +2280,11 @@ public static class RelicHoverShowPatch
             ?? new Dictionary<string, RelicOrbActivationAggregate>();
         var standardOrbs = new[]
         {
-            ("ORB.LIGHTNING", "Lightning"),
-            ("ORB.FROST", "Frost"),
-            ("ORB.DARK", "Dark"),
-            ("ORB.PLASMA", "Plasma"),
-            ("ORB.GLASS", "Glass"),
+            (OrbCardRegistry.LightningOrbId, "Lightning"),
+            (OrbCardRegistry.FrostOrbId, "Frost"),
+            (OrbCardRegistry.DarkOrbId, "Dark"),
+            (OrbCardRegistry.PlasmaOrbId, "Plasma"),
+            (OrbCardRegistry.GlassOrbId, "Glass"),
         };
 
         foreach (var (orbId, fallbackName) in standardOrbs)

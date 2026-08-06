@@ -27,7 +27,7 @@ public class CardOrbDamageStatsTests
 
         var outcome = RunTracker.RecordCardSourcedOrbDamageForTest(
             aggregate,
-            "ORB.LIGHTNING",
+            "ORB.LIGHTNING_ORB",
             [
                 (
                     BlockedDamage: 2,
@@ -41,7 +41,7 @@ public class CardOrbDamageStatsTests
                     WasTargetKilled: true),
             ]);
 
-        Assert.Equal("ORB.LIGHTNING", outcome.OrbId);
+        Assert.Equal("ORB.LIGHTNING_ORB", outcome.OrbId);
         Assert.Equal(10, outcome.DamageAttempted);
         Assert.Equal(7, outcome.DamageDealt);
         Assert.Equal(2, outcome.DamageBlocked);
@@ -59,9 +59,9 @@ public class CardOrbDamageStatsTests
     public void CardOrbAggregate_DamageFields_RoundTrip()
     {
         var aggregate = new CardAggregate();
-        aggregate.OrbOutcomes["ORB.LIGHTNING"] = new CardOrbAggregate
+        aggregate.OrbOutcomes["ORB.LIGHTNING_ORB"] = new CardOrbAggregate
         {
-            OrbId = "ORB.LIGHTNING",
+            OrbId = "ORB.LIGHTNING_ORB",
             Created = 2,
             DamageAttempted = 18,
             DamageDealt = 12,
@@ -85,7 +85,7 @@ public class CardOrbDamageStatsTests
         Assert.Contains("\"targets_hit\"", json);
         Assert.Contains("\"energy_generated\"", json);
         Assert.NotNull(restored);
-        var outcome = restored!.OrbOutcomes["ORB.LIGHTNING"];
+        var outcome = restored!.OrbOutcomes["ORB.LIGHTNING_ORB"];
         Assert.Equal(18, outcome.DamageAttempted);
         Assert.Equal(12, outcome.DamageDealt);
         Assert.Equal(4, outcome.DamageBlocked);
@@ -101,7 +101,7 @@ public class CardOrbDamageStatsTests
         var outcome = JsonSerializer.Deserialize<CardOrbAggregate>(
             """
             {
-              "orb_id": "ORB.LIGHTNING",
+              "orb_id": "ORB.LIGHTNING_ORB",
               "created": 1,
               "passive_activations": 2,
               "evokes": 1

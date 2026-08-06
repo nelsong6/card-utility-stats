@@ -263,9 +263,9 @@ public class BlockTooltipTests
         {
             TotalOrbsCreated = 2,
         };
-        agg.OrbOutcomes["ORB.FROST"] = new CardOrbAggregate
+        agg.OrbOutcomes["ORB.FROST_ORB"] = new CardOrbAggregate
         {
-            OrbId = "ORB.FROST",
+            OrbId = "ORB.FROST_ORB",
             Created = 2,
             PassiveActivations = 5,
             Evokes = 1,
@@ -301,9 +301,9 @@ public class BlockTooltipTests
         {
             TotalOrbsCreated = 2,
         };
-        agg.OrbOutcomes["ORB.LIGHTNING"] = new CardOrbAggregate
+        agg.OrbOutcomes["ORB.LIGHTNING_ORB"] = new CardOrbAggregate
         {
-            OrbId = "ORB.LIGHTNING",
+            OrbId = "ORB.LIGHTNING_ORB",
             Created = 2,
             PassiveActivations = 3,
             Evokes = 1,
@@ -378,9 +378,9 @@ public class BlockTooltipTests
     public void AppendOrbCreationStats_ShowsPlasmaEnergyFromExactOrb()
     {
         var agg = new CardAggregate { TotalOrbsCreated = 1 };
-        agg.OrbOutcomes["ORB.PLASMA"] = new CardOrbAggregate
+        agg.OrbOutcomes["ORB.PLASMA_ORB"] = new CardOrbAggregate
         {
-            OrbId = "ORB.PLASMA",
+            OrbId = "ORB.PLASMA_ORB",
             Created = 1,
             EnergyGenerated = 4,
         };

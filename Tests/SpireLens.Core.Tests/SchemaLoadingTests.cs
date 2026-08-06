@@ -4977,19 +4977,19 @@ public class SchemaLoadingTests
         Assert.Equal(7, relicAgg.Activations);
         Assert.Equal(
             4,
-            relicAgg.GoldPlatedCablesActivationsByOrbType["ORB.LIGHTNING"]
+            relicAgg.GoldPlatedCablesActivationsByOrbType["ORB.LIGHTNING_ORB"]
                 .Activations);
         Assert.Equal(
             "Lightning",
-            relicAgg.GoldPlatedCablesActivationsByOrbType["ORB.LIGHTNING"]
+            relicAgg.GoldPlatedCablesActivationsByOrbType["ORB.LIGHTNING_ORB"]
                 .DisplayName);
         Assert.Equal(
             2,
-            relicAgg.GoldPlatedCablesActivationsByOrbType["ORB.FROST"]
+            relicAgg.GoldPlatedCablesActivationsByOrbType["ORB.FROST_ORB"]
                 .Activations);
         Assert.Equal(
             1,
-            relicAgg.GoldPlatedCablesActivationsByOrbType["ORB.PLASMA"]
+            relicAgg.GoldPlatedCablesActivationsByOrbType["ORB.PLASMA_ORB"]
                 .Activations);
         Assert.Equal(3, relicAgg.GoldPlatedCablesNoOrbTargets);
     }
@@ -5426,7 +5426,7 @@ public class SchemaLoadingTests
         Assert.True(loaded!.SupportsResume);
         AssertCardOrbLifecycleFixture(
             loaded.Data.Aggregates["CARD.GLACIER#1"]);
-        Assert.Equal("ORB.FROST", loaded.Data.Events[0].OrbId);
+        Assert.Equal("ORB.FROST_ORB", loaded.Data.Events[0].OrbId);
         Assert.Contains(loaded.Data.Events, entry => entry.Type == "orb_passive");
         Assert.Contains(loaded.Data.Events, entry => entry.Type == "orb_evoked");
         Assert.Contains(loaded.Data.Events, entry => entry.Type == "orb_fizzled");
@@ -5444,14 +5444,14 @@ public class SchemaLoadingTests
         Assert.NotNull(resumed);
         AssertCardOrbLifecycleFixture(
             resumed!.Aggregates["CARD.GLACIER#1"]);
-        Assert.Equal("ORB.FROST", resumed.Events[0].OrbId);
+        Assert.Equal("ORB.FROST_ORB", resumed.Events[0].OrbId);
     }
 
     private static void AssertCardOrbLifecycleFixture(CardAggregate aggregate)
     {
         Assert.Equal(6, aggregate.TotalOrbsCreated);
-        var frost = aggregate.OrbOutcomes["ORB.FROST"];
-        Assert.Equal("ORB.FROST", frost.OrbId);
+        var frost = aggregate.OrbOutcomes["ORB.FROST_ORB"];
+        Assert.Equal("ORB.FROST_ORB", frost.OrbId);
         Assert.Equal(6, frost.Created);
         Assert.Equal(9, frost.PassiveActivations);
         Assert.Equal(4, frost.Evokes);
@@ -5471,7 +5471,7 @@ public class SchemaLoadingTests
             loaded.Data.Aggregates["CARD.BALL_LIGHTNING#1"]);
         Assert.Equal(4, loaded.Data.Events.Count(entry =>
             entry.Type == "orb_damage"
-            && entry.OrbId == "ORB.LIGHTNING"));
+            && entry.OrbId == "ORB.LIGHTNING_ORB"));
     }
 
     [Fact]
@@ -5491,8 +5491,8 @@ public class SchemaLoadingTests
         Assert.Equal(2, aggregate.TotalOrbsCreated);
         Assert.Equal(0, aggregate.TotalIntended);
         Assert.Equal(0, aggregate.TotalEffective);
-        var lightning = aggregate.OrbOutcomes["ORB.LIGHTNING"];
-        Assert.Equal("ORB.LIGHTNING", lightning.OrbId);
+        var lightning = aggregate.OrbOutcomes["ORB.LIGHTNING_ORB"];
+        Assert.Equal("ORB.LIGHTNING_ORB", lightning.OrbId);
         Assert.Equal(2, lightning.Created);
         Assert.Equal(3, lightning.PassiveActivations);
         Assert.Equal(1, lightning.Evokes);
@@ -5529,12 +5529,12 @@ public class SchemaLoadingTests
     private static void AssertDefectOrbFamilyFixture(RunData run)
     {
         var plasma = run.Aggregates["CARD.FUSION#1"]
-            .OrbOutcomes["ORB.PLASMA"];
+            .OrbOutcomes["ORB.PLASMA_ORB"];
         Assert.Equal(5, plasma.EnergyGenerated);
 
         var storm = run.MetaStats.PowerAggregates["POWER.STORM"];
         Assert.Equal(3, storm.TotalOrbsCreated);
-        var lightning = storm.OrbOutcomes["ORB.LIGHTNING"];
+        var lightning = storm.OrbOutcomes["ORB.LIGHTNING_ORB"];
         Assert.Equal(3, lightning.Created);
         Assert.Equal(4, lightning.PassiveActivations);
         Assert.Equal(2, lightning.Evokes);

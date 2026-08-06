@@ -18,47 +18,53 @@ internal sealed record OrbPowerDefinition(
 /// </summary>
 internal static class OrbCardRegistry
 {
+    internal const string DarkOrbId = "ORB.DARK_ORB";
+    internal const string FrostOrbId = "ORB.FROST_ORB";
+    internal const string GlassOrbId = "ORB.GLASS_ORB";
+    internal const string LightningOrbId = "ORB.LIGHTNING_ORB";
+    internal const string PlasmaOrbId = "ORB.PLASMA_ORB";
+
     internal static readonly string[] AllOrbIds =
     [
-        "ORB.DARK",
-        "ORB.FROST",
-        "ORB.GLASS",
-        "ORB.LIGHTNING",
-        "ORB.PLASMA",
+        DarkOrbId,
+        FrostOrbId,
+        GlassOrbId,
+        LightningOrbId,
+        PlasmaOrbId,
     ];
 
     private static readonly IReadOnlyDictionary<string, string[]> DirectByCardId =
         new Dictionary<string, string[]>(StringComparer.Ordinal)
         {
-            ["CARD.BALL_LIGHTNING"] = ["ORB.LIGHTNING"],
+            ["CARD.BALL_LIGHTNING"] = [LightningOrbId],
             ["CARD.CHAOS"] = AllOrbIds,
-            ["CARD.CHILL"] = ["ORB.FROST"],
-            ["CARD.COLD_SNAP"] = ["ORB.FROST"],
-            ["CARD.CONSUMING_SHADOW"] = ["ORB.DARK"],
-            ["CARD.COOLHEADED"] = ["ORB.FROST"],
-            ["CARD.DARKNESS"] = ["ORB.DARK"],
-            ["CARD.FUSION"] = ["ORB.PLASMA"],
-            ["CARD.GLACIER"] = ["ORB.FROST"],
-            ["CARD.GLASSWORK"] = ["ORB.GLASS"],
-            ["CARD.HIBERNATE"] = ["ORB.FROST"],
-            ["CARD.ICE_LANCE"] = ["ORB.FROST"],
-            ["CARD.IGNITION"] = ["ORB.PLASMA"],
-            ["CARD.METEOR_STRIKE"] = ["ORB.PLASMA"],
-            ["CARD.NULL"] = ["ORB.DARK"],
-            ["CARD.RAINBOW"] = ["ORB.LIGHTNING", "ORB.FROST", "ORB.DARK"],
-            ["CARD.REFRACT"] = ["ORB.GLASS"],
-            ["CARD.SHADOW_SHIELD"] = ["ORB.DARK"],
-            ["CARD.SPINNER"] = ["ORB.GLASS"],
-            ["CARD.TEMPEST"] = ["ORB.LIGHTNING"],
-            ["CARD.VOLTAIC"] = ["ORB.LIGHTNING"],
-            ["CARD.ZAP"] = ["ORB.LIGHTNING"],
+            ["CARD.CHILL"] = [FrostOrbId],
+            ["CARD.COLD_SNAP"] = [FrostOrbId],
+            ["CARD.CONSUMING_SHADOW"] = [DarkOrbId],
+            ["CARD.COOLHEADED"] = [FrostOrbId],
+            ["CARD.DARKNESS"] = [DarkOrbId],
+            ["CARD.FUSION"] = [PlasmaOrbId],
+            ["CARD.GLACIER"] = [FrostOrbId],
+            ["CARD.GLASSWORK"] = [GlassOrbId],
+            ["CARD.HIBERNATE"] = [FrostOrbId],
+            ["CARD.ICE_LANCE"] = [FrostOrbId],
+            ["CARD.IGNITION"] = [PlasmaOrbId],
+            ["CARD.METEOR_STRIKE"] = [PlasmaOrbId],
+            ["CARD.NULL"] = [DarkOrbId],
+            ["CARD.RAINBOW"] = [LightningOrbId, FrostOrbId, DarkOrbId],
+            ["CARD.REFRACT"] = [GlassOrbId],
+            ["CARD.SHADOW_SHIELD"] = [DarkOrbId],
+            ["CARD.SPINNER"] = [GlassOrbId],
+            ["CARD.TEMPEST"] = [LightningOrbId],
+            ["CARD.VOLTAIC"] = [LightningOrbId],
+            ["CARD.ZAP"] = [LightningOrbId],
         };
 
     private static readonly OrbPowerDefinition[] RecurringPowerDefinitions =
     [
-        new("CARD.LIGHTNING_ROD", "POWER.LIGHTNING_ROD", "Lightning Rod", ["ORB.LIGHTNING"]),
-        new("CARD.SPINNER", "POWER.SPINNER", "Spinner", ["ORB.GLASS"]),
-        new("CARD.STORM", "POWER.STORM", "Storm", ["ORB.LIGHTNING"]),
+        new("CARD.LIGHTNING_ROD", "POWER.LIGHTNING_ROD", "Lightning Rod", [LightningOrbId]),
+        new("CARD.SPINNER", "POWER.SPINNER", "Spinner", [GlassOrbId]),
+        new("CARD.STORM", "POWER.STORM", "Storm", [LightningOrbId]),
         new("CARD.TRASH_TO_TREASURE", "POWER.TRASH_TO_TREASURE", "Trash to Treasure", AllOrbIds),
     ];
 

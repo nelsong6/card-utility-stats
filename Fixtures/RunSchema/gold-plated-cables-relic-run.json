@@ -13,18 +13,18 @@
     "RELIC.GOLD_PLATED_CABLES": {
       "activations": 7,
       "gold_plated_cables_activations_by_orb_type": {
-        "ORB.LIGHTNING": {
-          "orb_id": "ORB.LIGHTNING",
+        "ORB.LIGHTNING_ORB": {
+          "orb_id": "ORB.LIGHTNING_ORB",
           "display_name": "Lightning",
           "activations": 4
         },
-        "ORB.FROST": {
-          "orb_id": "ORB.FROST",
+        "ORB.FROST_ORB": {
+          "orb_id": "ORB.FROST_ORB",
           "display_name": "Frost",
           "activations": 2
         },
-        "ORB.PLASMA": {
-          "orb_id": "ORB.PLASMA",
+        "ORB.PLASMA_ORB": {
+          "orb_id": "ORB.PLASMA_ORB",
           "display_name": "Plasma",
           "activations": 1
         }

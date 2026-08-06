@@ -14,8 +14,8 @@
       "times_drawn": 4,
       "total_orbs_created": 2,
       "orb_outcomes": {
-        "ORB.PLASMA": {
-          "orb_id": "ORB.PLASMA",
+        "ORB.PLASMA_ORB": {
+          "orb_id": "ORB.PLASMA_ORB",
           "created": 2,
           "passive_activations": 3,
           "evokes": 1,
@@ -32,7 +32,7 @@
       "t": "2026-08-06T17:18:00Z",
       "type": "orb_energy_gained",
       "card_id": "CARD.FUSION#1",
-      "orb_id": "ORB.PLASMA",
+      "orb_id": "ORB.PLASMA_ORB",
       "energy_gained": 2
     }
   ],
@@ -47,8 +47,8 @@
         "successful_applications": 1,
         "total_orbs_created": 3,
         "orb_outcomes": {
-          "ORB.LIGHTNING": {
-            "orb_id": "ORB.LIGHTNING",
+          "ORB.LIGHTNING_ORB": {
+            "orb_id": "ORB.LIGHTNING_ORB",
             "created": 3,
             "passive_activations": 4,
             "evokes": 2,
