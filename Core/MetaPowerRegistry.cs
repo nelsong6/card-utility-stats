@@ -31,7 +31,10 @@ internal static class MetaPowerRegistry
         new("CARD.JUGGLING", "POWER.JUGGLING", "Juggling"),
         new("CARD.RUPTURE", "POWER.RUPTURE", "Rupture"),
         new("CARD.SPECTRUM_SHIFT", "POWER.SPECTRUM_SHIFT", "Spectrum Shift"),
+        new("CARD.SPINNER", "POWER.SPINNER", "Spinner"),
         new("CARD.STAMPEDE", "POWER.STAMPEDE", "Stampede"),
+        new("CARD.STORM", "POWER.STORM", "Storm"),
+        new("CARD.TRASH_TO_TREASURE", "POWER.TRASH_TO_TREASURE", "Trash to Treasure"),
         new("CARD.UNMOVABLE", "POWER.UNMOVABLE", "Unmovable"),
         new("CARD.VICIOUS", "POWER.VICIOUS", "Vicious"),
     ];

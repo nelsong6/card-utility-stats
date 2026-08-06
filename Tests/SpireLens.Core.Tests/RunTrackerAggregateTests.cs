@@ -39,6 +39,7 @@ public class RunTrackerAggregateTests
             Evokes = 4,
             Fizzles = 1,
             BlockGained = 28,
+            EnergyGenerated = 5,
         };
         source.ReplayExtraPlayPlannedReasons["power:POWER.BURST"] = new ReplayExtraPlayReasonAggregate
         {
@@ -70,6 +71,7 @@ public class RunTrackerAggregateTests
         Assert.Equal(4, clone.OrbOutcomes["ORB.FROST"].Evokes);
         Assert.Equal(1, clone.OrbOutcomes["ORB.FROST"].Fizzles);
         Assert.Equal(28, clone.OrbOutcomes["ORB.FROST"].BlockGained);
+        Assert.Equal(5, clone.OrbOutcomes["ORB.FROST"].EnergyGenerated);
         Assert.Equal(21, clone.TotalOstyHpAttackBonus);
         Assert.Equal(3, clone.TimesOstyHpAttackBonusApplied);
         Assert.Equal(2, clone.TimesOstySummoned);
@@ -107,6 +109,7 @@ public class RunTrackerAggregateTests
             PassiveActivations = 3,
             Evokes = 1,
             BlockGained = 8,
+            EnergyGenerated = 2,
         };
         target.ReplayExtraPlayPlannedReasons["replay"] = new ReplayExtraPlayReasonAggregate
         {
@@ -148,6 +151,7 @@ public class RunTrackerAggregateTests
             Evokes = 3,
             Fizzles = 2,
             BlockGained = 20,
+            EnergyGenerated = 3,
         };
         source.ReplayExtraPlayPlannedReasons["power:POWER.BURST"] = new ReplayExtraPlayReasonAggregate
         {
@@ -179,6 +183,7 @@ public class RunTrackerAggregateTests
         Assert.Equal(4, target.OrbOutcomes["ORB.FROST"].Evokes);
         Assert.Equal(2, target.OrbOutcomes["ORB.FROST"].Fizzles);
         Assert.Equal(28, target.OrbOutcomes["ORB.FROST"].BlockGained);
+        Assert.Equal(5, target.OrbOutcomes["ORB.FROST"].EnergyGenerated);
         Assert.Equal(21, target.TotalOstyHpAttackBonus);
         Assert.Equal(3, target.TimesOstyHpAttackBonusApplied);
         Assert.Equal(3, target.TimesOstySummoned);

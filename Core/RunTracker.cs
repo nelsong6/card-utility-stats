@@ -3724,10 +3724,74 @@ public static class RunTracker
     }
 
     /// <summary>
-    /// Attribute one successfully channeled orb to the card whose play is
-    /// currently resolving. OrbCmd emits OrbChanneledEntry only after
-    /// TryEnqueue succeeds, making this an observed result rather than a
-    /// count inferred from the card's printed channel commands.
+    /// Keep delayed orb channels attached to the shared Power card that owns
+    /// them. The callback remains armed across its awaited OrbCmd.Channel
+    /// calls and is restored safely when nested hooks occur.
+    /// </summary>
+    internal static OrbGenerationPowerWindow? ArmOrbGenerationPower(
+        PowerModel? power)
+    {
+        if (power?.Owner?.Player == null
+            || !OrbCardRegistry.TryGetRecurringByPower(
+                power,
+                out var definition)
+            || definition == null)
+        {
+            return null;
+        }
+
+        lock (_lock)
+        {
+            if (!ShouldTrackCardStatsDuringCombatLocked()
+                || !IsTrackedPlayer(power.Owner.Player))
+            {
+                return null;
+            }
+
+            _pendingCombat ??= new PendingCombat();
+            _pendingCombat.OrbPowerWindows.TryGetValue(
+                power.Owner.Player,
+                out var previous);
+            var window = new OrbGenerationPowerWindow(
+                power.Owner.Player,
+                definition.PowerId,
+                definition.CardId,
+                definition.DisplayName,
+                previous);
+            _pendingCombat.OrbPowerWindows[power.Owner.Player] = window;
+            return window;
+        }
+    }
+
+    internal static void DisarmOrbGenerationPower(
+        OrbGenerationPowerWindow? window)
+    {
+        if (window == null) return;
+
+        lock (_lock)
+        {
+            if (_pendingCombat == null
+                || !_pendingCombat.OrbPowerWindows.TryGetValue(
+                    window.Player,
+                    out var active)
+                || !ReferenceEquals(active, window))
+            {
+                return;
+            }
+
+            if (window.Previous == null)
+                _pendingCombat.OrbPowerWindows.Remove(window.Player);
+            else
+                _pendingCombat.OrbPowerWindows[window.Player] = window.Previous;
+        }
+    }
+
+    /// <summary>
+    /// Attribute one successfully channeled orb to either the card whose play
+    /// is currently resolving or the narrow recurring-Power callback that is
+    /// currently active. OrbCmd emits OrbChanneledEntry only after TryEnqueue
+    /// succeeds, making this an observed result rather than a count inferred
+    /// from printed card text.
     /// </summary>
     private static void RecordOrbCreated(OrbChanneledEntry entry)
     {
@@ -3737,23 +3801,45 @@ public static class RunTracker
             {
                 if (!ShouldTrackCardStatsDuringCombatLocked()) return;
 
-                var causingPlay = FindCurrentlyResolvingCardPlay();
-                var sourceCard = causingPlay?.Card;
                 var orb = entry.Orb;
                 var orbOwner = orb?.Owner;
-                if (sourceCard == null || orb == null || orbOwner == null) return;
-                if (!IsTrackedCard(sourceCard) || !IsTrackedPlayer(orbOwner)) return;
-                if (!ReferenceEquals(sourceCard.Owner, orbOwner)) return;
+                if (orb == null || orbOwner == null) return;
 
                 _pendingCombat ??= new PendingCombat();
-                var instanceId = GetOrAssignInstanceId(sourceCard);
-                var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
+                PendingOrbSource? source = null;
+                if (_pendingCombat.OrbPowerWindows.TryGetValue(
+                        orbOwner,
+                        out var powerWindow))
+                {
+                    source = new PendingOrbSource(
+                        CardInstanceId: null,
+                        powerWindow.PowerId,
+                        powerWindow.CardId,
+                        powerWindow.DisplayName);
+                }
+                else
+                {
+                    var sourceCard = FindCurrentlyResolvingCardPlay()?.Card;
+                    if (!OrbCardRegistry.IsDirectGenerator(sourceCard)
+                        || sourceCard == null
+                        || !IsTrackedCard(sourceCard))
+                    {
+                        return;
+                    }
+
+                    var instanceId = GetOrAssignInstanceId(sourceCard);
+                    source = new PendingOrbSource(
+                        instanceId,
+                        PowerId: null,
+                        EventCardId: instanceId,
+                        sourceCard.Title);
+                }
+
                 var orbId = orb.Id.ToString();
-                agg.TotalOrbsCreated++;
-                GetOrCreateCardOrbAggregate(agg, orbId).Created++;
+                IncrementOrbCreatedLocked(source, orbId);
                 var firstRegistration =
-                    !_pendingCombat.CardSourceByOrb.ContainsKey(orb);
-                _pendingCombat.CardSourceByOrb[orb] = instanceId;
+                    !_pendingCombat.OrbSourceByOrb.ContainsKey(orb);
+                _pendingCombat.OrbSourceByOrb[orb] = source;
                 if (firstRegistration)
                 {
                     Action passiveHandler =
@@ -3772,7 +3858,7 @@ public static class RunTracker
                 {
                     T = Now(),
                     Type = "orb_created",
-                    CardId = instanceId,
+                    CardId = source.EventCardId,
                     OrbId = orbId,
                 });
             }
@@ -3789,7 +3875,7 @@ public static class RunTracker
 
         lock (_lock)
         {
-            return _pendingCombat?.CardSourceByOrb.ContainsKey(orb) == true;
+            return _pendingCombat?.OrbSourceByOrb.ContainsKey(orb) == true;
         }
     }
 
@@ -3804,16 +3890,15 @@ public static class RunTracker
             try
             {
                 if (_pendingCombat == null
-                    || !_pendingCombat.CardSourceByOrb.TryGetValue(
+                    || !_pendingCombat.OrbSourceByOrb.TryGetValue(
                         orb,
-                        out var instanceId))
+                        out var source))
                 {
                     return;
                 }
 
-                var aggregate = GetOrCreateAggregate(_pendingCombat, instanceId);
                 var orbId = orb.Id.ToString();
-                var outcome = GetOrCreateCardOrbAggregate(aggregate, orbId);
+                var outcome = GetOrCreateOrbAggregateLocked(source, orbId);
                 foreach (var result in results)
                 {
                     if (result == null) continue;
@@ -3827,7 +3912,7 @@ public static class RunTracker
                     {
                         T = Now(),
                         Type = "orb_damage",
-                        CardId = instanceId,
+                        CardId = source.EventCardId,
                         OrbId = orbId,
                         Receiver = result.Receiver == null
                             ? "MONSTER.UNKNOWN"
@@ -3854,6 +3939,8 @@ public static class RunTracker
             outcome => outcome.PassiveActivations++);
         if (orb is FrostOrb)
             ArmFrostOrbBlockAttribution(orb);
+        if (orb is PlasmaOrb)
+            ArmPlasmaOrbEnergyAttribution(orb);
     }
 
     private static void RecordCardSourcedOrbEvokeActivated(OrbModel? orb)
@@ -3864,6 +3951,8 @@ public static class RunTracker
             outcome => outcome.Evokes++);
         if (orb is FrostOrb)
             ArmFrostOrbBlockAttribution(orb);
+        if (orb is PlasmaOrb)
+            ArmPlasmaOrbEnergyAttribution(orb);
     }
 
     public static void RecordCardSourcedOrbsFizzled(IEnumerable<OrbModel>? removedOrbs)
@@ -3879,21 +3968,20 @@ public static class RunTracker
                 foreach (var orb in removedOrbs)
                 {
                     if (orb == null
-                        || !_pendingCombat.CardSourceByOrb.TryGetValue(
+                        || !_pendingCombat.OrbSourceByOrb.TryGetValue(
                             orb,
-                            out var instanceId))
+                            out var source))
                     {
                         continue;
                     }
 
-                    var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
                     var orbId = orb.Id.ToString();
-                    GetOrCreateCardOrbAggregate(agg, orbId).Fizzles++;
+                    GetOrCreateOrbAggregateLocked(source, orbId).Fizzles++;
                     _pendingCombat.CombatEvents.Add(new CardEvent
                     {
                         T = Now(),
                         Type = "orb_fizzled",
-                        CardId = instanceId,
+                        CardId = source.EventCardId,
                         OrbId = orbId,
                     });
                     if (_pendingCombat.CardOrbSubscriptions.Remove(
@@ -3903,7 +3991,7 @@ public static class RunTracker
                         orb.PassiveActivated -= subscription.PassiveHandler;
                         orb.EvokeActivated -= subscription.EvokeHandler;
                     }
-                    _pendingCombat.CardSourceByOrb.Remove(orb);
+                    _pendingCombat.OrbSourceByOrb.Remove(orb);
                 }
             }
             catch (Exception e)
@@ -3926,21 +4014,20 @@ public static class RunTracker
             try
             {
                 if (_pendingCombat == null
-                    || !_pendingCombat.CardSourceByOrb.TryGetValue(
+                    || !_pendingCombat.OrbSourceByOrb.TryGetValue(
                         orb,
-                        out var instanceId))
+                        out var source))
                 {
                     return;
                 }
 
-                var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
                 var orbId = orb.Id.ToString();
-                record(GetOrCreateCardOrbAggregate(agg, orbId));
+                record(GetOrCreateOrbAggregateLocked(source, orbId));
                 _pendingCombat.CombatEvents.Add(new CardEvent
                 {
                     T = Now(),
                     Type = eventType,
-                    CardId = instanceId,
+                    CardId = source.EventCardId,
                     OrbId = orbId,
                 });
             }
@@ -3969,6 +4056,64 @@ public static class RunTracker
         if (string.IsNullOrWhiteSpace(outcome.OrbId))
             outcome.OrbId = orbId;
         return outcome;
+    }
+
+    private static CardOrbAggregate GetOrCreatePowerOrbAggregate(
+        PowerAggregate aggregate,
+        string orbId)
+    {
+        aggregate.OrbOutcomes ??= new Dictionary<string, CardOrbAggregate>();
+        if (!aggregate.OrbOutcomes.TryGetValue(orbId, out var outcome))
+        {
+            outcome = new CardOrbAggregate { OrbId = orbId };
+            aggregate.OrbOutcomes[orbId] = outcome;
+        }
+
+        if (string.IsNullOrWhiteSpace(outcome.OrbId))
+            outcome.OrbId = orbId;
+        return outcome;
+    }
+
+    private static CardOrbAggregate GetOrCreateOrbAggregateLocked(
+        PendingOrbSource source,
+        string orbId)
+    {
+        _pendingCombat ??= new PendingCombat();
+        if (!string.IsNullOrWhiteSpace(source.PowerId))
+        {
+            var powerAggregate = GetOrCreatePowerAggregate(
+                _pendingCombat.MetaStats,
+                source.PowerId,
+                source.DisplayName);
+            return GetOrCreatePowerOrbAggregate(powerAggregate, orbId);
+        }
+
+        return GetOrCreateCardOrbAggregate(
+            GetOrCreateAggregate(_pendingCombat, source.CardInstanceId!),
+            orbId);
+    }
+
+    private static void IncrementOrbCreatedLocked(
+        PendingOrbSource source,
+        string orbId)
+    {
+        _pendingCombat ??= new PendingCombat();
+        if (!string.IsNullOrWhiteSpace(source.PowerId))
+        {
+            var powerAggregate = GetOrCreatePowerAggregate(
+                _pendingCombat.MetaStats,
+                source.PowerId,
+                source.DisplayName);
+            powerAggregate.TotalOrbsCreated++;
+            GetOrCreatePowerOrbAggregate(powerAggregate, orbId).Created++;
+            return;
+        }
+
+        var cardAggregate = GetOrCreateAggregate(
+            _pendingCombat,
+            source.CardInstanceId!);
+        cardAggregate.TotalOrbsCreated++;
+        GetOrCreateCardOrbAggregate(cardAggregate, orbId).Created++;
     }
 
     private static void AddCardOrbDamageResultPartsLocked(
@@ -4094,18 +4239,17 @@ public static class RunTracker
                 && ReferenceEquals(orb.Owner.Creature, entry.Receiver));
         if (activeOrb == null) return false;
 
-        if (_pendingCombat.CardSourceByOrb.TryGetValue(
+        if (_pendingCombat.OrbSourceByOrb.TryGetValue(
                 activeOrb,
-                out var instanceId))
+                out var source))
         {
-            var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
             var orbId = activeOrb.Id.ToString();
-            GetOrCreateCardOrbAggregate(agg, orbId).BlockGained += entry.Amount;
+            GetOrCreateOrbAggregateLocked(source, orbId).BlockGained += entry.Amount;
             _pendingCombat.CombatEvents.Add(new CardEvent
             {
                 T = Now(),
                 Type = "orb_block_gained",
-                CardId = instanceId,
+                CardId = source.EventCardId,
                 OrbId = orbId,
                 Blocked = entry.Amount,
             });
@@ -4113,6 +4257,69 @@ public static class RunTracker
 
         // True means the entry is known orb output. Even without a card
         // source, suppress direct/recent-card attribution.
+        return true;
+    }
+
+    private static void ArmPlasmaOrbEnergyAttribution(OrbModel? orb)
+    {
+        var owner = orb?.Owner;
+        if (orb == null || owner == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat?.OrbSourceByOrb.ContainsKey(orb) != true)
+                    return;
+                _pendingCombat.ActivePlasmaOrbEnergySources.Add(orb);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"ArmPlasmaOrbEnergyAttribution failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void CompletePlasmaOrbEnergyAttribution(OrbModel? orb)
+    {
+        if (orb == null) return;
+
+        lock (_lock)
+        {
+            _pendingCombat?.ActivePlasmaOrbEnergySources.Remove(orb);
+        }
+    }
+
+    private static bool TryRecordPlasmaOrbEnergyLocked(
+        Player? player,
+        int amount)
+    {
+        if (_pendingCombat == null || player == null || amount <= 0)
+            return false;
+
+        var activeOrb = _pendingCombat.ActivePlasmaOrbEnergySources
+            .FirstOrDefault(orb => ReferenceEquals(orb?.Owner, player));
+        if (activeOrb == null) return false;
+
+        _pendingCombat.ActivePlasmaOrbEnergySources.Remove(activeOrb);
+        if (!_pendingCombat.OrbSourceByOrb.TryGetValue(
+                activeOrb,
+                out var source))
+        {
+            return true;
+        }
+
+        var orbId = activeOrb.Id.ToString();
+        GetOrCreateOrbAggregateLocked(source, orbId).EnergyGenerated += amount;
+        _pendingCombat.CombatEvents.Add(new CardEvent
+        {
+            T = Now(),
+            Type = "orb_energy_gained",
+            CardId = source.EventCardId,
+            OrbId = orbId,
+            EnergyGained = amount,
+        });
         return true;
     }
 
@@ -23896,10 +24103,10 @@ public static class RunTracker
     }
 
     /// <summary>Single arbitration point for player energy gains at
-    /// PlayerCombatState.GainEnergy. If a relic energy window (Gremlin Horn /
-    /// Happy Flower / Booming Conch) is live for this player it claims the
-    /// delta; otherwise the resolving card play is credited. Replaces the
-    /// un-arbitrated fan-out and closes the Gremlin-Horn card+relic double count.</summary>
+    /// PlayerCombatState.GainEnergy. Exact Plasma-orb output claims first,
+    /// then a relic energy window (Gremlin Horn / Happy Flower / Booming
+    /// Conch), then the resolving card play. Replaces the un-arbitrated fan-out
+    /// and closes both orb/card and Gremlin-Horn/card double counts.</summary>
     public static void DispatchPlayerEnergyGain(PlayerCombatState combatState, int amount)
     {
         if (amount <= 0 || combatState == null) return;
@@ -23907,10 +24114,17 @@ public static class RunTracker
         {
             try
             {
-                // Co-op: a partner's energy gain is not ours.
-                if (!IsTrackedPlayer(combatState._player)) return;
-                if (_pendingCombat == null) { RecordEnergyGained(combatState, amount); return; }
                 var owner = combatState._player;
+                // A locally played Ignition can give its exact tracked Plasma
+                // orb to a co-op partner. Let that local source claim the
+                // partner's observed energy before the ordinary local-player
+                // guard rejects unrelated partner gains.
+                if (_pendingCombat != null
+                    && TryRecordPlasmaOrbEnergyLocked(owner, amount))
+                    return;
+                // Co-op: any otherwise-unclaimed partner energy is not ours.
+                if (!IsTrackedPlayer(owner)) return;
+                if (_pendingCombat == null) { RecordEnergyGained(combatState, amount); return; }
                 var key = _pendingCombat.Windows.TryConsume(
                     AttributionEventKind.PlayerEnergyGain, CurrentHistoryCountLocked(), ownerId: owner);
                 if (key != null)
@@ -35088,6 +35302,7 @@ public static class RunTracker
             targetOutcome.Evokes += sourceOutcome.Evokes;
             targetOutcome.Fizzles += sourceOutcome.Fizzles;
             targetOutcome.BlockGained += sourceOutcome.BlockGained;
+            targetOutcome.EnergyGenerated += sourceOutcome.EnergyGenerated;
             targetOutcome.DamageAttempted += sourceOutcome.DamageAttempted;
             targetOutcome.DamageDealt += sourceOutcome.DamageDealt;
             targetOutcome.DamageBlocked += sourceOutcome.DamageBlocked;
@@ -35209,6 +35424,11 @@ public static class RunTracker
             MergeRandomCardGenerationInto(
                 targetAgg.RandomCardGeneration,
                 sourceAgg.RandomCardGeneration);
+            targetAgg.TotalOrbsCreated += sourceAgg.TotalOrbsCreated;
+            targetAgg.OrbOutcomes ??= new Dictionary<string, CardOrbAggregate>();
+            MergeCardOrbOutcomesInto(
+                targetAgg.OrbOutcomes,
+                sourceAgg.OrbOutcomes);
             targetAgg.RateAttacksCopied += sourceAgg.RateAttacksCopied;
             targetAgg.RateTimesTriggered += sourceAgg.RateTimesTriggered;
             targetAgg.RateBlockGained += sourceAgg.RateBlockGained;
@@ -36029,6 +36249,19 @@ internal sealed record CardOrbEventSubscription(
     Action PassiveHandler,
     Action<Creature[]> EvokeHandler);
 
+internal sealed record PendingOrbSource(
+    string? CardInstanceId,
+    string? PowerId,
+    string EventCardId,
+    string DisplayName);
+
+internal sealed record OrbGenerationPowerWindow(
+    Player Player,
+    string PowerId,
+    string CardId,
+    string DisplayName,
+    OrbGenerationPowerWindow? Previous);
+
 /// <summary>
 /// Holds per-combat stats and events while a combat is in progress.
 /// Discarded if the combat doesn't finish cleanly; promoted into the run on CombatEnded.
@@ -36046,6 +36279,9 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, RandomCardGenerationPowerWindow>
         RandomCardGenerationPowerWindows { get; }
+            = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, OrbGenerationPowerWindow>
+        OrbPowerWindows { get; }
             = new(ReferenceEqualityComparer.Instance);
     public List<CardEvent> CombatEvents { get; } = new();
     public List<PotionRunHistoryEntry>? PotionHistory { get; set; }
@@ -36071,11 +36307,12 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Creature, PendingPoisonTick> PendingPoisonTicks { get; }
         = new(ReferenceEqualityComparer.Instance);
-    public Dictionary<OrbModel, string> CardSourceByOrb { get; }
+    public Dictionary<OrbModel, PendingOrbSource> OrbSourceByOrb { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<OrbModel, CardOrbEventSubscription> CardOrbSubscriptions { get; }
         = new(ReferenceEqualityComparer.Instance);
     public List<OrbModel> ActiveFrostOrbBlockSources { get; } = new();
+    public List<OrbModel> ActivePlasmaOrbEnergySources { get; } = new();
     public Dictionary<Player, PendingBrilliantScarfDiscount> BrilliantScarfDiscountOffers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> PermafrostCombatCountedPlayers { get; }

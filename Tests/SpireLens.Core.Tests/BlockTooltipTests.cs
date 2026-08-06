@@ -5,6 +5,7 @@ using SpireLens.Core;
 using SpireLens.Core.Patches;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Models.Cards;
 using Xunit;
 
 namespace SpireLens.Core.Tests;
@@ -275,7 +276,7 @@ public class BlockTooltipTests
         var sb = new StringBuilder();
         _ = AppendOrbCreationStatsMethod.Invoke(
             null,
-            new object?[] { sb, agg, false });
+            new object?[] { sb, null, agg, null, false });
         var text = sb.ToString();
 
         Assert.Contains(
@@ -317,7 +318,7 @@ public class BlockTooltipTests
         var sb = new StringBuilder();
         _ = AppendOrbCreationStatsMethod.Invoke(
             null,
-            new object?[] { sb, agg, false });
+            new object?[] { sb, null, agg, null, false });
         var text = sb.ToString();
 
         Assert.Contains("res://images/orbs/lightning.png", text);
@@ -347,6 +348,59 @@ public class BlockTooltipTests
         Assert.Contains("[b]4[/b]", text);
         Assert.Contains("[b]2[/b]", text);
         Assert.Contains("[b]1[/b]", text);
+    }
+
+    [Fact]
+    public void AppendOrbCreationStats_ShowsDarkLifecycleAndDamageAtZero()
+    {
+        var sb = new StringBuilder();
+        _ = AppendOrbCreationStatsMethod.Invoke(
+            null,
+            new object?[]
+            {
+                sb,
+                new Darkness(),
+                new CardAggregate(),
+                new RunMetaStats(),
+                false,
+            });
+        var text = sb.ToString();
+
+        Assert.Contains("res://images/orbs/dark.png", text);
+        Assert.Contains("created", text);
+        Assert.Contains("passive", text);
+        Assert.Contains("evoked", text);
+        Assert.Contains("damage attempted", text);
+        Assert.Contains("targets hit", text);
+    }
+
+    [Fact]
+    public void AppendOrbCreationStats_ShowsPlasmaEnergyFromExactOrb()
+    {
+        var agg = new CardAggregate { TotalOrbsCreated = 1 };
+        agg.OrbOutcomes["ORB.PLASMA"] = new CardOrbAggregate
+        {
+            OrbId = "ORB.PLASMA",
+            Created = 1,
+            EnergyGenerated = 4,
+        };
+
+        var sb = new StringBuilder();
+        _ = AppendOrbCreationStatsMethod.Invoke(
+            null,
+            new object?[]
+            {
+                sb,
+                new Fusion(),
+                agg,
+                new RunMetaStats(),
+                false,
+            });
+        var text = sb.ToString();
+
+        Assert.Contains("res://images/orbs/plasma.png", text);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("energy"), text);
+        Assert.Contains("[b]4[/b]", text);
     }
 
     [Fact]

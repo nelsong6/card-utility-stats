@@ -113,6 +113,22 @@ public class PendingCombatPromotionTests
         pending.MetaStats.OstyBodyTurns = 3;
         pending.MetaStats.OstyBodyCombats = 1;
         pending.MetaStats.ExtraBlockGainedFromUnmovablePower = 9;
+        pending.MetaStats.PowerAggregates["POWER.STORM"] = new PowerAggregate
+        {
+            PowerId = "POWER.STORM",
+            DisplayName = "Storm",
+            TotalOrbsCreated = 2,
+            OrbOutcomes =
+            {
+                ["ORB.LIGHTNING"] = new CardOrbAggregate
+                {
+                    OrbId = "ORB.LIGHTNING",
+                    Created = 2,
+                    PassiveActivations = 3,
+                    DamageDealt = 9,
+                },
+            },
+        };
 
         var run = new RunData();
         RunTracker.PromotePendingCombatIntoRun(pending, run);
@@ -128,5 +144,10 @@ public class PendingCombatPromotionTests
         Assert.Equal(3, run.MetaStats.OstyBodyTurns);
         Assert.Equal(1, run.MetaStats.OstyBodyCombats);
         Assert.Equal(9, run.MetaStats.ExtraBlockGainedFromUnmovablePower);
+        var storm = run.MetaStats.PowerAggregates["POWER.STORM"];
+        Assert.Equal(2, storm.TotalOrbsCreated);
+        Assert.Equal(2, storm.OrbOutcomes["ORB.LIGHTNING"].Created);
+        Assert.Equal(3, storm.OrbOutcomes["ORB.LIGHTNING"].PassiveActivations);
+        Assert.Equal(9, storm.OrbOutcomes["ORB.LIGHTNING"].DamageDealt);
     }
 }

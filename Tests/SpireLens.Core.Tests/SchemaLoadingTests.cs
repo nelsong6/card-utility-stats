@@ -5506,6 +5506,48 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsDefectOrbFamilyFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("defect-orb-family-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertDefectOrbFamilyFixture(loaded.Data);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsDefectOrbFamilyFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("defect-orb-family-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertDefectOrbFamilyFixture(resumed!);
+    }
+
+    private static void AssertDefectOrbFamilyFixture(RunData run)
+    {
+        var plasma = run.Aggregates["CARD.FUSION#1"]
+            .OrbOutcomes["ORB.PLASMA"];
+        Assert.Equal(5, plasma.EnergyGenerated);
+
+        var storm = run.MetaStats.PowerAggregates["POWER.STORM"];
+        Assert.Equal(3, storm.TotalOrbsCreated);
+        var lightning = storm.OrbOutcomes["ORB.LIGHTNING"];
+        Assert.Equal(3, lightning.Created);
+        Assert.Equal(4, lightning.PassiveActivations);
+        Assert.Equal(2, lightning.Evokes);
+        Assert.Equal(1, lightning.Fizzles);
+        Assert.Equal(24, lightning.DamageAttempted);
+        Assert.Equal(19, lightning.DamageDealt);
+        Assert.Equal(3, lightning.DamageBlocked);
+        Assert.Equal(2, lightning.DamageOverkill);
+        Assert.Equal(1, lightning.Kills);
+        Assert.Equal(6, lightning.TargetsHit);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsPotionRunHistoryFixture()
     {
         var loaded = RunStorage.LoadHistorical(

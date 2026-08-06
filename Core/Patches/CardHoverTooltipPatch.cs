@@ -427,7 +427,12 @@ public static class CardHoverShowPatch
             Row3(sb, GetForgeStatLabel("avg gained"), FormatDecimal(avgGenerated), "");
         }
 
-        AppendOrbCreationStats(sb, agg, compact: false);
+        AppendOrbCreationStats(
+            sb,
+            cardModel,
+            agg,
+            metaStats,
+            compact: false);
 
         // Energy-spent rows — only rendered when the card's cost is actually
         // variable (see IsEnergyInteresting). Same 3-col layout as every
@@ -606,7 +611,12 @@ public static class CardHoverShowPatch
         if (agg.TotalForgeGenerated > 0m)
             Row3(sb, GetForgeStatLabel("gained"), FormatDecimal(agg.TotalForgeGenerated), "");
 
-        AppendOrbCreationStats(sb, agg, compact: true);
+        AppendOrbCreationStats(
+            sb,
+            cardModel,
+            agg,
+            metaStats,
+            compact: true);
 
         if (etherealCardsPlayedThisCombat.HasValue)
             AppendPullFromBelowStats(sb, cardModel, etherealCardsPlayedThisCombat.Value);
@@ -804,6 +814,20 @@ public static class CardHoverShowPatch
             aggregate,
             metaStats,
             detailed: true);
+        if (OrbCardRegistry.IsRecurringPowerId(definition.PowerId))
+        {
+            var powerOutcomes = new Dictionary<string, CardOrbAggregate>(
+                StringComparer.Ordinal);
+            MergeOrbOutcomesForDisplay(
+                powerOutcomes,
+                aggregate.OrbOutcomes);
+            AppendOrbOutcomeRows(
+                sb,
+                OrbCardRegistry.GetExpectedOrbIdsForPower(definition.PowerId),
+                powerOutcomes,
+                aggregate.TotalOrbsCreated,
+                compact: false);
+        }
         AppendMetaPowerRates(sb, definition, aggregate);
     }
 
@@ -2611,10 +2635,75 @@ public static class CardHoverShowPatch
 
     private static void AppendOrbCreationStats(
         StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel? cardModel,
         CardAggregate agg,
+        RunMetaStats? metaStats,
         bool compact)
     {
-        var outcomes = agg.OrbOutcomes?.Values
+        var expectedOrbIds = new HashSet<string>(
+            OrbCardRegistry.GetExpectedOrbIds(cardModel),
+            StringComparer.Ordinal);
+        var combined = new Dictionary<string, CardOrbAggregate>(
+            StringComparer.Ordinal);
+        MergeOrbOutcomesForDisplay(combined, agg.OrbOutcomes);
+        var totalOrbsCreated = agg.TotalOrbsCreated;
+
+        if (cardModel != null
+            && OrbCardRegistry.TryGetRecurringByCard(
+                cardModel,
+                out var definition)
+            && definition != null)
+        {
+            foreach (var orbId in OrbCardRegistry.GetExpectedOrbIdsForPower(
+                         definition.PowerId))
+            {
+                expectedOrbIds.Add(orbId);
+            }
+
+            var powerAggregate = GetOrbPowerAggregate(
+                metaStats,
+                definition);
+            totalOrbsCreated += powerAggregate.TotalOrbsCreated;
+            MergeOrbOutcomesForDisplay(combined, powerAggregate.OrbOutcomes);
+        }
+
+        AppendOrbOutcomeRows(
+            sb,
+            expectedOrbIds,
+            combined,
+            totalOrbsCreated,
+            compact);
+    }
+
+    private static PowerAggregate GetOrbPowerAggregate(
+        RunMetaStats? metaStats,
+        OrbPowerDefinition definition)
+    {
+        if (metaStats?.PowerAggregates != null
+            && metaStats.PowerAggregates.TryGetValue(
+                definition.PowerId,
+                out var aggregate))
+        {
+            return aggregate;
+        }
+
+        return new PowerAggregate
+        {
+            PowerId = definition.PowerId,
+            DisplayName = definition.DisplayName,
+        };
+    }
+
+    private static void AppendOrbOutcomeRows(
+        StringBuilder sb,
+        IEnumerable<string> expectedOrbIdSource,
+        Dictionary<string, CardOrbAggregate> combined,
+        int totalOrbsCreated,
+        bool compact)
+    {
+        var expectedOrbIds = expectedOrbIdSource.ToHashSet(
+            StringComparer.Ordinal);
+        var observedOrbIds = combined.Values
             .Where(outcome =>
                 outcome != null
                 && (outcome.Created > 0
@@ -2622,15 +2711,30 @@ public static class CardHoverShowPatch
                     || outcome.Evokes > 0
                     || outcome.Fizzles > 0
                     || outcome.BlockGained > 0
+                    || outcome.EnergyGenerated > 0
                     || HasOrbDamageStats(outcome)))
+            .Select(outcome => outcome.OrbId)
+            .Where(orbId => !string.IsNullOrWhiteSpace(orbId))
+            .ToHashSet(StringComparer.Ordinal);
+
+        // Fixed one-to-three-orb cards show their complete zero state. Random
+        // generators (Chaos and Trash to Treasure) avoid a five-type wall and
+        // expand only as each actual orb type is observed.
+        var orbIdsToRender = new HashSet<string>(observedOrbIds, StringComparer.Ordinal);
+        if (expectedOrbIds.Count <= 3)
+            orbIdsToRender.UnionWith(expectedOrbIds);
+
+        var outcomes = orbIdsToRender
+            .Select(orbId => combined.TryGetValue(orbId, out var outcome)
+                ? outcome
+                : new CardOrbAggregate { OrbId = orbId })
             .OrderBy(outcome => outcome.OrbId, StringComparer.Ordinal)
-            .ToList()
-            ?? new List<CardOrbAggregate>();
+            .ToList();
 
         if (compact || outcomes.Count == 0)
         {
-            if (agg.TotalOrbsCreated > 0)
-                Row3(sb, "Orbs created", agg.TotalOrbsCreated.ToString(), "");
+            if (totalOrbsCreated > 0 || expectedOrbIds.Count > 0)
+                Row3(sb, "Orbs created", totalOrbsCreated.ToString(), "");
             return;
         }
 
@@ -2660,7 +2764,7 @@ public static class CardHoverShowPatch
                 outcome.Fizzles.ToString(),
                 "");
 
-            if (IsLightningOrbId(orbId) || HasOrbDamageStats(outcome))
+            if (IsDamageOrbId(orbId) || HasOrbDamageStats(outcome))
             {
                 Row3(
                     sb,
@@ -2702,6 +2806,46 @@ public static class CardHoverShowPatch
                     outcome.BlockGained.ToString(),
                     "");
             }
+
+            if (IsPlasmaOrbId(orbId))
+            {
+                Row3(
+                    sb,
+                    GetPlasmaOrbEnergyStatLabel(),
+                    outcome.EnergyGenerated.ToString(),
+                    "");
+            }
+        }
+    }
+
+    private static void MergeOrbOutcomesForDisplay(
+        Dictionary<string, CardOrbAggregate> target,
+        Dictionary<string, CardOrbAggregate>? source)
+    {
+        if (source == null) return;
+
+        foreach (var (key, value) in source)
+        {
+            if (value == null) continue;
+            var orbId = string.IsNullOrWhiteSpace(value.OrbId) ? key : value.OrbId;
+            if (!target.TryGetValue(orbId, out var combined))
+            {
+                combined = new CardOrbAggregate { OrbId = orbId };
+                target[orbId] = combined;
+            }
+
+            combined.Created += value.Created;
+            combined.PassiveActivations += value.PassiveActivations;
+            combined.Evokes += value.Evokes;
+            combined.Fizzles += value.Fizzles;
+            combined.BlockGained += value.BlockGained;
+            combined.EnergyGenerated += value.EnergyGenerated;
+            combined.DamageAttempted += value.DamageAttempted;
+            combined.DamageDealt += value.DamageDealt;
+            combined.DamageBlocked += value.DamageBlocked;
+            combined.DamageOverkill += value.DamageOverkill;
+            combined.Kills += value.Kills;
+            combined.TargetsHit += value.TargetsHit;
         }
     }
 
@@ -2718,16 +2862,33 @@ public static class CardHoverShowPatch
             + $"{BlockIconPath}[/img]";
     }
 
+    private static string GetPlasmaOrbEnergyStatLabel()
+    {
+        return $"[img={InlineKeywordIconSize}x{InlineKeywordIconSize}]"
+            + $"{GetOrbIconPath("ORB.PLASMA")}[/img] "
+            + GetEnergyStatLabel("");
+    }
+
     private static bool IsFrostOrbId(string orbId)
     {
         return orbId.EndsWith(".FROST", StringComparison.OrdinalIgnoreCase)
             || string.Equals(orbId, "FROST", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool IsLightningOrbId(string orbId)
+    private static bool IsDamageOrbId(string orbId)
     {
         return orbId.EndsWith(".LIGHTNING", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(orbId, "LIGHTNING", StringComparison.OrdinalIgnoreCase);
+            || string.Equals(orbId, "LIGHTNING", StringComparison.OrdinalIgnoreCase)
+            || orbId.EndsWith(".DARK", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(orbId, "DARK", StringComparison.OrdinalIgnoreCase)
+            || orbId.EndsWith(".GLASS", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(orbId, "GLASS", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsPlasmaOrbId(string orbId)
+    {
+        return orbId.EndsWith(".PLASMA", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(orbId, "PLASMA", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool HasOrbDamageStats(CardOrbAggregate outcome)

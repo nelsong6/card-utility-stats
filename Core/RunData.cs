@@ -738,6 +738,11 @@ public class CardOrbAggregate
     // originating card's direct block totals and provenance ledger.
     public int BlockGained { get; set; }
 
+    // Observed energy added by Plasma activations. This is kept on the exact
+    // originating orb rather than attributed to whichever card caused an
+    // eviction/evoke while the Plasma orb happened to be in the queue.
+    public int EnergyGenerated { get; set; }
+
     // Observed damage created by this orb type. These remain separate from the
     // originating card's direct Attack damage so cards such as Ball Lightning
     // expose both values without blending them.
@@ -793,6 +798,13 @@ public class PowerAggregate
     // the stack. MetaActiveTurns and MetaActiveApplicationTurns provide the
     // zero-inclusive denominators.
     public RandomCardGenerationAggregate? RandomCardGeneration { get; set; }
+
+    // Orb outcomes produced later by recurring Power callbacks (Storm,
+    // Spinner, Trash to Treasure, and Lightning Rod). These are folded into
+    // the originating card family's tooltip without assigning them to one
+    // physical card copy.
+    public int TotalOrbsCreated { get; set; }
+    public Dictionary<string, CardOrbAggregate> OrbOutcomes { get; set; } = new();
 
     // Matching observation-era numerators for the three meta-power rate
     // denominators above. Lifetime totals predate these denominators in saved
@@ -2154,7 +2166,7 @@ public readonly record struct CardRewardCategoryObservation(string Key, string D
 public class CardEvent
 {
     public string T { get; set; } = "";          // ISO-8601 UTC timestamp
-    public string Type { get; set; } = "";       // "card_played" | "damage_received" | "energy_gained" | "stars_gained" | "forge_gained" | "orb_created" | "orb_passive" | "orb_evoked" | "orb_fizzled" | "orb_block_gained" | "orb_damage"
+    public string Type { get; set; } = "";       // "card_played" | "damage_received" | "energy_gained" | "stars_gained" | "forge_gained" | "orb_created" | "orb_passive" | "orb_evoked" | "orb_fizzled" | "orb_block_gained" | "orb_energy_gained" | "orb_damage"
     public string CardId { get; set; } = "";
 
     // card_played fields

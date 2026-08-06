@@ -17,6 +17,7 @@ public class CardOrbDamageStatsTests
         Assert.Equal(0, outcome.DamageOverkill);
         Assert.Equal(0, outcome.Kills);
         Assert.Equal(0, outcome.TargetsHit);
+        Assert.Equal(0, outcome.EnergyGenerated);
     }
 
     [Fact]
@@ -68,6 +69,7 @@ public class CardOrbDamageStatsTests
             DamageOverkill = 2,
             Kills = 1,
             TargetsHit = 4,
+            EnergyGenerated = 5,
         };
 
         var json = JsonSerializer.Serialize(aggregate, RunStorage.Options);
@@ -81,6 +83,7 @@ public class CardOrbDamageStatsTests
         Assert.Contains("\"damage_overkill\"", json);
         Assert.Contains("\"kills\"", json);
         Assert.Contains("\"targets_hit\"", json);
+        Assert.Contains("\"energy_generated\"", json);
         Assert.NotNull(restored);
         var outcome = restored!.OrbOutcomes["ORB.LIGHTNING"];
         Assert.Equal(18, outcome.DamageAttempted);
@@ -89,6 +92,7 @@ public class CardOrbDamageStatsTests
         Assert.Equal(2, outcome.DamageOverkill);
         Assert.Equal(1, outcome.Kills);
         Assert.Equal(4, outcome.TargetsHit);
+        Assert.Equal(5, outcome.EnergyGenerated);
     }
 
     [Fact]
@@ -112,5 +116,6 @@ public class CardOrbDamageStatsTests
         Assert.Equal(0, outcome.DamageOverkill);
         Assert.Equal(0, outcome.Kills);
         Assert.Equal(0, outcome.TargetsHit);
+        Assert.Equal(0, outcome.EnergyGenerated);
     }
 }

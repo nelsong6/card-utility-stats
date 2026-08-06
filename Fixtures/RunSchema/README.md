@@ -4,6 +4,11 @@ schema version that existed when it was added. Versions are no longer used at
 runtime; the loader detects the per-instance vs. pooled shape structurally.
 New fixtures added going forward do not need a `v*-` prefix.
 
+- `defect-orb-family-run.json`
+  Adds Plasma energy to exact card-sourced orb outcomes and recurring Defect
+  Power orb outcomes for cards such as Storm, Spinner, Trash to Treasure, and
+  Lightning Rod.
+
 - `v1-pooled-run.json`
   Pooled shape. Aggregates are keyed by card definition id and do not carry
   the per-instance resume metadata introduced later. Loads as historical-only;

@@ -1,0 +1,75 @@
+{
+  "run_id": "defect-orb-family-fixture",
+  "started_at": "2026-08-06T17:00:00Z",
+  "updated_at": "2026-08-06T17:24:00Z",
+  "character": "DEFECT",
+  "ascension": 7,
+  "floor_reached": 19,
+  "outcome": "in_progress",
+  "game_start_time": 1786035600,
+  "aggregates": {
+    "CARD.FUSION#1": {
+      "combats_in_deck": 3,
+      "plays": 2,
+      "times_drawn": 4,
+      "total_orbs_created": 2,
+      "orb_outcomes": {
+        "ORB.PLASMA": {
+          "orb_id": "ORB.PLASMA",
+          "created": 2,
+          "passive_activations": 3,
+          "evokes": 1,
+          "fizzles": 0,
+          "energy_generated": 5
+        }
+      },
+      "floor_added": 6,
+      "initial_upgrade_level": 0
+    }
+  },
+  "events": [
+    {
+      "t": "2026-08-06T17:18:00Z",
+      "type": "orb_energy_gained",
+      "card_id": "CARD.FUSION#1",
+      "orb_id": "ORB.PLASMA",
+      "energy_gained": 2
+    }
+  ],
+  "relic_aggregates": {},
+  "enemy_aggregates": {},
+  "meta_stats": {
+    "power_aggregates": {
+      "POWER.STORM": {
+        "power_id": "POWER.STORM",
+        "display_name": "Storm",
+        "power_cards_played": 1,
+        "successful_applications": 1,
+        "total_orbs_created": 3,
+        "orb_outcomes": {
+          "ORB.LIGHTNING": {
+            "orb_id": "ORB.LIGHTNING",
+            "created": 3,
+            "passive_activations": 4,
+            "evokes": 2,
+            "fizzles": 1,
+            "damage_attempted": 24,
+            "damage_dealt": 19,
+            "damage_blocked": 3,
+            "damage_overkill": 2,
+            "kills": 1,
+            "targets_hit": 6
+          }
+        }
+      }
+    }
+  },
+  "instance_numbers_by_def": {
+    "CARD.FUSION": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.FUSION": 1
+  }
+}
