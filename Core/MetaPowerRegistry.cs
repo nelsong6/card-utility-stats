@@ -21,6 +21,7 @@ internal static class MetaPowerRegistry
         new("CARD.AGGRESSION", "POWER.AGGRESSION", "Aggression"),
         new("CARD.CALAMITY", "POWER.CALAMITY", "Calamity"),
         new("CARD.CALL_OF_THE_VOID", "POWER.CALL_OF_THE_VOID", "Call of the Void"),
+        new("CARD.CONSUMING_SHADOW", "POWER.CONSUMING_SHADOW", "Consuming Shadow"),
         new("CARD.CREATIVE_AI", "POWER.CREATIVE_AI", "Creative AI"),
         new("CARD.DANSE_MACABRE", "POWER.DANSE_MACABRE", "Danse Macabre"),
         new("CARD.DARK_EMBRACE", "POWER.DARK_EMBRACE", "Dark Embrace"),

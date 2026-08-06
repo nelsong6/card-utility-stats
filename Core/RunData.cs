@@ -812,6 +812,12 @@ public class PowerAggregate
     public decimal UnmovableExtraBlockGained { get; set; }
     public decimal RateUnmovableExtraBlockGained { get; set; }
 
+    // Consuming Shadow tracking. This counts only completed orb evocations
+    // reached through the power's own end-of-turn EvokeLast calls. It is
+    // power-owned because multiple card applications stack into one shared
+    // Consuming Shadow power.
+    public int OrbsEvoked { get; set; }
+
     // Juggling tracking. Copies count only generated Attack cards confirmed
     // by the combat-pile add result. Turns and combats are held-power
     // denominators and include active periods with no copy.

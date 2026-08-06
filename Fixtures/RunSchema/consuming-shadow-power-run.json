@@ -1,0 +1,41 @@
+{
+  "run_id": "consuming-shadow-power-fixture",
+  "started_at": "2026-08-06T01:00:00Z",
+  "updated_at": "2026-08-06T01:22:00Z",
+  "character": "DEFECT",
+  "ascension": 7,
+  "floor_reached": 24,
+  "outcome": "in_progress",
+  "game_start_time": 1785978000,
+  "aggregates": {
+    "CARD.CONSUMING_SHADOW#1": {
+      "combats_in_deck": 4,
+      "plays": 3,
+      "times_drawn": 6,
+      "floor_added": 7,
+      "initial_upgrade_level": 0
+    }
+  },
+  "events": [],
+  "relic_aggregates": {},
+  "enemy_aggregates": {},
+  "meta_stats": {
+    "power_aggregates": {
+      "POWER.CONSUMING_SHADOW": {
+        "power_id": "POWER.CONSUMING_SHADOW",
+        "display_name": "Consuming Shadow",
+        "power_cards_played": 3,
+        "successful_applications": 3,
+        "orbs_evoked": 7
+      }
+    }
+  },
+  "instance_numbers_by_def": {
+    "CARD.CONSUMING_SHADOW": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.CONSUMING_SHADOW": 1
+  }
+}

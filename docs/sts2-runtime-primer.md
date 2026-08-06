@@ -968,6 +968,16 @@ before it was played, by finalizing that combat-wide denominator at promotion.
 Persist both turn denominators, the active-combat count, and cards drawn under
 `POWER.DARK_EMBRACE`, then project all four rows on every Dark Embrace card.
 
+`ConsumingShadowPower.AfterSideTurnEnd` sequentially calls and awaits
+`OrbCmd.EvokeLast` once per Power stack, but later calls can become no-ops when
+the queue runs empty or combat begins ending. Keep a callback-wide window,
+claim each direct `EvokeLast` while excluding nested calls, retain the exact
+last orb, and count it only when that same orb reaches `Hook.AfterOrbEvoked`
+after its `Evoke` task completes. Persist the observed count under the shared
+`POWER.CONSUMING_SHADOW` aggregate because multiple card applications stack
+into one Power; do not confuse this with the lifecycle evocations credited to
+the cards that originally channeled those orbs.
+
 `DanseMacabrePower.BeforeCardPlayed` owns both the exact trigger condition and
 the block command: an owner card whose resolved energy cost is at least the
 power's Energy dynamic variable causes one flash and one awaited

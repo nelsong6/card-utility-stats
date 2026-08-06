@@ -7484,6 +7484,197 @@ public static class RunTracker
         agg.DarkEmbraceCombatTurns += combatTurns;
     }
 
+    /// <summary>
+    /// Keep Consuming Shadow's end-of-turn callback identifiable while it
+    /// sequentially awaits EvokeLast. The final orb-evoked hook is the
+    /// observed outcome boundary; this callback is only its attribution
+    /// scope.
+    /// </summary>
+    internal static PendingConsumingShadowCallback? ArmConsumingShadowCallback(
+        ConsumingShadowPower? consumingShadow,
+        IEnumerable<Creature>? participants)
+    {
+        if (consumingShadow?.Owner?.Player is not Player owner) return null;
+        if (consumingShadow.Amount <= 0m
+            || participants == null
+            || !participants.Any(participant =>
+                ReferenceEquals(participant, consumingShadow.Owner)))
+        {
+            return null;
+        }
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return null;
+                if (!IsTrackedPlayer(owner)) return null;
+
+                _pendingCombat ??= new PendingCombat();
+                var pending = new PendingConsumingShadowCallback
+                {
+                    PendingCombat = _pendingCombat,
+                    Owner = owner,
+                    PowerId = consumingShadow.Id.ToString(),
+                    DisplayName = GetPowerDisplayName(consumingShadow),
+                };
+                _pendingCombat.PendingConsumingShadowCallbacks[owner] = pending;
+                return pending;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"ArmConsumingShadowCallback failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Claim only an EvokeLast call made directly by the active Consuming
+    /// Shadow callback. While that task is in flight, nested EvokeLast calls
+    /// are excluded from this power's count.
+    /// </summary>
+    internal static PendingConsumingShadowEvoke? TryBeginConsumingShadowEvoke(
+        Player? player,
+        bool dequeue)
+    {
+        if (player == null || !dequeue) return null;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null
+                    || !_pendingCombat.PendingConsumingShadowCallbacks.TryGetValue(
+                        player,
+                        out var callback)
+                    || !ReferenceEquals(callback.PendingCombat, _pendingCombat)
+                    || callback.EvokeInProgress)
+                {
+                    return null;
+                }
+
+                var orbs = player.PlayerCombatState?.OrbQueue?.Orbs;
+                if (orbs == null || orbs.Count == 0) return null;
+
+                var pending = new PendingConsumingShadowEvoke
+                {
+                    Callback = callback,
+                    Orb = orbs.Last(),
+                };
+                callback.EvokeInProgress = true;
+                _pendingCombat.PendingConsumingShadowEvokes[player] = pending;
+                return pending;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"TryBeginConsumingShadowEvoke failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record the direct Consuming Shadow orb after OrbModel.Evoke has
+    /// completed and Hook.AfterOrbEvoked is entered. Matching the exact orb
+    /// rejects nested or unrelated evocations.
+    /// </summary>
+    public static void RecordConsumingShadowOrbEvoked(OrbModel? orb)
+    {
+        if (orb?.Owner is not Player owner) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_pendingCombat == null
+                    || !_pendingCombat.PendingConsumingShadowEvokes.TryGetValue(
+                        owner,
+                        out var pending)
+                    || !ReferenceEquals(pending.Callback.PendingCombat, _pendingCombat)
+                    || !ReferenceEquals(pending.Orb, orb)
+                    || pending.Recorded)
+                {
+                    return;
+                }
+
+                pending.Recorded = true;
+                var agg = GetOrCreatePowerAggregate(
+                    _pendingCombat.MetaStats,
+                    pending.Callback.PowerId,
+                    pending.Callback.DisplayName);
+                RecordConsumingShadowOrbEvokedForTest(agg);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordConsumingShadowOrbEvoked failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordConsumingShadowOrbEvokedForTest(
+        PowerAggregate agg,
+        int count = 1)
+    {
+        if (agg == null || count <= 0) return;
+        agg.OrbsEvoked += count;
+    }
+
+    internal static void CompleteConsumingShadowEvoke(
+        PendingConsumingShadowEvoke? pending)
+    {
+        if (pending == null) return;
+
+        lock (_lock)
+        {
+            if (_pendingCombat == null) return;
+            var callback = pending.Callback;
+            if (!ReferenceEquals(callback.PendingCombat, _pendingCombat)) return;
+
+            if (_pendingCombat.PendingConsumingShadowEvokes.TryGetValue(
+                    callback.Owner,
+                    out var active)
+                && ReferenceEquals(active, pending))
+            {
+                _pendingCombat.PendingConsumingShadowEvokes.Remove(callback.Owner);
+            }
+
+            if (_pendingCombat.PendingConsumingShadowCallbacks.TryGetValue(
+                    callback.Owner,
+                    out var activeCallback)
+                && ReferenceEquals(activeCallback, callback))
+            {
+                callback.EvokeInProgress = false;
+            }
+        }
+    }
+
+    internal static void DisarmConsumingShadowCallback(
+        PendingConsumingShadowCallback? pending)
+    {
+        if (pending == null) return;
+
+        lock (_lock)
+        {
+            if (_pendingCombat == null) return;
+            if (_pendingCombat.PendingConsumingShadowCallbacks.TryGetValue(
+                    pending.Owner,
+                    out var active)
+                && ReferenceEquals(active, pending))
+            {
+                _pendingCombat.PendingConsumingShadowCallbacks.Remove(pending.Owner);
+            }
+
+            if (_pendingCombat.PendingConsumingShadowEvokes.TryGetValue(
+                    pending.Owner,
+                    out var activeEvoke)
+                && ReferenceEquals(activeEvoke.Callback, pending))
+            {
+                _pendingCombat.PendingConsumingShadowEvokes.Remove(pending.Owner);
+            }
+        }
+    }
+
     internal static PendingStampedeCallback? ArmStampedeCallback(
         StampedePower? stampede,
         Player? callbackPlayer)
@@ -35040,6 +35231,7 @@ public static class RunTracker
                 sourceAgg.UnmovableExtraBlockGained;
             targetAgg.RateUnmovableExtraBlockGained +=
                 sourceAgg.RateUnmovableExtraBlockGained;
+            targetAgg.OrbsEvoked += sourceAgg.OrbsEvoked;
             targetAgg.AttacksCopied += sourceAgg.AttacksCopied;
             targetAgg.CommonAttacksCopied += sourceAgg.CommonAttacksCopied;
             targetAgg.UncommonAttacksCopied += sourceAgg.UncommonAttacksCopied;
@@ -36096,6 +36288,10 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> DarkEmbracePowerCombatTurnsRecordedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, PendingConsumingShadowCallback> PendingConsumingShadowCallbacks { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, PendingConsumingShadowEvoke> PendingConsumingShadowEvokes { get; }
+        = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, PendingStampedeCallback> PendingStampedeCallbacks { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, PendingStampedeAutoPlay> PendingStampedeAutoPlays { get; }
@@ -36277,6 +36473,22 @@ internal sealed class PendingGamePieceDraw
     public required PendingCombat PendingCombat { get; init; }
     public required Player Owner { get; init; }
     public int CardsRequested { get; set; }
+}
+
+internal sealed class PendingConsumingShadowCallback
+{
+    public required PendingCombat PendingCombat { get; init; }
+    public required Player Owner { get; init; }
+    public required string PowerId { get; init; }
+    public required string DisplayName { get; init; }
+    public bool EvokeInProgress { get; set; }
+}
+
+internal sealed class PendingConsumingShadowEvoke
+{
+    public required PendingConsumingShadowCallback Callback { get; init; }
+    public required OrbModel Orb { get; init; }
+    public bool Recorded { get; set; }
 }
 
 internal sealed class PendingStampedeCallback

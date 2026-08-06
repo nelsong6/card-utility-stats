@@ -642,6 +642,20 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsConsumingShadowPowerFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("consuming-shadow-power-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        AssertConsumingShadowPowerFixture(
+            loaded.Data.MetaStats.PowerAggregates["POWER.CONSUMING_SHADOW"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsMetaPowerRegistryFixture()
     {
         var loaded = RunStorage.LoadHistorical(
@@ -1581,6 +1595,17 @@ public class SchemaLoadingTests
         Assert.NotNull(resumed);
         AssertDarkEmbracePowerFixture(
             resumed!.MetaStats.PowerAggregates["POWER.DARK_EMBRACE"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsConsumingShadowPowerFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("consuming-shadow-power-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertConsumingShadowPowerFixture(
+            resumed!.MetaStats.PowerAggregates["POWER.CONSUMING_SHADOW"]);
     }
 
     [Fact]
@@ -4752,6 +4777,15 @@ public class SchemaLoadingTests
         Assert.Equal(6, powerAgg.TurnsActive);
         Assert.Equal(9, powerAgg.DarkEmbraceCombatTurns);
         Assert.Equal(3, powerAgg.CombatsActive);
+    }
+
+    private static void AssertConsumingShadowPowerFixture(PowerAggregate powerAgg)
+    {
+        Assert.Equal("POWER.CONSUMING_SHADOW", powerAgg.PowerId);
+        Assert.Equal("Consuming Shadow", powerAgg.DisplayName);
+        Assert.Equal(3, powerAgg.PowerCardsPlayed);
+        Assert.Equal(3, powerAgg.SuccessfulApplications);
+        Assert.Equal(7, powerAgg.OrbsEvoked);
     }
 
     private static void AssertMetaPowerRegistryFixture(RunMetaStats metaStats)

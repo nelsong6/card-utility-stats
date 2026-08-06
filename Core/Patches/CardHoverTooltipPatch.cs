@@ -25,6 +25,7 @@ public static class CardHoverShowPatch
     private const string BlockedDrawIconPath = DrawCardsNextTurnPowerIconPath;
     private const int DebtGoldLossPerTrigger = 5;
     private const string AggressionPowerId = "POWER.AGGRESSION";
+    private const string ConsumingShadowPowerId = "POWER.CONSUMING_SHADOW";
     private const string DanseMacabrePowerId = "POWER.DANSE_MACABRE";
     private const string DarkEmbracePowerId = "POWER.DARK_EMBRACE";
     private const string EntropyPowerId = "POWER.ENTROPY";
@@ -846,6 +847,14 @@ public static class CardHoverShowPatch
 
         switch (definition.PowerId)
         {
+            case ConsumingShadowPowerId:
+                Row3(
+                    sb,
+                    "Orbs evoked",
+                    aggregate.OrbsEvoked.ToString(),
+                    "");
+                break;
+
             case JugglingPowerId:
                 Row3(sb, "Total attacks copied", aggregate.AttacksCopied.ToString(), "");
                 if (detailed)

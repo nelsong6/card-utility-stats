@@ -481,6 +481,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `dark-embrace-power-run.json`
   Adds Dark Embrace's observed immediate and deferred cards drawn, its active
   turn and active-combat denominators, and all turns in combats where active.
+- `consuming-shadow-power-run.json`
+  Adds Consuming Shadow's completed end-of-turn orb evocations to its shared
+  Power aggregate.
 - `burning-sticks-relic-run.json`
   Adds Burning Sticks confirmed duplicate activations, exact generated-card
   plays, duplicate rarity splits, and its held-combat denominator.
