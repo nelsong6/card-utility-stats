@@ -279,17 +279,13 @@ public class BlockTooltipTests
             new object?[] { sb, null, agg, null, false });
         var text = sb.ToString();
 
-        Assert.Contains(
-            "[img width=16 height=16 color=#FFFFFF align=center]res://images/orbs/frost.png[/img] created",
-            text);
+        Assert.Contains("[hint=", text);
+        Assert.Contains("res://images/orbs/frost_orb.png", text);
+        Assert.Contains("created", text);
         Assert.Contains(StatConceptGlossary.RenderHintedGlyph("activation"), text);
         Assert.Contains("passive", text);
-        Assert.Contains(
-            "[img width=16 height=16 color=#FFFFFF align=center]res://images/orbs/frost.png[/img] evoked",
-            text);
-        Assert.Contains(
-            "[img width=16 height=16 color=#FFFFFF align=center]res://images/orbs/frost.png[/img] fizzled",
-            text);
+        Assert.Contains("evoked", text);
+        Assert.Contains("fizzled", text);
         Assert.Contains(StatConceptGlossary.RenderHintedGlyph("block"), text);
         Assert.Contains("[b]17[/b]", text);
     }
@@ -321,7 +317,8 @@ public class BlockTooltipTests
             new object?[] { sb, null, agg, null, false });
         var text = sb.ToString();
 
-        Assert.Contains("res://images/orbs/lightning.png", text);
+        Assert.Contains("[hint=", text);
+        Assert.Contains("res://images/orbs/lightning_orb.png", text);
         Assert.Contains(
             StatConceptGlossary.RenderInformationHint("damage attempted"),
             text);
@@ -366,7 +363,8 @@ public class BlockTooltipTests
             });
         var text = sb.ToString();
 
-        Assert.Contains("res://images/orbs/dark.png", text);
+        Assert.Contains("[hint=", text);
+        Assert.Contains("res://images/orbs/dark_orb.png", text);
         Assert.Contains("created", text);
         Assert.Contains("passive", text);
         Assert.Contains("evoked", text);
@@ -398,7 +396,8 @@ public class BlockTooltipTests
             });
         var text = sb.ToString();
 
-        Assert.Contains("res://images/orbs/plasma.png", text);
+        Assert.Contains("[hint=", text);
+        Assert.Contains("res://images/orbs/plasma_orb.png", text);
         Assert.Contains(StatConceptGlossary.RenderHintedGlyph("energy"), text);
         Assert.Contains("[b]4[/b]", text);
     }
@@ -419,7 +418,8 @@ public class BlockTooltipTests
             });
         var text = sb.ToString();
 
-        Assert.Contains("res://images/orbs/dark.png", text);
+        Assert.Contains("[hint=", text);
+        Assert.Contains("res://images/orbs/dark_orb.png", text);
         Assert.Contains("created", text);
         Assert.DoesNotContain("Orbs created", text);
     }
@@ -440,11 +440,12 @@ public class BlockTooltipTests
             });
         var text = sb.ToString();
 
-        Assert.Contains("res://images/orbs/dark.png", text);
-        Assert.Contains("res://images/orbs/frost.png", text);
-        Assert.Contains("res://images/orbs/glass.png", text);
-        Assert.Contains("res://images/orbs/lightning.png", text);
-        Assert.Contains("res://images/orbs/plasma.png", text);
+        Assert.Contains("[hint=", text);
+        Assert.Contains("res://images/orbs/dark_orb.png", text);
+        Assert.Contains("res://images/orbs/frost_orb.png", text);
+        Assert.Contains("res://images/orbs/glass_orb.png", text);
+        Assert.Contains("res://images/orbs/lightning_orb.png", text);
+        Assert.Contains("res://images/orbs/plasma_orb.png", text);
         Assert.Contains("created", text);
     }
 

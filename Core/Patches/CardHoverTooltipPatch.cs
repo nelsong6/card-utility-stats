@@ -2,10 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using Godot;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.HoverTips;
+using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Cards;
+using MegaCrit.Sts2.Core.Models.Orbs;
 using MegaCrit.Sts2.Core.Nodes.Cards.Holders;
 using MegaCrit.Sts2.Core.Nodes.Screens.CardSelection;
 
@@ -2899,7 +2902,82 @@ public static class CardHoverShowPatch
         // [img=16x16] form survives the vocabulary parser but renders as an
         // empty slot, which is why the screenshot showed only the semantic
         // activation/damage icons.
-        return StatConceptGlossary.RenderInlineImage(GetOrbIconPath(orbId));
+        return StatConceptGlossary.RenderHintedInlineImage(
+            GetOrbIconPath(orbId),
+            GetOrbHint(orbId));
+    }
+
+    private static string GetOrbHint(string orbId)
+    {
+        var normalizedOrbId = NormalizeOrbId(orbId);
+        var fallbackTitle = RunTracker.FormatOrbIdForDisplay(normalizedOrbId);
+
+        try
+        {
+            var orb = ModelDb.GetByIdOrNull<OrbModel>(
+                ModelId.Deserialize(normalizedOrbId));
+            if (orb == null) return fallbackTitle;
+
+            var title = GetLocalizedOrbText(
+                () => orb.Title.GetFormattedText(),
+                () => orb.Title.GetRawText(),
+                fallbackTitle);
+            var description = GetLocalizedOrbText(
+                () => orb.Description.GetFormattedText(),
+                () => orb.Description.GetRawText(),
+                string.Empty);
+            description = StripBbcodeForHint(description);
+
+            return string.IsNullOrWhiteSpace(description)
+                ? title
+                : $"{title}: {description}";
+        }
+        catch
+        {
+            // Historical stats can contain an orb that no longer resolves in
+            // the current model database. Its readable ID is still a useful
+            // hint, and avoids making the image silently non-interactive.
+            return fallbackTitle;
+        }
+    }
+
+    private static string GetLocalizedOrbText(
+        Func<string> getFormattedText,
+        Func<string> getRawText,
+        string fallback)
+    {
+        try
+        {
+            var text = getFormattedText();
+            if (!string.IsNullOrWhiteSpace(text)) return text;
+        }
+        catch
+        {
+        }
+
+        try
+        {
+            var text = getRawText();
+            if (!string.IsNullOrWhiteSpace(text)) return text;
+        }
+        catch
+        {
+        }
+
+        return fallback;
+    }
+
+    private static string StripBbcodeForHint(string value)
+    {
+        const string escapedBracketPlaceholder = "\uE000";
+        var protectedEscapedBrackets = value.Replace(
+            "[lb]",
+            escapedBracketPlaceholder,
+            StringComparison.Ordinal);
+        var withoutTags = Regex.Replace(protectedEscapedBrackets, @"\[[^\]]+\]", " ");
+        return Regex.Replace(withoutTags, @"\s+", " ")
+            .Replace(escapedBracketPlaceholder, "[", StringComparison.Ordinal)
+            .Trim();
     }
 
     private static string GetFrostOrbBlockStatLabel()
