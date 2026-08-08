@@ -11,12 +11,18 @@ scenarios, capture verification screenshots, or otherwise attempt to prove the
 feature's behavior. Implement the requested change and clearly report that
 tests and behavioral verification were not run.
 
-Normal implementation and handoff steps are still expected: Codex may build and
-deploy the mod, hot-reload SpireLens, commit, and push. This preference overrides
-only the automatic test/live-verification parts of repo skills or workflows, not
-their build/deploy/reload flow. Explicitly assigned verification tasks (for
-example, a Glimmung verification phase) still count as an explicit request and
-should follow their own validation contract.
+Normal implementation and handoff steps are still expected: the agent may build
+and deploy the mod, hot-reload SpireLens, commit, and push. This preference
+overrides only the automatic test/live-verification parts of repo skills or
+workflows, not their build/deploy/reload flow. Explicitly assigned verification
+tasks (for example, a Glimmung verification phase) still count as an explicit
+request and should follow their own validation contract.
+
+Build, deploy, and reload are **agent-owned, not user-owned**. Never hand the
+user an F5 press, a rebuild, or a redeploy as a chore — the commands are in
+**Useful Commands** below and the agent runs them. The only thing a running game
+needs from the user is a full process restart, and that is governed by
+**Restart Claims** below.
 
 ## Restart Claims
 
@@ -156,6 +162,31 @@ judge unit tests, and its narration cannot move the unit-test verdict.
 
 ## Useful Commands
 
+- Deploy Core to the live game (the build's post-build target copies
+  `SpireLens.Core.dll` into `mods/SpireLens/`; the Loader reads it from a temp
+  copy so the file stays unlocked while STS2 runs):
+  - `dotnet build D:\repos\SpireLens\Core\SpireLens.Core.csproj -c Debug`
+  - add `-p:SkipModsDeploy=true` to compile without touching the live install
+- Hot-reload the deployed Core into the running game — the agent does this, the
+  user is never asked to press F5:
+  - MCP tool `reload_spirelens_core` when the SpireLensMcp tools are connected
+  - otherwise the equivalent bridge call:
+    `Invoke-RestMethod -Uri 'http://localhost:15526/api/v1/singleplayer' -Method Post -ContentType 'application/json' -Body '{"action":"dev_reload_spirelens_core"}'`
+  - a successful reload returns `{"status":"ok", ..., "reload_number":N}`
+- Confirm the reload took, in `%APPDATA%\SlayTheSpire2\logs\godot.log`:
+  - require `--- HOT RELOAD DONE ---` and `Core.Initialize complete`
+  - treat `Core.Initialize threw` as a failed reload
+  - `Patch install: N classes patched, 0 failed/skipped` should account for any
+    patch classes the change added
+  - note that `godot.log` is the **live** session; the timestamped
+    `godot<ISO-8601>.log` siblings are rotated copies of *earlier* sessions, so
+    reading one of those to judge the running process gives a stale answer
+  - `[CUS-diag] Harmony patched methods` lists every installed target; grep it to
+    prove a specific hook was installed (installation only — not that the live
+    path reaches it)
+- Loader or config-page changes need the root build/deploy, not the Core project
+  alone, and can fail while STS2 holds `SpireLens.dll`. Report that distinction;
+  Core-only hot reload may still be deployable.
 - Build/tests:
   - `dotnet test D:\repos\SpireLens\Tests\SpireLens.Core.Tests\SpireLens.Core.Tests.csproj -c Debug`
 - Focused schema tests:
