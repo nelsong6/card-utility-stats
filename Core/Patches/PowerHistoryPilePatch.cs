@@ -5,6 +5,7 @@ using Godot;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Context;
+using MegaCrit.Sts2.Core.ControllerInput;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Nodes.Combat;
@@ -169,6 +170,7 @@ internal static class PowerHistoryPileUi
             && NCapstoneContainer.Instance?.CurrentCapstoneScreen is NCardPileScreen current
             && current.Pile == injected.OpenPile)
         {
+            CoreMain.Logger.Info("PowerHistoryPile: closing played-powers pile");
             NCapstoneContainer.Instance.Close();
             return;
         }
@@ -190,7 +192,19 @@ internal static class PowerHistoryPileUi
         }
 
         injected.OpenPile = displayPile;
+        CoreMain.Logger.Info(
+            $"PowerHistoryPile: opening {powers.Count} played power card(s)");
         NCardPileScreen.ShowScreen(displayPile, Array.Empty<string>());
+    }
+
+    private static bool IsOpenInput(InputEvent inputEvent)
+    {
+        return inputEvent is InputEventMouseButton
+            {
+                ButtonIndex: MouseButton.Left,
+                Pressed: false,
+            }
+            || inputEvent.IsActionReleased(MegaInput.select);
     }
 
     private static void ShowHoverTip(InjectedPile injected)
@@ -231,7 +245,7 @@ internal static class PowerHistoryPileUi
     {
         private readonly MegaLabel _countLabel;
         private readonly NodePath _originalExhaustFocusNeighborTop;
-        private readonly Callable _releasedCallable;
+        private readonly Control.GuiInputEventHandler _guiInputHandler;
         private readonly Callable _focusedCallable;
         private readonly Callable _unfocusedCallable;
         private int _currentCount;
@@ -262,17 +276,34 @@ internal static class PowerHistoryPileUi
             Button = button;
             _countLabel = countLabel;
             _originalExhaustFocusNeighborTop = exhaustPile.FocusNeighborTop;
-            _releasedCallable = Callable.From<NButton>(_ => OpenPlayedPowers(this));
+            _guiInputHandler = HandleGuiInput;
             _focusedCallable = Callable.From<NButton>(_ => ShowHoverTip(this));
             _unfocusedCallable = Callable.From<NButton>(_ => NHoverTipSet.Remove(Button));
         }
 
         public void ConnectSignals()
         {
-            Button.Connect(NClickableControl.SignalName.Released, _releasedCallable);
+            // The cloned native pile button can temporarily retain a stale
+            // NClickableControl enabled/focus state after combat UI churn.
+            // Listen to its direct GUI input and gate on the real exhaust pile,
+            // which is the game's authoritative combat-pile enabled state.
+            Button.GuiInput += _guiInputHandler;
             Button.Connect(NClickableControl.SignalName.Focused, _focusedCallable);
             Button.Connect(NClickableControl.SignalName.Unfocused, _unfocusedCallable);
             _signalsConnected = true;
+        }
+
+        private void HandleGuiInput(InputEvent inputEvent)
+        {
+            if (!IsLive
+                || _currentCount <= 0
+                || !ExhaustPile.IsEnabled
+                || !IsOpenInput(inputEvent))
+            {
+                return;
+            }
+
+            OpenPlayedPowers(this);
         }
 
         public void Refresh(bool animateIn = false)
@@ -329,7 +360,7 @@ internal static class PowerHistoryPileUi
                 NHoverTipSet.Remove(Button);
                 if (_signalsConnected)
                 {
-                    DisconnectIfConnected(NClickableControl.SignalName.Released, _releasedCallable);
+                    Button.GuiInput -= _guiInputHandler;
                     DisconnectIfConnected(NClickableControl.SignalName.Focused, _focusedCallable);
                     DisconnectIfConnected(NClickableControl.SignalName.Unfocused, _unfocusedCallable);
                 }
