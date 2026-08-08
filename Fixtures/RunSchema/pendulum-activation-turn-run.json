@@ -1,0 +1,36 @@
+{
+  "run_id": "pendulum-activation-turn-fixture",
+  "started_at": "2026-08-08T16:00:00Z",
+  "updated_at": "2026-08-08T16:10:00Z",
+  "outcome": "in_progress",
+  "aggregates": {
+    "CARD.STRIKE_IRONCLAD#1": {
+      "plays": 4,
+      "times_drawn": 5
+    }
+  },
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.PENDULUM": {
+      "activations": 3,
+      "additional_cards_drawn": 3,
+      "pendulum_combats": 2,
+      "pendulum_combats_ended_on0_charges": 1,
+      "pendulum_combats_ended_on1_charge": 1,
+      "pendulum_combats_ended_on2_charges": 0,
+      "pendulum_combat_end_charge_total": 1,
+      "pendulum_combat_end_charge_count": 2,
+      "pendulum_activation_turn_total": 12,
+      "pendulum_activation_turn_samples": 3
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.STRIKE_IRONCLAD": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.STRIKE_IRONCLAD": 1
+  }
+}
