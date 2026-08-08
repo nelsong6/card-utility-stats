@@ -24,6 +24,10 @@ public static class RunStorage
         public long? GameStartTime { get; set; }
         public string RunId { get; set; } = "";
         public string? Outcome { get; set; }
+
+        // Cheap content signal for duplicate resolution: a record that never
+        // observed a floor is an empty stand-in, not a played run.
+        public int? FloorReached { get; set; }
     }
 
     /// <summary>
@@ -308,28 +312,66 @@ public static class RunStorage
     /// Historical counterpart to <see cref="FindByGameStartTime"/>. Returns a
     /// loaded run file even when the source uses the historic pooled shape.
     /// </summary>
+    /// <summary>
+    /// Resolve the run record for one game run, identified by its
+    /// <c>game_start_time</c>.
+    ///
+    /// A game run should own exactly one record, but a duplicate can exist —
+    /// historically because a post-run event resurrected a finished run as a
+    /// second, empty record (see
+    /// <c>RunTracker.IsResurrectedEndedRunLocked</c>). Picking purely by newest
+    /// file mtime let such a duplicate win and made the run history screen
+    /// report all-zero stats for a real run. So rank the candidates instead of
+    /// taking the first match, and prefer the record that actually describes a
+    /// completed game. This keeps history correct for duplicates already on
+    /// disk, with no file cleanup required.
+    /// </summary>
     public static LoadedRunFile? FindHistoricalByGameStartTime(long gameStartTime)
     {
         try
         {
             if (!Directory.Exists(RunsDir)) return null;
 
-            var files = Directory.GetFiles(RunsDir, "*.json");
-            Array.Sort(files, (a, b) => File.GetLastWriteTimeUtc(b).CompareTo(File.GetLastWriteTimeUtc(a)));
-
-            foreach (var path in files)
+            var candidates = new List<RunFileCandidate>();
+            foreach (var path in Directory.GetFiles(RunsDir, "*.json"))
             {
                 try
                 {
                     var header = ReadHeader(path);
                     if (header?.GameStartTime != gameStartTime) continue;
-                    return LoadKnownSchemaFile(path);
+                    candidates.Add(new RunFileCandidate(
+                        path,
+                        IsFinished: header.Outcome != null
+                            && header.Outcome != RunTracker.InProgressOutcome,
+                        FloorReached: header.FloorReached ?? -1,
+                        LastWriteUtc: File.GetLastWriteTimeUtc(path)));
                 }
                 catch (Exception e)
                 {
                     CoreMain.LogDebug($"FindHistoricalByGameStartTime: skipping unreadable {Path.GetFileName(path)}: {e.Message}");
                 }
             }
+
+            var best = SelectBestRunFileCandidate(candidates);
+            if (best == null) return null;
+
+            if (candidates.Count > 1)
+            {
+                // Always-on: more than one record for a single game run means
+                // something wrote a duplicate, and that should be visible in the
+                // log rather than silently resolved.
+                CoreMain.Logger.Warn(
+                    $"FindHistoricalByGameStartTime: {candidates.Count} run files share "
+                    + $"game_start_time={gameStartTime}; chose {Path.GetFileName(best.Path)} "
+                    + $"(finished={best.IsFinished}, floor={best.FloorReached}). Others: "
+                    + string.Join(
+                        ", ",
+                        candidates
+                            .Where(c => !ReferenceEquals(c, best))
+                            .Select(c => $"{Path.GetFileName(c.Path)}(finished={c.IsFinished}, floor={c.FloorReached})")));
+            }
+
+            return LoadKnownSchemaFile(best.Path);
         }
         catch (Exception e)
         {
@@ -337,4 +379,28 @@ public static class RunStorage
         }
         return null;
     }
+
+    /// <summary>
+    /// Rank duplicate records for one game run. Finished beats in-progress: a
+    /// game run cannot un-finish, so a terminal record is the authoritative one.
+    /// Then higher floor, which separates a real run from an empty stand-in that
+    /// never recorded a floor. Newest write time only breaks remaining ties —
+    /// on its own it is the wrong signal, because the stray duplicate is written
+    /// after the real record.
+    /// </summary>
+    internal static RunFileCandidate? SelectBestRunFileCandidate(
+        IReadOnlyList<RunFileCandidate> candidates)
+        => candidates == null || candidates.Count == 0
+            ? null
+            : candidates
+                .OrderByDescending(c => c.IsFinished)
+                .ThenByDescending(c => c.FloorReached)
+                .ThenByDescending(c => c.LastWriteUtc)
+                .First();
+
+    internal sealed record RunFileCandidate(
+        string Path,
+        bool IsFinished,
+        int FloorReached,
+        DateTime LastWriteUtc);
 }

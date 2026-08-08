@@ -117,6 +117,12 @@ public static class RunTracker
     // SP is byte-identical and a mis-detection can never disable tracking.
     // Re-derived from LocalContext.NetId on run start/adopt; never persisted.
     private static ulong? _trackedNetId;
+    /// <summary>
+    /// The one non-terminal <see cref="RunData.Outcome"/> value. A run record
+    /// carrying anything else describes a game that has already finished.
+    /// </summary>
+    internal const string InProgressOutcome = "in_progress";
+
     private static RunData? _currentRun;
     private static RunData? _lastEndedRun;
     private static PendingCombat? _pendingCombat;
@@ -1381,6 +1387,7 @@ public static class RunTracker
     private static void SaveCurrentRun()
     {
         if (_currentRun == null) return;
+        if (IsResurrectedEndedRunLocked(_currentRun)) return;
 
         // Never capture identity from a deck that belongs to a DIFFERENT game
         // run. During a new-run embark or continue-load, CardEnterDeckPatch
@@ -1398,6 +1405,47 @@ public static class RunTracker
         }
 
         RunStorage.SaveAsync(_currentRun);
+    }
+
+    /// <summary>
+    /// True when <paramref name="run"/> is an in-memory record for a game run
+    /// that has already finished.
+    ///
+    /// <see cref="OnRunEnded"/> deliberately nulls <c>_currentRun</c>, but the
+    /// ~40 Record*/getter paths that funnel through
+    /// <see cref="EnsureLazyCurrentRunLocked"/> all re-create it on demand and
+    /// cannot tell "no run yet" (the legitimate hot-loaded-mid-run case) from
+    /// "run just ended". A single post-run event — a victory-screen HP change, a
+    /// history read, the deck repopulating — therefore resurrects the finished
+    /// game as a second, empty record carrying the same <c>game_start_time</c>.
+    /// That duplicate then competes with the real record in
+    /// <see cref="RunStorage.FindHistoricalByGameStartTime"/> and the run
+    /// history screen reads all-zero stats.
+    ///
+    /// Blocking the write is the narrow, load-bearing invariant: a finished
+    /// game's record is written exactly once, by <see cref="OnRunEnded"/>. The
+    /// resurrected instance may still accumulate in memory; it is discarded at
+    /// the next run start and never reaches disk.
+    /// </summary>
+    private static bool IsResurrectedEndedRunLocked(RunData run)
+        => IsResurrectedEndedRun(_lastEndedRun, run);
+
+    internal static bool IsResurrectedEndedRun(RunData? lastEndedRun, RunData? run)
+    {
+        if (run?.GameStartTime == null) return false;
+        if (lastEndedRun == null) return false;
+        if (ReferenceEquals(run, lastEndedRun)) return false;
+        if (lastEndedRun.GameStartTime != run.GameStartTime) return false;
+        if (lastEndedRun.Outcome == null
+            || lastEndedRun.Outcome == InProgressOutcome)
+        {
+            return false;
+        }
+
+        // Only suppress records that carry no finished-run identity of their own.
+        // A genuinely distinct record for the same start time that already has
+        // its own terminal outcome is somebody else's business, not a phantom.
+        return run.Outcome == null || run.Outcome == InProgressOutcome;
     }
 
     /// <summary>
