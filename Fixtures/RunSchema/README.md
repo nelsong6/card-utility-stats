@@ -151,6 +151,12 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds a power-ID-keyed Feel No Pain aggregate with observed post-modifier
   block and active-turn denominator data. Every Feel No Pain card projects
   the shared block-per-active-turn value.
+- `buffer-power-run.json`
+  Adds a power-ID-keyed Buffer aggregate with charges granted, charges the
+  power confirmed spending, and the observed post-Block HP loss those charges
+  zeroed. Keyed by the canonical `POWER.BUFFER_POWER` id. Every Buffer card
+  projects these shared totals; charges that never fired are granted minus
+  used.
 - `entropy-power-run.json`
   Adds a power-ID-keyed Entropy aggregate with confirmed replacement-card
   rarities, Bound cards transformed, and a zero-inclusive active-combat

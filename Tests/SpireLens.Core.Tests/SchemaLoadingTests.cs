@@ -725,6 +725,20 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsBufferPowerFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("buffer-power-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        AssertBufferPowerFixture(
+            loaded.Data.MetaStats.PowerAggregates["POWER.BUFFER_POWER"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsEntropyPowerFixture()
     {
         var loaded = RunStorage.LoadHistorical(
@@ -1699,6 +1713,17 @@ public class SchemaLoadingTests
         Assert.NotNull(resumed);
         AssertFeelNoPainPowerFixture(
             resumed!.MetaStats.PowerAggregates["POWER.FEEL_NO_PAIN"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsBufferPowerFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("buffer-power-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertBufferPowerFixture(
+            resumed!.MetaStats.PowerAggregates["POWER.BUFFER_POWER"]);
     }
 
     [Fact]
@@ -4925,6 +4950,19 @@ public class SchemaLoadingTests
         Assert.Equal("Feel No Pain", powerAgg.DisplayName);
         Assert.Equal(36m, powerAgg.BlockGained);
         Assert.Equal(6, powerAgg.TurnsActive);
+    }
+
+    private static void AssertBufferPowerFixture(PowerAggregate powerAgg)
+    {
+        Assert.Equal("POWER.BUFFER_POWER", powerAgg.PowerId);
+        Assert.Equal("Buffer", powerAgg.DisplayName);
+        Assert.Equal(3, powerAgg.PowerCardsPlayed);
+        Assert.Equal(3, powerAgg.SuccessfulApplications);
+        Assert.Equal(7, powerAgg.BufferChargesGranted);
+        Assert.Equal(5, powerAgg.BufferChargesUsed);
+        Assert.Equal(63m, powerAgg.BufferDamagePrevented);
+        Assert.Equal(11, powerAgg.TurnsActive);
+        Assert.Equal(4, powerAgg.CombatsActive);
     }
 
     private static void AssertEntropyPowerFixture(PowerAggregate powerAgg)

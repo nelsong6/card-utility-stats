@@ -28,6 +28,7 @@ public static class CardHoverShowPatch
     private const string BlockedDrawIconPath = DrawCardsNextTurnPowerIconPath;
     private const int DebtGoldLossPerTrigger = 5;
     private const string AggressionPowerId = "POWER.AGGRESSION";
+    private const string BufferPowerId = "POWER.BUFFER_POWER";
     private const string ConsumingShadowPowerId = "POWER.CONSUMING_SHADOW";
     private const string DanseMacabrePowerId = "POWER.DANSE_MACABRE";
     private const string DarkEmbracePowerId = "POWER.DARK_EMBRACE";
@@ -994,6 +995,35 @@ public static class CardHoverShowPatch
                     GetDrawStatLabel("cards drawn"),
                     aggregate.ViciousCardsDrawn.ToString(),
                     "");
+                break;
+
+            case BufferPowerId:
+                Row3(
+                    sb,
+                    "HP loss prevented",
+                    FormatDecimal(aggregate.BufferDamagePrevented),
+                    "");
+                if (detailed)
+                {
+                    var chargeUtilization = aggregate.BufferChargesGranted <= 0
+                        ? 0m
+                        : 100m * aggregate.BufferChargesUsed
+                            / aggregate.BufferChargesGranted;
+                    var preventedPerCharge = aggregate.BufferChargesUsed <= 0
+                        ? 0m
+                        : aggregate.BufferDamagePrevented
+                            / aggregate.BufferChargesUsed;
+                    Row3(
+                        sb,
+                        "Charges used/granted",
+                        $"{aggregate.BufferChargesUsed}/{aggregate.BufferChargesGranted}",
+                        $"{chargeUtilization:F0}%");
+                    Row3(
+                        sb,
+                        "Avg HP loss prevented per charge",
+                        FormatDecimal(preventedPerCharge),
+                        "");
+                }
                 break;
         }
     }

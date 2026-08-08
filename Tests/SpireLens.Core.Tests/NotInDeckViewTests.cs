@@ -60,6 +60,7 @@ public class NotInDeckViewTests
                 "CARD.SOUL",
                 "CARD.SOVEREIGN_BLADE",
                 "CARD.AGGRESSION",
+                "CARD.BUFFER",
                 "CARD.CALAMITY",
                 "CARD.CALL_OF_THE_VOID",
                 "CARD.CONSUMING_SHADOW",
