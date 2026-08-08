@@ -1,4 +1,3 @@
-using Godot;
 using SpireLens.Core.Patches;
 using Xunit;
 
@@ -6,51 +5,50 @@ namespace SpireLens.Core.Tests;
 
 public class MapLegendStatsTooltipTests
 {
-    private static readonly Rect2 Viewport = new(0f, 0f, 1000f, 800f);
-
     [Fact]
     public void ClampInsideViewport_PreservesAnAlreadyVisiblePosition()
     {
-        var position = new Vector2(300f, 250f);
+        var result = Clamp(300f, 250f, 240f, 180f);
 
-        var result = MapLegendStatsTooltip.ClampInsideViewport(
-            position,
-            new Vector2(240f, 180f),
-            Viewport);
-
-        Assert.Equal(position, result);
+        Assert.Equal(new CaptureFloatPoint(300f, 250f), result);
     }
 
     [Fact]
     public void ClampInsideViewport_MovesRightAndBottomOverflowInsideMargin()
     {
-        var result = MapLegendStatsTooltip.ClampInsideViewport(
-            new Vector2(900f, 700f),
-            new Vector2(300f, 200f),
-            Viewport);
+        var result = Clamp(900f, 700f, 300f, 200f);
 
-        Assert.Equal(new Vector2(692f, 592f), result);
+        Assert.Equal(new CaptureFloatPoint(692f, 592f), result);
     }
 
     [Fact]
     public void ClampInsideViewport_MovesLeftAndTopOverflowInsideMargin()
     {
-        var result = MapLegendStatsTooltip.ClampInsideViewport(
-            new Vector2(-40f, -20f),
-            new Vector2(300f, 200f),
-            Viewport);
+        var result = Clamp(-40f, -20f, 300f, 200f);
 
-        Assert.Equal(new Vector2(8f, 8f), result);
+        Assert.Equal(new CaptureFloatPoint(8f, 8f), result);
     }
 
     [Fact]
     public void ClampInsideViewport_AnchorsOversizedStackAtMinimumMargin()
     {
-        var result = MapLegendStatsTooltip.ClampInsideViewport(
-            new Vector2(300f, 200f),
-            new Vector2(1200f, 900f),
-            Viewport);
+        var result = Clamp(300f, 200f, 1200f, 900f);
 
-        Assert.Equal(new Vector2(8f, 8f), result);
+        Assert.Equal(new CaptureFloatPoint(8f, 8f), result);
     }
+
+    private static CaptureFloatPoint Clamp(
+        float positionX,
+        float positionY,
+        float width,
+        float height)
+        => MapLegendStatsTooltip.ClampInsideViewportBounds(
+            positionX,
+            positionY,
+            width,
+            height,
+            viewportX: 0f,
+            viewportY: 0f,
+            viewportWidth: 1000f,
+            viewportHeight: 800f);
 }

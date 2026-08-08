@@ -211,7 +211,7 @@ public class CrackedCoreStatsTests
         Assert.Contains("[b]1[/b]", body);
         Assert.Contains("Damage attempted", body);
         Assert.Contains("[b]15[/b]", body);
-        Assert.Contains("Damage dealt", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("damage"), body);
         Assert.Contains("[b]10[/b]", body);
         Assert.Contains("Damage blocked", body);
         Assert.Contains("[b]2[/b]", body);

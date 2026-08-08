@@ -86,16 +86,6 @@ public static class RelicHoverShowPatch
         AccessTools.Field(typeof(OrnamentalFan), "_attacksPlayedThisTurn");
     private static readonly System.Reflection.FieldInfo? ShurikenAttacksPlayedThisTurnField =
         AccessTools.Field(typeof(Shuriken), "_attacksPlayedThisTurn");
-    private static readonly (string Key, string DisplayName)[] ObservedCardRewardPools =
-    [
-        ("ironclad", "Ironclad"),
-        ("silent", "Silent"),
-        ("regent", "Regent"),
-        ("necrobinder", "Necrobinder"),
-        ("defect", "Defect"),
-        ("colorless", "Colorless"),
-    ];
-
     internal static bool TryBuildNativeHoverTip(
         NRelicInventoryHolder holder,
         out HoverTip statsTip)
@@ -2820,7 +2810,7 @@ public static class RelicHoverShowPatch
         RelicAggregate agg,
         string relicName)
     {
-        foreach (var (key, displayName) in ObservedCardRewardPools)
+        foreach (var (key, displayName) in EnumerateObservedCardRewardPools())
         {
             var count = GetObservedCardRewardPoolOfferCount(agg, key);
             DescribedIconRow(
@@ -2831,6 +2821,17 @@ public static class RelicHoverShowPatch
                 count.ToString(),
                 $"{displayName} cards offered — final visible {displayName} card options in rewards while {relicName} was held.");
         }
+    }
+
+    private static IEnumerable<(string Key, string DisplayName)>
+        EnumerateObservedCardRewardPools()
+    {
+        yield return ("ironclad", "Ironclad");
+        yield return ("silent", "Silent");
+        yield return ("regent", "Regent");
+        yield return ("necrobinder", "Necrobinder");
+        yield return ("defect", "Defect");
+        yield return ("colorless", "Colorless");
     }
 
     private static int GetObservedCardRewardPoolOfferCount(RelicAggregate agg, string key)
@@ -6979,7 +6980,8 @@ public static class RelicHoverShowPatch
 
     private static bool IsPrecomposedLabelMarkup(string label)
         => label.StartsWith("[b]", StringComparison.Ordinal)
-           || label.StartsWith("[hint", StringComparison.Ordinal);
+           || label.Contains("[hint", StringComparison.Ordinal)
+           || label.Contains("[img", StringComparison.Ordinal);
 
     private static void AppendConceptLabel(
         StringBuilder sb,

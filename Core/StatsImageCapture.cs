@@ -10,6 +10,10 @@ internal readonly record struct CaptureFloatRect(
     float Width,
     float Height);
 
+internal readonly record struct CaptureFloatPoint(
+    float X,
+    float Y);
+
 internal readonly record struct CapturePixelRect(
     int X,
     int Y,
@@ -323,29 +327,28 @@ internal static class StatsImageCapture
         CaptureFloatRect renderedSubjectRect,
         CaptureFloatRect tooltipBounds)
     {
-        var bounds = new Rect2(
-            tooltipBounds.X,
-            tooltipBounds.Y,
-            tooltipBounds.Width,
-            tooltipBounds.Height);
+        var left = tooltipBounds.X;
+        var top = tooltipBounds.Y;
+        var right = tooltipBounds.X + tooltipBounds.Width;
+        var bottom = tooltipBounds.Y + tooltipBounds.Height;
         if (renderedSubjectRect.Width > 0f
             && renderedSubjectRect.Height > 0f)
         {
-            bounds = Merge(
-                bounds,
-                new Rect2(
-                    renderedSubjectRect.X,
-                    renderedSubjectRect.Y,
-                    renderedSubjectRect.Width,
-                    renderedSubjectRect.Height));
+            left = Math.Min(left, renderedSubjectRect.X);
+            top = Math.Min(top, renderedSubjectRect.Y);
+            right = Math.Max(
+                right,
+                renderedSubjectRect.X + renderedSubjectRect.Width);
+            bottom = Math.Max(
+                bottom,
+                renderedSubjectRect.Y + renderedSubjectRect.Height);
         }
 
-        bounds = Grow(bounds, ShareCaptureMargin);
         return new CaptureFloatRect(
-            bounds.Position.X,
-            bounds.Position.Y,
-            bounds.Size.X,
-            bounds.Size.Y);
+            left - ShareCaptureMargin,
+            top - ShareCaptureMargin,
+            right - left + ShareCaptureMargin * 2f,
+            bottom - top + ShareCaptureMargin * 2f);
     }
 
     internal static Rect2I CalculatePixelRect(

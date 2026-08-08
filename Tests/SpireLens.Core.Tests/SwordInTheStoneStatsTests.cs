@@ -161,8 +161,11 @@ public class SwordInTheStoneStatsTests
         Assert.Contains("Activated this combat", body);
         Assert.Contains("Total strength gained", body);
         Assert.Contains("Strength gained this combat", body);
-        Assert.Contains("Avg strength gained per activation", body);
-        Assert.Contains("Avg strength gained per combat", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("average"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("strength_gained"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("per"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("activation"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("combat"), body);
         Assert.Contains("same tracking window", body);
         Assert.Contains("[b]true[/b]", body);
         Assert.Contains("[b]3[/b]", body);
@@ -198,8 +201,11 @@ public class SwordInTheStoneStatsTests
             SwordInTheStoneStrengthCombats = 2,
         });
 
-        Assert.Contains("Avg strength gained per activation", body);
-        Assert.Contains("Avg strength gained per combat", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("average"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("strength_gained"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("per"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("activation"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("combat"), body);
         Assert.Contains("[b]3[/b]", body);
         Assert.Contains("[b]1.5[/b]", body);
     }

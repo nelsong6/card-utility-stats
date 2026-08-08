@@ -154,7 +154,7 @@ public class EnemyStatusStatsTests
         Assert.Contains("Burn", body);
         Assert.Contains("[b]2[/b]", body);
         Assert.Contains("[b]1[/b]", body);
-        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("card"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("status"), body);
         Assert.Contains(StatConceptGlossary.RenderHintedGlyph("draw"), body);
         Assert.DoesNotContain("[color=#e0e0e0]Status cards", body);
     }

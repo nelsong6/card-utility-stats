@@ -182,9 +182,9 @@ public class SilverCrucibleStatsTests
 
         var body = BuildBody(agg);
 
-        Assert.Contains("[color=#e0e0e0]reward 1[/color]", body);
-        Assert.Contains("[table=2]", body);
-        Assert.Contains("[cell expand=4 padding=0,0,4,0]", body);
+        Assert.Contains("reward 1", body);
+        Assert.Contains("[table=4]", body);
+        Assert.Contains("[cell expand=0 padding=0,0,12,0]", body);
         Assert.Contains("[b]Grave Warden+[/b]", body);
         Assert.Contains("[b]pending[/b]", body);
     }

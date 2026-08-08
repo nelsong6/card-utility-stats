@@ -109,18 +109,41 @@ internal static class MapLegendStatsTooltip
         Vector2 size,
         Rect2 viewportRect)
     {
-        var minimumX = viewportRect.Position.X + ViewportMargin;
-        var minimumY = viewportRect.Position.Y + ViewportMargin;
+        var result = ClampInsideViewportBounds(
+            position.X,
+            position.Y,
+            size.X,
+            size.Y,
+            viewportRect.Position.X,
+            viewportRect.Position.Y,
+            viewportRect.Size.X,
+            viewportRect.Size.Y);
+
+        return new Vector2(result.X, result.Y);
+    }
+
+    internal static CaptureFloatPoint ClampInsideViewportBounds(
+        float positionX,
+        float positionY,
+        float width,
+        float height,
+        float viewportX,
+        float viewportY,
+        float viewportWidth,
+        float viewportHeight)
+    {
+        var minimumX = viewportX + ViewportMargin;
+        var minimumY = viewportY + ViewportMargin;
         var maximumX = Math.Max(
             minimumX,
-            viewportRect.End.X - ViewportMargin - size.X);
+            viewportX + viewportWidth - ViewportMargin - width);
         var maximumY = Math.Max(
             minimumY,
-            viewportRect.End.Y - ViewportMargin - size.Y);
+            viewportY + viewportHeight - ViewportMargin - height);
 
-        return new Vector2(
-            Math.Clamp(position.X, minimumX, maximumX),
-            Math.Clamp(position.Y, minimumY, maximumY));
+        return new CaptureFloatPoint(
+            Math.Clamp(positionX, minimumX, maximumX),
+            Math.Clamp(positionY, minimumY, maximumY));
     }
 
     private static bool IsLive(GodotObject? value)

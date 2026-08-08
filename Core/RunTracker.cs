@@ -35259,10 +35259,13 @@ public static class RunTracker
         target.UncommonPotionsGained += source.UncommonPotionsGained;
         target.RarePotionsGained += source.RarePotionsGained;
         target.PotionsSkipped += source.PotionsSkipped;
-        target.RandomCardGeneration ??= new RandomCardGenerationAggregate();
-        MergeRandomCardGenerationInto(
-            target.RandomCardGeneration,
-            source.RandomCardGeneration);
+        if (source.RandomCardGeneration != null)
+        {
+            target.RandomCardGeneration ??= new RandomCardGenerationAggregate();
+            MergeRandomCardGenerationInto(
+                target.RandomCardGeneration,
+                source.RandomCardGeneration);
+        }
         target.JackColorlessCardsAdded += source.JackColorlessCardsAdded;
         target.JackUncommonCardsAdded += source.JackUncommonCardsAdded;
         target.JackRareCardsAdded += source.JackRareCardsAdded;

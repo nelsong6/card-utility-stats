@@ -62,6 +62,7 @@ public class NotInDeckViewTests
                 "CARD.AGGRESSION",
                 "CARD.CALAMITY",
                 "CARD.CALL_OF_THE_VOID",
+                "CARD.CONSUMING_SHADOW",
                 "CARD.CREATIVE_AI",
                 "CARD.DANSE_MACABRE",
                 "CARD.DARK_EMBRACE",

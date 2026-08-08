@@ -99,7 +99,7 @@ public class RelicStatRowVocabularyTests
     [InlineData(
         "Non-upgraded attacks in combat",
         "Non-upgraded",
-        "attack,combat",
+        "attack,in,combat",
         "")]
     [InlineData(
         "Commons picked",

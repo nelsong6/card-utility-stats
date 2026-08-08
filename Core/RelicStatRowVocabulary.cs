@@ -334,12 +334,6 @@ internal static class RelicStatRowVocabulary
         var remainingText = CleanupRemainingText(
             BuildRemainingText(workingText, removed),
             conceptIds);
-        if (!string.IsNullOrWhiteSpace(remainingText))
-        {
-            conceptIds = conceptIds
-                .Where(id => id is not ("in" or "all"))
-                .ToArray();
-        }
         var renderedLabel = string.Join(
             " ",
             preservedImages

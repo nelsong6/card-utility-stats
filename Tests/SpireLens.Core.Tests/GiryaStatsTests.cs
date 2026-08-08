@@ -91,7 +91,20 @@ public class GiryaStatsTests
         RunTracker.RecordGiryaAttackPlayedForTest(agg, -1);
         RunTracker.RecordGiryaAttackHitForTest(agg, -1);
 
-        AssertAggregate(agg);
+        Assert.Equal(5, agg.FloorAcquired);
+        Assert.Equal(2, agg.Activations);
+        Assert.Equal(3m, agg.StrengthAdded);
+        Assert.Equal(3m, agg.GiryaStrengthRateAdded);
+        Assert.Equal(4, agg.GiryaStrengthCombats);
+        Assert.Equal(7, agg.GiryaAttacksPlayed);
+        Assert.Equal(12, agg.GiryaAttackHits);
+        Assert.Equal(11, agg.GiryaCountFloorTotal);
+        Assert.Equal(10, agg.GiryaFloorSamples);
+        Assert.Equal(14, agg.GiryaLastFloorSampled);
+        Assert.Equal(9, agg.GiryaUseFloorDistanceTotal);
+        Assert.Equal(3, agg.GiryaUseFloorDistanceSamples);
+        Assert.Equal(14, agg.GiryaLastUseFloor);
+        Assert.Equal(3, agg.GiryaLastObservedLiftCount);
     }
 
     [Fact]
@@ -159,8 +172,10 @@ public class GiryaStatsTests
         Assert.Contains("Activated this combat", body);
         Assert.Contains("Total strength gained", body);
         Assert.Contains("Strength gained this combat", body);
-        Assert.Contains("Avg strength gained per activation", body);
-        Assert.Contains("Avg strength gained per combat", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("average"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("strength_gained"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("per"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("combat"), body);
         Assert.Contains("Attack cards played while Girya's Strength was active", body);
         Assert.Contains("Resolved enemy damage hits from Attack cards", body);
         Assert.Contains(StatConceptGlossary.RenderHintedGlyph("average"), body);

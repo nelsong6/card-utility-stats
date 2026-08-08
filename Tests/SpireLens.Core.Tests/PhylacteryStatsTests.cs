@@ -78,9 +78,9 @@ public class PhylacteryStatsTests
         Assert.Contains("Total HP lost by the tracked player's Osty bodies", body);
         Assert.Contains("Average damage absorbed by Osty per player turn", body);
         Assert.Contains("Average damage absorbed by Osty per combat", body);
-        Assert.Contains("generated-icons/stat-average-", body);
-        Assert.Contains("generated-icons/stat-all-", body);
-        Assert.Contains("generated-icons/stat-per-", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("average"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("all"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("per"), body);
         Assert.Contains("[b]4[/b]", body);
         Assert.Contains("[b]12[/b]", body);
         Assert.Contains("[b]31[/b]", body);
