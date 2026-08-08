@@ -3800,6 +3800,52 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsOrichalcumBlockMissedFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("orichalcum-block-missed-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.ORICHALCUM"];
+        Assert.Equal(18, relicAgg.AdditionalBlockGained);
+        Assert.Equal(5, relicAgg.BlockedTriggers);
+        Assert.Equal(4, relicAgg.OrichalcumTurnsUndercut);
+        Assert.Equal(11, relicAgg.OrichalcumBlockMissed);
+        Assert.Equal(14, relicAgg.OrichalcumTurns);
+        Assert.Equal(3, relicAgg.OrichalcumCombats);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsOrichalcumBlockMissedFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("orichalcum-block-missed-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.ORICHALCUM"];
+        Assert.Equal(4, relicAgg.OrichalcumTurnsUndercut);
+        Assert.Equal(11, relicAgg.OrichalcumBlockMissed);
+        Assert.Equal(14, relicAgg.OrichalcumTurns);
+        Assert.Equal(3, relicAgg.OrichalcumCombats);
+    }
+
+    [Fact]
+    public void OlderOrichalcumFixture_DefaultsBlockMissedFieldsToZero()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("v27-orichalcum-blocked-and-combats-in-deck-run.json"));
+
+        Assert.NotNull(loaded);
+        var relicAgg = loaded!.Data.RelicAggregates["RELIC.ORICHALCUM"];
+        Assert.Equal(4, relicAgg.BlockedTriggers);
+        Assert.Equal(0, relicAgg.OrichalcumTurnsUndercut);
+        Assert.Equal(0, relicAgg.OrichalcumBlockMissed);
+        Assert.Equal(0, relicAgg.OrichalcumTurns);
+        Assert.Equal(0, relicAgg.OrichalcumCombats);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsToastyMittensRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("toasty-mittens-relic-run.json"));

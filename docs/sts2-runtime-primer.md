@@ -853,6 +853,25 @@ zero-inclusively, and count Ancient energy at the established
 
 For relics that grant block after a specific owner-owned condition, arm a narrow block-gain window at the relic callback and let `Hook.AfterBlockGained` record the modified amount. Permafrost follows this pattern from `Permafrost.AfterCardPlayed`: mirror the first-owned-Power condition, count that combat trigger, then derive block per triggered combat from observed block gained divided by triggers. Count every combat where Permafrost was held, including zero-trigger combats, as the separate trigger-rate denominator. Older runs predate that denominator; because Permafrost can trigger at most once per combat, backfill the minimum known historical combat count from its activation total before adding newly observed combats. Its private `_activatedThisCombat` field is the authoritative live source for whether it has triggered in the current combat; display that state directly rather than inferring it from persisted activation totals.
 
+Orichalcum only pays out when the player ends the turn holding no Block, and its
+`BeforeSideTurnEndVeryEarly` callback is where the game itself performs that
+comparison — the leftover Block readable there is the exact value that decided
+the outcome. When leftover Block is present the relic stays silent, and the
+interesting quantity is what the leftover cost: leftover strictly between zero
+and the relic's own `DynamicVars.Block.BaseValue` leaves the player holding less
+than the suppressed trigger would have granted, so score the difference. Leftover
+at or above that amount costs nothing and must not be scored, which makes the
+undercut-turn count a strict subset of the existing blocked-trigger count. Read
+the threshold from the relic rather than hardcoding 6 so an upgraded or modified
+amount stays correct. This shortfall is a **counterfactual**, not an observed
+outcome: it assumes the leftover Block could have been spent or avoided, which an
+unavoidable auto-block source can make false. Keep it in fields separate from the
+observed `AdditionalBlockGained` ledger, and keep it separate from
+`AdditionalBlockWasted`, which already means relic-granted Block that expired
+unused — a different measurement entirely. Count every player turn and combat
+where the relic was held as the average denominators so periods that missed
+nothing stay in both.
+
 Cloak Clasp's owner-specific `BeforeSideTurnEnd` callback makes exactly one
 block command for `cards in hand * Block`, and skips the command when the hand
 is empty. Keep its existing one-shot observed-block attribution window for the
@@ -1079,6 +1098,26 @@ and wait for the full pickup callback before resolving the outcome against new
 physical permanent-deck references. Mark an option taken only when the chosen
 card actually produces a deck addition; preserve a null selection as a true
 skip rather than treating selection intent as acquisition.
+
+Choices Paradox generates five distinct combat cards from its owner's own
+character card pool on the first player turn of a combat, applies Retain to each
+one, and awaits the shared `CardSelectCmd.FromSimpleGrid` command with a
+select-exactly-one prompt. Open a window in a prefix on the relic's own
+`AfterPlayerTurnStart` override and close it in that method's finalizer. The
+relic generates its options and enters the grid command synchronously before its
+first await, so the window is still open when the grid is armed and has already
+closed by the time the async callback hands its task back; every other caller of
+that widely shared command stays unclaimed. Count the selection screen at the
+grid call rather than at the relic callback: the relic's own zero-options
+softlock guard returns before any grid exists, so a screen counted at the grid
+was really offered, and the offered-rarity buckets can never disagree with the
+screen count. `CardFactory.FilterForCombat` drops Basic, Ancient, and Event
+cards, so Common, Uncommon, and Rare fully account for the options. The command
+materializes its result list before returning, so awaiting the same task
+alongside the relic reads the observed pick; do not infer the taken card from
+the prompt's requested count of one, and do not assume the offered rarities
+follow reward-screen weights — the options are a uniform draw over the distinct
+eligible pool.
 
 Yummy Cookie's pickup flow calls `CardModel.UpgradeInternal` both for its real
 permanent-deck upgrades and while constructing non-deck copies of cards that

@@ -187,6 +187,7 @@ public static class RunTracker
     private static readonly Dictionary<string, int> _lastEnergyResetRoundByRelicAndPlayer = new();
     private static int _pendingWhiteBeastPotionRewards;
     private static int _pendingToolboxOfferScreens;
+    private static ChoicesParadoxSelectionWindow? _choicesParadoxSelectionWindow;
     private static readonly List<Player> _pendingHeftyTabletChoicePlayers = new();
     private static readonly Dictionary<Player, PendingLeadPaperweightChoice>
         _pendingLeadPaperweightChoices = new(ReferenceEqualityComparer.Instance);
@@ -1632,6 +1633,7 @@ public static class RunTracker
         _lastEnergyResetRoundByRelicAndPlayer.Clear();
         _pendingWarHammerActivations.Clear();
         _pendingToolboxOfferScreens = 0;
+        _choicesParadoxSelectionWindow = null;
         _pendingMakeItSoSummons.Clear();
         _pendingReplayExtraPlaySources.Clear();
         _pendingReplayExtraPlaySeriesStarted.Clear();
@@ -2745,6 +2747,10 @@ public static class RunTracker
         target.CloakClaspCombats += source.CloakClaspCombats;
         target.PermafrostCombats += source.PermafrostCombats;
         target.BlockedTriggers += source.BlockedTriggers;
+        target.OrichalcumTurnsUndercut += source.OrichalcumTurnsUndercut;
+        target.OrichalcumBlockMissed += source.OrichalcumBlockMissed;
+        target.OrichalcumTurns += source.OrichalcumTurns;
+        target.OrichalcumCombats += source.OrichalcumCombats;
         target.StrengthAdded += source.StrengthAdded;
         target.GiryaStrengthRateAdded += source.GiryaStrengthRateAdded;
         target.GiryaStrengthCombats += source.GiryaStrengthCombats;
@@ -9917,6 +9923,7 @@ public static class RunTracker
     private const string BoundPhylacteryRelicId = "RELIC.BOUND_PHYLACTERY";
     private const string PhylacteryUnboundRelicId = "RELIC.PHYLACTERY_UNBOUND";
     private const string ToolboxRelicId = "RELIC.TOOLBOX";
+    private const string ChoicesParadoxRelicId = "RELIC.CHOICES_PARADOX";
     private const string WhiteStarRelicId = "RELIC.WHITE_STAR";
     private const string PrayerWheelRelicId = "RELIC.PRAYER_WHEEL";
     private const string PaelsWingRelicId = "RELIC.PAELS_WING";
@@ -11089,7 +11096,9 @@ public static class RunTracker
     /// <c>BeforeSideTurnEndVeryEarly</c> method, where the game performs this
     /// exact condition check before arming <c>ShouldTrigger</c>.
     /// </summary>
-    public static void RecordOrichalcumBlockedTrigger()
+    public static void RecordOrichalcumBlockedTrigger(
+        int leftoverBlock = 0,
+        decimal triggerBlock = 0m)
     {
         lock (_lock)
         {
@@ -11097,10 +11106,68 @@ public static class RunTracker
             {
                 var agg = GetOrCreateRelicAggregateLocked(OrichalcumRelicId);
                 agg.BlockedTriggers += 1;
+                RecordOrichalcumUndercutTurnForTest(agg, leftoverBlock, triggerBlock);
             }
             catch (Exception e)
             {
                 CoreMain.LogDebug($"RecordOrichalcumBlockedTrigger failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Score one blocked end-of-turn check for the leftover-Block shortfall.
+    /// Only leftover strictly between zero and the relic's own trigger amount
+    /// costs anything: at or above that amount the player already holds at
+    /// least what the trigger would have granted, so nothing was missed. The
+    /// shortfall is a counterfactual — it assumes the leftover Block could have
+    /// been spent or avoided — so it is deliberately kept apart from the
+    /// observed <c>AdditionalBlockGained</c> ledger.
+    /// </summary>
+    internal static void RecordOrichalcumUndercutTurnForTest(
+        RelicAggregate agg,
+        int leftoverBlock,
+        decimal triggerBlock)
+    {
+        if (agg == null) return;
+        if (leftoverBlock <= 0 || triggerBlock <= 0m) return;
+        if (leftoverBlock >= triggerBlock) return;
+
+        agg.OrichalcumTurnsUndercut += 1;
+        agg.OrichalcumBlockMissed += (int)(triggerBlock - leftoverBlock);
+    }
+
+    internal static void RecordOrichalcumTurnForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.OrichalcumTurns += Math.Max(0, count);
+    }
+
+    internal static void RecordOrichalcumCombatForTest(RelicAggregate agg, int count = 1)
+    {
+        if (agg == null) return;
+        agg.OrichalcumCombats += Math.Max(0, count);
+    }
+
+    /// <summary>
+    /// Count a distinct player turn toward Orichalcum's held-turn average,
+    /// including turns that end at zero Block and lose nothing.
+    /// </summary>
+    public static void RecordOrichalcumTurnStarted(Player player)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+                _pendingCombat ??= new PendingCombat();
+                RecordOrichalcumTurnForPlayerLocked(player);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordOrichalcumTurnStarted failed: {e.Message}");
             }
         }
     }
@@ -13978,6 +14045,163 @@ public static class RunTracker
             {
                 CoreMain.LogDebug($"RecordToolboxTaken failed: {e.Message}");
             }
+        }
+    }
+
+    /// <summary>
+    /// Open the narrow window that identifies Choices Paradox's own selection
+    /// screen. The relic builds its options and calls the shared
+    /// CardSelectCmd.FromSimpleGrid command synchronously inside its turn-start
+    /// callback, so this window brackets the one grid call that belongs to it
+    /// and leaves every other caller of that command unclaimed.
+    /// </summary>
+    internal static ChoicesParadoxSelectionWindow? BeginChoicesParadoxSelection(
+        ChoicesParadox relic,
+        Player player)
+    {
+        if (relic?.Owner == null || player == null) return null;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ReferenceEquals(relic.Owner, player)) return null;
+                if (player.PlayerCombatState?.TurnNumber != 1) return null;
+                if (!IsTrackedRelic(relic) || !IsTrackedPlayer(player)) return null;
+
+                var window = new ChoicesParadoxSelectionWindow(player);
+                _choicesParadoxSelectionWindow = window;
+                return window;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"BeginChoicesParadoxSelection failed: {e.Message}");
+                return null;
+            }
+        }
+    }
+
+    internal static void EndChoicesParadoxSelection(
+        ChoicesParadoxSelectionWindow? window)
+    {
+        if (window == null) return;
+        if (ReferenceEquals(_choicesParadoxSelectionWindow, window))
+            _choicesParadoxSelectionWindow = null;
+    }
+
+    /// <summary>
+    /// Record one observed Choices Paradox selection screen plus the rarity of
+    /// every option on it. The screen is the activation rather than the relic
+    /// callback: the relic's own zero-options guard returns before any grid is
+    /// built, so a screen counted here was really offered.
+    /// </summary>
+    internal static bool RecordChoicesParadoxOffers(
+        IReadOnlyList<CardModel>? cards,
+        Player? player)
+    {
+        if (cards == null || cards.Count == 0) return false;
+        // FromSimpleGrid is shared by many callers; keep the unarmed path free
+        // of the tracker lock.
+        if (_choicesParadoxSelectionWindow == null) return false;
+
+        lock (_lock)
+        {
+            try
+            {
+                var window = _choicesParadoxSelectionWindow;
+                if (window == null || window.OffersRecorded) return false;
+                if (!ReferenceEquals(window.Player, player)) return false;
+                window.OffersRecorded = true;
+
+                var agg = GetOrCreateRelicAggregateLocked(ChoicesParadoxRelicId);
+                RecordChoicesParadoxScreenForTest(agg);
+                RecordChoicesParadoxOffersForTest(
+                    agg,
+                    cards.Where(card => card != null).Select(card => card.Rarity));
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordChoicesParadoxOffers failed: {e.Message}");
+                return false;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record what the selection actually resolved to. The command returns the
+    /// already-materialized selected cards, so this counts the observed pick
+    /// rather than the single card the relic's prompt asks for.
+    /// </summary>
+    internal static void RecordChoicesParadoxTaken(IEnumerable<CardModel>? cards)
+    {
+        if (cards == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                var agg = GetOrCreateRelicAggregateLocked(ChoicesParadoxRelicId);
+                foreach (var card in cards)
+                {
+                    if (card == null) continue;
+                    RecordChoicesParadoxTakenForTest(agg, card.Rarity);
+                }
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordChoicesParadoxTaken failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static void RecordChoicesParadoxScreenForTest(RelicAggregate agg)
+    {
+        if (agg == null) return;
+        agg.Activations += 1;
+    }
+
+    internal static void RecordChoicesParadoxOffersForTest(
+        RelicAggregate agg,
+        IEnumerable<CardRarity>? rarities)
+    {
+        if (agg == null || rarities == null) return;
+
+        foreach (var rarity in rarities)
+        {
+            switch (rarity)
+            {
+                case CardRarity.Common:
+                    agg.CommonCardsOffered += 1;
+                    break;
+                case CardRarity.Uncommon:
+                    agg.UncommonCardsOffered += 1;
+                    break;
+                case CardRarity.Rare:
+                    agg.RareCardsOffered += 1;
+                    break;
+            }
+        }
+    }
+
+    internal static void RecordChoicesParadoxTakenForTest(
+        RelicAggregate agg,
+        CardRarity rarity,
+        int count = 1)
+    {
+        if (agg == null || count <= 0) return;
+
+        switch (rarity)
+        {
+            case CardRarity.Common:
+                agg.CommonCardsTaken += count;
+                break;
+            case CardRarity.Uncommon:
+                agg.UncommonCardsTaken += count;
+                break;
+            case CardRarity.Rare:
+                agg.RareCardsTaken += count;
+                break;
         }
     }
 
@@ -28462,6 +28686,7 @@ public static class RunTracker
             RecordLetterOpenerCombatForPlayerLocked(player);
             RecordTuningForkCombatForPlayerLocked(player);
             RecordCloakClaspCombatForPlayerLocked(player);
+            RecordOrichalcumCombatForPlayerLocked(player);
             RecordRippleBasinCombatForPlayerLocked(player);
             RecordReptileTrinketCombatForPlayerLocked(player);
             RecordRainbowRingCombatForPlayerLocked(player);
@@ -28956,6 +29181,36 @@ public static class RunTracker
 
         var agg = GetOrCreatePendingRelicAggregateLocked(CloakClaspRelicId);
         RecordCloakClaspTurnForTest(agg);
+    }
+
+    private static void RecordOrichalcumCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasOrichalcum(player)) return;
+        if (!_pendingCombat.OrichalcumCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(OrichalcumRelicId);
+        RecordOrichalcumCombatForTest(agg);
+    }
+
+    private static void RecordOrichalcumTurnForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasOrichalcum(player)) return;
+
+        var turnNumber = player.PlayerCombatState?.TurnNumber ?? 0;
+        if (turnNumber <= 0) return;
+        if (_pendingCombat.OrichalcumTurnCountedTurns.TryGetValue(player, out var recordedTurn)
+            && recordedTurn == turnNumber)
+        {
+            return;
+        }
+
+        _pendingCombat.OrichalcumTurnCountedTurns[player] = turnNumber;
+        RecordOrichalcumCombatForPlayerLocked(player);
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(OrichalcumRelicId);
+        RecordOrichalcumTurnForTest(agg);
     }
 
     private static void RecordRippleBasinCombatForPlayerLocked(Player player)
@@ -30495,6 +30750,18 @@ public static class RunTracker
         try
         {
             return player.Relics.Any(r => r is RippleBasin);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool PlayerHasOrichalcum(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is Orichalcum);
         }
         catch
         {
@@ -36540,6 +36807,10 @@ internal class PendingCombat
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> CloakClaspTurnCountedTurns { get; }
         = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> OrichalcumCombatCountedPlayers { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public Dictionary<Player, int> OrichalcumTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
     public HashSet<Player> EmberTeaActivePlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> EmberTeaActiveTurnCountedTurns { get; }
@@ -36984,6 +37255,22 @@ internal enum TungstenRodPreventionSource
     Curse,
     Status,
     Enemy,
+}
+
+/// <summary>
+/// Marks the synchronous stretch of Choices Paradox's turn-start callback that
+/// contains its own card-selection grid. OffersRecorded keeps a second grid
+/// call inside the same callback from being claimed as another screen.
+/// </summary>
+internal sealed class ChoicesParadoxSelectionWindow
+{
+    public ChoicesParadoxSelectionWindow(Player player)
+    {
+        Player = player;
+    }
+
+    public Player Player { get; }
+    public bool OffersRecorded { get; set; }
 }
 
 internal sealed class PendingToastyMittensActivation
