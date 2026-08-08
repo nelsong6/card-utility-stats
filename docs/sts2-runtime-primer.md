@@ -1099,6 +1099,27 @@ physical permanent-deck references. Mark an option taken only when the chosen
 card actually produces a deck addition; preserve a null selection as a true
 skip rather than treating selection intent as acquisition.
 
+Instance numbers must be reclaimed, not just restored. `AdoptRunLocked` seeds
+`_pendingRankRestores` from the saved `instance_numbers_by_def` snapshot, but that
+snapshot only covers cards in the deck at the last save. Any deck card the queue
+does not cover used to mint a fresh number, orphaning the stats already recorded
+against that physical card — and because each Continue and each Core reload
+repopulates the deck, the orphans accumulated into whole generations per
+definition. An observed floor-49 run held 124 tracked instances for a 33-card
+deck: starter Strikes as `#1-#4` (played, then orphaned), `#5-#8` (minted and
+immediately superseded, zero activity), `#9-#11` (the live generation), and `#12`
+removed, with 21% of the run's recorded plays sitting on numbers no live card was
+bound to. `PruneGhostAggregates` does not clean these up: it skips any number at
+or below the last saved `def_counters` value, which every accumulated generation
+is. So before minting in `GetOrAssignNumber`, take the lowest number this run
+already tracks for the definition that no live card is bound to, that is not
+waiting in the snapshot queue, and that is not marked removed. Out of combat
+only — combat-generated copies route through the same primitive, and letting an
+ephemeral card claim a deck card's identity is the hazard the queue already
+avoids by clearing at combat setup. This does not repair runs whose generations
+already split; nothing in the data says which orphan belonged to which surviving
+copy, so a retroactive merge would be invented attribution.
+
 Choices Paradox generates five distinct combat cards from its owner's own
 character card pool on the first player turn of a combat, applies Retain to each
 one, and awaits the shared `CardSelectCmd.FromSimpleGrid` command with a
