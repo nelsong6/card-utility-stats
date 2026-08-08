@@ -137,6 +137,57 @@ public class DuplicateRunRecordTests
         Assert.Null(RunStorage.SelectBestRunFileCandidate(null!));
     }
 
+    // ---- Half three: a run is only created by run start, or mid-run hot-load ----
+
+    [Fact]
+    public void RunCreation_IsRefusedOnceThatGameRunHasFinished()
+    {
+        // Every write path funnels through this one gate, so a single false
+        // closes the whole ~38-call-site resurrection class at once.
+        Assert.True(
+            RunTracker.WouldResurrectEndedRun(Ended("win", floor: 49), GameStartTime));
+    }
+
+    [Theory]
+    [InlineData("win")]
+    [InlineData("loss")]
+    [InlineData("abandoned")]
+    public void RunCreation_IsRefusedForEveryTerminalOutcome(string outcome)
+    {
+        Assert.True(
+            RunTracker.WouldResurrectEndedRun(Ended(outcome, floor: 8), GameStartTime));
+    }
+
+    [Fact]
+    public void RunCreation_StillWorksWhenTheModIsHotLoadedMidRun()
+    {
+        // The one case the lazy path exists for: no run record yet, nothing has
+        // ended, data must not be dropped.
+        Assert.False(RunTracker.WouldResurrectEndedRun(null, GameStartTime));
+    }
+
+    [Fact]
+    public void RunCreation_AllowsTheNextGameRunAfterOneFinished()
+    {
+        Assert.False(
+            RunTracker.WouldResurrectEndedRun(Ended("win", floor: 49), GameStartTime + 1));
+    }
+
+    [Fact]
+    public void RunCreation_IsAllowedWhenThePreviousRunNeverFinished()
+    {
+        Assert.False(RunTracker.WouldResurrectEndedRun(InProgress(), GameStartTime));
+    }
+
+    [Fact]
+    public void RunCreation_IsAllowedWhenNoLiveGameRunIsReadable()
+    {
+        // _startTime unreadable reads as 0; that is "unknown", not "matches",
+        // so it must not block the legitimate mid-run hot-load mint.
+        Assert.False(
+            RunTracker.WouldResurrectEndedRun(Ended("win", floor: 49), liveGameStartTime: 0));
+    }
+
     private static RunData Ended(string outcome, int floor)
         => new()
         {

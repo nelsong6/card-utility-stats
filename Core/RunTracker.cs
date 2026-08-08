@@ -1413,7 +1413,7 @@ public static class RunTracker
     ///
     /// <see cref="OnRunEnded"/> deliberately nulls <c>_currentRun</c>, but the
     /// ~40 Record*/getter paths that funnel through
-    /// <see cref="EnsureLazyCurrentRunLocked"/> all re-create it on demand and
+    /// <see cref="TryEnsureCurrentRunLocked"/> all re-create it on demand and
     /// cannot tell "no run yet" (the legitimate hot-loaded-mid-run case) from
     /// "run just ended". A single post-run event — a victory-screen HP change, a
     /// history read, the deck repopulating — therefore resurrects the finished
@@ -1455,22 +1455,80 @@ public static class RunTracker
     /// this record instead of stranding it — the previous inline mints omitted
     /// it, re-seeding the stranding bug. Single home for the lazy mint.
     /// </summary>
-    [MemberNotNull(nameof(_currentRun))]
-    private static void EnsureLazyCurrentRunLocked()
+    /// <summary>
+    /// The single gate for writing to the current run. Returns false when there
+    /// is no run to write to, and callers must then do nothing.
+    ///
+    /// This replaced an unconditional <c>EnsureLazyCurrentRunLocked()</c> that
+    /// every write path called and that could not fail. That shape made run
+    /// creation a side effect of ~38 scattered call sites, so after
+    /// <see cref="OnRunEnded"/> nulled <c>_currentRun</c> the next post-run
+    /// event resurrected the finished game as a second, empty record sharing its
+    /// <c>game_start_time</c> — and the run history screen read all-zero stats.
+    /// A run now comes into existence for exactly two reasons: the game started
+    /// one, or the mod was hot-loaded into one already in progress.
+    /// </summary>
+    [MemberNotNullWhen(true, nameof(_currentRun))]
+    private static bool TryEnsureCurrentRunLocked()
     {
-        if (_currentRun != null) return;
-        long gameStartTime = 0;
-        try { gameStartTime = RunManager.Instance._startTime; }
-        catch { /* no live run state — leave GameStartTime null */ }
+        if (_currentRun != null) return true;
+        if (WouldResurrectEndedRunLocked()) return false;
+
+        long gameStartTime = LiveGameStartTimeOrZero();
         string now = Now();
         _currentRun = new RunData
         {
             RunId = Guid.NewGuid().ToString("N"),
             StartedAt = now,
             UpdatedAt = now,
+            // Always stamp GameStartTime so a later Continue/hot-reload can
+            // match and resume this record instead of stranding it — the
+            // historic inline mints omitted it, re-seeding the stranding bug.
             GameStartTime = gameStartTime != 0 ? gameStartTime : null,
         };
+        return true;
     }
+
+    /// <summary>
+    /// True when creating a run now would re-create the game run that just
+    /// finished. The live <c>_startTime</c> still reads the finished run's value
+    /// on every post-run surface (victory screen, run history, deck
+    /// repopulation), which is exactly what let the duplicate inherit its
+    /// identity.
+    /// </summary>
+    private static bool WouldResurrectEndedRunLocked()
+        => WouldResurrectEndedRun(_lastEndedRun, LiveGameStartTimeOrZero());
+
+    internal static bool WouldResurrectEndedRun(
+        RunData? lastEndedRun,
+        long liveGameStartTime)
+    {
+        if (liveGameStartTime == 0) return false;
+        if (lastEndedRun?.GameStartTime == null) return false;
+        if (lastEndedRun.Outcome == null
+            || lastEndedRun.Outcome == InProgressOutcome)
+        {
+            return false;
+        }
+
+        return lastEndedRun.GameStartTime == liveGameStartTime;
+    }
+
+    private static long LiveGameStartTimeOrZero()
+    {
+        try { return RunManager.Instance._startTime; }
+        catch { return 0; /* no live run state */ }
+    }
+
+    /// <summary>
+    /// Write sink for relic stats that arrive with no run to record them
+    /// against. <see cref="GetOrCreateCurrentRunRelicAggregateLocked"/> has ~95
+    /// callers that all treat its result as non-null and immediately mutate it;
+    /// handing them a detached aggregate keeps every one of those paths simple
+    /// while guaranteeing the writes reach nothing persistent. A fresh instance
+    /// per call, so nothing accumulates and nothing is shared.
+    /// </summary>
+    private static RelicAggregate DetachedRelicAggregateSink() => new();
 
     /// <summary>
     /// Run a game-event handler body under a top-level guard. These handlers
@@ -2308,7 +2366,7 @@ public static class RunTracker
         lock (_lock)
         {
             RuntimeOptionsProvider.Refresh();
-            EnsureLazyCurrentRunLocked();
+            if (!TryEnsureCurrentRunLocked()) return;
             SampleRunTimeStatsLocked(
                 RunTimeCategory.Combat,
                 CurrentGameRunTimeSeconds(),
@@ -2359,7 +2417,7 @@ public static class RunTracker
             // Lazy run creation: if events came in before RunStarted ever fired
             // (e.g. mod loaded mid-run), create a minimal run record now so we
             // don't drop the combat's data.
-            EnsureLazyCurrentRunLocked();
+            if (!TryEnsureCurrentRunLocked()) return;
 
             SampleRunTimeStatsLocked(
                 RunTimeCategory.RewardScreen,
@@ -4431,7 +4489,7 @@ public static class RunTracker
             try
             {
                 if (!IsTrackedPlayer(player)) return;
-                EnsureLazyCurrentRunLocked();
+                if (!TryEnsureCurrentRunLocked()) return;
                 var history = GetMutablePotionHistoryLocked();
 
                 if (TryGetPotionSequence(offerSource, out var existingSequence))
@@ -4507,7 +4565,7 @@ public static class RunTracker
             try
             {
                 if (!IsTrackedPlayer(reward.Player)) return;
-                EnsureLazyCurrentRunLocked();
+                if (!TryEnsureCurrentRunLocked()) return;
                 var history = GetMutablePotionHistoryLocked();
                 if (!TryGetPotionSequence(reward, out var sequence)
                     && !TryGetPotionSequence(reward.Potion, out sequence))
@@ -4556,7 +4614,7 @@ public static class RunTracker
             try
             {
                 if (!IsTrackedPlayer(player)) return;
-                EnsureLazyCurrentRunLocked();
+                if (!TryEnsureCurrentRunLocked()) return;
                 var history = GetMutablePotionHistoryLocked();
                 var location = CapturePotionLocationLocked(player);
 
@@ -4643,7 +4701,7 @@ public static class RunTracker
                     return;
                 }
 
-                EnsureLazyCurrentRunLocked();
+                if (!TryEnsureCurrentRunLocked()) return;
                 var history = GetMutablePotionHistoryLocked();
                 if (!TryGetPotionSequence(potion, out var sequence)) return;
                 var entry = history.FirstOrDefault(candidate =>
@@ -4683,7 +4741,7 @@ public static class RunTracker
             {
                 if (!IsTrackedPlayer(potion.Owner)) return;
 
-                EnsureLazyCurrentRunLocked();
+                if (!TryEnsureCurrentRunLocked()) return;
                 var history = GetMutablePotionHistoryLocked();
                 if (!TryGetPotionSequence(potion, out var sequence)) return;
                 var entry = history.FirstOrDefault(candidate =>
@@ -4729,7 +4787,7 @@ public static class RunTracker
             {
                 if (!IsTrackedPlayer(potion.Owner)) return;
 
-                EnsureLazyCurrentRunLocked();
+                if (!TryEnsureCurrentRunLocked()) return;
                 if (!TryGetPotionSequence(potion, out var sequence)) return;
                 RecordPotionBlockGainedForSequenceLocked(
                     sequence,
@@ -4776,7 +4834,7 @@ public static class RunTracker
             {
                 if (!IsTrackedPlayer(potion.Owner)) return;
 
-                EnsureLazyCurrentRunLocked();
+                if (!TryEnsureCurrentRunLocked()) return;
                 var history = GetMutablePotionHistoryLocked();
                 if (!TryGetPotionSequence(potion, out var sequence)) return;
                 var entry = history.FirstOrDefault(candidate =>
@@ -4856,7 +4914,7 @@ public static class RunTracker
             try
             {
                 if (!IsTrackedPlayer(player)) return;
-                EnsureLazyCurrentRunLocked();
+                if (!TryEnsureCurrentRunLocked()) return;
                 var history = GetMutablePotionHistoryLocked();
                 var location = CapturePotionLocationLocked(player);
                 PotionRunHistoryEntry? entry = null;
@@ -4937,7 +4995,7 @@ public static class RunTracker
                 if (_currentRun == null && RunManager.Instance?.IsInProgress != true)
                     return;
 
-                EnsureLazyCurrentRunLocked();
+                if (!TryEnsureCurrentRunLocked()) return;
                 var history = GetMutableMaxHpHistoryLocked();
                 var location = CapturePotionLocationLocked(creature.Player);
                 var sourceCard = FindCurrentlyResolvingCardPlay()?.Card;
@@ -4990,7 +5048,7 @@ public static class RunTracker
                 if (_currentRun == null && RunManager.Instance?.IsInProgress != true)
                     return;
 
-                EnsureLazyCurrentRunLocked();
+                if (!TryEnsureCurrentRunLocked()) return;
                 var isCombat = combatState != null
                     || CombatManager.Instance?.IsInProgress == true
                     || RunManager.Instance?.State?.CurrentRoom is CombatRoom;
@@ -5049,7 +5107,7 @@ public static class RunTracker
                 if (_currentRun == null && RunManager.Instance?.IsInProgress != true)
                     return;
 
-                EnsureLazyCurrentRunLocked();
+                if (!TryEnsureCurrentRunLocked()) return;
                 var roomType = RunManager.Instance?.State?.CurrentRoom?.RoomType;
                 var inCombat = combatState != null
                     || CombatManager.Instance?.IsInProgress == true;
@@ -5105,7 +5163,7 @@ public static class RunTracker
 
     private static List<MaxHpRunHistoryEntry> GetMutableMaxHpHistoryLocked()
     {
-        EnsureLazyCurrentRunLocked();
+        if (!TryEnsureCurrentRunLocked()) return new List<MaxHpRunHistoryEntry>();
         _currentRun.MaxHpHistory ??= new List<MaxHpRunHistoryEntry>();
         if (_pendingCombat == null) return _currentRun.MaxHpHistory;
 
@@ -5152,7 +5210,7 @@ public static class RunTracker
 
     private static List<PotionRunHistoryEntry> GetMutablePotionHistoryLocked()
     {
-        EnsureLazyCurrentRunLocked();
+        if (!TryEnsureCurrentRunLocked()) return new List<PotionRunHistoryEntry>();
         _currentRun.PotionHistory ??= new List<PotionRunHistoryEntry>();
         if (_pendingCombat == null) return _currentRun.PotionHistory;
 
@@ -14665,7 +14723,7 @@ public static class RunTracker
                 var player = GetTrackedRunPlayerLocked();
                 if (player == null) return;
 
-                EnsureLazyCurrentRunLocked();
+                if (!TryEnsureCurrentRunLocked()) return;
                 _currentRun.MapLegendStats ??= new RunMapLegendStats();
                 var mapStats = _currentRun.MapLegendStats;
                 var floor = Math.Max(
@@ -14753,7 +14811,7 @@ public static class RunTracker
                 if (_currentRun == null && RunManager.Instance?.IsInProgress != true)
                     return;
 
-                EnsureLazyCurrentRunLocked();
+                if (!TryEnsureCurrentRunLocked()) return;
                 _currentRun.MapLegendStats ??= new RunMapLegendStats();
                 var mapStats = _currentRun.MapLegendStats;
                 var floor = Math.Max(0, runState.TotalFloor);
@@ -14812,7 +14870,7 @@ public static class RunTracker
     {
         if (_pendingCombat == null) return;
 
-        EnsureLazyCurrentRunLocked();
+        if (!TryEnsureCurrentRunLocked()) return;
         _currentRun.MapLegendStats ??= new RunMapLegendStats();
         var roomType = RunManager.Instance?.State?.CurrentRoom?.RoomType;
         var categoryKey = ResolveMapLegendCategoryKeyLocked(roomType);
@@ -14871,7 +14929,7 @@ public static class RunTracker
         bool inCombat,
         RoomType? roomType)
     {
-        EnsureLazyCurrentRunLocked();
+        if (!TryEnsureCurrentRunLocked()) return null;
         _currentRun.MapLegendStats ??= new RunMapLegendStats();
         var categoryKey = ResolveMapLegendCategoryKeyLocked(roomType);
         if (inCombat && _pendingCombat != null)
@@ -14933,7 +14991,7 @@ public static class RunTracker
                 if (_currentRun == null && RunManager.Instance?.IsInProgress != true)
                     return;
 
-                EnsureLazyCurrentRunLocked();
+                if (!TryEnsureCurrentRunLocked()) return;
                 var inCombat = CombatManager.Instance?.IsInProgress == true;
                 var category = GetMapLegendCategoryForContextLocked(
                     inCombat,
@@ -15796,7 +15854,7 @@ public static class RunTracker
             try
             {
                 if (!IsTrackedRelic(relic) || !IsTrackedPlayer(relic.Owner)) return;
-                EnsureLazyCurrentRunLocked();
+                if (!TryEnsureCurrentRunLocked()) return;
                 if (!RefreshPaelsClawSnapshotIfOwnedLocked(relic.Owner)) return;
 
                 RefreshCurrentRunMetadataLocked();
@@ -18037,7 +18095,7 @@ public static class RunTracker
                     || !ReferenceEquals(owner.RunState?.BaseRoom, room))
                     return;
 
-                EnsureLazyCurrentRunLocked();
+                if (!TryEnsureCurrentRunLocked()) return;
                 var aggregate = GetOrCreateCurrentRunRelicAggregateLocked(MawBankRelicId);
                 var pendingShopFloor = _currentRun.MawBankPendingShopFloor;
                 var changed = RecordMawBankRoomEntryForTest(
@@ -18285,7 +18343,7 @@ public static class RunTracker
                 if (_currentRun == null && RunManager.Instance?.IsInProgress != true)
                     return;
 
-                EnsureLazyCurrentRunLocked();
+                if (!TryEnsureCurrentRunLocked()) return;
                 var isCombat = IsCombatRoomType(context.RoomType);
                 if (isCombat && _pendingCombat == null
                     && CombatManager.Instance?.IsInProgress == true)
@@ -18339,7 +18397,7 @@ public static class RunTracker
                 if (_currentRun == null && RunManager.Instance?.IsInProgress != true)
                     return;
 
-                EnsureLazyCurrentRunLocked();
+                if (!TryEnsureCurrentRunLocked()) return;
                 _currentRun.GoldStats ??= new RunGoldStats();
                 if (!RecordGoldRoomVisitForTest(
                         _currentRun.GoldStats,
@@ -18490,7 +18548,7 @@ public static class RunTracker
 
                 if (countsAsSpent)
                 {
-                    EnsureLazyCurrentRunLocked();
+                    if (!TryEnsureCurrentRunLocked()) return;
                     if (inCombat && _pendingCombat == null)
                     {
                         _pendingCombat = new PendingCombat
@@ -18598,7 +18656,7 @@ public static class RunTracker
         bool createForOldCoinPickup,
         bool inCombat)
     {
-        EnsureLazyCurrentRunLocked();
+        if (!TryEnsureCurrentRunLocked()) return null;
         _currentRun.GoldAttributionLedger ??= new List<GoldAttributionChunk>();
 
         if (!inCombat)
@@ -26483,7 +26541,7 @@ public static class RunTracker
         pending = null;
         if (!IsTrackedPlayer(reward.Player)) return false;
 
-        EnsureLazyCurrentRunLocked();
+        if (!TryEnsureCurrentRunLocked()) return false;
         if (!_currentRun.RelicAggregates.TryGetValue(OrreryRelicId, out var agg))
             return false;
 
@@ -26676,7 +26734,7 @@ public static class RunTracker
                     return true;
                 }
 
-                EnsureLazyCurrentRunLocked();
+                if (!TryEnsureCurrentRunLocked()) return false;
                 if (!_currentRun.RelicAggregates.TryGetValue(SilverCrucibleRelicId, out var agg))
                     return false;
 
@@ -26832,7 +26890,7 @@ public static class RunTracker
         pending = null;
         if (!IsTrackedPlayer(reward.Player)) return false;
 
-        EnsureLazyCurrentRunLocked();
+        if (!TryEnsureCurrentRunLocked()) return false;
         if (!_currentRun.RelicAggregates.TryGetValue(SilverCrucibleRelicId, out var agg))
             return false;
 
@@ -26923,7 +26981,7 @@ public static class RunTracker
         {
             try
             {
-                EnsureLazyCurrentRunLocked();
+                if (!TryEnsureCurrentRunLocked()) return;
 
                 if (!_currentRun.RelicAggregates.TryGetValue(relicId, out var agg))
                 {
@@ -26973,7 +27031,7 @@ public static class RunTracker
         {
             try
             {
-                EnsureLazyCurrentRunLocked();
+                if (!TryEnsureCurrentRunLocked()) return;
 
                 if (!_currentRun.RelicAggregates.TryGetValue(relicId, out var agg))
                 {
@@ -27439,7 +27497,7 @@ public static class RunTracker
 
     private static RelicAggregate GetOrCreateCurrentRunRelicAggregateLocked(string relicId)
     {
-        EnsureLazyCurrentRunLocked();
+        if (!TryEnsureCurrentRunLocked()) return DetachedRelicAggregateSink();
 
         if (!_currentRun.RelicAggregates.TryGetValue(relicId, out var agg))
         {
@@ -32106,7 +32164,7 @@ public static class RunTracker
             // Lazy run-creation guard — upgrade could fire before RunStarted
             // if the mod hot-loaded mid-run and missed the signal. We still
             // want to record the event.
-            EnsureLazyCurrentRunLocked();
+            if (!TryEnsureCurrentRunLocked()) return;
             var canonical = Canonical(card);
             var newLevel = canonical.CurrentUpgradeLevel;
             var floor = RunManager.Instance.State?.TotalFloor;
@@ -33003,7 +33061,7 @@ public static class RunTracker
 
             _shivAvailableThisRun = true;
 
-            EnsureLazyCurrentRunLocked();
+            if (!TryEnsureCurrentRunLocked()) return;
             _pendingCombat ??= new PendingCombat();
 
             bool alreadyRecorded =
@@ -33031,7 +33089,7 @@ public static class RunTracker
 
             _soulAvailableThisRun = true;
 
-            EnsureLazyCurrentRunLocked();
+            if (!TryEnsureCurrentRunLocked()) return;
             _pendingCombat ??= new PendingCombat();
 
             bool alreadyRecorded =
@@ -33060,7 +33118,7 @@ public static class RunTracker
             var definitionId = Canonical(card).Id.ToString();
             if (string.IsNullOrWhiteSpace(definitionId)) return;
 
-            EnsureLazyCurrentRunLocked();
+            if (!TryEnsureCurrentRunLocked()) return;
             _pendingCombat ??= new PendingCombat();
 
             bool alreadyRecorded =
@@ -33206,7 +33264,7 @@ public static class RunTracker
                 CoreMain.LogDebug($"RecordSovereignBladeGenerated clone failed: {e.Message}");
             }
 
-            EnsureLazyCurrentRunLocked();
+            if (!TryEnsureCurrentRunLocked()) return;
             _pendingCombat ??= new PendingCombat();
 
             var existingEvent = _pendingCombat.CombatEvents
@@ -33239,7 +33297,7 @@ public static class RunTracker
 
             _sovereignBladeAvailableThisRun = true;
 
-            EnsureLazyCurrentRunLocked();
+            if (!TryEnsureCurrentRunLocked()) return;
             _pendingCombat ??= new PendingCombat();
 
             bool alreadyRecorded =
