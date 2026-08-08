@@ -173,6 +173,41 @@ public class OpenBranchRelicStatsTests
     }
 
     [Fact]
+    public void RunTracker_RecordPendulumActivationTurnForTest_SamplesEachActivation()
+    {
+        var agg = new RelicAggregate();
+
+        RunTracker.RecordPendulumActivationTurnForTest(agg, 3);
+        RunTracker.RecordPendulumActivationTurnForTest(agg, 6);
+        RunTracker.RecordPendulumActivationTurnForTest(agg, 3);
+        RunTracker.RecordPendulumActivationTurnForTest(agg, 0);
+        RunTracker.RecordPendulumActivationTurnForTest(agg, -2);
+
+        Assert.Equal(12, agg.PendulumActivationTurnTotal);
+        Assert.Equal(3, agg.PendulumActivationTurnSamples);
+    }
+
+    [Fact]
+    public void MergeRelicAggregateInto_PendulumActivationTurn_Accumulates()
+    {
+        var target = new RelicAggregate
+        {
+            PendulumActivationTurnTotal = 9,
+            PendulumActivationTurnSamples = 2,
+        };
+        var source = new RelicAggregate
+        {
+            PendulumActivationTurnTotal = 3,
+            PendulumActivationTurnSamples = 1,
+        };
+
+        RunTracker.MergeRelicAggregateInto(target, source);
+
+        Assert.Equal(12, target.PendulumActivationTurnTotal);
+        Assert.Equal(3, target.PendulumActivationTurnSamples);
+    }
+
+    [Fact]
     public void RunTracker_RecordPenNibBaseDamageAdded_AccumulatesTruncatedBaseDamage()
     {
         var agg = new RelicAggregate();

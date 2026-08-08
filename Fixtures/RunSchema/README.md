@@ -232,6 +232,10 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `pendulum-combat-end-charge-run.json`
   Adds Pendulum combat-end 0/1/2 charge counts and explicit combat-end charge
   samples for average charge.
+- `pendulum-activation-turn-run.json`
+  Adds Pendulum activation-turn total and samples for the average turn it
+  activated on. Samples count activations, not combats, so combats too short
+  for it to activate stay out of the average.
 - `paels-wing-sacrifice-relic-run.json`
   Adds Pael's Wing sacrifice tracking: consumed card reward options split by
   common, uncommon, and rare, sacrifices made and skipped, and the total and

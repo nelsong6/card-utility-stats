@@ -2593,10 +2593,20 @@ public static class RelicHoverShowPatch
         var averageEndCharge = chargeSamples <= 0
             ? 0m
             : (decimal)chargeTotal / chargeSamples;
+        var averageActivationTurn = agg.PendulumActivationTurnSamples <= 0
+            ? 0m
+            : (decimal)agg.PendulumActivationTurnTotal
+                / agg.PendulumActivationTurnSamples;
 
         RelicActivationRow(sb, agg.Activations.ToString());
         Row3(sb, "Cards drawn", agg.AdditionalCardsDrawn.ToString(), "");
         Row3(sb, "Avg cards drawn per combat", FormatDecimal(cardsDrawnPerCombat), "");
+        Row3(
+            sb,
+            "Avg activation turn",
+            FormatDecimal(averageActivationTurn),
+            "",
+            "Average activation turn — the average player turn number when Pendulum activated; combats too short for it to activate are excluded.");
         Row3(sb, "Combats ended on 0 charges", agg.PendulumCombatsEndedOn0Charges.ToString(), "");
         Row3(sb, "Combats ended on 1 charge", agg.PendulumCombatsEndedOn1Charge.ToString(), "");
         Row3(sb, "Combats ended on 2 charges", agg.PendulumCombatsEndedOn2Charges.ToString(), "");

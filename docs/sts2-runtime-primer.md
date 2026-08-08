@@ -1364,6 +1364,17 @@ denominator rather than using activations. Its public
 once during combat promotion, before the pending aggregate is merged into the
 run, for combat-end charge buckets and averages.
 
+The owner's `PlayerCombatState.TurnNumber` is already the turn being drawn for
+when the hand-draw modifier chain runs — `CombatManager.SwitchSides` increments
+it before the upcoming player side, and `SetupPlayerTurn` itself branches on
+`TurnNumber == 1` for first-turn Innate handling immediately after
+`Hook.ModifyHandDraw`. Read it at the positive `ModifyHandDraw` delta for the
+average-activation-turn sample; `Hook.ModifyHandDraw` has that single call site,
+so one turn cannot yield two samples. Samples count activations rather than
+combats, so a long combat contributes each of its turn-3/6/9 activations and a
+combat too short to activate contributes nothing instead of pulling the average
+toward zero.
+
 Pocketwatch increments its private current-turn counter from owner
 `AfterCardPlayed` callbacks and transfers that value to its private
 previous-turn counter during `BeforeSideTurnStart`. Its hand-draw modifier is

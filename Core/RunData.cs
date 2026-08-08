@@ -1093,6 +1093,13 @@ public class RelicAggregate
     public int PendulumCombatEndChargeTotal { get; set; }
     public int PendulumCombatEndChargeCount { get; set; }
 
+    // The owner's turn number at each Pendulum activation. Pendulum can
+    // activate several times in one combat, so samples count activations
+    // rather than combats and exclude held combats too short to activate;
+    // combats without an activation must not pull the average toward zero.
+    public int PendulumActivationTurnTotal { get; set; }
+    public int PendulumActivationTurnSamples { get; set; }
+
     // Total block gained from this relic across all combats.
     // Used by Orichalcum, Permafrost, The Abacus, Bone Flute, Cloak Clasp,
     // Anchor, Horn Cleat, Captain's Wheel, Tuning Fork, Ornamental Fan,

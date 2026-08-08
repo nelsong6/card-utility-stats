@@ -2821,6 +2821,8 @@ public static class RunTracker
         target.PendulumCombatsEndedOn2Charges += source.PendulumCombatsEndedOn2Charges;
         target.PendulumCombatEndChargeTotal += source.PendulumCombatEndChargeTotal;
         target.PendulumCombatEndChargeCount += source.PendulumCombatEndChargeCount;
+        target.PendulumActivationTurnTotal += source.PendulumActivationTurnTotal;
+        target.PendulumActivationTurnSamples += source.PendulumActivationTurnSamples;
         target.AdditionalBlockGained += source.AdditionalBlockGained;
         target.AdditionalBlockEffective += source.AdditionalBlockEffective;
         target.AdditionalBlockWasted += source.AdditionalBlockWasted;
@@ -10330,6 +10332,8 @@ public static class RunTracker
     /// persistent turn counter wraps. Unlike opening-hand relics, it can
     /// activate repeatedly in one combat, so each positive modifier is a new
     /// activation and replaces only the pending observation for that draw.
+    /// The owner's turn number is already the turn being drawn for when the
+    /// hand-draw modifier chain runs, so it is the activation turn sample.
     /// </summary>
     public static void RecordPendulumActivation(
         Pendulum? relic,
@@ -10348,6 +10352,9 @@ public static class RunTracker
                 _pendingCombat ??= new PendingCombat();
                 var agg = GetOrCreatePendingRelicAggregateLocked(PendulumRelicId);
                 agg.Activations += 1;
+                RecordPendulumActivationTurnForTest(
+                    agg,
+                    player.PlayerCombatState?.TurnNumber ?? 0);
                 _pendingCombat.PendingPendulumDraws[player] =
                     new PendingOpeningHandDrawRelicDraw(cardsRequested);
             }
@@ -24655,6 +24662,15 @@ public static class RunTracker
     {
         if (agg == null) return;
         agg.PendulumCombats += Math.Max(0, count);
+    }
+
+    internal static void RecordPendulumActivationTurnForTest(RelicAggregate agg, int turnNumber)
+    {
+        if (agg == null) return;
+        if (turnNumber <= 0) return;
+
+        agg.PendulumActivationTurnTotal += turnNumber;
+        agg.PendulumActivationTurnSamples += 1;
     }
 
     internal static void RecordPendulumCombatEndChargeForTest(RelicAggregate agg, int charge)

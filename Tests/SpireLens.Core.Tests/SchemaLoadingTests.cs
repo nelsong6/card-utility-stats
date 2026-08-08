@@ -1255,6 +1255,10 @@ public class SchemaLoadingTests
         Assert.Equal(2, relicAgg.PendulumCombatsEndedOn2Charges);
         Assert.Equal(5, relicAgg.PendulumCombatEndChargeTotal);
         Assert.Equal(4, relicAgg.PendulumCombatEndChargeCount);
+
+        // Pre-dates activation-turn tracking; missing fields default to zero.
+        Assert.Equal(0, relicAgg.PendulumActivationTurnTotal);
+        Assert.Equal(0, relicAgg.PendulumActivationTurnSamples);
     }
 
     [Fact]
@@ -1272,6 +1276,41 @@ public class SchemaLoadingTests
         Assert.Equal(2, relicAgg.PendulumCombatsEndedOn2Charges);
         Assert.Equal(5, relicAgg.PendulumCombatEndChargeTotal);
         Assert.Equal(4, relicAgg.PendulumCombatEndChargeCount);
+        Assert.Equal(0, relicAgg.PendulumActivationTurnTotal);
+        Assert.Equal(0, relicAgg.PendulumActivationTurnSamples);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsPendulumActivationTurnFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("pendulum-activation-turn-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.PENDULUM"];
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(3, relicAgg.AdditionalCardsDrawn);
+        Assert.Equal(2, relicAgg.PendulumCombats);
+        Assert.Equal(1, relicAgg.PendulumCombatsEndedOn0Charges);
+        Assert.Equal(1, relicAgg.PendulumCombatsEndedOn1Charge);
+        Assert.Equal(0, relicAgg.PendulumCombatsEndedOn2Charges);
+        Assert.Equal(1, relicAgg.PendulumCombatEndChargeTotal);
+        Assert.Equal(2, relicAgg.PendulumCombatEndChargeCount);
+        Assert.Equal(12, relicAgg.PendulumActivationTurnTotal);
+        Assert.Equal(3, relicAgg.PendulumActivationTurnSamples);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsPendulumActivationTurnFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("pendulum-activation-turn-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.PENDULUM"];
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(2, relicAgg.PendulumCombats);
+        Assert.Equal(12, relicAgg.PendulumActivationTurnTotal);
+        Assert.Equal(3, relicAgg.PendulumActivationTurnSamples);
     }
 
     [Fact]
