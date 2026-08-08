@@ -20,6 +20,10 @@ Treat SpireLens work as branch-based, pushed, live-validated development. Do not
      worktree from it and breaks tooling that expects it to be free — notably
      `gh pr merge --delete-branch`, which dies with `fatal: 'main' is already
      used by worktree` after the merge has already succeeded.
+   - Freeing `main` is not by itself the fix, because that same
+     `--delete-branch` wants to *check `main` out*. With `main` unheld it
+     succeeds and silently leaves the feature worktree camping instead of
+     erroring. Not passing the flag is the fix — see **PR And Merge** step 3.
    - If a clone is found parked on `main` and is clean, `git checkout --detach`
      frees the branch without changing working-tree contents.
    - If main cannot be updated cleanly, stop and report the blocker.
@@ -82,10 +86,25 @@ When the user asks to PR and merge:
 
 1. Ensure the branch is committed and pushed.
 2. Create the PR.
-3. Merge using the repo's normal merge path.
+3. Merge with `gh pr merge <number> --squash`. **Do not pass `--delete-branch`
+   /`-d`.** Both halves of that flag are wrong here:
+   - The remote half is a no-op — the repo has `delete_branch_on_merge`
+     enabled, so GitHub has already deleted the branch by the time `gh` asks.
+   - The local half is what causes camping. Git cannot delete the branch `HEAD`
+     is on, so `gh` checks out the default branch and pulls it in order to
+     delete the feature branch. That checkout is the camping, and it happens
+     silently on success.
 4. After merge, update local `main` as a ref: `git fetch origin main:main`. Do
-   not switch a worktree to `main` to do it.
-5. Do not spend user attention on branch deletion; merged feature branches are auto-deleted.
+   not switch a worktree to `main` to do it. Refs are shared across worktrees —
+   one fetch updates `main` for the primary clone and every worktree at once, so
+   there is nothing further to do "at the git root".
+5. Delete the local feature branch yourself, detaching first so nothing camps:
+   `git checkout --detach main && git branch -D <feature-branch>`. This also
+   lands the worktree on the merged result. The remote branch needs no
+   attention; it is auto-deleted on merge.
+6. Optional: if the primary clone's working tree is stale enough to confuse
+   anyone reading it, `git -C D:\repos\spirelens checkout --detach main` moves
+   its detached `HEAD` to the tip without holding the branch.
 
 ## Communication
 
