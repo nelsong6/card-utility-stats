@@ -119,7 +119,9 @@ public class LastingCandyStatsTests
         Assert.Equal(1, body.Split("[table=4]", StringSplitOptions.None).Length - 1);
         Assert.Equal(11, body.Split("[left][b]", StringSplitOptions.None).Length - 1);
         Assert.DoesNotContain("[table=2]", body);
-        Assert.DoesNotContain("not ", body);
+        Assert.DoesNotContain(
+            $"not {StatConceptGlossary.RenderHintedGlyph("taken")}",
+            body);
     }
 
     [Fact]

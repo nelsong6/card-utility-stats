@@ -66,7 +66,7 @@ public class PoisonTooltipTests
 
         Assert.True(rendered);
         Assert.DoesNotContain("[color=#b5b5b5]Poison applied[/color]", text);
-        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("poison"), text);
+        Assert.Contains("res://art/powers/poison.png", text);
         Assert.Contains(StatConceptGlossary.RenderHintedGlyph("all"), text);
         Assert.Contains("[b]12[/b]", text);
         Assert.Contains("avg applied", text);

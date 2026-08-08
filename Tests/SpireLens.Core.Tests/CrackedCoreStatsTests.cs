@@ -213,11 +213,13 @@ public class CrackedCoreStatsTests
         Assert.Contains("[b]15[/b]", body);
         Assert.Contains(StatConceptGlossary.RenderHintedGlyph("damage"), body);
         Assert.Contains("[b]10[/b]", body);
-        Assert.Contains("Damage blocked", body);
+        Assert.Contains(
+            "Damage from the starting Lightning orb absorbed by enemy Block.",
+            body);
         Assert.Contains("[b]2[/b]", body);
-        Assert.Contains("Overkill", body);
+        Assert.Contains("Overkill damage dealt by the starting Lightning orb.", body);
         Assert.Contains("[b]3[/b]", body);
-        Assert.Contains("Kills", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("kill"), body);
         Assert.Contains(StatConceptGlossary.RenderHintedGlyph("targets_hit"), body);
     }
 

@@ -354,6 +354,7 @@ internal static class RelicStatRowVocabulary
         IReadOnlyList<string> denominatorConceptIds)
     {
         var mergedConceptIds = NormalizeConceptIds(conceptIds
+            .Concat(denominatorConceptIds)
             .Concat(presentation.ConceptIds)
             .Distinct(StringComparer.Ordinal)
             .ToArray());
