@@ -1,0 +1,37 @@
+{
+  "run_id": "orichalcum-block-missed-fixture",
+  "started_at": "2026-08-08T00:00:00Z",
+  "updated_at": "2026-08-08T00:12:00Z",
+  "outcome": "in_progress",
+  "character": "CHAR.IRONCLAD",
+  "ascension": 0,
+  "floor_reached": 5,
+  "game_start_time": 1786000000,
+  "aggregates": {
+    "CARD.STRIKE_IRONCLAD#1": {
+      "combats_in_deck": 3,
+      "plays": 5,
+      "times_drawn": 6
+    }
+  },
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.ORICHALCUM": {
+      "additional_block_gained": 18,
+      "blocked_triggers": 5,
+      "orichalcum_turns_undercut": 4,
+      "orichalcum_block_missed": 11,
+      "orichalcum_turns": 14,
+      "orichalcum_combats": 3
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.STRIKE_IRONCLAD": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.STRIKE_IRONCLAD": 1
+  }
+}

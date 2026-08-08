@@ -651,6 +651,10 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `dingy-rug-relic-run.json`
   Adds Dingy Rug's affected card rewards and final visible card offers split
   across the five character pools and the Colorless pool.
+- `orichalcum-block-missed-run.json`
+  Adds Orichalcum's leftover-Block shortfall: undercut turns, the missed-Block
+  total scored against the relic's own trigger amount, and the zero-inclusive
+  held turn/combat denominators for its two averages.
 
 Why these exist:
 

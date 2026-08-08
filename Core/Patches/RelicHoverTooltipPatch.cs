@@ -1445,6 +1445,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is ChoicesParadox)
+        {
+            title = "Choices Paradox";
+            body = BuildChoicesParadoxBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is WhiteStar)
         {
             title = "White Star";
@@ -1991,7 +1998,53 @@ public static class RelicHoverShowPatch
         var sb = new StringBuilder();
         Row3(sb, BlockLabel("block gained"), agg.AdditionalBlockGained.ToString(), "");
         Row3(sb, "Triggers blocked", agg.BlockedTriggers.ToString(), "");
+        Row3(
+            sb,
+            "Turns undercut",
+            agg.OrichalcumTurnsUndercut.ToString(),
+            "",
+            "Turns undercut — player turns that ended holding less Block than Orichalcum would have granted, "
+            + "so the leftover Block was worth less than the trigger it suppressed.");
+        Row3(
+            sb,
+            BlockLabel("block missed"),
+            agg.OrichalcumBlockMissed.ToString(),
+            "",
+            "Block missed — Block given up across those turns, each scored as the trigger amount minus the "
+            + "leftover Block. This is a counterfactual: it assumes the leftover Block could have been spent "
+            + "or avoided.");
+        Row3(
+            sb,
+            BlockLabel("block missed per turn"),
+            FormatDecimal(CalculateOrichalcumBlockMissedPerTurn(agg)),
+            "",
+            "Block missed per turn — missed Block across every player turn Orichalcum was held, including "
+            + "turns that missed nothing.");
+        Row3(
+            sb,
+            BlockLabel("block missed per combat"),
+            FormatDecimal(CalculateOrichalcumBlockMissedPerCombat(agg)),
+            "",
+            "Block missed per combat — missed Block across every combat Orichalcum was held, including "
+            + "combats that missed nothing.");
         return sb.ToString();
+    }
+
+    internal static decimal CalculateOrichalcumBlockMissedPerTurn(RelicAggregate agg)
+    {
+        if (agg == null) return 0m;
+        // Undercut turns are themselves held turns, so a stale or missing turn
+        // denominator can never make the average understate the total.
+        var turns = Math.Max(agg.OrichalcumTurns, agg.OrichalcumTurnsUndercut);
+        return turns <= 0 ? 0m : (decimal)agg.OrichalcumBlockMissed / turns;
+    }
+
+    internal static decimal CalculateOrichalcumBlockMissedPerCombat(RelicAggregate agg)
+    {
+        if (agg == null) return 0m;
+        return agg.OrichalcumCombats <= 0
+            ? 0m
+            : (decimal)agg.OrichalcumBlockMissed / agg.OrichalcumCombats;
     }
 
     private static string BuildPermafrostBodyBBCode(RelicAggregate agg, bool triggeredThisCombat)
@@ -4845,6 +4898,58 @@ public static class RelicHoverShowPatch
         Row3(sb, "Rare cards offered", agg.RareCardsOffered.ToString(), "");
         Row3(sb, "Uncommon cards taken", agg.UncommonCardsTaken.ToString(), "");
         Row3(sb, "Rare cards taken", agg.RareCardsTaken.ToString(), "");
+        return sb.ToString();
+    }
+
+    private static string BuildChoicesParadoxBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        RelicActivationRow(
+            sb,
+            agg.Activations.ToString(),
+            "Activations — random card selection screens Choices Paradox offered on the first turn of a combat.");
+        DescribedIconRow(
+            sb,
+            ["card", "offered"],
+            [],
+            string.Empty,
+            agg.CommonCardsOffered.ToString(),
+            "Commons offered — Common card options Choices Paradox put on its selection screens.");
+        DescribedIconRow(
+            sb,
+            ["card_uncommon", "offered"],
+            [],
+            string.Empty,
+            agg.UncommonCardsOffered.ToString(),
+            "Uncommons offered — Uncommon card options Choices Paradox put on its selection screens.");
+        DescribedIconRow(
+            sb,
+            ["card_rare", "offered"],
+            [],
+            string.Empty,
+            agg.RareCardsOffered.ToString(),
+            "Rares offered — Rare card options Choices Paradox put on its selection screens.");
+        DescribedIconRow(
+            sb,
+            ["card", "taken"],
+            [],
+            string.Empty,
+            agg.CommonCardsTaken.ToString(),
+            "Commons taken — Common cards taken from Choices Paradox selection screens.");
+        DescribedIconRow(
+            sb,
+            ["card_uncommon", "taken"],
+            [],
+            string.Empty,
+            agg.UncommonCardsTaken.ToString(),
+            "Uncommons taken — Uncommon cards taken from Choices Paradox selection screens.");
+        DescribedIconRow(
+            sb,
+            ["card_rare", "taken"],
+            [],
+            string.Empty,
+            agg.RareCardsTaken.ToString(),
+            "Rares taken — Rare cards taken from Choices Paradox selection screens.");
         return sb.ToString();
     }
 

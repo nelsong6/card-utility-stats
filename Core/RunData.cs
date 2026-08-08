@@ -1120,6 +1120,20 @@ public class RelicAggregate
     // has block at end of turn.
     public int BlockedTriggers { get; set; }
 
+    // Orichalcum's leftover-Block shortfall. A turn is undercut when it ended
+    // holding 1..(threshold - 1) Block: the relic stayed silent, and the
+    // leftover is worth less than the trigger would have been. BlockMissed sums
+    // threshold - leftover across those turns and is a counterfactual — it
+    // assumes the leftover Block could have been spent or avoided. Turns that
+    // ended at or above the threshold lose nothing and are excluded, so this is
+    // a strict subset of BlockedTriggers. OrichalcumTurns and
+    // OrichalcumCombats are the zero-inclusive held-period denominators, so
+    // turns and combats that missed nothing stay in both averages.
+    public int OrichalcumTurnsUndercut { get; set; }
+    public int OrichalcumBlockMissed { get; set; }
+    public int OrichalcumTurns { get; set; }
+    public int OrichalcumCombats { get; set; }
+
     // Total Strength this relic added. Used by Girya, Reptile Trinket,
     // Shuriken, Ruined Helmet, Sword of Jade, and Toasty Mittens.
     public decimal StrengthAdded { get; set; }

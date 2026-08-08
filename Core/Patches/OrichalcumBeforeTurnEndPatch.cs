@@ -5,6 +5,8 @@ using System.Reflection;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Entities.Creatures;
+using MegaCrit.Sts2.Core.Entities.Players;
+using MegaCrit.Sts2.Core.Hooks;
 using MegaCrit.Sts2.Core.Models.Relics;
 
 namespace SpireLens.Core.Patches;
@@ -13,6 +15,11 @@ namespace SpireLens.Core.Patches;
 /// Arms the Orichalcum block-gain attribution window just before the relic's
 /// end-of-turn check runs. If the player has no block, Orichalcum will gain
 /// block and <see cref="HookAfterBlockGainedPatch"/> records the amount.
+///
+/// When the player does have block the relic stays silent, and the leftover
+/// amount read here is the one the game itself compares against. Passing the
+/// relic's own <c>DynamicVars.Block.BaseValue</c> alongside it lets the tracker
+/// score the shortfall against the live trigger amount instead of a hardcoded 6.
 /// </summary>
 [HarmonyPatch]
 public static class OrichalcumBeforeSideTurnEndVeryEarlyPatch
@@ -35,11 +42,47 @@ public static class OrichalcumBeforeSideTurnEndVeryEarlyPatch
             if (participants == null || !participants.Contains(owner)) return;
             if (owner.Block <= 0) return;
 
-            RunTracker.RecordOrichalcumBlockedTrigger();
+            RunTracker.RecordOrichalcumBlockedTrigger(owner.Block, TriggerBlock(__instance!));
         }
         catch (Exception e)
         {
             CoreMain.LogDebug($"OrichalcumBeforeSideTurnEndVeryEarlyPatch.Prefix failed: {e.Message}");
+        }
+    }
+
+    private static decimal TriggerBlock(Orichalcum relic)
+    {
+        try
+        {
+            return relic.DynamicVars.Block.BaseValue;
+        }
+        catch
+        {
+            // No readable amount means no defensible shortfall; the tracker
+            // still counts the blocked trigger itself.
+            return 0m;
+        }
+    }
+}
+
+/// <summary>
+/// Counts every distinct player turn while Orichalcum is held so turns that end
+/// at zero block — and turns where combat ends before the end-of-turn check —
+/// stay in the missed-block averages.
+/// </summary>
+[HarmonyPatch(typeof(Hook), nameof(Hook.AfterPlayerTurnStart))]
+public static class HookAfterPlayerTurnStartOrichalcumPatch
+{
+    [HarmonyPrefix]
+    public static void Prefix(Player player)
+    {
+        try
+        {
+            RunTracker.RecordOrichalcumTurnStarted(player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"HookAfterPlayerTurnStartOrichalcumPatch failed: {e.Message}");
         }
     }
 }
