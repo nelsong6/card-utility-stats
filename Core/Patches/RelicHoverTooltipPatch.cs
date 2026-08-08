@@ -1333,7 +1333,10 @@ public static class RelicHoverShowPatch
         if (relicModel is BowlerHat)
         {
             title = "Bowler Hat";
-            body = BuildBowlerHatBodyBBCode(agg);
+            body = BuildBowlerHatBodyBBCode(
+                agg,
+                floorCount,
+                RelicFloorAddedToDeck(relicModel));
             return true;
         }
 
@@ -4620,12 +4623,20 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
-    private static string BuildBowlerHatBodyBBCode(RelicAggregate agg)
+    private static string BuildBowlerHatBodyBBCode(
+        RelicAggregate agg,
+        int? currentFloor,
+        int? floorAcquiredFallback = null)
     {
         var sb = new StringBuilder();
         var averageExtraGold = agg.Activations <= 0
             ? 0m
             : (decimal)agg.GoldGained / agg.Activations;
+        var floorAcquired = agg.FloorAcquired ?? floorAcquiredFallback;
+        var floorsHeld = currentFloor.HasValue && floorAcquired.HasValue
+            ? Math.Max(1, currentFloor.Value - floorAcquired.Value + 1)
+            : Math.Max(1, currentFloor ?? 1);
+        var extraGoldPerFloor = (decimal)agg.GoldGained / floorsHeld;
 
         RelicActivationRow(
             sb,
@@ -4643,6 +4654,12 @@ public static class RelicHoverShowPatch
             FormatDecimal(averageExtraGold),
             "",
             "Average extra gold per activation — observed Bowler Hat bonus gold divided by successful positive-integer bonuses.");
+        Row3(
+            sb,
+            "Avg extra gold/floor",
+            FormatDecimal(extraGoldPerFloor),
+            "",
+            "Average extra gold per floor — observed Bowler Hat bonus gold divided by the floors held since Bowler Hat was acquired.");
         return sb.ToString();
     }
 
