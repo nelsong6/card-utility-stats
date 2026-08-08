@@ -2229,19 +2229,62 @@ public static class RelicHoverShowPatch
     private static string BuildStartingLightningCoreBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        Row3(sb, "Times orb was evoked", agg.CrackedCoreOrbEvokes.ToString(), "");
+        var lightningIcon = CardHoverShowPatch.RenderOrbInlineIcon(
+            OrbCardRegistry.LightningOrbId);
         Row3(
             sb,
-            "Times orb passive triggered",
+            $"{lightningIcon} evoked",
+            agg.CrackedCoreOrbEvokes.ToString(),
+            "",
+            "Times the starting Lightning orb was evoked.");
+        Row3(
+            sb,
+            $"{lightningIcon} passive activations",
             agg.CrackedCoreOrbPassiveTriggers.ToString(),
-            "");
-        Row3(sb, "Times orb fizzled", agg.CrackedCoreOrbFizzles.ToString(), "");
-        Row3(sb, "Damage attempted", agg.TotalDamageAttempted.ToString(), "");
-        Row3(sb, "Damage dealt", agg.TotalDamageDealt.ToString(), "");
-        Row3(sb, "Damage blocked", agg.TotalDamageBlocked.ToString(), "");
-        Row3(sb, "Overkill", agg.TotalDamageOverkill.ToString(), "");
-        Row3(sb, "Kills", agg.Kills.ToString(), "");
-        Row3(sb, "Targets hit", agg.TotalTargets.ToString(), "");
+            "",
+            "Passive activations of the starting Lightning orb.");
+        Row3(
+            sb,
+            $"{lightningIcon} fizzled",
+            agg.CrackedCoreOrbFizzles.ToString(),
+            "",
+            "Starting Lightning orbs removed without being evoked.");
+        Row3(
+            sb,
+            $"{lightningIcon} damage attempted",
+            agg.TotalDamageAttempted.ToString(),
+            "",
+            "Damage attempted by the starting Lightning orb.");
+        Row3(
+            sb,
+            $"{lightningIcon} damage dealt",
+            agg.TotalDamageDealt.ToString(),
+            "",
+            "Unblocked damage dealt by the starting Lightning orb.");
+        Row3(
+            sb,
+            $"{lightningIcon} damage blocked",
+            agg.TotalDamageBlocked.ToString(),
+            "",
+            "Damage from the starting Lightning orb absorbed by enemy Block.");
+        Row3(
+            sb,
+            $"{lightningIcon} overkill",
+            agg.TotalDamageOverkill.ToString(),
+            "",
+            "Overkill damage dealt by the starting Lightning orb.");
+        Row3(
+            sb,
+            $"{lightningIcon} kills",
+            agg.Kills.ToString(),
+            "",
+            "Enemies killed by the starting Lightning orb.");
+        Row3(
+            sb,
+            $"{lightningIcon} targets hit",
+            agg.TotalTargets.ToString(),
+            "",
+            "Targets hit by the starting Lightning orb.");
         return sb.ToString();
     }
 

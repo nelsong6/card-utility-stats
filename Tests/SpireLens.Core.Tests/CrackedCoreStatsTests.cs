@@ -196,11 +196,18 @@ public class CrackedCoreStatsTests
     {
         var body = BuildBody(PopulatedAggregate());
 
-        Assert.Contains("Times orb was evoked", body);
+        Assert.Contains("[hint=", body);
+        Assert.Contains("res://images/orbs/lightning_orb.png", body);
+        Assert.Equal(
+            9,
+            body.Split(
+                "res://images/orbs/lightning_orb.png",
+                StringSplitOptions.None).Length - 1);
+        Assert.Contains("starting Lightning orb was evoked", body);
         Assert.Contains("[b]3[/b]", body);
-        Assert.Contains("Times orb passive triggered", body);
+        Assert.Contains("Passive activations of the starting Lightning orb", body);
         Assert.Contains("[b]7[/b]", body);
-        Assert.Contains("Times orb fizzled", body);
+        Assert.Contains("Starting Lightning orbs removed without being evoked", body);
         Assert.Contains("[b]1[/b]", body);
         Assert.Contains("Damage attempted", body);
         Assert.Contains("[b]15[/b]", body);
@@ -229,7 +236,8 @@ public class CrackedCoreStatsTests
 
         Assert.True(recognized);
         Assert.Equal("Cracked Core", title);
-        Assert.Contains("Times orb was evoked", body);
+        Assert.Contains("res://images/orbs/lightning_orb.png", body);
+        Assert.Contains("starting Lightning orb was evoked", body);
     }
 
     [Fact]
@@ -248,7 +256,8 @@ public class CrackedCoreStatsTests
 
         Assert.True(recognized);
         Assert.Equal("Infused Core", title);
-        Assert.Contains("Times orb was evoked", body);
+        Assert.Contains("res://images/orbs/lightning_orb.png", body);
+        Assert.Contains("starting Lightning orb was evoked", body);
         Assert.Contains("Damage dealt", body);
     }
 

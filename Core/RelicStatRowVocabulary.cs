@@ -38,7 +38,7 @@ internal static class RelicStatRowVocabulary
         bool IsDenominator);
 
     private static readonly Regex LeadingImageRegex = new(
-        @"^\s*(?<image>\[img[^\]]*\].*?\[/img\])\s*",
+        @"^\s*(?<image>(?:\[hint[^\]]*\])?\[img[^\]]*\].*?\[/img\](?:\[/hint\])?)\s*",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Singleline);
 
     private static readonly Regex ImageRegex = new(

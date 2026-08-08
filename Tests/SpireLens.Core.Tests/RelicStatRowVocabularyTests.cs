@@ -359,6 +359,22 @@ public class RelicStatRowVocabularyTests
     }
 
     [Fact]
+    public void Create_PreservesHintWrappedCustomImage()
+    {
+        const string lightningIcon =
+            "[hint=\"Lightning Orb\"]"
+            + "[img width=16 height=16]res://images/orbs/lightning_orb.png[/img]"
+            + "[/hint]";
+
+        var presentation = RelicStatRowVocabulary.Create(
+            $"{lightningIcon} evoked");
+
+        Assert.Equal($"{lightningIcon} evoked", presentation.Label);
+        Assert.Empty(presentation.ConceptIds);
+        Assert.Contains("evoked", presentation.FullDescription);
+    }
+
+    [Fact]
     public void SharedRowPresentation_DeduplicatesExplicitIconsAndLabelProse()
     {
         var presentation = StatsTooltip.CreateStatRowPresentation(

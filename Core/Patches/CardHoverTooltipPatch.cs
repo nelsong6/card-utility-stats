@@ -2877,7 +2877,7 @@ public static class CardHoverShowPatch
 
     private static string GetOrbStatLabel(string orbId, string suffix)
     {
-        return $"{GetOrbInlineIcon(orbId)} {suffix}";
+        return $"{RenderOrbInlineIcon(orbId)} {suffix}";
     }
 
     private static string GetOrbGroupStatLabel(
@@ -2888,15 +2888,15 @@ public static class CardHoverShowPatch
             .Where(orbId => !string.IsNullOrWhiteSpace(orbId))
             .Distinct(StringComparer.Ordinal)
             .OrderBy(orbId => orbId, StringComparer.Ordinal)
-            .Select(GetOrbInlineIcon)
+            .Select(RenderOrbInlineIcon)
             .ToList();
         if (icons.Count == 0)
-            icons.Add(GetOrbInlineIcon("ORB.UNKNOWN"));
+            icons.Add(RenderOrbInlineIcon("ORB.UNKNOWN"));
 
         return $"{string.Join(" ", icons)} {suffix}";
     }
 
-    private static string GetOrbInlineIcon(string orbId)
+    internal static string RenderOrbInlineIcon(string orbId)
     {
         // Godot 4's RichTextLabel uses named width/height attributes. The old
         // [img=16x16] form survives the vocabulary parser but renders as an
@@ -2982,14 +2982,14 @@ public static class CardHoverShowPatch
 
     private static string GetFrostOrbBlockStatLabel()
     {
-        return $"{GetOrbInlineIcon(OrbCardRegistry.FrostOrbId)} "
+        return $"{RenderOrbInlineIcon(OrbCardRegistry.FrostOrbId)} "
             + $"[img={InlineKeywordIconSize}x{InlineKeywordIconSize}]"
             + $"{BlockIconPath}[/img]";
     }
 
     private static string GetPlasmaOrbEnergyStatLabel()
     {
-        return $"{GetOrbInlineIcon(OrbCardRegistry.PlasmaOrbId)} "
+        return $"{RenderOrbInlineIcon(OrbCardRegistry.PlasmaOrbId)} "
             + GetEnergyStatLabel("");
     }
 
