@@ -13,9 +13,15 @@ Treat SpireLens work as branch-based, pushed, live-validated development. Do not
 
 1. Read `AGENTS.md`, then read the task-relevant docs named there.
 2. Make sure local `main` matches remote `origin/main`.
-   - Fetch first.
-   - Switch to local `main`.
-   - Pull fast-forward only.
+   - Update it as a ref, without checking it out: `git fetch origin main:main`.
+     That fast-forwards the ref and fails loudly on divergence.
+   - Never leave a worktree sitting on `main`, the primary clone included. Git
+     allows one worktree per branch, so camping on `main` blocks every other
+     worktree from it and breaks tooling that expects it to be free — notably
+     `gh pr merge --delete-branch`, which dies with `fatal: 'main' is already
+     used by worktree` after the merge has already succeeded.
+   - If a clone is found parked on `main` and is clean, `git checkout --detach`
+     frees the branch without changing working-tree contents.
    - If main cannot be updated cleanly, stop and report the blocker.
 3. Branch from fresh `main`, using the `codex/` prefix unless the user asks otherwise.
    - Do this when starting a new dev-work session, or after the current feature branch has been PR'd/merged and work is continuing.
@@ -77,7 +83,8 @@ When the user asks to PR and merge:
 1. Ensure the branch is committed and pushed.
 2. Create the PR.
 3. Merge using the repo's normal merge path.
-4. Switch to `main` and pull latest `origin/main` after merge.
+4. After merge, update local `main` as a ref: `git fetch origin main:main`. Do
+   not switch a worktree to `main` to do it.
 5. Do not spend user attention on branch deletion; merged feature branches are auto-deleted.
 
 ## Communication
