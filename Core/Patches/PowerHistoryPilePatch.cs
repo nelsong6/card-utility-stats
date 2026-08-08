@@ -29,7 +29,10 @@ internal static class PowerHistoryPileUi
     private const string ContainerName = "SpireLensPowerHistoryPileContainer";
     private const string ButtonName = "SpireLensPowerHistoryPile";
     private const float VerticalOffset = 112f;
+    private const double FocusDurationSeconds = 0.05;
+    private const double UnfocusDurationSeconds = 0.5;
     private static readonly Color PowerBlue = Color.FromHtml("7DDEFFFF");
+    private static readonly Vector2 FocusedIconScale = Vector2.One * 1.25f;
     private static readonly List<InjectedPile> InjectedPiles = [];
 
     public static void Inject(NCombatUi combatUi)
@@ -78,22 +81,19 @@ internal static class PowerHistoryPileUi
         container.AddChild(button);
 
         var icon = button.GetNodeOrNull<Control>("Icon");
-        if (icon != null)
-        {
-            // SelfModulate survives the native hover/press animation, which
-            // animates Modulate between white and dark gray.
-            icon.SelfModulate = PowerBlue;
-        }
-
         var countLabel = button.GetNodeOrNull<MegaLabel>("CountContainer/Count");
-        if (countLabel == null)
+        if (icon == null || countLabel == null)
         {
             container.QueueFree();
-            CoreMain.Logger.Warn("PowerHistoryPile: count label was not found on the native pile clone.");
+            CoreMain.Logger.Warn("PowerHistoryPile: icon or count label was not found on the native pile clone.");
             return;
         }
 
-        var injected = new InjectedPile(combatUi, exhaustPile, container, button, countLabel);
+        // SelfModulate survives the native press animation, which animates
+        // Modulate between white and dark gray.
+        icon.SelfModulate = PowerBlue;
+
+        var injected = new InjectedPile(combatUi, exhaustPile, container, button, icon, countLabel);
         InjectedPiles.Add(injected);
         injected.ConnectSignals();
         injected.Refresh(animateIn: true);
@@ -243,12 +243,19 @@ internal static class PowerHistoryPileUi
 
     private sealed class InjectedPile
     {
+        private readonly Control _icon;
         private readonly MegaLabel _countLabel;
         private readonly NodePath _originalExhaustFocusNeighborTop;
         private readonly Control.GuiInputEventHandler _guiInputHandler;
-        private readonly Callable _focusedCallable;
-        private readonly Callable _unfocusedCallable;
+        private readonly Action _mouseEnteredHandler;
+        private readonly Action _mouseExitedHandler;
+        private readonly Action _focusEnteredHandler;
+        private readonly Action _focusExitedHandler;
+        private Tween? _interactionTween;
         private int _currentCount;
+        private bool _pointerInside;
+        private bool _controlFocused;
+        private bool _isPresentedFocused;
         private bool _signalsConnected;
 
         public NCombatUi CombatUi { get; }
@@ -268,29 +275,60 @@ internal static class PowerHistoryPileUi
             NExhaustPileButton exhaustPile,
             Control container,
             NExhaustPileButton button,
+            Control icon,
             MegaLabel countLabel)
         {
             CombatUi = combatUi;
             ExhaustPile = exhaustPile;
             Container = container;
             Button = button;
+            _icon = icon;
             _countLabel = countLabel;
             _originalExhaustFocusNeighborTop = exhaustPile.FocusNeighborTop;
             _guiInputHandler = HandleGuiInput;
-            _focusedCallable = Callable.From<NButton>(_ => ShowHoverTip(this));
-            _unfocusedCallable = Callable.From<NButton>(_ => NHoverTipSet.Remove(Button));
+            _mouseEnteredHandler = HandleMouseEntered;
+            _mouseExitedHandler = HandleMouseExited;
+            _focusEnteredHandler = HandleFocusEntered;
+            _focusExitedHandler = HandleFocusExited;
         }
 
         public void ConnectSignals()
         {
-            // The cloned native pile button can temporarily retain a stale
-            // NClickableControl enabled/focus state after combat UI churn.
-            // Listen to its direct GUI input and gate on the real exhaust pile,
-            // which is the game's authoritative combat-pile enabled state.
+            // This clone deliberately has no CardPile bound to it. The native
+            // NCombatCardPile focus handler gates both its hover tip and icon
+            // tween on that pile, so supply the equivalent presentation here.
+            // Direct GUI input remains gated on the real exhaust pile, which
+            // is the game's authoritative combat-pile enabled state.
             Button.GuiInput += _guiInputHandler;
-            Button.Connect(NClickableControl.SignalName.Focused, _focusedCallable);
-            Button.Connect(NClickableControl.SignalName.Unfocused, _unfocusedCallable);
+            Button.MouseEntered += _mouseEnteredHandler;
+            Button.MouseExited += _mouseExitedHandler;
+            Button.FocusEntered += _focusEnteredHandler;
+            Button.FocusExited += _focusExitedHandler;
             _signalsConnected = true;
+        }
+
+        private void HandleMouseEntered()
+        {
+            _pointerInside = true;
+            RefreshPresentedFocus();
+        }
+
+        private void HandleMouseExited()
+        {
+            _pointerInside = false;
+            RefreshPresentedFocus();
+        }
+
+        private void HandleFocusEntered()
+        {
+            _controlFocused = true;
+            RefreshPresentedFocus();
+        }
+
+        private void HandleFocusExited()
+        {
+            _controlFocused = false;
+            RefreshPresentedFocus();
         }
 
         private void HandleGuiInput(InputEvent inputEvent)
@@ -316,10 +354,11 @@ internal static class PowerHistoryPileUi
 
             if (count == 0)
             {
+                _currentCount = 0;
                 Button.Visible = false;
                 Button.Disable();
                 RestoreExhaustFocusNeighbor();
-                _currentCount = 0;
+                RefreshPresentedFocus();
                 return;
             }
 
@@ -345,6 +384,7 @@ internal static class PowerHistoryPileUi
                 Button.Enable();
             else
                 Button.Disable();
+            RefreshPresentedFocus();
         }
 
         public void AnimOut()
@@ -357,12 +397,16 @@ internal static class PowerHistoryPileUi
         {
             if (PowerHistoryPileUi.IsLive(Button))
             {
+                _interactionTween?.Kill();
+                _interactionTween = null;
                 NHoverTipSet.Remove(Button);
                 if (_signalsConnected)
                 {
                     Button.GuiInput -= _guiInputHandler;
-                    DisconnectIfConnected(NClickableControl.SignalName.Focused, _focusedCallable);
-                    DisconnectIfConnected(NClickableControl.SignalName.Unfocused, _unfocusedCallable);
+                    Button.MouseEntered -= _mouseEnteredHandler;
+                    Button.MouseExited -= _mouseExitedHandler;
+                    Button.FocusEntered -= _focusEnteredHandler;
+                    Button.FocusExited -= _focusExitedHandler;
                 }
             }
 
@@ -373,10 +417,45 @@ internal static class PowerHistoryPileUi
             _signalsConnected = false;
         }
 
-        private void DisconnectIfConnected(StringName signal, Callable callable)
+        private void RefreshPresentedFocus()
         {
-            if (Button.IsConnected(signal, callable))
-                Button.Disconnect(signal, callable);
+            var shouldPresentFocused = IsLive
+                && _currentCount > 0
+                && ExhaustPile.IsEnabled
+                && (_pointerInside || _controlFocused);
+            if (shouldPresentFocused == _isPresentedFocused) return;
+
+            _isPresentedFocused = shouldPresentFocused;
+            _interactionTween?.Kill();
+
+            if (shouldPresentFocused)
+            {
+                ShowHoverTip(this);
+                _interactionTween = Button.CreateTween();
+                _interactionTween.TweenProperty(
+                    _icon,
+                    "scale",
+                    FocusedIconScale,
+                    FocusDurationSeconds);
+                return;
+            }
+
+            NHoverTipSet.Remove(Button);
+            if (!PowerHistoryPileUi.IsLive(_icon)) return;
+
+            _interactionTween = Button.CreateTween().SetParallel();
+            _interactionTween.SetTrans(Tween.TransitionType.Expo);
+            _interactionTween.SetEase(Tween.EaseType.Out);
+            _interactionTween.TweenProperty(
+                _icon,
+                "scale",
+                Vector2.One,
+                UnfocusDurationSeconds);
+            _interactionTween.TweenProperty(
+                _icon,
+                "modulate",
+                Colors.White,
+                UnfocusDurationSeconds);
         }
 
         private void RestoreExhaustFocusNeighbor()
