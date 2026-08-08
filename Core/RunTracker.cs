@@ -1203,6 +1203,22 @@ public static class RunTracker
             return restored;
         }
 
+        // Before minting a brand-new number, re-adopt one this run already
+        // tracks that no live card currently claims. The snapshot queue above
+        // only covers numbers captured at the last save; any deck card it does
+        // not cover used to mint a fresh number and orphan the stats already
+        // recorded against that physical card. Repeated across a run's
+        // Continues and Core reloads, that accumulated whole generations of
+        // instances per definition — starter Strikes tracked as #1-#4, #5-#8
+        // and #9-#11, with the plays split between them and only the newest
+        // generation still bound to a live card.
+        if (TryReclaimOrphanedInstanceNumberLocked(defId, out var reclaimed))
+        {
+            _instanceNumbers[key] = reclaimed;
+            StampArrival(key, reclaimed);   // no-op when already stamped
+            return reclaimed;
+        }
+
         _defCounters.TryGetValue(defId, out var n);
         n++;
         _defCounters[defId] = n;
@@ -1210,6 +1226,71 @@ public static class RunTracker
         StampArrival(key, n);
 
         return n;
+    }
+
+    /// <summary>
+    /// Lowest tracked instance number for <paramref name="defId"/> that no live
+    /// card is bound to, is not waiting in the snapshot queue, and was not
+    /// removed from the deck. Deck rank order is preserved by taking the lowest
+    /// first, matching how the snapshot queue hands numbers out.
+    ///
+    /// Out of combat only. Combat-generated copies also route through
+    /// <see cref="GetOrAssignNumber"/>, and letting an ephemeral card claim a
+    /// deck card's identity is the same hazard <see cref="_pendingRankRestores"/>
+    /// avoids by clearing at combat setup.
+    /// </summary>
+    private static bool TryReclaimOrphanedInstanceNumberLocked(string defId, out int number)
+    {
+        number = 0;
+        if (_currentRun == null) return false;
+
+        try
+        {
+            if (CombatManager.Instance?.IsInProgress == true) return false;
+        }
+        catch
+        {
+            return false;   // combat state unreadable — do not risk a mis-bind
+        }
+
+        HashSet<int>? bound = null;
+        foreach (var kv in _instanceNumbers)
+        {
+            if (string.Equals(kv.Key.Id.ToString(), defId, StringComparison.Ordinal))
+                (bound ??= new HashSet<int>()).Add(kv.Value);
+        }
+
+        HashSet<int>? queued = null;
+        if (_pendingRankRestores.TryGetValue(defId, out var waiting) && waiting.Count > 0)
+            queued = new HashSet<int>(waiting);
+
+        var selected = SelectOrphanedInstanceNumber(
+            _currentRun.Aggregates, defId, bound, queued);
+        if (selected == null) return false;
+        number = selected.Value;
+        return true;
+    }
+
+    internal static int? SelectOrphanedInstanceNumber(
+        IReadOnlyDictionary<string, CardAggregate> aggregates,
+        string defId,
+        ISet<int>? boundNumbers,
+        ISet<int>? queuedNumbers)
+    {
+        if (aggregates == null) return null;
+
+        var best = int.MaxValue;
+        foreach (var kv in aggregates)
+        {
+            if (!TryParseAggregateKey(kv.Key, out var keyDef, out var num)) continue;
+            if (!string.Equals(keyDef, defId, StringComparison.Ordinal)) continue;
+            if (kv.Value.Removed) continue;
+            if (boundNumbers?.Contains(num) == true) continue;
+            if (queuedNumbers?.Contains(num) == true) continue;
+            if (num < best) best = num;
+        }
+
+        return best == int.MaxValue ? null : best;
     }
 
     /// <summary>
