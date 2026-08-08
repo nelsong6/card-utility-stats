@@ -60,7 +60,7 @@ public class LostWispStatsTests
         Assert.Contains("Damage blocked", body);
         Assert.Contains("Overkill", body);
         Assert.Contains("Kills", body);
-        Assert.Contains("Targets hit", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("targets_hit"), body);
         Assert.Contains("[b]3[/b]", body);
         Assert.Contains("[b]4[/b]", body);
     }

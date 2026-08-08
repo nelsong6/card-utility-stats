@@ -103,7 +103,7 @@ public class MrStrugglesStatsTests
         Assert.Contains("Damage blocked", body);
         Assert.Contains("Overkill", body);
         Assert.Contains("Kills", body);
-        Assert.Contains("Targets hit", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("targets_hit"), body);
         Assert.Contains("Damage per activation", body);
         Assert.Contains("[b]40[/b]", body);
         Assert.Contains("[b]31[/b]", body);

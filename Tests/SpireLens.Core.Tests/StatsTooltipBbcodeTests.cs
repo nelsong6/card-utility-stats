@@ -1,3 +1,5 @@
+using System;
+using System.Text;
 using SpireLens.Core;
 using Xunit;
 
@@ -41,5 +43,30 @@ public class StatsTooltipBbcodeTests
     {
         Assert.Equal(string.Empty, StatsTooltip.EscapeBbcode(null));
         Assert.Equal(string.Empty, StatsTooltip.EscapeBbcode(string.Empty));
+    }
+
+    [Fact]
+    public void ScalarStatRows_ShareNaturalWidthTableAndLeftAlignEveryColumn()
+    {
+        var body = new StringBuilder();
+        StatsTooltip.AppendScalarStatRow(
+            body,
+            StatsTooltip.CreateStatRowPresentation("Short"),
+            "0");
+        StatsTooltip.AppendScalarStatRow(
+            body,
+            StatsTooltip.CreateStatRowPresentation("The longest semantic label"),
+            "false",
+            "100%");
+
+        var markup = body.ToString();
+
+        Assert.Equal(1, markup.Split("[table=4]", StringSplitOptions.None).Length - 1);
+        Assert.Equal(2, markup.Split("[left][b]", StringSplitOptions.None).Length - 1);
+        Assert.Equal(2, markup.Split("[left][color=#b5b5b5]", StringSplitOptions.None).Length - 1);
+        Assert.Contains("[left][b]0[/b][/left]", markup);
+        Assert.Contains("[left][b]false[/b][/left]", markup);
+        Assert.DoesNotContain("[right]", markup);
+        Assert.True(StatsTooltip.ContainsScalarStatTable(markup));
     }
 }

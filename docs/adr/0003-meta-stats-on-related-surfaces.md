@@ -36,14 +36,19 @@ For Osty:
 
 - `TimesOstySummoned` and `TotalOstyHpSummoned` belong to the source card that
   successfully called `OstyCmd.Summon`.
-- `RunMetaStats.TotalOstyHpSummoned` and `TotalOstyDamageAbsorbed` belong to
-  run-level meta stats and may be surfaced on Osty summon cards as related
-  mechanic stats.
+- `RunMetaStats.TotalOstyHpSummoned`, `TotalOstyHpWhenUnleashPlayed`, and
+  `TotalOstyDamageAbsorbed` belong to run-level meta stats and may be surfaced
+  on Osty summon cards or the Phylactery relic family as related mechanic
+  stats.
+- Bound Phylactery and Phylactery Unbound deliberately project the same
+  run-level Osty-body ledger. Their held turn/combat denominators are also
+  shared, so upgrading the relic adds to one continuous set of averages.
 - Label card-owned summon HP as a local contribution, such as `Summon gained`.
   Label run-level values with an `All Osty ...` prefix so the hovered card does
   not appear to own them.
-- Unleash's Osty HP damage bonus remains on Unleash because Unleash itself uses
-  Osty's current HP at play time.
+- Unleash keeps its per-card Osty HP damage bonus because Unleash itself uses
+  Osty's current HP at play time. The same observed play-time HP is also added
+  to the run-level ledger for the Phylactery family total.
 
 ## Consequences
 

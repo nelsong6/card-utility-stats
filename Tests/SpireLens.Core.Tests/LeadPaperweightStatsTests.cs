@@ -137,8 +137,11 @@ public class LeadPaperweightStatsTests
         Assert.Contains("[b]12[/b]", body);
         Assert.Contains("Panache", body);
         Assert.Contains("Master of Strategy", body);
-        Assert.Contains("taken", body);
-        Assert.Contains("not taken", body);
+        var takenIcon = StatConceptGlossary.RenderHintedGlyph("taken");
+        Assert.Contains($"[b]{takenIcon}[/b]", body);
+        Assert.Contains($"[b]not {takenIcon}[/b]", body);
+        Assert.DoesNotContain("[b]taken[/b]", body);
+        Assert.DoesNotContain("[b]not taken[/b]", body);
     }
 
     [Fact]

@@ -75,9 +75,12 @@ Examples already implemented:
 - Alchemize potions actually procured, failed procurements, and gained rarity splits
 - Discovery cards actually selected, including rarity/type and observed energy discount
 - observed cards drawn from draw effects
+- observed Lightning-orb damage retained on the exact card that channeled it,
+  separate from that card's direct Attack damage
 - blocked draw attempts, categorized blocked reasons, and effect-side downstream blocked counts
 - successful self-summons to hand for recurring cards like Make It So
-- Osty summon HP, current-body absorbed damage, and Unleash's Osty-HP payoff damage
+- Osty summon HP, current-body absorbed damage, Unleash's Osty-HP payoff
+  damage, and the upgrade-continuous Phylactery family rates
 - effect applications credited back to the source card
 - Artifact-blocked debuffs
 - downstream poison damage and poison overkill
@@ -100,7 +103,7 @@ When attribution is not naturally one-card-to-one-outcome, the code prefers:
 - [Core/Patches/PotionCompendiumRunHistoryPatch.cs](../Core/Patches/PotionCompendiumRunHistoryPatch.cs) adds the potion-gallery mode dropdown and replaces the rarity galleries with a two-column vertical timeline of native potion holders. Each holder's run details are appended through the shared native hover-tip augmentation path.
 - [Core/Patches/PotionRunHistoryTrackingPatch.cs](../Core/Patches/PotionRunHistoryTrackingPatch.cs) observes visible reward/shop offers plus final belt insertion, use, and discard outcomes.
 - [Core/Patches/PotionBeltStatsTooltip.cs](../Core/Patches/PotionBeltStatsTooltip.cs) derives the run-wide offer, rarity, rejection, purchase, activation, and discard summary from that provenance and appends it to every filled or empty native potion-belt holder.
-- [Core/Patches/RelicBarFilterPatch.cs](../Core/Patches/RelicBarFilterPatch.cs) optionally hides classified, already-resolved relics from the standard in-run relic bar without changing ownership, effects, or any other relic surface, then rewires top-bar controller navigation across the remaining visible relics.
+- [Core/Patches/RelicBarFilterPatch.cs](../Core/Patches/RelicBarFilterPatch.cs) optionally hides classified, already-resolved relics from the standard in-run relic bar without changing ownership, effects, or any other relic surface, then rewires top-bar controller navigation across the remaining visible relics. Finite-turn relics enter a transient non-combat state when their native activation fires (with the configured turn as a reload-safe fallback). Native terminal-combat relics do the same without a turn cutoff and reconstruct their state directly from the game after Core reload; Lava Lamp uses irreversible combat disqualification rather than a positive activation. Limited-use relics transition when the game reports `IsUsedUp`; combat reset restores recurring relics for the next fight.
 - [Core/RelicClassificationStore.cs](../Core/RelicClassificationStore.cs) loads the embedded combat/non-combat JSON, normalizes it against the current game relic database, persists the editable AppData copy, and applies compendium changes immediately.
 - [Core/Patches/RelicCompendiumClassificationPatch.cs](../Core/Patches/RelicCompendiumClassificationPatch.cs) turns compendium mouse/controller presses into classification toggles while edit mode is active and renders the classification badges.
 - [Core/StatConceptGlossary.cs](../Core/StatConceptGlossary.cs) validates and caches the embedded [Core/Config/stat-concepts.json](../Core/Config/stat-concepts.json) vocabulary once per Core load, then renders the same native rich-text hint markup for stat rows and the relic compendium's **Icon glossary** mode.
@@ -109,9 +112,9 @@ When attribution is not naturally one-card-to-one-outcome, the code prefers:
 - [Core/Patches/DeckViewNotInDeckPatch.cs](../Core/Patches/DeckViewNotInDeckPatch.cs) switches the native deck grid between current deck cards and the separate removed/meta-card collection; those two sets are never mixed.
 - [Core/Patches/NativeHoverTipAugmentationPatch.cs](../Core/Patches/NativeHoverTipAugmentationPatch.cs) appends owner-specific SpireLens data to the game's `IHoverTip` sequence immediately before `NHoverTipSet` renders it, then applies the SpireLens blue panel tint and brand to only the resulting native stats control.
 - [Core/Patches/StatsTooltipPinManager.cs](../Core/Patches/StatsTooltipPinManager.cs) pins one native card, relic, or campfire-summary tooltip set under a dedicated surrogate owner, including card and relic rows rebuilt inside run history, displays the game's top-panel lock icon on its source, and releases the pin on the next non-motion user action.
-- [Core/StatsImageCapture.cs](../Core/StatsImageCapture.cs) composes the selected
-  card or isolated relic artwork with every rendered native and SpireLens
-  tooltip page, using logical-to-texture scaling for live viewport crops;
+- [Core/StatsImageCapture.cs](../Core/StatsImageCapture.cs) crops the selected
+  item with every rendered native and SpireLens tooltip page in their original
+  user-visible scale and relative placement, using logical-to-texture scaling;
   [Core/WindowsImageClipboard.cs](../Core/WindowsImageClipboard.cs) publishes
   that image as an in-memory Windows DIB without a helper process or file.
 - [Core/RunHistoryDeckViewer.cs](../Core/RunHistoryDeckViewer.cs) adds a deck icon to the run-history Cards section and hosts the game's native deck-view scene over run history. It reconstructs the selected player's final deck from the game's individual `SerializableCard` entries and binds duplicate cards back to their SpireLens per-instance keys by saved deck rank.
@@ -127,16 +130,25 @@ Current UI conventions:
 - card tooltips on every surface are display-only opt-in; disabling them does not disable attribution
 - deck-view tooltips can be fuller and include lineage/context
 - rows should be self-describing
-- numeric relic-row values and percentages use the right-aligned value
-  columns; card names, relic names, destinations, and other textual outcomes
-  render inline in the expanding label cell so Godot cannot squeeze them into
-  a narrow numeric column; do not use character-count wrapping heuristics
+- ordinary card, relic, and enemy scalar rows share a natural-width table: the
+  widest semantic label establishes the value column, and every value and
+  percentage is left-aligned at its column's shared horizontal position; card
+  names, relic names, destinations, and other textual outcomes render inline
+  with their label so Godot cannot squeeze them into a narrow scalar column;
+  do not use character-count wrapping heuristics
+- run-summary rows share one natural-width table: the widest semantic label
+  establishes the value column, and every value is left-aligned at that same
+  horizontal position
 - loud section headers are discouraged unless they add real clarity
 - inline icons are preferred for keyword-like effects when they improve scanning
-- rows phrased as “per <recognized concept>” render `/` immediately before
-  the denominator icon; “in” and “this” indicate scope and do not receive a
-  slash
+- rows phrased as “per <recognized concept>” render the hinted **Per** (`/`)
+  concept immediately before the denominator icon; fully icon-driven “in” and
+  “this” scopes render `∈`,
+  and an aggregate over every member of a plural scope renders `∈ ∀` before
+  the scope icon; mixed prose stays readable instead of forcing relation
+  symbols ahead of its remaining words
 - every icon-driven stat row can pair a left-side information hint for the full row meaning with a separate semantic concept hint; the central compendium glossary describes those same concept symbols
+- card, enemy, relic, potion, and run-summary stat rows all pass through the shared row vocabulary; established concepts render as glossary icons, and equivalent prose is retained only in the information hint rather than repeated visibly beside the icon
 - when the game already exposes a recognizable asset, prefer the in-game block/draw/energy/star iconography over generic text-only rows
 - native lifecycle does not erase visual ownership: SpireLens stats tips retain
   their larger body text, blue background treatment, and top-right brand while

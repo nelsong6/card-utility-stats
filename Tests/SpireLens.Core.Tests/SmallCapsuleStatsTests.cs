@@ -9,6 +9,7 @@ using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Models.Relics;
 using MegaCrit.Sts2.Core.Rewards;
+using SpireLens.Core;
 using SpireLens.Core.Patches;
 using Xunit;
 
@@ -152,10 +153,13 @@ public class SmallCapsuleStatsTests
 
         Assert.Contains("data_disk.tres", body);
         Assert.Contains("Data Disk", body);
-        Assert.Contains("taken", body);
         Assert.Contains("bag_of_preparation.tres", body);
         Assert.Contains("Bag of Preparation", body);
-        Assert.Contains("not taken", body);
+        var takenIcon = StatConceptGlossary.RenderHintedGlyph("taken");
+        Assert.Contains($"[b]{takenIcon}[/b]", body);
+        Assert.Contains($"[b]not {takenIcon}[/b]", body);
+        Assert.DoesNotContain("[b]taken[/b]", body);
+        Assert.DoesNotContain("[b]not taken[/b]", body);
     }
 
     [Fact]

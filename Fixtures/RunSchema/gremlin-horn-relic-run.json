@@ -1,0 +1,21 @@
+{
+  "run_id": "gremlin-horn-relic-fixture",
+  "started_at": "2026-08-04T23:00:00Z",
+  "updated_at": "2026-08-04T23:20:00Z",
+  "outcome": "in_progress",
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.GREMLIN_HORN": {
+      "activations": 6,
+      "energy_generated": 5,
+      "additional_cards_drawn": 4,
+      "gremlin_horn_rate_activations": 6,
+      "gremlin_horn_turns": 8,
+      "gremlin_horn_combats": 3
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

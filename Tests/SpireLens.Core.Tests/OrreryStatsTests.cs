@@ -118,11 +118,14 @@ public class OrreryStatsTests
     public void RelicTooltip_Orrery_ShowsEveryRewardAndFinalHandlingInOrder()
     {
         var body = BuildBody(BuildPopulatedAggregate());
+        var takenIcon = StatConceptGlossary.RenderHintedGlyph("taken");
 
         Assert.Contains("Reward 1", body);
-        Assert.Contains("skipped", body);
+        Assert.Contains($"not {takenIcon}", body);
         Assert.Contains("Reward 2", body);
-        Assert.Contains("obtained Pommel Strike", body);
+        Assert.Contains($"{takenIcon} Pommel Strike", body);
+        Assert.DoesNotContain("skipped", body);
+        Assert.DoesNotContain("obtained Pommel Strike", body);
         Assert.Contains("Reward 3", body);
         Assert.Contains(
             "res://images/atlases/relic_atlas.sprites/paels_wing.tres",

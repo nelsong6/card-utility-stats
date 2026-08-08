@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Cards;
 using MegaCrit.Sts2.Core.Models.Relics;
@@ -33,6 +34,10 @@ public class MiniatureCannonStatsTests
     private static readonly FieldInfo CurrentUpgradeLevelField =
         typeof(CardModel).GetField("_currentUpgradeLevel", BindingFlags.NonPublic | BindingFlags.Instance)
         ?? throw new InvalidOperationException("CardModel._currentUpgradeLevel not found.");
+
+    private static readonly FieldInfo CardTypeField =
+        typeof(CardModel).GetField("<Type>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance)
+        ?? throw new InvalidOperationException("CardModel.<Type>k__BackingField not found.");
 
     private static readonly FieldInfo DeckVersionField =
         typeof(CardModel).GetField("_deckVersion", BindingFlags.NonPublic | BindingFlags.Instance)
@@ -128,6 +133,7 @@ public class MiniatureCannonStatsTests
         var upgradedDeckCard = Uninitialized<DrainPower>();
         var unupgradedCombatCard = Uninitialized<DrainPower>();
         SetUpgradeLevel(upgradedDeckCard, 1);
+        SetAttackType(unupgradedCombatCard);
         DeckVersionField.SetValue(unupgradedCombatCard, upgradedDeckCard);
 
         Assert.False(IsMiniatureCannonUpgradedAttackCard(unupgradedCombatCard));
@@ -147,6 +153,7 @@ public class MiniatureCannonStatsTests
             Uninitialized<DrainPower>());
 
         var nonUpgradedCombatCard = Uninitialized<DrainPower>();
+        SetAttackType(nonUpgradedCombatCard);
         DeckVersionField.SetValue(nonUpgradedCombatCard, upgradedDeckCard);
 
         var agg = new RelicAggregate();
@@ -233,6 +240,12 @@ public class MiniatureCannonStatsTests
 
     private static void SetUpgradeLevel(CardModel card, int upgradeLevel)
     {
+        SetAttackType(card);
         CurrentUpgradeLevelField.SetValue(card, upgradeLevel);
+    }
+
+    private static void SetAttackType(CardModel card)
+    {
+        CardTypeField.SetValue(card, CardType.Attack);
     }
 }

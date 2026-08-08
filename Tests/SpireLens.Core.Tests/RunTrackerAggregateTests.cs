@@ -31,14 +31,15 @@ public class RunTrackerAggregateTests
             TimesReplayExtraPlayed = 4,
             TimesReplayAttackNoDamage = 2,
         };
-        source.OrbOutcomes["ORB.FROST"] = new CardOrbAggregate
+        source.OrbOutcomes["ORB.FROST_ORB"] = new CardOrbAggregate
         {
-            OrbId = "ORB.FROST",
+            OrbId = "ORB.FROST_ORB",
             Created = 6,
             PassiveActivations = 9,
             Evokes = 4,
             Fizzles = 1,
             BlockGained = 28,
+            EnergyGenerated = 5,
         };
         source.ReplayExtraPlayPlannedReasons["power:POWER.BURST"] = new ReplayExtraPlayReasonAggregate
         {
@@ -66,10 +67,11 @@ public class RunTrackerAggregateTests
         Assert.Equal(7, clone.CombatsInDeck);
         Assert.Equal(9m, clone.TotalForgeGenerated);
         Assert.Equal(6, clone.TotalOrbsCreated);
-        Assert.Equal(9, clone.OrbOutcomes["ORB.FROST"].PassiveActivations);
-        Assert.Equal(4, clone.OrbOutcomes["ORB.FROST"].Evokes);
-        Assert.Equal(1, clone.OrbOutcomes["ORB.FROST"].Fizzles);
-        Assert.Equal(28, clone.OrbOutcomes["ORB.FROST"].BlockGained);
+        Assert.Equal(9, clone.OrbOutcomes["ORB.FROST_ORB"].PassiveActivations);
+        Assert.Equal(4, clone.OrbOutcomes["ORB.FROST_ORB"].Evokes);
+        Assert.Equal(1, clone.OrbOutcomes["ORB.FROST_ORB"].Fizzles);
+        Assert.Equal(28, clone.OrbOutcomes["ORB.FROST_ORB"].BlockGained);
+        Assert.Equal(5, clone.OrbOutcomes["ORB.FROST_ORB"].EnergyGenerated);
         Assert.Equal(21, clone.TotalOstyHpAttackBonus);
         Assert.Equal(3, clone.TimesOstyHpAttackBonusApplied);
         Assert.Equal(2, clone.TimesOstySummoned);
@@ -100,13 +102,14 @@ public class RunTrackerAggregateTests
             TimesReplayExtraPlayed = 1,
             TimesReplayAttackNoDamage = 1,
         };
-        target.OrbOutcomes["ORB.FROST"] = new CardOrbAggregate
+        target.OrbOutcomes["ORB.FROST_ORB"] = new CardOrbAggregate
         {
-            OrbId = "ORB.FROST",
+            OrbId = "ORB.FROST_ORB",
             Created = 2,
             PassiveActivations = 3,
             Evokes = 1,
             BlockGained = 8,
+            EnergyGenerated = 2,
         };
         target.ReplayExtraPlayPlannedReasons["replay"] = new ReplayExtraPlayReasonAggregate
         {
@@ -140,14 +143,15 @@ public class RunTrackerAggregateTests
             TimesReplayExtraPlayed = 3,
             TimesReplayAttackNoDamage = 2,
         };
-        source.OrbOutcomes["ORB.FROST"] = new CardOrbAggregate
+        source.OrbOutcomes["ORB.FROST_ORB"] = new CardOrbAggregate
         {
-            OrbId = "ORB.FROST",
+            OrbId = "ORB.FROST_ORB",
             Created = 5,
             PassiveActivations = 7,
             Evokes = 3,
             Fizzles = 2,
             BlockGained = 20,
+            EnergyGenerated = 3,
         };
         source.ReplayExtraPlayPlannedReasons["power:POWER.BURST"] = new ReplayExtraPlayReasonAggregate
         {
@@ -174,11 +178,12 @@ public class RunTrackerAggregateTests
         Assert.Equal(11, target.CombatsInDeck);
         Assert.Equal(9m, target.TotalForgeGenerated);
         Assert.Equal(7, target.TotalOrbsCreated);
-        Assert.Equal(7, target.OrbOutcomes["ORB.FROST"].Created);
-        Assert.Equal(10, target.OrbOutcomes["ORB.FROST"].PassiveActivations);
-        Assert.Equal(4, target.OrbOutcomes["ORB.FROST"].Evokes);
-        Assert.Equal(2, target.OrbOutcomes["ORB.FROST"].Fizzles);
-        Assert.Equal(28, target.OrbOutcomes["ORB.FROST"].BlockGained);
+        Assert.Equal(7, target.OrbOutcomes["ORB.FROST_ORB"].Created);
+        Assert.Equal(10, target.OrbOutcomes["ORB.FROST_ORB"].PassiveActivations);
+        Assert.Equal(4, target.OrbOutcomes["ORB.FROST_ORB"].Evokes);
+        Assert.Equal(2, target.OrbOutcomes["ORB.FROST_ORB"].Fizzles);
+        Assert.Equal(28, target.OrbOutcomes["ORB.FROST_ORB"].BlockGained);
+        Assert.Equal(5, target.OrbOutcomes["ORB.FROST_ORB"].EnergyGenerated);
         Assert.Equal(21, target.TotalOstyHpAttackBonus);
         Assert.Equal(3, target.TimesOstyHpAttackBonusApplied);
         Assert.Equal(3, target.TimesOstySummoned);

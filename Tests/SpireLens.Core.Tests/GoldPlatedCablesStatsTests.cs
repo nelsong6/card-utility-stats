@@ -51,15 +51,15 @@ public class GoldPlatedCablesStatsTests
         Assert.Equal(5, agg.Activations);
         Assert.Equal(
             3,
-            agg.GoldPlatedCablesActivationsByOrbType["ORB.LIGHTNING"]
+            agg.GoldPlatedCablesActivationsByOrbType["ORB.LIGHTNING_ORB"]
                 .Activations);
         Assert.Equal(
             "Lightning",
-            agg.GoldPlatedCablesActivationsByOrbType["ORB.LIGHTNING"]
+            agg.GoldPlatedCablesActivationsByOrbType["ORB.LIGHTNING_ORB"]
                 .DisplayName);
         Assert.Equal(
             2,
-            agg.GoldPlatedCablesActivationsByOrbType["ORB.FROST"]
+            agg.GoldPlatedCablesActivationsByOrbType["ORB.FROST_ORB"]
                 .Activations);
         Assert.Equal(2, agg.GoldPlatedCablesNoOrbTargets);
     }
@@ -83,7 +83,7 @@ public class GoldPlatedCablesStatsTests
         Assert.Equal(
             3,
             restored!.RelicAggregates[RelicId]
-                .GoldPlatedCablesActivationsByOrbType["ORB.LIGHTNING"]
+                .GoldPlatedCablesActivationsByOrbType["ORB.LIGHTNING_ORB"]
                 .Activations);
         Assert.Equal(
             2,
@@ -101,11 +101,11 @@ public class GoldPlatedCablesStatsTests
         Assert.Equal(10, target.Activations);
         Assert.Equal(
             6,
-            target.GoldPlatedCablesActivationsByOrbType["ORB.LIGHTNING"]
+            target.GoldPlatedCablesActivationsByOrbType["ORB.LIGHTNING_ORB"]
                 .Activations);
         Assert.Equal(
             4,
-            target.GoldPlatedCablesActivationsByOrbType["ORB.FROST"]
+            target.GoldPlatedCablesActivationsByOrbType["ORB.FROST_ORB"]
                 .Activations);
         Assert.Equal(4, target.GoldPlatedCablesNoOrbTargets);
     }
@@ -160,12 +160,12 @@ public class GoldPlatedCablesStatsTests
         var agg = new RelicAggregate();
         RunTracker.RecordGoldPlatedCablesActivationForTest(
             agg,
-            "ORB.LIGHTNING",
+            "ORB.LIGHTNING_ORB",
             "Lightning",
             3);
         RunTracker.RecordGoldPlatedCablesActivationForTest(
             agg,
-            "ORB.FROST",
+            "ORB.FROST_ORB",
             "Frost",
             2);
         RunTracker.RecordGoldPlatedCablesNoOrbTargetForTest(agg, 2);

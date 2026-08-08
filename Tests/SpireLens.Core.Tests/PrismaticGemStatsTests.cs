@@ -15,6 +15,9 @@ public class PrismaticGemStatsTests
     private static readonly MethodInfo BuildPrismaticGemBodyMethod =
         typeof(RelicHoverShowPatch).GetMethod("BuildPrismaticGemBodyBBCode", BindingFlags.NonPublic | BindingFlags.Static)
         ?? throw new InvalidOperationException("BuildPrismaticGemBodyBBCode not found.");
+    private static readonly MethodInfo NormalizePrismaticGemCategoryKeyMethod =
+        typeof(HookTryModifyCardRewardOptionsPrismaticGemPatch).GetMethod("NormalizeKey", BindingFlags.NonPublic | BindingFlags.Static)
+        ?? throw new InvalidOperationException("NormalizeKey not found.");
 
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
@@ -30,6 +33,21 @@ public class PrismaticGemStatsTests
         Assert.Equal(0, agg.EnergyGenerated);
         Assert.Equal(0, agg.CardRewardsAffected);
         Assert.Empty(agg.CardRewardCategories);
+    }
+
+    [Theory]
+    [InlineData("IRONCLAD_CARD_POOL", "ironclad")]
+    [InlineData("SILENT_CARD_POOL", "silent")]
+    [InlineData("REGENT_CARD_POOL", "regent")]
+    [InlineData("NECROBINDER_CARD_POOL", "necrobinder")]
+    [InlineData("DEFECT_CARD_POOL", "defect")]
+    [InlineData("COLORLESS_CARD_POOL", "colorless")]
+    public void PrismaticGemCategoryKey_NormalizesNativeCardPoolIds(string nativePoolId, string expected)
+    {
+        var actual = (string)(NormalizePrismaticGemCategoryKeyMethod.Invoke(null, new object?[] { nativePoolId })
+            ?? throw new InvalidOperationException("NormalizeKey returned null."));
+
+        Assert.Equal(expected, actual);
     }
 
     [Fact]
@@ -74,8 +92,12 @@ public class PrismaticGemStatsTests
             CardRewardsAffected = 2,
             CardRewardCategories =
             {
-                ["defect"] = new CardRewardCategoryAggregate { DisplayName = "Defect", Count = 3 },
-                ["colorless"] = new CardRewardCategoryAggregate { DisplayName = "Colorless", Count = 1 },
+                ["ironclad"] = new CardRewardCategoryAggregate { DisplayName = "Ironclad", Count = 1 },
+                ["silent"] = new CardRewardCategoryAggregate { DisplayName = "Silent", Count = 2 },
+                ["regent"] = new CardRewardCategoryAggregate { DisplayName = "Regent", Count = 3 },
+                ["necrobinder"] = new CardRewardCategoryAggregate { DisplayName = "Necrobinder", Count = 4 },
+                ["defect"] = new CardRewardCategoryAggregate { DisplayName = "Defect", Count = 5 },
+                ["colorless"] = new CardRewardCategoryAggregate { DisplayName = "Colorless", Count = 6 },
             },
         };
 
@@ -86,10 +108,53 @@ public class PrismaticGemStatsTests
         Assert.Contains("[b]4[/b]", body);
         Assert.Contains("Card rewards affected", body);
         Assert.Contains("[b]2[/b]", body);
-        Assert.Contains("Defect rewards", body);
-        Assert.Contains("[b]3[/b]", body);
-        Assert.Contains("Colorless rewards", body);
+        Assert.Contains("Ironclad cards offered", body);
+        Assert.Contains("Silent cards offered", body);
+        Assert.Contains("Regent cards offered", body);
+        Assert.Contains("Necrobinder cards offered", body);
+        Assert.Contains("Defect cards offered", body);
+        Assert.Contains("Colorless cards offered", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("card"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("offered"), body);
+        Assert.DoesNotContain("Defect rewards", body);
+        Assert.DoesNotContain("Colorless rewards", body);
         Assert.Contains("[b]1[/b]", body);
+        Assert.Contains("[b]3[/b]", body);
+        Assert.Contains("[b]5[/b]", body);
+        Assert.Contains("[b]6[/b]", body);
+    }
+
+    [Fact]
+    public void RelicTooltip_PrismaticGem_ShowsAllCardPoolsBeforeAnyAreOffered()
+    {
+        var body = (string)(BuildPrismaticGemBodyMethod.Invoke(null, new object?[] { new RelicAggregate() })
+            ?? throw new InvalidOperationException("BuildPrismaticGemBodyBBCode returned null."));
+
+        Assert.Contains("Ironclad cards offered", body);
+        Assert.Contains("Silent cards offered", body);
+        Assert.Contains("Regent cards offered", body);
+        Assert.Contains("Necrobinder cards offered", body);
+        Assert.Contains("Defect cards offered", body);
+        Assert.Contains("Colorless cards offered", body);
+    }
+
+    [Fact]
+    public void RelicTooltip_PrismaticGem_PreservesOffersStoredWithLegacyNativePoolKeys()
+    {
+        var agg = new RelicAggregate
+        {
+            CardRewardCategories =
+            {
+                ["defect_card_pool"] = new CardRewardCategoryAggregate { DisplayName = "defect", Count = 2 },
+                ["defect"] = new CardRewardCategoryAggregate { DisplayName = "Defect", Count = 3 },
+            },
+        };
+
+        var body = (string)(BuildPrismaticGemBodyMethod.Invoke(null, new object?[] { agg })
+            ?? throw new InvalidOperationException("BuildPrismaticGemBodyBBCode returned null."));
+
+        Assert.Contains("Defect cards offered", body);
+        Assert.Contains("[b]5[/b]", body);
     }
 
     [Fact]

@@ -128,8 +128,11 @@ public class SilverCrucibleStatsTests
         Assert.Contains("reward 1", body);
         Assert.Contains("Bash+", body);
         Assert.Contains("Shrug It Off+", body);
-        Assert.Contains("taken", body);
-        Assert.Contains("not taken", body);
+        var takenIcon = StatConceptGlossary.RenderHintedGlyph("taken");
+        Assert.Contains($"[b]{takenIcon}[/b]", body);
+        Assert.Contains($"[b]not {takenIcon}[/b]", body);
+        Assert.DoesNotContain("[b]taken[/b]", body);
+        Assert.DoesNotContain("[b]not taken[/b]", body);
         Assert.Contains("reward 2", body);
         Assert.Contains("not seen yet", body);
         Assert.Contains("reward 3", body);
@@ -179,9 +182,9 @@ public class SilverCrucibleStatsTests
 
         var body = BuildBody(agg);
 
-        Assert.Contains("[color=#e0e0e0]reward 1[/color]", body);
-        Assert.Contains("[table=2]", body);
-        Assert.Contains("[cell expand=4 padding=0,0,4,0]", body);
+        Assert.Contains("reward 1", body);
+        Assert.Contains("[table=4]", body);
+        Assert.Contains("[cell expand=0 padding=0,0,12,0]", body);
         Assert.Contains("[b]Grave Warden+[/b]", body);
         Assert.Contains("[b]pending[/b]", body);
     }

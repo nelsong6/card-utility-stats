@@ -274,53 +274,59 @@ public static class SwiftPotionHistoryDrawPatch
 }
 
 /// <summary>
-/// Fortifier does not pass its choice context into GainBlock. Keep its exact
-/// direct call identifiable across the command's awaits so the observed block
-/// history entry can own a potion-ledger chunk.
+/// Block Potion and Fortifier do not pass their choice context into GainBlock.
+/// Keep their exact direct calls identifiable across the command's awaits so
+/// the observed block history entry can own a potion-ledger chunk.
 /// </summary>
 [HarmonyPatch]
-public static class FortifierHistoryUsePatch
+public static class BlockPotionHistoryUsePatch
 {
-    private static MethodBase? TargetMethod()
-        => AccessTools.Method(
-            typeof(Fortifier),
-            "OnUse",
-            [typeof(PlayerChoiceContext), typeof(Creature)]);
+    private static IEnumerable<MethodBase> TargetMethods()
+    {
+        var signature = new[]
+        {
+            typeof(PlayerChoiceContext),
+            typeof(Creature),
+        };
+
+        yield return AccessTools.Method(typeof(BlockPotion), "OnUse", signature);
+        yield return AccessTools.Method(typeof(Fortifier), "OnUse", signature);
+    }
 
     [HarmonyPrefix]
     public static void Prefix(
-        Fortifier __instance,
+        PotionModel __instance,
         Creature target,
-        out FortifierUseFrame? __state)
+        out PotionBlockUseFrame? __state)
     {
         __state = null;
 
         try
         {
             if (__instance?.Owner == null || target == null) return;
-            __state = FortifierBlockFrameTracker.BeginUse(__instance, target);
+            __state = PotionBlockFrameTracker.BeginUse(__instance, target);
         }
         catch (Exception e)
         {
             CoreMain.LogDebug(
-                $"FortifierHistoryUsePatch.Prefix failed: {e.Message}");
+                $"BlockPotionHistoryUsePatch.Prefix failed: {e.Message}");
         }
     }
 
     [HarmonyPostfix]
-    public static void Postfix(FortifierUseFrame? __state)
+    public static void Postfix(PotionBlockUseFrame? __state)
     {
         if (__state != null)
-            FortifierBlockFrameTracker.EndUse(__state);
+            PotionBlockFrameTracker.EndUse(__state);
     }
 
     [HarmonyFinalizer]
     public static Exception? Finalizer(
         Exception? __exception,
-        FortifierUseFrame? __state)
+        PotionBlockUseFrame? __state)
     {
         if (__exception != null && __state != null)
-            FortifierBlockFrameTracker.EndUse(__state);
+            PotionBlockFrameTracker.EndUse(__state);
         return __exception;
     }
 }
@@ -336,38 +342,38 @@ public static class FortifierHistoryUsePatch
         typeof(CardPlay),
         typeof(bool),
     })]
-public static class FortifierCreatureGainBlockHistoryPatch
+public static class PotionCreatureGainBlockHistoryPatch
 {
     [HarmonyPrefix]
     public static void Prefix(
         Creature creature,
         CardPlay? cardPlay,
-        out FortifierBlockCommandFrame? __state)
+        out PotionBlockCommandFrame? __state)
     {
         __state = null;
 
         try
         {
-            __state = FortifierBlockFrameTracker.BeginCommand(
+            __state = PotionBlockFrameTracker.BeginCommand(
                 creature,
                 cardPlay);
         }
         catch (Exception e)
         {
             CoreMain.LogDebug(
-                $"FortifierCreatureGainBlockHistoryPatch.Prefix failed: {e.Message}");
+                $"PotionCreatureGainBlockHistoryPatch.Prefix failed: {e.Message}");
         }
     }
 
     [HarmonyPostfix]
     public static void Postfix(
-        FortifierBlockCommandFrame? __state,
+        PotionBlockCommandFrame? __state,
         ref Task<decimal> __result)
     {
         if (__state == null) return;
         if (__result == null)
         {
-            FortifierBlockFrameTracker.EndCommand(__state);
+            PotionBlockFrameTracker.EndCommand(__state);
             return;
         }
 
@@ -377,48 +383,48 @@ public static class FortifierCreatureGainBlockHistoryPatch
     [HarmonyFinalizer]
     public static Exception? Finalizer(
         Exception? __exception,
-        FortifierBlockCommandFrame? __state)
+        PotionBlockCommandFrame? __state)
     {
         if (__exception != null && __state != null)
-            FortifierBlockFrameTracker.EndCommand(__state);
+            PotionBlockFrameTracker.EndCommand(__state);
         return __exception;
     }
 
     private static async Task<decimal> ObserveBlockAsync(
-        FortifierBlockCommandFrame state,
+        PotionBlockCommandFrame state,
         Task<decimal> inner)
     {
         try
         {
             var blockGained = await inner.ConfigureAwait(false);
             if (state.Potion != null)
-                RunTracker.RecordFortifierBlockGain(state.Potion, blockGained);
+                RunTracker.RecordPotionBlockGain(state.Potion, blockGained);
             return blockGained;
         }
         catch (Exception e)
         {
             CoreMain.LogDebug(
-                $"FortifierCreatureGainBlockHistoryPatch.ObserveBlockAsync failed: {e.Message}");
+                $"PotionCreatureGainBlockHistoryPatch.ObserveBlockAsync failed: {e.Message}");
             throw;
         }
         finally
         {
-            FortifierBlockFrameTracker.EndCommand(state);
+            PotionBlockFrameTracker.EndCommand(state);
         }
     }
 }
 
-internal static class FortifierBlockFrameTracker
+internal static class PotionBlockFrameTracker
 {
-    private static readonly AsyncLocal<FortifierUseFrame?> PendingUse = new();
-    private static readonly AsyncLocal<Stack<FortifierBlockCommandFrame>?>
+    private static readonly AsyncLocal<PotionBlockUseFrame?> PendingUse = new();
+    private static readonly AsyncLocal<Stack<PotionBlockCommandFrame>?>
         ActiveCommands = new();
 
-    internal static FortifierUseFrame BeginUse(
-        Fortifier potion,
+    internal static PotionBlockUseFrame BeginUse(
+        PotionModel potion,
         Creature target)
     {
-        var frame = new FortifierUseFrame(
+        var frame = new PotionBlockUseFrame(
             potion,
             target,
             PendingUse.Value);
@@ -426,17 +432,17 @@ internal static class FortifierBlockFrameTracker
         return frame;
     }
 
-    internal static void EndUse(FortifierUseFrame frame)
+    internal static void EndUse(PotionBlockUseFrame frame)
     {
         if (ReferenceEquals(PendingUse.Value, frame))
             PendingUse.Value = frame.Previous;
     }
 
-    internal static FortifierBlockCommandFrame BeginCommand(
+    internal static PotionBlockCommandFrame BeginCommand(
         Creature creature,
         CardPlay? cardPlay)
     {
-        Fortifier? potion = null;
+        PotionModel? potion = null;
         var pending = PendingUse.Value;
         if (cardPlay == null
             && pending != null
@@ -449,16 +455,16 @@ internal static class FortifierBlockFrameTracker
         var commands = ActiveCommands.Value;
         if (commands == null)
         {
-            commands = new Stack<FortifierBlockCommandFrame>();
+            commands = new Stack<PotionBlockCommandFrame>();
             ActiveCommands.Value = commands;
         }
 
-        var frame = new FortifierBlockCommandFrame(potion, creature);
+        var frame = new PotionBlockCommandFrame(potion, creature);
         commands.Push(frame);
         return frame;
     }
 
-    internal static void EndCommand(FortifierBlockCommandFrame frame)
+    internal static void EndCommand(PotionBlockCommandFrame frame)
     {
         var commands = ActiveCommands.Value;
         if (commands == null
@@ -473,9 +479,9 @@ internal static class FortifierBlockFrameTracker
             ActiveCommands.Value = null;
     }
 
-    internal static bool TryGetActiveFortifier(
+    internal static bool TryGetActivePotion(
         Creature creature,
-        out Fortifier? potion)
+        out PotionModel? potion)
     {
         potion = null;
         var commands = ActiveCommands.Value;
@@ -493,13 +499,13 @@ internal static class FortifierBlockFrameTracker
     }
 }
 
-public sealed record FortifierUseFrame(
-    Fortifier Potion,
+public sealed record PotionBlockUseFrame(
+    PotionModel Potion,
     Creature Target,
-    FortifierUseFrame? Previous);
+    PotionBlockUseFrame? Previous);
 
-public sealed record FortifierBlockCommandFrame(
-    Fortifier? Potion,
+public sealed record PotionBlockCommandFrame(
+    PotionModel? Potion,
     Creature Creature);
 
 /// <summary>

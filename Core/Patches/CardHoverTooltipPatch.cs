@@ -2,10 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using Godot;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.HoverTips;
+using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Cards;
+using MegaCrit.Sts2.Core.Models.Orbs;
 using MegaCrit.Sts2.Core.Nodes.Cards.Holders;
 using MegaCrit.Sts2.Core.Nodes.Screens.CardSelection;
 
@@ -25,6 +28,7 @@ public static class CardHoverShowPatch
     private const string BlockedDrawIconPath = DrawCardsNextTurnPowerIconPath;
     private const int DebtGoldLossPerTrigger = 5;
     private const string AggressionPowerId = "POWER.AGGRESSION";
+    private const string ConsumingShadowPowerId = "POWER.CONSUMING_SHADOW";
     private const string DanseMacabrePowerId = "POWER.DANSE_MACABRE";
     private const string DarkEmbracePowerId = "POWER.DARK_EMBRACE";
     private const string EntropyPowerId = "POWER.ENTROPY";
@@ -93,7 +97,10 @@ public static class CardHoverShowPatch
         bool compact = holder is NHandCardHolder
             && !RuntimeOptionsProvider.Current.UseVerboseHandStats;
         var body = BuildBodyBBCode(cardModel, displayName, compact);
-        statsTip = StatsTooltip.CreateNativeTip(displayName, body);
+        statsTip = StatsTooltip.CreateNativeTip(
+            displayName,
+            body,
+            stretchHorizontally: StatsTooltip.ContainsScalarStatTable(body));
         return true;
     }
 
@@ -365,6 +372,10 @@ public static class CardHoverShowPatch
             Row3(sb, "Played/Drawn", $"{agg.Plays}/{agg.TimesDrawn}", $"{playRate:F0}%");
         }
 
+        AppendDeathMarchStats(
+            sb,
+            cardModel,
+            RunTracker.GetDeathMarchCardsDrawnThisTurn(cardModel));
         Row3(sb, "Combats in deck", agg.CombatsInDeck.ToString(), "");
 
         if (etherealCardsPlayedThisCombat.HasValue)
@@ -377,6 +388,7 @@ public static class CardHoverShowPatch
         AppendSoulPileStats(sb, agg);
         AppendPhysicalMetaPowerSummary(sb, cardModel, metaStats);
         AppendAlchemizePotionStats(sb, cardModel, agg, compact: false);
+        AppendRandomCardGenerationStats(sb, cardModel, agg, compact: false);
         AppendJackOfAllTradesStats(sb, cardModel, agg, compact: false);
         AppendDiscoveryStats(sb, cardModel, agg, compact: false);
         AppendSplashStats(sb, cardModel, agg);
@@ -418,7 +430,12 @@ public static class CardHoverShowPatch
             Row3(sb, GetForgeStatLabel("avg gained"), FormatDecimal(avgGenerated), "");
         }
 
-        AppendOrbCreationStats(sb, agg, compact: false);
+        AppendOrbCreationStats(
+            sb,
+            cardModel,
+            agg,
+            metaStats,
+            compact: false);
 
         // Energy-spent rows — only rendered when the card's cost is actually
         // variable (see IsEnergyInteresting). Same 3-col layout as every
@@ -581,6 +598,10 @@ public static class CardHoverShowPatch
             Row3(sb, "Played/Drawn", $"{agg.Plays}/{agg.TimesDrawn}", $"{playRate:F0}%");
         }
 
+        AppendDeathMarchStats(
+            sb,
+            cardModel,
+            RunTracker.GetDeathMarchCardsDrawnThisTurn(cardModel));
         bool hasDedicatedPoison = AppendDedicatedPoisonStats(sb, agg, compact: true);
         AppendAppliedEffects(sb, agg, compact: true, excludePoison: hasDedicatedPoison);
 
@@ -593,7 +614,12 @@ public static class CardHoverShowPatch
         if (agg.TotalForgeGenerated > 0m)
             Row3(sb, GetForgeStatLabel("gained"), FormatDecimal(agg.TotalForgeGenerated), "");
 
-        AppendOrbCreationStats(sb, agg, compact: true);
+        AppendOrbCreationStats(
+            sb,
+            cardModel,
+            agg,
+            metaStats,
+            compact: true);
 
         if (etherealCardsPlayedThisCombat.HasValue)
             AppendPullFromBelowStats(sb, cardModel, etherealCardsPlayedThisCombat.Value);
@@ -605,6 +631,7 @@ public static class CardHoverShowPatch
         AppendSoulPileStats(sb, agg);
         AppendPhysicalMetaPowerSummary(sb, cardModel, metaStats);
         AppendAlchemizePotionStats(sb, cardModel, agg, compact: true);
+        AppendRandomCardGenerationStats(sb, cardModel, agg, compact: true);
         AppendJackOfAllTradesStats(sb, cardModel, agg, compact: true);
         AppendDiscoveryStats(sb, cardModel, agg, compact: true);
         AppendSplashStats(sb, cardModel, agg);
@@ -790,6 +817,20 @@ public static class CardHoverShowPatch
             aggregate,
             metaStats,
             detailed: true);
+        if (OrbCardRegistry.IsRecurringPowerId(definition.PowerId))
+        {
+            var powerOutcomes = new Dictionary<string, CardOrbAggregate>(
+                StringComparer.Ordinal);
+            MergeOrbOutcomesForDisplay(
+                powerOutcomes,
+                aggregate.OrbOutcomes);
+            AppendOrbOutcomeRows(
+                sb,
+                OrbCardRegistry.GetExpectedOrbIdsForPower(definition.PowerId),
+                powerOutcomes,
+                aggregate.TotalOrbsCreated,
+                compact: false);
+        }
         AppendMetaPowerRates(sb, definition, aggregate);
     }
 
@@ -820,8 +861,27 @@ public static class CardHoverShowPatch
         RunMetaStats metaStats,
         bool detailed)
     {
+        if (RandomCardGenerationRegistry.IsRecurringPowerId(
+                definition.PowerId))
+        {
+            AppendRandomCardGenerationOutcomeStats(
+                sb,
+                aggregate.RandomCardGeneration,
+                compact: !detailed,
+                combatsInDeck: 0,
+                metaPowerAggregate: aggregate);
+        }
+
         switch (definition.PowerId)
         {
+            case ConsumingShadowPowerId:
+                Row3(
+                    sb,
+                    "Orbs evoked",
+                    aggregate.OrbsEvoked.ToString(),
+                    "");
+                break;
+
             case JugglingPowerId:
                 Row3(sb, "Total attacks copied", aggregate.AttacksCopied.ToString(), "");
                 if (detailed)
@@ -1101,6 +1161,196 @@ public static class CardHoverShowPatch
         Row3(sb, "rare potions", agg.RarePotionsGained.ToString(), "");
     }
 
+    private static void AppendRandomCardGenerationStats(
+        StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel card,
+        CardAggregate agg,
+        bool compact)
+    {
+        if (!RandomCardGenerationRegistry.IsDirectGenerator(card)) return;
+
+        AppendRandomCardGenerationOutcomeStats(
+            sb,
+            agg.RandomCardGeneration,
+            compact,
+            agg.CombatsInDeck,
+            metaPowerAggregate: null);
+    }
+
+    private static void AppendRandomCardGenerationOutcomeStats(
+        StringBuilder sb,
+        RandomCardGenerationAggregate? generation,
+        bool compact,
+        int combatsInDeck,
+        PowerAggregate? metaPowerAggregate)
+    {
+        generation ??= new RandomCardGenerationAggregate();
+        var utilization = generation.CardsGenerated <= 0
+            ? 0m
+            : 100m * generation.GeneratedCardsPlayed / generation.CardsGenerated;
+
+        Row3(
+            sb,
+            "Cards generated",
+            generation.CardsGenerated.ToString(),
+            "",
+            "Cards that successfully entered a combat pile from this random-card generator.");
+        Row3(
+            sb,
+            "Generated cards played",
+            generation.GeneratedCardsPlayed.ToString(),
+            $"{utilization:0}%",
+            "Distinct physical generated cards that completed at least one play; the percentage is generated-card utilization.");
+
+        if (compact) return;
+
+        if (generation.GeneratedCardPlays > generation.GeneratedCardsPlayed)
+        {
+            Row3(
+                sb,
+                "All generated card plays",
+                generation.GeneratedCardPlays.ToString(),
+                "",
+                "Every completed play of a generated card, including replays of the same physical card.");
+        }
+
+        if (metaPowerAggregate == null)
+        {
+            var generatedPerCombat = combatsInDeck <= 0
+                ? 0m
+                : (decimal)generation.CardsGenerated / combatsInDeck;
+            Row3(
+                sb,
+                "Avg cards generated per combat",
+                FormatDecimal(generatedPerCombat),
+                "",
+                "Average successful generated-card arrivals across every combat this physical source card was in the deck, including combats with none.");
+        }
+        else
+        {
+            Row3(
+                sb,
+                "Avg cards generated per turn",
+                FormatDecimal(DivideMetaPowerRate(
+                    generation.CardsGenerated,
+                    metaPowerAggregate.MetaDeckTurns)),
+                "",
+                "Average generated cards per turn in combats where this Power card was in the permanent deck, including turns before activation.");
+            Row3(
+                sb,
+                "Avg cards generated while active per turn",
+                FormatDecimal(DivideMetaPowerRate(
+                    generation.CardsGenerated,
+                    metaPowerAggregate.MetaActiveTurns)),
+                "",
+                "Average generated cards per turn while at least one stack of the shared Power was active, including zero-output active turns.");
+            Row3(
+                sb,
+                "Avg cards generated per turn each active application",
+                FormatDecimal(DivideMetaPowerRate(
+                    generation.CardsGenerated,
+                    metaPowerAggregate.MetaActiveApplicationTurns)),
+                "",
+                "Average generated cards per active Power application per turn, so stacked applications contribute separately to the denominator.");
+        }
+
+        if (generation.CardsGenerated > 0
+            && (generation.EnergyCostBeforeDiscountTotal > 0
+                || generation.XCostCardsGenerated > 0))
+        {
+            var nonXCards = Math.Max(
+                1,
+                generation.CardsGenerated - generation.XCostCardsGenerated);
+            var averageCost = (decimal)generation.EnergyCostBeforeDiscountTotal
+                              / nonXCards;
+            Row3(
+                sb,
+                GetEnergyStatLabel("avg generated-card cost before discount"),
+                FormatDecimal(averageCost),
+                "");
+        }
+
+        if (generation.EnergyDiscountGrantedTotal > 0)
+        {
+            var averageDiscount = generation.CardsGenerated <= 0
+                ? 0m
+                : (decimal)generation.EnergyDiscountGrantedTotal
+                  / generation.CardsGenerated;
+            Row3(
+                sb,
+                GetEnergyStatLabel("avg discount granted"),
+                FormatDecimal(averageDiscount),
+                "");
+        }
+
+        if (generation.UpgradedCardsGenerated > 0)
+            Row3(sb, "Upgraded cards generated", generation.UpgradedCardsGenerated.ToString(), "");
+        if (generation.XCostCardsGenerated > 0)
+            Row3(sb, "X-cost cards generated", generation.XCostCardsGenerated.ToString(), "");
+
+        var positiveRarityBuckets = new[]
+        {
+            generation.BasicCardsGenerated,
+            generation.CommonCardsGenerated,
+            generation.UncommonCardsGenerated,
+            generation.RareCardsGenerated,
+            generation.StatusCardsGenerated,
+            generation.CurseCardsGenerated,
+            generation.OtherRarityCardsGenerated,
+        }.Count(value => value > 0);
+        if (positiveRarityBuckets > 1 || generation.OtherRarityCardsGenerated > 0)
+        {
+            if (generation.BasicCardsGenerated > 0)
+                Row3(sb, "Basic cards generated", generation.BasicCardsGenerated.ToString(), "");
+            if (generation.CommonCardsGenerated > 0)
+                Row3(sb, "Common cards generated", generation.CommonCardsGenerated.ToString(), "");
+            if (generation.UncommonCardsGenerated > 0)
+                Row3(sb, "Uncommon cards generated", generation.UncommonCardsGenerated.ToString(), "");
+            if (generation.RareCardsGenerated > 0)
+                Row3(sb, "Rare cards generated", generation.RareCardsGenerated.ToString(), "");
+            if (generation.StatusCardsGenerated > 0)
+                Row3(sb, "Statuses generated", generation.StatusCardsGenerated.ToString(), "");
+            if (generation.CurseCardsGenerated > 0)
+                Row3(sb, "Curses generated", generation.CurseCardsGenerated.ToString(), "");
+            if (generation.OtherRarityCardsGenerated > 0)
+                Row3(sb, "Other cards generated", generation.OtherRarityCardsGenerated.ToString(), "");
+        }
+
+        var positiveTypeBuckets = new[]
+        {
+            generation.AttacksGenerated,
+            generation.SkillsGenerated,
+            generation.PowersGenerated,
+            generation.OtherTypeCardsGenerated,
+        }.Count(value => value > 0);
+        if (positiveTypeBuckets > 1)
+        {
+            if (generation.AttacksGenerated > 0)
+                Row3(sb, "Attacks generated", generation.AttacksGenerated.ToString(), "");
+            if (generation.SkillsGenerated > 0)
+                Row3(sb, "Skills generated", generation.SkillsGenerated.ToString(), "");
+            if (generation.PowersGenerated > 0)
+                Row3(sb, "Powers generated", generation.PowersGenerated.ToString(), "");
+            if (generation.OtherTypeCardsGenerated > 0)
+                Row3(sb, "Other cards generated", generation.OtherTypeCardsGenerated.ToString(), "");
+        }
+
+        var nonHandDestinations = generation.CardsAddedToDrawPile
+                                  + generation.CardsAddedToDiscardPile
+                                  + generation.CardsAddedElsewhere;
+        if (nonHandDestinations > 0)
+        {
+            if (generation.CardsAddedToHand > 0)
+                Row3(sb, "Cards added to hand", generation.CardsAddedToHand.ToString(), "");
+            if (generation.CardsAddedToDrawPile > 0)
+                Row3(sb, "Cards added to draw pile", generation.CardsAddedToDrawPile.ToString(), "");
+            if (generation.CardsAddedToDiscardPile > 0)
+                Row3(sb, "Cards added to discard pile", generation.CardsAddedToDiscardPile.ToString(), "");
+            if (generation.CardsAddedElsewhere > 0)
+                Row3(sb, "Cards added elsewhere", generation.CardsAddedElsewhere.ToString(), "");
+        }
+    }
+
     private static void AppendJackOfAllTradesStats(
         StringBuilder sb,
         MegaCrit.Sts2.Core.Models.CardModel card,
@@ -1108,6 +1358,11 @@ public static class CardHoverShowPatch
         bool compact)
     {
         if (card is not JackOfAllTrades && !IsCardId(card, "CARD.JACK_OF_ALL_TRADES")) return;
+
+        // The common generator aggregate supersedes Jack's original exact-add
+        // rows once new observation-era data exists. Keep the legacy display
+        // for older run files instead of showing two copies of the same facts.
+        if (agg.RandomCardGeneration?.CardsGenerated > 0) return;
 
         Row3(sb, "Colorless cards added", agg.JackColorlessCardsAdded.ToString(), "");
         if (compact) return;
@@ -1197,19 +1452,19 @@ public static class CardHoverShowPatch
 
         Row3(
             sb,
-            "Commons taken",
+            "Common Attacks taken",
             agg.SplashCommonAttacksTaken.ToString(),
             "",
             "Common Attacks selected from Splash.");
         Row3(
             sb,
-            "Uncommons taken",
+            "Uncommon Attacks taken",
             agg.SplashUncommonAttacksTaken.ToString(),
             "",
             "Uncommon Attacks selected from Splash.");
         Row3(
             sb,
-            "Rares taken",
+            "Rare Attacks taken",
             agg.SplashRareAttacksTaken.ToString(),
             "",
             "Rare Attacks selected from Splash.");
@@ -1935,20 +2190,10 @@ public static class CardHoverShowPatch
     }
 
     /// <summary>
-    /// Emit a single stat row in the canonical 4-column layout used for
-    /// every stat line in the tooltip. <paramref name="pct"/> can be empty
-    /// — the cell's still present so the label and value columns align
-    /// vertically with rows that DO have a percentage (Overkill, Blocked,
-    /// Played/Drawn). The cell padding keeps adjacent columns from
-    /// crowding visually (fixes "Played/Drawn1/1100%"-style crowding).
-    ///
-    /// The first compact column holds the informational hover icon. Column
-    /// weights after that are label=4, value=1, percent=1. Label dominates
-    /// (~66% of width) so the label text always fits; numeric columns
-    /// are narrow since their content is typically 1-5 chars.
-    /// Padding: label gets right-padding (12px), value gets right-padding
-    /// (12px) so it sits off the percent column, percent gets left-side
-    /// padding from value's right-padding and small right-padding (4px).
+    /// Emit a single stat row in the canonical natural-width scalar table.
+    /// Consecutive rows share the table, so the widest label establishes one
+    /// left-aligned value column. <paramref name="pct"/> can be empty; its
+    /// cell remains present so percentage-bearing rows retain the same shape.
     /// </summary>
     private static void Row3(
         StringBuilder sb,
@@ -1957,14 +2202,15 @@ public static class CardHoverShowPatch
         string pct,
         string? fullDescription = null)
     {
-        sb.Append("[table=4]");
-        sb.Append("[cell expand=0 padding=0,0,10,0]");
-        sb.Append(StatsTooltip.RenderRowInformationHint(label, fullDescription));
-        sb.Append("[/cell]");
-        sb.Append($"[cell expand=4 padding=0,0,12,0][color=#e0e0e0]{label}[/color][/cell]");
-        sb.Append($"[cell expand=1 padding=0,0,12,0][right][b]{value}[/b][/right][/cell]");
-        sb.Append($"[cell expand=1 padding=0,0,4,0][right][color=#b5b5b5]{pct}[/color][/right][/cell]");
-        sb.Append("[/table]\n");
+        var presentation = StatsTooltip.CreateStatRowPresentation(
+            label,
+            fullDescription);
+        StatsTooltip.AppendScalarStatRow(
+            sb,
+            presentation,
+            value,
+            pct,
+            labelColor: "#e0e0e0");
     }
 
     /// <summary>
@@ -1975,16 +2221,32 @@ public static class CardHoverShowPatch
     /// </summary>
     private static void RowDual(StringBuilder sb, string leftLabel, string leftValue, string rightLabel, string rightValue)
     {
+        var leftPresentation = StatsTooltip.CreateStatRowPresentation(leftLabel);
+        var rightPresentation = StatsTooltip.CreateStatRowPresentation(rightLabel);
         sb.Append("[table=6]");
         sb.Append("[cell expand=0 padding=0,0,10,0]");
-        sb.Append(StatsTooltip.RenderRowInformationHint(leftLabel));
+        sb.Append(StatConceptGlossary.RenderInformationHint(
+            leftPresentation.FullDescription));
         sb.Append("[/cell]");
-        sb.Append($"[cell expand=3 padding=0,0,12,0][color=#e0e0e0]{leftLabel}[/color][/cell]");
+        sb.Append("[cell expand=3 padding=0,0,12,0][color=#e0e0e0]");
+        StatsTooltip.AppendConceptLabel(
+            sb,
+            leftPresentation.ConceptIds,
+            leftPresentation.DenominatorConceptIds,
+            leftPresentation.Label);
+        sb.Append("[/color][/cell]");
         sb.Append($"[cell expand=1 padding=0,0,18,0][right][b]{leftValue}[/b][/right][/cell]");
         sb.Append("[cell expand=0 padding=0,0,10,0]");
-        sb.Append(StatsTooltip.RenderRowInformationHint(rightLabel));
+        sb.Append(StatConceptGlossary.RenderInformationHint(
+            rightPresentation.FullDescription));
         sb.Append("[/cell]");
-        sb.Append($"[cell expand=3 padding=0,0,12,0][color=#e0e0e0]{rightLabel}[/color][/cell]");
+        sb.Append("[cell expand=3 padding=0,0,12,0][color=#e0e0e0]");
+        StatsTooltip.AppendConceptLabel(
+            sb,
+            rightPresentation.ConceptIds,
+            rightPresentation.DenominatorConceptIds,
+            rightPresentation.Label);
+        sb.Append("[/color][/cell]");
         sb.Append($"[cell expand=1 padding=0,0,4,0][right][b]{rightValue}[/b][/right][/cell]");
         sb.Append("[/table]\n");
     }
@@ -2112,6 +2374,25 @@ public static class CardHoverShowPatch
             "avg gained" => "Forge avg",
             _ => $"Forge {suffix}",
         };
+    }
+
+    private static void AppendDeathMarchStats(
+        StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel cardModel,
+        int cardsDrawnThisTurn)
+    {
+        if (cardModel is not DeathMarch
+            && !IsCardId(cardModel, "CARD.DEATH_MARCH"))
+        {
+            return;
+        }
+
+        Row3(
+            sb,
+            "Cards drawn this turn",
+            Math.Max(0, cardsDrawnThisTurn).ToString(),
+            "",
+            "Cards drawn this turn — successful draws by this card's owner during the current turn, excluding the automatic opening-hand draw to match Death March's damage scaling.");
     }
 
     private static void AppendMakeItSoStats(
@@ -2357,25 +2638,128 @@ public static class CardHoverShowPatch
 
     private static void AppendOrbCreationStats(
         StringBuilder sb,
+        MegaCrit.Sts2.Core.Models.CardModel? cardModel,
         CardAggregate agg,
+        RunMetaStats? metaStats,
         bool compact)
     {
-        var outcomes = agg.OrbOutcomes?.Values
+        var expectedOrbIds = new HashSet<string>(
+            OrbCardRegistry.GetExpectedOrbIds(cardModel),
+            StringComparer.Ordinal);
+        var combined = new Dictionary<string, CardOrbAggregate>(
+            StringComparer.Ordinal);
+        MergeOrbOutcomesForDisplay(combined, agg.OrbOutcomes);
+        var totalOrbsCreated = agg.TotalOrbsCreated;
+
+        if (cardModel != null
+            && OrbCardRegistry.TryGetRecurringByCard(
+                cardModel,
+                out var definition)
+            && definition != null)
+        {
+            foreach (var orbId in OrbCardRegistry.GetExpectedOrbIdsForPower(
+                         definition.PowerId))
+            {
+                expectedOrbIds.Add(orbId);
+            }
+
+            var powerAggregate = GetOrbPowerAggregate(
+                metaStats,
+                definition);
+            totalOrbsCreated += powerAggregate.TotalOrbsCreated;
+            MergeOrbOutcomesForDisplay(combined, powerAggregate.OrbOutcomes);
+        }
+
+        AppendOrbOutcomeRows(
+            sb,
+            expectedOrbIds,
+            combined,
+            totalOrbsCreated,
+            compact);
+    }
+
+    private static PowerAggregate GetOrbPowerAggregate(
+        RunMetaStats? metaStats,
+        OrbPowerDefinition definition)
+    {
+        if (metaStats?.PowerAggregates != null
+            && metaStats.PowerAggregates.TryGetValue(
+                definition.PowerId,
+                out var aggregate))
+        {
+            return aggregate;
+        }
+
+        return new PowerAggregate
+        {
+            PowerId = definition.PowerId,
+            DisplayName = definition.DisplayName,
+        };
+    }
+
+    private static void AppendOrbOutcomeRows(
+        StringBuilder sb,
+        IEnumerable<string> expectedOrbIdSource,
+        Dictionary<string, CardOrbAggregate> combined,
+        int totalOrbsCreated,
+        bool compact)
+    {
+        var expectedOrbIds = expectedOrbIdSource.ToHashSet(
+            StringComparer.Ordinal);
+        var observedOrbIds = combined.Values
             .Where(outcome =>
                 outcome != null
                 && (outcome.Created > 0
                     || outcome.PassiveActivations > 0
                     || outcome.Evokes > 0
                     || outcome.Fizzles > 0
-                    || outcome.BlockGained > 0))
-            .OrderBy(outcome => outcome.OrbId, StringComparer.Ordinal)
-            .ToList()
-            ?? new List<CardOrbAggregate>();
+                    || outcome.BlockGained > 0
+                    || outcome.EnergyGenerated > 0
+                    || HasOrbDamageStats(outcome)))
+            .Select(outcome => outcome.OrbId)
+            .Where(orbId => !string.IsNullOrWhiteSpace(orbId))
+            .ToHashSet(StringComparer.Ordinal);
 
-        if (compact || outcomes.Count == 0)
+        // Fixed one-to-three-orb cards show their complete zero state. Random
+        // generators (Chaos and Trash to Treasure) avoid a five-type wall and
+        // expand only as each actual orb type is observed.
+        var orbIdsToRender = new HashSet<string>(observedOrbIds, StringComparer.Ordinal);
+        if (expectedOrbIds.Count <= 3)
+            orbIdsToRender.UnionWith(expectedOrbIds);
+
+        var outcomes = orbIdsToRender
+            .Select(orbId => combined.TryGetValue(orbId, out var outcome)
+                ? outcome
+                : new CardOrbAggregate { OrbId = orbId })
+            .OrderBy(outcome => outcome.OrbId, StringComparer.Ordinal)
+            .ToList();
+
+        if (compact)
         {
-            if (agg.TotalOrbsCreated > 0)
-                Row3(sb, "Orbs created", agg.TotalOrbsCreated.ToString(), "");
+            if (totalOrbsCreated > 0 || expectedOrbIds.Count > 0)
+            {
+                var compactOrbIds = outcomes.Count > 0
+                    ? outcomes.Select(outcome => outcome.OrbId)
+                    : expectedOrbIds;
+                Row3(
+                    sb,
+                    GetOrbGroupStatLabel(compactOrbIds, "created"),
+                    totalOrbsCreated.ToString(),
+                    "");
+            }
+            return;
+        }
+
+        if (outcomes.Count == 0)
+        {
+            if (totalOrbsCreated > 0 || expectedOrbIds.Count > 0)
+            {
+                Row3(
+                    sb,
+                    GetOrbGroupStatLabel(expectedOrbIds, "created"),
+                    totalOrbsCreated.ToString(),
+                    "");
+            }
             return;
         }
 
@@ -2405,6 +2789,40 @@ public static class CardHoverShowPatch
                 outcome.Fizzles.ToString(),
                 "");
 
+            if (IsDamageOrbId(orbId) || HasOrbDamageStats(outcome))
+            {
+                Row3(
+                    sb,
+                    GetOrbStatLabel(orbId, "damage attempted"),
+                    outcome.DamageAttempted.ToString(),
+                    "");
+                Row3(
+                    sb,
+                    GetOrbStatLabel(orbId, "damage dealt"),
+                    outcome.DamageDealt.ToString(),
+                    "");
+                Row3(
+                    sb,
+                    GetOrbStatLabel(orbId, "damage blocked"),
+                    outcome.DamageBlocked.ToString(),
+                    "");
+                Row3(
+                    sb,
+                    GetOrbStatLabel(orbId, "overkill"),
+                    outcome.DamageOverkill.ToString(),
+                    "");
+                Row3(
+                    sb,
+                    GetOrbStatLabel(orbId, "kills"),
+                    outcome.Kills.ToString(),
+                    "");
+                Row3(
+                    sb,
+                    GetOrbStatLabel(orbId, "targets hit"),
+                    outcome.TargetsHit.ToString(),
+                    "");
+            }
+
             if (IsFrostOrbId(orbId))
             {
                 Row3(
@@ -2413,30 +2831,214 @@ public static class CardHoverShowPatch
                     outcome.BlockGained.ToString(),
                     "");
             }
+
+            if (IsPlasmaOrbId(orbId))
+            {
+                Row3(
+                    sb,
+                    GetPlasmaOrbEnergyStatLabel(),
+                    outcome.EnergyGenerated.ToString(),
+                    "");
+            }
+        }
+    }
+
+    private static void MergeOrbOutcomesForDisplay(
+        Dictionary<string, CardOrbAggregate> target,
+        Dictionary<string, CardOrbAggregate>? source)
+    {
+        if (source == null) return;
+
+        foreach (var (key, value) in source)
+        {
+            if (value == null) continue;
+            var orbId = NormalizeOrbId(
+                string.IsNullOrWhiteSpace(value.OrbId) ? key : value.OrbId);
+            if (!target.TryGetValue(orbId, out var combined))
+            {
+                combined = new CardOrbAggregate { OrbId = orbId };
+                target[orbId] = combined;
+            }
+
+            combined.Created += value.Created;
+            combined.PassiveActivations += value.PassiveActivations;
+            combined.Evokes += value.Evokes;
+            combined.Fizzles += value.Fizzles;
+            combined.BlockGained += value.BlockGained;
+            combined.EnergyGenerated += value.EnergyGenerated;
+            combined.DamageAttempted += value.DamageAttempted;
+            combined.DamageDealt += value.DamageDealt;
+            combined.DamageBlocked += value.DamageBlocked;
+            combined.DamageOverkill += value.DamageOverkill;
+            combined.Kills += value.Kills;
+            combined.TargetsHit += value.TargetsHit;
         }
     }
 
     private static string GetOrbStatLabel(string orbId, string suffix)
     {
-        return GetInlineIconStatLabel(GetOrbIconPath(orbId), suffix);
+        return $"{RenderOrbInlineIcon(orbId)} {suffix}";
+    }
+
+    private static string GetOrbGroupStatLabel(
+        IEnumerable<string> orbIds,
+        string suffix)
+    {
+        var icons = orbIds
+            .Where(orbId => !string.IsNullOrWhiteSpace(orbId))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(orbId => orbId, StringComparer.Ordinal)
+            .Select(RenderOrbInlineIcon)
+            .ToList();
+        if (icons.Count == 0)
+            icons.Add(RenderOrbInlineIcon("ORB.UNKNOWN"));
+
+        return $"{string.Join(" ", icons)} {suffix}";
+    }
+
+    internal static string RenderOrbInlineIcon(string orbId)
+    {
+        // Godot 4's RichTextLabel uses named width/height attributes. The old
+        // [img=16x16] form survives the vocabulary parser but renders as an
+        // empty slot, which is why the screenshot showed only the semantic
+        // activation/damage icons.
+        return StatConceptGlossary.RenderHintedInlineImage(
+            GetOrbIconPath(orbId),
+            GetOrbHint(orbId));
+    }
+
+    private static string GetOrbHint(string orbId)
+    {
+        var normalizedOrbId = NormalizeOrbId(orbId);
+        var fallbackTitle = RunTracker.FormatOrbIdForDisplay(normalizedOrbId);
+
+        try
+        {
+            var orb = ModelDb.GetByIdOrNull<OrbModel>(
+                ModelId.Deserialize(normalizedOrbId));
+            if (orb == null) return fallbackTitle;
+
+            var title = GetLocalizedOrbText(
+                () => orb.Title.GetFormattedText(),
+                () => orb.Title.GetRawText(),
+                fallbackTitle);
+            var description = GetLocalizedOrbText(
+                () => orb.Description.GetFormattedText(),
+                () => orb.Description.GetRawText(),
+                string.Empty);
+            description = StripBbcodeForHint(description);
+
+            return string.IsNullOrWhiteSpace(description)
+                ? title
+                : $"{title}: {description}";
+        }
+        catch
+        {
+            // Historical stats can contain an orb that no longer resolves in
+            // the current model database. Its readable ID is still a useful
+            // hint, and avoids making the image silently non-interactive.
+            return fallbackTitle;
+        }
+    }
+
+    private static string GetLocalizedOrbText(
+        Func<string> getFormattedText,
+        Func<string> getRawText,
+        string fallback)
+    {
+        try
+        {
+            var text = getFormattedText();
+            if (!string.IsNullOrWhiteSpace(text)) return text;
+        }
+        catch
+        {
+        }
+
+        try
+        {
+            var text = getRawText();
+            if (!string.IsNullOrWhiteSpace(text)) return text;
+        }
+        catch
+        {
+        }
+
+        return fallback;
+    }
+
+    private static string StripBbcodeForHint(string value)
+    {
+        const string escapedBracketPlaceholder = "\uE000";
+        var protectedEscapedBrackets = value.Replace(
+            "[lb]",
+            escapedBracketPlaceholder,
+            StringComparison.Ordinal);
+        var withoutTags = Regex.Replace(protectedEscapedBrackets, @"\[[^\]]+\]", " ");
+        return Regex.Replace(withoutTags, @"\s+", " ")
+            .Replace(escapedBracketPlaceholder, "[", StringComparison.Ordinal)
+            .Trim();
     }
 
     private static string GetFrostOrbBlockStatLabel()
     {
-        return $"[img={InlineKeywordIconSize}x{InlineKeywordIconSize}]"
-            + $"{GetOrbIconPath("ORB.FROST")}[/img] "
+        return $"{RenderOrbInlineIcon(OrbCardRegistry.FrostOrbId)} "
             + $"[img={InlineKeywordIconSize}x{InlineKeywordIconSize}]"
             + $"{BlockIconPath}[/img]";
     }
 
+    private static string GetPlasmaOrbEnergyStatLabel()
+    {
+        return $"{RenderOrbInlineIcon(OrbCardRegistry.PlasmaOrbId)} "
+            + GetEnergyStatLabel("");
+    }
+
     private static bool IsFrostOrbId(string orbId)
     {
-        return orbId.EndsWith(".FROST", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(orbId, "FROST", StringComparison.OrdinalIgnoreCase);
+        return string.Equals(
+            NormalizeOrbId(orbId),
+            OrbCardRegistry.FrostOrbId,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsDamageOrbId(string orbId)
+    {
+        var normalized = NormalizeOrbId(orbId);
+        return string.Equals(
+                   normalized,
+                   OrbCardRegistry.LightningOrbId,
+                   StringComparison.OrdinalIgnoreCase)
+            || string.Equals(
+                normalized,
+                OrbCardRegistry.DarkOrbId,
+                StringComparison.OrdinalIgnoreCase)
+            || string.Equals(
+                normalized,
+                OrbCardRegistry.GlassOrbId,
+                StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsPlasmaOrbId(string orbId)
+    {
+        return string.Equals(
+            NormalizeOrbId(orbId),
+            OrbCardRegistry.PlasmaOrbId,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool HasOrbDamageStats(CardOrbAggregate outcome)
+    {
+        return outcome.DamageAttempted > 0
+            || outcome.DamageDealt > 0
+            || outcome.DamageBlocked > 0
+            || outcome.DamageOverkill > 0
+            || outcome.Kills > 0
+            || outcome.TargetsHit > 0;
     }
 
     private static string GetOrbIconPath(string orbId)
     {
+        orbId = NormalizeOrbId(orbId);
         var separator = orbId.LastIndexOf('.');
         var entry = separator >= 0 && separator < orbId.Length - 1
             ? orbId[(separator + 1)..]
@@ -2452,6 +3054,26 @@ public static class CardHoverShowPatch
             safeEntry = "unknown";
 
         return $"res://images/orbs/{safeEntry}.png";
+    }
+
+    private static string NormalizeOrbId(string? orbId)
+    {
+        if (string.IsNullOrWhiteSpace(orbId)) return "ORB.UNKNOWN";
+
+        var separator = orbId.LastIndexOf('.');
+        var entry = separator >= 0 && separator < orbId.Length - 1
+            ? orbId[(separator + 1)..]
+            : orbId;
+        var canonicalEntry = entry.ToUpperInvariant() switch
+        {
+            "DARK" or "DARK_ORB" => "DARK_ORB",
+            "FROST" or "FROST_ORB" => "FROST_ORB",
+            "GLASS" or "GLASS_ORB" => "GLASS_ORB",
+            "LIGHTNING" or "LIGHTNING_ORB" => "LIGHTNING_ORB",
+            "PLASMA" or "PLASMA_ORB" => "PLASMA_ORB",
+            _ => entry,
+        };
+        return $"ORB.{canonicalEntry}";
     }
 
     private static void AppendBlockedDrawReasonRows(StringBuilder sb, CardAggregate agg, int blockedGap)

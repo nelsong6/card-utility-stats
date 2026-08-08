@@ -90,11 +90,12 @@ public static class CardRewardAttributedRelicPopulateStatsPatch
     {
         try
         {
-            if (__state == 0 || __instance?.IsPopulated != true) return;
+            if (__instance?.IsPopulated != true) return;
             if ((__state & 1) != 0)
                 RunTracker.RecordWhiteStarOffers(__instance);
             if ((__state & 2) != 0)
                 RunTracker.RecordPrayerWheelOffers(__instance);
+            RunTracker.NoteLastingCandyReward(__instance);
         }
         catch (Exception e)
         {
@@ -124,6 +125,7 @@ public static class CardRewardAttributedRelicOnSelectStatsPatch
             RunTracker.NotePrayerWheelRewardOpened(__instance);
             RunTracker.NoteSilkenTressRewardOpened(__instance);
             RunTracker.NoteWingCharmRewardOpened(__instance);
+            RunTracker.NoteLastingCandyReward(__instance);
         }
         catch (Exception e)
         {
@@ -150,7 +152,10 @@ public static class CardRewardAttributedRelicOnSelectStatsPatch
             RunTracker.RecordPrayerWheelRewardResolved(reward, completed);
             RunTracker.RecordSilkenTressRewardResolved(reward);
             if (completed)
+            {
                 RunTracker.RecordWingCharmRewardResolved(reward);
+                RunTracker.RecordLastingCandyRewardResolved(reward);
+            }
         }
         catch (Exception e)
         {
@@ -158,6 +163,7 @@ public static class CardRewardAttributedRelicOnSelectStatsPatch
             RunTracker.RecordPrayerWheelRewardResolved(reward, completed: false);
             RunTracker.CancelSilkenTressReward(reward);
             RunTracker.CancelWingCharmReward(reward);
+            RunTracker.CancelLastingCandyReward(reward);
             CoreMain.LogDebug(
                 $"CardRewardAttributedRelicOnSelectStatsPatch failed: {e.Message}");
         }
@@ -180,6 +186,8 @@ public static class CardRewardAttributedRelicOnSkippedStatsPatch
             RunTracker.RecordPrayerWheelRewardSkipped(__instance);
             RunTracker.CancelSilkenTressReward(__instance);
             RunTracker.RecordWingCharmRewardResolved(__instance);
+            RunTracker.NoteLastingCandyReward(__instance);
+            RunTracker.RecordLastingCandyRewardResolved(__instance);
         }
         catch (Exception e)
         {
@@ -202,6 +210,8 @@ public static class CardRewardAttributedRelicRerollStatsPatch
         try
         {
             RunTracker.RecordWingCharmRewardResolved(__instance);
+            RunTracker.NoteLastingCandyReward(__instance);
+            RunTracker.RecordLastingCandyRewardResolved(__instance);
         }
         catch (Exception e)
         {
@@ -219,6 +229,7 @@ public static class CardRewardAttributedRelicRerollStatsPatch
             RunTracker.RefreshPrayerWheelRewardAfterReroll(__instance);
             RunTracker.RefreshSilkenTressRewardAfterReroll(__instance);
             RunTracker.NoteWingCharmRewardOpened(__instance);
+            RunTracker.NoteLastingCandyReward(__instance);
         }
         catch (Exception e)
         {

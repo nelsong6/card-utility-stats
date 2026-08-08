@@ -26,12 +26,18 @@ public class CardAggregatePoolerTests
             TimesReplayExtraPlayed = 1,
             TimesReplayAttackNoDamage = 1,
         };
-        first.OrbOutcomes["ORB.LIGHTNING"] = new CardOrbAggregate
+        first.OrbOutcomes["ORB.LIGHTNING_ORB"] = new CardOrbAggregate
         {
-            OrbId = "ORB.LIGHTNING",
+            OrbId = "ORB.LIGHTNING_ORB",
             Created = 2,
             PassiveActivations = 4,
             Evokes = 1,
+            DamageAttempted = 10,
+            DamageDealt = 8,
+            DamageBlocked = 1,
+            DamageOverkill = 1,
+            Kills = 1,
+            TargetsHit = 2,
         };
         first.AppliedEffects["POWER.ARTIFACT"] = new AppliedEffectAggregate
         {
@@ -84,13 +90,19 @@ public class CardAggregatePoolerTests
             TimesReplayExtraPlayed = 3,
             TimesReplayAttackNoDamage = 2,
         };
-        second.OrbOutcomes["ORB.LIGHTNING"] = new CardOrbAggregate
+        second.OrbOutcomes["ORB.LIGHTNING_ORB"] = new CardOrbAggregate
         {
-            OrbId = "ORB.LIGHTNING",
+            OrbId = "ORB.LIGHTNING_ORB",
             Created = 3,
             PassiveActivations = 6,
             Evokes = 2,
             Fizzles = 1,
+            DamageAttempted = 20,
+            DamageDealt = 15,
+            DamageBlocked = 3,
+            DamageOverkill = 2,
+            Kills = 2,
+            TargetsHit = 4,
         };
         second.AppliedEffects["POWER.VULNERABLE"] = new AppliedEffectAggregate
         {
@@ -148,10 +160,16 @@ public class CardAggregatePoolerTests
         Assert.Equal(3, pooled.TotalBlocked);
         Assert.Equal(3, pooled.TimesExhausted);
         Assert.Equal(5, pooled.TotalOrbsCreated);
-        Assert.Equal(5, pooled.OrbOutcomes["ORB.LIGHTNING"].Created);
-        Assert.Equal(10, pooled.OrbOutcomes["ORB.LIGHTNING"].PassiveActivations);
-        Assert.Equal(3, pooled.OrbOutcomes["ORB.LIGHTNING"].Evokes);
-        Assert.Equal(1, pooled.OrbOutcomes["ORB.LIGHTNING"].Fizzles);
+        Assert.Equal(5, pooled.OrbOutcomes["ORB.LIGHTNING_ORB"].Created);
+        Assert.Equal(10, pooled.OrbOutcomes["ORB.LIGHTNING_ORB"].PassiveActivations);
+        Assert.Equal(3, pooled.OrbOutcomes["ORB.LIGHTNING_ORB"].Evokes);
+        Assert.Equal(1, pooled.OrbOutcomes["ORB.LIGHTNING_ORB"].Fizzles);
+        Assert.Equal(30, pooled.OrbOutcomes["ORB.LIGHTNING_ORB"].DamageAttempted);
+        Assert.Equal(23, pooled.OrbOutcomes["ORB.LIGHTNING_ORB"].DamageDealt);
+        Assert.Equal(4, pooled.OrbOutcomes["ORB.LIGHTNING_ORB"].DamageBlocked);
+        Assert.Equal(3, pooled.OrbOutcomes["ORB.LIGHTNING_ORB"].DamageOverkill);
+        Assert.Equal(3, pooled.OrbOutcomes["ORB.LIGHTNING_ORB"].Kills);
+        Assert.Equal(6, pooled.OrbOutcomes["ORB.LIGHTNING_ORB"].TargetsHit);
         Assert.Equal(4, pooled.TimesCardsDrawAttempted);
         Assert.Equal(3, pooled.TimesCardsDrawBlocked);
         Assert.Equal(18, pooled.TotalOstyHpAttackBonus);

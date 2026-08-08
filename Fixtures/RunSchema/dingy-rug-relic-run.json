@@ -1,0 +1,29 @@
+{
+  "run_id": "schema-dingy-rug-relic",
+  "started_at": "2026-08-05T00:00:00Z",
+  "updated_at": "2026-08-05T00:18:00Z",
+  "outcome": "in_progress",
+  "character": "CHAR.IRONCLAD",
+  "ascension": 0,
+  "floor_reached": 8,
+  "game_start_time": 1785888000,
+  "aggregates": {},
+  "events": [],
+  "instance_numbers_by_def": {},
+  "def_counters": {},
+  "relic_aggregates": {
+    "RELIC.DINGY_RUG": {
+      "card_rewards_affected": 3,
+      "card_reward_categories": {
+        "ironclad": {
+          "display_name": "Ironclad",
+          "count": 6
+        },
+        "colorless": {
+          "display_name": "Colorless",
+          "count": 3
+        }
+      }
+    }
+  }
+}

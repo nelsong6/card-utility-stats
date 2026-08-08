@@ -627,7 +627,11 @@ internal static class PotionCompendiumHistoryUi
                 entry.SeenLocationName,
                 entry.SeenTurn);
             AppendTooltipRow(body, "Method", entry.AcquisitionMethod);
-            AppendTooltipRow(body, "Outcome", "Not taken");
+            AppendTooltipRow(
+                body,
+                "Outcome",
+                $"not {StatConceptGlossary.RenderHintedGlyph("taken")}",
+                valueIsBbcode: true);
             return body.ToString().TrimEnd();
         }
 
@@ -635,11 +639,12 @@ internal static class PotionCompendiumHistoryUi
         {
             AppendLocationRows(
                 body,
-                "Acquired",
+                StatConceptGlossary.RenderHintedGlyph("taken"),
                 entry.AcquiredFloor,
                 entry.AcquiredLocationKind,
                 entry.AcquiredLocationName,
-                entry.AcquiredTurn);
+                entry.AcquiredTurn,
+                timingLabelIsBbcode: true);
             AppendTooltipRow(body, "Method", entry.AcquisitionMethod);
             if (!entry.Used
                 && !entry.Discarded
@@ -757,18 +762,30 @@ internal static class PotionCompendiumHistoryUi
         StringBuilder body,
         string label,
         string value,
-        string? fullDescription = null)
+        string? fullDescription = null,
+        bool valueIsBbcode = false,
+        bool labelIsBbcode = false)
     {
         if (!string.IsNullOrWhiteSpace(fullDescription))
         {
-            body.Append(StatsTooltip.RenderRowInformationHint(
+            var presentation = StatsTooltip.CreateStatRowPresentation(
                 label,
-                fullDescription));
-            body.Append(' ');
+                fullDescription);
+            body.Append(StatConceptGlossary.RenderInformationHint(
+                    presentation.FullDescription))
+                .Append(' ');
+            StatsTooltip.AppendConceptLabel(
+                body,
+                presentation.ConceptIds,
+                presentation.DenominatorConceptIds,
+                presentation.Label);
         }
-        body.Append(StatsTooltip.EscapeBbcode(label));
+        else
+        {
+            body.Append(labelIsBbcode ? label : StatsTooltip.EscapeBbcode(label));
+        }
         body.Append("  [b]");
-        body.Append(StatsTooltip.EscapeBbcode(value));
+        body.Append(valueIsBbcode ? value : StatsTooltip.EscapeBbcode(value));
         body.Append("[/b]\n");
     }
 
@@ -778,7 +795,8 @@ internal static class PotionCompendiumHistoryUi
         int? floor,
         string? kind,
         string? name,
-        int? turn)
+        int? turn,
+        bool timingLabelIsBbcode = false)
     {
         var hasKind = !string.IsNullOrWhiteSpace(kind);
         var hasName = !string.IsNullOrWhiteSpace(name);
@@ -789,7 +807,8 @@ internal static class PotionCompendiumHistoryUi
                 ? $"Floor {floor.Value}"
                 : hasKind || hasName
                     ? "Floor unknown"
-                    : "Unknown location");
+                    : "Unknown location",
+            labelIsBbcode: timingLabelIsBbcode);
 
         if (hasKind && hasName)
         {

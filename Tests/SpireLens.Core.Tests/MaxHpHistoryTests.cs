@@ -91,12 +91,29 @@ public class MaxHpHistoryTests
                 },
             ]);
 
-        Assert.Contains("HP lost in combats   [b]30[/b]", body);
-        Assert.Contains("HP lost in events   [b]10[/b]", body);
-        Assert.Contains("Avg HP lost per floor   [b]5[/b]", body);
-        Assert.Contains("Avg HP lost per combat   [b]10[/b]", body);
-        Assert.Contains("Max HP gained   [b]14[/b]", body);
-        Assert.Contains("Max HP lost   [b]7[/b]", body);
+        var rows = body.Split('\n');
+        Assert.Contains(rows, row => row.Contains("Damage:")
+            && row.Contains("In:")
+            && row.Contains("All:")
+            && row.Contains("Combat:")
+            && row.Contains("[b]30[/b]"));
+        Assert.Contains(rows, row => row.Contains("Damage:")
+            && row.Contains("In:")
+            && row.Contains("All:")
+            && row.Contains("Unknown room:")
+            && row.Contains("[b]10[/b]"));
+        Assert.Contains(rows, row => row.Contains("Average:")
+            && row.Contains("Floor:")
+            && row.Contains("[b]5[/b]"));
+        Assert.Contains(rows, row => row.Contains("Average:")
+            && row.Contains("Combat:")
+            && row.Contains("[b]10[/b]"));
+        Assert.Contains(rows, row => row.Contains("Maximum HP gained:")
+            && row.Contains("[b]14[/b]"));
+        Assert.Contains(rows, row => row.Contains("Max HP:")
+            && row.Contains("lost")
+            && row.Contains("[b]7[/b]"));
+        Assert.DoesNotContain("Max HP gained   [b]", body);
         Assert.Contains(
             StatConceptGlossary.RenderInformationHint("HP lost to combat damage this run."),
             body);

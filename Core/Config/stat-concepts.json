@@ -11,6 +11,16 @@
         "description": "An activation occurs when an effect successfully triggers."
       }
     },
+    "all": {
+      "display": {
+        "type": "embedded_image",
+        "resource": "Assets.stat-all.svg"
+      },
+      "help": {
+        "label": "All",
+        "description": "All relevant instances of the concept that follows."
+      }
+    },
     "attack": {
       "display": {
         "type": "game_resource",
@@ -154,6 +164,16 @@
       "help": {
         "label": "Combat",
         "description": "A combat encounter or a value measured across combats."
+      }
+    },
+    "curse": {
+      "display": {
+        "type": "embedded_image",
+        "resource": "Assets.stat-curse.svg"
+      },
+      "help": {
+        "label": "Curse",
+        "description": "A Curse card or a count of Curse cards."
       }
     },
     "damage": {
@@ -378,6 +398,16 @@
         "description": "The player's current HP at the observed moment."
       }
     },
+    "in": {
+      "display": {
+        "type": "embedded_image",
+        "resource": "Assets.stat-in.svg"
+      },
+      "help": {
+        "label": "In",
+        "description": "Scopes the preceding stat to the concept that follows."
+      }
+    },
     "max_hp": {
       "display": {
         "type": "game_resource",
@@ -427,6 +457,16 @@
       "help": {
         "label": "Osty summon gained",
         "description": "An increase to Osty's summon amount."
+      }
+    },
+    "per": {
+      "display": {
+        "type": "embedded_image",
+        "resource": "Assets.stat-per.svg"
+      },
+      "help": {
+        "label": "Per",
+        "description": "Divides the preceding stat by each instance of the concept that follows."
       }
     },
     "potion": {
@@ -641,6 +681,16 @@
         "description": "Regent Stars gained, spent, saved, or otherwise measured by a stat."
       }
     },
+    "status": {
+      "display": {
+        "type": "embedded_image",
+        "resource": "Assets.stat-status.svg"
+      },
+      "help": {
+        "label": "Status",
+        "description": "A Status card or a count of Status cards."
+      }
+    },
     "strength": {
       "display": {
         "type": "game_resource",
@@ -680,6 +730,16 @@
       "help": {
         "label": "Taken",
         "description": "An offered item or reward selected by the player."
+      }
+    },
+    "targets_hit": {
+      "display": {
+        "type": "embedded_image",
+        "resource": "Assets.stat-targets-hit.svg"
+      },
+      "help": {
+        "label": "Targets hit",
+        "description": "Distinct enemies or other targets hit by the tracked card, relic, potion, or effect."
       }
     },
     "turn": {

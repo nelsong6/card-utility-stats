@@ -30,6 +30,9 @@ public class GremlinHornStatsTests
         Assert.Equal(0, agg.Activations);
         Assert.Equal(0, agg.EnergyGenerated);
         Assert.Equal(0, agg.AdditionalCardsDrawn);
+        Assert.Equal(0, agg.GremlinHornRateActivations);
+        Assert.Equal(0, agg.GremlinHornTurns);
+        Assert.Equal(0, agg.GremlinHornCombats);
     }
 
     [Fact]
@@ -41,6 +44,9 @@ public class GremlinHornStatsTests
             Activations = 3,
             EnergyGenerated = 3,
             AdditionalCardsDrawn = 2,
+            GremlinHornRateActivations = 3,
+            GremlinHornTurns = 5,
+            GremlinHornCombats = 2,
         };
 
         var json = JsonSerializer.Serialize(run, SerializerOptions);
@@ -48,6 +54,9 @@ public class GremlinHornStatsTests
         Assert.Contains("activations", json);
         Assert.Contains("energy_generated", json);
         Assert.Contains("additional_cards_drawn", json);
+        Assert.Contains("gremlin_horn_rate_activations", json);
+        Assert.Contains("gremlin_horn_turns", json);
+        Assert.Contains("gremlin_horn_combats", json);
 
         var restored = JsonSerializer.Deserialize<RunData>(json, SerializerOptions);
 
@@ -56,26 +65,72 @@ public class GremlinHornStatsTests
         Assert.Equal(3, agg.Activations);
         Assert.Equal(3, agg.EnergyGenerated);
         Assert.Equal(2, agg.AdditionalCardsDrawn);
+        Assert.Equal(3, agg.GremlinHornRateActivations);
+        Assert.Equal(5, agg.GremlinHornTurns);
+        Assert.Equal(2, agg.GremlinHornCombats);
     }
 
     [Fact]
-    public void RelicTooltip_GremlinHorn_ShowsActivationsEnergyAndCardsDrawn()
+    public void RelicTooltip_GremlinHorn_ShowsEnergyGainAndActivationRates()
     {
         var agg = new RelicAggregate
         {
-            Activations = 3,
-            EnergyGenerated = 3,
-            AdditionalCardsDrawn = 2,
+            Activations = 6,
+            EnergyGenerated = 5,
+            AdditionalCardsDrawn = 4,
+            GremlinHornRateActivations = 6,
+            GremlinHornTurns = 8,
+            GremlinHornCombats = 3,
         };
 
         var body = (string)(BuildGremlinHornBodyMethod.Invoke(null, new object?[] { agg })
             ?? throw new InvalidOperationException("BuildGremlinHornBodyBBCode returned null."));
 
         Assert.Contains("Activations", body);
-        Assert.Contains("Energy generated", body);
+        Assert.Contains("Energy gained", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("energy_gained"), body);
+        Assert.DoesNotContain("Energy generated", body);
         Assert.Contains("Cards drawn", body);
-        Assert.Contains("[b]3[/b]", body);
+        Assert.Contains("Average activations per turn", body);
+        Assert.Contains("Average activations per combat", body);
+        Assert.Contains("[b]0.75[/b]", body);
         Assert.Contains("[b]2[/b]", body);
+    }
+
+    [Fact]
+    public void HeldPeriodDenominatorsAndMerge_AreZeroInclusiveAndAdditive()
+    {
+        var target = new RelicAggregate
+        {
+            GremlinHornRateActivations = 2,
+            GremlinHornTurns = 3,
+            GremlinHornCombats = 1,
+        };
+        var source = new RelicAggregate
+        {
+            GremlinHornRateActivations = 4,
+            GremlinHornTurns = 5,
+            GremlinHornCombats = 2,
+        };
+
+        RunTracker.RecordGremlinHornTurnForTest(target, 2);
+        RunTracker.RecordGremlinHornCombatForTest(target);
+        RunTracker.MergeRelicAggregateInto(target, source);
+
+        Assert.Equal(6, target.GremlinHornRateActivations);
+        Assert.Equal(10, target.GremlinHornTurns);
+        Assert.Equal(4, target.GremlinHornCombats);
+    }
+
+    [Fact]
+    public void Activation_IncrementsLifetimeAndMatchingRateWindowNumerators()
+    {
+        var agg = new RelicAggregate { Activations = 7 };
+
+        RunTracker.RecordGremlinHornActivationForTest(agg, 2);
+
+        Assert.Equal(9, agg.Activations);
+        Assert.Equal(2, agg.GremlinHornRateActivations);
     }
 
     [Fact]
@@ -104,5 +159,8 @@ public class GremlinHornStatsTests
         Assert.Equal(0, agg.Activations);
         Assert.Equal(0, agg.EnergyGenerated);
         Assert.Equal(0, agg.AdditionalCardsDrawn);
+        Assert.Equal(0, agg.GremlinHornRateActivations);
+        Assert.Equal(0, agg.GremlinHornTurns);
+        Assert.Equal(0, agg.GremlinHornCombats);
     }
 }

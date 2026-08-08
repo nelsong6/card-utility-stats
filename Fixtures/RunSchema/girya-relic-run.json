@@ -1,0 +1,29 @@
+{
+  "run_id": "girya-relic-fixture",
+  "started_at": "2026-08-04T21:00:00Z",
+  "updated_at": "2026-08-04T21:20:00Z",
+  "outcome": "in_progress",
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.GIRYA": {
+      "floor_acquired": 5,
+      "activations": 3,
+      "strength_added": 6,
+      "girya_strength_rate_added": 6,
+      "girya_strength_combats": 4,
+      "girya_attacks_played": 7,
+      "girya_attack_hits": 12,
+      "girya_count_floor_total": 11,
+      "girya_floor_samples": 10,
+      "girya_last_floor_sampled": 14,
+      "girya_use_floor_distance_total": 9,
+      "girya_use_floor_distance_samples": 3,
+      "girya_last_use_floor": 14,
+      "girya_last_observed_lift_count": 3
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

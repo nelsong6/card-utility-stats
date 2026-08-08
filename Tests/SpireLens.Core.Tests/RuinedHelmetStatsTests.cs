@@ -139,13 +139,18 @@ public class RuinedHelmetStatsTests
 
         Assert.Contains("Times activated", body);
         Assert.Contains("[b]2[/b]", body);
+        Assert.Contains("Activated this combat", body);
+        Assert.Contains("[b]true[/b]", body);
         Assert.Contains("Total strength gained", body);
         Assert.Contains("[b]7.5[/b]", body);
         Assert.Contains("Strength gained this combat", body);
         Assert.Contains("[b]2[/b]", body);
-        Assert.Contains("Avg strength gained per activation", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("average"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("strength_gained"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("per"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("activation"), body);
         Assert.Contains("[b]3.75[/b]", body);
-        Assert.Contains("Avg strength gained per combat", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("combat"), body);
         Assert.Contains("[b]2.5[/b]", body);
     }
 
@@ -155,11 +160,16 @@ public class RuinedHelmetStatsTests
         var body = BuildBody(new RelicAggregate { StrengthAdded = 4m });
 
         Assert.Contains("Times activated", body);
+        Assert.Contains("Activated this combat", body);
+        Assert.Contains("[b]false[/b]", body);
         Assert.Contains("Total strength gained", body);
         Assert.Contains("[b]4[/b]", body);
         Assert.Contains("Strength gained this combat", body);
-        Assert.Contains("Avg strength gained per activation", body);
-        Assert.Contains("Avg strength gained per combat", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("average"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("strength_gained"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("per"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("activation"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("combat"), body);
         Assert.Contains("[b]0[/b]", body);
     }
 

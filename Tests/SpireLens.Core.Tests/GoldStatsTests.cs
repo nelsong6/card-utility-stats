@@ -92,31 +92,37 @@ public class GoldStatsTests
 
         var rows = body.Split('\n');
         Assert.Contains(rows, row => row.Contains("Gold gained:")
-            && row.Contains("Acquired   [b]480[/b]"));
+            && row.Contains("[b]480[/b]"));
         Assert.Contains(rows, row => row.Contains("Gold:")
-            && row.Contains("Spent   [b]300[/b]"));
+            && row.Contains("Spent")
+            && row.Contains("[b]300[/b]"));
         Assert.Contains(rows, row => row.Contains("Merchant:")
             && row.Contains("Gold:")
-            && row.Contains("Spent   [b]220[/b]"));
+            && row.Contains("Spent")
+            && row.Contains("[b]220[/b]"));
         Assert.Contains(rows, row => row.Contains("Average:")
             && row.Contains("Merchant:")
             && row.Contains("Gold:")
-            && row.Contains("Spent   [b]55[/b]"));
+            && row.Contains("Spent")
+            && row.Contains("[b]55[/b]"));
         Assert.Contains(rows, row => row.Contains("Unknown room:")
             && row.Contains("Gold:")
-            && row.Contains("Spent   [b]50[/b]"));
+            && row.Contains("Spent")
+            && row.Contains("[b]50[/b]"));
         Assert.Contains(rows, row => row.Contains("Average:")
             && row.Contains("Floor:")
             && row.Contains("Gold gained:")
-            && row.Contains("Gained   [b]40[/b]"));
+            && row.Contains("[b]40[/b]"));
         Assert.Contains(rows, row => row.Contains("Average:")
             && row.Contains("Combat:")
             && row.Contains("Gold gained:")
-            && row.Contains("Gained   [b]18[/b]"));
+            && row.Contains("[b]18[/b]"));
         Assert.Contains(rows, row => row.Contains("Average:")
             && row.Contains("Unknown room:")
             && row.Contains("Gold gained:")
-            && row.Contains("Gained   [b]16[/b]"));
+            && row.Contains("[b]16[/b]"));
+        Assert.DoesNotContain("Gained   [b]", body);
+        Assert.DoesNotContain("Acquired   [b]", body);
         Assert.Contains(
             StatConceptGlossary.RenderInformationHint("All gold acquired this run."),
             body);

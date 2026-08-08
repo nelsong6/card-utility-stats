@@ -84,7 +84,10 @@ internal static class RunHistoryStatsContext
             aggregate,
             run.MetaStats,
             GetPermanentUpgradeEvents(run, key));
-        statsTip = StatsTooltip.CreateNativeTip(title, body);
+        statsTip = StatsTooltip.CreateNativeTip(
+            title,
+            body,
+            stretchHorizontally: StatsTooltip.ContainsScalarStatTable(body));
         return true;
     }
 
@@ -103,7 +106,10 @@ internal static class RunHistoryStatsContext
         if (!HasCurrent || !TryBuildCardTooltip(entry, out var title, out var body))
             return false;
 
-        statsTip = StatsTooltip.CreateNativeTip(title, body);
+        statsTip = StatsTooltip.CreateNativeTip(
+            title,
+            body,
+            stretchHorizontally: StatsTooltip.ContainsScalarStatTable(body));
         return true;
     }
 
@@ -272,6 +278,7 @@ internal static class RunHistoryStatsContext
             cursedPearlCurseAgg,
             neowsBonesCurseAggs,
             storybookBrightestFlameAgg,
+            run.MetaStats,
             out title,
             out body);
         if (relicModel.IsWax)

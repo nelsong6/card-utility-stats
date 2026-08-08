@@ -146,7 +146,11 @@ public class BingBongStatsTests
 
         Assert.True(recognized);
         Assert.Equal("Bing Bong", title);
-        Assert.Contains("Extra cards added", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("card"), body);
+        Assert.Contains(
+            StatConceptGlossary.RenderInformationHint(
+                "Extra cards successfully added to the permanent deck by Bing Bong."),
+            body);
     }
 
     [Fact]

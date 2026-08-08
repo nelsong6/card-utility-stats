@@ -642,6 +642,20 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsConsumingShadowPowerFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("consuming-shadow-power-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        AssertConsumingShadowPowerFixture(
+            loaded.Data.MetaStats.PowerAggregates["POWER.CONSUMING_SHADOW"]);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsMetaPowerRegistryFixture()
     {
         var loaded = RunStorage.LoadHistorical(
@@ -828,6 +842,22 @@ public class SchemaLoadingTests
         var unboundAgg = loaded.Data.RelicAggregates["RELIC.PHYLACTERY_UNBOUND"];
         Assert.Equal(4, unboundAgg.Activations);
         Assert.Equal(20m, unboundAgg.TotalOstyHpSummoned);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsPhylacteryOstyBodyFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("phylactery-osty-body-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        var stats = loaded.Data.MetaStats;
+        Assert.Equal(42m, stats.TotalOstyHpSummoned);
+        Assert.Equal(27m, stats.TotalOstyHpWhenUnleashPlayed);
+        Assert.Equal(30m, stats.TotalOstyDamageAbsorbed);
+        Assert.Equal(6, stats.OstyBodyTurns);
+        Assert.Equal(2, stats.OstyBodyCombats);
     }
 
     [Fact]
@@ -1568,6 +1598,17 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void ResumableLoad_AcceptsConsumingShadowPowerFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("consuming-shadow-power-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertConsumingShadowPowerFixture(
+            resumed!.MetaStats.PowerAggregates["POWER.CONSUMING_SHADOW"]);
+    }
+
+    [Fact]
     public void ResumableLoad_AcceptsMetaPowerRegistryFixture()
     {
         var resumed = RunStorage.LoadResumable(
@@ -1703,6 +1744,19 @@ public class SchemaLoadingTests
         var unboundAgg = resumed.RelicAggregates["RELIC.PHYLACTERY_UNBOUND"];
         Assert.Equal(4, unboundAgg.Activations);
         Assert.Equal(20m, unboundAgg.TotalOstyHpSummoned);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsPhylacteryOstyBodyFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("phylactery-osty-body-run.json"));
+
+        Assert.NotNull(resumed);
+        Assert.Equal(42m, resumed!.MetaStats.TotalOstyHpSummoned);
+        Assert.Equal(27m, resumed.MetaStats.TotalOstyHpWhenUnleashPlayed);
+        Assert.Equal(30m, resumed.MetaStats.TotalOstyDamageAbsorbed);
+        Assert.Equal(6, resumed.MetaStats.OstyBodyTurns);
+        Assert.Equal(2, resumed.MetaStats.OstyBodyCombats);
     }
 
     [Fact]
@@ -1858,6 +1912,20 @@ public class SchemaLoadingTests
         Assert.Equal(3, relicAgg.CardRewardCategories["defect"].Count);
         Assert.Equal("Defect", relicAgg.CardRewardCategories["defect"].DisplayName);
         Assert.Equal(1, relicAgg.CardRewardCategories["colorless"].Count);
+        Assert.Equal("Colorless", relicAgg.CardRewardCategories["colorless"].DisplayName);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsDingyRugRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("dingy-rug-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.DINGY_RUG"];
+        Assert.Equal(3, relicAgg.CardRewardsAffected);
+        Assert.Equal(6, relicAgg.CardRewardCategories["ironclad"].Count);
+        Assert.Equal("Ironclad", relicAgg.CardRewardCategories["ironclad"].DisplayName);
+        Assert.Equal(3, relicAgg.CardRewardCategories["colorless"].Count);
         Assert.Equal("Colorless", relicAgg.CardRewardCategories["colorless"].DisplayName);
     }
 
@@ -3543,6 +3611,11 @@ public class SchemaLoadingTests
         Assert.True(loaded!.SupportsResume);
         var relicAgg = loaded.Data.RelicAggregates["RELIC.PAELS_EYE"];
         Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(11, relicAgg.PaelsEyeCardsExhausted);
+        Assert.Equal(3, relicAgg.PaelsEyeStrikesAndDefendsExhausted);
+        Assert.Equal(7, relicAgg.PaelsEyeActivationTurnTotal);
+        Assert.Equal(3, relicAgg.PaelsEyeActivationTurnSamples);
+        Assert.Equal(8, relicAgg.PaelsEyeCombats);
         Assert.Equal(4, relicAgg.StatusCardsExhausted);
         Assert.Equal(2, relicAgg.CurseCardsExhausted);
         Assert.Equal(5, relicAgg.CombatsWithoutActivation);
@@ -3556,6 +3629,11 @@ public class SchemaLoadingTests
         Assert.NotNull(resumed);
         var relicAgg = resumed!.RelicAggregates["RELIC.PAELS_EYE"];
         Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(11, relicAgg.PaelsEyeCardsExhausted);
+        Assert.Equal(3, relicAgg.PaelsEyeStrikesAndDefendsExhausted);
+        Assert.Equal(7, relicAgg.PaelsEyeActivationTurnTotal);
+        Assert.Equal(3, relicAgg.PaelsEyeActivationTurnSamples);
+        Assert.Equal(8, relicAgg.PaelsEyeCombats);
         Assert.Equal(4, relicAgg.StatusCardsExhausted);
         Assert.Equal(2, relicAgg.CurseCardsExhausted);
         Assert.Equal(5, relicAgg.CombatsWithoutActivation);
@@ -4701,6 +4779,15 @@ public class SchemaLoadingTests
         Assert.Equal(3, powerAgg.CombatsActive);
     }
 
+    private static void AssertConsumingShadowPowerFixture(PowerAggregate powerAgg)
+    {
+        Assert.Equal("POWER.CONSUMING_SHADOW", powerAgg.PowerId);
+        Assert.Equal("Consuming Shadow", powerAgg.DisplayName);
+        Assert.Equal(3, powerAgg.PowerCardsPlayed);
+        Assert.Equal(3, powerAgg.SuccessfulApplications);
+        Assert.Equal(7, powerAgg.OrbsEvoked);
+    }
+
     private static void AssertMetaPowerRegistryFixture(RunMetaStats metaStats)
     {
         var danse = metaStats.PowerAggregates["POWER.DANSE_MACABRE"];
@@ -4870,6 +4957,12 @@ public class SchemaLoadingTests
         Assert.Equal(3, relicAgg.CrackedCoreOrbEvokes);
         Assert.Equal(7, relicAgg.CrackedCoreOrbPassiveTriggers);
         Assert.Equal(1, relicAgg.CrackedCoreOrbFizzles);
+        Assert.Equal(15, relicAgg.TotalDamageAttempted);
+        Assert.Equal(10, relicAgg.TotalDamageDealt);
+        Assert.Equal(2, relicAgg.TotalDamageBlocked);
+        Assert.Equal(3, relicAgg.TotalDamageOverkill);
+        Assert.Equal(1, relicAgg.Kills);
+        Assert.Equal(2, relicAgg.TotalTargets);
     }
 
     private static void AssertSymbioticVirusFixture(RelicAggregate relicAgg)
@@ -4884,19 +4977,19 @@ public class SchemaLoadingTests
         Assert.Equal(7, relicAgg.Activations);
         Assert.Equal(
             4,
-            relicAgg.GoldPlatedCablesActivationsByOrbType["ORB.LIGHTNING"]
+            relicAgg.GoldPlatedCablesActivationsByOrbType["ORB.LIGHTNING_ORB"]
                 .Activations);
         Assert.Equal(
             "Lightning",
-            relicAgg.GoldPlatedCablesActivationsByOrbType["ORB.LIGHTNING"]
+            relicAgg.GoldPlatedCablesActivationsByOrbType["ORB.LIGHTNING_ORB"]
                 .DisplayName);
         Assert.Equal(
             2,
-            relicAgg.GoldPlatedCablesActivationsByOrbType["ORB.FROST"]
+            relicAgg.GoldPlatedCablesActivationsByOrbType["ORB.FROST_ORB"]
                 .Activations);
         Assert.Equal(
             1,
-            relicAgg.GoldPlatedCablesActivationsByOrbType["ORB.PLASMA"]
+            relicAgg.GoldPlatedCablesActivationsByOrbType["ORB.PLASMA_ORB"]
                 .Activations);
         Assert.Equal(3, relicAgg.GoldPlatedCablesNoOrbTargets);
     }
@@ -5333,7 +5426,7 @@ public class SchemaLoadingTests
         Assert.True(loaded!.SupportsResume);
         AssertCardOrbLifecycleFixture(
             loaded.Data.Aggregates["CARD.GLACIER#1"]);
-        Assert.Equal("ORB.FROST", loaded.Data.Events[0].OrbId);
+        Assert.Equal("ORB.FROST_ORB", loaded.Data.Events[0].OrbId);
         Assert.Contains(loaded.Data.Events, entry => entry.Type == "orb_passive");
         Assert.Contains(loaded.Data.Events, entry => entry.Type == "orb_evoked");
         Assert.Contains(loaded.Data.Events, entry => entry.Type == "orb_fizzled");
@@ -5351,19 +5444,107 @@ public class SchemaLoadingTests
         Assert.NotNull(resumed);
         AssertCardOrbLifecycleFixture(
             resumed!.Aggregates["CARD.GLACIER#1"]);
-        Assert.Equal("ORB.FROST", resumed.Events[0].OrbId);
+        Assert.Equal("ORB.FROST_ORB", resumed.Events[0].OrbId);
     }
 
     private static void AssertCardOrbLifecycleFixture(CardAggregate aggregate)
     {
         Assert.Equal(6, aggregate.TotalOrbsCreated);
-        var frost = aggregate.OrbOutcomes["ORB.FROST"];
-        Assert.Equal("ORB.FROST", frost.OrbId);
+        var frost = aggregate.OrbOutcomes["ORB.FROST_ORB"];
+        Assert.Equal("ORB.FROST_ORB", frost.OrbId);
         Assert.Equal(6, frost.Created);
         Assert.Equal(9, frost.PassiveActivations);
         Assert.Equal(4, frost.Evokes);
         Assert.Equal(1, frost.Fizzles);
         Assert.Equal(28, frost.BlockGained);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsBallLightningOrbDamageFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("ball-lightning-orb-damage-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertBallLightningOrbDamageFixture(
+            loaded.Data.Aggregates["CARD.BALL_LIGHTNING#1"]);
+        Assert.Equal(4, loaded.Data.Events.Count(entry =>
+            entry.Type == "orb_damage"
+            && entry.OrbId == "ORB.LIGHTNING_ORB"));
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsBallLightningOrbDamageFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("ball-lightning-orb-damage-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertBallLightningOrbDamageFixture(
+            resumed!.Aggregates["CARD.BALL_LIGHTNING#1"]);
+    }
+
+    private static void AssertBallLightningOrbDamageFixture(
+        CardAggregate aggregate)
+    {
+        Assert.Equal(2, aggregate.TotalOrbsCreated);
+        Assert.Equal(0, aggregate.TotalIntended);
+        Assert.Equal(0, aggregate.TotalEffective);
+        var lightning = aggregate.OrbOutcomes["ORB.LIGHTNING_ORB"];
+        Assert.Equal("ORB.LIGHTNING_ORB", lightning.OrbId);
+        Assert.Equal(2, lightning.Created);
+        Assert.Equal(3, lightning.PassiveActivations);
+        Assert.Equal(1, lightning.Evokes);
+        Assert.Equal(0, lightning.Fizzles);
+        Assert.Equal(18, lightning.DamageAttempted);
+        Assert.Equal(12, lightning.DamageDealt);
+        Assert.Equal(4, lightning.DamageBlocked);
+        Assert.Equal(2, lightning.DamageOverkill);
+        Assert.Equal(1, lightning.Kills);
+        Assert.Equal(4, lightning.TargetsHit);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsDefectOrbFamilyFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("defect-orb-family-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertDefectOrbFamilyFixture(loaded.Data);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsDefectOrbFamilyFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("defect-orb-family-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertDefectOrbFamilyFixture(resumed!);
+    }
+
+    private static void AssertDefectOrbFamilyFixture(RunData run)
+    {
+        var plasma = run.Aggregates["CARD.FUSION#1"]
+            .OrbOutcomes["ORB.PLASMA_ORB"];
+        Assert.Equal(5, plasma.EnergyGenerated);
+
+        var storm = run.MetaStats.PowerAggregates["POWER.STORM"];
+        Assert.Equal(3, storm.TotalOrbsCreated);
+        var lightning = storm.OrbOutcomes["ORB.LIGHTNING_ORB"];
+        Assert.Equal(3, lightning.Created);
+        Assert.Equal(4, lightning.PassiveActivations);
+        Assert.Equal(2, lightning.Evokes);
+        Assert.Equal(1, lightning.Fizzles);
+        Assert.Equal(24, lightning.DamageAttempted);
+        Assert.Equal(19, lightning.DamageDealt);
+        Assert.Equal(3, lightning.DamageBlocked);
+        Assert.Equal(2, lightning.DamageOverkill);
+        Assert.Equal(1, lightning.Kills);
+        Assert.Equal(6, lightning.TargetsHit);
     }
 
     [Fact]
@@ -6013,6 +6194,42 @@ public class SchemaLoadingTests
         Assert.Equal("ENCOUNTER.GREMLIN_LEADER", relicAgg.SwordInTheStoneElitesSlain[2].EncounterId);
         Assert.Equal(2, relicAgg.Activations);
         Assert.Equal(6, relicAgg.StrengthAdded);
+        Assert.Equal(0m, relicAgg.SwordInTheStoneStrengthRateAdded);
+        Assert.Equal(0, relicAgg.SwordInTheStoneStrengthCombats);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsSwordInTheStoneStrengthRatesFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("sword-in-the-stone-strength-rates-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertSwordInTheStoneStrengthRatesFixture(
+            loaded.Data.RelicAggregates["RELIC.SWORD_OF_STONE"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsSwordInTheStoneStrengthRatesFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("sword-in-the-stone-strength-rates-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertSwordInTheStoneStrengthRatesFixture(
+            resumed!.RelicAggregates["RELIC.SWORD_OF_STONE"]);
+    }
+
+    private static void AssertSwordInTheStoneStrengthRatesFixture(
+        RelicAggregate relicAgg)
+    {
+        Assert.Equal(8, relicAgg.FloorAcquired);
+        Assert.Equal(3, relicAgg.SwordInTheStoneElitesSlain.Count);
+        Assert.Equal(4, relicAgg.Activations);
+        Assert.Equal(12m, relicAgg.StrengthAdded);
+        Assert.Equal(9m, relicAgg.SwordInTheStoneStrengthRateAdded);
+        Assert.Equal(4, relicAgg.SwordInTheStoneStrengthCombats);
     }
 
     [Fact]
@@ -6180,6 +6397,232 @@ public class SchemaLoadingTests
                 Assert.Equal(14, activation.Floor);
                 Assert.Equal(0m, activation.HpRestored);
             });
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsGamePieceRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("game-piece-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertGamePieceFixture(
+            loaded.Data.RelicAggregates["RELIC.GAME_PIECE"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsGamePieceRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("game-piece-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertGamePieceFixture(
+            resumed!.RelicAggregates["RELIC.GAME_PIECE"]);
+    }
+
+    private static void AssertGamePieceFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(5, relicAgg.Activations);
+        Assert.Equal(4, relicAgg.AdditionalCardsDrawn);
+        Assert.Equal(1, relicAgg.AdditionalCardDrawsBlocked);
+        Assert.Equal(8, relicAgg.GamePieceTurns);
+        Assert.Equal(2, relicAgg.GamePieceCombats);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsRandomCardGenerationFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("random-card-generation-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertRandomCardGenerationFixture(loaded.Data);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsRandomCardGenerationFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("random-card-generation-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertRandomCardGenerationFixture(resumed!);
+    }
+
+    private static void AssertRandomCardGenerationFixture(RunData run)
+    {
+        var cardGeneration = run.Aggregates["CARD.METAMORPHOSIS#1"]
+            .RandomCardGeneration!;
+        Assert.Equal(6, cardGeneration.CardsGenerated);
+        Assert.Equal(4, cardGeneration.GeneratedCardsPlayed);
+        Assert.Equal(5, cardGeneration.GeneratedCardPlays);
+        Assert.Equal(2, cardGeneration.CommonCardsGenerated);
+        Assert.Equal(3, cardGeneration.UncommonCardsGenerated);
+        Assert.Equal(1, cardGeneration.RareCardsGenerated);
+        Assert.Equal(6, cardGeneration.AttacksGenerated);
+        Assert.Equal(3, cardGeneration.UpgradedCardsGenerated);
+        Assert.Equal(11, cardGeneration.EnergyCostBeforeDiscountTotal);
+        Assert.Equal(11, cardGeneration.EnergyDiscountGrantedTotal);
+        Assert.Equal(6, cardGeneration.CardsAddedToDrawPile);
+        Assert.Equal(
+            3,
+            cardGeneration.CardsById["CARD.STRIKE_IRONCLAD"].Plays);
+
+        var power = run.MetaStats.PowerAggregates["POWER.CREATIVE_AI"];
+        Assert.Equal(10, power.MetaDeckTurns);
+        Assert.Equal(7, power.MetaActiveTurns);
+        Assert.Equal(11, power.MetaActiveApplicationTurns);
+        var powerGeneration = power.RandomCardGeneration!;
+        Assert.Equal(7, powerGeneration.CardsGenerated);
+        Assert.Equal(3, powerGeneration.GeneratedCardsPlayed);
+        Assert.Equal(4, powerGeneration.GeneratedCardPlays);
+        Assert.Equal(7, powerGeneration.PowersGenerated);
+        Assert.Equal(17, powerGeneration.EnergyCostBeforeDiscountTotal);
+        Assert.Equal(7, powerGeneration.CardsAddedToHand);
+        Assert.Equal(
+            2,
+            powerGeneration.CardsById["CARD.ECHO_FORM"].Plays);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsGoldenPearlRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("golden-pearl-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertGoldenPearlFixture(loaded.Data);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsGoldenPearlRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("golden-pearl-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertGoldenPearlFixture(resumed!);
+    }
+
+    private static void AssertGoldenPearlFixture(RunData run)
+    {
+        Assert.Equal(
+            5,
+            run.RelicAggregates["RELIC.GOLDEN_PEARL"]
+                .FloorsBeforeFirstGoldExpense);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsGiryaRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("girya-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertGiryaFixture(loaded.Data);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsGiryaRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("girya-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertGiryaFixture(resumed!);
+    }
+
+    private static void AssertGiryaFixture(RunData run)
+    {
+        var relic = run.RelicAggregates["RELIC.GIRYA"];
+        Assert.Equal(5, relic.FloorAcquired);
+        Assert.Equal(3, relic.Activations);
+        Assert.Equal(6m, relic.StrengthAdded);
+        Assert.Equal(6m, relic.GiryaStrengthRateAdded);
+        Assert.Equal(4, relic.GiryaStrengthCombats);
+        Assert.Equal(7, relic.GiryaAttacksPlayed);
+        Assert.Equal(12, relic.GiryaAttackHits);
+        Assert.Equal(11, relic.GiryaCountFloorTotal);
+        Assert.Equal(10, relic.GiryaFloorSamples);
+        Assert.Equal(14, relic.GiryaLastFloorSampled);
+        Assert.Equal(9, relic.GiryaUseFloorDistanceTotal);
+        Assert.Equal(3, relic.GiryaUseFloorDistanceSamples);
+        Assert.Equal(14, relic.GiryaLastUseFloor);
+        Assert.Equal(3, relic.GiryaLastObservedLiftCount);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsLastingCandyRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("lasting-candy-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertLastingCandyFixture(loaded.Data);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsLastingCandyRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("lasting-candy-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertLastingCandyFixture(resumed!);
+    }
+
+    private static void AssertLastingCandyFixture(RunData run)
+    {
+        var relic = run.RelicAggregates["RELIC.LASTING_CANDY"];
+        Assert.Equal(5, relic.LastingCandyPowersOffered);
+        Assert.Equal(2, relic.LastingCandyPowersTaken);
+        Assert.Equal(3, relic.LastingCandyPowersRejected);
+        Assert.Equal(3, relic.LastingCandyUncommonPowersOffered);
+        Assert.Equal(1, relic.LastingCandyUncommonPowersTaken);
+        Assert.Equal(2, relic.LastingCandyUncommonPowersRejected);
+        Assert.Equal(2, relic.LastingCandyRarePowersOffered);
+        Assert.Equal(1, relic.LastingCandyRarePowersTaken);
+        Assert.Equal(1, relic.LastingCandyRarePowersRejected);
+        Assert.Equal(2, relic.LastingCandyEliteActivations);
+        Assert.Equal(1, relic.LastingCandyBossActivations);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsGremlinHornRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("gremlin-horn-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertGremlinHornFixture(loaded.Data);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsGremlinHornRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("gremlin-horn-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertGremlinHornFixture(resumed!);
+    }
+
+    private static void AssertGremlinHornFixture(RunData run)
+    {
+        var relic = run.RelicAggregates["RELIC.GREMLIN_HORN"];
+        Assert.Equal(6, relic.Activations);
+        Assert.Equal(5, relic.EnergyGenerated);
+        Assert.Equal(4, relic.AdditionalCardsDrawn);
+        Assert.Equal(6, relic.GremlinHornRateActivations);
+        Assert.Equal(8, relic.GremlinHornTurns);
+        Assert.Equal(3, relic.GremlinHornCombats);
     }
 
     private static void AssertSplashFixture(CardAggregate cardAgg)

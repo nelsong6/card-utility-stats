@@ -65,47 +65,47 @@ internal static class MaxHpHistoryTooltip
             Math.Max(0, entry.NewMaxHp - entry.PreviousMaxHp));
         var maxHpLost = orderedHistory.Sum(entry =>
             Math.Max(0, entry.PreviousMaxHp - entry.NewMaxHp));
-        var damageIcon = StatConceptGlossary.RenderHintedGlyph("damage");
-        var averageIcon = StatConceptGlossary.RenderHintedGlyph("average");
-        var floorIcon = StatConceptGlossary.RenderHintedGlyph("floor");
-        var combatIcon = StatConceptGlossary.RenderHintedGlyph("combat");
-        var maxHpIcon = StatConceptGlossary.RenderHintedGlyph("max_hp");
-        var maxHpGainedIcon = StatConceptGlossary.RenderHintedGlyph("max_hp_gained");
         var body = new StringBuilder();
 
         AppendStatRow(
             body,
-            damageIcon,
+            ["damage", "in", "all", "combat"],
+            [],
             "HP lost in combats",
             FormatDecimal(healthStats.HpLostInCombats),
             "HP lost to combat damage this run.");
         AppendStatRow(
             body,
-            damageIcon,
+            ["damage", "in", "all", "unknown_room"],
+            [],
             "HP lost in events",
             FormatDecimal(healthStats.HpLostInEvents),
             "HP lost from events this run.");
         AppendStatRow(
             body,
-            $"{averageIcon} {floorIcon}",
+            ["average", "damage", "floor"],
+            ["floor"],
             "Avg HP lost per floor",
             FormatDecimal(avgPerFloor),
             "Average total HP lost per floor reached.");
         AppendStatRow(
             body,
-            $"{averageIcon} {combatIcon}",
+            ["average", "damage", "combat"],
+            ["combat"],
             "Avg HP lost per combat",
             FormatDecimal(avgPerCombat),
             "Average HP lost to combat damage per combat.");
         AppendStatRow(
             body,
-            maxHpGainedIcon,
+            ["max_hp_gained"],
+            [],
             "Max HP gained",
             maxHpGained.ToString(CultureInfo.InvariantCulture),
             "Total maximum HP gained this run.");
         AppendStatRow(
             body,
-            maxHpIcon,
+            ["max_hp"],
+            [],
             "Max HP lost",
             maxHpLost.ToString(CultureInfo.InvariantCulture),
             "Total maximum HP lost this run.");
@@ -123,6 +123,7 @@ internal static class MaxHpHistoryTooltip
         IEnumerable<MaxHpRunHistoryEntry>? history)
     {
         var floorIcon = StatConceptGlossary.RenderHintedGlyph("floor");
+        var turnIcon = StatConceptGlossary.RenderHintedGlyph("turn");
         var body = new StringBuilder();
 
         foreach (var entry in (history ?? Array.Empty<MaxHpRunHistoryEntry>())
@@ -144,7 +145,7 @@ internal static class MaxHpHistoryTooltip
                 .Append(' ')
                 .Append(Math.Max(0, entry.Floor));
             if (entry.Turn is > 0)
-                body.Append(" · T").Append(entry.Turn.Value);
+                body.Append(" · ").Append(turnIcon).Append(' ').Append(entry.Turn.Value);
             body.Append("   ")
                 .Append(StatsTooltip.EscapeBbcode(source))
                 .Append("   [b]")
@@ -161,20 +162,19 @@ internal static class MaxHpHistoryTooltip
 
     private static void AppendStatRow(
         StringBuilder body,
-        string icon,
+        IReadOnlyList<string> conceptIds,
+        IReadOnlyList<string> denominatorConceptIds,
         string label,
         string value,
         string fullDescription)
     {
-        if (body.Length > 0) body.Append('\n');
-        body.Append(StatsTooltip.RenderRowInformationHint(label, fullDescription))
-            .Append(' ')
-            .Append(icon)
-            .Append(' ')
-            .Append(label)
-            .Append("   [b]")
-            .Append(value)
-            .Append("[/b]");
+        StatsTooltip.AppendInlineStatRow(
+            body,
+            conceptIds,
+            denominatorConceptIds,
+            label,
+            value,
+            fullDescription);
     }
 
     private static string FormatDecimal(decimal value)

@@ -47,6 +47,10 @@ public class PotionRunHistoryTooltipTests
         Assert.Contains("Seen  [b]Floor 4[/b]\n", body);
         Assert.Contains("Event  [b]The Legends Were True[/b]\n", body);
         Assert.DoesNotContain("Floor 4 · Event", body);
+        Assert.Contains(
+            $"Outcome  [b]not {StatConceptGlossary.RenderHintedGlyph("taken")}[/b]",
+            body);
+        Assert.DoesNotContain("Outcome  [b]Not taken[/b]", body);
     }
 
     [Fact]
@@ -80,13 +84,15 @@ public class PotionRunHistoryTooltipTests
             ?? throw new InvalidOperationException("BuildTooltipTitle returned null."));
 
         Assert.Equal("Swift Potion 1", title);
-        Assert.Contains("Acquired  [b]Floor 5[/b]\n", acquiredBody);
+        Assert.Contains(
+            $"{StatConceptGlossary.RenderHintedGlyph("taken")}  [b]Floor 5[/b]\n",
+            acquiredBody);
         Assert.Contains("Shop  [b]Merchant[/b]\n", acquiredBody);
         Assert.DoesNotContain("Used  ", acquiredBody);
         Assert.Contains("Used  [b]Floor 7[/b]\n", usedBody);
         Assert.Contains("Elite combat  [b]Lagavulin[/b]\n", usedBody);
         Assert.Contains("Turn  [b]2[/b]", usedBody);
-        Assert.DoesNotContain("Acquired  ", usedBody);
+        Assert.DoesNotContain(StatConceptGlossary.RenderHintedGlyph("taken"), usedBody);
     }
 
     [Fact]
@@ -162,7 +168,8 @@ public class PotionRunHistoryTooltipTests
             PotionTimelineOccurrence.Used);
 
         Assert.DoesNotContain("HP gained", acquiredBody);
-        Assert.Contains("HP gained  [b]12[/b]", usedBody);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("healing_gained"), usedBody);
+        Assert.Contains("  [b]12[/b]", usedBody);
         Assert.Contains(
             StatConceptGlossary.RenderInformationHint(
                 "HP actually restored when this potion was used."),
@@ -236,14 +243,21 @@ public class PotionRunHistoryTooltipTests
             PotionTimelineOccurrence.Used);
 
         Assert.DoesNotContain("Cards drawn", acquiredBody);
-        Assert.Contains("Cards drawn  [b]2[/b]", usedBody);
-        Assert.Contains("Card draws blocked  [b]1[/b]", usedBody);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("draw"), usedBody);
+        Assert.Contains("  [b]2[/b]", usedBody);
+        Assert.Contains("blocked  [b]1[/b]", usedBody);
     }
 
     [Fact]
-    public void FortifierBlockPatches_TargetPotionUseAndFinalGainBlockCommand()
+    public void BlockPotionPatches_TargetPotionUsesAndFinalGainBlockCommand()
     {
-        var useTarget = typeof(Fortifier).GetMethod(
+        var blockPotionUseTarget = typeof(BlockPotion).GetMethod(
+            "OnUse",
+            BindingFlags.NonPublic | BindingFlags.Instance,
+            binder: null,
+            types: [typeof(PlayerChoiceContext), typeof(Creature)],
+            modifiers: null);
+        var fortifierUseTarget = typeof(Fortifier).GetMethod(
             "OnUse",
             BindingFlags.NonPublic | BindingFlags.Instance,
             binder: null,
@@ -263,14 +277,16 @@ public class PotionRunHistoryTooltipTests
             ],
             modifiers: null);
 
-        Assert.NotNull(useTarget);
-        Assert.Equal(typeof(Task), useTarget!.ReturnType);
+        Assert.NotNull(blockPotionUseTarget);
+        Assert.Equal(typeof(Task), blockPotionUseTarget!.ReturnType);
+        Assert.NotNull(fortifierUseTarget);
+        Assert.Equal(typeof(Task), fortifierUseTarget!.ReturnType);
         Assert.NotNull(blockTarget);
         Assert.Equal(typeof(Task<decimal>), blockTarget!.ReturnType);
     }
 
     [Fact]
-    public void FortifierBlockGain_RecordsObservedAmountAndZeroOutcomes()
+    public void BlockPotionBlockGain_RecordsObservedAmountAndZeroOutcomes()
     {
         var entry = new PotionRunHistoryEntry();
 
@@ -282,12 +298,12 @@ public class PotionRunHistoryTooltipTests
     }
 
     [Fact]
-    public void FortifierUsedTooltip_ShowsBlockRowsOnlyAtUse()
+    public void BlockPotionUsedTooltip_ShowsBlockRowsOnlyAtUse()
     {
         var entry = new PotionRunHistoryEntry
         {
-            PotionId = "POTION.FORTIFIER",
-            DisplayName = "Fortifier",
+            PotionId = "POTION.BLOCK_POTION",
+            DisplayName = "Block Potion",
             Acquired = true,
             Used = true,
             UsedFloor = 8,
@@ -306,9 +322,11 @@ public class PotionRunHistoryTooltipTests
             PotionTimelineOccurrence.Used);
 
         Assert.DoesNotContain("Block gained", acquiredBody);
-        Assert.Contains("Block gained  [b]12[/b]", usedBody);
-        Assert.Contains("Block absorbed  [b]8[/b]", usedBody);
-        Assert.Contains("Block wasted  [b]4[/b]", usedBody);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("block_gained"), usedBody);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("block_wasted"), usedBody);
+        Assert.Contains("  [b]12[/b]", usedBody);
+        Assert.Contains("absorbed  [b]8[/b]", usedBody);
+        Assert.Contains("  [b]4[/b]", usedBody);
     }
 
     [Fact]
@@ -384,12 +402,17 @@ public class PotionRunHistoryTooltipTests
             PotionTimelineOccurrence.Used);
 
         Assert.DoesNotContain("Damage attempted", acquiredBody);
-        Assert.Contains("Damage attempted  [b]20[/b]", usedBody);
-        Assert.Contains("Damage dealt  [b]9[/b]", usedBody);
-        Assert.Contains("Damage blocked  [b]4[/b]", usedBody);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("damage"), usedBody);
+        Assert.Contains("attempted  [b]20[/b]", usedBody);
+        Assert.Contains("dealt  [b]9[/b]", usedBody);
+        Assert.Contains("blocked  [b]4[/b]", usedBody);
         Assert.Contains("Overkill  [b]7[/b]", usedBody);
-        Assert.Contains("Kills  [b]1[/b]", usedBody);
-        Assert.Contains("Targets hit  [b]2[/b]", usedBody);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("kill"), usedBody);
+        Assert.Contains("  [b]1[/b]", usedBody);
+        Assert.Contains(
+            StatConceptGlossary.RenderHintedGlyph("targets_hit"),
+            usedBody);
+        Assert.Contains("  [b]2[/b]", usedBody);
     }
 
     private static string BuildBody(

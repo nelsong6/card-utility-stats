@@ -89,7 +89,7 @@ public class ForgottenSoulStatsTests
         Assert.Contains("Damage dealt", body);
         Assert.Contains("Damage blocked", body);
         Assert.Contains("Kills", body);
-        Assert.Contains("Targets hit", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("targets_hit"), body);
         Assert.Contains("Avg damage dealt per turn", body);
         Assert.Contains("Avg damage dealt per combat", body);
         Assert.Contains("[b]12[/b]", body);

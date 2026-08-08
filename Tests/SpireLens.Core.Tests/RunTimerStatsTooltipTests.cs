@@ -64,6 +64,8 @@ public class RunTimerStatsTooltipTests
             StatConceptGlossary.RenderInformationHint(
                 "Total time spent in combats this run."),
             before);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("combat"), before);
+        Assert.DoesNotContain("Time spent in combats   [b]", before);
         Assert.Contains("03:37", after);
         Assert.NotEqual(before, after);
     }

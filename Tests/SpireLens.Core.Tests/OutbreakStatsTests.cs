@@ -89,7 +89,8 @@ public class OutbreakStatsTests
 
         var body = sb.ToString();
         Assert.Contains("poison_power.tres", body);
-        Assert.Contains("damage from extra triggers", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("damage"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("activation"), body);
         Assert.Contains("[b]37[/b]", body);
         Assert.Contains(
             StatConceptGlossary.RenderInformationHint(

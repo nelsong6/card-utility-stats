@@ -355,24 +355,77 @@ internal static class StatsTooltipPinManager
         // call returns, so reconciling the surrogate here would mistake the
         // in-progress pin for a dead one and remove the SpireLens page before
         // NativeStatsHoverTipFactory can append it.
-        if (owner is not NRelicInventoryHolder
-            && owner is not NRelicCollectionEntry
-            && owner is not NCardHolder
-            && owner is not NDeckHistoryEntry
-            && owner is not NRelicBasicHolder
-            && owner is not RunHistoryCampfireButton
-            && owner is not NTopBarHp
-            && owner is not NTopBarGold
-            && owner is not NPotionHolder
-            && !RunHistoryHpTooltip.IsTarget(owner)
-            && !RunHistoryGoldTooltip.IsTarget(owner)
-            && !RunTimerStatsTooltip.IsTarget(owner))
-        {
+        if (ReferenceEquals(owner, _pinOwner)
+            || ReferenceEquals(owner, _hintOwner)
+            || IsInsidePinnedTooltip(owner))
             return false;
-        }
 
         ReconcilePinnedState();
-        return ReferenceEquals(_pinnedTarget, owner);
+        if (_pinnedTarget == null) return false;
+
+        // The pinned target's ordinary hover lifecycle continues to fire
+        // while its surrogate tooltip remains visible. Never allow that
+        // owner to manufacture a duplicate set.
+        if (ReferenceEquals(_pinnedTarget, owner)) return true;
+
+        // Native tooltip pages deliberately ignore mouse input so clicks can
+        // dismiss the pin and continue to the game underneath. Keep that
+        // click-through behavior, but do not let a covered card, relic, or
+        // other hover target raise a second tooltip through the pinned pages.
+        return IsPointerOverPinnedTooltip();
+    }
+
+    private static bool IsInsidePinnedTooltip(Node node)
+    {
+        if (!IsLive(_pinnedTipSet)) return false;
+
+        for (Node? current = node;
+             current != null;
+             current = current.GetParent())
+        {
+            if (ReferenceEquals(current, _pinnedTipSet))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsPointerOverPinnedTooltip()
+    {
+        if (!IsLive(_pinnedTipSet)) return false;
+
+        var viewport = _pinnedTipSet!.GetViewport();
+        if (viewport == null) return false;
+
+        var pointerPosition = viewport.GetMousePosition();
+        return ContainsVisibleControlAtPoint(
+                   _pinnedTipSet._textHoverTipContainer,
+                   pointerPosition)
+            || ContainsVisibleControlAtPoint(
+                _pinnedTipSet._cardHoverTipContainer,
+                pointerPosition);
+    }
+
+    private static bool ContainsVisibleControlAtPoint(
+        Control? root,
+        Vector2 point)
+    {
+        if (!IsLive(root) || !root!.IsVisibleInTree()) return false;
+        if (root.GetGlobalRect().HasPoint(point)) return true;
+
+        // Some native containers derive their bounds from children only after
+        // layout. Checking descendants as a fallback keeps suppression exact
+        // during that first frame without turning it into a screen-wide lock.
+        foreach (var child in root.GetChildren())
+        {
+            if (child is Control control
+                && ContainsVisibleControlAtPoint(control, point))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     internal static bool TryBuildPinnedStatsTip(
@@ -572,13 +625,43 @@ internal static class StatsTooltipPinManager
         DetachCopyImageButton();
         if (!IsLive(_pinnedStatsControl)) return;
 
-        var title = _pinnedStatsControl!
-            .GetNodeOrNull<Control>("%Title");
-        if (title?.GetParent() is not HBoxContainer header)
+        var button = EnsureCopyImageButton(_pinnedStatsControl!);
+        if (!IsLive(button))
         {
             CoreMain.LogDebug(
                 "Stats image copy button skipped: tooltip title header was not found.");
             return;
+        }
+
+        button!.Disabled = false;
+        button.MouseFilter = Control.MouseFilterEnum.Stop;
+        button.TooltipText = CopyImageButtonTooltip;
+        Action handler = OnCopyImageButtonPressed;
+        button.Pressed += handler;
+
+        _copyImageButton = button;
+        _copyImageButtonHandler = handler;
+        _copyImageGeneration++;
+        _copyImageInProgress = false;
+    }
+
+    /// <summary>
+    /// Gives every rendered SpireLens panel the same final header geometry.
+    /// The ordinary hover-tip instance is visual only because it disappears
+    /// when the pointer leaves its owner; pinning activates that instance
+    /// instead of inserting a new control and remeasuring the panel.
+    /// </summary>
+    internal static Button? EnsureCopyImageButton(Control statsControl)
+    {
+        var title = statsControl.GetNodeOrNull<Control>("%Title");
+        if (title?.GetParent() is not HBoxContainer header)
+            return null;
+
+        var existing = header.GetNodeOrNull<Button>(CopyImageButtonNodeName);
+        if (IsLive(existing))
+        {
+            MoveCopyImageButtonBeforeBrand(header, existing!);
+            return existing;
         }
 
         var icon = GetCopyImageIcon();
@@ -589,8 +672,9 @@ internal static class StatsTooltipPinManager
             Icon = icon,
             TooltipText = CopyImageButtonTooltip,
             Flat = true,
+            Disabled = true,
             FocusMode = Control.FocusModeEnum.None,
-            MouseFilter = Control.MouseFilterEnum.Stop,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
             CustomMinimumSize = new Vector2(icon == null ? 68f : 34f, 28f),
             SizeFlagsHorizontal = Control.SizeFlags.ShrinkEnd,
             SizeFlagsVertical = Control.SizeFlags.ShrinkCenter,
@@ -605,14 +689,19 @@ internal static class StatsTooltipPinManager
         button.AddThemeColorOverride("icon_pressed_color", Color.FromHtml("#A9BCEB"));
         button.AddThemeColorOverride("icon_disabled_color", Color.FromHtml("#94A0AE"));
 
-        Action handler = OnCopyImageButtonPressed;
-        button.Pressed += handler;
         header.AddChild(button);
+        MoveCopyImageButtonBeforeBrand(header, button);
+        return button;
+    }
 
-        _copyImageButton = button;
-        _copyImageButtonHandler = handler;
-        _copyImageGeneration++;
-        _copyImageInProgress = false;
+    private static void MoveCopyImageButtonBeforeBrand(
+        HBoxContainer header,
+        Button button)
+    {
+        var brand = header.GetNodeOrNull<Label>(
+            NativeStatsHoverTipStyler.BrandNodeName);
+        if (IsLive(brand) && button.GetIndex() > brand!.GetIndex())
+            header.MoveChild(button, brand.GetIndex());
     }
 
     private static void DetachCopyImageButton()
@@ -625,8 +714,13 @@ internal static class StatsTooltipPinManager
         _copyImageButton = null;
         _copyImageButtonHandler = null;
 
-        if (IsLive(button) && handler != null)
-            button!.Pressed -= handler;
+        if (IsLive(button))
+        {
+            if (handler != null)
+                button!.Pressed -= handler;
+            button!.Disabled = true;
+            button.MouseFilter = Control.MouseFilterEnum.Ignore;
+        }
     }
 
     private static void OnCopyImageButtonPressed()
@@ -680,7 +774,6 @@ internal static class StatsTooltipPinManager
             if (!StatsImageCapture.TryCaptureShareImage(
                     statsControl,
                     GetRenderedSubjectRect(pinnedTarget),
-                    GetIsolatedSubjectTexture(pinnedTarget),
                     GetTooltipCaptureGroups(pinnedTipSet),
                     out var image,
                     out var captureError))
@@ -768,22 +861,6 @@ internal static class StatsTooltipPinManager
         }
 
         return groups;
-    }
-
-    private static Texture2D? GetIsolatedSubjectTexture(Control target)
-    {
-        var relicModel = target switch
-        {
-            NRelicInventoryHolder holder => holder.Relic.Model,
-            NRelicCollectionEntry entry
-                when CompendiumRelicStatsContext.TryGetRelicModel(entry, out var model)
-                => model,
-            NRelicBasicHolder holder when IsLive(holder.Relic)
-                => holder.Relic.Model,
-            _ => null,
-        };
-
-        return relicModel?.BigIcon ?? relicModel?.Icon;
     }
 
     private static Rect2 GetRenderedSubjectRect(Control target)

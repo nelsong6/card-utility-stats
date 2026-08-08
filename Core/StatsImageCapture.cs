@@ -10,6 +10,10 @@ internal readonly record struct CaptureFloatRect(
     float Width,
     float Height);
 
+internal readonly record struct CaptureFloatPoint(
+    float X,
+    float Y);
+
 internal readonly record struct CapturePixelRect(
     int X,
     int Y,
@@ -23,15 +27,7 @@ internal readonly record struct CapturePixelRect(
 /// </summary>
 internal static class StatsImageCapture
 {
-    private const int ShareImagePadding = 24;
-    private const int ShareImageGap = 24;
-    private const int MaxRenderedSubjectWidth = 420;
-    private const int MaxRenderedSubjectHeight = 560;
-    private const int MaxIsolatedSubjectSize = 224;
-    private const float TooltipCaptureMargin = 10f;
-
-    private static readonly Color ShareImageBackground =
-        Color.FromHtml("#0B0910");
+    private const float ShareCaptureMargin = 10f;
 
     public static bool TryCapture(
         Control control,
@@ -91,15 +87,13 @@ internal static class StatsImageCapture
     }
 
     /// <summary>
-    /// Builds a clipboard-ready share image from the rendered tooltip set and
-    /// the thing that owns it. Relics can provide their source texture so the
-    /// composition contains isolated artwork instead of the surrounding relic
-    /// bar; cards and other targets use their exact rendered viewport bounds.
+    /// Crops a clipboard-ready share image around the rendered tooltip set and
+    /// the thing that owns it. Taking one viewport crop preserves the exact
+    /// user-visible scale, spacing, and relative placement of every element.
     /// </summary>
     public static bool TryCaptureShareImage(
         Control viewportAnchor,
         Rect2 renderedSubjectRect,
-        Texture2D? isolatedSubjectTexture,
         IReadOnlyList<Control> tooltipGroups,
         out Image image,
         out string error)
@@ -139,145 +133,54 @@ internal static class StatsImageCapture
             return false;
         }
 
-        tooltipBounds = Grow(tooltipBounds, TooltipCaptureMargin);
+        var captureBounds = CalculateShareBounds(
+            new CaptureFloatRect(
+                renderedSubjectRect.Position.X,
+                renderedSubjectRect.Position.Y,
+                renderedSubjectRect.Size.X,
+                renderedSubjectRect.Size.Y),
+            new CaptureFloatRect(
+                tooltipBounds.Position.X,
+                tooltipBounds.Position.Y,
+                tooltipBounds.Size.X,
+                tooltipBounds.Size.Y));
         var viewportRect = viewport.GetVisibleRect();
         var viewportImageSize = new Vector2I(
             viewportImage.GetWidth(),
             viewportImage.GetHeight());
-        var tooltipPixelRect = CalculatePixelRect(
-            tooltipBounds,
-            viewportRect,
-            viewportImageSize);
-        if (tooltipPixelRect.Size.X <= 0 || tooltipPixelRect.Size.Y <= 0)
+        var capturePixelRect = CalculatePixelBounds(
+            captureBounds.X,
+            captureBounds.Y,
+            captureBounds.Width,
+            captureBounds.Height,
+            viewportRect.Position.X,
+            viewportRect.Position.Y,
+            viewportRect.Size.X,
+            viewportRect.Size.Y,
+            viewportImageSize.X,
+            viewportImageSize.Y);
+        if (capturePixelRect.Width <= 0 || capturePixelRect.Height <= 0)
         {
-            error = "The pinned tooltip set is outside the visible game viewport.";
+            error = "The pinned item and tooltip set are outside the visible game viewport.";
             return false;
         }
 
-        using var tooltipImage = viewportImage.GetRegion(tooltipPixelRect);
-        if (tooltipImage == null
-            || tooltipImage.GetWidth() <= 0
-            || tooltipImage.GetHeight() <= 0)
-        {
-            error = "The pinned tooltip image was empty.";
-            return false;
-        }
-
-        Image? subjectImage = null;
-        try
-        {
-            var isolatedSubject = TryCaptureTexture(
-                isolatedSubjectTexture,
-                out subjectImage);
-            if (!isolatedSubject)
-            {
-                var subjectPixelRect = CalculatePixelRect(
-                    renderedSubjectRect,
-                    viewportRect,
-                    viewportImageSize);
-                if (subjectPixelRect.Size.X > 0 && subjectPixelRect.Size.Y > 0)
-                    subjectImage = viewportImage.GetRegion(subjectPixelRect);
-            }
-
-            if (subjectImage != null
-                && subjectImage.GetWidth() > 0
-                && subjectImage.GetHeight() > 0)
-            {
-                ResizeSubject(subjectImage, isolatedSubject);
-            }
-            else
-            {
-                subjectImage?.Dispose();
-                subjectImage = null;
-            }
-
-            var subjectWidth = subjectImage?.GetWidth() ?? 0;
-            var subjectHeight = subjectImage?.GetHeight() ?? 0;
-            var contentGap = subjectImage == null ? 0 : ShareImageGap;
-            var width = checked(
-                ShareImagePadding * 2
-                + subjectWidth
-                + contentGap
-                + tooltipImage.GetWidth());
-            var height = checked(
-                ShareImagePadding * 2
-                + Math.Max(subjectHeight, tooltipImage.GetHeight()));
-
-            var combined = Image.CreateEmpty(
-                width,
-                height,
-                false,
-                Image.Format.Rgba8);
-            combined.Fill(ShareImageBackground);
-
-            if (subjectImage != null)
-            {
-                combined.BlendRect(
-                    subjectImage,
-                    new Rect2I(
-                        0,
-                        0,
-                        subjectImage.GetWidth(),
-                        subjectImage.GetHeight()),
-                    new Vector2I(
-                        ShareImagePadding,
-                        (height - subjectImage.GetHeight()) / 2));
-            }
-
-            combined.BlitRect(
-                tooltipImage,
-                new Rect2I(
-                    0,
-                    0,
-                    tooltipImage.GetWidth(),
-                    tooltipImage.GetHeight()),
-                new Vector2I(
-                    ShareImagePadding + subjectWidth + contentGap,
-                    (height - tooltipImage.GetHeight()) / 2));
-
-            image = combined;
-            return true;
-        }
-        finally
-        {
-            subjectImage?.Dispose();
-        }
-    }
-
-    private static bool TryCaptureTexture(
-        Texture2D? texture,
-        out Image? image)
-    {
-        image = null;
-        if (texture == null || !GodotObject.IsInstanceValid(texture))
-            return false;
-
-        try
-        {
-            using var source = texture.GetImage();
-            if (source == null
-                || source.GetWidth() <= 0
-                || source.GetHeight() <= 0)
-            {
-                return false;
-            }
-
-            if (!TryNormalizeForComposition(source, out _))
-                return false;
-
-            var usedRect = source.GetUsedRect();
-            if (usedRect.Size.X <= 0 || usedRect.Size.Y <= 0)
-                return false;
-
-            image = source.GetRegion(usedRect);
-            return image.GetWidth() > 0 && image.GetHeight() > 0;
-        }
-        catch
+        image = viewportImage.GetRegion(new Rect2I(
+            capturePixelRect.X,
+            capturePixelRect.Y,
+            capturePixelRect.Width,
+            capturePixelRect.Height));
+        if (image == null
+            || image.GetWidth() <= 0
+            || image.GetHeight() <= 0)
         {
             image?.Dispose();
-            image = null;
+            image = null!;
+            error = "The pinned item and tooltip image was empty.";
             return false;
         }
+
+        return true;
     }
 
     private static bool TryNormalizeForComposition(
@@ -303,35 +206,6 @@ internal static class StatsImageCapture
 
         error = "Could not convert the captured image to RGBA pixels.";
         return false;
-    }
-
-    private static void ResizeSubject(Image subject, bool isolatedSubject)
-    {
-        var maxWidth = isolatedSubject
-            ? MaxIsolatedSubjectSize
-            : MaxRenderedSubjectWidth;
-        var maxHeight = isolatedSubject
-            ? MaxIsolatedSubjectSize
-            : MaxRenderedSubjectHeight;
-        var scale = Math.Min(
-            1d,
-            Math.Min(
-                maxWidth / (double)subject.GetWidth(),
-                maxHeight / (double)subject.GetHeight()));
-        if (scale >= 1d) return;
-
-        subject.Resize(
-            Math.Max(
-                1,
-                (int)Math.Round(
-                    subject.GetWidth() * scale,
-                    MidpointRounding.AwayFromZero)),
-            Math.Max(
-                1,
-                (int)Math.Round(
-                    subject.GetHeight() * scale,
-                    MidpointRounding.AwayFromZero)),
-            Image.Interpolation.Lanczos);
     }
 
     private static bool TryGetVisibleBounds(
@@ -448,6 +322,34 @@ internal static class StatsImageCapture
         => new(
             rect.Position - new Vector2(amount, amount),
             rect.Size + new Vector2(amount * 2f, amount * 2f));
+
+    internal static CaptureFloatRect CalculateShareBounds(
+        CaptureFloatRect renderedSubjectRect,
+        CaptureFloatRect tooltipBounds)
+    {
+        var left = tooltipBounds.X;
+        var top = tooltipBounds.Y;
+        var right = tooltipBounds.X + tooltipBounds.Width;
+        var bottom = tooltipBounds.Y + tooltipBounds.Height;
+        if (renderedSubjectRect.Width > 0f
+            && renderedSubjectRect.Height > 0f)
+        {
+            left = Math.Min(left, renderedSubjectRect.X);
+            top = Math.Min(top, renderedSubjectRect.Y);
+            right = Math.Max(
+                right,
+                renderedSubjectRect.X + renderedSubjectRect.Width);
+            bottom = Math.Max(
+                bottom,
+                renderedSubjectRect.Y + renderedSubjectRect.Height);
+        }
+
+        return new CaptureFloatRect(
+            left - ShareCaptureMargin,
+            top - ShareCaptureMargin,
+            right - left + ShareCaptureMargin * 2f,
+            bottom - top + ShareCaptureMargin * 2f);
+    }
 
     internal static Rect2I CalculatePixelRect(
         Rect2 controlRect,

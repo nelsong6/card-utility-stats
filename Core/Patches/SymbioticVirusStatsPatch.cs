@@ -41,9 +41,11 @@ public static class SymbioticVirusStartingOrbStatsPatch
                 return;
             }
 
-            if (!RunTracker.IsTrackedRelic(__instance)) return;
             if (!participants.Contains(owner.Creature)) return;
             if (playerCombatState.TurnNumber > 1) return;
+
+            RelicBarFilterPatch.MarkRelicFired(__instance);
+            if (!RunTracker.IsTrackedRelic(__instance)) return;
 
             __state = new StartingOrbState(
                 __instance,

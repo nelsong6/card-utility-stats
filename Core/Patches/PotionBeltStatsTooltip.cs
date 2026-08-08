@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Collections.Generic;
 using System.Text;
 using MegaCrit.Sts2.Core.Entities.Potions;
 using MegaCrit.Sts2.Core.HoverTips;
@@ -105,92 +106,90 @@ internal static class PotionBeltStatsTooltip
     internal static string BuildBodyBBCode(PotionBeltStatsSummary summary)
     {
         summary ??= new PotionBeltStatsSummary();
-        var potionIcon = StatConceptGlossary.RenderHintedGlyph("potion");
-        var commonIcon = StatConceptGlossary.RenderHintedGlyph("potion_common");
-        var uncommonIcon = StatConceptGlossary.RenderHintedGlyph("potion_uncommon");
-        var rareIcon = StatConceptGlossary.RenderHintedGlyph("potion_rare");
-        var fruitJuiceIcon = StatConceptGlossary.RenderHintedGlyph("fruit_juice");
-        var offeredIcon = StatConceptGlossary.RenderHintedGlyph("offered");
-        var takenIcon = StatConceptGlossary.RenderHintedGlyph("taken");
-        var averageIcon = StatConceptGlossary.RenderHintedGlyph("average");
-        var floorIcon = StatConceptGlossary.RenderHintedGlyph("floor");
-        var combatIcon = StatConceptGlossary.RenderHintedGlyph("combat");
-        var eventIcon = StatConceptGlossary.RenderHintedGlyph("unknown_room");
-        var shopIcon = StatConceptGlossary.RenderHintedGlyph("shop");
-        var activationIcon = StatConceptGlossary.RenderHintedGlyph("activation");
-        var wastedIcon = StatConceptGlossary.RenderHintedGlyph("wasted");
         var body = new StringBuilder();
 
         AppendRow(
             body,
-            $"{combatIcon} {offeredIcon} {potionIcon}",
-            "Offered",
+            ["potion", "offered", "in", "all", "combat"],
+            [],
+            "Potions offered in all combats",
             summary.CombatRewardPotionsOffered,
             "Potions offered in combat rewards this run.");
         AppendRow(
             body,
-            $"{averageIcon} {floorIcon} {offeredIcon} {potionIcon}",
-            "Offered",
+            ["average", "potion", "offered", "floor"],
+            ["floor"],
+            "Average potions offered per floor",
             Divide(summary.TotalPotionsOffered, summary.Floors),
             "Average potions offered per floor reached.");
         AppendRow(
             body,
-            $"{combatIcon} {offeredIcon} {commonIcon}",
-            "Offered",
+            ["potion_common", "offered", "in", "all", "combat"],
+            [],
+            "Common potions offered in all combats",
             summary.CommonCombatRewardPotions,
             "Common potions offered in combat rewards.");
         AppendRow(
             body,
-            $"{combatIcon} {offeredIcon} {uncommonIcon}",
-            "Offered",
+            ["potion_uncommon", "offered", "in", "all", "combat"],
+            [],
+            "Uncommon potions offered in all combats",
             summary.UncommonCombatRewardPotions,
             "Uncommon potions offered in combat rewards.");
         AppendRow(
             body,
-            $"{combatIcon} {offeredIcon} {rareIcon}",
-            "Offered",
+            ["potion_rare", "offered", "in", "all", "combat"],
+            [],
+            "Rare potions offered in all combats",
             summary.RareCombatRewardPotions,
             "Rare potions offered in combat rewards.");
         AppendRow(
             body,
-            $"{combatIcon} {offeredIcon} {fruitJuiceIcon}",
-            "Offered",
+            ["fruit_juice", "offered", "in", "all", "combat"],
+            [],
+            "Fruit Juices offered in all combats",
             summary.FruitJuicesInCombatRewards,
             "Fruit Juices offered in combat rewards.");
         AppendRow(
             body,
-            $"{offeredIcon} {wastedIcon} {potionIcon}",
-            "Rejected",
+            ["potion", "offered", "wasted"],
+            [],
+            string.Empty,
             summary.RejectedPotionsAtRewardScreen,
             "Potions rejected at reward screens.");
         AppendRow(
             body,
-            $"{eventIcon} {offeredIcon} {potionIcon}",
-            "Offered",
+            ["potion", "offered", "in", "all", "unknown_room"],
+            [],
+            "Potions offered in all events",
             summary.PotionsOfferedInEvents,
             "Potions offered in events.");
         AppendRow(
             body,
-            $"{shopIcon} {offeredIcon} {potionIcon}",
-            "Offered",
+            ["potion", "offered", "in", "all", "shop"],
+            [],
+            "Potions offered in all shops",
             summary.PotionsOfferedInShops,
             "Potions offered in shops.");
         AppendRow(
             body,
-            $"{shopIcon} {takenIcon} {potionIcon}",
-            "Purchased",
+            ["potion", "taken", "in", "all", "shop"],
+            [],
+            string.Empty,
             summary.PotionsPurchasedInShops,
             "Potions purchased in shops.");
         AppendRow(
             body,
-            $"{activationIcon} {potionIcon}",
+            ["potion", "activation"],
+            [],
             "Activated",
             summary.TotalPotionActivations,
             "Potions activated this run.");
         AppendRow(
             body,
-            $"{wastedIcon} {potionIcon}",
-            "Discarded",
+            ["potion", "wasted"],
+            [],
+            string.Empty,
             summary.TotalPotionDiscards,
             "Potions discarded without being used this run.");
 
@@ -240,46 +239,49 @@ internal static class PotionBeltStatsTooltip
 
     private static void AppendRow(
         StringBuilder body,
-        string icon,
+        IReadOnlyList<string> conceptIds,
+        IReadOnlyList<string> denominatorConceptIds,
         string label,
         int value,
         string fullDescription)
         => AppendRow(
             body,
-            icon,
+            conceptIds,
+            denominatorConceptIds,
             label,
             value.ToString(CultureInfo.InvariantCulture),
             fullDescription);
 
     private static void AppendRow(
         StringBuilder body,
-        string icon,
+        IReadOnlyList<string> conceptIds,
+        IReadOnlyList<string> denominatorConceptIds,
         string label,
         decimal value,
         string fullDescription)
         => AppendRow(
             body,
-            icon,
+            conceptIds,
+            denominatorConceptIds,
             label,
             value.ToString("0.##", CultureInfo.InvariantCulture),
             fullDescription);
 
     private static void AppendRow(
         StringBuilder body,
-        string icon,
+        IReadOnlyList<string> conceptIds,
+        IReadOnlyList<string> denominatorConceptIds,
         string label,
         string value,
         string fullDescription)
     {
-        if (body.Length > 0) body.Append('\n');
-        body.Append(StatsTooltip.RenderRowInformationHint(label, fullDescription))
-            .Append(' ')
-            .Append(icon)
-            .Append(' ')
-            .Append(label)
-            .Append("   [b]")
-            .Append(value)
-            .Append("[/b]");
+        StatsTooltip.AppendInlineStatRow(
+            body,
+            conceptIds,
+            denominatorConceptIds,
+            label,
+            value,
+            fullDescription);
     }
 
     private static decimal Divide(int numerator, int denominator)

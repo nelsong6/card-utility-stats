@@ -100,11 +100,21 @@ public class AllForOneStatsTests
     {
         var body = BuildStatsBody(RepresentativeAggregate(), compact: false);
 
-        Assert.Contains("0-cost cards returned", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("card"), body);
+        Assert.Contains(
+            StatConceptGlossary.RenderInformationHint(
+                "Zero-cost cards returned from the discard pile to hand by All for One."),
+            body);
         Assert.Contains("[b]12[/b]", body);
-        Assert.Contains("Avg returned per play", body);
+        Assert.Contains(
+            StatConceptGlossary.RenderInformationHint(
+                "Average zero-cost cards returned each time All for One was played."),
+            body);
         Assert.Contains("[b]2[/b]", body);
-        Assert.Contains("Avg returned per combat", body);
+        Assert.Contains(
+            StatConceptGlossary.RenderInformationHint(
+                "Average zero-cost cards returned by All for One per combat in the deck."),
+            body);
         Assert.Contains("[b]3[/b]", body);
     }
 
@@ -113,9 +123,19 @@ public class AllForOneStatsTests
     {
         var body = BuildStatsBody(RepresentativeAggregate(), compact: true);
 
-        Assert.Contains("0-cost cards returned", body);
-        Assert.DoesNotContain("Avg returned per play", body);
-        Assert.DoesNotContain("Avg returned per combat", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("card"), body);
+        Assert.Contains(
+            StatConceptGlossary.RenderInformationHint(
+                "Zero-cost cards returned from the discard pile to hand by All for One."),
+            body);
+        Assert.DoesNotContain(
+            StatConceptGlossary.RenderInformationHint(
+                "Average zero-cost cards returned each time All for One was played."),
+            body);
+        Assert.DoesNotContain(
+            StatConceptGlossary.RenderInformationHint(
+                "Average zero-cost cards returned by All for One per combat in the deck."),
+            body);
     }
 
     [Fact]

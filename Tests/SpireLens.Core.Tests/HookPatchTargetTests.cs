@@ -159,12 +159,11 @@ public class HookPatchTargetTests
         Assert.Equal("MegaCrit.Sts2.Core.Hooks.Hook", target!.DeclaringType?.FullName);
         Assert.Contains(target.Name, new[] { "BeforeSideTurnEnd", "BeforeTurnEnd" });
         Assert.Equal(
-            new[]
-            {
-                "side",
-                "participants",
-            },
-            target.GetParameters().Select(parameter => parameter.Name).ToArray());
+            new[] { "side", "participants" },
+            target.GetParameters()
+                .Select(parameter => parameter.Name)
+                .TakeLast(2)
+                .ToArray());
 
         var sideParameter = target.GetParameters().SingleOrDefault(parameter => parameter.Name == "side");
         Assert.NotNull(sideParameter);

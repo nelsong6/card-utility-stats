@@ -73,29 +73,55 @@ internal static class PowerHistoryPileUi
             return;
         }
 
-        button.Name = ButtonName;
-        container.AddChild(button);
-
-        var icon = button.GetNodeOrNull<Control>("Icon");
-        if (icon != null)
+        var localPlayer = exhaustPile._localPlayer;
+        if (localPlayer == null)
         {
-            // SelfModulate survives the native hover/press animation, which
-            // animates Modulate between white and dark gray.
-            icon.SelfModulate = PowerBlue;
-        }
-
-        var countLabel = button.GetNodeOrNull<MegaLabel>("CountContainer/Count");
-        if (countLabel == null)
-        {
+            button.Free();
             container.QueueFree();
-            CoreMain.Logger.Warn("PowerHistoryPile: count label was not found on the native pile clone.");
+            CoreMain.Logger.Warn("PowerHistoryPile: local player was not bound to the exhaust pile.");
             return;
         }
 
-        var injected = new InjectedPile(combatUi, exhaustPile, container, button, countLabel);
+        // Bind a real, persistent pile before the clone enters the scene tree.
+        // NCombatCardPile._EnterTree then installs its ordinary add/remove
+        // listeners, and every interaction from this point uses the game's
+        // native pile-button lifecycle. Exhaust is the closest presentation
+        // type understood by NCombatCardPile.OnFocus; cards are inserted
+        // directly below so this display-only pile never joins combat state.
+        var historyPile = new CardPile(PileType.Exhaust);
+        var addedCards = new HashSet<CardModel>(ReferenceEqualityComparer.Instance);
+        foreach (var power in GetPlayedPowers())
+            AppendDisplayCard(historyPile, addedCards, power, notify: false);
+
+        button.Name = ButtonName;
+        button._pile = historyPile;
+        button._localPlayer = localPlayer;
+        container.AddChild(button);
+
+        var icon = button.GetNodeOrNull<Control>("Icon");
+        var countLabel = button.GetNodeOrNull<MegaLabel>("CountContainer/Count");
+        if (icon == null || countLabel == null)
+        {
+            container.QueueFree();
+            CoreMain.Logger.Warn("PowerHistoryPile: icon or count label was not found on the native pile clone.");
+            return;
+        }
+
+        // SelfModulate survives the native press animation, which animates
+        // Modulate between white and dark gray.
+        icon.SelfModulate = PowerBlue;
+
+        var injected = new InjectedPile(
+            combatUi,
+            exhaustPile,
+            container,
+            button,
+            historyPile,
+            addedCards,
+            countLabel);
         InjectedPiles.Add(injected);
         injected.ConnectSignals();
-        injected.Refresh(animateIn: true);
+        injected.Initialize();
         CoreMain.Logger.Info("PowerHistoryPile: injected played-powers button");
     }
 
@@ -155,42 +181,28 @@ internal static class PowerHistoryPileUi
             .ToList();
     }
 
-    private static void OpenPlayedPowers(InjectedPile injected)
+    private static void AppendDisplayCard(
+        CardPile historyPile,
+        HashSet<CardModel> addedCards,
+        CardModel power,
+        bool notify)
     {
-        if (!injected.IsLive || !CombatManager.Instance.IsInProgress) return;
+        // A physical Power normally appears once. If an unusual effect
+        // returns and plays that exact instance again, the display pile still
+        // needs a distinct model for the second chronological slot.
+        var displayCard = addedCards.Add(power)
+            ? power
+            : (CardModel)power.ClonePreservingMutability();
 
-        var powers = GetPlayedPowers();
-        if (powers.Count == 0) return;
+        // CardPile.AddInternal subscribes Exhaust cards to combat state. This
+        // pile is UI history, so update its backing collection without that
+        // gameplay side effect and emit the same completion notifications the
+        // native pile button consumes.
+        historyPile._cards.Add(displayCard);
+        if (!notify) return;
 
-        if (NTargetManager.Instance.IsInSelection)
-            NTargetManager.Instance.CancelTargeting();
-
-        if (injected.OpenPile != null
-            && NCapstoneContainer.Instance?.CurrentCapstoneScreen is NCardPileScreen current
-            && current.Pile == injected.OpenPile)
-        {
-            NCapstoneContainer.Instance.Close();
-            return;
-        }
-
-        // PileType.None makes this a display-only pile: it does not subscribe
-        // cards to combat state or change their real pile membership. The
-        // native NCardPileScreen still renders ordinary, hoverable cards.
-        var displayPile = new CardPile(PileType.None);
-        var addedCards = new HashSet<CardModel>(ReferenceEqualityComparer.Instance);
-        foreach (var power in powers)
-        {
-            // A physical Power normally appears once. If an unusual effect
-            // returns and plays that exact instance again, the display pile
-            // still needs a distinct model for the second chronological slot.
-            var displayCard = addedCards.Add(power)
-                ? power
-                : (CardModel)power.ClonePreservingMutability();
-            displayPile.AddInternal(displayCard, silent: true);
-        }
-
-        injected.OpenPile = displayPile;
-        NCardPileScreen.ShowScreen(displayPile, Array.Empty<string>());
+        historyPile.InvokeContentsChanged();
+        historyPile.InvokeCardAddFinished();
     }
 
     private static void ShowHoverTip(InjectedPile injected)
@@ -229,19 +241,18 @@ internal static class PowerHistoryPileUi
 
     private sealed class InjectedPile
     {
+        private readonly HashSet<CardModel> _addedCards;
         private readonly MegaLabel _countLabel;
         private readonly NodePath _originalExhaustFocusNeighborTop;
-        private readonly Callable _releasedCallable;
-        private readonly Callable _focusedCallable;
-        private readonly Callable _unfocusedCallable;
-        private int _currentCount;
+        private readonly Action _replaceMouseHoverTipHandler;
+        private readonly Action _replaceControllerHoverTipHandler;
         private bool _signalsConnected;
 
         public NCombatUi CombatUi { get; }
         public NExhaustPileButton ExhaustPile { get; }
         public Control Container { get; }
         public NExhaustPileButton Button { get; }
-        public CardPile? OpenPile { get; set; }
+        public CardPile HistoryPile { get; }
 
         public bool IsLive =>
             PowerHistoryPileUi.IsLive(CombatUi)
@@ -254,41 +265,66 @@ internal static class PowerHistoryPileUi
             NExhaustPileButton exhaustPile,
             Control container,
             NExhaustPileButton button,
+            CardPile historyPile,
+            HashSet<CardModel> addedCards,
             MegaLabel countLabel)
         {
             CombatUi = combatUi;
             ExhaustPile = exhaustPile;
             Container = container;
             Button = button;
+            HistoryPile = historyPile;
+            _addedCards = addedCards;
             _countLabel = countLabel;
             _originalExhaustFocusNeighborTop = exhaustPile.FocusNeighborTop;
-            _releasedCallable = Callable.From<NButton>(_ => OpenPlayedPowers(this));
-            _focusedCallable = Callable.From<NButton>(_ => ShowHoverTip(this));
-            _unfocusedCallable = Callable.From<NButton>(_ => NHoverTipSet.Remove(Button));
+            _replaceMouseHoverTipHandler = ReplaceNativeHoverTip;
+            _replaceControllerHoverTipHandler = ReplaceNativeHoverTip;
         }
 
         public void ConnectSignals()
         {
-            Button.Connect(NClickableControl.SignalName.Released, _releasedCallable);
-            Button.Connect(NClickableControl.SignalName.Focused, _focusedCallable);
-            Button.Connect(NClickableControl.SignalName.Unfocused, _unfocusedCallable);
+            // NClickableControl's handlers were connected during _Ready and
+            // therefore run first. They retain all native focus animation;
+            // these later handlers only replace the Exhaust wording produced
+            // for the history pile's presentation type.
+            Button.MouseEntered += _replaceMouseHoverTipHandler;
+            Button.FocusEntered += _replaceControllerHoverTipHandler;
             _signalsConnected = true;
+        }
+
+        public void Initialize()
+        {
+            if (!IsLive) return;
+
+            Button._currentCount = HistoryPile.Cards.Count;
+            _countLabel.SetTextAutoSize(HistoryPile.Cards.Count.ToString());
+            _countLabel.PivotOffset = _countLabel.Size * 0.5f;
+            Refresh(animateIn: HistoryPile.Cards.Count > 0);
         }
 
         public void Refresh(bool animateIn = false)
         {
             if (!IsLive) return;
 
-            var count = GetPlayedPowers().Count;
-            _countLabel.SetTextAutoSize(count.ToString());
-            _countLabel.PivotOffset = _countLabel.Size * 0.5f;
+            var powers = GetPlayedPowers();
+            var previousCount = HistoryPile.Cards.Count;
+            for (var i = previousCount; i < powers.Count; i++)
+            {
+                AppendDisplayCard(HistoryPile, _addedCards, powers[i], notify: true);
+                SuppressDuplicateExhaustHotkey();
+            }
 
-            if (count == 0)
+            if (powers.Count < previousCount)
+            {
+                CoreMain.Logger.Warn(
+                    $"PowerHistoryPile: combat history shrank from {previousCount} to {powers.Count}; retaining native pile state.");
+            }
+
+            if (HistoryPile.Cards.Count == 0)
             {
                 Button.Visible = false;
                 Button.Disable();
                 RestoreExhaustFocusNeighbor();
-                _currentCount = 0;
                 return;
             }
 
@@ -298,20 +334,22 @@ internal static class PowerHistoryPileUi
             Button.FocusNeighborRight = Button.GetPath();
             ExhaustPile.FocusNeighborTop = Button.GetPath();
 
-            if (!Button.Visible || (animateIn && _currentCount == 0))
+            if (!Button.Visible || animateIn)
                 Button.AnimIn();
             else
                 Button.Visible = true;
 
-            _currentCount = count;
             SyncEnabled(ExhaustPile.IsEnabled);
         }
 
         public void SyncEnabled(bool enabled)
         {
-            if (!IsLive || _currentCount == 0) return;
+            if (!IsLive || HistoryPile.Cards.Count == 0) return;
             if (enabled)
+            {
                 Button.Enable();
+                SuppressDuplicateExhaustHotkey();
+            }
             else
                 Button.Disable();
         }
@@ -329,23 +367,36 @@ internal static class PowerHistoryPileUi
                 NHoverTipSet.Remove(Button);
                 if (_signalsConnected)
                 {
-                    DisconnectIfConnected(NClickableControl.SignalName.Released, _releasedCallable);
-                    DisconnectIfConnected(NClickableControl.SignalName.Focused, _focusedCallable);
-                    DisconnectIfConnected(NClickableControl.SignalName.Unfocused, _unfocusedCallable);
+                    Button.MouseEntered -= _replaceMouseHoverTipHandler;
+                    Button.FocusEntered -= _replaceControllerHoverTipHandler;
                 }
+            }
+
+            if (NCapstoneContainer.Instance?.CurrentCapstoneScreen is NCardPileScreen current
+                && ReferenceEquals(current.Pile, HistoryPile))
+            {
+                NCapstoneContainer.Instance.Close();
             }
 
             RestoreExhaustFocusNeighbor();
             if (PowerHistoryPileUi.IsLive(Container))
                 Container.QueueFree();
-            OpenPile = null;
             _signalsConnected = false;
         }
 
-        private void DisconnectIfConnected(StringName signal, Callable callable)
+        private void ReplaceNativeHoverTip()
         {
-            if (Button.IsConnected(signal, callable))
-                Button.Disconnect(signal, callable);
+            if (!IsLive || !Button.IsFocused) return;
+            NHoverTipSet.Remove(Button);
+            ShowHoverTip(this);
+        }
+
+        private void SuppressDuplicateExhaustHotkey()
+        {
+            // The cloned presentation class advertises the real Exhaust hotkey.
+            // This fourth pile has no shortcut, so keep native mouse/controller
+            // behavior while removing its competing global binding.
+            Button.UnregisterHotkeys();
         }
 
         private void RestoreExhaustFocusNeighbor()

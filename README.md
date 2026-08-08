@@ -2,7 +2,7 @@
 
 Per-card attribution stats mod for [Slay the Spire 2](https://store.steampowered.com/app/2868840/Slay_the_Spire_2/). For every card you play, it tracks what actually happened: effective damage vs. overkill, block that absorbed vs. wasted, drawn cards played vs. idle, energy generated vs. unused, and effect-oriented outcomes like poison damage.
 
-**Status:** Dev build - core per-instance card stats are live in-game, including damage/block attribution, observed draw and energy generation, card-caused current/max-HP loss, Regent star-resource spend/gain tracking, forge granted from cards, Alchemize potion outcomes by rarity, Jack of All Trades generated-card totals with rarity/type/cost breakdowns, Discovery picked-card rarity/type/discount outcomes, Juggling power-owned Attack-copy totals with rarity and active turn/combat averages, Unrelenting's shared Free Attack charge utilization and energy savings, blocked-draw attribution, recurring summon-to-hand tracking, applied-effect summaries, Artifact-blocked debuffs, removed-card viewing, pooled combat-generated card summaries, and dedicated poison application/damage rows. Not yet published to Nexus (M6).
+**Status:** Dev build - core per-instance card stats are live in-game, including damage/block attribution, observed draw and energy generation, card-caused current/max-HP loss, Regent star-resource spend/gain tracking, forge granted from cards, Alchemize potion outcomes by rarity, Jack of All Trades generated-card totals with rarity/type/cost breakdowns, Discovery picked-card rarity/type/discount outcomes, Consuming Shadow's Power-owned orb evocations, Juggling power-owned Attack-copy totals with rarity and active turn/combat averages, Unrelenting's shared Free Attack charge utilization and energy savings, Prismatic Gem and Dingy Rug's final visible card offers split across the Ironclad, Silent, Regent, Necrobinder, Defect, and Colorless pools, blocked-draw attribution, recurring summon-to-hand tracking, applied-effect summaries, Artifact-blocked debuffs, removed-card viewing, pooled combat-generated card summaries, and dedicated poison application/damage rows. Not yet published to Nexus (M6).
 
 For codebase orientation, start with [AGENTS.md](AGENTS.md), [docs/architecture.md](docs/architecture.md), and [docs/sts2-runtime-primer.md](docs/sts2-runtime-primer.md).
 
@@ -81,11 +81,15 @@ a card or relic in run history, or the run-history Campfires summary to pin its
 complete native tooltip set. The game's compact top-panel lock icon appears on
 the pinned item, and the tooltip remains visible and mouse-interactive after the
 pointer leaves it. Right-clicking the locked item again always unlocks it. Pointer
-movement is allowed so inline help can be inspected. Pinned SpireLens panels
-also expose a camera button that captures the selected card or relic together
-with its complete native and SpireLens tooltip set, then places that composed
-image directly on the Windows clipboard without a temporary file or external
-process. Clicking that button preserves the pin; any other mouse click or wheel
+movement is allowed so inline help can be inspected. Each pinned panel blocks
+covered game elements from raising their own hover tooltips, while uncovered
+elements remain normally hoverable. Every SpireLens panel keeps
+a camera button in the same header position so pinning never changes the
+tooltip's measured size. Once pinned, that button captures the selected card or
+relic together with its complete native and SpireLens tooltip set in their exact
+visible arrangement, then places that viewport crop directly on the Windows
+clipboard without a temporary file or external process. Clicking that button
+preserves the pin; any other mouse click or wheel
 action, key press, or controller action removes the pin and continues to the
 game normally.
 
@@ -102,9 +106,17 @@ relic's classification with the game's enemy-map icon for combat or top-bar
 map icon for non-combat. Inspecting a discovered relic opens explicit **Combat**
 and **Non-combat** radio buttons on the full relic inspection screen. Combat
 relics also have an **Always / Until turn 1 / Until turn 2 / Until turn 3**
-dropdown; a finite assignment leaves the filtered relic bar when that turn
-begins. For example, **Until turn 2** shows the relic on turn 1 and hides it
-starting on turn 2. The same assignment controls appear
+dropdown. A finite relic moves to effective non-combat status for the rest of
+the combat as soon as its native activation fires; the selected turn is also
+an exclusive fallback cutoff for non-flashing activations and Core reloads.
+For example, **Until turn 2** shows the relic on turn 1 and no later than the
+start of turn 2. Relics with a native terminal combat state likewise leave the
+filtered bar as soon as their one available activation fires—or, for Lava
+Lamp, as soon as qualifying damage permanently disqualifies its reward upgrade
+for that combat—even when their duration remains **Always**. Limited-use relics
+become effectively non-combat when the game reports that all uses are spent.
+These runtime transitions do not change the saved classification for the next
+combat. The same assignment controls appear
 when inspecting an owned relic from the in-run relic bar. The duration dropdown
 stays available for both categories; choosing a duration also selects Combat.
 Changes apply immediately and are saved under
@@ -166,7 +178,7 @@ The controls themselves are injected only into the in-run deck viewer for now (n
 | **M5b** | Run History integration - browse past-run stats | [#9](https://github.com/romaine-life/spirelens/issues/9) |
 | **M6** | Publish v0.1 to Nexus | - |
 
-Additional shipped: discard count, pile-top placements (from hand / from discard), exhaust-others attribution, self-exhaust count, current/max-HP lost from card costs, cards-drawn attribution, blocked-draw attempt/reason tracking, Regent star-resource tracking, forge granted tracking, observed card-sourced orb creation and exact passive/evoke/fizzle lifecycles with separate Frost block, observed Alchemize potion gains/failures with rarity splits, observed Jack of All Trades colorless-card additions with rarity/type and average-cost splits, observed Discovery selections with rarity/type and average-energy-discount splits, All for One's successful zero-cost discard-to-hand returns and per-play/combat averages, Debt and Seal of Gold triggers with attempted, actual, and blocked gold loss, Seal of Gold's generated-energy total and per-combat average, Art of War's observed energy total, held-turn/combat averages, and live turn/combat energy, Cracked Core's exact starting-Lightning passive, evoke, and fizzle lifecycle, Reptile Trinket's activation rates and exact-two/over-two per-turn distribution, Pendulum's observed draws and held-combat average, Mummified Hand trigger/discount efficiency with discounted-card type and rarity tracking, Ruined Helmet's observed bonus Strength total with per-activation and held-combat averages, Daughter of the Wind's and Ripple Basin's observed block totals with held-turn/combat averages, observed max-HP pickup tracking for Strawberry, Pear, Mango, and Nutritious Oyster, Gnarled Hammer's observed Sharp-enchanted card list, Stone Humidifier's observed max-HP gains with per-activation before/after snapshots, Sturdy Clamp's retained/capped block averages per turn and combat, Pael's Claw's Goopy play rates and earned enhancements per Goopy card, recurring summon-to-hand tracking, effect application summaries, Artifact-blocked debuff tracking, downstream poison damage attribution including stacked Noxious Fumes contributor preservation, Dowsing Rod's live `?`-room countdown, Fishing Rod's ordered list of cards actually upgraded, and Molten/Toxic/Frozen Egg counts for matching upgraded cards offered across rewards and shops.
+Additional shipped: discard count, pile-top placements (from hand / from discard), exhaust-others attribution, self-exhaust count, current/max-HP lost from card costs, cards-drawn attribution, Death March's live non-opening-hand draw count for the current turn, blocked-draw attempt/reason tracking, Regent star-resource tracking, forge granted tracking, observed card-sourced orb creation and exact passive/evoke/fizzle lifecycles with separate Frost block and Lightning damage, observed Alchemize potion gains/failures with rarity splits, observed Jack of All Trades colorless-card additions with rarity/type and average-cost splits, observed Discovery selections with rarity/type and average-energy-discount splits, All for One's successful zero-cost discard-to-hand returns and per-play/combat averages, Debt and Seal of Gold triggers with attempted, actual, and blocked gold loss, Seal of Gold's generated-energy total and per-combat average, Art of War's observed energy total, held-turn/combat averages, and live turn/combat energy, Cracked Core's and Infused Core's exact starting-Lightning passive, evoke, and fizzle lifecycles plus observed damage outcomes, Reptile Trinket's activation rates and exact-two/over-two per-turn distribution, Pendulum's observed draws and held-combat average, Mummified Hand trigger/discount efficiency with discounted-card type and rarity tracking, Ruined Helmet's observed bonus Strength total with per-activation and held-combat averages, Daughter of the Wind's and Ripple Basin's observed block totals with held-turn/combat averages, observed max-HP pickup tracking for Strawberry, Pear, Mango, and Nutritious Oyster, Gnarled Hammer's observed Sharp-enchanted card list, Stone Humidifier's observed max-HP gains with per-activation before/after snapshots, Sturdy Clamp's retained/capped block averages per turn and combat, Pael's Claw's Goopy play rates and earned enhancements per Goopy card, Pael's Eye's observed exhaust totals, per-combat rate, and activation timing, recurring summon-to-hand tracking, effect application summaries, Artifact-blocked debuff tracking, downstream poison damage attribution including stacked Noxious Fumes contributor preservation, Dowsing Rod's live `?`-room countdown, Fishing Rod's ordered list of cards actually upgraded, and Molten/Toxic/Frozen Egg counts for matching upgraded cards offered across rewards and shops.
 Ornamental Fan additionally owns its gained, effective, and wasted block
 attribution, with zero-inclusive held-turn and held-combat averages.
 Kunai and Shuriken share one canonical three-Attack scaling presentation: the
@@ -190,6 +202,15 @@ Petrified Toad records Potion Shaped Rocks successfully given and attempts
 blocked specifically by a full potion belt.
 Pumpkin Candle records its Ancient energy contribution, average combat-start
 charges, and campfire rekindles.
+Girya records the Strength it actually adds at combat entry, Attack plays and
+resolved enemy hits while that Strength is active, the average saved Lift count
+across every floor held, and average floor travel from acquisition to the first
+Lift and between later Lifts.
+Lasting Candy records each exact Power it adds to a combat card reward and
+whether that option was taken or rejected, with Uncommon/Rare splits and
+activation counts for Elite and Boss combat rewards.
+Gremlin Horn records its exact activations, observed Energy and card draws,
+plus average activations across zero-inclusive held turns and combats.
 Small Capsule records the exact relic rolled on its reward screen and whether
 that same reward was taken or left behind, with the relic remaining hoverable
 in the SpireLens tooltip.
@@ -202,6 +223,9 @@ exhaust because of Ethereal.
 Crossbow records only Attacks that successfully enter combat, splits them by
 rarity, and averages both Attack gains and their observed energy discount over
 its zero-inclusive held turns and combats.
+Game Piece records qualifying Power plays, cards its direct draw actually adds
+to hand, draws that were blocked, and average observed cards drawn per held
+turn and combat.
 
 Drain Power additionally tracks its observed discard-pile upgrades and later
 plays of the exact combat cards it upgraded, with held-turn and held-combat

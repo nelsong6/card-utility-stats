@@ -4,6 +4,11 @@ schema version that existed when it was added. Versions are no longer used at
 runtime; the loader detects the per-instance vs. pooled shape structurally.
 New fixtures added going forward do not need a `v*-` prefix.
 
+- `defect-orb-family-run.json`
+  Adds Plasma energy to exact card-sourced orb outcomes and recurring Defect
+  Power orb outcomes for cards such as Storm, Spinner, Trash to Treasure, and
+  Lightning Rod.
+
 - `v1-pooled-run.json`
   Pooled shape. Aggregates are keyed by card definition id and do not carry
   the per-instance resume metadata introduced later. Loads as historical-only;
@@ -98,6 +103,10 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds successfully channeled orbs to the physical card aggregate, preserves
   exact-orb lifecycle outcomes by type, and keeps Frost block separate from
   the source card's direct block totals.
+- `ball-lightning-orb-damage-run.json`
+  Adds the observed attempted/dealt/blocked/overkill/kill/target damage split
+  from Ball Lightning's exact channeled Lightning orb, kept separate from the
+  card's direct Attack damage totals.
 - `jack-of-all-trades-card-run.json`
   Adds Jack of All Trades generated colorless-card totals, uncommon/rare and
   attack/skill/power splits, plus the numerator for average added-card cost.
@@ -107,6 +116,10 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `splash-card-run.json`
   Adds Splash selected-Attack totals, common/uncommon/rare splits, and the
   numerator for average observed energy discount.
+- `random-card-generation-run.json`
+  Adds the shared successful-arrival, exact generated-card utilization,
+  rarity/type/cost/discount/destination, and per-definition ledger shape for
+  direct random generators and recurring shared Power generators.
 - `feed-card-run.json`
   Adds Feed's observed maximum-HP gain to the physical card aggregate after
   its Fatal play callback completes successfully.
@@ -171,6 +184,10 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `phylactery-relic-run.json`
   Adds Bound Phylactery and Phylactery Unbound activation tracking plus actual
   Osty summon HP gained from the shared summon command result.
+- `phylactery-osty-body-run.json`
+  Adds the shared, upgrade-continuous Osty-body ledger surfaced by both
+  Phylactery forms: all successful summon HP, Unleash-play HP, absorbed damage,
+  and zero-inclusive held turn/combat denominators.
 - `v32-enemy-damage-run.json`
   Adds per-enemy observed damage output aggregates: attempted damage, HP damage
   dealt, and damage blocked by player block.
@@ -224,9 +241,9 @@ New fixtures added going forward do not need a `v*-` prefix.
   duplicate definitions, final display names, post-return upgrade levels, and
   the floors climbed before each card was returned.
 - `paels-eye-relic-run.json`
-  Adds Pael's Eye activation tracking plus counts of status and curse cards
-  actually exhausted by its extra-turn callback, and combats where it was held
-  without activating.
+  Adds Pael's Eye activation tracking, observed total/Strike-and-Defend/Status/
+  Curse exhaust counts, activation-turn samples, and held-combat denominators
+  including combats where it did not activate.
 - `strike-dummy-relic-run.json`
   Adds Strike Dummy tracked Strike-card plays since pickup plus current
   permanent-deck counts for base Strikes and non-base Strike-tagged cards.
@@ -380,7 +397,9 @@ New fixtures added going forward do not need a `v*-` prefix.
   for its total and average rows.
 - `cracked-core-relic-run.json`
   Adds lifecycle tracking for the exact Lightning orb Cracked Core channels:
-  completed evokes, passive triggers, and non-evoke slot-removal fizzles.
+  completed evokes, passive triggers, non-evoke slot-removal fizzles, and the
+  observed attempted/dealt/blocked/overkill/kill/target damage split from that
+  exact orb.
 - `symbiotic-virus-relic-run.json`
   Adds lifecycle tracking for the exact Dark orb Symbiotic Virus channels:
   completed evokes, passive triggers, and non-evoke slot-removal fizzles.
@@ -415,6 +434,9 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds Sword in the Stone's acquisition floor, ordered Elite-victory history,
   and the observed Strength activations/gains retained after Sword of Jade
   replaces it.
+- `sword-in-the-stone-strength-rates-run.json`
+  Adds Sword of Jade's observation-era Strength numerator and zero-inclusive
+  held-combat denominator for the shared Strength-relic family presentation.
 - `egg-relic-offers-run.json`
   Adds Molten, Toxic, and Frozen Egg tracking: every matching choosable card
   option the egg actually upgraded across rewards, shops, and other offers,
@@ -464,6 +486,9 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `dark-embrace-power-run.json`
   Adds Dark Embrace's observed immediate and deferred cards drawn, its active
   turn and active-combat denominators, and all turns in combats where active.
+- `consuming-shadow-power-run.json`
+  Adds Consuming Shadow's completed end-of-turn orb evocations to its shared
+  Power aggregate.
 - `burning-sticks-relic-run.json`
   Adds Burning Sticks confirmed duplicate activations, exact generated-card
   plays, duplicate rarity splits, and its held-combat denominator.
@@ -604,9 +629,28 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `crossbow-relic-run.json`
   Adds Crossbow's successfully gained Attacks, rarity splits, observed energy
   discount, and zero-inclusive held turn/combat denominators.
+- `game-piece-relic-run.json`
+  Adds Game Piece's qualifying Power plays, observed and blocked draws, and
+  zero-inclusive held turn/combat denominators.
 - `card-removal-source-run.json`
   Adds per-physical-card removal source attribution plus the exact gold charge
   for cards removed by the shopkeeper.
+- `golden-pearl-relic-run.json`
+  Adds Golden Pearl's floor distance from acquisition to the first observed
+  positive gold loss classified by the game as spending.
+- `girya-relic-run.json`
+  Adds Girya's observed Strength, eligible-combat denominator, time-weighted
+  floor counter samples, successful-Lift floor pacing, and Attack plays/hits
+  while its Strength is active.
+- `lasting-candy-relic-run.json`
+  Adds Lasting Candy's exact Power offers and terminal taken/rejected outcomes,
+  split into Uncommon/Rare rarity buckets and Elite/Boss activation contexts.
+- `gremlin-horn-relic-run.json`
+  Adds Gremlin Horn's tracking-window activation numerator and zero-inclusive
+  held turn/combat denominators alongside its observed Energy and card draws.
+- `dingy-rug-relic-run.json`
+  Adds Dingy Rug's affected card rewards and final visible card offers split
+  across the five character pools and the Colorless pool.
 
 Why these exist:
 

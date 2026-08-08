@@ -107,8 +107,28 @@ public class PendingCombatPromotionTests
             DamageDealt = 11,
             DamageBlocked = 5,
         };
+        pending.MetaStats.TotalOstyHpSummoned = 12;
+        pending.MetaStats.TotalOstyHpWhenUnleashPlayed = 15;
         pending.MetaStats.TotalOstyDamageAbsorbed = 4;
+        pending.MetaStats.OstyBodyTurns = 3;
+        pending.MetaStats.OstyBodyCombats = 1;
         pending.MetaStats.ExtraBlockGainedFromUnmovablePower = 9;
+        pending.MetaStats.PowerAggregates["POWER.STORM"] = new PowerAggregate
+        {
+            PowerId = "POWER.STORM",
+            DisplayName = "Storm",
+            TotalOrbsCreated = 2,
+            OrbOutcomes =
+            {
+                ["ORB.LIGHTNING_ORB"] = new CardOrbAggregate
+                {
+                    OrbId = "ORB.LIGHTNING_ORB",
+                    Created = 2,
+                    PassiveActivations = 3,
+                    DamageDealt = 9,
+                },
+            },
+        };
 
         var run = new RunData();
         RunTracker.PromotePendingCombatIntoRun(pending, run);
@@ -118,7 +138,16 @@ public class PendingCombatPromotionTests
         Assert.Equal(16, enemy.DamageAttempted);
         Assert.Equal(11, enemy.DamageDealt);
         Assert.Equal(5, enemy.DamageBlocked);
+        Assert.Equal(12, run.MetaStats.TotalOstyHpSummoned);
+        Assert.Equal(15, run.MetaStats.TotalOstyHpWhenUnleashPlayed);
         Assert.Equal(4, run.MetaStats.TotalOstyDamageAbsorbed);
+        Assert.Equal(3, run.MetaStats.OstyBodyTurns);
+        Assert.Equal(1, run.MetaStats.OstyBodyCombats);
         Assert.Equal(9, run.MetaStats.ExtraBlockGainedFromUnmovablePower);
+        var storm = run.MetaStats.PowerAggregates["POWER.STORM"];
+        Assert.Equal(2, storm.TotalOrbsCreated);
+        Assert.Equal(2, storm.OrbOutcomes["ORB.LIGHTNING_ORB"].Created);
+        Assert.Equal(3, storm.OrbOutcomes["ORB.LIGHTNING_ORB"].PassiveActivations);
+        Assert.Equal(9, storm.OrbOutcomes["ORB.LIGHTNING_ORB"].DamageDealt);
     }
 }

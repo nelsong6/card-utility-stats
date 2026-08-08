@@ -5,6 +5,7 @@ using SpireLens.Core;
 using SpireLens.Core.Patches;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Models.Cards;
 using Xunit;
 
 namespace SpireLens.Core.Tests;
@@ -43,6 +44,31 @@ public class BlockTooltipTests
         typeof(CardHoverShowPatch).GetMethod("AppendOrbCreationStats", BindingFlags.NonPublic | BindingFlags.Static)
         ?? throw new InvalidOperationException("AppendOrbCreationStats not found.");
 
+    private static readonly MethodInfo Row3Method =
+        typeof(CardHoverShowPatch).GetMethod("Row3", BindingFlags.NonPublic | BindingFlags.Static)
+        ?? throw new InvalidOperationException("Row3 not found.");
+
+    [Fact]
+    public void CardScalarRows_ShareNaturalWidthTableAndLeftAlignValues()
+    {
+        var body = new StringBuilder();
+        _ = Row3Method.Invoke(null, new object?[] { body, "Short", "0", "", null });
+        _ = Row3Method.Invoke(null, new object?[]
+        {
+            body,
+            "The longest semantic label",
+            "false",
+            "100%",
+            null,
+        });
+        var markup = body.ToString();
+
+        Assert.Equal(1, markup.Split("[table=4]", StringSplitOptions.None).Length - 1);
+        Assert.Contains("[left][b]0[/b][/left]", markup);
+        Assert.Contains("[left][b]false[/b][/left]", markup);
+        Assert.DoesNotContain("[right]", markup);
+    }
+
     [Fact]
     public void GetBlockStatLabel_UsesShieldIcon()
     {
@@ -68,7 +94,8 @@ public class BlockTooltipTests
         _ = AppendCompactBodyMethod.Invoke(null, new object?[] { sb, cardModel, agg });
         var text = sb.ToString();
 
-        Assert.Contains("[img=16x16]res://images/ui/combat/block.png[/img] gained", text);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("block"), text);
+        Assert.Contains("gained", text);
         Assert.Contains("[b]9[/b]", text);
     }
 
@@ -142,7 +169,7 @@ public class BlockTooltipTests
         _ = AppendCompactBodyMethod.Invoke(null, new object?[] { sb, cardModel, agg });
         var text = sb.ToString();
 
-        Assert.Contains("[img=16x16]res://images/atlases/power_atlas.sprites/draw_cards_next_turn_power.tres[/img] drawn", text);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("draw"), text);
         Assert.Contains("[b]4[/b]", text);
     }
 
@@ -162,9 +189,8 @@ public class BlockTooltipTests
         _ = AppendCompactBodyMethod.Invoke(null, new object?[] { sb, cardModel, agg });
         var text = sb.ToString();
 
-        Assert.Contains(
-            "[img=16x16]res://images/packed/sprite_fonts/ironclad_energy_icon.png[/img] gained",
-            text);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("energy"), text);
+        Assert.Contains("gained", text);
         Assert.Contains("[b]2[/b]", text);
     }
 
@@ -184,7 +210,8 @@ public class BlockTooltipTests
         _ = AppendCompactBodyMethod.Invoke(null, new object?[] { sb, cardModel, agg });
         var text = sb.ToString();
 
-        Assert.Contains("[img=16x16]res://images/packed/sprite_fonts/star_icon.png[/img] gained", text);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("stars"), text);
+        Assert.Contains("gained", text);
         Assert.Contains("[b]2[/b]", text);
     }
 
@@ -236,9 +263,9 @@ public class BlockTooltipTests
         {
             TotalOrbsCreated = 2,
         };
-        agg.OrbOutcomes["ORB.FROST"] = new CardOrbAggregate
+        agg.OrbOutcomes["ORB.FROST_ORB"] = new CardOrbAggregate
         {
-            OrbId = "ORB.FROST",
+            OrbId = "ORB.FROST_ORB",
             Created = 2,
             PassiveActivations = 5,
             Evokes = 1,
@@ -249,26 +276,177 @@ public class BlockTooltipTests
         var sb = new StringBuilder();
         _ = AppendOrbCreationStatsMethod.Invoke(
             null,
-            new object?[] { sb, agg, false });
+            new object?[] { sb, null, agg, null, false });
         var text = sb.ToString();
 
-        Assert.Contains(
-            "[img=16x16]res://images/orbs/frost.png[/img] created",
-            text);
-        Assert.Contains(
-            "[img=16x16]res://images/orbs/frost.png[/img] passive activations",
-            text);
-        Assert.Contains(
-            "[img=16x16]res://images/orbs/frost.png[/img] evoked",
-            text);
-        Assert.Contains(
-            "[img=16x16]res://images/orbs/frost.png[/img] fizzled",
-            text);
-        Assert.Contains(
-            "[img=16x16]res://images/orbs/frost.png[/img] "
-            + "[img=16x16]res://images/ui/combat/block.png[/img]",
-            text);
+        Assert.Contains("[hint=", text);
+        Assert.Contains("res://images/orbs/frost_orb.png", text);
+        Assert.Contains("created", text);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("activation"), text);
+        Assert.Contains("passive", text);
+        Assert.Contains("evoked", text);
+        Assert.Contains("fizzled", text);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("block"), text);
         Assert.Contains("[b]17[/b]", text);
+    }
+
+    [Fact]
+    public void AppendOrbCreationStats_ShowsLightningDamageOutcomesSeparately()
+    {
+        var agg = new CardAggregate
+        {
+            TotalOrbsCreated = 2,
+        };
+        agg.OrbOutcomes["ORB.LIGHTNING_ORB"] = new CardOrbAggregate
+        {
+            OrbId = "ORB.LIGHTNING_ORB",
+            Created = 2,
+            PassiveActivations = 3,
+            Evokes = 1,
+            DamageAttempted = 18,
+            DamageDealt = 12,
+            DamageBlocked = 4,
+            DamageOverkill = 2,
+            Kills = 1,
+            TargetsHit = 4,
+        };
+
+        var sb = new StringBuilder();
+        _ = AppendOrbCreationStatsMethod.Invoke(
+            null,
+            new object?[] { sb, null, agg, null, false });
+        var text = sb.ToString();
+
+        Assert.Contains("[hint=", text);
+        Assert.Contains("res://images/orbs/lightning_orb.png", text);
+        Assert.Contains(
+            StatConceptGlossary.RenderInformationHint("damage attempted"),
+            text);
+        Assert.Contains(
+            StatConceptGlossary.RenderInformationHint("damage dealt"),
+            text);
+        Assert.Contains(
+            StatConceptGlossary.RenderInformationHint("damage blocked"),
+            text);
+        Assert.Contains(
+            StatConceptGlossary.RenderInformationHint("overkill"),
+            text);
+        Assert.Contains(
+            StatConceptGlossary.RenderInformationHint("kills"),
+            text);
+        Assert.Contains(
+            StatConceptGlossary.RenderInformationHint("targets hit"),
+            text);
+        Assert.Contains(
+            StatConceptGlossary.RenderHintedGlyph("targets_hit"),
+            text);
+        Assert.Contains("[b]18[/b]", text);
+        Assert.Contains("[b]12[/b]", text);
+        Assert.Contains("[b]4[/b]", text);
+        Assert.Contains("[b]2[/b]", text);
+        Assert.Contains("[b]1[/b]", text);
+    }
+
+    [Fact]
+    public void AppendOrbCreationStats_ShowsDarkLifecycleAndDamageAtZero()
+    {
+        var sb = new StringBuilder();
+        _ = AppendOrbCreationStatsMethod.Invoke(
+            null,
+            new object?[]
+            {
+                sb,
+                new Darkness(),
+                new CardAggregate(),
+                new RunMetaStats(),
+                false,
+            });
+        var text = sb.ToString();
+
+        Assert.Contains("[hint=", text);
+        Assert.Contains("res://images/orbs/dark_orb.png", text);
+        Assert.Contains("created", text);
+        Assert.Contains("passive", text);
+        Assert.Contains("evoked", text);
+        Assert.Contains("damage attempted", text);
+        Assert.Contains("targets hit", text);
+    }
+
+    [Fact]
+    public void AppendOrbCreationStats_ShowsPlasmaEnergyFromExactOrb()
+    {
+        var agg = new CardAggregate { TotalOrbsCreated = 1 };
+        agg.OrbOutcomes["ORB.PLASMA_ORB"] = new CardOrbAggregate
+        {
+            OrbId = "ORB.PLASMA_ORB",
+            Created = 1,
+            EnergyGenerated = 4,
+        };
+
+        var sb = new StringBuilder();
+        _ = AppendOrbCreationStatsMethod.Invoke(
+            null,
+            new object?[]
+            {
+                sb,
+                new Fusion(),
+                agg,
+                new RunMetaStats(),
+                false,
+            });
+        var text = sb.ToString();
+
+        Assert.Contains("[hint=", text);
+        Assert.Contains("res://images/orbs/plasma_orb.png", text);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("energy"), text);
+        Assert.Contains("[b]4[/b]", text);
+    }
+
+    [Fact]
+    public void AppendOrbCreationStats_CompactCreatedRowUsesOrbIcon()
+    {
+        var sb = new StringBuilder();
+        _ = AppendOrbCreationStatsMethod.Invoke(
+            null,
+            new object?[]
+            {
+                sb,
+                new Darkness(),
+                new CardAggregate(),
+                new RunMetaStats(),
+                true,
+            });
+        var text = sb.ToString();
+
+        Assert.Contains("[hint=", text);
+        Assert.Contains("res://images/orbs/dark_orb.png", text);
+        Assert.Contains("created", text);
+        Assert.DoesNotContain("Orbs created", text);
+    }
+
+    [Fact]
+    public void AppendOrbCreationStats_RandomFallbackShowsEligibleOrbIcons()
+    {
+        var sb = new StringBuilder();
+        _ = AppendOrbCreationStatsMethod.Invoke(
+            null,
+            new object?[]
+            {
+                sb,
+                new Chaos(),
+                new CardAggregate(),
+                new RunMetaStats(),
+                false,
+            });
+        var text = sb.ToString();
+
+        Assert.Contains("[hint=", text);
+        Assert.Contains("res://images/orbs/dark_orb.png", text);
+        Assert.Contains("res://images/orbs/frost_orb.png", text);
+        Assert.Contains("res://images/orbs/glass_orb.png", text);
+        Assert.Contains("res://images/orbs/lightning_orb.png", text);
+        Assert.Contains("res://images/orbs/plasma_orb.png", text);
+        Assert.Contains("created", text);
     }
 
     [Fact]
@@ -293,9 +471,10 @@ public class BlockTooltipTests
         _ = AppendCardDrawStatsMethod.Invoke(null, new object?[] { sb, agg });
         var text = sb.ToString();
 
-        Assert.Contains("[img=16x16]res://images/atlases/power_atlas.sprites/draw_cards_next_turn_power.tres[/img] drawn / tried", text);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("draw"), text);
+        Assert.Contains("tried", text);
         Assert.Contains("[b]1/3[/b]", text);
-        Assert.Contains("[img=16x16]res://images/atlases/power_atlas.sprites/draw_cards_next_turn_power.tres[/img] blocked by No Draw", text);
+        Assert.Contains("blocked by No", text);
         Assert.Contains("[b]2[/b]", text);
     }
 
@@ -312,9 +491,10 @@ public class BlockTooltipTests
         _ = AppendCardDrawStatsMethod.Invoke(null, new object?[] { sb, agg });
         var text = sb.ToString();
 
-        Assert.Contains("[img=16x16]res://images/atlases/power_atlas.sprites/draw_cards_next_turn_power.tres[/img] drawn / tried", text);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("draw"), text);
+        Assert.Contains("tried", text);
         Assert.Contains("[b]0/3[/b]", text);
-        Assert.Contains("[img=16x16]res://images/atlases/power_atlas.sprites/draw_cards_next_turn_power.tres[/img] blocked by other", text);
+        Assert.Contains("blocked by other", text);
     }
 
     [Fact]
@@ -339,7 +519,8 @@ public class BlockTooltipTests
         _ = AppendCardDrawStatsMethod.Invoke(null, new object?[] { sb, agg });
         var text = sb.ToString();
 
-        Assert.Contains("[img=16x16]res://images/atlases/power_atlas.sprites/draw_cards_next_turn_power.tres[/img] blocked by hand full", text);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("draw"), text);
+        Assert.Contains("blocked by hand full", text);
         Assert.Contains("[b]2[/b]", text);
     }
     private static CardModel CreateCardModel(CardType type)

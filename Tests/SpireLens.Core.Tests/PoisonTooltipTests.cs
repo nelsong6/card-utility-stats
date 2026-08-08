@@ -66,7 +66,8 @@ public class PoisonTooltipTests
 
         Assert.True(rendered);
         Assert.DoesNotContain("[color=#b5b5b5]Poison applied[/color]", text);
-        Assert.Contains("[img=16x16]res://art/powers/poison.png[/img] total applied", text);
+        Assert.Contains("res://art/powers/poison.png", text);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("all"), text);
         Assert.Contains("[b]12[/b]", text);
         Assert.Contains("avg applied", text);
         Assert.Contains("[b]3[/b]", text);
@@ -195,7 +196,9 @@ public class PoisonTooltipTests
         AppendAppliedEffects(sb, agg, compact: false, excludePoison: false);
         var text = sb.ToString();
 
-        Assert.Contains("[img=16x16]res://images/atlases/power_atlas.sprites/star_next_turn_power.tres[/img] Star Next Turn", text);
+        Assert.Contains("res://images/atlases/power_atlas.sprites/star_next_turn_power.tres", text);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("stars"), text);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("turn"), text);
         Assert.Contains("[b]2[/b]", text);
     }
 
@@ -222,9 +225,10 @@ public class PoisonTooltipTests
         AppendAppliedEffects(sb, agg, compact: false, excludePoison: false);
         var text = sb.ToString();
 
-        Assert.Contains("[img=16x16]res://images/atlases/power_atlas.sprites/no_draw_power.tres[/img] No Draw", text);
+        Assert.Contains("res://images/atlases/power_atlas.sprites/no_draw_power.tres", text);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("draw"), text);
         Assert.Contains("[b]1[/b]", text);
-        Assert.Contains("[img=16x16]res://images/atlases/power_atlas.sprites/draw_cards_next_turn_power.tres[/img] cards blocked", text);
+        Assert.Contains("blocked", text);
         Assert.Contains("[b]2[/b]", text);
     }
 

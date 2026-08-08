@@ -359,6 +359,58 @@ public class PotionRunHistoryEntry
     public int? HeldAtRunEndFloor { get; set; }
 }
 
+/// <summary>
+/// One definition within a random-generator outcome ledger. Generated counts
+/// successful arrivals; generated-cards-played counts distinct physical
+/// generated cards used at least once; plays includes replays.
+/// </summary>
+public class GeneratedCardOutcomeAggregate
+{
+    public string CardId { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public int Generated { get; set; }
+    public int GeneratedCardsPlayed { get; set; }
+    public int Plays { get; set; }
+}
+
+/// <summary>
+/// Shared observed-outcome shape for cards and Powers that select a random
+/// combat card. Exact generated-card objects are followed only within their
+/// combat; this additive aggregate is the durable run summary.
+/// </summary>
+public class RandomCardGenerationAggregate
+{
+    public int CardsGenerated { get; set; }
+    public int GeneratedCardsPlayed { get; set; }
+    public int GeneratedCardPlays { get; set; }
+
+    public int BasicCardsGenerated { get; set; }
+    public int CommonCardsGenerated { get; set; }
+    public int UncommonCardsGenerated { get; set; }
+    public int RareCardsGenerated { get; set; }
+    public int StatusCardsGenerated { get; set; }
+    public int CurseCardsGenerated { get; set; }
+    public int OtherRarityCardsGenerated { get; set; }
+
+    public int AttacksGenerated { get; set; }
+    public int SkillsGenerated { get; set; }
+    public int PowersGenerated { get; set; }
+    public int OtherTypeCardsGenerated { get; set; }
+
+    public int UpgradedCardsGenerated { get; set; }
+    public int XCostCardsGenerated { get; set; }
+    public int EnergyCostBeforeDiscountTotal { get; set; }
+    public int EnergyDiscountGrantedTotal { get; set; }
+
+    public int CardsAddedToHand { get; set; }
+    public int CardsAddedToDrawPile { get; set; }
+    public int CardsAddedToDiscardPile { get; set; }
+    public int CardsAddedElsewhere { get; set; }
+
+    public Dictionary<string, GeneratedCardOutcomeAggregate> CardsById { get; set; }
+        = new();
+}
+
 /// <summary>Aggregated per-card attribution stats for this run.</summary>
 public class CardAggregate
 {
@@ -417,6 +469,11 @@ public class CardAggregate
     public int UncommonPotionsGained { get; set; }
     public int RarePotionsGained { get; set; }
     public int PotionsSkipped { get; set; }
+
+    // Shared random-card generation outcomes. This supplements bespoke
+    // choice-screen details (Discovery and Splash) with one consistent,
+    // successful-arrival and later-utilization model across the whole family.
+    public RandomCardGenerationAggregate? RandomCardGeneration { get; set; }
 
     // Jack of All Trades generated-card outcomes. The total counts only cards
     // that the combat pile command confirms were added. Rarity/type buckets
@@ -680,12 +737,32 @@ public class CardOrbAggregate
     // Observed block created by this orb type. This remains separate from the
     // originating card's direct block totals and provenance ledger.
     public int BlockGained { get; set; }
+
+    // Observed energy added by Plasma activations. This is kept on the exact
+    // originating orb rather than attributed to whichever card caused an
+    // eviction/evoke while the Plasma orb happened to be in the queue.
+    public int EnergyGenerated { get; set; }
+
+    // Observed damage created by this orb type. These remain separate from the
+    // originating card's direct Attack damage so cards such as Ball Lightning
+    // expose both values without blending them.
+    public int DamageAttempted { get; set; }
+    public int DamageDealt { get; set; }
+    public int DamageBlocked { get; set; }
+    public int DamageOverkill { get; set; }
+    public int Kills { get; set; }
+    public int TargetsHit { get; set; }
 }
 
 public class RunMetaStats
 {
+    // Shared Osty-body facts. Bound Phylactery and Phylactery Unbound both
+    // project these values so upgrading the relic never resets its history.
     public decimal TotalOstyHpSummoned { get; set; }
+    public decimal TotalOstyHpWhenUnleashPlayed { get; set; }
     public decimal TotalOstyDamageAbsorbed { get; set; }
+    public int OstyBodyTurns { get; set; }
+    public int OstyBodyCombats { get; set; }
     public decimal ExtraBlockGainedFromUnmovablePower { get; set; }
 
     // Power-owned outcomes that should not be attributed to one physical
@@ -716,6 +793,19 @@ public class PowerAggregate
     public int MetaActiveTurns { get; set; }
     public int MetaActiveApplicationTurns { get; set; }
 
+    // Random cards created by recurring Power callbacks. These belong to the
+    // shared Power identity rather than whichever physical card first applied
+    // the stack. MetaActiveTurns and MetaActiveApplicationTurns provide the
+    // zero-inclusive denominators.
+    public RandomCardGenerationAggregate? RandomCardGeneration { get; set; }
+
+    // Orb outcomes produced later by recurring Power callbacks (Storm,
+    // Spinner, Trash to Treasure, and Lightning Rod). These are folded into
+    // the originating card family's tooltip without assigning them to one
+    // physical card copy.
+    public int TotalOrbsCreated { get; set; }
+    public Dictionary<string, CardOrbAggregate> OrbOutcomes { get; set; } = new();
+
     // Matching observation-era numerators for the three meta-power rate
     // denominators above. Lifetime totals predate these denominators in saved
     // runs, so dividing those older totals by newer denominators would create
@@ -733,6 +823,12 @@ public class PowerAggregate
     public decimal RateStrengthGained { get; set; }
     public decimal UnmovableExtraBlockGained { get; set; }
     public decimal RateUnmovableExtraBlockGained { get; set; }
+
+    // Consuming Shadow tracking. This counts only completed orb evocations
+    // reached through the power's own end-of-turn EvokeLast calls. It is
+    // power-owned because multiple card applications stack into one shared
+    // Consuming Shadow power.
+    public int OrbsEvoked { get; set; }
 
     // Juggling tracking. Copies count only generated Attack cards confirmed
     // by the combat-pile add result. Turns and combats are held-power
@@ -920,10 +1016,23 @@ public class RelicAggregate
     // relic-attributed requests that did not produce a card.
     // Used by Pocketwatch (draws 3 extra cards when 3 or fewer cards were
     // played last turn), Gremlin Horn (draws after enemy death), Pendulum
-    // (draws every N turns), and Booming Conch (draws extra cards at Elite
-    // combat start).
+    // (draws every N turns), Game Piece (draws after an owner Power), and
+    // Booming Conch (draws extra cards at Elite combat start).
     public int AdditionalCardsDrawn { get; set; }
     public int AdditionalCardDrawsBlocked { get; set; }
+
+    // Gremlin Horn's zero-inclusive held-period denominators. Lifetime
+    // activations, observed Energy, and observed draws use shared fields.
+    // RateActivations is separate from the legacy lifetime activation total
+    // so upgraded runs do not divide historical triggers by new denominators.
+    public int GremlinHornRateActivations { get; set; }
+    public int GremlinHornTurns { get; set; }
+    public int GremlinHornCombats { get; set; }
+
+    // Game Piece's zero-inclusive held-period denominators. Its observed
+    // draw total uses AdditionalCardsDrawn.
+    public int GamePieceTurns { get; set; }
+    public int GamePieceCombats { get; set; }
 
     // Centennial Puzzle's once-per-combat activation context. The turn total
     // is summed at the exact HP-loss callback and uses the owning player's
@@ -1011,8 +1120,8 @@ public class RelicAggregate
     // has block at end of turn.
     public int BlockedTriggers { get; set; }
 
-    // Total Strength this relic added. Used by Reptile Trinket, Shuriken,
-    // Ruined Helmet, and Toasty Mittens.
+    // Total Strength this relic added. Used by Girya, Reptile Trinket,
+    // Shuriken, Ruined Helmet, Sword of Jade, and Toasty Mittens.
     public decimal StrengthAdded { get; set; }
 
     // Toasty Mittens outcomes and its zero-inclusive held-combat denominator.
@@ -1183,6 +1292,41 @@ public class RelicAggregate
     // relic can continue presenting the original acquisition/progression story.
     public List<SwordInTheStoneEliteSlainAggregate> SwordInTheStoneElitesSlain { get; set; } = new();
 
+    // Sword of Jade's matching observation-era Strength numerator and
+    // zero-inclusive held-combat denominator. Lifetime StrengthAdded predates
+    // these fields, so it must not be divided by only newly observed combats.
+    // Pre-transformation Sword in the Stone combats are deliberately excluded.
+    public decimal SwordInTheStoneStrengthRateAdded { get; set; }
+    public int SwordInTheStoneStrengthCombats { get; set; }
+
+    // Tooltip-only projection populated from the live pending combat aggregate.
+    // Internal properties are not part of the persisted System.Text.Json shape.
+    internal decimal SwordInTheStoneStrengthAddedThisCombat { get; set; }
+
+    // Girya's matching observation-era Strength numerator and eligible-combat
+    // denominator. The floor samples are one counter snapshot per entered floor
+    // while held (including its acquisition floor), so time spent at each Lift
+    // count is weighted naturally. Use distances run from acquisition to the
+    // first Lift and then between consecutive successful Lifts.
+    public decimal GiryaStrengthRateAdded { get; set; }
+    public int GiryaStrengthCombats { get; set; }
+    public int GiryaCountFloorTotal { get; set; }
+    public int GiryaFloorSamples { get; set; }
+    public int? GiryaLastFloorSampled { get; set; }
+    public int GiryaUseFloorDistanceTotal { get; set; }
+    public int GiryaUseFloorDistanceSamples { get; set; }
+    public int? GiryaLastUseFloor { get; set; }
+    public int GiryaLastObservedLiftCount { get; set; }
+
+    // Downstream use while Girya is providing Strength. Mirrors Vajra's
+    // Attack-play and resolved enemy-hit counters, but excludes the pre-Lift
+    // period when Girya has not added any Strength yet.
+    public int GiryaAttacksPlayed { get; set; }
+    public int GiryaAttackHits { get; set; }
+
+    // Tooltip-only projection populated from the live pending combat aggregate.
+    internal decimal GiryaStrengthAddedThisCombat { get; set; }
+
     // Total observed maximum HP gained by pickup max-HP relics and Chosen Cheese.
     public decimal MaxHpGained { get; set; }
 
@@ -1293,8 +1437,9 @@ public class RelicAggregate
     internal int ArtOfWarEnergyAddedThisTurn { get; set; }
     internal int ArtOfWarTurnsThisCombat { get; set; }
 
-    // Lifecycle outcomes for the exact Lightning orb instance created by
-    // Cracked Core at the start of combat.
+    // Lifecycle outcomes for exact starting Lightning orb instances created
+    // by Cracked Core or Infused Core. Property names retain the original
+    // Cracked Core prefix for schema compatibility.
     public int CrackedCoreOrbEvokes { get; set; }
     public int CrackedCoreOrbPassiveTriggers { get; set; }
     public int CrackedCoreOrbFizzles { get; set; }
@@ -1338,9 +1483,9 @@ public class RelicAggregate
     // downstream hook effects such as Lethality or Vulnerable.
     public int TotalDamageAttempted { get; set; }
 
-    // Relic damage outcome split. Used by relics such as Parrying Shield,
-    // Festive Popper, Mercury Hourglass, and Forgotten Soul when their strikes
-    // actually resolve through the game's damage command.
+    // Relic damage outcome split. Used by relics such as Cracked Core,
+    // Parrying Shield, Festive Popper, Mercury Hourglass, and Forgotten Soul
+    // when their strikes actually resolve through the game's damage command.
     public int TotalDamageDealt { get; set; }
     public int TotalDamageBlocked { get; set; }
     public int TotalDamageOverkill { get; set; }
@@ -1360,8 +1505,8 @@ public class RelicAggregate
     public int ForgottenSoulCombats { get; set; }
 
     // Total targets included in those attempted relic-damage payloads. Used by
-    // Letter Opener, Parrying Shield, Festive Popper, Mercury Hourglass, and
-    // Forgotten Soul.
+    // Cracked Core, Letter Opener, Parrying Shield, Festive Popper, Mercury
+    // Hourglass, and Forgotten Soul.
     public int TotalTargets { get; set; }
 
     // Letter Opener tracking. TotalDamageAttempted stores the attempted AoE
@@ -1493,7 +1638,14 @@ public class RelicAggregate
     public int PaelsClawTurns { get; set; }
     public int PaelsClawCombats { get; set; }
 
-    // Status/curse cards exhausted by Pael's Eye when it takes an extra turn.
+    // Cards observed in Exhaust after Pael's Eye's extra-turn callback.
+    // ActivationTurnSamples excludes held combats where the relic did not
+    // activate. Combats is the zero-inclusive denominator for cards/combat.
+    public int PaelsEyeCardsExhausted { get; set; }
+    public int PaelsEyeStrikesAndDefendsExhausted { get; set; }
+    public int PaelsEyeActivationTurnTotal { get; set; }
+    public int PaelsEyeActivationTurnSamples { get; set; }
+    public int PaelsEyeCombats { get; set; }
     public int StatusCardsExhausted { get; set; }
     public int CurseCardsExhausted { get; set; }
     public int CombatsWithoutActivation { get; set; }
@@ -1773,6 +1925,11 @@ public class RelicAggregate
     // completed zero-floor result.
     public int? FloorsTraveledUntilNextShop { get; set; }
 
+    // Distance from Golden Pearl's pickup floor to the first observed gold
+    // loss classified by the game as spending. Nullable distinguishes no
+    // expense yet from a same-floor expense.
+    public int? FloorsBeforeFirstGoldExpense { get; set; }
+
     // Ordered off-path destinations reached by spending Winged Boots charges.
     // UseNumber comes from the relic's own saved TimesUsed counter so tracking
     // remains correctly numbered when the mod is hot-reloaded mid-run.
@@ -1807,6 +1964,23 @@ public class RelicAggregate
     public int WingCharmCommonSwiftCardsOffered { get; set; }
     public int WingCharmUncommonSwiftCardsOffered { get; set; }
     public int WingCharmRareSwiftCardsOffered { get; set; }
+
+    // Lasting Candy card-reward outcomes. Each count comes from the exact
+    // Power CardCreationResult the relic appended to a triggering combat
+    // reward; rejected means that result remained when the reward resolved or
+    // was replaced by a reroll. Elite/Boss activations classify those exact
+    // appended options by the combat room that produced their reward.
+    public int LastingCandyPowersOffered { get; set; }
+    public int LastingCandyPowersTaken { get; set; }
+    public int LastingCandyPowersRejected { get; set; }
+    public int LastingCandyUncommonPowersOffered { get; set; }
+    public int LastingCandyUncommonPowersTaken { get; set; }
+    public int LastingCandyUncommonPowersRejected { get; set; }
+    public int LastingCandyRarePowersOffered { get; set; }
+    public int LastingCandyRarePowersTaken { get; set; }
+    public int LastingCandyRarePowersRejected { get; set; }
+    public int LastingCandyEliteActivations { get; set; }
+    public int LastingCandyBossActivations { get; set; }
 
     // Ordered relic-owned card-choice offers. Silver Crucible uses its
     // one-based use number (1-3); Lead Paperweight uses screen 1. Cards keeps
@@ -1993,7 +2167,7 @@ public readonly record struct CardRewardCategoryObservation(string Key, string D
 public class CardEvent
 {
     public string T { get; set; } = "";          // ISO-8601 UTC timestamp
-    public string Type { get; set; } = "";       // "card_played" | "damage_received" | "energy_gained" | "stars_gained" | "forge_gained" | "orb_created" | "orb_passive" | "orb_evoked" | "orb_fizzled" | "orb_block_gained"
+    public string Type { get; set; } = "";       // "card_played" | "damage_received" | "energy_gained" | "stars_gained" | "forge_gained" | "orb_created" | "orb_passive" | "orb_evoked" | "orb_fizzled" | "orb_block_gained" | "orb_energy_gained" | "orb_damage"
     public string CardId { get; set; } = "";
 
     // card_played fields
@@ -2012,7 +2186,7 @@ public class CardEvent
     public int? Floor { get; set; }
     public int? UpgradeLevel { get; set; }
 
-    // damage_received fields (only populated when Type == "damage_received" with a CardSource)
+    // damage_received / orb_damage fields
     public string? Receiver { get; set; }
     public int? Blocked { get; set; }
     public int? Unblocked { get; set; }

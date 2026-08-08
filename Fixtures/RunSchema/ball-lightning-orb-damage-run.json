@@ -1,0 +1,92 @@
+{
+  "run_id": "ball-lightning-orb-damage-fixture",
+  "started_at": "2026-08-04T08:00:00Z",
+  "updated_at": "2026-08-04T08:18:00Z",
+  "character": "DEFECT",
+  "ascension": 7,
+  "floor_reached": 14,
+  "outcome": "in_progress",
+  "game_start_time": 1785830400,
+  "aggregates": {
+    "CARD.BALL_LIGHTNING#1": {
+      "combats_in_deck": 2,
+      "plays": 2,
+      "times_drawn": 4,
+      "total_orbs_created": 2,
+      "orb_outcomes": {
+        "ORB.LIGHTNING_ORB": {
+          "orb_id": "ORB.LIGHTNING_ORB",
+          "created": 2,
+          "passive_activations": 3,
+          "evokes": 1,
+          "fizzles": 0,
+          "damage_attempted": 18,
+          "damage_dealt": 12,
+          "damage_blocked": 4,
+          "damage_overkill": 2,
+          "kills": 1,
+          "targets_hit": 4
+        }
+      },
+      "floor_added": 4,
+      "initial_upgrade_level": 0
+    }
+  },
+  "events": [
+    {
+      "t": "2026-08-04T08:12:00Z",
+      "type": "orb_damage",
+      "card_id": "CARD.BALL_LIGHTNING#1",
+      "orb_id": "ORB.LIGHTNING_ORB",
+      "receiver": "MONSTER.CULTIST",
+      "blocked": 2,
+      "unblocked": 3,
+      "overkill": 0,
+      "killed": false
+    },
+    {
+      "t": "2026-08-04T08:13:00Z",
+      "type": "orb_damage",
+      "card_id": "CARD.BALL_LIGHTNING#1",
+      "orb_id": "ORB.LIGHTNING_ORB",
+      "receiver": "MONSTER.CULTIST",
+      "blocked": 0,
+      "unblocked": 4,
+      "overkill": 1,
+      "killed": false
+    },
+    {
+      "t": "2026-08-04T08:14:00Z",
+      "type": "orb_damage",
+      "card_id": "CARD.BALL_LIGHTNING#1",
+      "orb_id": "ORB.LIGHTNING_ORB",
+      "receiver": "MONSTER.SENTRY",
+      "blocked": 2,
+      "unblocked": 2,
+      "overkill": 0,
+      "killed": false
+    },
+    {
+      "t": "2026-08-04T08:15:00Z",
+      "type": "orb_damage",
+      "card_id": "CARD.BALL_LIGHTNING#1",
+      "orb_id": "ORB.LIGHTNING_ORB",
+      "receiver": "MONSTER.SENTRY",
+      "blocked": 0,
+      "unblocked": 3,
+      "overkill": 1,
+      "killed": true
+    }
+  ],
+  "relic_aggregates": {},
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.BALL_LIGHTNING": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.BALL_LIGHTNING": 1
+  }
+}

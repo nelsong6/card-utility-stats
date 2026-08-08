@@ -194,6 +194,10 @@ But do not assume every small `CombatHistory.*` wrapper is safe to patch. The re
 - Harmony patches on that wrapper did not fire in diagnostic runs.
 - `CardDrawnEntry` also did not appear through the generic `Observe` distribution during confirmed draws.
 - The reliable draw hook is `Hook.AfterCardDrawn`, not `CombatHistory.CardDrawn`.
+- Other runtime/JIT states can expose `CardDrawnEntry` through the generic
+  history observer after all. Treat it as recovery/diagnostic evidence only;
+  `Hook.AfterCardDrawn` remains the single live counter path, or successful
+  draws will be counted twice.
 
 When a future stat seems obvious from combat history but never appears, suspect inlining, alternate code paths, or late async flow. Add a focused diagnostic hook only long enough to prove the path, then promote the reliable hook or document the trap.
 
@@ -432,20 +436,24 @@ than exact Storybook-grant lineage.
 Necrobinder has both investment cards that create or maintain Osty and payoff
 cards that spend the resulting board state. Track those as different signals.
 
-- Patch `OstyCmd.Summon`, not individual card text, for successful card-sourced
-  Osty summons. The command carries the source model and returns the
+- Patch `OstyCmd.Summon`, not individual card text, for all successful Osty
+  summons. The command carries the source model and summoner and returns the
   game-observed summon amount.
 - Attribute the summon amount to the source card. That is the card's own
   contribution. Tooltip label: `Summon gained`.
-- Also add successful summon amount to run-level Osty meta stats. Tooltip
-  label: `All Osty total summon`.
+- Also add every successful summon amount for the tracked player's Osty to
+  run-level Osty meta stats, including card, Power, Potion, and either
+  Phylactery source.
 - Attribute Osty HP lost through `Hook.AfterCurrentHpChanged` negative deltas
   on any Osty creature into run-level meta stats. Do not assign all later Osty
   damage absorbed to the card that happened to summon most recently. Tooltip
   label: `All Osty damage absorbed`.
-- Keep payoff tracking separate. For example, Unleash's Osty-current-HP attack
-  bonus belongs on Unleash, while HP summoned belongs on the summon card, and
-  all-Osty totals are meta stats surfaced on related summon cards.
+- Keep payoff tracking separate. Unleash's Osty-current-HP attack bonus belongs
+  on the physical Unleash card, while the same observed play-time HP also
+  contributes to the run-level Phylactery family total.
+- Bound Phylactery and Phylactery Unbound share one Osty-body presentation.
+  Count zero-inclusive turns and combats while either form is held; never
+  restart those denominators when the relic upgrades.
 
 ## Block Attribution
 
@@ -545,6 +553,14 @@ to the Frost-orb bucket and bypasses the generic current/recent-card fallback.
 Otherwise a Glacier-created Frost orb can incorrectly add its block to
 Glacier—or to an unrelated recently completed card—as direct card block.
 
+Lightning orbs likewise call `CreatureCmd.Damage` without a `CardSource`.
+When Lightning's private `ApplyLightningDamage` routine belongs to an exact
+card-sourced orb, observe that command's returned `DamageResult` values and
+write the attempted, effective, blocked, overkill, kill, and target outcomes
+to the source card's orb-type bucket. Keep these separate from the card's
+direct Attack totals: Ball Lightning's own hit and the lifetime damage from
+the Lightning orb it channeled are distinct value streams.
+
 ## Effects And Powers
 
 Power/effect attribution needs two layers:
@@ -600,6 +616,31 @@ Combat-start relics often hook relic model callbacks directly by type name with 
 This is intentionally outcome-shaped but still simple. It assumes the relic applies one stack to each alive enemy at combat start. If a future relic has prevention/modifier interactions, use the same observed-result discipline as cards rather than only counting targets.
 
 Relic aggregates live in `RunData.RelicAggregates`, keyed by relic id. Fields are shared across relics; each relic uses only relevant fields.
+
+The filtered relic bar treats combat relevance as an effective live state,
+not a mutation of the saved classification. A relic with a finite combat
+duration enters a per-model, combat-local resolved set when its native
+`RelicModel.Flash(IEnumerable<Creature>)` activation fires. Bag of Preparation,
+Ring of the Snake, and Symbiotic Virus do not flash, so their established
+owner-specific activation hooks mark the same state directly. The configured
+turn is retained as an exclusive fallback cutoff, which also reconstructs the
+right projection after a Core hot reload. Any relic whose native `IsUsedUp`
+becomes true is effectively non-combat immediately; recurring finite relics
+leave the transient set at combat end and remain combat-classified for the
+next fight. This state is presentation-only and never removes or disables a
+relic.
+
+Terminal combat relevance is a separate no-turn-fallback path. Burning Sticks,
+Centennial Puzzle, Pael's Eye, Permafrost, Ruined Helmet, Throwing Axe,
+Unsettling Lamp, and Vambrace have one native activation per combat; their
+activation flash resolves their filtered-bar relevance immediately. Lava Lamp
+has the equivalent irreversible failure state: its `TookDamageThisCombat` flag
+permanently disqualifies its reward upgrade until the next combat. Read each
+relic's authoritative native boolean in addition to the transient flash set so
+a Core reload during combat reconstructs the terminal state without inventing
+a turn cutoff. Reversible states such as Belt Buckle, Meat on the Bone, and Red
+Skull are deliberately excluded because they can become relevant again in the
+same combat.
 
 Bag of Preparation raises its owner's first-turn hand-draw request inside
 `ModifyHandDraw`; the game then finishes the complete normal/late modifier
@@ -725,7 +766,12 @@ Keep both relic forms under the original `RELIC.SWORD_OF_STONE` stats identity.
 Sword of Jade's `AfterRoomEntered(AbstractRoom)` applies Strength on combat-room
 entry; measure the owner's Strength before and after that completed callback so
 the shared aggregate records the observed gain rather than its listed base
-value.
+value. Count every combat in which Sword of Jade is held as the zero-inclusive
+Strength-rate denominator, but exclude pre-transformation Sword in the Stone
+combats because that form cannot grant Strength. Keep a matching
+observation-era Strength numerator for this denominator: lifetime Strength
+totals can predate combat-rate tracking and must not be divided by only newly
+observed combats.
 
 Molten Egg, Toxic Egg, and Frozen Egg share `EggRelicHelper.UpgradeValidCards`
 for both late card-reward modification and merchant inventory modification.
@@ -773,6 +819,16 @@ ledger. Derive the displayed sacrifice rate from exact recorded opportunities:
 `SacrificesMade / (SacrificesMade + SacrificesSkipped)`. Do not use floors since
 pickup; that incorrectly counts acquisition or non-reward floors where Sacrifice
 was never offered.
+
+Pael's Eye can activate at most once per combat through its owner-specific
+`BeforeSideTurnEndEarly` callback. Snapshot the exact cards in its owner's hand
+and the owner's current `PlayerCombatState.TurnNumber` after the native
+`ShouldTakeExtraTurn` condition succeeds, then wait for the callback to finish.
+Count only snapshot cards whose final pile is Exhaust; classify starter Strikes
+and Defends with the game's `IsBasicStrikeOrDefend` property. Held combats are
+a separate zero-inclusive denominator, while activation-turn samples include
+only completed activations, so combats where the relic did not fire do not
+pull the average activation turn toward zero.
 
 Pael's Tooth is a separate pickup-and-return mechanic. Its native `CardTitles`
 text is rebuilt from only the `SerializableCards` still held by the relic, so a
@@ -912,6 +968,16 @@ before it was played, by finalizing that combat-wide denominator at promotion.
 Persist both turn denominators, the active-combat count, and cards drawn under
 `POWER.DARK_EMBRACE`, then project all four rows on every Dark Embrace card.
 
+`ConsumingShadowPower.AfterSideTurnEnd` sequentially calls and awaits
+`OrbCmd.EvokeLast` once per Power stack, but later calls can become no-ops when
+the queue runs empty or combat begins ending. Keep a callback-wide window,
+claim each direct `EvokeLast` while excluding nested calls, retain the exact
+last orb, and count it only when that same orb reaches `Hook.AfterOrbEvoked`
+after its `Evoke` task completes. Persist the observed count under the shared
+`POWER.CONSUMING_SHADOW` aggregate because multiple card applications stack
+into one Power; do not confuse this with the lifecycle evocations credited to
+the cards that originally channeled those orbs.
+
 `DanseMacabrePower.BeforeCardPlayed` owns both the exact trigger condition and
 the block command: an owner card whose resolved energy cost is at least the
 power's Energy dynamic variable causes one flash and one awaited
@@ -941,6 +1007,16 @@ while combat is in progress, count that qualifying Power as the activation,
 then consume the window at the immediately emitted decimal-plus-`ValueProp`
 multi-target `CreatureCmd.Damage` overload. The resolved results are
 authoritative for blocked damage, overkill, kills, and targets hit.
+
+Game Piece also owns an `AfterCardPlayed` callback for each same-owner Power
+played while combat remains in progress. Count that qualifying Power at the
+owner callback, then consume the callback's direct non-hand
+`CardPileCmd.Draw` call and count the non-null cards returned by its completed
+task. The requested-minus-returned difference is the blocked draw total, so No
+Draw, a full hand, and pile exhaustion remain observed zero-value outcomes.
+Count every distinct player turn and combat while Game Piece is held as its
+zero-inclusive cards-drawn rate denominators, and reconcile the current turn
+at combat promotion so a combat-ending turn is not omitted.
 
 Forgotten Soul owns `AfterCardExhausted` and flashes for every same-owner card
 exhaust, even when no hittable enemy remains. Count that callback as the
@@ -1399,15 +1475,23 @@ be queried without granting a turn's energy. Snapshot `KindleCount` at
 `KindleRestSiteOption` at the established local rest-site exit boundary; do not
 count the pickup call as a rekindle.
 
-Cracked Core channels its starting Lightning orb from its owner-specific
-`BeforeSideTurnStart` callback on turn one. Snapshot the owner's orb queue
-around that completed callback and retain the exact newly added mutable
-`LightningOrb` reference for the combat. Count each successfully completed
-`LightningOrb.Passive` and `LightningOrb.Evoke` call carrying that reference;
-multi-evoke effects therefore count every actual evoke. The gameplay
-non-evoke removal path is `OrbQueue.RemoveCapacity`, currently used by Bulk
-Up, so compare raw queue references around that method for fizzles. Normal
-combat cleanup uses `OrbQueue.Clear` and must not count as a fizzle.
+Cracked Core and Infused Core channel their starting Lightning orbs from their
+owner-specific turn-one callbacks: `CrackedCore.BeforeSideTurnStart` and
+`InfusedCore.AfterSideTurnStart`, respectively. Snapshot the owner's orb queue
+around the completed callback and retain every exact newly added mutable
+`LightningOrb` reference with the source relic id for the combat. Count each
+successfully completed `LightningOrb.Passive` and `LightningOrb.Evoke` call
+carrying one of those references; multi-evoke effects therefore count every
+actual evoke. The gameplay non-evoke removal path is
+`OrbQueue.RemoveCapacity`, currently used by Bulk Up, so compare raw queue
+references around that method for fizzles. Normal combat cleanup uses
+`OrbQueue.Clear` and must not count as a fizzle. For damage, scope Lightning's
+private `ApplyLightningDamage` call to that exact tracked orb and observe the
+returned `DamageResult` values from its five-parameter `CreatureCmd.Damage`
+command. This preserves the actual attempted, effective, blocked, overkill,
+kill, and target outcomes under the correct source relic without claiming
+damage from other Lightning orbs owned at the same time. Infused Core's native
+Lightning value modifier is naturally reflected in those observed results.
 
 Symbiotic Virus follows the same exact-reference lifecycle with its
 owner-specific `AfterSideTurnStart` callback and the newly queued mutable
@@ -1446,6 +1530,19 @@ model and intentionally overlaps the Rare offer bucket. Actual campfires where
 Rest was available but another option was chosen can share Shovel's
 `RestSiteSynchronizer.BeforeLocalRestSiteExited` observation point.
 
+Girya's saved `TimesLifted` counter is incremented inside
+`LiftRestSiteOption.OnSelect`, before the rest site exits. Observe a selected
+`LiftRestSiteOption` at `RestSiteSynchronizer.BeforeLocalRestSiteExited`; the
+counter is then the completed result and can make the floor-distance update
+idempotent across reloads. Sample that counter once at the successful relic
+obtain boundary and once for each later `RunManager.EnterMapPointInternal`
+destination floor. Sampling before the destination room acts means a Lift at a
+rest site begins weighting the next floor, while count zero still weights the
+acquisition and pre-Lift floors. Girya applies Strength only from its awaited
+`AfterRoomEntered` callback for combat rooms with `TimesLifted > 0`; measure the
+owner's actual Strength before and after that callback rather than assuming the
+saved count was fully applied.
+
 Fresnel Lens applies Nimble from its owner-specific
 `TryModifyCardRewardOptionsLate` callback. Count the final option only when its
 `CardCreationResult` is still Nimble and names Fresnel Lens in
@@ -1469,6 +1566,17 @@ removed from `CardReward._cards` was successfully taken; a terminal selection
 or outer skip with the result remaining is not taken. A reroll visibly offered
 the old Swift option, so resolve that option before `_cards` is cleared, then
 register the newly generated Swift option after repopulation.
+
+Lasting Candy's owner-specific `TryModifyCardRewardOptions` appends one Power
+as a new `CardCreationResult` and records itself in that result's
+`ModifyingRelics`. Snapshot that exact result after `CardReward.Populate` (or
+when an already-populated reward opens after a Core reload). A successful deck
+add removes the result object, so its absence at terminal resolution is an
+observed taken outcome; choosing another card, an outer skip, a terminal
+alternative, or a Driftwood reroll leaves it present and therefore rejects it.
+Resolve the old Candy option before reroll clears `_cards`, then register the
+new Candy-tagged result after repopulation. Inner card-screen Skip is not
+terminal and must preserve the pending snapshot.
 
 Silver Crucible's first, second, and third reward numbers are generation order,
 not click order. `CardReward.Populate` runs before the outer rewards page is
@@ -1537,6 +1645,12 @@ Examples:
 
 - Shiv data is pooled under a synthetic Shiv meta-card once a Shiv has been generated.
 - Soul data is pooled under a synthetic Soul meta-card once a Soul has been generated.
+- A Core hot reload during combat loses the ordinary pending-combat buffer, but
+  the game's live `CombatHistory` remains intact. On resume, SpireLens narrowly
+  rebuilds directly observable Soul usage (completed plays, draws, discards,
+  exhausts, paid resources, and cards actually drawn during Soul resolution)
+  into the pooled Soul aggregate. This does not make general mid-combat restore
+  supported; source windows and outcomes absent from history remain lost.
 - Sovereign Blade gets a pooled meta-card once forged/generated behavior makes it relevant.
 - Each Status definition that reaches a combat pile gets one pooled meta-card
   whose tooltip merges every observed instance of that Status.
@@ -1675,7 +1789,8 @@ Important surfaces:
   one native event. The pinned stats page's **Copy** button is the sole click
   exception: the global input pass preserves the pin when the press lands in
   that button, then the button hides through a completed render frame while
-  `StatsImageCapture` crops the panel from the viewport texture. The resulting
+  `StatsImageCapture` crops the selected item and complete tooltip set from the
+  viewport texture in their existing visible arrangement. The resulting
   RGBA image is converted entirely in process to a bottom-up Windows DIB and
   transferred to the OS clipboard; no temporary file, process, or companion
   service participates. Do not correlate input phases with

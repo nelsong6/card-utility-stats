@@ -22,6 +22,11 @@ public class RelicStatRowVocabularyTests
         "average,activation,combat",
         "combat")]
     [InlineData(
+        "Combats activations = 0",
+        "= 0",
+        "combat,activation",
+        "")]
+    [InlineData(
         "Turns ended at 1 charge",
         "ended at 1",
         "turn,charge",
@@ -29,7 +34,7 @@ public class RelicStatRowVocabularyTests
     [InlineData(
         "Cards upgraded",
         "",
-        "card,upgraded",
+        "upgraded",
         "")]
     [InlineData(
         "Attacks upgraded",
@@ -43,8 +48,8 @@ public class RelicStatRowVocabularyTests
         "")]
     [InlineData(
         "Cards drawn total",
-        "total",
-        "draw",
+        "",
+        "draw,all",
         "")]
     [InlineData(
         "Avg cards drawn per combat",
@@ -59,7 +64,7 @@ public class RelicStatRowVocabularyTests
     [InlineData(
         "Triggered this combat",
         "",
-        "activation,combat",
+        "activation,in,combat",
         "")]
     [InlineData(
         "HP healed",
@@ -94,7 +99,7 @@ public class RelicStatRowVocabularyTests
     [InlineData(
         "Non-upgraded attacks in combat",
         "Non-upgraded",
-        "attack,combat",
+        "attack,in,combat",
         "")]
     [InlineData(
         "Commons picked",
@@ -133,8 +138,8 @@ public class RelicStatRowVocabularyTests
         "")]
     [InlineData(
         "Total damage dealt",
-        "Total dealt",
-        "damage",
+        "dealt",
+        "all,damage",
         "")]
     [InlineData(
         "Strength gained per activation",
@@ -159,8 +164,13 @@ public class RelicStatRowVocabularyTests
     [InlineData(
         "Cards exhausted per combat",
         "",
-        "card,exhaust,combat",
+        "exhaust,combat",
         "combat")]
+    [InlineData(
+        "Cards discarded",
+        "",
+        "discard",
+        "")]
     [InlineData(
         "Potions gained",
         "",
@@ -183,8 +193,8 @@ public class RelicStatRowVocabularyTests
         "")]
     [InlineData(
         "Total block gained",
-        "Total",
-        "block_gained",
+        "",
+        "all,block_gained",
         "")]
     [InlineData(
         "Avg energy gained per combat",
@@ -222,9 +232,74 @@ public class RelicStatRowVocabularyTests
         "card_uncommon,taken",
         "")]
     [InlineData(
+        "Floor acquired",
+        "",
+        "taken",
+        "")]
+    [InlineData(
+        "Curses acquired",
+        "",
+        "curse,taken",
+        "")]
+    [InlineData(
+        "Statuses exhausted",
+        "",
+        "status,exhaust",
+        "")]
+    [InlineData(
+        "Status cards added",
+        "added",
+        "status",
+        "")]
+    [InlineData(
+        "Targets hit per activation",
+        "",
+        "targets_hit,activation",
+        "activation")]
+    [InlineData(
         "Swift cards not taken",
         "not taken",
         "swift,card",
+        "")]
+    [InlineData(
+        "Rare Attacks offered",
+        "",
+        "attack_rare,offered",
+        "")]
+    [InlineData(
+        "Rare Powers offered",
+        "",
+        "power_rare,offered",
+        "")]
+    [InlineData(
+        "Common Skills offered",
+        "",
+        "skill_common,offered",
+        "")]
+    [InlineData(
+        "Elites slain",
+        "",
+        "elite,kill",
+        "")]
+    [InlineData(
+        "Merchants visited",
+        "visited",
+        "shop",
+        "")]
+    [InlineData(
+        "Campfires not rested",
+        "not rested",
+        "campfire",
+        "")]
+    [InlineData(
+        "HP lost in events",
+        "",
+        "damage,in,all,unknown_room",
+        "")]
+    [InlineData(
+        "Avg floors between merchants",
+        "",
+        "average,floor,shop",
         "")]
     public void Create_ReplacesKnownRelicConceptWords(
         string label,
@@ -281,5 +356,37 @@ public class RelicStatRowVocabularyTests
             presentation.ConceptIds);
         Assert.Equal(["combat"], presentation.DenominatorConceptIds);
         Assert.Contains("energy", presentation.FullDescription);
+    }
+
+    [Fact]
+    public void Create_PreservesHintWrappedCustomImage()
+    {
+        const string lightningIcon =
+            "[hint=\"Lightning Orb\"]"
+            + "[img width=16 height=16]res://images/orbs/lightning_orb.png[/img]"
+            + "[/hint]";
+
+        var presentation = RelicStatRowVocabulary.Create(
+            $"{lightningIcon} evoked");
+
+        Assert.Equal($"{lightningIcon} evoked", presentation.Label);
+        Assert.Empty(presentation.ConceptIds);
+        Assert.Contains("evoked", presentation.FullDescription);
+    }
+
+    [Fact]
+    public void SharedRowPresentation_DeduplicatesExplicitIconsAndLabelProse()
+    {
+        var presentation = StatsTooltip.CreateStatRowPresentation(
+            "Potions offered in all combats",
+            "Potions offered in combat rewards.",
+            ["potion", "offered", "in", "all", "combat"],
+            []);
+
+        Assert.Equal("", presentation.Label);
+        Assert.Equal(
+            ["potion", "offered", "in", "all", "combat"],
+            presentation.ConceptIds);
+        Assert.Empty(presentation.DenominatorConceptIds);
     }
 }
