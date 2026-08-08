@@ -502,7 +502,8 @@ public static class CardHoverShowPatch
             float avgBlock = agg.Plays > 0 ? (float)agg.TotalBlockGained / agg.Plays : 0f;
             float absorbedPct = 100f * agg.TotalBlockEffective / agg.TotalBlockGained;
             float wastedPct = 100f * agg.TotalBlockWasted / agg.TotalBlockGained;
-            RowDual(sb, GetBlockStatLabel("gained"), agg.TotalBlockGained.ToString(), GetBlockStatLabel("avg"), $"{avgBlock:F1}");
+            Row3(sb, GetBlockStatLabel("gained"), agg.TotalBlockGained.ToString(), "");
+            Row3(sb, GetBlockStatLabel("avg"), $"{avgBlock:F1}", "");
             Row3(sb, GetBlockStatLabel("absorbed"), agg.TotalBlockEffective.ToString(), $"{absorbedPct:F0}%");
             Row3(sb, GetBlockStatLabel("wasted"), agg.TotalBlockWasted.ToString(), $"{wastedPct:F0}%");
         }
@@ -2211,44 +2212,6 @@ public static class CardHoverShowPatch
             value,
             pct,
             labelColor: "#e0e0e0");
-    }
-
-    /// <summary>
-    /// Emit a two-stat row for closely-related values that read better side by
-    /// side than stacked vertically. Used for compact pairs like
-    /// "Block gained" / "Avg block" where both numbers belong to the same
-    /// section and neither needs a percentage column.
-    /// </summary>
-    private static void RowDual(StringBuilder sb, string leftLabel, string leftValue, string rightLabel, string rightValue)
-    {
-        var leftPresentation = StatsTooltip.CreateStatRowPresentation(leftLabel);
-        var rightPresentation = StatsTooltip.CreateStatRowPresentation(rightLabel);
-        sb.Append("[table=6]");
-        sb.Append("[cell expand=0 padding=0,0,10,0]");
-        sb.Append(StatConceptGlossary.RenderInformationHint(
-            leftPresentation.FullDescription));
-        sb.Append("[/cell]");
-        sb.Append("[cell expand=3 padding=0,0,12,0][color=#e0e0e0]");
-        StatsTooltip.AppendConceptLabel(
-            sb,
-            leftPresentation.ConceptIds,
-            leftPresentation.DenominatorConceptIds,
-            leftPresentation.Label);
-        sb.Append("[/color][/cell]");
-        sb.Append($"[cell expand=1 padding=0,0,18,0][right][b]{leftValue}[/b][/right][/cell]");
-        sb.Append("[cell expand=0 padding=0,0,10,0]");
-        sb.Append(StatConceptGlossary.RenderInformationHint(
-            rightPresentation.FullDescription));
-        sb.Append("[/cell]");
-        sb.Append("[cell expand=3 padding=0,0,12,0][color=#e0e0e0]");
-        StatsTooltip.AppendConceptLabel(
-            sb,
-            rightPresentation.ConceptIds,
-            rightPresentation.DenominatorConceptIds,
-            rightPresentation.Label);
-        sb.Append("[/color][/cell]");
-        sb.Append($"[cell expand=1 padding=0,0,4,0][right][b]{rightValue}[/b][/right][/cell]");
-        sb.Append("[/table]\n");
     }
 
     private static bool AppendDedicatedPoisonStats(StringBuilder sb, CardAggregate agg, bool compact)
