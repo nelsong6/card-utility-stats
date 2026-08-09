@@ -33,6 +33,8 @@ public class EternalFeatherStatsTests
         Assert.Equal(0m, agg.TotalHealingLost);
         Assert.Empty(agg.HealingLostReasons);
         Assert.Empty(agg.EternalFeatherHealingActivations);
+        Assert.Equal(0, agg.EternalFeatherDeckCardsTotal);
+        Assert.Equal(0, agg.EternalFeatherDeckCardsSamples);
     }
 
     [Fact]
@@ -45,6 +47,8 @@ public class EternalFeatherStatsTests
             TotalHealingAttempted = 18m,
             TotalHealingRestored = 11m,
             TotalHealingLost = 7m,
+            EternalFeatherDeckCardsTotal = 41,
+            EternalFeatherDeckCardsSamples = 2,
         };
         agg.HealingLostReasons["full_hp"] = new HealingLostReasonAggregate
         {
@@ -65,6 +69,8 @@ public class EternalFeatherStatsTests
         Assert.Contains("activations", json);
         Assert.Contains("total_healing_attempted", json);
         Assert.Contains("healing_lost_reasons", json);
+        Assert.Contains("eternal_feather_deck_cards_total", json);
+        Assert.Contains("eternal_feather_deck_cards_samples", json);
 
         var restored = JsonSerializer.Deserialize<RunData>(json, SerializerOptions);
 
@@ -78,6 +84,31 @@ public class EternalFeatherStatsTests
         var activation = Assert.Single(restoredAgg.EternalFeatherHealingActivations);
         Assert.Equal(7, activation.Floor);
         Assert.Equal(11m, activation.HpRestored);
+        Assert.Equal(41, restoredAgg.EternalFeatherDeckCardsTotal);
+        Assert.Equal(2, restoredAgg.EternalFeatherDeckCardsSamples);
+    }
+
+    [Fact]
+    public void MergeRelicAggregateInto_EternalFeatherDeckCards_Accumulates()
+    {
+        var target = new RelicAggregate
+        {
+            Activations = 1,
+            EternalFeatherDeckCardsTotal = 21,
+            EternalFeatherDeckCardsSamples = 1,
+        };
+        var source = new RelicAggregate
+        {
+            Activations = 2,
+            EternalFeatherDeckCardsTotal = 45,
+            EternalFeatherDeckCardsSamples = 2,
+        };
+
+        RunTracker.MergeRelicAggregateInto(target, source);
+
+        Assert.Equal(3, target.Activations);
+        Assert.Equal(66, target.EternalFeatherDeckCardsTotal);
+        Assert.Equal(3, target.EternalFeatherDeckCardsSamples);
     }
 
     [Fact]
@@ -108,6 +139,40 @@ public class EternalFeatherStatsTests
     }
 
     [Fact]
+    public void RelicTooltip_EternalFeather_ShowsAverageHealPerActivation()
+    {
+        var agg = new RelicAggregate
+        {
+            Activations = 2,
+            TotalHealingRestored = 11m,
+        };
+
+        var body = (string)(BuildEternalFeatherBodyMethod.Invoke(null, new object?[] { agg })
+            ?? throw new InvalidOperationException("BuildEternalFeatherBodyBBCode returned null."));
+
+        Assert.Contains("Average HP actually restored per activation", body);
+        Assert.Contains("[b]5.5[/b]", body);
+    }
+
+    [Fact]
+    public void RelicTooltip_EternalFeather_ShowsAverageDeckCardsPerRestSite()
+    {
+        var agg = new RelicAggregate
+        {
+            Activations = 3,
+            EternalFeatherDeckCardsTotal = 62,
+            EternalFeatherDeckCardsSamples = 3,
+        };
+
+        var body = (string)(BuildEternalFeatherBodyMethod.Invoke(null, new object?[] { agg })
+            ?? throw new InvalidOperationException("BuildEternalFeatherBodyBBCode returned null."));
+
+        Assert.Contains("in deck", body);
+        Assert.Contains("Average deck size observed when Eternal Feather triggered", body);
+        Assert.Contains("[b]20.67[/b]", body);
+    }
+
+    [Fact]
     public void RelicTooltip_EternalFeather_ShowsZeroHealingRows()
     {
         var body = (string)(BuildEternalFeatherBodyMethod.Invoke(null, new object?[] { new RelicAggregate() })
@@ -116,6 +181,8 @@ public class EternalFeatherStatsTests
         Assert.Contains("Activations", body);
         Assert.Contains("HP healed", body);
         Assert.Contains("healing lost", body);
+        Assert.Contains("Average HP actually restored per activation", body);
+        Assert.Contains("Average deck size observed when Eternal Feather triggered", body);
         Assert.Contains("[b]0[/b]", body);
     }
 
@@ -148,5 +215,7 @@ public class EternalFeatherStatsTests
         Assert.Equal(0m, agg.TotalHealingLost);
         Assert.Empty(agg.HealingLostReasons);
         Assert.Empty(agg.EternalFeatherHealingActivations);
+        Assert.Equal(0, agg.EternalFeatherDeckCardsTotal);
+        Assert.Equal(0, agg.EternalFeatherDeckCardsSamples);
     }
 }

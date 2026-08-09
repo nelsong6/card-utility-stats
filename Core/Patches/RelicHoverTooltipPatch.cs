@@ -2223,7 +2223,18 @@ public static class RelicHoverShowPatch
     {
         var sb = new StringBuilder();
         RelicActivationRow(sb, agg.Activations.ToString());
-        AppendHealingStats(sb, agg);
+        AppendHealingStats(sb, agg, averageActivations: agg.Activations);
+
+        var deckCardsPerRestSite = agg.EternalFeatherDeckCardsSamples <= 0
+            ? 0m
+            : (decimal)agg.EternalFeatherDeckCardsTotal / agg.EternalFeatherDeckCardsSamples;
+        Row3(
+            sb,
+            "Avg cards in deck per rest site",
+            FormatDecimal(deckCardsPerRestSite),
+            "",
+            "Average deck size observed when Eternal Feather triggered at a rest site; "
+                + "the heal is one unit per whole group of those cards.");
         return sb.ToString();
     }
 
@@ -6681,9 +6692,23 @@ public static class RelicHoverShowPatch
         StringBuilder sb,
         RelicAggregate agg,
         string lostLabel = "healing lost",
-        string reasonPrefix = "lost to")
+        string reasonPrefix = "lost to",
+        int? averageActivations = null)
     {
         Row3(sb, "HP healed", FormatDecimal(agg.TotalHealingRestored), "");
+        if (averageActivations.HasValue)
+        {
+            var healedPerActivation = averageActivations.Value <= 0
+                ? 0m
+                : agg.TotalHealingRestored / averageActivations.Value;
+            Row3(
+                sb,
+                "Avg HP healed per activation",
+                FormatDecimal(healedPerActivation),
+                "",
+                "Average HP actually restored per activation of this relic.");
+        }
+
         Row3(sb, lostLabel, FormatDecimal(agg.TotalHealingLost), "");
 
         if (agg.TotalHealingLost <= 0m) return;

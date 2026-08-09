@@ -6567,6 +6567,39 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsEternalFeatherDeckSizeFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("eternal-feather-deck-size-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertEternalFeatherDeckSizeFixture(
+            loaded.Data.RelicAggregates["RELIC.ETERNAL_FEATHER"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsEternalFeatherDeckSizeFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("eternal-feather-deck-size-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertEternalFeatherDeckSizeFixture(
+            resumed!.RelicAggregates["RELIC.ETERNAL_FEATHER"]);
+    }
+
+    private static void AssertEternalFeatherDeckSizeFixture(
+        RelicAggregate relicAgg)
+    {
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(15m, relicAgg.TotalHealingRestored);
+        Assert.Equal(62, relicAgg.EternalFeatherDeckCardsTotal);
+        Assert.Equal(3, relicAgg.EternalFeatherDeckCardsSamples);
+        Assert.Equal(3, relicAgg.EternalFeatherHealingActivations.Count);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsGamePieceRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(

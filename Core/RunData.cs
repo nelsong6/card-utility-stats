@@ -1314,6 +1314,13 @@ public class RelicAggregate
     // activation for an exact campfire-history split.
     public List<EternalFeatherHealingActivationAggregate> EternalFeatherHealingActivations { get; set; } = new();
 
+    // Deck size observed at each Eternal Feather rest-site activation. It is
+    // the input the game divides to size the heal, so it is kept as its own
+    // numerator/denominator pair rather than inferred from the activation
+    // list, which only exists for activations that reached a floor number.
+    public int EternalFeatherDeckCardsTotal { get; set; }
+    public int EternalFeatherDeckCardsSamples { get; set; }
+
     // Legacy numerator from the first pre-trigger HP implementation. It used
     // max HP as the baseline and is retained only so files written by that
     // short-lived build remain loadable; new observations do not update it.

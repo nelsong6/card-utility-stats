@@ -596,6 +596,10 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `eternal-feather-campfire-healing-run.json`
   Adds Eternal Feather's observed restored HP per campfire floor so native
   combined rest-site healing can be split by source in run history.
+- `eternal-feather-deck-size-run.json`
+  Adds Eternal Feather's observed rest-site deck-size total and its matching
+  sample count, the denominator behind the average cards-in-deck-per-rest-site
+  row. Samples count activations, so a full-HP rest site still contributes.
 - `potion-run-history-turns.json`
   Adds combat-turn timing for potion lifecycle points that occur during
   combat, allowing same-turn acquisitions and uses to share a timeline row.
