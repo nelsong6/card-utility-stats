@@ -577,6 +577,50 @@ Artifact-blocked debuffs require a before/after pair:
 
 Do not record only successful applications. A debuff eaten by Artifact is still an important thing the card caused, and it should surface as blocked/stripped rather than disappearing.
 
+Buffer is the reference case for a stacking counter power whose payoff cannot
+be traced to one physical card:
+
+- `BufferPower` is `PowerStackType.Counter` and inherits
+  `PowerInstanceType.None`, so `PowerCmd.FindExistingInstanceForStacking`
+  resolves it to `target.GetPower(id)` and every application merges into one
+  power object with an integer `Amount`. Two Buffer plays do not make two
+  power instances; they make `Amount = 2`. There is no game-native answer to
+  "which application is this charge."
+- Application attribution is still exact, because `PowerCmd.Apply` and
+  `ModifyAmount` both thread `cardSource`, and `Cards.Buffer.OnPlay` passes
+  its own instance. `Potions.LuckyTonic` also grants Buffer, with a null card
+  source, so charge accounting has to sit ahead of any card-source
+  requirement or the potion's charges vanish.
+- Downstream attribution is observed from the power itself.
+  `BufferPower.ModifyHpLostAfterOstyLate` returns 0 for its owner, so the
+  prevented amount is the drop across that call — post-Block unblocked HP
+  loss, not the attack's intended damage. `AfterModifyingHpLostAfterOsty`
+  then confirms the spend.
+- Arm on the modifier and commit on the follow-up, and gate the arm on the
+  same `decimal.Truncate(before) != decimal.Truncate(after)` test that
+  `Hook.ModifyHpLost` uses to decide which modifiers get the follow-up call.
+  That keeps every armed prevention paired with exactly one confirmed charge,
+  and it is why a fully blocked or zero-damage hit never burns a charge.
+- Commit on the follow-up's prefix, not after its `PowerCmd.Decrement`.
+  `ModifyAmount` early-returns while `CombatManager.IsEnding`, so waiting for
+  the decrement would discard preventions that really stopped HP loss in the
+  killing-blow window.
+- `Hook.ModifyHpLost` is called from exactly one place, `CreatureCmd.Damage`,
+  so Buffer never touches card-cost or curse HP loss. Note that the Osty
+  redirect branch runs the `AfterOsty` phase a second time for overkill spill,
+  which can legitimately spend a second charge in one damage command.
+- The outcome belongs to the pooled `PowerAggregate`, matching Feel No Pain,
+  Dark Embrace, Rupture, Free Attack, and Free Skill. A per-card FIFO ledger
+  like `PlayerBlockLedger` was considered and rejected: block is a fungible
+  pool of points the game itself spends in order, while Buffer charges carry
+  no ordering the game respects, so per-card charge attribution would be
+  invented provenance rather than a heuristic over something real.
+
+Registry note: `MetaPowerRegistry` power ids must equal the runtime
+`power.Id.ToString()`, because `TryGetByPower` matches on it. Power model ids
+slugify the full type name, so `BufferPower` is `POWER.BUFFER_POWER` — the
+suffix is part of the id, not decoration to trim.
+
 ## Poison And Other Downstream Damage
 
 Poison demonstrates the core challenge of downstream attribution: the damage tick often arrives with `CardSource == null`, but users care which card originally applied the poison.

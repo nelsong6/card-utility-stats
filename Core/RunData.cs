@@ -915,6 +915,24 @@ public class PowerAggregate
     // Rupture's own payoff callbacks. TurnsActive is the zero-inclusive
     // denominator for the power's per-active-turn average.
     public decimal StrengthGained { get; set; }
+
+    // Buffer tracking. Buffer is a Counter power with no per-application
+    // identity, so charges from every source (the Buffer card, Lucky Tonic)
+    // stack into one shared power and belong to this pooled aggregate rather
+    // than to one physical card instance.
+    //
+    // ChargesGranted counts observed positive applications to the tracked
+    // player. ChargesUsed counts only spends the power's own post-modifier
+    // callback confirmed, so a fully blocked or zero-damage hit never burns
+    // one. DamagePrevented is the post-Block HP loss the power actually
+    // zeroed, not the attack's printed or intended damage.
+    //
+    // Charges that never prevented anything are (granted - used): Buffer does
+    // not survive a combat, so that difference stays exact at run level and
+    // needs no separately persisted expiry field.
+    public int BufferChargesGranted { get; set; }
+    public int BufferChargesUsed { get; set; }
+    public decimal BufferDamagePrevented { get; set; }
 }
 
 public class EnemyAggregate

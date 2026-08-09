@@ -1,0 +1,45 @@
+{
+  "run_id": "buffer-power-fixture",
+  "started_at": "2026-08-08T20:00:00Z",
+  "updated_at": "2026-08-08T20:22:00Z",
+  "character": "DEFECT",
+  "ascension": 9,
+  "floor_reached": 24,
+  "outcome": "in_progress",
+  "game_start_time": 1786089600,
+  "aggregates": {
+    "CARD.BUFFER#1": {
+      "combats_in_deck": 5,
+      "plays": 3,
+      "times_drawn": 6,
+      "floor_added": 9,
+      "initial_upgrade_level": 1
+    }
+  },
+  "events": [],
+  "relic_aggregates": {},
+  "enemy_aggregates": {},
+  "meta_stats": {
+    "power_aggregates": {
+      "POWER.BUFFER_POWER": {
+        "power_id": "POWER.BUFFER_POWER",
+        "display_name": "Buffer",
+        "power_cards_played": 3,
+        "successful_applications": 3,
+        "buffer_charges_granted": 7,
+        "buffer_charges_used": 5,
+        "buffer_damage_prevented": 63,
+        "turns_active": 11,
+        "combats_active": 4
+      }
+    }
+  },
+  "instance_numbers_by_def": {
+    "CARD.BUFFER": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.BUFFER": 1
+  }
+}

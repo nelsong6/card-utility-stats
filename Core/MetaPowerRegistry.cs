@@ -19,6 +19,10 @@ internal static class MetaPowerRegistry
     internal static readonly IReadOnlyList<MetaPowerDefinition> All =
     [
         new("CARD.AGGRESSION", "POWER.AGGRESSION", "Aggression"),
+        // Canonical game id, not the shortened form the older entries use.
+        // BufferPower slugs to POWER.BUFFER_POWER, and TryGetByPower matches
+        // on power.Id, so the short form would silently never resolve.
+        new("CARD.BUFFER", "POWER.BUFFER_POWER", "Buffer"),
         new("CARD.CALAMITY", "POWER.CALAMITY", "Calamity"),
         new("CARD.CALL_OF_THE_VOID", "POWER.CALL_OF_THE_VOID", "Call of the Void"),
         new("CARD.CONSUMING_SHADOW", "POWER.CONSUMING_SHADOW", "Consuming Shadow"),

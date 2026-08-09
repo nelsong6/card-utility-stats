@@ -158,6 +158,13 @@ public static class RunTracker
         _potionHistorySequences = GetPotionHistorySequences();
     private static readonly List<PendingPowerChangeAttempt> _pendingPowerChangeAttempts = new();
     private static readonly List<PendingUnsettlingLampDebuff> _pendingUnsettlingLampDebuffs = new();
+    // Buffer zeroes HP loss in one hook and decrements itself in a separate
+    // follow-up callback, so the observed prevented amount has to survive
+    // between the two. Keyed by power instance; at most one entry is live per
+    // power because the game pairs the two calls within a single damage
+    // resolution.
+    private static readonly Dictionary<BufferPower, decimal>
+        _pendingBufferPreventions = new();
     private static readonly System.Threading.AsyncLocal<EnemyStatusSourceFrame?> _enemyStatusSourceFrame = new();
     private static readonly System.Threading.AsyncLocal<PendingToastyMittensActivation?> _toastyMittensActivation = new();
     private static readonly System.Threading.AsyncLocal<HpLossPowerSourceFrame?> _hpLossPowerSourceFrame = new();
@@ -1684,6 +1691,7 @@ public static class RunTracker
         _pendingEffectSourceHistoryCount = 0;
         _pendingPowerChangeAttempts.Clear();
         _pendingUnsettlingLampDebuffs.Clear();
+        _pendingBufferPreventions.Clear();
         _toastyMittensActivation.Value = null;
         _hpLossPowerSourceFrame.Value = null;
         _pendingPlayerBlockClearAmount = 0;
@@ -8586,6 +8594,117 @@ public static class RunTracker
         if (agg == null || amount <= 0m) return;
         agg.StrengthGained += amount;
         agg.RateStrengthGained += amount;
+    }
+
+    /// <summary>
+    /// Notes the HP loss a Buffer stack is about to zero, so the amount is
+    /// still known when the power's own follow-up callback confirms the
+    /// spend. Mirrors the game's own gate in <c>Hook.ModifyHpLost</c>: it only
+    /// dispatches <c>AfterModifyingHpLostAfterOsty</c> when the truncated
+    /// amount actually changed, so arming on the same condition keeps every
+    /// armed prevention paired with exactly one confirmed charge.
+    /// </summary>
+    internal static void ArmBufferDamagePrevention(
+        BufferPower? power,
+        Creature? target,
+        decimal amountBefore,
+        decimal amountAfter)
+    {
+        if (power?.Owner == null || target == null) return;
+        if (!ReferenceEquals(target, power.Owner)) return;
+        if (decimal.Truncate(amountBefore) == decimal.Truncate(amountAfter))
+            return;
+
+        var prevented = amountBefore - amountAfter;
+        if (prevented <= 0m) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+                if (power.Owner.Player is not Player owner) return;
+                if (!IsTrackedPlayer(owner)) return;
+
+                _pendingBufferPreventions[power] = prevented;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"ArmBufferDamagePrevention failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Confirms one Buffer charge actually spent. The game reaches this only
+    /// after the power changed the HP loss, so a fully blocked or zero-damage
+    /// hit never burns a charge here either.
+    /// </summary>
+    internal static void RecordBufferChargeSpent(BufferPower? power)
+    {
+        if (power == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_pendingBufferPreventions.TryGetValue(
+                        power,
+                        out var prevented))
+                {
+                    return;
+                }
+
+                _pendingBufferPreventions.Remove(power);
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+
+                _pendingCombat ??= new PendingCombat();
+                var agg = GetOrCreatePowerAggregate(
+                    _pendingCombat.MetaStats,
+                    power.Id.ToString(),
+                    GetPowerDisplayName(power));
+                RecordBufferChargeSpentForTest(agg, prevented);
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordBufferChargeSpent failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void RecordBufferChargesGrantedLocked(
+        BufferPower power,
+        decimal amount)
+    {
+        if (_pendingCombat == null) return;
+
+        var charges = Math.Max(0, (int)Math.Floor(amount));
+        if (charges <= 0) return;
+
+        var agg = GetOrCreatePowerAggregate(
+            _pendingCombat.MetaStats,
+            power.Id.ToString(),
+            GetPowerDisplayName(power));
+        RecordBufferChargesGrantedForTest(agg, charges);
+    }
+
+    internal static void RecordBufferChargesGrantedForTest(
+        PowerAggregate agg,
+        int charges)
+    {
+        if (agg == null || charges <= 0) return;
+        agg.BufferChargesGranted += charges;
+    }
+
+    internal static void RecordBufferChargeSpentForTest(
+        PowerAggregate agg,
+        decimal damagePrevented)
+    {
+        if (agg == null || damagePrevented <= 0m) return;
+        agg.BufferChargesUsed++;
+        agg.BufferDamagePrevented += damagePrevented;
     }
 
     private static void InitializeMetaPowerDeckEligibilityLocked(
@@ -34692,6 +34811,19 @@ public static class RunTracker
                         darkEmbrace.Owner.Player);
                 }
 
+                // Deliberately ahead of the card-source requirement below:
+                // Lucky Tonic applies Buffer with a null card source, and a
+                // charge it granted is just as real as one the Buffer card
+                // granted. Positive amounts only — the game also fires
+                // PowerReceived for the power's own -1 decrements.
+                if (entry.Amount > 0m
+                    && entry.Power is BufferPower buffer
+                    && buffer.Owner?.Player != null
+                    && IsTrackedPlayer(buffer.Owner.Player))
+                {
+                    RecordBufferChargesGrantedLocked(buffer, entry.Amount);
+                }
+
                 if (causingPlay?.Card == null)
                 {
                     if (target != null
@@ -36030,6 +36162,10 @@ public static class RunTracker
             targetAgg.AggressionCardsUpgraded +=
                 sourceAgg.AggressionCardsUpgraded;
             targetAgg.StrengthGained += sourceAgg.StrengthGained;
+            targetAgg.BufferChargesGranted += sourceAgg.BufferChargesGranted;
+            targetAgg.BufferChargesUsed += sourceAgg.BufferChargesUsed;
+            targetAgg.BufferDamagePrevented +=
+                sourceAgg.BufferDamagePrevented;
         }
     }
 
