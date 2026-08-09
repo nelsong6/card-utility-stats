@@ -5589,6 +5589,9 @@ public static class RunTracker
             BlockGained = source.BlockGained,
             BlockEffective = source.BlockEffective,
             BlockWasted = source.BlockWasted,
+            BufferChargesGranted = source.BufferChargesGranted,
+            BufferChargesUsed = source.BufferChargesUsed,
+            BufferDamagePrevented = source.BufferDamagePrevented,
             DamageAttempted = source.DamageAttempted,
             DamageDealt = source.DamageDealt,
             DamageBlocked = source.DamageBlocked,
@@ -8669,6 +8672,7 @@ public static class RunTracker
                     power.Id.ToString(),
                     GetPowerDisplayName(power));
                 RecordBufferChargeSpentForTest(agg, prevented);
+                AttributeBufferChargeSpentLocked(prevented);
             }
             catch (Exception e)
             {
@@ -8680,7 +8684,8 @@ public static class RunTracker
 
     private static void RecordBufferChargesGrantedLocked(
         BufferPower power,
-        decimal amount)
+        decimal amount,
+        CardPlay? causingPlay)
     {
         if (_pendingCombat == null) return;
 
@@ -8692,6 +8697,162 @@ public static class RunTracker
             power.Id.ToString(),
             GetPowerDisplayName(power));
         RecordBufferChargesGrantedForTest(agg, charges);
+
+        // Source is exact here: Lucky Tonic's own use frame, or the physical
+        // card that is resolving. Only the later question of which charge ate
+        // which hit is heuristic.
+        string? cardInstanceId = null;
+        int? potionSequence = null;
+
+        if (Patches.LuckyTonicFrameTracker.TryGetActivePotion(
+                power.Owner,
+                out var potion)
+            && potion?.Owner != null
+            && IsTrackedPlayer(potion.Owner)
+            && TryGetPotionSequence(potion, out var sequence))
+        {
+            potionSequence = sequence;
+            RecordPotionBufferChargesGrantedLocked(sequence, charges);
+        }
+        else if (causingPlay?.Card != null)
+        {
+            cardInstanceId = GetOrAssignInstanceId(causingPlay.Card);
+            var cardAgg = GetOrCreateAggregate(_pendingCombat, cardInstanceId);
+            cardAgg.BufferChargesGranted += charges;
+        }
+        else
+        {
+            CoreMain.LogDebug(
+                $"Buffer charges unattributed amount={charges}");
+        }
+
+        AppendBufferChargeChunkLocked(cardInstanceId, potionSequence, charges);
+    }
+
+    private static void AppendBufferChargeChunkLocked(
+        string? cardInstanceId,
+        int? potionSequence,
+        int charges)
+    {
+        if (_pendingCombat == null || charges <= 0) return;
+
+        _pendingCombat.PlayerBufferLedger.Add(new BufferChargeChunk
+        {
+            CardInstanceId = cardInstanceId,
+            PotionSequence = potionSequence,
+            Remaining = charges,
+        });
+    }
+
+    /// <summary>
+    /// Charges one spent Buffer charge, and the HP loss it prevented, to the
+    /// oldest surviving chunk. FIFO is a stated convention: the game merges
+    /// every application into one Counter power and exposes no order for the
+    /// decrements. Unowned chunks (dev console, anything unattributed) absorb
+    /// their charge without crediting anyone.
+    /// </summary>
+    private static void AttributeBufferChargeSpentLocked(decimal prevented)
+    {
+        if (_pendingCombat == null) return;
+
+        for (int i = 0; i < _pendingCombat.PlayerBufferLedger.Count; i++)
+        {
+            var chunk = _pendingCombat.PlayerBufferLedger[i];
+            if (chunk.Remaining <= 0) continue;
+
+            chunk.Remaining--;
+
+            if (chunk.CardInstanceId != null)
+            {
+                var agg = GetOrCreateAggregate(
+                    _pendingCombat,
+                    chunk.CardInstanceId);
+                agg.BufferChargesUsed++;
+                agg.BufferDamagePrevented += prevented;
+            }
+            else if (chunk.PotionSequence.HasValue)
+            {
+                var potion = _pendingCombat.PotionHistory?.FirstOrDefault(
+                    entry => entry.Sequence == chunk.PotionSequence.Value);
+                if (potion != null)
+                {
+                    potion.BufferChargesUsed =
+                        (potion.BufferChargesUsed ?? 0) + 1;
+                    potion.BufferDamagePrevented =
+                        (potion.BufferDamagePrevented ?? 0m) + prevented;
+                }
+            }
+
+            break;
+        }
+
+        _pendingCombat.PlayerBufferLedger.RemoveAll(
+            chunk => chunk.Remaining <= 0);
+    }
+
+    private static void RecordPotionBufferChargesGrantedLocked(
+        int sequence,
+        int charges)
+    {
+        var potion = _pendingCombat?.PotionHistory?.FirstOrDefault(
+            entry => entry.Sequence == sequence);
+        if (potion == null) return;
+
+        potion.BufferChargesGranted =
+            (potion.BufferChargesGranted ?? 0) + charges;
+    }
+
+    /// <summary>
+    /// Test seam for the Buffer charge ledger. Runs the real grant → spend
+    /// sequence against a throwaway pending combat so the FIFO invariant can
+    /// be pinned headlessly, mirroring <see cref="RunBlockLedgerForTest"/>.
+    /// </summary>
+    internal static PendingCombat RunBufferLedgerForTest(
+        IEnumerable<(string? cardInstanceId, int? potionSequence, int charges)> grants,
+        IEnumerable<decimal> spends,
+        List<PotionRunHistoryEntry>? potionHistory = null)
+    {
+        lock (_lock)
+        {
+            var previous = _pendingCombat;
+            try
+            {
+                var scratch = new PendingCombat
+                {
+                    PotionHistory = potionHistory,
+                };
+                _pendingCombat = scratch;
+
+                foreach (var (cardInstanceId, potionSequence, charges) in grants)
+                {
+                    if (cardInstanceId != null)
+                    {
+                        GetOrCreateAggregate(scratch, cardInstanceId)
+                            .BufferChargesGranted += charges;
+                    }
+                    else if (potionSequence.HasValue)
+                    {
+                        RecordPotionBufferChargesGrantedLocked(
+                            potionSequence.Value,
+                            charges);
+                    }
+
+                    AppendBufferChargeChunkLocked(
+                        cardInstanceId,
+                        potionSequence,
+                        charges);
+                }
+
+                foreach (var prevented in spends)
+                    AttributeBufferChargeSpentLocked(prevented);
+
+                return scratch;
+            }
+            finally
+            {
+                _pendingCombat = previous;
+            }
+        }
     }
 
     internal static void RecordBufferChargesGrantedForTest(
@@ -34828,7 +34989,10 @@ public static class RunTracker
                     && buffer.Owner?.Player != null
                     && IsTrackedPlayer(buffer.Owner.Player))
                 {
-                    RecordBufferChargesGrantedLocked(buffer, entry.Amount);
+                    RecordBufferChargesGrantedLocked(
+                        buffer,
+                        entry.Amount,
+                        causingPlay);
                 }
 
                 if (causingPlay?.Card == null)
@@ -35911,6 +36075,9 @@ public static class RunTracker
         target.TotalBlockGained += source.TotalBlockGained;
         target.TotalBlockEffective += source.TotalBlockEffective;
         target.TotalBlockWasted += source.TotalBlockWasted;
+        target.BufferChargesGranted += source.BufferChargesGranted;
+        target.BufferChargesUsed += source.BufferChargesUsed;
+        target.BufferDamagePrevented += source.BufferDamagePrevented;
         target.TimesDrawn += source.TimesDrawn;
         target.TimesDiscarded += source.TimesDiscarded;
         target.TimesPlacedOnTopFromHand += source.TimesPlacedOnTopFromHand;
@@ -36966,6 +37133,7 @@ internal class PendingCombat
     public Dictionary<string, RelicAggregate> RelicAggregates { get; } = new();
     public Dictionary<string, EnemyAggregate> EnemyAggregates { get; } = new();
     public List<BlockChunk> PlayerBlockLedger { get; } = new();
+    public List<BufferChargeChunk> PlayerBufferLedger { get; } = new();
     public List<GoldAttributionChunk>? GoldAttributionLedger { get; set; }
     public Dictionary<AbstractModel, PlayerPowerOwnershipShare> PlayerPowerOwnershipByModifier { get; }
         = new(ReferenceEqualityComparer.Instance);
@@ -37536,6 +37704,20 @@ internal sealed class BlockChunk
 {
     public string? CardInstanceId { get; init; }
     public string? RelicId { get; init; }
+    public int? PotionSequence { get; init; }
+    public int Remaining { get; set; }
+}
+
+/// <summary>
+/// One Buffer application's charges and who granted them. Buffer merges every
+/// application into a single Counter power, so this is the same provenance
+/// model <see cref="BlockChunk"/> uses — with the advantage that charges are
+/// discrete, so a spend consumes exactly one chunk unit rather than an
+/// arbitrary slice of a fungible pool.
+/// </summary>
+internal sealed class BufferChargeChunk
+{
+    public string? CardInstanceId { get; init; }
     public int? PotionSequence { get; init; }
     public int Remaining { get; set; }
 }

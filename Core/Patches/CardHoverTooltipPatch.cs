@@ -516,6 +516,8 @@ public static class CardHoverShowPatch
             Row3(sb, GetBlockStatLabel("wasted"), agg.TotalBlockWasted.ToString(), $"{wastedPct:F0}%");
         }
 
+        AppendBufferChargeStats(sb, agg, compact: false);
+
         // Discarded count — shown only when > 0 because for most cards
         // discarding doesn't happen. When it does (end-of-turn with card
         // still in hand, discard-triggering effects), the number is
@@ -664,6 +666,8 @@ public static class CardHoverShowPatch
         if (agg.TotalBlockGained > 0)
             Row3(sb, GetBlockStatLabel("gained"), agg.TotalBlockGained.ToString(), "");
 
+        AppendBufferChargeStats(sb, agg, compact: true);
+
         if (agg.TotalHpLost > 0)
             Row3(sb, "HP lost", agg.TotalHpLost.ToString(), "");
         if (agg.TotalMaxHpLost > 0)
@@ -775,6 +779,41 @@ public static class CardHoverShowPatch
             || agg.TotalOstyHpSummoned > 0m
             || card is SummonForth
             || IsCardId(card, "CARD.SUMMON_FORTH");
+    }
+
+    /// <summary>
+    /// This physical card's own Buffer charges, from the charge ledger.
+    /// Separate from the pooled power total the meta-power rows show, the same
+    /// way per-card block sits alongside the shared block pool.
+    /// </summary>
+    private static void AppendBufferChargeStats(
+        StringBuilder sb,
+        CardAggregate agg,
+        bool compact)
+    {
+        if (agg.BufferChargesGranted <= 0) return;
+
+        Row3(
+            sb,
+            "HP loss prevented",
+            FormatDecimal(agg.BufferDamagePrevented),
+            "");
+        if (compact) return;
+
+        var utilization = 100m * agg.BufferChargesUsed / agg.BufferChargesGranted;
+        var preventedPerCharge = agg.BufferChargesUsed <= 0
+            ? 0m
+            : agg.BufferDamagePrevented / agg.BufferChargesUsed;
+        Row3(
+            sb,
+            "Charges used/granted",
+            $"{agg.BufferChargesUsed}/{agg.BufferChargesGranted}",
+            $"{utilization:F0}%");
+        Row3(
+            sb,
+            "Avg HP loss prevented per charge",
+            FormatDecimal(preventedPerCharge),
+            "");
     }
 
     private static void AppendPhysicalMetaPowerSummary(

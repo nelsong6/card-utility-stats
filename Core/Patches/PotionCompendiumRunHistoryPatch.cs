@@ -702,6 +702,27 @@ internal static class PotionCompendiumHistoryUi
                     Math.Max(0, entry.BlockWasted ?? 0).ToString(),
                     "Unused Block from this potion that expired.");
             }
+            if (entry.BufferChargesGranted.HasValue)
+            {
+                AppendTooltipRow(
+                    body,
+                    "Buffer charges granted",
+                    Math.Max(0, entry.BufferChargesGranted.Value).ToString(),
+                    "Buffer charges this potion added.");
+                AppendTooltipRow(
+                    body,
+                    "Buffer charges used",
+                    Math.Max(0, entry.BufferChargesUsed ?? 0).ToString(),
+                    "Charges from this potion that a hit actually consumed.");
+                AppendTooltipRow(
+                    body,
+                    "HP loss prevented",
+                    Math.Max(0m, entry.BufferDamagePrevented ?? 0m)
+                        .ToString("0.##"),
+                    "HP loss stopped by this potion's Buffer charges, "
+                    + "attributed oldest-charge-first across every live "
+                    + "Buffer stack.");
+            }
             if (entry.DamageAttempted.HasValue)
             {
                 AppendTooltipRow(

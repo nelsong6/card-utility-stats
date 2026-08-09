@@ -157,6 +157,11 @@ New fixtures added going forward do not need a `v*-` prefix.
   zeroed. Keyed by the canonical `POWER.BUFFER_POWER` id. Every Buffer card
   projects these shared totals; charges that never fired are granted minus
   used.
+- `buffer-charge-ledger-run.json`
+  Adds per-source Buffer provenance on top of the pooled aggregate: charges
+  granted, charges used, and HP loss prevented on both a physical Buffer card
+  and a used Lucky Tonic. The pooled power total stays the family sum, so it
+  is greater than either contributor alone.
 - `entropy-power-run.json`
   Adds a power-ID-keyed Entropy aggregate with confirmed replacement-card
   rarities, Bound cards transformed, and a zero-inclusive active-combat
