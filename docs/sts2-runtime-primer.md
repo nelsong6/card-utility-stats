@@ -616,10 +616,33 @@ be traced to one physical card:
   no ordering the game respects, so per-card charge attribution would be
   invented provenance rather than a heuristic over something real.
 
-Registry note: `MetaPowerRegistry` power ids must equal the runtime
-`power.Id.ToString()`, because `TryGetByPower` matches on it. Power model ids
-slugify the full type name, so `BufferPower` is `POWER.BUFFER_POWER` — the
-suffix is part of the id, not decoration to trim.
+### Registry Ids Come From The Game, Not From Typing
+
+`ModelDb.GetId` slugifies the whole type name and only strips `_MODEL` from
+the category. So `RupturePower` is `POWER.RUPTURE_POWER` and `BufferPower` is
+`POWER.BUFFER_POWER` — the suffix is part of the id, not decoration to trim.
+Card ids have no such suffix, so `CARD.RUPTURE` is already correct.
+
+`MetaPowerRegistry`, `OrbCardRegistry`, and `RandomCardGenerationRegistry`
+therefore derive their ids from the game types through `ModelIds.TryGet<T>()`
+rather than hand-copied strings. `TryGetByPower` matches on
+`power.Id.ToString()`, and every hand-copied entry used a shortened form that
+never matched, so `SuccessfulApplications` and `MetaActiveTurns` recorded zero
+for every meta power across every run from the registry's introduction until
+this was fixed. Do not reintroduce power-id string literals in these
+registries; add the type pair instead, so a renamed game class is a compile
+error rather than a lookup that quietly returns nothing.
+
+Tooltip switch labels use **card** ids for the same reason: card ids are safe
+as compile-time constants, derived power ids are not.
+
+Legacy data note: run files written before the fix can contain two aggregates
+for one power — denominators under the shortened key (written from the
+card-driven path, which always worked) and outcomes under the canonical key
+(written from `power.Id.ToString()` paths). There is deliberately no
+reconciliation: the two stats that actually broke were never written to disk,
+so a merge could only recover a negligible amount, and it is not worth new
+logic in the persistence path every run file passes through.
 
 ## Poison And Other Downstream Damage
 

@@ -2,6 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Models.Cards;
+using MegaCrit.Sts2.Core.Models.Powers;
+using BufferCard = MegaCrit.Sts2.Core.Models.Cards.Buffer;
 
 namespace SpireLens.Core;
 
@@ -16,38 +19,71 @@ internal sealed record MetaPowerDefinition(
 
 internal static class MetaPowerRegistry
 {
-    internal static readonly IReadOnlyList<MetaPowerDefinition> All =
-    [
-        new("CARD.AGGRESSION", "POWER.AGGRESSION", "Aggression"),
-        // Canonical game id, not the shortened form the older entries use.
-        // BufferPower slugs to POWER.BUFFER_POWER, and TryGetByPower matches
-        // on power.Id, so the short form would silently never resolve.
-        new("CARD.BUFFER", "POWER.BUFFER_POWER", "Buffer"),
-        new("CARD.CALAMITY", "POWER.CALAMITY", "Calamity"),
-        new("CARD.CALL_OF_THE_VOID", "POWER.CALL_OF_THE_VOID", "Call of the Void"),
-        new("CARD.CONSUMING_SHADOW", "POWER.CONSUMING_SHADOW", "Consuming Shadow"),
-        new("CARD.CREATIVE_AI", "POWER.CREATIVE_AI", "Creative AI"),
-        new("CARD.DANSE_MACABRE", "POWER.DANSE_MACABRE", "Danse Macabre"),
-        new("CARD.DARK_EMBRACE", "POWER.DARK_EMBRACE", "Dark Embrace"),
-        new("CARD.ENTROPY", "POWER.ENTROPY", "Entropy"),
-        new("CARD.FEEL_NO_PAIN", "POWER.FEEL_NO_PAIN", "Feel No Pain"),
-        new("CARD.HELLO_WORLD", "POWER.HELLO_WORLD", "Hello World"),
-        new("CARD.JUGGLING", "POWER.JUGGLING", "Juggling"),
-        new("CARD.RUPTURE", "POWER.RUPTURE", "Rupture"),
-        new("CARD.SPECTRUM_SHIFT", "POWER.SPECTRUM_SHIFT", "Spectrum Shift"),
-        new("CARD.SPINNER", "POWER.SPINNER", "Spinner"),
-        new("CARD.STAMPEDE", "POWER.STAMPEDE", "Stampede"),
-        new("CARD.STORM", "POWER.STORM", "Storm"),
-        new("CARD.TRASH_TO_TREASURE", "POWER.TRASH_TO_TREASURE", "Trash to Treasure"),
-        new("CARD.UNMOVABLE", "POWER.UNMOVABLE", "Unmovable"),
-        new("CARD.VICIOUS", "POWER.VICIOUS", "Vicious"),
-    ];
+    // Ids come from the game types, never from copied strings — see ModelIds
+    // for why. Lazy so the first touch happens after CoreMain's logger exists,
+    // and so a failure surfaces at a stat lookup rather than at class load.
+    private static readonly Lazy<IReadOnlyList<MetaPowerDefinition>> LazyAll =
+        new(BuildAll);
 
-    private static readonly Dictionary<string, MetaPowerDefinition> ByCardId =
-        BuildIndex(definition => definition.CardId);
+    internal static IReadOnlyList<MetaPowerDefinition> All => LazyAll.Value;
 
-    private static readonly Dictionary<string, MetaPowerDefinition> ByPowerId =
-        BuildIndex(definition => definition.PowerId);
+    private static readonly Lazy<Dictionary<string, MetaPowerDefinition>>
+        LazyByCardId = new(() => BuildIndex(definition => definition.CardId));
+
+    private static readonly Lazy<Dictionary<string, MetaPowerDefinition>>
+        LazyByPowerId = new(() => BuildIndex(definition => definition.PowerId));
+
+    private static Dictionary<string, MetaPowerDefinition> ByCardId =>
+        LazyByCardId.Value;
+
+    private static Dictionary<string, MetaPowerDefinition> ByPowerId =>
+        LazyByPowerId.Value;
+
+    private static IReadOnlyList<MetaPowerDefinition> BuildAll()
+    {
+        var result = new List<MetaPowerDefinition>();
+
+        // Alphabetical by card. NotInDeckViewTests pins this order.
+        Add<Aggression, AggressionPower>("Aggression");
+        Add<BufferCard, BufferPower>("Buffer");
+        Add<Calamity, CalamityPower>("Calamity");
+        Add<CallOfTheVoid, CallOfTheVoidPower>("Call of the Void");
+        Add<ConsumingShadow, ConsumingShadowPower>("Consuming Shadow");
+        Add<CreativeAi, CreativeAiPower>("Creative AI");
+        Add<DanseMacabre, DanseMacabrePower>("Danse Macabre");
+        Add<DarkEmbrace, DarkEmbracePower>("Dark Embrace");
+        Add<Entropy, EntropyPower>("Entropy");
+        Add<FeelNoPain, FeelNoPainPower>("Feel No Pain");
+        Add<HelloWorld, HelloWorldPower>("Hello World");
+        Add<Juggling, JugglingPower>("Juggling");
+        Add<Rupture, RupturePower>("Rupture");
+        Add<SpectrumShift, SpectrumShiftPower>("Spectrum Shift");
+        Add<Spinner, SpinnerPower>("Spinner");
+        Add<Stampede, StampedePower>("Stampede");
+        Add<Storm, StormPower>("Storm");
+        Add<TrashToTreasure, TrashToTreasurePower>("Trash to Treasure");
+        Add<Unmovable, UnmovablePower>("Unmovable");
+        Add<Vicious, ViciousPower>("Vicious");
+
+        return result;
+
+        void Add<TCard, TPower>(string displayName)
+            where TCard : CardModel
+            where TPower : PowerModel
+        {
+            var cardId = ModelIds.TryGet<TCard>();
+            var powerId = ModelIds.TryGet<TPower>();
+            if (cardId == null || powerId == null)
+            {
+                CoreMain.LogDebug(
+                    $"MetaPowerRegistry skipped {displayName}: "
+                    + $"card={cardId ?? "null"} power={powerId ?? "null"}");
+                return;
+            }
+
+            result.Add(new MetaPowerDefinition(cardId, powerId, displayName));
+        }
+    }
 
     internal static bool TryGetByCard(
         CardModel? card,
@@ -100,6 +136,16 @@ internal static class MetaPowerRegistry
         return !string.IsNullOrWhiteSpace(powerId)
             && ByPowerId.TryGetValue(powerId, out definition);
     }
+
+    /// <summary>
+    /// Power id for a registered card id, for the few tracker and tooltip call
+    /// sites that know the card but need the aggregate key. Returns null when
+    /// the card is not a registered meta power.
+    /// </summary>
+    internal static string? PowerIdForCardId(string? cardId)
+        => TryGetByCardId(cardId, out var definition)
+            ? definition.PowerId
+            : null;
 
     private static Dictionary<string, MetaPowerDefinition> BuildIndex(
         Func<MetaPowerDefinition, string> keySelector)

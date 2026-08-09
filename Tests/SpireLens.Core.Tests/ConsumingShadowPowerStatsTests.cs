@@ -21,7 +21,12 @@ namespace SpireLens.Core.Tests;
 public class ConsumingShadowPowerStatsTests
 {
     private const string CardId = "CARD.CONSUMING_SHADOW";
-    private const string PowerId = "POWER.CONSUMING_SHADOW";
+
+    // Canonical runtime id. Power model ids slugify the whole type name, so
+    // ConsumingShadowPower is POWER.CONSUMING_SHADOW_POWER. Deliberately a
+    // literal rather than a ModelIds call: this pins the expected string
+    // independently of the registry that now derives it.
+    private const string PowerId = "POWER.CONSUMING_SHADOW_POWER";
 
     private static readonly MethodInfo AppendMetaPowerLifetimeStatsMethod =
         typeof(CardHoverShowPatch).GetMethod(

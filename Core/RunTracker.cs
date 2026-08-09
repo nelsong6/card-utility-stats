@@ -83,7 +83,8 @@ public static class RunTracker
     private const string EnthralledDefinitionId = "CARD.ENTHRALLED";
     private const string CursedPearlCurseDefinitionId = "CARD.GREED";
     private const string NormalityDefinitionId = "CARD.NORMALITY";
-    private const string DarkEmbracePowerId = "POWER.DARK_EMBRACE";
+    private const string DarkEmbraceCardId = "CARD.DARK_EMBRACE";
+    private const string UnmovableCardId = "CARD.UNMOVABLE";
     private const string GamePieceRelicId = "RELIC.GAME_PIECE";
     private const string ShivDefinitionId = "CARD.SHIV";
     private const string SoulDefinitionId = "CARD.SOUL";
@@ -7859,9 +7860,12 @@ public static class RunTracker
             }
 
             int combatTurns = player.PlayerCombatState?.TurnNumber ?? 0;
+            var powerId = MetaPowerRegistry.PowerIdForCardId(DarkEmbraceCardId);
+            if (powerId == null) return;
+
             var agg = GetOrCreatePowerAggregate(
                 _pendingCombat.MetaStats,
-                DarkEmbracePowerId,
+                powerId,
                 "Dark Embrace");
             RecordDarkEmbraceCombatTurnsForTest(agg, combatTurns);
         }
@@ -12998,9 +13002,12 @@ public static class RunTracker
     {
         if (metaStats == null || extraBlock <= 0m) return;
         metaStats.ExtraBlockGainedFromUnmovablePower += extraBlock;
+        var powerId = MetaPowerRegistry.PowerIdForCardId(UnmovableCardId);
+        if (powerId == null) return;
+
         var aggregate = GetOrCreatePowerAggregate(
             metaStats,
-            "POWER.UNMOVABLE",
+            powerId,
             "Unmovable");
         aggregate.UnmovableExtraBlockGained += extraBlock;
         aggregate.RateUnmovableExtraBlockGained += extraBlock;

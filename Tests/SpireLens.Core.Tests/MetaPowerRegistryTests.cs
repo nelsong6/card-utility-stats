@@ -1,3 +1,5 @@
+using System.Linq;
+using MegaCrit.Sts2.Core.Models.Powers;
 using SpireLens.Core.Patches;
 using Xunit;
 
@@ -5,6 +7,46 @@ namespace SpireLens.Core.Tests;
 
 public class MetaPowerRegistryTests
 {
+    /// <summary>
+    /// The registry's power ids must equal what the game emits at runtime,
+    /// because TryGetByPower matches on power.Id. Shortened forms silently
+    /// resolved to nothing for every entry, which cost five months of
+    /// application and active-turn data before anyone noticed.
+    /// </summary>
+    [Fact]
+    public void EveryEntryUsesTheCanonicalRuntimePowerId()
+    {
+        Assert.NotEmpty(MetaPowerRegistry.All);
+
+        foreach (var definition in MetaPowerRegistry.All)
+        {
+            Assert.StartsWith("POWER.", definition.PowerId);
+            Assert.EndsWith("_POWER", definition.PowerId);
+            Assert.StartsWith("CARD.", definition.CardId);
+        }
+    }
+
+    [Fact]
+    public void LookupByLivePowerIdResolvesTheSameDefinition()
+    {
+        var expected = MetaPowerRegistry.All.Single(candidate =>
+            candidate.CardId == "CARD.RUPTURE");
+
+        Assert.Equal(ModelIds.TryGet<RupturePower>(), expected.PowerId);
+        Assert.True(
+            MetaPowerRegistry.TryGetByPowerId(expected.PowerId, out var byId));
+        Assert.Equal(expected, byId);
+    }
+
+    [Fact]
+    public void BufferIsRegisteredAsAMetaPower()
+    {
+        Assert.True(
+            MetaPowerRegistry.TryGetByCardId("CARD.BUFFER", out var definition));
+        Assert.Equal("POWER.BUFFER_POWER", definition!.PowerId);
+        Assert.Equal("Buffer", definition.DisplayName);
+    }
+
     [Fact]
     public void DivideMetaPowerRate_UsesTheSelectedDenominator()
     {

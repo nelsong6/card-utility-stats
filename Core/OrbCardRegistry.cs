@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Models.Cards;
+using MegaCrit.Sts2.Core.Models.Powers;
 
 namespace SpireLens.Core;
 
@@ -60,19 +62,61 @@ internal static class OrbCardRegistry
             ["CARD.ZAP"] = [LightningOrbId],
         };
 
-    private static readonly OrbPowerDefinition[] RecurringPowerDefinitions =
-    [
-        new("CARD.LIGHTNING_ROD", "POWER.LIGHTNING_ROD", "Lightning Rod", [LightningOrbId]),
-        new("CARD.SPINNER", "POWER.SPINNER", "Spinner", [GlassOrbId]),
-        new("CARD.STORM", "POWER.STORM", "Storm", [LightningOrbId]),
-        new("CARD.TRASH_TO_TREASURE", "POWER.TRASH_TO_TREASURE", "Trash to Treasure", AllOrbIds),
-    ];
+    // Recurring definitions pair a card with the persistent power it creates,
+    // so their ids come from the game types rather than copied strings — see
+    // ModelIds. TryGetRecurringByPower matches a live power.Id, which the
+    // shortened forms never did.
+    private static readonly Lazy<OrbPowerDefinition[]>
+        LazyRecurringPowerDefinitions = new(BuildRecurringPowerDefinitions);
 
-    private static readonly IReadOnlyDictionary<string, OrbPowerDefinition>
-        RecurringByPowerId = BuildRecurringIndex(definition => definition.PowerId);
+    private static OrbPowerDefinition[] RecurringPowerDefinitions =>
+        LazyRecurringPowerDefinitions.Value;
 
-    private static readonly IReadOnlyDictionary<string, OrbPowerDefinition>
-        RecurringByCardId = BuildRecurringIndex(definition => definition.CardId);
+    private static readonly Lazy<IReadOnlyDictionary<string, OrbPowerDefinition>>
+        LazyRecurringByPowerId =
+            new(() => BuildRecurringIndex(definition => definition.PowerId));
+
+    private static readonly Lazy<IReadOnlyDictionary<string, OrbPowerDefinition>>
+        LazyRecurringByCardId =
+            new(() => BuildRecurringIndex(definition => definition.CardId));
+
+    private static IReadOnlyDictionary<string, OrbPowerDefinition>
+        RecurringByPowerId => LazyRecurringByPowerId.Value;
+
+    private static IReadOnlyDictionary<string, OrbPowerDefinition>
+        RecurringByCardId => LazyRecurringByCardId.Value;
+
+    private static OrbPowerDefinition[] BuildRecurringPowerDefinitions()
+    {
+        var result = new List<OrbPowerDefinition>();
+
+        Add<LightningRod, LightningRodPower>("Lightning Rod", [LightningOrbId]);
+        Add<Spinner, SpinnerPower>("Spinner", [GlassOrbId]);
+        Add<Storm, StormPower>("Storm", [LightningOrbId]);
+        Add<TrashToTreasure, TrashToTreasurePower>(
+            "Trash to Treasure",
+            AllOrbIds);
+
+        return result.ToArray();
+
+        void Add<TCard, TPower>(string displayName, string[] orbIds)
+            where TCard : CardModel
+            where TPower : PowerModel
+        {
+            var cardId = ModelIds.TryGet<TCard>();
+            var powerId = ModelIds.TryGet<TPower>();
+            if (cardId == null || powerId == null)
+            {
+                CoreMain.LogDebug(
+                    $"OrbCardRegistry skipped {displayName}: "
+                    + $"card={cardId ?? "null"} power={powerId ?? "null"}");
+                return;
+            }
+
+            result.Add(
+                new OrbPowerDefinition(cardId, powerId, displayName, orbIds));
+        }
+    }
 
     internal static bool IsDirectGenerator(CardModel? card)
         => TryGetCardId(card, out var cardId)

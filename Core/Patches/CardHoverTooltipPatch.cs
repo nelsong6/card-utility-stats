@@ -27,19 +27,26 @@ public static class CardHoverShowPatch
     private const string DrawCardsNextTurnPowerIconPath = "res://images/atlases/power_atlas.sprites/draw_cards_next_turn_power.tres";
     private const string BlockedDrawIconPath = DrawCardsNextTurnPowerIconPath;
     private const int DebtGoldLossPerTrigger = 5;
-    private const string AggressionPowerId = "POWER.AGGRESSION";
-    private const string BufferPowerId = "POWER.BUFFER_POWER";
-    private const string ConsumingShadowPowerId = "POWER.CONSUMING_SHADOW";
-    private const string DanseMacabrePowerId = "POWER.DANSE_MACABRE";
-    private const string DarkEmbracePowerId = "POWER.DARK_EMBRACE";
-    private const string EntropyPowerId = "POWER.ENTROPY";
-    private const string FeelNoPainPowerId = "POWER.FEEL_NO_PAIN";
+    // Meta-power rows key off CARD ids, not power ids. Card ids carry no type
+    // suffix, so they are safe as compile-time switch labels, while power ids
+    // now come from the game types via MetaPowerRegistry and cannot be spelled
+    // as constants here without reintroducing the copy that broke them.
+    private const string AggressionCardId = "CARD.AGGRESSION";
+    private const string BufferCardId = "CARD.BUFFER";
+    private const string ConsumingShadowCardId = "CARD.CONSUMING_SHADOW";
+    private const string DanseMacabreCardId = "CARD.DANSE_MACABRE";
+    private const string DarkEmbraceCardId = "CARD.DARK_EMBRACE";
+    private const string EntropyCardId = "CARD.ENTROPY";
+    private const string FeelNoPainCardId = "CARD.FEEL_NO_PAIN";
+    private const string JugglingCardId = "CARD.JUGGLING";
+    private const string RuptureCardId = "CARD.RUPTURE";
+    private const string StampedeCardId = "CARD.STAMPEDE";
+    private const string UnmovableCardId = "CARD.UNMOVABLE";
+    private const string ViciousCardId = "CARD.VICIOUS";
+    // Unrelenting and Pounce are not Power cards, so they have no meta-power
+    // registry entry. These ids are the canonical runtime ones already.
     private const string FreeAttackPowerId = "POWER.FREE_ATTACK_POWER";
     private const string FreeSkillPowerId = "POWER.FREE_SKILL_POWER";
-    private const string JugglingPowerId = "POWER.JUGGLING";
-    private const string RupturePowerId = "POWER.RUPTURE";
-    private const string StampedePowerId = "POWER.STAMPEDE";
-    private const string ViciousPowerId = "POWER.VICIOUS";
     private const string PoisonPowerIconPath = "res://images/atlases/power_atlas.sprites/poison_power.tres";
     private const string StarIconPath = "res://images/packed/sprite_fonts/star_icon.png";
     private const string SovereignBladeMetaNote = "Reflects All Sovereign Blade Usage";
@@ -874,9 +881,9 @@ public static class CardHoverShowPatch
                 metaPowerAggregate: aggregate);
         }
 
-        switch (definition.PowerId)
+        switch (definition.CardId)
         {
-            case ConsumingShadowPowerId:
+            case ConsumingShadowCardId:
                 Row3(
                     sb,
                     "Orbs evoked",
@@ -884,7 +891,7 @@ public static class CardHoverShowPatch
                     "");
                 break;
 
-            case JugglingPowerId:
+            case JugglingCardId:
                 Row3(sb, "Total attacks copied", aggregate.AttacksCopied.ToString(), "");
                 if (detailed)
                 {
@@ -894,7 +901,7 @@ public static class CardHoverShowPatch
                 }
                 break;
 
-            case DanseMacabrePowerId:
+            case DanseMacabreCardId:
                 Row3(sb, "Times triggered", aggregate.TimesTriggered.ToString(), "");
                 Row3(
                     sb,
@@ -903,7 +910,7 @@ public static class CardHoverShowPatch
                     "");
                 break;
 
-            case DarkEmbracePowerId:
+            case DarkEmbraceCardId:
                 Row3(
                     sb,
                     GetDrawStatLabel("cards drawn"),
@@ -911,7 +918,7 @@ public static class CardHoverShowPatch
                     "");
                 break;
 
-            case EntropyPowerId:
+            case EntropyCardId:
                 Row3(
                     sb,
                     "Cards generated",
@@ -930,7 +937,7 @@ public static class CardHoverShowPatch
                 }
                 break;
 
-            case FeelNoPainPowerId:
+            case FeelNoPainCardId:
                 Row3(
                     sb,
                     GetBlockStatLabel("Block gained"),
@@ -938,7 +945,7 @@ public static class CardHoverShowPatch
                     "");
                 break;
 
-            case RupturePowerId:
+            case RuptureCardId:
                 Row3(
                     sb,
                     "Strength gained",
@@ -946,7 +953,7 @@ public static class CardHoverShowPatch
                     "");
                 break;
 
-            case StampedePowerId:
+            case StampedeCardId:
                 Row3(
                     sb,
                     "Attacks stampeded",
@@ -965,7 +972,7 @@ public static class CardHoverShowPatch
                 }
                 break;
 
-            case AggressionPowerId:
+            case AggressionCardId:
                 Row3(
                     sb,
                     "Cards returned to hand",
@@ -978,7 +985,7 @@ public static class CardHoverShowPatch
                     "");
                 break;
 
-            case "POWER.UNMOVABLE":
+            case UnmovableCardId:
                 decimal extraBlock = aggregate.UnmovableExtraBlockGained > 0m
                     ? aggregate.UnmovableExtraBlockGained
                     : metaStats.ExtraBlockGainedFromUnmovablePower;
@@ -989,7 +996,7 @@ public static class CardHoverShowPatch
                     "");
                 break;
 
-            case ViciousPowerId:
+            case ViciousCardId:
                 Row3(
                     sb,
                     GetDrawStatLabel("cards drawn"),
@@ -997,7 +1004,7 @@ public static class CardHoverShowPatch
                     "");
                 break;
 
-            case BufferPowerId:
+            case BufferCardId:
                 Row3(
                     sb,
                     "HP loss prevented",
@@ -1033,16 +1040,16 @@ public static class CardHoverShowPatch
         MetaPowerDefinition definition,
         PowerAggregate aggregate)
     {
-        switch (definition.PowerId)
+        switch (definition.CardId)
         {
-            case JugglingPowerId:
+            case JugglingCardId:
                 AppendMetaPowerRateTriplet(
                     sb,
                     "attacks copied",
                     aggregate.RateAttacksCopied,
                     aggregate);
                 break;
-            case DanseMacabrePowerId:
+            case DanseMacabreCardId:
                 AppendMetaPowerRateTriplet(
                     sb,
                     "triggers",
@@ -1054,35 +1061,35 @@ public static class CardHoverShowPatch
                     aggregate.RateBlockGained,
                     aggregate);
                 break;
-            case DarkEmbracePowerId:
+            case DarkEmbraceCardId:
                 AppendMetaPowerRateTriplet(
                     sb,
                     "cards drawn",
                     aggregate.RateDarkEmbraceCardsDrawn,
                     aggregate);
                 break;
-            case EntropyPowerId:
+            case EntropyCardId:
                 AppendMetaPowerRateTriplet(
                     sb,
                     "cards generated",
                     aggregate.RateEntropyCardsGenerated,
                     aggregate);
                 break;
-            case FeelNoPainPowerId:
+            case FeelNoPainCardId:
                 AppendMetaPowerRateTriplet(
                     sb,
                     "block gained",
                     aggregate.RateBlockGained,
                     aggregate);
                 break;
-            case RupturePowerId:
+            case RuptureCardId:
                 AppendMetaPowerRateTriplet(
                     sb,
                     "strength gained",
                     aggregate.RateStrengthGained,
                     aggregate);
                 break;
-            case StampedePowerId:
+            case StampedeCardId:
                 AppendMetaPowerRateTriplet(
                     sb,
                     "attacks stampeded",
@@ -1094,7 +1101,7 @@ public static class CardHoverShowPatch
                     aggregate.RateStampedeEnergySaved,
                     aggregate);
                 break;
-            case AggressionPowerId:
+            case AggressionCardId:
                 AppendMetaPowerRateTriplet(
                     sb,
                     "cards returned",
@@ -1106,14 +1113,14 @@ public static class CardHoverShowPatch
                     aggregate.RateAggressionCardsUpgraded,
                     aggregate);
                 break;
-            case "POWER.UNMOVABLE":
+            case UnmovableCardId:
                 AppendMetaPowerRateTriplet(
                     sb,
                     "extra block gained",
                     aggregate.RateUnmovableExtraBlockGained,
                     aggregate);
                 break;
-            case ViciousPowerId:
+            case ViciousCardId:
                 AppendMetaPowerRateTriplet(
                     sb,
                     "cards drawn",
@@ -1568,180 +1575,6 @@ public static class CardHoverShowPatch
         Row3(sb, "Cards upgraded", agg.ArmamentsCardsUpgraded.ToString(), "");
     }
 
-    private static void AppendEntropyPowerStats(
-        StringBuilder sb,
-        MegaCrit.Sts2.Core.Models.CardModel card,
-        RunMetaStats metaStats,
-        bool compact)
-    {
-        if (card is not Entropy && !IsCardId(card, "CARD.ENTROPY")) return;
-
-        metaStats ??= new RunMetaStats();
-        PowerAggregate? powerAgg = null;
-        if (metaStats.PowerAggregates != null)
-        {
-            metaStats.PowerAggregates.TryGetValue(EntropyPowerId, out powerAgg);
-            powerAgg ??= metaStats.PowerAggregates.Values.FirstOrDefault(candidate =>
-                string.Equals(
-                    candidate.PowerId,
-                    EntropyPowerId,
-                    StringComparison.Ordinal)
-                || string.Equals(
-                    candidate.DisplayName,
-                    "Entropy",
-                    StringComparison.OrdinalIgnoreCase));
-        }
-        powerAgg ??= new PowerAggregate();
-
-        Row3(
-            sb,
-            "Times Chains of Binding broken",
-            powerAgg.EntropyChainsOfBindingBroken.ToString(),
-            "");
-        if (compact) return;
-
-        Row3(
-            sb,
-            "Commons generated",
-            powerAgg.EntropyCommonCardsGenerated.ToString(),
-            "");
-        Row3(
-            sb,
-            "Uncommons generated",
-            powerAgg.EntropyUncommonCardsGenerated.ToString(),
-            "");
-        Row3(
-            sb,
-            "Rares generated",
-            powerAgg.EntropyRareCardsGenerated.ToString(),
-            "");
-
-        decimal averagePerCombat = powerAgg.CombatsActive > 0
-            ? (decimal)powerAgg.EntropyCardsGenerated / powerAgg.CombatsActive
-            : 0m;
-        Row3(
-            sb,
-            "Avg cards generated per combat",
-            FormatDecimal(averagePerCombat),
-            "");
-    }
-
-    private static void AppendJugglingPowerStats(
-        StringBuilder sb,
-        MegaCrit.Sts2.Core.Models.CardModel card,
-        RunMetaStats metaStats,
-        bool compact)
-    {
-        if (card is not Juggling && !IsCardId(card, "CARD.JUGGLING")) return;
-
-        metaStats ??= new RunMetaStats();
-        PowerAggregate? powerAgg = null;
-        if (metaStats.PowerAggregates != null)
-        {
-            metaStats.PowerAggregates.TryGetValue(JugglingPowerId, out powerAgg);
-            powerAgg ??= metaStats.PowerAggregates.Values.FirstOrDefault(candidate =>
-                string.Equals(candidate.PowerId, JugglingPowerId, StringComparison.Ordinal)
-                || string.Equals(candidate.DisplayName, "Juggling", StringComparison.OrdinalIgnoreCase));
-        }
-        powerAgg ??= new PowerAggregate();
-
-        Row3(sb, "Total attacks copied", powerAgg.AttacksCopied.ToString(), "");
-        if (compact) return;
-
-        Row3(sb, "commons copied", powerAgg.CommonAttacksCopied.ToString(), "");
-        Row3(sb, "uncommons copied", powerAgg.UncommonAttacksCopied.ToString(), "");
-        Row3(sb, "rares copied", powerAgg.RareAttacksCopied.ToString(), "");
-
-        decimal averagePerTurn = powerAgg.TurnsActive > 0
-            ? (decimal)powerAgg.AttacksCopied / powerAgg.TurnsActive
-            : 0m;
-        decimal averagePerCombat = powerAgg.CombatsActive > 0
-            ? (decimal)powerAgg.AttacksCopied / powerAgg.CombatsActive
-            : 0m;
-        Row3(sb, "avg copies per turn", FormatDecimal(averagePerTurn), "");
-        Row3(sb, "avg copies per combat", FormatDecimal(averagePerCombat), "");
-    }
-
-    private static void AppendDanseMacabrePowerStats(
-        StringBuilder sb,
-        MegaCrit.Sts2.Core.Models.CardModel card,
-        RunMetaStats metaStats,
-        bool compact)
-    {
-        if (card is not DanseMacabre
-            && !IsCardId(card, "CARD.DANSE_MACABRE"))
-            return;
-
-        metaStats ??= new RunMetaStats();
-        PowerAggregate? powerAgg = null;
-        if (metaStats.PowerAggregates != null)
-        {
-            metaStats.PowerAggregates.TryGetValue(
-                DanseMacabrePowerId,
-                out powerAgg);
-            powerAgg ??= metaStats.PowerAggregates.Values.FirstOrDefault(candidate =>
-                string.Equals(
-                    candidate.PowerId,
-                    DanseMacabrePowerId,
-                    StringComparison.Ordinal)
-                || string.Equals(
-                    candidate.DisplayName,
-                    "Danse Macabre",
-                    StringComparison.OrdinalIgnoreCase));
-        }
-        powerAgg ??= new PowerAggregate();
-
-        Row3(sb, "Times triggered", powerAgg.TimesTriggered.ToString(), "");
-        if (compact)
-        {
-            Row3(
-                sb,
-                GetBlockStatLabel("Block gained"),
-                FormatDecimal(powerAgg.BlockGained),
-                "");
-            return;
-        }
-
-        decimal triggersPerTurn = powerAgg.TurnsActive > 0
-            ? (decimal)powerAgg.TimesTriggered / powerAgg.TurnsActive
-            : 0m;
-        decimal triggersPerCombat = powerAgg.CombatsActive > 0
-            ? (decimal)powerAgg.TimesTriggered / powerAgg.CombatsActive
-            : 0m;
-        decimal blockPerTurn = powerAgg.TurnsActive > 0
-            ? powerAgg.BlockGained / powerAgg.TurnsActive
-            : 0m;
-        decimal blockPerCombat = powerAgg.CombatsActive > 0
-            ? powerAgg.BlockGained / powerAgg.CombatsActive
-            : 0m;
-
-        Row3(
-            sb,
-            "Avg triggers per turn once active",
-            FormatDecimal(triggersPerTurn),
-            "");
-        Row3(
-            sb,
-            "Avg triggers per combat",
-            FormatDecimal(triggersPerCombat),
-            "");
-        Row3(
-            sb,
-            GetBlockStatLabel("Block gained"),
-            FormatDecimal(powerAgg.BlockGained),
-            "");
-        Row3(
-            sb,
-            GetBlockStatLabel("Avg block gained per turn once active"),
-            FormatDecimal(blockPerTurn),
-            "");
-        Row3(
-            sb,
-            GetBlockStatLabel("Avg block gained per combat"),
-            FormatDecimal(blockPerCombat),
-            "");
-    }
-
     private static void AppendUnrelentingFreeAttackStats(
         StringBuilder sb,
         MegaCrit.Sts2.Core.Models.CardModel card,
@@ -1856,282 +1689,6 @@ public static class CardHoverShowPatch
         Row3(sb, $"Common {discountedCardType} discounted", commonDiscounted.ToString(), "");
         Row3(sb, $"Uncommon {discountedCardType} discounted", uncommonDiscounted.ToString(), "");
         Row3(sb, $"Rare {discountedCardType} discounted", rareDiscounted.ToString(), "");
-    }
-
-    private static void AppendViciousPowerStats(
-        StringBuilder sb,
-        MegaCrit.Sts2.Core.Models.CardModel card,
-        RunMetaStats metaStats)
-    {
-        if (card is not Vicious && !IsCardId(card, "CARD.VICIOUS")) return;
-
-        metaStats ??= new RunMetaStats();
-        PowerAggregate? powerAgg = null;
-        if (metaStats.PowerAggregates != null)
-        {
-            metaStats.PowerAggregates.TryGetValue(ViciousPowerId, out powerAgg);
-            powerAgg ??= metaStats.PowerAggregates.Values.FirstOrDefault(candidate =>
-                string.Equals(
-                    candidate.PowerId,
-                    ViciousPowerId,
-                    StringComparison.Ordinal)
-                || string.Equals(
-                    candidate.DisplayName,
-                    "Vicious",
-                    StringComparison.OrdinalIgnoreCase));
-        }
-        powerAgg ??= new PowerAggregate();
-
-        Row3(
-            sb,
-            GetDrawStatLabel("cards drawn"),
-            powerAgg.ViciousCardsDrawn.ToString(),
-            "");
-    }
-
-    private static void AppendDarkEmbracePowerStats(
-        StringBuilder sb,
-        MegaCrit.Sts2.Core.Models.CardModel card,
-        RunMetaStats metaStats)
-    {
-        if (card is not DarkEmbrace
-            && !IsCardId(card, "CARD.DARK_EMBRACE"))
-        {
-            return;
-        }
-
-        metaStats ??= new RunMetaStats();
-        PowerAggregate? powerAgg = null;
-        if (metaStats.PowerAggregates != null)
-        {
-            metaStats.PowerAggregates.TryGetValue(
-                DarkEmbracePowerId,
-                out powerAgg);
-            powerAgg ??= metaStats.PowerAggregates.Values.FirstOrDefault(candidate =>
-                string.Equals(
-                    candidate.PowerId,
-                    DarkEmbracePowerId,
-                    StringComparison.Ordinal)
-                || string.Equals(
-                    candidate.DisplayName,
-                    "Dark Embrace",
-                    StringComparison.OrdinalIgnoreCase));
-        }
-        powerAgg ??= new PowerAggregate();
-
-        decimal cardsPerActiveTurn = powerAgg.TurnsActive > 0
-            ? (decimal)powerAgg.DarkEmbraceCardsDrawn / powerAgg.TurnsActive
-            : 0m;
-        decimal cardsPerTurn = powerAgg.DarkEmbraceCombatTurns > 0
-            ? (decimal)powerAgg.DarkEmbraceCardsDrawn
-                / powerAgg.DarkEmbraceCombatTurns
-            : 0m;
-        decimal cardsPerCombat = powerAgg.CombatsActive > 0
-            ? (decimal)powerAgg.DarkEmbraceCardsDrawn / powerAgg.CombatsActive
-            : 0m;
-
-        Row3(
-            sb,
-            GetDrawStatLabel("cards drawn"),
-            powerAgg.DarkEmbraceCardsDrawn.ToString(),
-            "");
-        Row3(
-            sb,
-            GetDrawStatLabel("avg / active turn"),
-            FormatDecimal(cardsPerActiveTurn),
-            "");
-        Row3(
-            sb,
-            GetDrawStatLabel("avg / turn"),
-            FormatDecimal(cardsPerTurn),
-            "");
-        Row3(
-            sb,
-            GetDrawStatLabel("avg / combat"),
-            FormatDecimal(cardsPerCombat),
-            "");
-    }
-
-    private static void AppendStampedePowerStats(
-        StringBuilder sb,
-        MegaCrit.Sts2.Core.Models.CardModel card,
-        RunMetaStats metaStats,
-        bool compact)
-    {
-        if (card is not Stampede && !IsCardId(card, "CARD.STAMPEDE")) return;
-
-        metaStats ??= new RunMetaStats();
-        PowerAggregate? powerAgg = null;
-        if (metaStats.PowerAggregates != null)
-        {
-            metaStats.PowerAggregates.TryGetValue(StampedePowerId, out powerAgg);
-            powerAgg ??= metaStats.PowerAggregates.Values.FirstOrDefault(candidate =>
-                string.Equals(
-                    candidate.PowerId,
-                    StampedePowerId,
-                    StringComparison.Ordinal)
-                || string.Equals(
-                    candidate.DisplayName,
-                    "Stampede",
-                    StringComparison.OrdinalIgnoreCase));
-        }
-        powerAgg ??= new PowerAggregate();
-
-        Row3(
-            sb,
-            "Attacks stampeded",
-            powerAgg.StampedeAttacksPlayed.ToString(),
-            "");
-        if (!compact)
-        {
-            Row3(
-                sb,
-                "Common attacks",
-                powerAgg.StampedeCommonAttacksPlayed.ToString(),
-                "");
-            Row3(
-                sb,
-                "Uncommon attacks",
-                powerAgg.StampedeUncommonAttacksPlayed.ToString(),
-                "");
-            Row3(
-                sb,
-                "Rare attacks",
-                powerAgg.StampedeRareAttacksPlayed.ToString(),
-                "");
-        }
-        Row3(
-            sb,
-            GetEnergyStatLabel("saved"),
-            powerAgg.StampedeEnergySaved.ToString(),
-            "");
-    }
-
-    private static void AppendFeelNoPainPowerStats(
-        StringBuilder sb,
-        MegaCrit.Sts2.Core.Models.CardModel card,
-        RunMetaStats metaStats)
-    {
-        if (card is not FeelNoPain
-            && !IsCardId(card, "CARD.FEEL_NO_PAIN"))
-        {
-            return;
-        }
-
-        metaStats ??= new RunMetaStats();
-        PowerAggregate? powerAgg = null;
-        if (metaStats.PowerAggregates != null)
-        {
-            metaStats.PowerAggregates.TryGetValue(
-                FeelNoPainPowerId,
-                out powerAgg);
-            powerAgg ??= metaStats.PowerAggregates.Values.FirstOrDefault(candidate =>
-                string.Equals(
-                    candidate.PowerId,
-                    FeelNoPainPowerId,
-                    StringComparison.Ordinal)
-                || string.Equals(
-                    candidate.DisplayName,
-                    "Feel No Pain",
-                    StringComparison.OrdinalIgnoreCase));
-        }
-        powerAgg ??= new PowerAggregate();
-
-        decimal blockPerActiveTurn = powerAgg.TurnsActive > 0
-            ? powerAgg.BlockGained / powerAgg.TurnsActive
-            : 0m;
-        Row3(
-            sb,
-            GetBlockStatLabel("added / active turn"),
-            FormatDecimal(blockPerActiveTurn),
-            "");
-    }
-
-    private static void AppendAggressionPowerStats(
-        StringBuilder sb,
-        MegaCrit.Sts2.Core.Models.CardModel card,
-        RunMetaStats metaStats)
-    {
-        if (card is not Aggression
-            && !IsCardId(card, "CARD.AGGRESSION"))
-        {
-            return;
-        }
-
-        metaStats ??= new RunMetaStats();
-        PowerAggregate? powerAgg = null;
-        if (metaStats.PowerAggregates != null)
-        {
-            metaStats.PowerAggregates.TryGetValue(
-                AggressionPowerId,
-                out powerAgg);
-            powerAgg ??= metaStats.PowerAggregates.Values.FirstOrDefault(candidate =>
-                string.Equals(
-                    candidate.PowerId,
-                    AggressionPowerId,
-                    StringComparison.Ordinal)
-                || string.Equals(
-                    candidate.DisplayName,
-                    "Aggression",
-                    StringComparison.OrdinalIgnoreCase));
-        }
-        powerAgg ??= new PowerAggregate();
-
-        Row3(
-            sb,
-            "Cards returned to hand",
-            powerAgg.AggressionCardsReturnedToHand.ToString(),
-            "");
-        Row3(
-            sb,
-            "Cards upgraded",
-            powerAgg.AggressionCardsUpgraded.ToString(),
-            "");
-    }
-
-    private static void AppendRupturePowerStats(
-        StringBuilder sb,
-        MegaCrit.Sts2.Core.Models.CardModel card,
-        RunMetaStats metaStats)
-    {
-        if (card is not Rupture
-            && !IsCardId(card, "CARD.RUPTURE"))
-        {
-            return;
-        }
-
-        metaStats ??= new RunMetaStats();
-        PowerAggregate? powerAgg = null;
-        if (metaStats.PowerAggregates != null)
-        {
-            metaStats.PowerAggregates.TryGetValue(
-                RupturePowerId,
-                out powerAgg);
-            powerAgg ??= metaStats.PowerAggregates.Values.FirstOrDefault(candidate =>
-                string.Equals(
-                    candidate.PowerId,
-                    RupturePowerId,
-                    StringComparison.Ordinal)
-                || string.Equals(
-                    candidate.DisplayName,
-                    "Rupture",
-                    StringComparison.OrdinalIgnoreCase));
-        }
-        powerAgg ??= new PowerAggregate();
-
-        var strengthPerActiveTurn = powerAgg.TurnsActive <= 0
-            ? 0m
-            : powerAgg.StrengthGained / powerAgg.TurnsActive;
-        Row3(
-            sb,
-            "Strength gained",
-            FormatDecimal(powerAgg.StrengthGained),
-            "");
-        Row3(
-            sb,
-            "Strength gained / active turn",
-            FormatDecimal(strengthPerActiveTurn),
-            "");
     }
 
     private static void AppendDebtStats(
