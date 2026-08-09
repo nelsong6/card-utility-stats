@@ -22,6 +22,14 @@ public class EternalFeatherStatsTests
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
 
+    private static string BuildBody(
+        RelicAggregate agg,
+        EternalFeatherLiveHeal? liveHeal = null)
+    {
+        return (string)(BuildEternalFeatherBodyMethod.Invoke(null, new object?[] { agg, liveHeal })
+            ?? throw new InvalidOperationException("BuildEternalFeatherBodyBBCode returned null."));
+    }
+
     [Fact]
     public void RelicAggregate_EternalFeatherFields_DefaultToZero()
     {
@@ -127,8 +135,7 @@ public class EternalFeatherStatsTests
             Amount = 7m,
         };
 
-        var body = (string)(BuildEternalFeatherBodyMethod.Invoke(null, new object?[] { agg })
-            ?? throw new InvalidOperationException("BuildEternalFeatherBodyBBCode returned null."));
+        var body = BuildBody(agg);
 
         Assert.Contains("Activations", body);
         Assert.Contains("HP healed", body);
@@ -147,8 +154,7 @@ public class EternalFeatherStatsTests
             TotalHealingRestored = 11m,
         };
 
-        var body = (string)(BuildEternalFeatherBodyMethod.Invoke(null, new object?[] { agg })
-            ?? throw new InvalidOperationException("BuildEternalFeatherBodyBBCode returned null."));
+        var body = BuildBody(agg);
 
         Assert.Contains("Average HP actually restored per activation", body);
         Assert.Contains("[b]5.5[/b]", body);
@@ -164,8 +170,7 @@ public class EternalFeatherStatsTests
             EternalFeatherDeckCardsSamples = 3,
         };
 
-        var body = (string)(BuildEternalFeatherBodyMethod.Invoke(null, new object?[] { agg })
-            ?? throw new InvalidOperationException("BuildEternalFeatherBodyBBCode returned null."));
+        var body = BuildBody(agg);
 
         Assert.Contains("in deck", body);
         Assert.Contains("Average deck size observed when Eternal Feather triggered", body);
@@ -173,10 +178,29 @@ public class EternalFeatherStatsTests
     }
 
     [Fact]
+    public void RelicTooltip_EternalFeather_ShowsCurrentHealForLiveDeckSize()
+    {
+        var body = BuildBody(
+            new RelicAggregate { Activations = 1 },
+            new EternalFeatherLiveHeal(Heal: 9m, DeckCards: 23, CardsPerHeal: 7));
+
+        Assert.Contains("at current deck size", body);
+        Assert.Contains("23 cards in deck, healing once per 7 of them", body);
+        Assert.Contains("[b]9[/b]", body);
+    }
+
+    [Fact]
+    public void RelicTooltip_EternalFeather_OmitsCurrentHealWithoutLiveDeck()
+    {
+        var body = BuildBody(new RelicAggregate { Activations = 1 });
+
+        Assert.DoesNotContain("at current deck size", body);
+    }
+
+    [Fact]
     public void RelicTooltip_EternalFeather_ShowsZeroHealingRows()
     {
-        var body = (string)(BuildEternalFeatherBodyMethod.Invoke(null, new object?[] { new RelicAggregate() })
-            ?? throw new InvalidOperationException("BuildEternalFeatherBodyBBCode returned null."));
+        var body = BuildBody(new RelicAggregate());
 
         Assert.Contains("Activations", body);
         Assert.Contains("HP healed", body);
