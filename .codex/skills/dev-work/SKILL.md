@@ -106,6 +106,37 @@ When the user asks to PR and merge:
    anyone reading it, `git -C D:\repos\spirelens checkout --detach main` moves
    its detached `HEAD` to the tip without holding the branch.
 
+### One PR Per Logical Change, Even From One Branch
+
+Squash is the only merge method this repo allows, so a branch carrying several
+logical commits collapses into one `main` commit. That is wrong whenever the
+commits are separable work — every existing `main` commit is one focused change
+with its own `(#N)`, and collapsing two of them loses that.
+
+A session that stacks follow-up commits (the normal cadence above) therefore
+often ends with more than one PR. Land them oldest-first:
+
+1. Branch the first commit off on its own: `git branch <topic-a> <sha>`, push,
+   PR, merge.
+2. `git fetch origin main:main`, then rebase the working branch onto the new
+   `main`. The already-merged commit drops out as an empty cherry-pick, leaving
+   only the later work.
+3. Confirm the remainder is what you think it is — `git diff --stat main` should
+   show only the second change's files — then push with `--force-with-lease`,
+   PR, merge.
+
+Do not split a branch this way when the commits are genuinely one change (a fix
+plus its test, an implementation plus its doc note). The test is whether each
+commit would stand as a sensible `main` entry on its own.
+
+### Re-read This Doc After Rebasing
+
+`main` can gain workflow fixes mid-session. A copy of this file read at session
+start goes stale the moment you rebase onto newer `main`, and the stale copy is
+the one still in context. Re-read the relevant section after any rebase that
+pulls in new commits, and before the PR/merge phase specifically — that is where
+the guidance has changed most often.
+
 ## Communication
 
 Be explicit about which phase you are in: branch setup, implementation, commit/push, validation, iteration, PR/merge. If a required validation step is skipped, say exactly why.
