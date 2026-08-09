@@ -2878,14 +2878,15 @@ public static class RelicHoverShowPatch
     {
         foreach (var (key, displayName) in EnumerateObservedCardRewardPools())
         {
-            var count = GetObservedCardRewardPoolOfferCount(agg, key);
+            var offered = GetObservedCardRewardPoolOfferCount(agg, key);
+            var taken = GetObservedCardRewardPoolTakenCount(agg, key);
             DescribedIconRow(
                 sb,
-                ["card", "offered"],
+                ["card", "offered", "taken"],
                 [],
                 displayName,
-                count.ToString(),
-                $"{displayName} cards offered — final visible {displayName} card options in rewards while {relicName} was held.");
+                $"{offered}/{taken}",
+                $"{displayName} cards offered/taken — final visible {displayName} card options in rewards while {relicName} was held, and how many of those options were actually taken.");
         }
     }
 
@@ -2901,13 +2902,22 @@ public static class RelicHoverShowPatch
     }
 
     private static int GetObservedCardRewardPoolOfferCount(RelicAggregate agg, string key)
+        => SumObservedCardRewardPool(agg, key, category => category.Count);
+
+    private static int GetObservedCardRewardPoolTakenCount(RelicAggregate agg, string key)
+        => SumObservedCardRewardPool(agg, key, category => category.Taken);
+
+    private static int SumObservedCardRewardPool(
+        RelicAggregate agg,
+        string key,
+        Func<CardRewardCategoryAggregate, int> select)
     {
         var legacyKey = $"{key}_card_pool";
         return agg.CardRewardCategories
             .Where(category =>
                 string.Equals(category.Key, key, StringComparison.OrdinalIgnoreCase)
                 || string.Equals(category.Key, legacyKey, StringComparison.OrdinalIgnoreCase))
-            .Sum(category => Math.Max(0, category.Value.Count));
+            .Sum(category => Math.Max(0, select(category.Value)));
     }
 
     private static string BuildPumpkinCandleBodyBBCode(RelicAggregate agg)

@@ -58,7 +58,9 @@ public class DingyRugStatsTests
         var agg = restored!.RelicAggregates[RelicId];
         Assert.Equal(3, agg.CardRewardsAffected);
         Assert.Equal(6, agg.CardRewardCategories["ironclad"].Count);
+        Assert.Equal(2, agg.CardRewardCategories["ironclad"].Taken);
         Assert.Equal(3, agg.CardRewardCategories["colorless"].Count);
+        Assert.Equal(0, agg.CardRewardCategories["colorless"].Taken);
     }
 
     [Fact]
@@ -69,13 +71,16 @@ public class DingyRugStatsTests
         Assert.Contains("Card rewards affected", body);
         Assert.Contains(StatConceptGlossary.RenderHintedGlyph("card"), body);
         Assert.Contains(StatConceptGlossary.RenderHintedGlyph("offered"), body);
-        Assert.Contains("Ironclad cards offered", body);
-        Assert.Contains("Silent cards offered", body);
-        Assert.Contains("Regent cards offered", body);
-        Assert.Contains("Necrobinder cards offered", body);
-        Assert.Contains("Defect cards offered", body);
-        Assert.Contains("Colorless cards offered", body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("taken"), body);
+        Assert.Contains("Ironclad cards offered/taken", body);
+        Assert.Contains("Silent cards offered/taken", body);
+        Assert.Contains("Regent cards offered/taken", body);
+        Assert.Contains("Necrobinder cards offered/taken", body);
+        Assert.Contains("Defect cards offered/taken", body);
+        Assert.Contains("Colorless cards offered/taken", body);
         Assert.Contains("while Dingy Rug was held", body);
+        Assert.Contains("[b]6/2[/b]", body);
+        Assert.Contains("[b]3/0[/b]", body);
         Assert.DoesNotContain("Energy generated", body);
     }
 
@@ -84,9 +89,9 @@ public class DingyRugStatsTests
     {
         var body = BuildBody(new RelicAggregate());
 
-        Assert.Contains("Ironclad cards offered", body);
-        Assert.Contains("Colorless cards offered", body);
-        Assert.Contains("[b]0[/b]", body);
+        Assert.Contains("Ironclad cards offered/taken", body);
+        Assert.Contains("Colorless cards offered/taken", body);
+        Assert.Contains("[b]0/0[/b]", body);
     }
 
     [Fact]
@@ -103,7 +108,7 @@ public class DingyRugStatsTests
 
         Assert.True(recognized);
         Assert.Equal("Dingy Rug", title);
-        Assert.Contains("Colorless cards offered", body);
+        Assert.Contains("Colorless cards offered/taken", body);
     }
 
     private static string BuildBody(RelicAggregate agg)
@@ -116,7 +121,7 @@ public class DingyRugStatsTests
             CardRewardsAffected = 3,
             CardRewardCategories =
             {
-                ["ironclad"] = new CardRewardCategoryAggregate { DisplayName = "Ironclad", Count = 6 },
+                ["ironclad"] = new CardRewardCategoryAggregate { DisplayName = "Ironclad", Count = 6, Taken = 2 },
                 ["colorless"] = new CardRewardCategoryAggregate { DisplayName = "Colorless", Count = 3 },
             },
         };

@@ -1998,8 +1998,10 @@ public class SchemaLoadingTests
         Assert.Equal(2, relicAgg.CardRewardsAffected);
         Assert.Equal(3, relicAgg.CardRewardCategories["defect"].Count);
         Assert.Equal("Defect", relicAgg.CardRewardCategories["defect"].DisplayName);
+        Assert.Equal(0, relicAgg.CardRewardCategories["defect"].Taken);
         Assert.Equal(1, relicAgg.CardRewardCategories["colorless"].Count);
         Assert.Equal("Colorless", relicAgg.CardRewardCategories["colorless"].DisplayName);
+        Assert.Equal(0, relicAgg.CardRewardCategories["colorless"].Taken);
     }
 
     [Fact]
@@ -2012,8 +2014,34 @@ public class SchemaLoadingTests
         Assert.Equal(3, relicAgg.CardRewardsAffected);
         Assert.Equal(6, relicAgg.CardRewardCategories["ironclad"].Count);
         Assert.Equal("Ironclad", relicAgg.CardRewardCategories["ironclad"].DisplayName);
+        Assert.Equal(0, relicAgg.CardRewardCategories["ironclad"].Taken);
         Assert.Equal(3, relicAgg.CardRewardCategories["colorless"].Count);
         Assert.Equal("Colorless", relicAgg.CardRewardCategories["colorless"].DisplayName);
+        Assert.Equal(0, relicAgg.CardRewardCategories["colorless"].Taken);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsCardRewardPoolTakenFixture()
+    {
+        var resumed = RunStorage.LoadResumable(FixturePath("card-reward-pool-taken-run.json"));
+
+        Assert.NotNull(resumed);
+
+        var gem = resumed!.RelicAggregates["RELIC.PRISMATIC_GEM"];
+        Assert.Equal(6, gem.EnergyGenerated);
+        Assert.Equal(3, gem.CardRewardsAffected);
+        Assert.Equal(5, gem.CardRewardCategories["ironclad"].Count);
+        Assert.Equal(2, gem.CardRewardCategories["ironclad"].Taken);
+        Assert.Equal(4, gem.CardRewardCategories["defect"].Count);
+        Assert.Equal(1, gem.CardRewardCategories["defect"].Taken);
+        Assert.Equal(2, gem.CardRewardCategories["colorless"].Count);
+        Assert.Equal(0, gem.CardRewardCategories["colorless"].Taken);
+
+        var rug = resumed.RelicAggregates["RELIC.DINGY_RUG"];
+        Assert.Equal(5, rug.CardRewardCategories["ironclad"].Count);
+        Assert.Equal(2, rug.CardRewardCategories["ironclad"].Taken);
+        Assert.Equal(2, rug.CardRewardCategories["colorless"].Count);
+        Assert.Equal(1, rug.CardRewardCategories["colorless"].Taken);
     }
 
     [Fact]

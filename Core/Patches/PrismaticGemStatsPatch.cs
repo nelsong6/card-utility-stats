@@ -127,7 +127,7 @@ public static class HookTryModifyCardRewardOptionsPrismaticGemPatch
         }
     }
 
-    private static CardRewardCategoryObservation ToCategory(CardModel card)
+    internal static CardRewardCategoryObservation ToCategory(CardModel card)
     {
         try
         {
