@@ -739,6 +739,19 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsBufferChargeLedgerFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("buffer-charge-ledger-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        AssertBufferChargeLedgerFixture(loaded.Data);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsEntropyPowerFixture()
     {
         var loaded = RunStorage.LoadHistorical(
@@ -1724,6 +1737,16 @@ public class SchemaLoadingTests
         Assert.NotNull(resumed);
         AssertBufferPowerFixture(
             resumed!.MetaStats.PowerAggregates["POWER.BUFFER_POWER"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsBufferChargeLedgerFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("buffer-charge-ledger-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertBufferChargeLedgerFixture(resumed!);
     }
 
     [Fact]
@@ -4950,6 +4973,27 @@ public class SchemaLoadingTests
         Assert.Equal("Feel No Pain", powerAgg.DisplayName);
         Assert.Equal(36m, powerAgg.BlockGained);
         Assert.Equal(6, powerAgg.TurnsActive);
+    }
+
+    private static void AssertBufferChargeLedgerFixture(RunData run)
+    {
+        var card = run.Aggregates["CARD.BUFFER#1"];
+        Assert.Equal(5, card.BufferChargesGranted);
+        Assert.Equal(4, card.BufferChargesUsed);
+        Assert.Equal(51m, card.BufferDamagePrevented);
+
+        var potion = Assert.Single(run.PotionHistory!);
+        Assert.Equal("POTION.LUCKY_TONIC", potion.PotionId);
+        Assert.Equal(2, potion.BufferChargesGranted);
+        Assert.Equal(1, potion.BufferChargesUsed);
+        Assert.Equal(14m, potion.BufferDamagePrevented);
+
+        // The pooled power total is the family sum, so it stays greater than
+        // either contributor on its own.
+        var powerAgg = run.MetaStats.PowerAggregates["POWER.BUFFER_POWER"];
+        Assert.Equal(7, powerAgg.BufferChargesGranted);
+        Assert.Equal(5, powerAgg.BufferChargesUsed);
+        Assert.Equal(65m, powerAgg.BufferDamagePrevented);
     }
 
     private static void AssertBufferPowerFixture(PowerAggregate powerAgg)

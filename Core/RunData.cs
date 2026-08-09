@@ -334,6 +334,14 @@ public class PotionRunHistoryEntry
     public int? BlockEffective { get; set; }
     public int? BlockWasted { get; set; }
 
+    // Buffer charges this potion granted, and what those specific charges went
+    // on to prevent. Charges granted is exact — the application names its
+    // source. Which charge absorbed which hit is FIFO ledger attribution, the
+    // same heuristic the Block rows above use.
+    public int? BufferChargesGranted { get; set; }
+    public int? BufferChargesUsed { get; set; }
+    public decimal? BufferDamagePrevented { get; set; }
+
     // Observed results from a potion-owned damage command. Nullable fields
     // distinguish older history entries from newly observed zero outcomes.
     // Explosive Ampoule is the first potion to populate this outcome set.
@@ -556,6 +564,15 @@ public class CardAggregate
     // using an ordered provenance ledger for the player's block pool.
     public int TotalBlockGained { get; set; }
     public int TotalBlockEffective { get; set; }
+
+    // Buffer charges this physical card granted, and what those charges
+    // prevented. Charges granted is exact. Prevention is FIFO ledger
+    // attribution across every live charge, matching the Block ledger: the
+    // game merges all Buffer into one Counter power and spends charges in no
+    // order it exposes, so oldest-first is a stated convention, not a fact.
+    public int BufferChargesGranted { get; set; }
+    public int BufferChargesUsed { get; set; }
+    public decimal BufferDamagePrevented { get; set; }
     public int TotalBlockWasted { get; set; }
 
     // M3c: Draw count. Every time this card instance gets drawn — at

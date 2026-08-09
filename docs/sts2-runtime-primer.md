@@ -609,12 +609,22 @@ be traced to one physical card:
   so Buffer never touches card-cost or curse HP loss. Note that the Osty
   redirect branch runs the `AfterOsty` phase a second time for overkill spill,
   which can legitimately spend a second charge in one damage command.
-- The outcome belongs to the pooled `PowerAggregate`, matching Feel No Pain,
-  Dark Embrace, Rupture, Free Attack, and Free Skill. A per-card FIFO ledger
-  like `PlayerBlockLedger` was considered and rejected: block is a fungible
-  pool of points the game itself spends in order, while Buffer charges carry
-  no ordering the game respects, so per-card charge attribution would be
-  invented provenance rather than a heuristic over something real.
+- Outcomes land in **both** places, and the distinction matters. The pooled
+  `PowerAggregate` carries the family total. `_pendingCombat.PlayerBufferLedger`
+  carries per-source provenance, so an individual Buffer card and a Lucky Tonic
+  each get their own charges and prevented HP.
+- Do not pool a multi-source power just because the surface is power-shaped.
+  Free Attack and Free Skill pool because Unrelenting and Pounce are their only
+  sources, so pooling costs them nothing. Buffer has two sources, which makes
+  the right analogues `PlayerBlockLedger` and the Poison ownership ledger —
+  both multi-contributor, both solved with a contributor ledger documented as
+  heuristic.
+- Charges granted are exact: the application event names its source, either
+  through `cardSource` or through the Lucky Tonic use frame. Only the question
+  of which charge absorbed which hit is heuristic, and FIFO is the stated
+  convention, matching block's absorb order. Buffer is in fact more determinate
+  than block: charges are discrete, so a spend consumes exactly one ledger
+  unit rather than an arbitrary slice of a fungible pool.
 
 ### Registry Ids Come From The Game, Not From Typing
 

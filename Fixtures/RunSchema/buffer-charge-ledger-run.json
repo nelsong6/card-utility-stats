@@ -1,0 +1,63 @@
+{
+  "run_id": "buffer-charge-ledger-fixture",
+  "started_at": "2026-08-09T01:00:00Z",
+  "updated_at": "2026-08-09T01:24:00Z",
+  "character": "DEFECT",
+  "ascension": 11,
+  "floor_reached": 27,
+  "outcome": "in_progress",
+  "game_start_time": 1786107600,
+  "aggregates": {
+    "CARD.BUFFER#1": {
+      "combats_in_deck": 6,
+      "plays": 3,
+      "times_drawn": 7,
+      "floor_added": 8,
+      "initial_upgrade_level": 1,
+      "buffer_charges_granted": 5,
+      "buffer_charges_used": 4,
+      "buffer_damage_prevented": 51
+    }
+  },
+  "events": [],
+  "relic_aggregates": {},
+  "enemy_aggregates": {},
+  "potion_history": [
+    {
+      "sequence": 3,
+      "potion_id": "POTION.LUCKY_TONIC",
+      "display_name": "Lucky Tonic",
+      "acquisition_method": "combat_reward",
+      "rarity": "Rare",
+      "acquired": true,
+      "used": true,
+      "used_floor": 21,
+      "buffer_charges_granted": 2,
+      "buffer_charges_used": 1,
+      "buffer_damage_prevented": 14
+    }
+  ],
+  "meta_stats": {
+    "power_aggregates": {
+      "POWER.BUFFER_POWER": {
+        "power_id": "POWER.BUFFER_POWER",
+        "display_name": "Buffer",
+        "power_cards_played": 3,
+        "successful_applications": 3,
+        "buffer_charges_granted": 7,
+        "buffer_charges_used": 5,
+        "buffer_damage_prevented": 65,
+        "turns_active": 13,
+        "combats_active": 5
+      }
+    }
+  },
+  "instance_numbers_by_def": {
+    "CARD.BUFFER": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.BUFFER": 1
+  }
+}
