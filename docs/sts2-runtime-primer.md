@@ -1324,6 +1324,41 @@ classified by the game as `GoldLossType.Spent`, while `HasItemBeenBought` is
 still false and the owner's current `BaseRoom` is not a `MerchantRoom`.
 Ordinary gold loss and shop purchases do not belong in that total.
 
+Membership Card has no activation callback at all: it only overrides
+`ModifyMerchantPrice`, and `MerchantEntry.Cost` re-runs the entire
+`Hook.ModifyMerchantPrice` chain on every read — including the reads the shop
+UI makes while merely drawing prices. Do not treat that override as a trigger.
+The observed unit is a completed purchase, and the marginal saving is obtained
+by reading the same entry's `Cost` twice inside the purchase prefix: once
+normally, once with only this relic's own override short-circuited to return
+`originalPrice`. Both reads run the rest of the chain, so The Courier's
+overlapping 20% stays credited to The Courier and the game's own final
+`(int)` truncation applies to both sides. Suppression must be armed for exactly
+one nested read on the arming thread and released in a `finally`; a leaked flag
+would silently remove the discount from live shop prices.
+
+Take that snapshot before the purchase runs, not at
+`Hook.AfterItemPurchased`. `MerchantEntry.OnTryPurchaseWrapper` calls
+`RestockAfterPurchase` (which re-runs `CalcCost` for a *different* item) or
+`ClearAfterPurchase` between charging the player and announcing the sale, so
+`_cost` at hook time can already belong to the replacement stock whenever the
+player also owns The Courier. `MerchantCardRemovalEntry` declares its own
+cancelable `OnTryPurchaseWrapper` overload rather than calling the shared one,
+so both wrappers need the prefix. `Hook.AfterItemPurchased` then supplies the
+authoritative `goldSpent` and fires only on success; a free purchase
+(`ignoreCost`) reports zero and must record no saving rather than the full
+price.
+
+The relic's two framing stats need no new hooks. Its shop path pays through
+`PlayerCmd.LoseGold` before `RelicCmd.Obtain`, so the owner's balance at the
+existing obtain observation is already the gold held after buying it — stamp it
+once and never overwrite. Gold earned afterwards is every gain seen at the
+established `RunTracker.RecordRunGoldGain` boundary while the relic is held;
+ownership starts at the purchase, so held-period gains need no stored cutoff
+floor and survive Continue and Core hot reload for free. Melted wax relics drop
+out of `IterateHookListeners`, which makes both the discount measurement and
+the held-period gain stop on their own.
+
 Book of Five Rings also owns an `AfterCardChangedPiles` callback for every
 same-owner card whose final pile is the permanent Deck. Its saved `CardsAdded`
 counter advances on each callback and triggers healing whenever the post-add

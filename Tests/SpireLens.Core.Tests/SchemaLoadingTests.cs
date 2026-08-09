@@ -6726,6 +6726,36 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsMembershipCardRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("membership-card-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertMembershipCardFixture(loaded.Data);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsMembershipCardRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("membership-card-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertMembershipCardFixture(resumed!);
+    }
+
+    private static void AssertMembershipCardFixture(RunData run)
+    {
+        var relic = run.RelicAggregates["RELIC.MEMBERSHIP_CARD"];
+        Assert.Equal(4, relic.Activations);
+        Assert.Equal(163, relic.MembershipCardGoldSaved);
+        Assert.Equal(42, relic.MembershipCardGoldHeldAfterPurchase);
+        Assert.Equal(287, relic.MembershipCardGoldEarnedAfterPurchase);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsGoldenPearlRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(

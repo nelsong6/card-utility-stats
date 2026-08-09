@@ -2998,6 +2998,16 @@ public static class RunTracker
             source.MawBankGoldSpentOutsideShops;
         target.OldCoinGoldGranted += source.OldCoinGoldGranted;
         target.OldCoinGoldSpent += source.OldCoinGoldSpent;
+        target.MembershipCardGoldSaved += source.MembershipCardGoldSaved;
+        if (source.MembershipCardGoldHeldAfterPurchase.HasValue
+            && !target.MembershipCardGoldHeldAfterPurchase.HasValue)
+        {
+            target.MembershipCardGoldHeldAfterPurchase =
+                source.MembershipCardGoldHeldAfterPurchase;
+        }
+
+        target.MembershipCardGoldEarnedAfterPurchase +=
+            source.MembershipCardGoldEarnedAfterPurchase;
         target.CardsAddedToDeck += source.CardsAddedToDeck;
         target.CursesAddedToDeck += source.CursesAddedToDeck;
         target.LuckyFyshCardsAddedInCombats += source.LuckyFyshCardsAddedInCombats;
@@ -10310,6 +10320,7 @@ public static class RunTracker
         "RELIC.WONGOS_MYSTERY_TICKET";
     private const string MawBankRelicId = "RELIC.MAW_BANK";
     private const string OldCoinRelicId = "RELIC.OLD_COIN";
+    private const string MembershipCardRelicId = "RELIC.MEMBERSHIP_CARD";
     private const string GoldenPearlRelicId = "RELIC.GOLDEN_PEARL";
     private const string LeafyPoulticeRelicId = "RELIC.LEAFY_POULTICE";
     private const string RegalPillowRelicId = "RELIC.REGAL_PILLOW";
@@ -18860,6 +18871,103 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Stamp the balance Membership Card left its owner with. The shop path
+    /// pays for the relic before obtaining it, so the obtain-time balance is
+    /// the gold held after that purchase. Only the first observation counts:
+    /// a relic is obtained once, and re-observing must not overwrite it.
+    /// </summary>
+    public static void RecordMembershipCardObtained(RelicModel relic, Player player)
+    {
+        if (relic is not MembershipCard || player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player) || !IsTrackedRelic(relic)) return;
+                if (!TryEnsureCurrentRunLocked()) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(MembershipCardRelicId);
+                if (!RecordMembershipCardGoldHeldForTest(agg, player.Gold)) return;
+
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordMembershipCardObtained failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Record one completed merchant purchase that Membership Card actually
+    /// discounted. The undiscounted cost is the same entry's price re-read
+    /// with only this relic's modifier suppressed, so any other price modifier
+    /// keeps its own share of the difference.
+    /// </summary>
+    public static void RecordMembershipCardDiscountedPurchase(
+        Player player,
+        int undiscountedCost,
+        int goldSpent)
+    {
+        if (player == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(player)) return;
+
+                var relic = player.GetRelic<MembershipCard>();
+                if (relic == null || !IsTrackedRelic(relic)) return;
+                if (!TryEnsureCurrentRunLocked()) return;
+
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(MembershipCardRelicId);
+                if (!RecordMembershipCardDiscountedPurchaseForTest(
+                        agg,
+                        undiscountedCost,
+                        goldSpent))
+                {
+                    return;
+                }
+
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug(
+                    $"RecordMembershipCardDiscountedPurchase failed: {e.Message}");
+            }
+        }
+    }
+
+    internal static bool RecordMembershipCardGoldHeldForTest(
+        RelicAggregate agg,
+        int goldHeld)
+    {
+        if (agg == null || agg.MembershipCardGoldHeldAfterPurchase.HasValue)
+            return false;
+
+        agg.MembershipCardGoldHeldAfterPurchase = Math.Max(0, goldHeld);
+        return true;
+    }
+
+    internal static bool RecordMembershipCardDiscountedPurchaseForTest(
+        RelicAggregate agg,
+        int undiscountedCost,
+        int goldSpent)
+    {
+        if (agg == null) return false;
+
+        var saved = undiscountedCost - goldSpent;
+        if (saved <= 0) return false;
+
+        agg.Activations++;
+        agg.MembershipCardGoldSaved += saved;
+        return true;
+    }
+
+    /// <summary>
     /// Record one successful Amethyst Aubergine reward modification and the
     /// amount on the concrete extra GoldReward appended by that callback.
     /// </summary>
@@ -19073,6 +19181,20 @@ public static class RunTracker
                     mapCategory.GoldGained += gained;
 
                 RecordGoldRoomVisitForTest(stats, context.RoomType, context.Floor);
+
+                // Membership Card's "earned after purchase" total is simply
+                // every observed gain while the relic is held: ownership only
+                // begins at its purchase, so held-period gains and post-purchase
+                // gains are the same set without needing a stored cutoff.
+                var membershipCard = player.GetRelic<MembershipCard>();
+                if (membershipCard != null && IsTrackedRelic(membershipCard))
+                {
+                    var membershipAggregate = isCombat && _pendingCombat != null
+                        ? GetOrCreatePendingRelicAggregateLocked(MembershipCardRelicId)
+                        : GetOrCreateCurrentRunRelicAggregateLocked(MembershipCardRelicId);
+                    membershipAggregate.MembershipCardGoldEarnedAfterPurchase += gained;
+                }
+
                 _currentRun.UpdatedAt = Now();
                 RefreshCurrentRunMetadataLocked();
                 if (!ReferenceEquals(stats, _pendingCombat?.GoldStats))
