@@ -1266,7 +1266,11 @@ countable, and the pre-await room is the room the addition actually happened
 in — the awaited gold command can resolve after a room transition, so reading
 `CurrentRoom` in the continuation would attribute the add to the wrong room.
 Combat additions cover Monster, Elite, and Boss rooms, because card rewards
-resolve while the player is still standing in the combat room.
+resolve while the player is still standing in the combat room. The observed
+balance delta is split onto the same buckets, so each rate reports cards and
+the gold they paid out over one shared denominator. The per-room gold totals
+sum to at most the lifetime total, which also covers additions in rooms outside
+the four buckets.
 
 Denominators for the relic's per-room averages come from the shared resolved
 `Hook.AfterRoomEntered` prefix, counted once per floor per room type while the

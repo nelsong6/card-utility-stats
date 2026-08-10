@@ -2509,6 +2509,10 @@ public class SchemaLoadingTests
         Assert.Equal(2, relicAgg.LuckyFyshCardsAddedInShops);
         Assert.Equal(1, relicAgg.LuckyFyshCardsAddedInEvents);
         Assert.Equal(0, relicAgg.LuckyFyshCardsAddedInCampfires);
+        Assert.Equal(35, relicAgg.LuckyFyshGoldGainedInCombats);
+        Assert.Equal(24, relicAgg.LuckyFyshGoldGainedInShops);
+        Assert.Equal(11, relicAgg.LuckyFyshGoldGainedInEvents);
+        Assert.Equal(0, relicAgg.LuckyFyshGoldGainedInCampfires);
         Assert.Equal(6, relicAgg.LuckyFyshCombatsHeld);
         Assert.Equal(2, relicAgg.LuckyFyshShopsHeld);
         Assert.Equal(4, relicAgg.LuckyFyshEventsHeld);
@@ -2528,6 +2532,7 @@ public class SchemaLoadingTests
         var relicAgg = loaded!.Data.RelicAggregates["RELIC.LUCKY_FYSH"];
         Assert.Equal(0, relicAgg.CursesAddedToDeck);
         Assert.Equal(0, relicAgg.LuckyFyshCardsAddedInCombats);
+        Assert.Equal(0, relicAgg.LuckyFyshGoldGainedInCombats);
         Assert.Equal(0, relicAgg.LuckyFyshCombatsHeld);
         Assert.Null(relicAgg.LuckyFyshLastCombatFloorHeld);
     }
@@ -2710,6 +2715,10 @@ public class SchemaLoadingTests
         Assert.Equal(2, relicAgg.LuckyFyshCardsAddedInShops);
         Assert.Equal(1, relicAgg.LuckyFyshCardsAddedInEvents);
         Assert.Equal(0, relicAgg.LuckyFyshCardsAddedInCampfires);
+        Assert.Equal(35, relicAgg.LuckyFyshGoldGainedInCombats);
+        Assert.Equal(24, relicAgg.LuckyFyshGoldGainedInShops);
+        Assert.Equal(11, relicAgg.LuckyFyshGoldGainedInEvents);
+        Assert.Equal(0, relicAgg.LuckyFyshGoldGainedInCampfires);
         Assert.Equal(6, relicAgg.LuckyFyshCombatsHeld);
         Assert.Equal(2, relicAgg.LuckyFyshShopsHeld);
         Assert.Equal(4, relicAgg.LuckyFyshEventsHeld);

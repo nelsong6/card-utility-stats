@@ -4637,55 +4637,73 @@ public static class RelicHoverShowPatch
             agg.CursesAddedToDeck.ToString(),
             "",
             "Curses added to deck — Curse cards among the permanent-deck additions Lucky Fysh was observed paying for.");
-        Row3(
+        AppendLuckyFyshRateRow(
             sb,
             "Avg cards added per floor",
-            FormatDecimal((decimal)agg.CardsAddedToDeck / floorsHeld),
-            "",
-            "Average cards added per floor — every observed permanent-deck addition divided by the floors held since Lucky Fysh was acquired.");
-        AppendLuckyFyshRoomAverageRow(
+            agg.CardsAddedToDeck,
+            agg.GoldGained,
+            floorsHeld,
+            "Average cards added per floor, and the gold they paid out — every observed permanent-deck addition divided by the floors held since Lucky Fysh was acquired.");
+        AppendLuckyFyshRateRow(
             sb,
             "Avg cards added per combat",
             agg.LuckyFyshCardsAddedInCombats,
+            agg.LuckyFyshGoldGainedInCombats,
             agg.LuckyFyshCombatsHeld,
-            "Average cards added per combat — additions observed in Monster, Elite, and Boss rooms divided by those rooms entered while Lucky Fysh was held.");
-        AppendLuckyFyshRoomAverageRow(
+            "Average cards added per combat, and the gold they paid out — additions observed in Monster, Elite, and Boss rooms divided by those rooms entered while Lucky Fysh was held.");
+        AppendLuckyFyshRateRow(
             sb,
             "Avg cards added per shop",
             agg.LuckyFyshCardsAddedInShops,
+            agg.LuckyFyshGoldGainedInShops,
             agg.LuckyFyshShopsHeld,
-            "Average cards added per merchant — additions observed in merchant rooms divided by the merchants entered while Lucky Fysh was held.");
-        AppendLuckyFyshRoomAverageRow(
+            "Average cards added per merchant, and the gold they paid out — additions observed in merchant rooms divided by the merchants entered while Lucky Fysh was held.");
+        AppendLuckyFyshRateRow(
             sb,
             "Avg cards added per event",
             agg.LuckyFyshCardsAddedInEvents,
+            agg.LuckyFyshGoldGainedInEvents,
             agg.LuckyFyshEventsHeld,
-            "Average cards added per event — additions observed in event rooms divided by the events entered while Lucky Fysh was held.");
-        AppendLuckyFyshRoomAverageRow(
+            "Average cards added per event, and the gold they paid out — additions observed in event rooms divided by the events entered while Lucky Fysh was held.");
+        AppendLuckyFyshRateRow(
             sb,
             "Avg cards added per campfire",
             agg.LuckyFyshCardsAddedInCampfires,
+            agg.LuckyFyshGoldGainedInCampfires,
             agg.LuckyFyshCampfiresHeld,
-            "Average cards added per campfire — additions observed at rest sites divided by the rest sites entered while Lucky Fysh was held.");
+            "Average cards added per campfire, and the gold they paid out — additions observed at rest sites divided by the rest sites entered while Lucky Fysh was held.");
         return sb.ToString();
     }
 
     /// <summary>
-    /// One Lucky Fysh per-room average. Rooms of that type not yet entered
-    /// while the relic was held leave the average undefined rather than
-    /// reporting a zero the player could read as a measured result.
+    /// One Lucky Fysh rate, split across the row's two value columns: cards
+    /// added in the primary column, the gold those additions paid out beside
+    /// it. Both halves share a denominator, so the pair reads as one rate
+    /// rather than two stats that happen to be adjacent. A denominator of zero
+    /// leaves the rate undefined rather than reporting a zero the player could
+    /// read as a measured result.
     /// </summary>
-    private static void AppendLuckyFyshRoomAverageRow(
+    private static void AppendLuckyFyshRateRow(
         StringBuilder sb,
         string label,
         int cardsAdded,
-        int roomsHeld,
+        int goldGained,
+        int denominator,
         string fullDescription)
     {
-        var value = roomsHeld <= 0
-            ? "not yet"
-            : FormatDecimal((decimal)cardsAdded / roomsHeld);
-        Row3(sb, label, value, "", fullDescription);
+        if (denominator <= 0)
+        {
+            Row3(sb, label, "not yet", "", fullDescription);
+            return;
+        }
+
+        var goldIcon = StatConceptGlossary.RenderHintedGlyph("gold");
+        Row3(
+            sb,
+            label,
+            FormatDecimal((decimal)cardsAdded / denominator),
+            $"{goldIcon} {FormatDecimal((decimal)goldGained / denominator)}",
+            fullDescription);
     }
 
     private static string BuildBowlerHatBodyBBCode(
