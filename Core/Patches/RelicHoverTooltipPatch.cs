@@ -2881,14 +2881,12 @@ public static class RelicHoverShowPatch
     {
         foreach (var (key, displayName) in EnumerateObservedCardRewardPools())
         {
-            var offered = GetObservedCardRewardPoolOfferCount(agg, key);
-            var taken = GetObservedCardRewardPoolTakenCount(agg, key);
-            DescribedIconRow(
+            OfferedTakenRow(
                 sb,
-                ["card", "offered", "taken"],
-                [],
+                ["card"],
                 displayName,
-                $"{offered}/{taken}",
+                GetObservedCardRewardPoolOfferCount(agg, key),
+                GetObservedCardRewardPoolTakenCount(agg, key),
                 $"{displayName} cards offered/taken — final visible {displayName} card options in rewards while {relicName} was held, and how many of those options were actually taken.");
         }
     }
@@ -3085,52 +3083,63 @@ public static class RelicHoverShowPatch
     private static string BuildWingCharmBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
-        WingCharmSwiftRow(
+        var taken = Math.Max(0, agg.WingCharmSwiftCardsTaken);
+        WingCharmSwiftOfferedTakenRow(
             sb,
             "card",
-            "taken",
-            agg.WingCharmSwiftCardsTaken,
-            "Swift cards successfully taken from Wing Charm-modified rewards.");
-        WingCharmSwiftRow(
+            taken + Math.Max(0, agg.WingCharmSwiftCardsNotTaken),
+            taken,
+            "Swift cards offered/taken — options Wing Charm enchanted, and how many of them were successfully taken.");
+        WingCharmSwiftOfferedRow(
             sb,
             "card",
-            "not taken",
-            agg.WingCharmSwiftCardsNotTaken,
-            "Swift cards offered by Wing Charm but not taken.");
-        WingCharmSwiftRow(
-            sb,
-            "card",
-            "offered",
             agg.WingCharmCommonSwiftCardsOffered,
             "Common Swift cards offered by Wing Charm.");
-        WingCharmSwiftRow(
+        WingCharmSwiftOfferedRow(
             sb,
             "card_uncommon",
-            "offered",
             agg.WingCharmUncommonSwiftCardsOffered,
             "Uncommon Swift cards offered by Wing Charm.");
-        WingCharmSwiftRow(
+        WingCharmSwiftOfferedRow(
             sb,
             "card_rare",
-            "offered",
             agg.WingCharmRareSwiftCardsOffered,
             "Rare Swift cards offered by Wing Charm.");
         return sb.ToString();
     }
 
+    private static void WingCharmSwiftOfferedTakenRow(
+        StringBuilder sb,
+        string cardConceptId,
+        int offered,
+        int taken,
+        string fullDescription)
+        => WingCharmSwiftRow(
+            sb,
+            cardConceptId,
+            $"{StatConceptGlossary.RenderHintedGlyph("offered")}/{StatConceptGlossary.RenderHintedGlyph("taken")}",
+            FormatOfferedTaken(offered, taken),
+            fullDescription);
+
+    private static void WingCharmSwiftOfferedRow(
+        StringBuilder sb,
+        string cardConceptId,
+        int offered,
+        string fullDescription)
+        => WingCharmSwiftRow(
+            sb,
+            cardConceptId,
+            StatConceptGlossary.RenderHintedGlyph("offered"),
+            Math.Max(0, offered).ToString(),
+            fullDescription);
+
     private static void WingCharmSwiftRow(
         StringBuilder sb,
         string cardConceptId,
-        string action,
-        int value,
+        string actionExpression,
+        string value,
         string fullDescription)
     {
-        var actionExpression = action switch
-        {
-            "offered" => StatConceptGlossary.RenderHintedGlyph("offered"),
-            "taken" or "not taken" => RenderTakenOutcome(action),
-            _ => StatsTooltip.EscapeBbcode(action),
-        };
         var iconExpression =
             $"[b]+[/b] {StatConceptGlossary.RenderHintedGlyph("swift")} {actionExpression}";
         DescribedIconFlowRow(
@@ -3138,7 +3147,7 @@ public static class RelicHoverShowPatch
             new[] { cardConceptId },
             Array.Empty<string>(),
             iconExpression,
-            value.ToString(),
+            value,
             fullDescription);
     }
 
@@ -3148,21 +3157,9 @@ public static class RelicHoverShowPatch
         LastingCandyPowerRow(
             sb,
             "power",
-            "offered",
             agg.LastingCandyPowersOffered,
-            "Powers offered — Power options added to combat card rewards by Lasting Candy.");
-        LastingCandyPowerRow(
-            sb,
-            "power",
-            "taken",
             agg.LastingCandyPowersTaken,
-            "Powers taken — Lasting Candy Power options that successfully entered the permanent deck.");
-        LastingCandyPowerRow(
-            sb,
-            "power",
-            "rejected",
-            agg.LastingCandyPowersRejected,
-            "Powers rejected — Lasting Candy Power options not taken before their reward resolved or rerolled.");
+            "Powers offered/taken — Power options Lasting Candy added to combat card rewards, and how many of them entered the permanent deck. The remainder was rejected before its reward resolved or rerolled.");
         DescribedIconRow(
             sb,
             ["activation", "in", "all", "elite"],
@@ -3180,64 +3177,36 @@ public static class RelicHoverShowPatch
         LastingCandyPowerRow(
             sb,
             "power_uncommon",
-            "offered",
             agg.LastingCandyUncommonPowersOffered,
-            "Uncommon Powers offered by Lasting Candy.");
-        LastingCandyPowerRow(
-            sb,
-            "power_uncommon",
-            "taken",
             agg.LastingCandyUncommonPowersTaken,
-            "Uncommon Lasting Candy Powers successfully taken.");
-        LastingCandyPowerRow(
-            sb,
-            "power_uncommon",
-            "rejected",
-            agg.LastingCandyUncommonPowersRejected,
-            "Uncommon Lasting Candy Powers rejected.");
+            "Uncommon Lasting Candy Powers offered/taken.");
         LastingCandyPowerRow(
             sb,
             "power_rare",
-            "offered",
             agg.LastingCandyRarePowersOffered,
-            "Rare Powers offered by Lasting Candy.");
-        LastingCandyPowerRow(
-            sb,
-            "power_rare",
-            "taken",
             agg.LastingCandyRarePowersTaken,
-            "Rare Lasting Candy Powers successfully taken.");
-        LastingCandyPowerRow(
-            sb,
-            "power_rare",
-            "rejected",
-            agg.LastingCandyRarePowersRejected,
-            "Rare Lasting Candy Powers rejected.");
+            "Rare Lasting Candy Powers offered/taken.");
         return sb.ToString();
     }
 
+    /// <summary>
+    /// Lasting Candy's rejected counters are incremented in the same call that
+    /// increments offered and taken, so rejected is always offered minus taken
+    /// and does not need a row of its own.
+    /// </summary>
     private static void LastingCandyPowerRow(
         StringBuilder sb,
         string powerConceptId,
-        string outcome,
-        int value,
+        int offered,
+        int taken,
         string fullDescription)
-    {
-        var outcomeExpression = outcome switch
-        {
-            "offered" => StatConceptGlossary.RenderHintedGlyph("offered"),
-            "taken" => StatConceptGlossary.RenderHintedGlyph("taken"),
-            "rejected" => $"¬ {StatConceptGlossary.RenderHintedGlyph("taken")}",
-            _ => StatsTooltip.EscapeBbcode(outcome),
-        };
-        DescribedIconRow(
+        => OfferedTakenRow(
             sb,
             [powerConceptId],
-            [],
-            outcomeExpression,
-            value.ToString(),
+            string.Empty,
+            offered,
+            taken,
             fullDescription);
-    }
 
     private static string BuildFishingRodBodyBBCode(RelicAggregate agg)
     {
@@ -3288,50 +3257,26 @@ public static class RelicHoverShowPatch
             sb,
             cardType,
             rarity: null,
-            count: agg.UpgradedCardsOffered,
-            action: "offered");
+            offered: agg.UpgradedCardsOffered,
+            taken: agg.UpgradedCardsTaken);
         AppendEggCardRow(
             sb,
             cardType,
             "common",
             agg.UpgradedCommonCardsOffered,
-            "offered");
+            agg.UpgradedCommonCardsTaken);
         AppendEggCardRow(
             sb,
             cardType,
             "uncommon",
             agg.UpgradedUncommonCardsOffered,
-            "offered");
+            agg.UpgradedUncommonCardsTaken);
         AppendEggCardRow(
             sb,
             cardType,
             "rare",
             agg.UpgradedRareCardsOffered,
-            "offered");
-        AppendEggCardRow(
-            sb,
-            cardType,
-            rarity: null,
-            count: agg.UpgradedCardsTaken,
-            action: "taken");
-        AppendEggCardRow(
-            sb,
-            cardType,
-            "common",
-            agg.UpgradedCommonCardsTaken,
-            "taken");
-        AppendEggCardRow(
-            sb,
-            cardType,
-            "uncommon",
-            agg.UpgradedUncommonCardsTaken,
-            "taken");
-        AppendEggCardRow(
-            sb,
-            cardType,
-            "rare",
-            agg.UpgradedRareCardsTaken,
-            "taken");
+            agg.UpgradedRareCardsTaken);
         return sb.ToString();
     }
 
@@ -3339,8 +3284,8 @@ public static class RelicHoverShowPatch
         StringBuilder sb,
         string cardType,
         string? rarity,
-        int count,
-        string action)
+        int offered,
+        int taken)
     {
         var pluralCardType = $"{cardType}s";
         var rarityText = string.IsNullOrEmpty(rarity)
@@ -3349,13 +3294,13 @@ public static class RelicHoverShowPatch
         var typeConceptId = string.IsNullOrEmpty(rarity)
             ? cardType
             : $"{cardType}_{rarity}";
-        DescribedIconRow(
+        OfferedTakenRow(
             sb,
-            ["upgraded", typeConceptId, action],
-            [],
+            ["upgraded", typeConceptId],
             string.Empty,
-            count.ToString(),
-            $"Upgraded {rarityText}{pluralCardType} {action}.");
+            offered,
+            taken,
+            $"Upgraded {rarityText}{pluralCardType} offered/taken.");
     }
 
     private static string BuildLeadPaperweightBodyBBCode(
@@ -5014,10 +4959,20 @@ public static class RelicHoverShowPatch
     {
         var sb = new StringBuilder();
         RelicActivationRow(sb, agg.Activations.ToString());
-        Row3(sb, "Uncommon cards offered", agg.UncommonCardsOffered.ToString(), "");
-        Row3(sb, "Rare cards offered", agg.RareCardsOffered.ToString(), "");
-        Row3(sb, "Uncommon cards taken", agg.UncommonCardsTaken.ToString(), "");
-        Row3(sb, "Rare cards taken", agg.RareCardsTaken.ToString(), "");
+        OfferedTakenRow(
+            sb,
+            ["card_uncommon"],
+            string.Empty,
+            agg.UncommonCardsOffered,
+            agg.UncommonCardsTaken,
+            "Uncommon cards offered/taken from Toolbox's card choices.");
+        OfferedTakenRow(
+            sb,
+            ["card_rare"],
+            string.Empty,
+            agg.RareCardsOffered,
+            agg.RareCardsTaken,
+            "Rare cards offered/taken from Toolbox's card choices.");
         return sb.ToString();
     }
 
@@ -5028,48 +4983,27 @@ public static class RelicHoverShowPatch
             sb,
             agg.Activations.ToString(),
             "Activations — random card selection screens Choices Paradox offered on the first turn of a combat.");
-        DescribedIconRow(
+        OfferedTakenRow(
             sb,
-            ["card", "offered"],
-            [],
+            ["card"],
             string.Empty,
-            agg.CommonCardsOffered.ToString(),
-            "Commons offered — Common card options Choices Paradox put on its selection screens.");
-        DescribedIconRow(
+            agg.CommonCardsOffered,
+            agg.CommonCardsTaken,
+            "Commons offered/taken — Common card options Choices Paradox put on its selection screens, and how many were taken.");
+        OfferedTakenRow(
             sb,
-            ["card_uncommon", "offered"],
-            [],
+            ["card_uncommon"],
             string.Empty,
-            agg.UncommonCardsOffered.ToString(),
-            "Uncommons offered — Uncommon card options Choices Paradox put on its selection screens.");
-        DescribedIconRow(
+            agg.UncommonCardsOffered,
+            agg.UncommonCardsTaken,
+            "Uncommons offered/taken — Uncommon card options Choices Paradox put on its selection screens, and how many were taken.");
+        OfferedTakenRow(
             sb,
-            ["card_rare", "offered"],
-            [],
+            ["card_rare"],
             string.Empty,
-            agg.RareCardsOffered.ToString(),
-            "Rares offered — Rare card options Choices Paradox put on its selection screens.");
-        DescribedIconRow(
-            sb,
-            ["card", "taken"],
-            [],
-            string.Empty,
-            agg.CommonCardsTaken.ToString(),
-            "Commons taken — Common cards taken from Choices Paradox selection screens.");
-        DescribedIconRow(
-            sb,
-            ["card_uncommon", "taken"],
-            [],
-            string.Empty,
-            agg.UncommonCardsTaken.ToString(),
-            "Uncommons taken — Uncommon cards taken from Choices Paradox selection screens.");
-        DescribedIconRow(
-            sb,
-            ["card_rare", "taken"],
-            [],
-            string.Empty,
-            agg.RareCardsTaken.ToString(),
-            "Rares taken — Rare cards taken from Choices Paradox selection screens.");
+            agg.RareCardsOffered,
+            agg.RareCardsTaken,
+            "Rares offered/taken — Rare card options Choices Paradox put on its selection screens, and how many were taken.");
         return sb.ToString();
     }
 
@@ -5211,34 +5145,34 @@ public static class RelicHoverShowPatch
             sb,
             agg.Activations.ToString(),
             "Activations — extra rare card rewards created by White Star after Elite victories.");
-        DescribedIconRow(
+        OfferedTakenRow(
             sb,
-            ["card_rare", "offered"],
-            [],
+            ["card_rare"],
             string.Empty,
-            agg.RareCardsOffered.ToString(),
-            "Rares offered — Rare card options generated by White Star, including rerolled options.");
-        DescribedIconRow(
+            agg.RareCardsOffered,
+            agg.RareCardsTaken,
+            "Rares offered/taken — Rare card options generated by White Star, including rerolled options, and how many of them reached the deck.");
+        OfferedTakenRow(
             sb,
-            ["attack_rare", "offered"],
-            [],
+            ["attack_rare"],
             string.Empty,
-            agg.RareAttackCardsOffered.ToString(),
-            "Rare Attacks offered — Rare Attack options generated by White Star.");
-        DescribedIconRow(
+            agg.RareAttackCardsOffered,
+            agg.RareAttackCardsTaken,
+            "Rare Attacks offered/taken — Rare Attack options generated by White Star, and how many were taken.");
+        OfferedTakenRow(
             sb,
-            ["skill_rare", "offered"],
-            [],
+            ["skill_rare"],
             string.Empty,
-            agg.RareSkillCardsOffered.ToString(),
-            "Rare Skills offered — Rare Skill options generated by White Star.");
-        DescribedIconRow(
+            agg.RareSkillCardsOffered,
+            agg.RareSkillCardsTaken,
+            "Rare Skills offered/taken — Rare Skill options generated by White Star, and how many were taken.");
+        OfferedTakenRow(
             sb,
-            ["power_rare", "offered"],
-            [],
+            ["power_rare"],
             string.Empty,
-            agg.RarePowerCardsOffered.ToString(),
-            "Rare Powers offered — Rare Power options generated by White Star.");
+            agg.RarePowerCardsOffered,
+            agg.RarePowerCardsTaken,
+            "Rare Powers offered/taken — Rare Power options generated by White Star, and how many were taken.");
         DescribedIconRow(
             sb,
             ["card_rare"],
@@ -5266,48 +5200,27 @@ public static class RelicHoverShowPatch
             "extra reward screens rejected",
             agg.PrayerWheelExtraRewardScreensRejected.ToString(),
             "Times extra reward screen rejected — Prayer Wheel rewards terminally resolved without taking a card.");
-        DescribedIconRow(
+        OfferedTakenRow(
             sb,
-            ["card", "offered"],
-            [],
+            ["card"],
             string.Empty,
-            agg.CommonCardsOffered.ToString(),
-            "Commons offered — Common card options generated by Prayer Wheel, including rerolled options.");
-        DescribedIconRow(
+            agg.CommonCardsOffered,
+            agg.CommonCardsTaken,
+            "Commons offered/taken — Common card options generated by Prayer Wheel, including rerolled options, and how many were obtained.");
+        OfferedTakenRow(
             sb,
-            ["card_uncommon", "offered"],
-            [],
+            ["card_uncommon"],
             string.Empty,
-            agg.UncommonCardsOffered.ToString(),
-            "Uncommons offered — Uncommon card options generated by Prayer Wheel, including rerolled options.");
-        DescribedIconRow(
+            agg.UncommonCardsOffered,
+            agg.UncommonCardsTaken,
+            "Uncommons offered/taken — Uncommon card options generated by Prayer Wheel, including rerolled options, and how many were obtained.");
+        OfferedTakenRow(
             sb,
-            ["card_rare", "offered"],
-            [],
+            ["card_rare"],
             string.Empty,
-            agg.RareCardsOffered.ToString(),
-            "Rares offered — Rare card options generated by Prayer Wheel, including rerolled options.");
-        DescribedIconRow(
-            sb,
-            ["card", "taken"],
-            [],
-            string.Empty,
-            agg.CommonCardsTaken.ToString(),
-            "Commons taken — Common cards obtained from Prayer Wheel's extra rewards.");
-        DescribedIconRow(
-            sb,
-            ["card_uncommon", "taken"],
-            [],
-            string.Empty,
-            agg.UncommonCardsTaken.ToString(),
-            "Uncommons taken — Uncommon cards obtained from Prayer Wheel's extra rewards.");
-        DescribedIconRow(
-            sb,
-            ["card_rare", "taken"],
-            [],
-            string.Empty,
-            agg.RareCardsTaken.ToString(),
-            "Rares taken — Rare cards obtained from Prayer Wheel's extra rewards.");
+            agg.RareCardsOffered,
+            agg.RareCardsTaken,
+            "Rares offered/taken — Rare card options generated by Prayer Wheel, including rerolled options, and how many were obtained.");
         return sb.ToString();
     }
 
@@ -6244,8 +6157,12 @@ public static class RelicHoverShowPatch
             ? 0m
             : (decimal)agg.EnergySavedByDiscount / agg.DiscountsTaken;
         Row3(sb, "Combats held", agg.DiscountCombats.ToString(), "");
-        Row3(sb, "Discounts offered", agg.DiscountsOffered.ToString(), "");
-        Row3(sb, "Discounts taken", agg.DiscountsTaken.ToString(), "");
+        Row3(
+            sb,
+            "Discounts offered/taken",
+            FormatOfferedTaken(agg.DiscountsOffered, agg.DiscountsTaken),
+            "",
+            "Discounts offered/taken — Energy discounts Brilliant Scarf made available, and how many were actually spent on a play.");
         Row3(sb, EnergyLabel("Energy saved"), agg.EnergySavedByDiscount.ToString(), "");
         Row3(sb, EnergyLabel("saved / turn"), FormatDecimal(energySavedPerTurn), "");
         Row3(sb, EnergyLabel("saved / combat"), FormatDecimal(energySavedPerCombat), "");
@@ -6616,20 +6533,13 @@ public static class RelicHoverShowPatch
             sb,
             agg.Activations.ToString(),
             "Rest-site heals where Tiny Mailbox added its potion rewards.");
-        DescribedIconRow(
+        OfferedTakenRow(
             sb,
-            ["potion", "offered"],
-            [],
+            ["potion"],
             string.Empty,
-            agg.TinyMailboxPotionsOffered.ToString(),
-            "Potion rewards offered by Tiny Mailbox.");
-        DescribedIconRow(
-            sb,
-            ["potion", "taken"],
-            [],
-            string.Empty,
-            agg.TinyMailboxPotionsTaken.ToString(),
-            "Tiny Mailbox potions successfully taken.");
+            agg.TinyMailboxPotionsOffered,
+            agg.TinyMailboxPotionsTaken,
+            "Potions offered/taken — potion rewards Tiny Mailbox added, and how many were successfully taken.");
         DescribedIconRow(
             sb,
             ["potion_common", "offered"],
@@ -7090,6 +7000,31 @@ public static class RelicHoverShowPatch
             value,
             fullDescription);
     }
+
+    /// <summary>
+    /// One row for an offer bucket and the subset of it the player actually
+    /// took. The two numbers only mean anything next to each other, so they
+    /// share a row instead of forcing the reader to pair up two.
+    /// </summary>
+    private static void OfferedTakenRow(
+        StringBuilder sb,
+        IReadOnlyList<string> itemConceptIds,
+        string label,
+        int offered,
+        int taken,
+        string fullDescription)
+    {
+        DescribedIconRow(
+            sb,
+            [.. itemConceptIds, "offered", "taken"],
+            [],
+            label,
+            FormatOfferedTaken(offered, taken),
+            fullDescription);
+    }
+
+    private static string FormatOfferedTaken(int offered, int taken)
+        => $"{Math.Max(0, offered)}/{Math.Max(0, taken)}";
 
     private static void AppendLiveActivationRows(
         StringBuilder sb,

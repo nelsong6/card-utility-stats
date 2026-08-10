@@ -104,21 +104,19 @@ public class LastingCandyStatsTests
         Assert.Contains(StatConceptGlossary.RenderHintedGlyph("all"), body);
         Assert.Contains(StatConceptGlossary.RenderHintedGlyph("elite"), body);
         Assert.Contains(StatConceptGlossary.RenderHintedGlyph("combat"), body);
-        Assert.Contains(RenderNotTaken(), body);
-        Assert.Contains("Powers offered", body);
-        Assert.Contains("Powers taken", body);
-        Assert.Contains("Powers rejected", body);
-        Assert.Contains("Uncommon Powers offered", body);
-        Assert.Contains("Rare Lasting Candy Powers rejected", body);
+        Assert.Contains("Powers offered/taken", body);
+        Assert.Contains("Uncommon Lasting Candy Powers offered/taken", body);
+        Assert.Contains("Rare Lasting Candy Powers offered/taken", body);
         Assert.Contains("Elite activations", body);
         Assert.Contains("Boss activations", body);
         Assert.Contains("Boss", body);
-        Assert.Contains("[b]5[/b]", body);
-        Assert.Contains("[b]3[/b]", body);
-        Assert.Contains("[b]2[/b]", body);
+        Assert.Contains("[b]5/2[/b]", body);
+        Assert.Contains("[b]3/1[/b]", body);
+        Assert.Contains("[b]2/1[/b]", body);
         Assert.Equal(1, body.Split("[table=4]", StringSplitOptions.None).Length - 1);
-        Assert.Equal(11, body.Split("[left][b]", StringSplitOptions.None).Length - 1);
+        Assert.Equal(5, body.Split("[left][b]", StringSplitOptions.None).Length - 1);
         Assert.DoesNotContain("[table=2]", body);
+        Assert.DoesNotContain(RenderNotTaken(), body);
         Assert.DoesNotContain(
             $"not {StatConceptGlossary.RenderHintedGlyph("taken")}",
             body);
@@ -143,7 +141,7 @@ public class LastingCandyStatsTests
 
         Assert.True(recognized);
         Assert.Equal("Lasting Candy", title);
-        Assert.Contains("Powers offered", body);
+        Assert.Contains("Powers offered/taken", body);
     }
 
     private static RelicAggregate PopulatedAggregate() => new()

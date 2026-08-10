@@ -150,6 +150,8 @@ public class TinyMailboxStatsTests
             StatConceptGlossary.RenderHintedGlyph("potion_gained"),
             body);
         Assert.DoesNotContain("Fruit Juices offered", body);
+        Assert.Contains("Potions offered/taken", body);
+        Assert.Contains("[b]4/3[/b]", body);
         Assert.Contains("not rested", body);
     }
 

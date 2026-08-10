@@ -1692,6 +1692,12 @@ public class RelicAggregate
     public int RareAttackCardsOffered { get; set; }
     public int RareSkillCardsOffered { get; set; }
     public int RarePowerCardsOffered { get; set; }
+    // The subset of White Star's Rare offers that actually reached the deck,
+    // split the same way the offers are. Additive: runs recorded before these
+    // fields default to zero taken, not to zero offers.
+    public int RareAttackCardsTaken { get; set; }
+    public int RareSkillCardsTaken { get; set; }
+    public int RarePowerCardsTaken { get; set; }
     public int RareCardRewardScreensDeclined { get; set; }
     public int PrayerWheelExtraRewardScreens { get; set; }
     public int PrayerWheelExtraRewardScreensRejected { get; set; }

@@ -103,6 +103,12 @@ public class PrayerWheelStatsTests
         Assert.Contains(
             StatConceptGlossary.RenderHintedGlyph("taken"),
             body);
+        Assert.Contains("Commons offered/taken", body);
+        Assert.Contains("Uncommons offered/taken", body);
+        Assert.Contains("Rares offered/taken", body);
+        Assert.Contains("[b]7/3[/b]", body);
+        Assert.Contains("[b]4/1[/b]", body);
+        Assert.Contains("[b]1/1[/b]", body);
         Assert.Contains("color=#87CEEB", body);
         Assert.Contains("color=#EFC850", body);
     }

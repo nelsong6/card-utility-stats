@@ -336,13 +336,11 @@ public class OpenBranchRelicStatsTests
                 RareCardsTaken = 1,
             });
         Assert.Contains("Activations", toolboxBody);
-        Assert.Contains("Uncommon cards offered", toolboxBody);
-        Assert.Contains("Rare cards offered", toolboxBody);
-        Assert.Contains("Uncommon cards taken", toolboxBody);
-        Assert.Contains("Rare cards taken", toolboxBody);
-        Assert.Contains("[b]4[/b]", toolboxBody);
+        Assert.Contains("Uncommon cards offered/taken", toolboxBody);
+        Assert.Contains("Rare cards offered/taken", toolboxBody);
+        Assert.Contains("[b]4/2[/b]", toolboxBody);
+        Assert.Contains("[b]1/1[/b]", toolboxBody);
         Assert.Contains("[b]2[/b]", toolboxBody);
-        Assert.Contains("[b]1[/b]", toolboxBody);
 
         var pendulumBody = InvokeTooltipBuilder(
             "BuildPendulumBodyBBCode",
