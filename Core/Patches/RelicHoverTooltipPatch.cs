@@ -1326,7 +1326,10 @@ public static class RelicHoverShowPatch
         if (relicModel is LuckyFysh)
         {
             title = "Lucky Fysh";
-            body = BuildLuckyFyshBodyBBCode(agg);
+            body = BuildLuckyFyshBodyBBCode(
+                agg,
+                floorCount,
+                RelicFloorAddedToDeck(relicModel));
             return true;
         }
 
@@ -4615,12 +4618,74 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
-    private static string BuildLuckyFyshBodyBBCode(RelicAggregate agg)
+    private static string BuildLuckyFyshBodyBBCode(
+        RelicAggregate agg,
+        int? currentFloor = null,
+        int? floorAcquiredFallback = null)
     {
         var sb = new StringBuilder();
+        var floorAcquired = agg.FloorAcquired ?? floorAcquiredFallback;
+        var floorsHeld = currentFloor.HasValue && floorAcquired.HasValue
+            ? Math.Max(1, currentFloor.Value - floorAcquired.Value + 1)
+            : Math.Max(1, currentFloor ?? 1);
+
         Row3(sb, "Gold gained", agg.GoldGained.ToString(), "");
         Row3(sb, "Cards added to deck", agg.CardsAddedToDeck.ToString(), "");
+        Row3(
+            sb,
+            "Curses added to deck",
+            agg.CursesAddedToDeck.ToString(),
+            "",
+            "Curses added to deck — Curse cards among the permanent-deck additions Lucky Fysh was observed paying for.");
+        Row3(
+            sb,
+            "Avg cards added per floor",
+            FormatDecimal((decimal)agg.CardsAddedToDeck / floorsHeld),
+            "",
+            "Average cards added per floor — every observed permanent-deck addition divided by the floors held since Lucky Fysh was acquired.");
+        AppendLuckyFyshRoomAverageRow(
+            sb,
+            "Avg cards added per combat",
+            agg.LuckyFyshCardsAddedInCombats,
+            agg.LuckyFyshCombatsHeld,
+            "Average cards added per combat — additions observed in Monster, Elite, and Boss rooms divided by those rooms entered while Lucky Fysh was held.");
+        AppendLuckyFyshRoomAverageRow(
+            sb,
+            "Avg cards added per shop",
+            agg.LuckyFyshCardsAddedInShops,
+            agg.LuckyFyshShopsHeld,
+            "Average cards added per merchant — additions observed in merchant rooms divided by the merchants entered while Lucky Fysh was held.");
+        AppendLuckyFyshRoomAverageRow(
+            sb,
+            "Avg cards added per event",
+            agg.LuckyFyshCardsAddedInEvents,
+            agg.LuckyFyshEventsHeld,
+            "Average cards added per event — additions observed in event rooms divided by the events entered while Lucky Fysh was held.");
+        AppendLuckyFyshRoomAverageRow(
+            sb,
+            "Avg cards added per campfire",
+            agg.LuckyFyshCardsAddedInCampfires,
+            agg.LuckyFyshCampfiresHeld,
+            "Average cards added per campfire — additions observed at rest sites divided by the rest sites entered while Lucky Fysh was held.");
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// One Lucky Fysh per-room average. Rooms of that type not yet entered
+    /// while the relic was held leave the average undefined rather than
+    /// reporting a zero the player could read as a measured result.
+    /// </summary>
+    private static void AppendLuckyFyshRoomAverageRow(
+        StringBuilder sb,
+        string label,
+        int cardsAdded,
+        int roomsHeld,
+        string fullDescription)
+    {
+        var value = roomsHeld <= 0
+            ? "not yet"
+            : FormatDecimal((decimal)cardsAdded / roomsHeld);
+        Row3(sb, label, value, "", fullDescription);
     }
 
     private static string BuildBowlerHatBodyBBCode(

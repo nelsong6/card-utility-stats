@@ -2493,6 +2493,46 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsLuckyFyshRoomAveragesFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("lucky-fysh-room-averages-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        var relicAgg = loaded.Data.RelicAggregates["RELIC.LUCKY_FYSH"];
+        Assert.Equal(4, relicAgg.FloorAcquired);
+        Assert.Equal(70, relicAgg.GoldGained);
+        Assert.Equal(6, relicAgg.CardsAddedToDeck);
+        Assert.Equal(2, relicAgg.CursesAddedToDeck);
+        Assert.Equal(3, relicAgg.LuckyFyshCardsAddedInCombats);
+        Assert.Equal(2, relicAgg.LuckyFyshCardsAddedInShops);
+        Assert.Equal(1, relicAgg.LuckyFyshCardsAddedInEvents);
+        Assert.Equal(0, relicAgg.LuckyFyshCardsAddedInCampfires);
+        Assert.Equal(6, relicAgg.LuckyFyshCombatsHeld);
+        Assert.Equal(2, relicAgg.LuckyFyshShopsHeld);
+        Assert.Equal(4, relicAgg.LuckyFyshEventsHeld);
+        Assert.Equal(3, relicAgg.LuckyFyshCampfiresHeld);
+        Assert.Equal(15, relicAgg.LuckyFyshLastCombatFloorHeld);
+        Assert.Equal(12, relicAgg.LuckyFyshLastShopFloorHeld);
+        Assert.Equal(14, relicAgg.LuckyFyshLastEventFloorHeld);
+        Assert.Equal(13, relicAgg.LuckyFyshLastCampfireFloorHeld);
+    }
+
+    [Fact]
+    public void HistoricalLoad_LuckyFyshRelicFixture_DefaultsNewRoomFieldsToZero()
+    {
+        var loaded = RunStorage.LoadHistorical(FixturePath("lucky-fysh-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        var relicAgg = loaded!.Data.RelicAggregates["RELIC.LUCKY_FYSH"];
+        Assert.Equal(0, relicAgg.CursesAddedToDeck);
+        Assert.Equal(0, relicAgg.LuckyFyshCardsAddedInCombats);
+        Assert.Equal(0, relicAgg.LuckyFyshCombatsHeld);
+        Assert.Null(relicAgg.LuckyFyshLastCombatFloorHeld);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsMawBankRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(FixturePath("maw-bank-relic-run.json"));
@@ -2653,6 +2693,28 @@ public class SchemaLoadingTests
         var relicAgg = resumed!.RelicAggregates["RELIC.LUCKY_FYSH"];
         Assert.Equal(45, relicAgg.GoldGained);
         Assert.Equal(3, relicAgg.CardsAddedToDeck);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsLuckyFyshRoomAveragesFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("lucky-fysh-room-averages-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.LUCKY_FYSH"];
+        Assert.Equal(70, relicAgg.GoldGained);
+        Assert.Equal(6, relicAgg.CardsAddedToDeck);
+        Assert.Equal(2, relicAgg.CursesAddedToDeck);
+        Assert.Equal(3, relicAgg.LuckyFyshCardsAddedInCombats);
+        Assert.Equal(2, relicAgg.LuckyFyshCardsAddedInShops);
+        Assert.Equal(1, relicAgg.LuckyFyshCardsAddedInEvents);
+        Assert.Equal(0, relicAgg.LuckyFyshCardsAddedInCampfires);
+        Assert.Equal(6, relicAgg.LuckyFyshCombatsHeld);
+        Assert.Equal(2, relicAgg.LuckyFyshShopsHeld);
+        Assert.Equal(4, relicAgg.LuckyFyshEventsHeld);
+        Assert.Equal(3, relicAgg.LuckyFyshCampfiresHeld);
+        Assert.Equal(15, relicAgg.LuckyFyshLastCombatFloorHeld);
     }
 
     [Fact]

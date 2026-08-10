@@ -311,6 +311,10 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `lucky-fysh-relic-run.json`
   Adds Lucky Fysh permanent-deck additions and the actual gold gained from
   those owner-specific callbacks.
+- `lucky-fysh-room-averages-run.json`
+  Adds curses among those permanent-deck additions, the additions split by the
+  room each was observed in, and the once-per-floor held-room counts and floor
+  markers that supply the per-combat/shop/event/campfire denominators.
 - `maw-bank-relic-run.json`
   Adds Maw Bank room-entry activations, observed gold gained, completed shops
   skipped without spending, gold spent outside shops while active, and the

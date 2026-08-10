@@ -2769,6 +2769,18 @@ public static class RunTracker
             : Math.Max(left.Value, right.Value);
 
     /// <summary>
+    /// Merges two once-per-floor de-duplication markers. The later floor wins
+    /// so a merged aggregate cannot re-count a floor either side already
+    /// counted.
+    /// </summary>
+    private static int? MaxFloorMarker(int? target, int? source)
+    {
+        if (!source.HasValue) return target;
+        if (!target.HasValue) return source;
+        return Math.Max(target.Value, source.Value);
+    }
+
+    /// <summary>
     /// Additive merge of one relic aggregate into another. The single home
     /// for relic-field accumulation (mirrors <c>MergeAggregateInto</c> /
     /// <c>MergeEnemyAggregateInto</c>) — used by both combat promotion and
@@ -2987,6 +2999,27 @@ public static class RunTracker
         target.OldCoinGoldGranted += source.OldCoinGoldGranted;
         target.OldCoinGoldSpent += source.OldCoinGoldSpent;
         target.CardsAddedToDeck += source.CardsAddedToDeck;
+        target.CursesAddedToDeck += source.CursesAddedToDeck;
+        target.LuckyFyshCardsAddedInCombats += source.LuckyFyshCardsAddedInCombats;
+        target.LuckyFyshCardsAddedInShops += source.LuckyFyshCardsAddedInShops;
+        target.LuckyFyshCardsAddedInEvents += source.LuckyFyshCardsAddedInEvents;
+        target.LuckyFyshCardsAddedInCampfires += source.LuckyFyshCardsAddedInCampfires;
+        target.LuckyFyshCombatsHeld += source.LuckyFyshCombatsHeld;
+        target.LuckyFyshShopsHeld += source.LuckyFyshShopsHeld;
+        target.LuckyFyshEventsHeld += source.LuckyFyshEventsHeld;
+        target.LuckyFyshCampfiresHeld += source.LuckyFyshCampfiresHeld;
+        target.LuckyFyshLastCombatFloorHeld = MaxFloorMarker(
+            target.LuckyFyshLastCombatFloorHeld,
+            source.LuckyFyshLastCombatFloorHeld);
+        target.LuckyFyshLastShopFloorHeld = MaxFloorMarker(
+            target.LuckyFyshLastShopFloorHeld,
+            source.LuckyFyshLastShopFloorHeld);
+        target.LuckyFyshLastEventFloorHeld = MaxFloorMarker(
+            target.LuckyFyshLastEventFloorHeld,
+            source.LuckyFyshLastEventFloorHeld);
+        target.LuckyFyshLastCampfireFloorHeld = MaxFloorMarker(
+            target.LuckyFyshLastCampfireFloorHeld,
+            source.LuckyFyshLastCampfireFloorHeld);
         target.CardRewardsSkipped += source.CardRewardsSkipped;
         target.GoldLost += source.GoldLost;
         target.GoldLossBlocked += source.GoldLossBlocked;
@@ -18575,13 +18608,19 @@ public static class RunTracker
 
     /// <summary>
     /// Record one completed Lucky Fysh permanent-deck callback and the actual
-    /// gold added to its tracked owner's balance.
+    /// gold added to its tracked owner's balance. The room observed when the
+    /// callback started attributes the addition to a combat, shop, event, or
+    /// campfire, and also counts that room as held so an addition can never
+    /// outnumber the rooms it is averaged over.
     /// </summary>
     public static void RecordLuckyFyshCardAdded(
         LuckyFysh relic,
         Player owner,
         int initialGold,
-        int currentGold)
+        int currentGold,
+        bool isCurse = false,
+        RoomType? roomType = null,
+        int? floor = null)
     {
         if (relic == null || owner == null) return;
 
@@ -18595,7 +18634,16 @@ public static class RunTracker
                     return;
 
                 var agg = GetOrCreateCurrentRunRelicAggregateLocked(LuckyFyshRelicId);
-                RecordLuckyFyshCardAddedForTest(agg, initialGold, currentGold);
+                RecordRelicFloorAcquiredForTest(
+                    agg,
+                    RelicFloorAddedToDeck(relic) ?? floor ?? CurrentRunFloorLocked());
+                RecordLuckyFyshCardAddedForTest(
+                    agg,
+                    initialGold,
+                    currentGold,
+                    isCurse,
+                    roomType,
+                    floor ?? CurrentRunFloorLocked());
                 SaveCurrentRun();
             }
             catch (Exception e)
@@ -18603,6 +18651,63 @@ public static class RunTracker
                 CoreMain.LogDebug($"RecordLuckyFyshCardAdded failed: {e.Message}");
             }
         }
+    }
+
+    /// <summary>
+    /// Counts one resolved room entered while Lucky Fysh is held. These are the
+    /// denominators for the relic's per-room averages, so they must count the
+    /// room whether or not it produced a deck addition.
+    /// </summary>
+    public static void RecordLuckyFyshRoomEntered(IRunState runState, AbstractRoom room)
+    {
+        if (runState == null || room == null) return;
+        if (LuckyFyshRoomCategory(room.RoomType) == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (_currentRun == null && RunManager.Instance?.IsInProgress != true)
+                    return;
+
+                var player = GetTrackedRunPlayerLocked();
+                var relic = player?.Relics.OfType<LuckyFysh>().FirstOrDefault();
+                if (relic == null) return;
+
+                if (!TryEnsureCurrentRunLocked()) return;
+
+                var floor = Math.Max(0, runState.TotalFloor);
+                var agg = GetOrCreateCurrentRunRelicAggregateLocked(LuckyFyshRelicId);
+                RecordRelicFloorAcquiredForTest(
+                    agg,
+                    RelicFloorAddedToDeck(relic) ?? floor);
+                if (!RecordLuckyFyshRoomHeldForTest(agg, room.RoomType, floor)) return;
+
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordLuckyFyshRoomEntered failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// The Lucky Fysh room bucket a resolved room type belongs to, or null for
+    /// room types the relic's averages do not describe.
+    /// </summary>
+    private static string? LuckyFyshRoomCategory(RoomType? roomType)
+    {
+        if (IsCombatRoomType(roomType)) return "combat";
+
+        return roomType switch
+        {
+            RoomType.Shop => "shop",
+            RoomType.Event => "event",
+            RoomType.RestSite => "campfire",
+            _ => null,
+        };
     }
 
     /// <summary>
@@ -20454,12 +20559,84 @@ public static class RunTracker
     internal static void RecordLuckyFyshCardAddedForTest(
         RelicAggregate agg,
         int initialGold,
-        int currentGold)
+        int currentGold,
+        bool isCurse = false,
+        RoomType? roomType = null,
+        int? floor = null)
     {
         if (agg == null) return;
 
         agg.CardsAddedToDeck++;
         agg.GoldGained += Math.Max(0, currentGold - initialGold);
+        if (isCurse) agg.CursesAddedToDeck++;
+
+        switch (LuckyFyshRoomCategory(roomType))
+        {
+            case "combat":
+                agg.LuckyFyshCardsAddedInCombats++;
+                break;
+            case "shop":
+                agg.LuckyFyshCardsAddedInShops++;
+                break;
+            case "event":
+                agg.LuckyFyshCardsAddedInEvents++;
+                break;
+            case "campfire":
+                agg.LuckyFyshCardsAddedInCampfires++;
+                break;
+            default:
+                return;
+        }
+
+        RecordLuckyFyshRoomHeldForTest(agg, roomType, floor);
+    }
+
+    /// <summary>
+    /// Counts one room of the given type as held by Lucky Fysh, once per floor.
+    /// Returns whether the room was newly counted. A null floor still counts
+    /// the room, because an addition observed without a known floor is better
+    /// represented by a denominator of one than by zero.
+    /// </summary>
+    internal static bool RecordLuckyFyshRoomHeldForTest(
+        RelicAggregate agg,
+        RoomType? roomType,
+        int? floor)
+    {
+        if (agg == null) return false;
+
+        var category = LuckyFyshRoomCategory(roomType);
+        if (category == null) return false;
+
+        var marker = floor.HasValue ? Math.Max(0, floor.Value) : (int?)null;
+        switch (category)
+        {
+            case "combat":
+                if (marker.HasValue && agg.LuckyFyshLastCombatFloorHeld == marker)
+                    return false;
+                agg.LuckyFyshLastCombatFloorHeld = marker ?? agg.LuckyFyshLastCombatFloorHeld;
+                agg.LuckyFyshCombatsHeld++;
+                return true;
+            case "shop":
+                if (marker.HasValue && agg.LuckyFyshLastShopFloorHeld == marker)
+                    return false;
+                agg.LuckyFyshLastShopFloorHeld = marker ?? agg.LuckyFyshLastShopFloorHeld;
+                agg.LuckyFyshShopsHeld++;
+                return true;
+            case "event":
+                if (marker.HasValue && agg.LuckyFyshLastEventFloorHeld == marker)
+                    return false;
+                agg.LuckyFyshLastEventFloorHeld = marker ?? agg.LuckyFyshLastEventFloorHeld;
+                agg.LuckyFyshEventsHeld++;
+                return true;
+            case "campfire":
+                if (marker.HasValue && agg.LuckyFyshLastCampfireFloorHeld == marker)
+                    return false;
+                agg.LuckyFyshLastCampfireFloorHeld = marker ?? agg.LuckyFyshLastCampfireFloorHeld;
+                agg.LuckyFyshCampfiresHeld++;
+                return true;
+            default:
+                return false;
+        }
     }
 
     internal static void RecordBingBongCardAddedForTest(
