@@ -126,6 +126,22 @@ This distinction is easy to blur because tooltips merge committed and pending da
 
 When implementing new combat attribution, write it into `_pendingCombat` first unless the event is truly outside combat, such as card arrival/removal/upgrade lineage. Promotion should stay centralized in `PromotePendingCombatIntoRun` and its two callers.
 
+## The Run Save Is A Room-Boundary Snapshot
+
+The game's run save holds **no combat state at all**. `SerializableRun` carries acts, modifiers, map history, RNG sets, an optional `PreFinishedRoom`, and a `SerializablePlayer` list (HP, gold, deck, relics, potions, discoveries). There is no hand, no draw/discard/exhaust pile, no enemy, no power, no block, no turn number, and no `SerializableCombat` type anywhere in the assembly.
+
+That is by design, and the write points are what make it coherent:
+
+- `RunManager.EnterMapPointInternal` calls `SaveManager.Instance.SaveRun(null)` on map-node entry — *before* the room type is rolled and the room is created.
+- `CombatManager` saves again at victory, via `room.MarkPreFinished()` then `SaveRun(room, saveProgress: false)`, so continuing lands in the post-combat reward state instead of refighting.
+- Nothing is written during a fight.
+
+The consequence worth remembering: **for the entire duration of a combat, `current_run.save` on disk is that combat's opening state**, RNG included. Reloading it replays the identical encounter and shuffle, because `LoadIntoLatestMapCoord` re-rolls the room from restored RNG. This is also why save-and-quit mid-combat rewinds the fight, and why abandoning mid-combat must discard `_pendingCombat`.
+
+`Core/CombatResetter.cs` is built directly on this: restarting a combat needs no snapshot of SpireLens' own, only a replay of the save the game already wrote. Its load sequence mirrors the main menu's Continue button (`RunState.FromSerializable` → `SetUpSavedSingleplayer` → `NGame.LoadRun`), with `RunManager.CleanUp()` inserted first because `SetUpSavedSingleplayer` throws while `RunManager.State` is non-null. `CleanUp` is the Save-and-Quit/Abandon teardown: it sets `ShouldSave = false` (the half-played fight can never overwrite the save), calls `CombatManager.Reset(graceful)`, and nulls `State`, but does **not** call `RunManager.OnEnded` — so no run outcome is stamped and no `RunEnded` fires. Because the result is the Continue path, `RunStarted` re-fires with the same `_startTime` and the existing adoption logic below handles it, including the `_pendingCombat` discard that keeps the abandoned attempt out of the run record.
+
+Note that `SetUpSavedSingleplayer` awaits `SaveManager.IncrementNumReloads`, so every restart increments the save's `num_reloads`.
+
 ## RunStarted Is Not Deck-Ready
 
 Do not use `RunStarted` as the source of truth for starter deck population.
