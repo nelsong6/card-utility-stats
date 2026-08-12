@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Helpers;
@@ -40,6 +41,15 @@ namespace SpireLens.Core;
 /// </summary>
 public static class CombatResetter
 {
+    // The game's own transitions default to 0.8s each, which is right for a
+    // deliberate main-menu Continue and far too slow for a retry the player
+    // wants to feel instant. These are not zero because the run scene is torn
+    // down and rebuilt in between: an uncovered swap shows a frame or two of
+    // half-destroyed scene. Short enough to read as a blink, long enough to
+    // hide the rebuild.
+    private const float FadeOutSeconds = 0.12f;
+    private const float FadeInSeconds = 0.18f;
+
     private static bool _restartInProgress;
 
     /// <summary>
@@ -123,20 +133,41 @@ public static class CombatResetter
                 $"CombatResetter: restarting combat from run save (source={source}, " +
                 $"floor={save.MapPointHistory?.Count}, pre_finished_room={save.PreFinishedRoom?.RoomType.ToString() ?? "none"})");
 
+            // Per-phase timing, because the remaining cost after the fades is
+            // the game's own reload work and it is worth knowing which part
+            // dominates before trying to cut any of it.
+            var total = Stopwatch.StartNew();
+            var phase = Stopwatch.StartNew();
+
             NAudioManager.Instance?.StopMusic();
-            await game.Transition.FadeOut();
+            await game.Transition.FadeOut(FadeOutSeconds);
+            var fadeOutMs = phase.ElapsedMilliseconds; phase.Restart();
 
             // Frees RunManager.State so SetUpSavedSingleplayer will accept the
             // reloaded state, and suppresses any further save of the abandoned
             // fight on the way out.
             RunManager.Instance.CleanUp();
+            var cleanUpMs = phase.ElapsedMilliseconds; phase.Restart();
 
+            // Note: this awaits SaveManager.IncrementNumReloads, which writes
+            // the run save to disk before returning.
             await RunManager.Instance.SetUpSavedSingleplayer(runState, save);
-            game.ReactionContainer.InitializeNetworking(new NetSingleplayerGameService());
-            await game.LoadRun(runState, save.PreFinishedRoom);
-            await game.Transition.FadeIn();
+            var setUpMs = phase.ElapsedMilliseconds; phase.Restart();
 
-            CoreMain.Logger.Info("CombatResetter: combat restart complete");
+            game.ReactionContainer.InitializeNetworking(new NetSingleplayerGameService());
+
+            // Asset preload, NRun scene rebuild, map load, room entry and the
+            // normal combat intro all happen inside here.
+            await game.LoadRun(runState, save.PreFinishedRoom);
+            var loadRunMs = phase.ElapsedMilliseconds; phase.Restart();
+
+            await game.Transition.FadeIn(FadeInSeconds);
+            var fadeInMs = phase.ElapsedMilliseconds;
+
+            CoreMain.Logger.Info(
+                $"CombatResetter: combat restart complete in {total.ElapsedMilliseconds}ms " +
+                $"(fade_out={fadeOutMs}ms, clean_up={cleanUpMs}ms, set_up_saved={setUpMs}ms, " +
+                $"load_run={loadRunMs}ms, fade_in={fadeInMs}ms)");
         }
         catch (Exception e)
         {
