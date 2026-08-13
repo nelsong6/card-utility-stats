@@ -38,15 +38,56 @@ internal static class RunTimeStatsTracker
             };
             Action handler = SampleNow;
             timer.Timeout += handler;
-            tree.Root.AddChild(timer);
             _timer = timer;
             _timeoutHandler = handler;
+            AttachSamplerDeferred(timer);
             SampleNow();
         }
         catch (Exception exception)
         {
             CoreMain.Logger.Error(
                 $"RunTimeStatsTracker initialization failed: {exception}");
+        }
+    }
+
+    /// <summary>
+    /// Attaches the sampler on the next idle frame instead of inline. On a cold
+    /// start <see cref="CoreMain.Initialize"/> runs from inside
+    /// <c>NGame._EnterTree</c>, and Godot refuses <c>add_child</c> on a node
+    /// that is still setting up its own children. That refusal is a printed
+    /// engine error, not a managed exception, so the direct call left the
+    /// sampler parentless — silently never ticking for the rest of the process
+    /// — while initialization reported success. A hot reload never reproduced
+    /// it, because by then <c>_EnterTree</c> is long finished. See "Core Loads
+    /// Before The Scene Tree Accepts New Children" in
+    /// docs/sts2-runtime-primer.md.
+    /// </summary>
+    private static void AttachSamplerDeferred(Godot.Timer timer)
+        => Callable.From(() => AttachSampler(timer)).CallDeferred();
+
+    private static void AttachSampler(Godot.Timer timer)
+    {
+        try
+        {
+            // A Shutdown between the deferral and this frame (rapid reload)
+            // clears _timer; attaching that orphan would resurrect a sampler
+            // the previous Core already tore down.
+            if (!IsLive(timer)
+                || !ReferenceEquals(timer, _timer)
+                || timer.GetParent() != null
+                || Engine.GetMainLoop() is not SceneTree tree)
+            {
+                return;
+            }
+
+            tree.Root.AddChild(timer);
+            CoreMain.Logger.Info(
+                "Run time sampler attached (1s tick, deferred add_child).");
+        }
+        catch (Exception exception)
+        {
+            CoreMain.Logger.Error(
+                $"RunTimeStatsTracker attach failed: {exception}");
         }
     }
 
