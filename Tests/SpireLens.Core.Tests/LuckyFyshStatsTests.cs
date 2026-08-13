@@ -46,6 +46,10 @@ public class LuckyFyshStatsTests
         Assert.Equal(0, agg.LuckyFyshCardsAddedInShops);
         Assert.Equal(0, agg.LuckyFyshCardsAddedInEvents);
         Assert.Equal(0, agg.LuckyFyshCardsAddedInCampfires);
+        Assert.Equal(0, agg.LuckyFyshGoldGainedInCombats);
+        Assert.Equal(0, agg.LuckyFyshGoldGainedInShops);
+        Assert.Equal(0, agg.LuckyFyshGoldGainedInEvents);
+        Assert.Equal(0, agg.LuckyFyshGoldGainedInCampfires);
         Assert.Equal(0, agg.LuckyFyshCombatsHeld);
         Assert.Equal(0, agg.LuckyFyshShopsHeld);
         Assert.Equal(0, agg.LuckyFyshEventsHeld);
@@ -72,6 +76,10 @@ public class LuckyFyshStatsTests
         Assert.Contains("\"lucky_fysh_cards_added_in_shops\"", json);
         Assert.Contains("\"lucky_fysh_cards_added_in_events\"", json);
         Assert.Contains("\"lucky_fysh_cards_added_in_campfires\"", json);
+        Assert.Contains("\"lucky_fysh_gold_gained_in_combats\"", json);
+        Assert.Contains("\"lucky_fysh_gold_gained_in_shops\"", json);
+        Assert.Contains("\"lucky_fysh_gold_gained_in_events\"", json);
+        Assert.Contains("\"lucky_fysh_gold_gained_in_campfires\"", json);
         Assert.Contains("\"lucky_fysh_combats_held\"", json);
         Assert.Contains("\"lucky_fysh_shops_held\"", json);
         Assert.Contains("\"lucky_fysh_events_held\"", json);
@@ -123,21 +131,29 @@ public class LuckyFyshStatsTests
     }
 
     [Fact]
-    public void RunTracker_LuckyFyshHelper_SplitsAdditionsByObservedRoom()
+    public void RunTracker_LuckyFyshHelper_SplitsAdditionsAndGoldByObservedRoom()
     {
         var agg = new RelicAggregate();
 
         RunTracker.RecordLuckyFyshCardAddedForTest(agg, 0, 15, false, RoomType.Monster, 5);
-        RunTracker.RecordLuckyFyshCardAddedForTest(agg, 15, 30, false, RoomType.Shop, 6);
-        RunTracker.RecordLuckyFyshCardAddedForTest(agg, 30, 45, true, RoomType.Event, 7);
-        RunTracker.RecordLuckyFyshCardAddedForTest(agg, 45, 60, false, RoomType.RestSite, 8);
-        RunTracker.RecordLuckyFyshCardAddedForTest(agg, 60, 75, false, RoomType.Treasure, 9);
+        RunTracker.RecordLuckyFyshCardAddedForTest(agg, 15, 35, false, RoomType.Shop, 6);
+        RunTracker.RecordLuckyFyshCardAddedForTest(agg, 35, 60, true, RoomType.Event, 7);
+        RunTracker.RecordLuckyFyshCardAddedForTest(agg, 60, 90, false, RoomType.RestSite, 8);
+        RunTracker.RecordLuckyFyshCardAddedForTest(agg, 90, 125, false, RoomType.Treasure, 9);
 
         Assert.Equal(5, agg.CardsAddedToDeck);
         Assert.Equal(1, agg.LuckyFyshCardsAddedInCombats);
         Assert.Equal(1, agg.LuckyFyshCardsAddedInShops);
         Assert.Equal(1, agg.LuckyFyshCardsAddedInEvents);
         Assert.Equal(1, agg.LuckyFyshCardsAddedInCampfires);
+        Assert.Equal(15, agg.LuckyFyshGoldGainedInCombats);
+        Assert.Equal(20, agg.LuckyFyshGoldGainedInShops);
+        Assert.Equal(25, agg.LuckyFyshGoldGainedInEvents);
+        Assert.Equal(30, agg.LuckyFyshGoldGainedInCampfires);
+
+        // The Treasure-room addition has no bucket, so its 35 gold reaches the
+        // lifetime total without landing in any split.
+        Assert.Equal(125, agg.GoldGained);
     }
 
     [Fact]
@@ -182,6 +198,10 @@ public class LuckyFyshStatsTests
             LuckyFyshCardsAddedInShops = 1,
             LuckyFyshCardsAddedInEvents = 0,
             LuckyFyshCardsAddedInCampfires = 1,
+            LuckyFyshGoldGainedInCombats = 10,
+            LuckyFyshGoldGainedInShops = 12,
+            LuckyFyshGoldGainedInEvents = 0,
+            LuckyFyshGoldGainedInCampfires = 9,
             LuckyFyshCombatsHeld = 2,
             LuckyFyshShopsHeld = 1,
             LuckyFyshEventsHeld = 1,
@@ -200,6 +220,10 @@ public class LuckyFyshStatsTests
             LuckyFyshCardsAddedInShops = 0,
             LuckyFyshCardsAddedInEvents = 1,
             LuckyFyshCardsAddedInCampfires = 0,
+            LuckyFyshGoldGainedInCombats = 14,
+            LuckyFyshGoldGainedInShops = 0,
+            LuckyFyshGoldGainedInEvents = 16,
+            LuckyFyshGoldGainedInCampfires = 0,
             LuckyFyshCombatsHeld = 2,
             LuckyFyshShopsHeld = 1,
             LuckyFyshEventsHeld = 1,
@@ -247,25 +271,25 @@ public class LuckyFyshStatsTests
     [Fact]
     public void RelicTooltip_LuckyFysh_DividesEachRoomAverageByItsHeldRooms()
     {
-        var agg = new RelicAggregate
-        {
-            CardsAddedToDeck = 6,
-            LuckyFyshCardsAddedInCombats = 3,
-            LuckyFyshCardsAddedInShops = 2,
-            LuckyFyshCardsAddedInEvents = 1,
-            LuckyFyshCombatsHeld = 6,
-            LuckyFyshShopsHeld = 2,
-            LuckyFyshEventsHeld = 4,
-            FloorAcquired = 3,
-        };
-
-        var body = BuildBody(agg, currentFloor: 14);
+        var body = BuildBody(RateAggregate(), currentFloor: 14);
 
         // 6 additions over floors 3..14 inclusive, 3 over 6 combats, 2 over
         // 2 merchants, 1 over 4 events.
         Assert.Contains("[b]0.5[/b]", body);
         Assert.Contains("[b]1[/b]", body);
         Assert.Contains("[b]0.25[/b]", body);
+    }
+
+    [Fact]
+    public void RelicTooltip_LuckyFysh_SplitsTheGoldHalfOfEachRateBesideTheCards()
+    {
+        var body = BuildBody(RateAggregate(), currentFloor: 14);
+
+        // Same denominators as the card halves: 90 gold over 12 floors, 45
+        // over 6 combats, 30 over 2 merchants, 15 over 4 events.
+        Assert.Contains(" 7.5[/color]", body);
+        Assert.Contains(" 15[/color]", body);
+        Assert.Contains(" 3.75[/color]", body);
     }
 
     [Fact]
@@ -296,6 +320,27 @@ public class LuckyFyshStatsTests
         Assert.Contains("Curses added to deck", body);
     }
 
+    /// <summary>
+    /// Divides evenly against a floor 3 pickup viewed on floor 14, so every
+    /// rate in the tooltip is an exact decimal on both halves of the split.
+    /// </summary>
+    private static RelicAggregate RateAggregate()
+        => new()
+        {
+            FloorAcquired = 3,
+            GoldGained = 90,
+            CardsAddedToDeck = 6,
+            LuckyFyshCardsAddedInCombats = 3,
+            LuckyFyshCardsAddedInShops = 2,
+            LuckyFyshCardsAddedInEvents = 1,
+            LuckyFyshGoldGainedInCombats = 45,
+            LuckyFyshGoldGainedInShops = 30,
+            LuckyFyshGoldGainedInEvents = 15,
+            LuckyFyshCombatsHeld = 6,
+            LuckyFyshShopsHeld = 2,
+            LuckyFyshEventsHeld = 4,
+        };
+
     private static RelicAggregate PopulatedAggregate()
         => new()
         {
@@ -306,6 +351,10 @@ public class LuckyFyshStatsTests
             LuckyFyshCardsAddedInShops = 1,
             LuckyFyshCardsAddedInEvents = 1,
             LuckyFyshCardsAddedInCampfires = 1,
+            LuckyFyshGoldGainedInCombats = 24,
+            LuckyFyshGoldGainedInShops = 12,
+            LuckyFyshGoldGainedInEvents = 16,
+            LuckyFyshGoldGainedInCampfires = 9,
             LuckyFyshCombatsHeld = 4,
             LuckyFyshShopsHeld = 2,
             LuckyFyshEventsHeld = 2,
@@ -325,6 +374,10 @@ public class LuckyFyshStatsTests
         Assert.Equal(1, agg.LuckyFyshCardsAddedInShops);
         Assert.Equal(1, agg.LuckyFyshCardsAddedInEvents);
         Assert.Equal(1, agg.LuckyFyshCardsAddedInCampfires);
+        Assert.Equal(24, agg.LuckyFyshGoldGainedInCombats);
+        Assert.Equal(12, agg.LuckyFyshGoldGainedInShops);
+        Assert.Equal(16, agg.LuckyFyshGoldGainedInEvents);
+        Assert.Equal(9, agg.LuckyFyshGoldGainedInCampfires);
         Assert.Equal(4, agg.LuckyFyshCombatsHeld);
         Assert.Equal(2, agg.LuckyFyshShopsHeld);
         Assert.Equal(2, agg.LuckyFyshEventsHeld);

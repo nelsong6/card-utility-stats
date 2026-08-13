@@ -3004,6 +3004,10 @@ public static class RunTracker
         target.LuckyFyshCardsAddedInShops += source.LuckyFyshCardsAddedInShops;
         target.LuckyFyshCardsAddedInEvents += source.LuckyFyshCardsAddedInEvents;
         target.LuckyFyshCardsAddedInCampfires += source.LuckyFyshCardsAddedInCampfires;
+        target.LuckyFyshGoldGainedInCombats += source.LuckyFyshGoldGainedInCombats;
+        target.LuckyFyshGoldGainedInShops += source.LuckyFyshGoldGainedInShops;
+        target.LuckyFyshGoldGainedInEvents += source.LuckyFyshGoldGainedInEvents;
+        target.LuckyFyshGoldGainedInCampfires += source.LuckyFyshGoldGainedInCampfires;
         target.LuckyFyshCombatsHeld += source.LuckyFyshCombatsHeld;
         target.LuckyFyshShopsHeld += source.LuckyFyshShopsHeld;
         target.LuckyFyshEventsHeld += source.LuckyFyshEventsHeld;
@@ -20566,23 +20570,28 @@ public static class RunTracker
     {
         if (agg == null) return;
 
+        var gained = Math.Max(0, currentGold - initialGold);
         agg.CardsAddedToDeck++;
-        agg.GoldGained += Math.Max(0, currentGold - initialGold);
+        agg.GoldGained += gained;
         if (isCurse) agg.CursesAddedToDeck++;
 
         switch (LuckyFyshRoomCategory(roomType))
         {
             case "combat":
                 agg.LuckyFyshCardsAddedInCombats++;
+                agg.LuckyFyshGoldGainedInCombats += gained;
                 break;
             case "shop":
                 agg.LuckyFyshCardsAddedInShops++;
+                agg.LuckyFyshGoldGainedInShops += gained;
                 break;
             case "event":
                 agg.LuckyFyshCardsAddedInEvents++;
+                agg.LuckyFyshGoldGainedInEvents += gained;
                 break;
             case "campfire":
                 agg.LuckyFyshCardsAddedInCampfires++;
+                agg.LuckyFyshGoldGainedInCampfires += gained;
                 break;
             default:
                 return;

@@ -1478,6 +1478,14 @@ public class RelicAggregate
     public int LuckyFyshCardsAddedInEvents { get; set; }
     public int LuckyFyshCardsAddedInCampfires { get; set; }
 
+    // The observed gold those same additions paid out, on the same split.
+    // These sum to at most GoldGained, which also covers additions in rooms
+    // outside the four buckets.
+    public int LuckyFyshGoldGainedInCombats { get; set; }
+    public int LuckyFyshGoldGainedInShops { get; set; }
+    public int LuckyFyshGoldGainedInEvents { get; set; }
+    public int LuckyFyshGoldGainedInCampfires { get; set; }
+
     // Rooms of each type entered while Lucky Fysh was held — the denominators
     // for its per-room averages. A room counts once per floor, and a room
     // where an addition was observed always counts even if the relic arrived
