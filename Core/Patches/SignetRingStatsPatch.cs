@@ -7,9 +7,11 @@ using MegaCrit.Sts2.Core.Runs;
 namespace SpireLens.Core.Patches;
 
 /// <summary>
-/// Observes the first real merchant room reached after Signet Ring enters the
-/// run. Patching the resolved room hook includes shops rolled from ? nodes,
-/// while excluding screens that merely display shop-like content.
+/// Shared observer for resolved room entry. Patching the resolved room hook
+/// includes rooms rolled from ? nodes, while excluding screens that merely
+/// display room-like content — which is what Signet Ring's first-merchant
+/// measurement, the map legend, the run gold rooms, and Lucky Fysh's held-room
+/// denominators all need.
 /// </summary>
 [HarmonyPatch(typeof(Hook), nameof(Hook.AfterRoomEntered))]
 public static class SignetRingStatsPatch
@@ -21,6 +23,7 @@ public static class SignetRingStatsPatch
         {
             RunTracker.RecordMapLegendRoomEntered(runState, room);
             RunTracker.RecordRunGoldRoomEntered(runState, room);
+            RunTracker.RecordLuckyFyshRoomEntered(runState, room);
             if (room is MerchantRoom)
                 RunTracker.RecordSignetRingShopReached(runState, room);
         }

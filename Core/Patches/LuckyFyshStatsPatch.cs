@@ -5,6 +5,7 @@ using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Relics;
+using MegaCrit.Sts2.Core.Rooms;
 
 namespace SpireLens.Core.Patches;
 
@@ -12,7 +13,10 @@ namespace SpireLens.Core.Patches;
 /// Observes Lucky Fysh at its owner-specific permanent-deck callback. The
 /// callback awaits its exact gold command, so the completed owner balance
 /// reveals the actual modified gain while the matched callback confirms one
-/// card was successfully added to the permanent deck.
+/// card was successfully added to the permanent deck. Card type and the
+/// owner's room are read before the await, so a curse stays a curse and the
+/// addition is attributed to the room it actually happened in rather than
+/// whichever room the awaited command lands in.
 /// </summary>
 [HarmonyPatch(typeof(LuckyFysh), nameof(LuckyFysh.AfterCardChangedPiles))]
 public static class LuckyFyshStatsPatch
@@ -33,7 +37,14 @@ public static class LuckyFyshStatsPatch
             var owner = __instance.Owner;
             if (owner == null || card.Owner != owner) return;
 
-            __state = new LuckyFyshState(__instance, owner, owner.Gold);
+            var runState = owner.RunState;
+            __state = new LuckyFyshState(
+                __instance,
+                owner,
+                owner.Gold,
+                card.Type == CardType.Curse,
+                runState?.CurrentRoom?.RoomType,
+                runState?.TotalFloor);
         }
         catch (Exception e)
         {
@@ -65,7 +76,10 @@ public static class LuckyFyshStatsPatch
                 state.Relic!,
                 state.Owner!,
                 state.InitialGold,
-                state.Owner!.Gold);
+                state.Owner!.Gold,
+                state.IsCurse,
+                state.RoomType,
+                state.Floor);
         }
         catch (Exception e)
         {
@@ -76,5 +90,8 @@ public static class LuckyFyshStatsPatch
     public readonly record struct LuckyFyshState(
         LuckyFysh? Relic,
         Player? Owner,
-        int InitialGold);
+        int InitialGold,
+        bool IsCurse = false,
+        RoomType? RoomType = null,
+        int? Floor = null);
 }

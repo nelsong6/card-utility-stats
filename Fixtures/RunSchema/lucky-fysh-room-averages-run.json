@@ -1,0 +1,31 @@
+{
+  "run_id": "lucky-fysh-room-averages-fixture",
+  "started_at": "2026-08-09T08:00:00Z",
+  "updated_at": "2026-08-09T08:40:00Z",
+  "outcome": "in_progress",
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.LUCKY_FYSH": {
+      "floor_acquired": 4,
+      "gold_gained": 70,
+      "cards_added_to_deck": 6,
+      "curses_added_to_deck": 2,
+      "lucky_fysh_cards_added_in_combats": 3,
+      "lucky_fysh_cards_added_in_shops": 2,
+      "lucky_fysh_cards_added_in_events": 1,
+      "lucky_fysh_cards_added_in_campfires": 0,
+      "lucky_fysh_combats_held": 6,
+      "lucky_fysh_shops_held": 2,
+      "lucky_fysh_events_held": 4,
+      "lucky_fysh_campfires_held": 3,
+      "lucky_fysh_last_combat_floor_held": 15,
+      "lucky_fysh_last_shop_floor_held": 12,
+      "lucky_fysh_last_event_floor_held": 14,
+      "lucky_fysh_last_campfire_floor_held": 13
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

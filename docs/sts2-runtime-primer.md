@@ -1260,6 +1260,22 @@ task, count the confirmed deck addition only after successful completion, and
 measure the owner's completed gold-balance delta so gold modifiers or
 prevention are reflected instead of assuming its base 15 gold.
 
+Read the added card's `CardType` and the owner's `RunState.CurrentRoom` in the
+prefix, before the await. The card type is what makes a Curse addition
+countable, and the pre-await room is the room the addition actually happened
+in — the awaited gold command can resolve after a room transition, so reading
+`CurrentRoom` in the continuation would attribute the add to the wrong room.
+Combat additions cover Monster, Elite, and Boss rooms, because card rewards
+resolve while the player is still standing in the combat room.
+
+Denominators for the relic's per-room averages come from the shared resolved
+`Hook.AfterRoomEntered` prefix, counted once per floor per room type while the
+relic is held. That hook fires for the resolved room, so ? nodes land in the
+bucket they actually became. It cannot see a room the player was already
+standing in when the relic arrived, so the deck-addition path counts its own
+room too; the once-per-floor marker keeps the two paths from double-counting
+and keeps Continue and Core reloads idempotent.
+
 Bowler Hat applies its 25% multiplier through the central
 `PlayerCmd.GainGold` → `Hook.ModifyGoldGained` path without filtering the
 source. It therefore affects normal Gold rewards (including stolen gold being

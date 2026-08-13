@@ -1468,6 +1468,32 @@ public class RelicAggregate
     // callback. Used by Lucky Fysh and Book of Five Rings.
     public int CardsAddedToDeck { get; set; }
 
+    // Curses among those confirmed permanent-deck additions.
+    public int CursesAddedToDeck { get; set; }
+
+    // Lucky Fysh's confirmed permanent-deck additions split by the room the
+    // add was observed in. Combats cover Monster, Elite, and Boss rooms.
+    public int LuckyFyshCardsAddedInCombats { get; set; }
+    public int LuckyFyshCardsAddedInShops { get; set; }
+    public int LuckyFyshCardsAddedInEvents { get; set; }
+    public int LuckyFyshCardsAddedInCampfires { get; set; }
+
+    // Rooms of each type entered while Lucky Fysh was held — the denominators
+    // for its per-room averages. A room counts once per floor, and a room
+    // where an addition was observed always counts even if the relic arrived
+    // after the room-entered hook had already run.
+    public int LuckyFyshCombatsHeld { get; set; }
+    public int LuckyFyshShopsHeld { get; set; }
+    public int LuckyFyshEventsHeld { get; set; }
+    public int LuckyFyshCampfiresHeld { get; set; }
+
+    // Last floor already counted into each held total, keeping Continue and
+    // Core reload callbacks idempotent.
+    public int? LuckyFyshLastCombatFloorHeld { get; set; }
+    public int? LuckyFyshLastShopFloorHeld { get; set; }
+    public int? LuckyFyshLastEventFloorHeld { get; set; }
+    public int? LuckyFyshLastCampfireFloorHeld { get; set; }
+
     // Completed outer card rewards skipped while Book of Five Rings was held.
     public int CardRewardsSkipped { get; set; }
 
