@@ -17,8 +17,8 @@ public static class SpireLensOptionsMenu
 {
     private const int Layer = 1000;
 
-    /// <summary>Row index of the destructive "restart combat" action.</summary>
-    private const int RestartCombatIndex = 8;
+    /// <summary>Row index of the destructive "restart this room" action.</summary>
+    private const int RestartRoomIndex = 8;
 
     private static CanvasLayer? _layer;
     private static readonly List<Button> Checkboxes = new();
@@ -26,7 +26,7 @@ public static class SpireLensOptionsMenu
     private static readonly List<Button> CheckboxIndicators = new();
     private static readonly List<Panel> SelectionHighlights = new();
     private static readonly Dictionary<int, Action> RowActions = new();
-    private static Button? _restartCombatButton;
+    private static Button? _restartRoomButton;
     private static bool _restartArmed;
     private static int _selectedIndex;
     private static int _leftStickVerticalDirection;
@@ -54,7 +54,7 @@ public static class SpireLensOptionsMenu
 
         RefreshCheckboxes();
         _restartArmed = false;
-        RefreshRestartCombatRow();
+        RefreshRestartRoomRow();
         _layer!.Visible = true;
         _selectedIndex = Math.Clamp(_selectedIndex, 0, SelectableButtons.Count - 1);
         _leftStickVerticalDirection = 0;
@@ -69,7 +69,7 @@ public static class SpireLensOptionsMenu
         if (_layer == null || !GodotObject.IsInstanceValid(_layer)) return;
         _layer.Visible = false;
         _restartArmed = false;
-        RefreshRestartCombatRow();
+        RefreshRestartRoomRow();
         CoreMain.Logger.Info($"SpireLens options menu closed ({source})");
     }
 
@@ -127,7 +127,7 @@ public static class SpireLensOptionsMenu
         CheckboxIndicators.Clear();
         SelectionHighlights.Clear();
         RowActions.Clear();
-        _restartCombatButton = null;
+        _restartRoomButton = null;
         _restartArmed = false;
         _selectedIndex = 0;
         _leftStickVerticalDirection = 0;
@@ -204,12 +204,12 @@ public static class SpireLensOptionsMenu
         var practiceHeader = NewLabel("Practice", 20);
         practiceHeader.Modulate = new Color(0.72f, 0.8f, 0.92f);
         rows.AddChild(practiceHeader);
-        _restartCombatButton = AddAction(
+        _restartRoomButton = AddAction(
             rows,
-            "Restart this combat",
-            RestartCombatIndex,
-            OnRestartCombatActivated);
-        RefreshRestartCombatRow();
+            "Restart this room",
+            RestartRoomIndex,
+            OnRestartRoomActivated);
+        RefreshRestartRoomRow();
 
         var close = new Button
         {
@@ -404,10 +404,10 @@ public static class SpireLensOptionsMenu
 
         // Moving off the armed destructive row cancels the confirmation, so a
         // stray Enter/A elsewhere in the menu can never land on it.
-        if (_restartArmed && _selectedIndex != RestartCombatIndex)
+        if (_restartArmed && _selectedIndex != RestartRoomIndex)
         {
             _restartArmed = false;
-            RefreshRestartCombatRow();
+            RefreshRestartRoomRow();
         }
 
         RefreshSelectionHighlight();
@@ -516,50 +516,57 @@ public static class SpireLensOptionsMenu
     }
 
     /// <summary>
-    /// Two-step confirm. Restarting discards the fight in progress, so the
-    /// first activation only arms the row and the second one commits.
+    /// Two-step confirm. Restarting discards everything done in the room so
+    /// far, so the first activation only arms the row and the second commits.
     /// </summary>
-    private static void OnRestartCombatActivated()
+    private static void OnRestartRoomActivated()
     {
-        var blocked = CombatResetter.BlockedReason();
-        if (blocked != null)
+        var availability = RoomResetter.Describe();
+        if (!availability.CanRestart)
         {
             _restartArmed = false;
-            RefreshRestartCombatRow();
-            CoreMain.Logger.Info($"SpireLens options: restart combat unavailable ({blocked})");
+            RefreshRestartRoomRow();
+            CoreMain.Logger.Info(
+                $"SpireLens options: restart room unavailable ({availability.BlockedReason})");
             return;
         }
 
         if (!_restartArmed)
         {
             _restartArmed = true;
-            RefreshRestartCombatRow();
+            RefreshRestartRoomRow();
             return;
         }
 
         _restartArmed = false;
-        Close("restart combat button");
-        CombatResetter.Request("options menu");
+        Close("restart room button");
+        RoomResetter.Request("options menu");
     }
 
-    private static void RefreshRestartCombatRow()
+    /// <summary>
+    /// The row names the room it would actually replay — "combat", "shop" or
+    /// "event" — because what a restart undoes is the only thing the player
+    /// needs to weigh before confirming.
+    /// </summary>
+    private static void RefreshRestartRoomRow()
     {
-        if (_restartCombatButton == null || !GodotObject.IsInstanceValid(_restartCombatButton))
+        if (_restartRoomButton == null || !GodotObject.IsInstanceValid(_restartRoomButton))
             return;
 
-        var blocked = CombatResetter.BlockedReason();
-        if (blocked != null)
+        var availability = RoomResetter.Describe();
+        if (!availability.CanRestart)
         {
             _restartArmed = false;
-            _restartCombatButton.Text = $"Restart this combat  —  unavailable ({blocked})";
-            _restartCombatButton.Modulate = new Color(0.55f, 0.55f, 0.55f);
+            _restartRoomButton.Text = $"Restart this room  —  unavailable ({availability.BlockedReason})";
+            _restartRoomButton.Modulate = new Color(0.55f, 0.55f, 0.55f);
             return;
         }
 
-        _restartCombatButton.Text = _restartArmed
-            ? "Restart this combat  —  select again to confirm"
-            : "Restart this combat  —  replays it from the start, discarding this attempt";
-        _restartCombatButton.Modulate = _restartArmed
+        var noun = availability.RoomNoun;
+        _restartRoomButton.Text = _restartArmed
+            ? $"Restart this {noun}  —  select again to confirm"
+            : $"Restart this {noun}  —  replays it from the start, undoing everything you did here";
+        _restartRoomButton.Modulate = _restartArmed
             ? new Color(1f, 0.68f, 0.4f)
             : new Color(1f, 1f, 1f);
     }
