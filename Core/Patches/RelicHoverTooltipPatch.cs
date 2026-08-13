@@ -2697,12 +2697,22 @@ public static class RelicHoverShowPatch
     private static string BuildMercuryHourglassBodyBBCode(RelicAggregate agg)
     {
         var sb = new StringBuilder();
+        var activationsPerCombat = agg.MercuryHourglassCombats <= 0
+            ? 0m
+            : (decimal)agg.Activations / agg.MercuryHourglassCombats;
+
         AppendRelicDamageStats(
             sb,
             agg,
-            triggerDescription: "Combats triggered — the number of combats in which this relic activated.",
-            averageLabel: "Damage per combat",
-            averageDenominator: agg.Activations);
+            triggerDescription: "Activations — owner turn starts where Mercury Hourglass fired.",
+            averageLabel: "Avg damage per combat",
+            averageDenominator: agg.MercuryHourglassCombats);
+        Row3(
+            sb,
+            "Avg activations per combat",
+            FormatDecimal(activationsPerCombat),
+            "",
+            "Average activations per combat — activations divided by combats where Mercury Hourglass was held.");
         return sb.ToString();
     }
 

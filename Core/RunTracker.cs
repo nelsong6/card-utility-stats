@@ -3074,6 +3074,7 @@ public static class RunTracker
         target.ForgottenSoulTurns += source.ForgottenSoulTurns;
         target.ForgottenSoulCombats += source.ForgottenSoulCombats;
         target.TotalTargets += source.TotalTargets;
+        target.MercuryHourglassCombats += source.MercuryHourglassCombats;
         target.LetterOpenerSkillsPlayed += source.LetterOpenerSkillsPlayed;
         target.LetterOpenerCombats += source.LetterOpenerCombats;
         target.LetterOpenerTurns += source.LetterOpenerTurns;
@@ -25645,8 +25646,9 @@ public static class RunTracker
 
     /// <summary>
     /// Record Mercury Hourglass's owner-specific turn-start activation. The
-    /// damage split is observed from the damage command result. Activations are
-    /// counted once per combat so damage-per-combat has the expected denominator.
+    /// damage split is observed from the damage command result. Every trigger
+    /// counts as one activation; <see cref="RelicAggregate.MercuryHourglassCombats"/>
+    /// is the separate zero-inclusive denominator for its per-combat averages.
     /// </summary>
     public static void ArmMercuryHourglassAttribution(Creature dealer)
     {
@@ -25657,7 +25659,7 @@ public static class RunTracker
             try
             {
                 var agg = GetOrCreateRelicAggregateLocked(MercuryHourglassRelicId);
-                if (agg.Activations <= 0) agg.Activations = 1;
+                agg.Activations++;
                 _pendingMercuryHourglassDamageAttributions.Add(dealer);
             }
             catch (Exception e)
@@ -26146,6 +26148,13 @@ public static class RunTracker
         int count = 1)
     {
         agg.ScreamingFlagonCombats += Math.Max(0, count);
+    }
+
+    internal static void RecordMercuryHourglassCombatForTest(
+        RelicAggregate agg,
+        int count = 1)
+    {
+        agg.MercuryHourglassCombats += Math.Max(0, count);
     }
 
     internal static void RecordMercuryHourglassDamageForTest(
@@ -29360,6 +29369,18 @@ public static class RunTracker
         }
     }
 
+    private static bool PlayerHasMercuryHourglass(Player player)
+    {
+        try
+        {
+            return player.Relics.Any(r => r is MercuryHourglass);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static bool PlayerHasRuinedHelmet(Player player)
     {
         try
@@ -29556,6 +29577,7 @@ public static class RunTracker
             RecordTungstenRodCombatForPlayerLocked(player);
             RecordForgottenSoulCombatForPlayerLocked(player);
             RecordScreamingFlagonCombatForPlayerLocked(player);
+            RecordMercuryHourglassCombatForPlayerLocked(player);
             RecordRuinedHelmetCombatForPlayerLocked(player);
             RecordSwordInTheStoneStrengthCombatForPlayerLocked(player);
             RecordMummifiedHandCombatForPlayerLocked(player);
@@ -30354,6 +30376,16 @@ public static class RunTracker
 
         var agg = GetOrCreatePendingRelicAggregateLocked(ScreamingFlagonRelicId);
         RecordScreamingFlagonCombatForTest(agg);
+    }
+
+    private static void RecordMercuryHourglassCombatForPlayerLocked(Player player)
+    {
+        if (_pendingCombat == null) return;
+        if (!PlayerHasMercuryHourglass(player)) return;
+        if (!_pendingCombat.MercuryHourglassCombatCountedPlayers.Add(player)) return;
+
+        var agg = GetOrCreatePendingRelicAggregateLocked(MercuryHourglassRelicId);
+        RecordMercuryHourglassCombatForTest(agg);
     }
 
     private static void RecordScreamingFlagonTurnForTrackedPlayerLocked()
@@ -37811,6 +37843,8 @@ internal class PendingCombat
     public HashSet<Player> ScreamingFlagonCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public Dictionary<Player, int> ScreamingFlagonTurnCountedTurns { get; }
+        = new(ReferenceEqualityComparer.Instance);
+    public HashSet<Player> MercuryHourglassCombatCountedPlayers { get; }
         = new(ReferenceEqualityComparer.Instance);
     public List<PendingForgottenSoulDamageAttribution> ForgottenSoulDamageAttributions { get; }
         = new();

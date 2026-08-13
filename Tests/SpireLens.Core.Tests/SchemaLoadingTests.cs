@@ -6284,6 +6284,41 @@ public class SchemaLoadingTests
     }
 
     [Fact]
+    public void HistoricalLoad_AcceptsMercuryHourglassRelicFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("mercury-hourglass-relic-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertMercuryHourglassFixture(
+            loaded.Data.RelicAggregates["RELIC.MERCURY_HOURGLASS"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsMercuryHourglassRelicFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("mercury-hourglass-relic-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertMercuryHourglassFixture(
+            resumed!.RelicAggregates["RELIC.MERCURY_HOURGLASS"]);
+    }
+
+    private static void AssertMercuryHourglassFixture(RelicAggregate relicAgg)
+    {
+        Assert.Equal(9, relicAgg.Activations);
+        Assert.Equal(54, relicAgg.TotalDamageAttempted);
+        Assert.Equal(44, relicAgg.TotalDamageDealt);
+        Assert.Equal(6, relicAgg.TotalDamageBlocked);
+        Assert.Equal(4, relicAgg.TotalDamageOverkill);
+        Assert.Equal(2, relicAgg.Kills);
+        Assert.Equal(18, relicAgg.TotalTargets);
+        Assert.Equal(3, relicAgg.MercuryHourglassCombats);
+    }
+
+    [Fact]
     public void HistoricalLoad_AcceptsPetrifiedToadRelicFixture()
     {
         var loaded = RunStorage.LoadHistorical(
