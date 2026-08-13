@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Godot;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Models.Characters;
 
 namespace SpireLens.Core;
 
@@ -35,6 +36,7 @@ internal static class RelicClassificationStore
     private static readonly Dictionary<string, int> CombatRelevantUntilTurns =
         new(StringComparer.OrdinalIgnoreCase);
     private static bool _initialized;
+    private static bool _normalizedAgainstLiveRelics;
 
     public static string UserFilePath => ProjectSettings.GlobalizePath(UserFileUri);
 
@@ -46,15 +48,18 @@ internal static class RelicClassificationStore
             ? LoadFromFile(UserFilePath)
             : LoadEmbeddedDefault();
         ApplyDocument(source ?? new RelicClassificationDocument());
-        NormalizeAgainstCurrentRelics();
         _initialized = true;
+        var normalized = TryNormalizeAgainstLiveRelics(out _);
 
         if (Save())
         {
             CoreMain.Logger.Info(
                 $"Relic classifications loaded: combat={CombatIds.Count}, " +
                 $"non_combat={NonCombatIds.Count}, finite_combat={CombatRelevantUntilTurns.Count}, " +
-                $"file={UserFilePath}");
+                $"file={UserFilePath}" +
+                (normalized
+                    ? string.Empty
+                    : " (normalization deferred — the game's model database is not populated yet)"));
         }
     }
 
@@ -64,17 +69,18 @@ internal static class RelicClassificationStore
         NonCombatIds.Clear();
         CombatRelevantUntilTurns.Clear();
         _initialized = false;
+        _normalizedAgainstLiveRelics = false;
     }
 
     public static bool IsNonCombat(RelicModel relicModel)
     {
-        if (!_initialized) Initialize();
+        EnsureReady();
         return NonCombatIds.Contains(GetRelicId(relicModel));
     }
 
     public static bool SetNonCombat(RelicModel relicModel, bool isNonCombat)
     {
-        if (!_initialized) Initialize();
+        EnsureReady();
 
         var relicId = GetRelicId(relicModel);
         var changed = false;
@@ -103,7 +109,7 @@ internal static class RelicClassificationStore
 
     public static int? GetCombatRelevantUntilTurn(RelicModel relicModel)
     {
-        if (!_initialized) Initialize();
+        EnsureReady();
         return CombatRelevantUntilTurns.TryGetValue(GetRelicId(relicModel), out var turn)
             ? turn
             : null;
@@ -111,7 +117,7 @@ internal static class RelicClassificationStore
 
     public static bool SetCombatRelevantUntilTurn(RelicModel relicModel, int? turn)
     {
-        if (!_initialized) Initialize();
+        EnsureReady();
 
         var relicId = GetRelicId(relicModel);
         if (!CombatIds.Contains(relicId) || NonCombatIds.Contains(relicId)) return false;
@@ -210,35 +216,120 @@ internal static class RelicClassificationStore
             "non-combat won and the file was normalized.");
     }
 
-    private static void NormalizeAgainstCurrentRelics()
+    /// <summary>
+    /// Brings the store up to date before it answers. Split from
+    /// <see cref="Initialize"/> because on a cold start the relic database does
+    /// not exist yet when the Core first loads — see
+    /// <see cref="IsLiveRelicDatabaseReady"/>.
+    /// </summary>
+    private static void EnsureReady()
     {
+        if (!_initialized) Initialize();
+        if (_normalizedAgainstLiveRelics) return;
+        if (!TryNormalizeAgainstLiveRelics(out var changed)) return;
+
+        CoreMain.Logger.Info(
+            "Relic classifications normalized against the live relic database (deferred from " +
+            $"startup): combat={CombatIds.Count}, non_combat={NonCombatIds.Count}, " +
+            $"finite_combat={CombatRelevantUntilTurns.Count}, changed={changed}.");
+        if (changed) Save();
+    }
+
+    /// <summary>
+    /// The game populates <c>ModelDb</c> in
+    /// <c>OneTimeInitialization.ExecuteEssential</c>, but it loads mods (and so
+    /// runs our <c>[ModInitializer]</c>, the Loader, and <c>CoreMain.Initialize</c>)
+    /// one step earlier, from <c>ExecuteVeryEarly</c>. Until <c>ModelDb.Init</c>
+    /// has run, its backing dictionary is empty and the first thing
+    /// <c>ModelDb.AllRelics</c> touches — the characters the relic pools hang off
+    /// — throws <c>KeyNotFoundException: The given key 'CHARACTER.IRONCLAD' was
+    /// not present in the dictionary</c>.
+    ///
+    /// A hot reload never sees this, because by then the game is long past
+    /// <c>ExecuteEssential</c>. That asymmetry is why a degraded classification
+    /// store only ever showed up in real play sessions and never in dev.
+    ///
+    /// Probing is deliberate: catching the exception instead would cost one
+    /// throw per relic on the bar-refresh path for as long as the database
+    /// stays empty.
+    /// </summary>
+    internal static bool IsLiveRelicDatabaseReady() => ModelDb.Contains(typeof(Ironclad));
+
+    /// <summary>
+    /// Runs the reconciliation pass if the live relic database is available.
+    /// </summary>
+    /// <param name="changed">Whether the pass altered the in-memory sets.</param>
+    /// <returns>
+    /// <c>true</c> when the database was available and the pass ran (even if it
+    /// changed nothing); <c>false</c> while the database is still unpopulated,
+    /// leaving the store to retry on the next call.
+    /// </returns>
+    private static bool TryNormalizeAgainstLiveRelics(out bool changed)
+    {
+        changed = false;
+        if (!IsLiveRelicDatabaseReady()) return false;
+
+        // Claim the flag before the work: a genuine enumeration failure must not
+        // leave every later read retrying it on the relic-bar refresh path.
+        _normalizedAgainstLiveRelics = true;
         try
         {
             var knownIds = ModelDb.AllRelics
                 .Select(GetRelicId)
                 .Where(id => !string.IsNullOrWhiteSpace(id))
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
-            if (knownIds.Count == 0) return;
+            if (knownIds.Count == 0) return true;
 
-            CombatIds.IntersectWith(knownIds);
-            NonCombatIds.IntersectWith(knownIds);
-            foreach (var relicId in knownIds)
-            {
-                if (!NonCombatIds.Contains(relicId))
-                    CombatIds.Add(relicId);
-            }
-
-            var invalidCutoffs = CombatRelevantUntilTurns
-                .Where(pair => !CombatIds.Contains(pair.Key) || pair.Value is < 1 or > 3)
-                .Select(pair => pair.Key)
-                .ToArray();
-            foreach (var relicId in invalidCutoffs)
-                CombatRelevantUntilTurns.Remove(relicId);
+            changed = NormalizeClassifications(
+                CombatIds,
+                NonCombatIds,
+                CombatRelevantUntilTurns,
+                knownIds);
         }
         catch (Exception e)
         {
             CoreMain.Logger.Error($"Could not enumerate current relics for classification: {e.Message}");
         }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Reconciles a loaded document against the relics the game actually
+    /// defines: drops ids the game no longer has, defaults every unlisted relic
+    /// to combat, and drops finite-combat cutoffs that no longer name a combat
+    /// relic or fall outside the supported 1-3 turn range. Kept pure over the
+    /// collections it is handed so the rules stay testable without a live game.
+    /// </summary>
+    internal static bool NormalizeClassifications(
+        ISet<string> combatIds,
+        ISet<string> nonCombatIds,
+        IDictionary<string, int> combatRelevantUntilTurns,
+        IReadOnlyCollection<string> knownRelicIds)
+    {
+        // Rebuilt unconditionally so the membership tests below always match the
+        // case-insensitive comparer the classification sets themselves use.
+        var knownIds = new HashSet<string>(knownRelicIds, StringComparer.OrdinalIgnoreCase);
+        var changed = false;
+
+        foreach (var relicId in combatIds.Where(id => !knownIds.Contains(id)).ToArray())
+            changed |= combatIds.Remove(relicId);
+        foreach (var relicId in nonCombatIds.Where(id => !knownIds.Contains(id)).ToArray())
+            changed |= nonCombatIds.Remove(relicId);
+        foreach (var relicId in knownIds)
+        {
+            if (!nonCombatIds.Contains(relicId))
+                changed |= combatIds.Add(relicId);
+        }
+
+        var invalidCutoffs = combatRelevantUntilTurns
+            .Where(pair => !combatIds.Contains(pair.Key) || pair.Value is < 1 or > 3)
+            .Select(pair => pair.Key)
+            .ToArray();
+        foreach (var relicId in invalidCutoffs)
+            changed |= combatRelevantUntilTurns.Remove(relicId);
+
+        return changed;
     }
 
     private static void AddIds(ISet<string> destination, IEnumerable<string>? ids)

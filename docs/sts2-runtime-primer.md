@@ -53,6 +53,40 @@ When adding a hook:
 - If it subscribes to game events or Godot signals directly, add teardown.
 - If it creates UI nodes, make hot-reload reinjection and `QueueFree()` behavior explicit.
 
+### Core Loads Before The Game's Model Database Exists
+
+On a cold start, `CoreMain.Initialize()` runs *earlier* than `ModelDb`. The
+game's `NGame.GameStartup` calls `OneTimeInitialization.ExecuteVeryEarly`, which
+awaits `ModManager.Initialize` — that is where the `[ModInitializer]` contract
+invokes `LoaderMain.Initialize` → `LoadCore` → `CoreMain.Initialize`. Only the
+next step, `ExecuteEssential`, calls `ModelDb.Init()` (and then
+`ModelDb.InitIds()`). Mods are loaded first on purpose, so `ModelDb` and
+`LocManager` pick up whatever a mod injected.
+
+The consequence for us: during `CoreMain.Initialize()` on a cold start, the
+`ModelDb` dictionary is **empty**. Every model lookup fails, and the failure is
+an unhelpful `KeyNotFoundException` from a raw dictionary indexer rather than
+the `ModelNotFoundException` the by-id accessors throw. Aggregate properties
+fail on the first thing they touch — `ModelDb.AllRelics` reaches
+`AllCharacters` before any relic, so it throws
+`The given key 'CHARACTER.IRONCLAD' was not present in the dictionary`.
+
+This is invisible in dev. A Core hot reload re-runs `CoreMain.Initialize()` long
+after `ExecuteEssential`, so the same call succeeds. A bug of this shape is
+therefore permanent for real players and never reproduces in a session that
+presses F5. Treat "works after reload, failed at startup" as the signature.
+
+So: **do not enumerate `ModelDb` from `CoreMain.Initialize()`.** Defer it to
+first use and probe readiness with `ModelDb.Contains(typeof(SomeModelType))`,
+which answers `false` on an empty database instead of throwing. Probing beats
+catching, because a catch costs one throw per call for as long as the database
+stays empty. `RelicClassificationStore.IsLiveRelicDatabaseReady` /
+`TryNormalizeAgainstLiveRelics` are the worked example.
+
+`ModelDb.Preload()` is later still — `ExecuteDeferred`, after the main menu is
+up. Cached aggregates such as `_allRelics` are only assigned on a successful
+enumeration, so a mod's early failed access does not poison them.
+
 ### Newly Added Harmony Targets Need One Full Restart
 
 Core hot reload can install a Harmony detour, but it cannot reliably invalidate
