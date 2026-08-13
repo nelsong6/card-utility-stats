@@ -195,15 +195,13 @@ public class BrilliantScarfStatsTests
             ?? throw new InvalidOperationException("BuildBrilliantScarfBodyBBCode returned null."));
 
         Assert.Contains("Combats held", body);
-        Assert.Contains("Discounts offered", body);
-        Assert.Contains("Discounts taken", body);
+        Assert.Contains("Discounts offered/taken", body);
         Assert.Contains("Energy saved", body);
         Assert.Contains("saved / turn", body);
         Assert.Contains("saved / combat", body);
         Assert.Contains("saved / use", body);
         Assert.Contains("[b]2[/b]", body);
-        Assert.Contains("[b]5[/b]", body);
-        Assert.Contains("[b]3[/b]", body);
+        Assert.Contains("[b]5/3[/b]", body);
         Assert.Contains("[b]7[/b]", body);
         Assert.Contains("[b]1.75[/b]", body);
         Assert.Contains("[b]3.5[/b]", body);

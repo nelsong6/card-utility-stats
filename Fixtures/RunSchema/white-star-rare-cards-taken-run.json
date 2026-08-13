@@ -1,0 +1,26 @@
+{
+  "run_id": "white-star-rare-cards-taken-fixture",
+  "started_at": "2026-08-09T01:00:00Z",
+  "updated_at": "2026-08-09T01:24:00Z",
+  "outcome": "in_progress",
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.WHITE_STAR": {
+      "activations": 3,
+      "rare_cards_offered": 8,
+      "rare_attack_cards_offered": 4,
+      "rare_skill_cards_offered": 2,
+      "rare_power_cards_offered": 2,
+      "rare_cards_taken": 3,
+      "rare_attack_cards_taken": 2,
+      "rare_skill_cards_taken": 1,
+      "rare_power_cards_taken": 0,
+      "rare_card_reward_screens_declined": 1
+    }
+  },
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

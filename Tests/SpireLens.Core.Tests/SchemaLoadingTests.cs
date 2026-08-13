@@ -3115,6 +3115,31 @@ public class SchemaLoadingTests
         Assert.Equal(2, relicAgg.RareSkillCardsOffered);
         Assert.Equal(2, relicAgg.RarePowerCardsOffered);
         Assert.Equal(2, relicAgg.RareCardRewardScreensDeclined);
+        // Predates the taken counters, so they read as zero taken.
+        Assert.Equal(0, relicAgg.RareCardsTaken);
+        Assert.Equal(0, relicAgg.RareAttackCardsTaken);
+        Assert.Equal(0, relicAgg.RareSkillCardsTaken);
+        Assert.Equal(0, relicAgg.RarePowerCardsTaken);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsWhiteStarRareCardsTakenFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("white-star-rare-cards-taken-run.json"));
+
+        Assert.NotNull(resumed);
+        var relicAgg = resumed!.RelicAggregates["RELIC.WHITE_STAR"];
+        Assert.Equal(3, relicAgg.Activations);
+        Assert.Equal(8, relicAgg.RareCardsOffered);
+        Assert.Equal(4, relicAgg.RareAttackCardsOffered);
+        Assert.Equal(2, relicAgg.RareSkillCardsOffered);
+        Assert.Equal(2, relicAgg.RarePowerCardsOffered);
+        Assert.Equal(3, relicAgg.RareCardsTaken);
+        Assert.Equal(2, relicAgg.RareAttackCardsTaken);
+        Assert.Equal(1, relicAgg.RareSkillCardsTaken);
+        Assert.Equal(0, relicAgg.RarePowerCardsTaken);
+        Assert.Equal(1, relicAgg.RareCardRewardScreensDeclined);
     }
 
     private static void AssertPrayerWheelFixture(RelicAggregate relicAgg)

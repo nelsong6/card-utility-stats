@@ -104,9 +104,12 @@ public class WingCharmStatsTests
         Assert.Contains(StatConceptGlossary.RenderHintedGlyph("offered"), body);
         Assert.Contains(StatConceptGlossary.RenderHintedGlyph("taken"), body);
         Assert.Contains("[b]+[/b]", body);
-        Assert.Contains("not taken", body);
-        Assert.Contains("[b]3[/b]", body);
+        Assert.DoesNotContain("not taken", body);
+        // 3 taken of 7 enchanted options, then the offered-only rarity splits.
+        Assert.Contains("[b]7/3[/b]", body);
         Assert.Contains("[b]4[/b]", body);
+        Assert.Contains("[b]2[/b]", body);
+        Assert.Contains("[b]1[/b]", body);
     }
 
     private static RelicAggregate PopulatedAggregate()

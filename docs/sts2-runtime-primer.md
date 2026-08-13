@@ -1777,6 +1777,15 @@ credited on both, and the two counters are independent — an offer recorded at
 generation time can never be assumed taken, and old runs that predate the taken
 counter read as zero taken rather than as zero offers.
 
+White Star and Prayer Wheel own a whole extra `CardReward` rather than one
+option inside a shared one, so neither needs per-result identity: a bucketed
+option count snapshotted when the selection opens and diffed against the same
+count at terminal resolution is enough. Bucket White Star by card type among
+Rares and Prayer Wheel by rarity. The screen-level declined/rejected counters
+are the same observation read as a boolean — no bucket dropped means nothing was
+taken — so they must be derived from the same snapshot diff rather than from a
+second, independently timed check that could disagree with the per-card counts.
+
 Silver Crucible's first, second, and third reward numbers are generation order,
 not click order. `CardReward.Populate` runs before the outer rewards page is
 shown, and `SilverCrucible.AfterModifyingCardRewardOptions` synchronously

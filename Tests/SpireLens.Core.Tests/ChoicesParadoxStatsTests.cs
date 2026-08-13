@@ -108,28 +108,23 @@ public class ChoicesParadoxStatsTests
     }
 
     [Fact]
-    public void Tooltip_ShowsScreensThenOfferedThenTakenRarityRows()
+    public void Tooltip_PairsOfferedAndTakenOnOneRowPerRarity()
     {
         var body = BuildBody(PopulatedAggregate());
 
         Assert.Contains("Activations", body);
-        Assert.Contains("Commons offered", body);
-        Assert.Contains("Uncommons offered", body);
-        Assert.Contains("Rares offered", body);
-        Assert.Contains("Commons taken", body);
-        Assert.Contains("Uncommons taken", body);
-        Assert.Contains("Rares taken", body);
+        Assert.Contains("Commons offered/taken", body);
+        Assert.Contains("Uncommons offered/taken", body);
+        Assert.Contains("Rares offered/taken", body);
         Assert.Contains(
             StatConceptGlossary.RenderHintedGlyph("offered"),
             body);
         Assert.Contains(
             StatConceptGlossary.RenderHintedGlyph("taken"),
             body);
-
-        Assert.True(
-            body.IndexOf("Commons offered", StringComparison.Ordinal)
-            < body.IndexOf("Commons taken", StringComparison.Ordinal),
-            "Offered rows should precede taken rows.");
+        Assert.Contains("[b]19/2[/b]", body);
+        Assert.Contains("[b]8/2[/b]", body);
+        Assert.Contains("[b]3/1[/b]", body);
     }
 
     [Fact]
@@ -157,8 +152,8 @@ public class ChoicesParadoxStatsTests
 
         Assert.True(recognized);
         Assert.Equal("Choices Paradox", title);
-        Assert.Contains("Commons offered", body);
-        Assert.Contains("Rares taken", body);
+        Assert.Contains("Commons offered/taken", body);
+        Assert.Contains("Rares offered/taken", body);
     }
 
     private static RelicAggregate PopulatedAggregate()

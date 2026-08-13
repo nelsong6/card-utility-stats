@@ -195,10 +195,10 @@ public class EggRelicStatsTests
         Assert.DoesNotContain(
             "res://images/ui/reward_screen/reward_icon_card.png",
             body);
-        Assert.Contains("[b]6[/b]", body);
-        Assert.Contains("[b]3[/b]", body);
-        Assert.Contains("[b]2[/b]", body);
-        Assert.Contains("[b]1[/b]", body);
-        Assert.Contains("[b]4[/b]", body);
+        Assert.Contains("[b]6/4[/b]", body);
+        Assert.Contains("[b]3/2[/b]", body);
+        Assert.Contains("[b]2/1[/b]", body);
+        Assert.Contains("[b]1/1[/b]", body);
+        Assert.Contains("offered/taken", body);
     }
 }

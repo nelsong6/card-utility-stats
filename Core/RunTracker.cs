@@ -208,7 +208,7 @@ public static class RunTracker
     private static readonly Dictionary<CardReward, PendingLastingCandyReward> _lastingCandyRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, PendingSilverCrucibleReward> _silverCrucibleRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, PendingOrreryReward> _orreryRewards = new(ReferenceEqualityComparer.Instance);
-    private static readonly Dictionary<CardReward, int> _whiteStarRewardRareCardsBeforeSelection =
+    private static readonly Dictionary<CardReward, PendingWhiteStarReward> _whiteStarRewardCardsBeforeSelection =
         new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, PendingPrayerWheelReward> _prayerWheelRewardCardsBeforeSelection =
         new(ReferenceEqualityComparer.Instance);
@@ -1754,7 +1754,7 @@ public static class RunTracker
         _lastingCandyRewards.Clear();
         _silverCrucibleRewards.Clear();
         _orreryRewards.Clear();
-        _whiteStarRewardRareCardsBeforeSelection.Clear();
+        _whiteStarRewardCardsBeforeSelection.Clear();
         _prayerWheelRewardCardsBeforeSelection.Clear();
         _orreryRewardRegistrationRelic = null;
         _smallCapsuleRewardRegistrationRelic = null;
@@ -3112,6 +3112,9 @@ public static class RunTracker
         target.RareAttackCardsOffered += source.RareAttackCardsOffered;
         target.RareSkillCardsOffered += source.RareSkillCardsOffered;
         target.RarePowerCardsOffered += source.RarePowerCardsOffered;
+        target.RareAttackCardsTaken += source.RareAttackCardsTaken;
+        target.RareSkillCardsTaken += source.RareSkillCardsTaken;
+        target.RarePowerCardsTaken += source.RarePowerCardsTaken;
         target.RareCardRewardScreensDeclined += source.RareCardRewardScreensDeclined;
         target.PrayerWheelExtraRewardScreens += source.PrayerWheelExtraRewardScreens;
         target.PrayerWheelExtraRewardScreensRejected += source.PrayerWheelExtraRewardScreensRejected;
@@ -14703,8 +14706,8 @@ public static class RunTracker
             try
             {
                 if (!_whiteStarRewardAttributions.TryGetValue(reward, out _)) return;
-                _whiteStarRewardRareCardsBeforeSelection[reward] =
-                    CountRareCards(reward);
+                _whiteStarRewardCardsBeforeSelection[reward] =
+                    PendingWhiteStarReward.FromReward(reward);
             }
             catch (Exception e)
             {
@@ -14719,9 +14722,9 @@ public static class RunTracker
 
         lock (_lock)
         {
-            if (!_whiteStarRewardRareCardsBeforeSelection.ContainsKey(reward)) return;
-            _whiteStarRewardRareCardsBeforeSelection[reward] =
-                CountRareCards(reward);
+            if (!_whiteStarRewardCardsBeforeSelection.ContainsKey(reward)) return;
+            _whiteStarRewardCardsBeforeSelection[reward] =
+                PendingWhiteStarReward.FromReward(reward);
         }
     }
 
@@ -14735,9 +14738,9 @@ public static class RunTracker
         {
             try
             {
-                if (!_whiteStarRewardRareCardsBeforeSelection.Remove(
+                if (!_whiteStarRewardCardsBeforeSelection.Remove(
                         reward,
-                        out var rareCardsBeforeSelection))
+                        out var beforeSelection))
                 {
                     return;
                 }
@@ -14745,11 +14748,21 @@ public static class RunTracker
                 if (!_whiteStarRewardAttributions.Remove(reward)) return;
                 if (!IsTrackedPlayer(reward.Player)) return;
 
-                var remainingRareCards = CountRareCards(reward);
-                if (remainingRareCards < rareCardsBeforeSelection) return;
-
+                var afterSelection = PendingWhiteStarReward.FromReward(reward);
                 var agg = GetOrCreateCurrentRunRelicAggregateLocked(WhiteStarRelicId);
-                RecordWhiteStarRewardDeclinedForTest(agg);
+                if (afterSelection.RareCards >= beforeSelection.RareCards)
+                {
+                    RecordWhiteStarRewardDeclinedForTest(agg);
+                }
+                else
+                {
+                    RecordWhiteStarTakenForTest(
+                        agg,
+                        beforeSelection.RareCards - afterSelection.RareCards,
+                        beforeSelection.RareAttackCards - afterSelection.RareAttackCards,
+                        beforeSelection.RareSkillCards - afterSelection.RareSkillCards,
+                        beforeSelection.RarePowerCards - afterSelection.RarePowerCards);
+                }
                 RefreshCurrentRunMetadataLocked();
                 SaveCurrentRun();
             }
@@ -14768,7 +14781,7 @@ public static class RunTracker
         {
             try
             {
-                _whiteStarRewardRareCardsBeforeSelection.Remove(reward);
+                _whiteStarRewardCardsBeforeSelection.Remove(reward);
                 if (!_whiteStarRewardAttributions.Remove(reward)) return;
                 if (!IsTrackedPlayer(reward.Player)) return;
 
@@ -14816,15 +14829,32 @@ public static class RunTracker
         }
     }
 
+    /// <summary>
+    /// Credit the Rare options that left a White Star reward. CardReward drops
+    /// a card from its list only after the deck add succeeds, so the drop in
+    /// each type bucket is an observed take rather than a click.
+    /// </summary>
+    internal static void RecordWhiteStarTakenForTest(
+        RelicAggregate agg,
+        int rareCards,
+        int rareAttackCards = 0,
+        int rareSkillCards = 0,
+        int rarePowerCards = 0)
+    {
+        if (agg == null) return;
+
+        if (rareCards > 0) agg.RareCardsTaken += rareCards;
+        if (rareAttackCards > 0) agg.RareAttackCardsTaken += rareAttackCards;
+        if (rareSkillCards > 0) agg.RareSkillCardsTaken += rareSkillCards;
+        if (rarePowerCards > 0) agg.RarePowerCardsTaken += rarePowerCards;
+    }
+
     internal static void RecordWhiteStarRewardDeclinedForTest(
         RelicAggregate agg)
     {
         if (agg == null) return;
         agg.RareCardRewardScreensDeclined += 1;
     }
-
-    private static int CountRareCards(CardReward reward)
-        => reward.Cards.Count(card => card?.Rarity == CardRarity.Rare);
 
     /// <summary>
     /// Binds the exact CardReward appended by Prayer Wheel's normal-monster
@@ -37036,6 +37066,46 @@ internal sealed class PendingPaelSacrificeReward
                     break;
                 case CardRarity.Rare:
                     result.RareCards += 1;
+                    break;
+            }
+        }
+
+        return result;
+    }
+}
+
+/// <summary>
+/// White Star's visible Rare options bucketed by card type. Mirrors
+/// <see cref="PendingPrayerWheelReward"/>: an option count snapshotted when the
+/// selection opens, diffed against the same count at terminal resolution.
+/// </summary>
+internal sealed class PendingWhiteStarReward
+{
+    public int RareCards { get; private set; }
+    public int RareAttackCards { get; private set; }
+    public int RareSkillCards { get; private set; }
+    public int RarePowerCards { get; private set; }
+
+    public static PendingWhiteStarReward FromReward(CardReward? reward)
+    {
+        var result = new PendingWhiteStarReward();
+        if (reward == null) return result;
+
+        foreach (var card in reward.Cards)
+        {
+            if (card?.Rarity != CardRarity.Rare) continue;
+
+            result.RareCards += 1;
+            switch (card.Type)
+            {
+                case CardType.Attack:
+                    result.RareAttackCards += 1;
+                    break;
+                case CardType.Skill:
+                    result.RareSkillCards += 1;
+                    break;
+                case CardType.Power:
+                    result.RarePowerCards += 1;
                     break;
             }
         }

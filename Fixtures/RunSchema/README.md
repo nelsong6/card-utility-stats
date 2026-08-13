@@ -570,6 +570,10 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `white-star-relic-run.json`
   Adds White Star activations, generated Rare card offers split by
   Attack/Skill/Power, and terminally declined rare-card reward screens.
+- `white-star-rare-cards-taken-run.json`
+  Adds the Rare cards actually taken from White Star's rewards, split the same
+  Attack/Skill/Power way as its offers. Runs written before these counters keep
+  only the offer fields, which read as zero taken.
 - `oddly-smooth-stone-relic-run.json`
   Adds Oddly Smooth Stone's completed plays of cards the game classifies as
   immediately gaining Dexterity-scaled Block.

@@ -49,6 +49,28 @@ public class WhiteStarStatsTests
         Assert.Equal(1, agg.RareSkillCardsOffered);
         Assert.Equal(1, agg.RarePowerCardsOffered);
         Assert.Equal(1, agg.RareCardRewardScreensDeclined);
+        Assert.Equal(0, agg.RareCardsTaken);
+    }
+
+    [Fact]
+    public void TrackingMath_CreditsTakenRaresBySplitCardType()
+    {
+        var agg = new RelicAggregate();
+
+        RunTracker.RecordWhiteStarTakenForTest(
+            agg,
+            rareCards: 1,
+            rareAttackCards: 1);
+        RunTracker.RecordWhiteStarTakenForTest(
+            agg,
+            rareCards: 1,
+            rarePowerCards: 1);
+
+        Assert.Equal(2, agg.RareCardsTaken);
+        Assert.Equal(1, agg.RareAttackCardsTaken);
+        Assert.Equal(0, agg.RareSkillCardsTaken);
+        Assert.Equal(1, agg.RarePowerCardsTaken);
+        Assert.Equal(0, agg.RareCardRewardScreensDeclined);
     }
 
     [Fact]
@@ -65,6 +87,9 @@ public class WhiteStarStatsTests
         Assert.Contains("\"rare_attack_cards_offered\"", json);
         Assert.Contains("\"rare_skill_cards_offered\"", json);
         Assert.Contains("\"rare_power_cards_offered\"", json);
+        Assert.Contains("\"rare_attack_cards_taken\"", json);
+        Assert.Contains("\"rare_skill_cards_taken\"", json);
+        Assert.Contains("\"rare_power_cards_taken\"", json);
         Assert.Contains("\"rare_card_reward_screens_declined\"", json);
         Assert.NotNull(restored);
         AssertPopulatedAggregate(restored!.RelicAggregates[WhiteStarRelicId]);
@@ -82,6 +107,10 @@ public class WhiteStarStatsTests
         Assert.Equal(8, target.RareAttackCardsOffered);
         Assert.Equal(4, target.RareSkillCardsOffered);
         Assert.Equal(4, target.RarePowerCardsOffered);
+        Assert.Equal(6, target.RareCardsTaken);
+        Assert.Equal(4, target.RareAttackCardsTaken);
+        Assert.Equal(2, target.RareSkillCardsTaken);
+        Assert.Equal(0, target.RarePowerCardsTaken);
         Assert.Equal(4, target.RareCardRewardScreensDeclined);
     }
 
@@ -94,11 +123,18 @@ public class WhiteStarStatsTests
         Assert.Contains(
             StatConceptGlossary.RenderHintedGlyph("offered"),
             body);
+        Assert.Contains(
+            StatConceptGlossary.RenderHintedGlyph("taken"),
+            body);
         Assert.Contains("Rare card reward screens declined", body);
         Assert.Contains("type_sort_attack.png", body);
         Assert.Contains("type_sort_skill.png", body);
         Assert.Contains("type_sort_power.png", body);
         Assert.Contains("color=#EFC850", body);
+        Assert.Contains("[b]8/3[/b]", body);
+        Assert.Contains("[b]4/2[/b]", body);
+        Assert.Contains("[b]2/1[/b]", body);
+        Assert.Contains("[b]2/0[/b]", body);
     }
 
     [Fact]
@@ -117,7 +153,7 @@ public class WhiteStarStatsTests
 
         Assert.True(recognized);
         Assert.Equal("White Star", title);
-        Assert.Contains("Rares offered", body);
+        Assert.Contains("Rares offered/taken", body);
     }
 
     [Fact]
@@ -131,6 +167,10 @@ public class WhiteStarStatsTests
         Assert.Equal(0, agg!.RareAttackCardsOffered);
         Assert.Equal(0, agg.RareSkillCardsOffered);
         Assert.Equal(0, agg.RarePowerCardsOffered);
+        Assert.Equal(0, agg.RareCardsTaken);
+        Assert.Equal(0, agg.RareAttackCardsTaken);
+        Assert.Equal(0, agg.RareSkillCardsTaken);
+        Assert.Equal(0, agg.RarePowerCardsTaken);
         Assert.Equal(0, agg.RareCardRewardScreensDeclined);
     }
 
@@ -142,6 +182,9 @@ public class WhiteStarStatsTests
             RareAttackCardsOffered = 4,
             RareSkillCardsOffered = 2,
             RarePowerCardsOffered = 2,
+            RareCardsTaken = 3,
+            RareAttackCardsTaken = 2,
+            RareSkillCardsTaken = 1,
             RareCardRewardScreensDeclined = 2,
         };
 
@@ -152,6 +195,10 @@ public class WhiteStarStatsTests
         Assert.Equal(4, agg.RareAttackCardsOffered);
         Assert.Equal(2, agg.RareSkillCardsOffered);
         Assert.Equal(2, agg.RarePowerCardsOffered);
+        Assert.Equal(3, agg.RareCardsTaken);
+        Assert.Equal(2, agg.RareAttackCardsTaken);
+        Assert.Equal(1, agg.RareSkillCardsTaken);
+        Assert.Equal(0, agg.RarePowerCardsTaken);
         Assert.Equal(2, agg.RareCardRewardScreensDeclined);
     }
 
