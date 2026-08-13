@@ -16,11 +16,18 @@ namespace SpireLens.Core;
 public static class SpireLensOptionsMenu
 {
     private const int Layer = 1000;
+
+    /// <summary>Row index of the destructive "restart combat" action.</summary>
+    private const int RestartCombatIndex = 8;
+
     private static CanvasLayer? _layer;
     private static readonly List<Button> Checkboxes = new();
     private static readonly List<Button> SelectableButtons = new();
     private static readonly List<Button> CheckboxIndicators = new();
     private static readonly List<Panel> SelectionHighlights = new();
+    private static readonly Dictionary<int, Action> RowActions = new();
+    private static Button? _restartCombatButton;
+    private static bool _restartArmed;
     private static int _selectedIndex;
     private static int _leftStickVerticalDirection;
     private static int _leftStickHorizontalDirection;
@@ -46,6 +53,8 @@ public static class SpireLensOptionsMenu
             Build(tree);
 
         RefreshCheckboxes();
+        _restartArmed = false;
+        RefreshRestartCombatRow();
         _layer!.Visible = true;
         _selectedIndex = Math.Clamp(_selectedIndex, 0, SelectableButtons.Count - 1);
         _leftStickVerticalDirection = 0;
@@ -59,6 +68,8 @@ public static class SpireLensOptionsMenu
     {
         if (_layer == null || !GodotObject.IsInstanceValid(_layer)) return;
         _layer.Visible = false;
+        _restartArmed = false;
+        RefreshRestartCombatRow();
         CoreMain.Logger.Info($"SpireLens options menu closed ({source})");
     }
 
@@ -115,6 +126,9 @@ public static class SpireLensOptionsMenu
         SelectableButtons.Clear();
         CheckboxIndicators.Clear();
         SelectionHighlights.Clear();
+        RowActions.Clear();
+        _restartCombatButton = null;
+        _restartArmed = false;
         _selectedIndex = 0;
         _leftStickVerticalDirection = 0;
         _leftStickHorizontalDirection = 0;
@@ -186,6 +200,16 @@ public static class SpireLensOptionsMenu
         runViewsHeader.Modulate = new Color(0.72f, 0.8f, 0.92f);
         rows.AddChild(runViewsHeader);
         AddAction(rows, "View current-run potion history", 7, OpenPotionHistory);
+
+        var practiceHeader = NewLabel("Practice", 20);
+        practiceHeader.Modulate = new Color(0.72f, 0.8f, 0.92f);
+        rows.AddChild(practiceHeader);
+        _restartCombatButton = AddAction(
+            rows,
+            "Restart this combat",
+            RestartCombatIndex,
+            OnRestartCombatActivated);
+        RefreshRestartCombatRow();
 
         var close = new Button
         {
@@ -266,12 +290,14 @@ public static class SpireLensOptionsMenu
 
     }
 
-    private static void AddAction(
+    private static Button AddAction(
         VBoxContainer parent,
         string text,
         int index,
         Action action)
     {
+        RowActions[index] = action;
+
         var optionHost = new Control
         {
             CustomMinimumSize = new Vector2(0, 56),
@@ -307,6 +333,7 @@ public static class SpireLensOptionsMenu
         };
         SelectableButtons.Add(button);
         optionHost.AddChild(button);
+        return button;
     }
 
     private static Button CreateCheckboxIndicator()
@@ -350,9 +377,9 @@ public static class SpireLensOptionsMenu
 
     private static void ActivateSelection(int index, string source)
     {
-        if (index == 7)
+        if (RowActions.TryGetValue(index, out var action))
         {
-            OpenPotionHistory();
+            action();
             return;
         }
         ToggleOption(index, source);
@@ -374,6 +401,15 @@ public static class SpireLensOptionsMenu
     {
         if (SelectableButtons.Count == 0) return;
         _selectedIndex = Math.Clamp(index, 0, SelectableButtons.Count - 1);
+
+        // Moving off the armed destructive row cancels the confirmation, so a
+        // stray Enter/A elsewhere in the menu can never land on it.
+        if (_restartArmed && _selectedIndex != RestartCombatIndex)
+        {
+            _restartArmed = false;
+            RefreshRestartCombatRow();
+        }
+
         RefreshSelectionHighlight();
     }
 
@@ -477,6 +513,55 @@ public static class SpireLensOptionsMenu
                 ViewStatsInjectorPatch.SetHideNonCombatRelicStats(enabled, source);
                 break;
         }
+    }
+
+    /// <summary>
+    /// Two-step confirm. Restarting discards the fight in progress, so the
+    /// first activation only arms the row and the second one commits.
+    /// </summary>
+    private static void OnRestartCombatActivated()
+    {
+        var blocked = CombatResetter.BlockedReason();
+        if (blocked != null)
+        {
+            _restartArmed = false;
+            RefreshRestartCombatRow();
+            CoreMain.Logger.Info($"SpireLens options: restart combat unavailable ({blocked})");
+            return;
+        }
+
+        if (!_restartArmed)
+        {
+            _restartArmed = true;
+            RefreshRestartCombatRow();
+            return;
+        }
+
+        _restartArmed = false;
+        Close("restart combat button");
+        CombatResetter.Request("options menu");
+    }
+
+    private static void RefreshRestartCombatRow()
+    {
+        if (_restartCombatButton == null || !GodotObject.IsInstanceValid(_restartCombatButton))
+            return;
+
+        var blocked = CombatResetter.BlockedReason();
+        if (blocked != null)
+        {
+            _restartArmed = false;
+            _restartCombatButton.Text = $"Restart this combat  —  unavailable ({blocked})";
+            _restartCombatButton.Modulate = new Color(0.55f, 0.55f, 0.55f);
+            return;
+        }
+
+        _restartCombatButton.Text = _restartArmed
+            ? "Restart this combat  —  select again to confirm"
+            : "Restart this combat  —  replays it from the start, discarding this attempt";
+        _restartCombatButton.Modulate = _restartArmed
+            ? new Color(1f, 0.68f, 0.4f)
+            : new Color(1f, 1f, 1f);
     }
 
     private static void OpenPotionHistory()
