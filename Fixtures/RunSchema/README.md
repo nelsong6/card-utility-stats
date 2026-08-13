@@ -323,6 +323,10 @@ New fixtures added going forward do not need a `v*-` prefix.
 - `old-coin-relic-run.json`
   Adds Old Coin's observed gold grant, the amount of that grant later spent,
   and the persisted FIFO gold-provenance ledger used across floors and reloads.
+- `membership-card-relic-run.json`
+  Adds Membership Card's discounted-purchase activations, the marginal gold its
+  discount saved, the balance held immediately after the relic was obtained,
+  and the gold earned since then.
 - `book-of-five-rings-relic-run.json`
   Adds Book of Five Rings permanent-deck additions, held-floor rate context,
   five-card healing triggers and outcomes, and skipped card rewards.

@@ -1,0 +1,19 @@
+{
+  "run_id": "membership-card-relic-fixture",
+  "started_at": "2026-08-09T08:00:00Z",
+  "updated_at": "2026-08-09T08:20:00Z",
+  "outcome": "in_progress",
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.MEMBERSHIP_CARD": {
+      "activations": 4,
+      "membership_card_gold_saved": 163,
+      "membership_card_gold_held_after_purchase": 42,
+      "membership_card_gold_earned_after_purchase": 287
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

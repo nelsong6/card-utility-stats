@@ -93,6 +93,7 @@ public static class RelicCmdObtainStatsPatch
             RunTracker.RecordGiryaObtained(girya, player);
         RunTracker.RecordSwordOfStoneObtained(relic, player);
         RunTracker.RecordToyBoxWaxRelicBestowed(relic, player);
+        RunTracker.RecordMembershipCardObtained(relic, player);
 
         if (chosenCheeseState.Player != null)
             RunTracker.RecordChosenCheeseObtained(relic, player, chosenCheeseState.StartingMaxHp);

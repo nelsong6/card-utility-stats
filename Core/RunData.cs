@@ -1471,6 +1471,16 @@ public class RelicAggregate
     public int OldCoinGoldGranted { get; set; }
     public int OldCoinGoldSpent { get; set; }
 
+    // Membership Card tracking. Saved is the per-purchase gap between the
+    // merchant price re-read with only this relic's discount suppressed and
+    // the gold the purchase actually spent, so a second price modifier keeps
+    // its own share. The held/earned pair frames that saving against the
+    // relic's own cost: the balance left the moment it was obtained, and every
+    // later observed gold gain while it was still held.
+    public int MembershipCardGoldSaved { get; set; }
+    public int? MembershipCardGoldHeldAfterPurchase { get; set; }
+    public int MembershipCardGoldEarnedAfterPurchase { get; set; }
+
     // Permanent deck additions confirmed by a relic-owned pile-change
     // callback. Used by Lucky Fysh and Book of Five Rings.
     public int CardsAddedToDeck { get; set; }

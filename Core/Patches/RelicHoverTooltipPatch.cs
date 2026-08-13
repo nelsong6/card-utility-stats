@@ -1412,6 +1412,13 @@ public static class RelicHoverShowPatch
             return true;
         }
 
+        if (relicModel is MembershipCard)
+        {
+            title = "Membership Card";
+            body = BuildMembershipCardBodyBBCode(agg);
+            return true;
+        }
+
         if (relicModel is GoldenPearl)
         {
             title = "Golden Pearl";
@@ -4870,6 +4877,34 @@ public static class RelicHoverShowPatch
             $"{agg.OldCoinGoldSpent}/{agg.OldCoinGoldGranted}",
             "",
             "Granted gold spent — how much of Old Coin's observed gold grant was later consumed by purchases.");
+        return sb.ToString();
+    }
+
+    private static string BuildMembershipCardBodyBBCode(RelicAggregate agg)
+    {
+        var sb = new StringBuilder();
+        RelicActivationRow(
+            sb,
+            agg.Activations.ToString(),
+            "Activations — completed shop purchases whose price Membership Card actually reduced.");
+        Row3(
+            sb,
+            "Gold saved",
+            agg.MembershipCardGoldSaved.ToString(),
+            "",
+            "Gold saved — what those purchases would have cost with only Membership Card's discount removed, minus the gold actually spent. Another price modifier keeps its own share.");
+        Row3(
+            sb,
+            "Gold held after purchase",
+            agg.MembershipCardGoldHeldAfterPurchase?.ToString() ?? "not recorded",
+            "",
+            "Gold held after purchase — the balance remaining the moment Membership Card was obtained, after paying for it.");
+        Row3(
+            sb,
+            "Gold earned after purchase",
+            agg.MembershipCardGoldEarnedAfterPurchase.ToString(),
+            "",
+            "Gold earned after purchase — every gold gain observed since Membership Card was obtained, while it was still held.");
         return sb.ToString();
     }
 
