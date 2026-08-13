@@ -24,6 +24,15 @@ internal readonly record struct RelicLiveActivationCounts(
     int ThisTurn,
     int ThisCombat);
 
+/// <summary>
+/// Eternal Feather's heal as the game would size it right now, from the live
+/// owner's deck rather than from anything observed.
+/// </summary>
+internal readonly record struct EternalFeatherLiveHeal(
+    decimal Heal,
+    int DeckCards,
+    int CardsPerHeal);
+
 internal readonly record struct ThreeAttackScalingRelicStats(
     int AttacksPlayed,
     int Activations,
@@ -196,6 +205,9 @@ public static class RelicHoverShowPatch
         var liveActivationCounts = useEndedRun
             ? null
             : GetLiveAttackChargeRelicActivationCounts(relicModel, relicId);
+        var liveEternalFeatherHeal = useEndedRun
+            ? null
+            : GetLiveEternalFeatherHeal(relicModel);
 
         var built = TryBuildBodyBBCodeWithLiveActivationCounts(
             relicModel,
@@ -207,6 +219,7 @@ public static class RelicHoverShowPatch
             storybookBrightestFlameAgg,
             phylacteryOstyStats,
             liveActivationCounts,
+            liveEternalFeatherHeal,
             out title,
             out body);
 
@@ -339,6 +352,32 @@ public static class RelicHoverShowPatch
         return TryBuildBodyBBCode(relicModel, agg, floorCount, null, null, null, null, out title, out body);
     }
 
+    /// <summary>
+    /// Read Eternal Feather's heal for the deck as it stands now, mirroring the
+    /// game's own <c>Heal * floor(deck count / Cards)</c> sizing. Returns null
+    /// when the relic has no live owner, so unowned compendium entries and
+    /// historical relic views do not claim a current value.
+    /// </summary>
+    private static EternalFeatherLiveHeal? GetLiveEternalFeatherHeal(RelicModel relicModel)
+    {
+        try
+        {
+            if (relicModel is not EternalFeather feather) return null;
+
+            var deckCards = feather.Owner?.Deck?.Cards?.Count;
+            if (!deckCards.HasValue) return null;
+
+            var cardsPerHeal = Math.Max(1, feather.DynamicVars.Cards.IntValue);
+            decimal heal = feather.DynamicVars.Heal.BaseValue * (deckCards.Value / cardsPerHeal);
+            return new EternalFeatherLiveHeal(heal, deckCards.Value, cardsPerHeal);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"GetLiveEternalFeatherHeal failed: {e.Message}");
+            return null;
+        }
+    }
+
     internal static float? GetPreferredStatsTooltipWidth(RelicModel? relicModel)
         => relicModel switch
         {
@@ -434,6 +473,7 @@ public static class RelicHoverShowPatch
             storybookBrightestFlameAgg,
             phylacteryOstyStats,
             null,
+            null,
             out title,
             out body);
     }
@@ -448,6 +488,7 @@ public static class RelicHoverShowPatch
         CardAggregate? storybookBrightestFlameAgg,
         RunMetaStats? phylacteryOstyStats,
         RelicLiveActivationCounts? liveActivationCounts,
+        EternalFeatherLiveHeal? liveEternalFeatherHeal,
         out string title,
         out string body)
     {
@@ -598,7 +639,7 @@ public static class RelicHoverShowPatch
         if (relicModel is EternalFeather)
         {
             title = "Eternal Feather";
-            body = BuildEternalFeatherBodyBBCode(agg);
+            body = BuildEternalFeatherBodyBBCode(agg, liveEternalFeatherHeal);
             return true;
         }
 
@@ -2222,7 +2263,9 @@ public static class RelicHoverShowPatch
         return sb.ToString();
     }
 
-    private static string BuildEternalFeatherBodyBBCode(RelicAggregate agg)
+    private static string BuildEternalFeatherBodyBBCode(
+        RelicAggregate agg,
+        EternalFeatherLiveHeal? liveHeal = null)
     {
         var sb = new StringBuilder();
         RelicActivationRow(sb, agg.Activations.ToString());
@@ -2238,6 +2281,19 @@ public static class RelicHoverShowPatch
             "",
             "Average deck size observed when Eternal Feather triggered at a rest site; "
                 + "the heal is one unit per whole group of those cards.");
+
+        if (liveHeal.HasValue)
+        {
+            DescribedIconRow(
+                sb,
+                ["healing_gained"],
+                [],
+                "at current deck size",
+                FormatDecimal(liveHeal.Value.Heal),
+                $"HP this would heal at a rest site right now: {liveHeal.Value.DeckCards} "
+                    + $"cards in deck, healing once per {liveHeal.Value.CardsPerHeal} of them.");
+        }
+
         return sb.ToString();
     }
 
