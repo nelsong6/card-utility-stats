@@ -87,6 +87,61 @@ stays empty. `RelicClassificationStore.IsLiveRelicDatabaseReady` /
 up. Cached aggregates such as `_allRelics` are only assigned on a successful
 enumeration, so a mod's early failed access does not poison them.
 
+### Core Loads Before The Scene Tree Accepts New Children
+
+Same startup ordering as the section above, different victim.
+`CoreMain.Initialize()` is reached from `NGame._EnterTree` →
+`GameStartupWrapper` → `GameStartup` →
+`OneTimeInitialization.ExecuteVeryEarly` → `ModManager` → our
+`[ModInitializer]`. `NGame` is therefore still inside `_EnterTree` while we run,
+and Godot refuses to parent anything onto a node that is mid-setup:
+
+```
+ERROR: Parent node is busy setting up children, `add_child()` failed.
+Consider using `add_child.call_deferred(child)` instead.
+   at: add_child (scene/main/node.cpp:1689)
+```
+
+Two properties make this worse than it looks:
+
+- **It is not an exception.** The refusal is a native `ERR_FAIL` that prints and
+  returns. A `try`/`catch` around the `AddChild` never fires, the code after it
+  keeps running, and `Core.Initialize complete` still gets logged. The node is
+  simply left parentless — never in the tree, never `_ready`, never emitting
+  signals — and nothing retries.
+- **It cannot reproduce in dev.** A hot reload re-runs `CoreMain.Initialize()`
+  long after `_EnterTree` returned, so the same call succeeds. "Fine after F5,
+  broken at launch" is the signature; the only honest evidence is the cold-start
+  window of `godot.log`, above the first `--- HOT RELOAD START ---`.
+
+So: **anything `CoreMain.Initialize()` parents into the tree must go through
+`CallDeferred`.** `RunTimeStatsTracker.AttachSampler` and
+`LoaderMain.AttachInputListener` are the worked examples;
+`HotReloadToast.Show` does the same for its `CanvasLayer`. Guard the deferred
+callback — re-check `IsInstanceValid`, that the node is still the current one,
+and that it has no parent yet — so an `Initialize`/`Shutdown` pair inside one
+frame cannot attach a node the previous Core already tore down.
+
+Only unconditional node creation is exposed. The `Reinject*` steps in
+`CoreMain.Initialize()` are safe by construction: each locates an existing live
+screen and no-ops when it finds none, which on a cold start is always. Hooks are
+safe too — `RunManager.Instance` and `CombatManager.Instance` already exist that
+early and the subscriptions survive into gameplay — and `TryResumeActiveRun`
+finds a null `RunState` and defers to the later `RunStarted` adopt path.
+`res://` resource loading works this early as well, which is why
+`StatConceptGlossary` builds its icons here without complaint.
+
+The second-order damage is worth understanding, because it does not look like a
+startup bug from the outside. A dead sampler took the run-timer tooltip with it:
+`RunTimerStatsTooltip.EnsureLiveTarget` is a no-op at `Initialize` time (the top
+bar does not exist yet) and its only retry is the sampler tick, so the live
+tooltip never bound at all for a launched-and-played session. Per-surface
+attribution degraded the same way — with no periodic sample, the only remaining
+`SampleRunTimeStats` callers were combat boundaries, and since each sample bills
+all elapsed time to the *previously* recorded surface, everything between one
+combat ending and the next starting landed in `reward_screen_seconds` while
+`map_seconds` and `event_seconds` stayed at zero.
+
 ### Newly Added Harmony Targets Need One Full Restart
 
 Core hot reload can install a Harmony detour, but it cannot reliably invalidate
