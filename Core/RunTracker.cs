@@ -4,6 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Combat.History.Entries;
 using MegaCrit.Sts2.Core.Entities.Cards;
@@ -127,6 +128,17 @@ public static class RunTracker
     private static RunData? _currentRun;
     private static RunData? _lastEndedRun;
     private static PendingCombat? _pendingCombat;
+
+    // The run record as it stood when the current room opened, serialized in
+    // the on-disk shape, plus the run it belongs to. This is the rewind target
+    // for RoomResetter: the game's own room-boundary save and this snapshot are
+    // taken at the same instant, so replaying one and restoring the other keeps
+    // the record and the game telling the same story. In memory only — a
+    // hot-reload drops it, and RoomResetter refuses rather than restart without
+    // one. See CaptureRoomEntrySnapshot / RollBackToRoomEntry.
+    private static string? _roomEntrySnapshotJson;
+    private static string? _roomEntrySnapshotRunId;
+
     private static long _unsavedRunTimeSeconds;
     private static CardPlay? _currentPlayerCardPlay;
     private static CardPlay? _recentCompletedPlayerCardPlay;
@@ -1498,6 +1510,108 @@ public static class RunTracker
         RunStorage.SaveAsync(_currentRun);
     }
 
+    /// <summary>Whether a room-entry rewind target exists for the live run.</summary>
+    public static bool HasRoomEntrySnapshot
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _roomEntrySnapshotJson != null
+                    && _currentRun != null
+                    && _roomEntrySnapshotRunId == _currentRun.RunId;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Capture the run record as the room opens, so a restart can rewind it in
+    /// step with the game. Called from
+    /// <see cref="Patches.SignetRingStatsPatch"/>, which observes the resolved
+    /// room-entry hook — that fires just after
+    /// <c>EnterMapPointInternal</c> has written the run save, which is exactly
+    /// the state a restart replays.
+    ///
+    /// Base rooms only. An event option that starts a fight pushes a combat
+    /// room onto the stack, but the save still replays the map point, so
+    /// overwriting the snapshot there would rewind to the middle of the event
+    /// instead of its start.
+    /// </summary>
+    public static void CaptureRoomEntrySnapshot(IRunState? runState)
+    {
+        lock (_lock)
+        {
+            try
+            {
+                if (_currentRun == null) return;
+                if (runState != null && runState.CurrentRoomCount > 1) return;
+
+                _roomEntrySnapshotJson =
+                    JsonSerializer.Serialize(_currentRun, RunStorage.Options);
+                _roomEntrySnapshotRunId = _currentRun.RunId;
+            }
+            catch (Exception e)
+            {
+                // A snapshot we could not take is not a reason to disturb room
+                // entry; RoomResetter reads HasRoomEntrySnapshot and refuses.
+                _roomEntrySnapshotJson = null;
+                _roomEntrySnapshotRunId = null;
+                CoreMain.LogDebug($"CaptureRoomEntrySnapshot failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Rewind the run record to the room-entry snapshot and persist it.
+    /// Returns false, having changed nothing, when no usable snapshot exists.
+    ///
+    /// Called by <see cref="RoomResetter"/> immediately before the point of no
+    /// return, because everything a shop or an event does — gold spent, cards
+    /// bought, relics taken, HP traded — is committed as it happens rather than
+    /// buffered the way combat stats are. Without this the replayed room would
+    /// bank its purchases a second time.
+    ///
+    /// The live identity maps are deliberately left alone: <c>RunStarted</c>
+    /// re-fires moments later and <see cref="AdoptRunLocked"/> clears and
+    /// rebuilds them from the restored record against the reloaded deck. The
+    /// write goes through <see cref="RunStorage.SaveAsync"/> rather than
+    /// <see cref="SaveCurrentRun"/> for the same reason — the latter would
+    /// stamp the still-live (post-purchase) instance numbers back over the
+    /// restored ones.
+    /// </summary>
+    public static bool RollBackToRoomEntry(string source)
+    {
+        lock (_lock)
+        {
+            try
+            {
+                if (_currentRun == null || _roomEntrySnapshotJson == null) return false;
+                if (_roomEntrySnapshotRunId != _currentRun.RunId) return false;
+
+                var restored = JsonSerializer.Deserialize<RunData>(
+                    _roomEntrySnapshotJson,
+                    RunStorage.Options);
+                if (restored == null) return false;
+
+                var beforeFloor = _currentRun.FloorReached;
+                _currentRun = restored;
+                _pendingCombat = null;
+                _unsavedRunTimeSeconds = 0;
+                RunStorage.SaveAsync(_currentRun);
+
+                CoreMain.Logger.Info(
+                    $"Run record rewound to room entry ({source}): "
+                    + $"run={_currentRun.RunId} floor={beforeFloor}->{_currentRun.FloorReached}");
+                return true;
+            }
+            catch (Exception e)
+            {
+                CoreMain.Logger.Error($"RollBackToRoomEntry failed: {e}");
+                return false;
+            }
+        }
+    }
+
     /// <summary>
     /// True when <paramref name="run"/> is an in-memory record for a game run
     /// that has already finished.
@@ -2443,6 +2557,8 @@ public static class RunTracker
 
             // Clear state so the next OnRunStarted sees a clean slate.
             _currentRun = null;
+            _roomEntrySnapshotJson = null;
+            _roomEntrySnapshotRunId = null;
             UnsubscribeCardOrbEventsLocked();
             _pendingCombat = null;
             _unsavedRunTimeSeconds = 0;

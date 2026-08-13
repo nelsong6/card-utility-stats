@@ -52,21 +52,19 @@ public readonly record struct RoomRestartAvailability(string? RoomNoun, string? 
 /// It deliberately does NOT call <c>RunManager.OnEnded</c>, so no run outcome is
 /// stamped and no <c>RunEnded</c> fires.
 ///
-/// SpireLens tracking needs no special handling for a restarted <i>combat</i>:
-/// this is the Continue path, so <c>RunStarted</c> re-fires with the same
-/// <c>_startTime</c> and <c>RunTracker.OnRunStarted</c> adopts the existing run
-/// record — which already discards <c>_pendingCombat</c>, so the abandoned
-/// half-fight's stats are not promoted and the replayed fight is counted once.
-///
-/// Shops and events are different, and deliberately so: their effects (gold
-/// spent, cards bought, relics taken, HP traded) are committed to the run record
-/// as they happen rather than buffered, so a restart rolls the game back but
-/// leaves those entries behind as history. That is the same rollback the tracker
-/// already tolerates when a crash or a save-and-quit rewinds the save past a
-/// card acquisition: <c>AdoptRunLocked</c> re-binds instance numbers from the
-/// live deck and drops the restores it can no longer match. Undoing the record
-/// too would need a SpireLens-side room snapshot, which is exactly the machinery
-/// this feature exists without.
+/// The run record rewinds with the game. A restarted <i>combat</i> would be fine
+/// on its own — this is the Continue path, so <c>RunStarted</c> re-fires with
+/// the same <c>_startTime</c>, <c>RunTracker.OnRunStarted</c> adopts the
+/// existing record, and the adopt already discards <c>_pendingCombat</c>, so the
+/// abandoned fight is never promoted. Shops and events get no such protection:
+/// gold spent, cards bought, relics taken and HP traded are committed as they
+/// happen, so replaying the room without rewinding the record would bank them
+/// twice — in the exact stats the room exists to produce, per-relic attribution
+/// included. <c>RunTracker.RollBackToRoomEntry</c> restores the snapshot taken
+/// when the room opened, which is the same instant the run save was written.
+/// The snapshot is in memory, so a hot reload mid-room drops it and
+/// <see cref="Describe"/> refuses until the next room re-arms it — refusing
+/// beats quietly inflating the run.
 /// </summary>
 public static class RoomResetter
 {
@@ -102,6 +100,12 @@ public static class RoomResetter
                 return Blocked("singleplayer only");
 
             if (SaveManager.Instance?.HasRunSave != true) return Blocked("no run save on disk");
+
+            // Without a room-entry snapshot the run record cannot rewind with
+            // the game, and a shop or event would bank what it did here twice.
+            // The snapshot is in-memory, so a hot reload mid-room drops it; the
+            // next room re-arms it.
+            if (!RunTracker.HasRoomEntrySnapshot) return Blocked("no room-entry snapshot");
 
             var state = run.State;
 
@@ -226,6 +230,20 @@ public static class RoomResetter
             await game.Transition.FadeOut(FadeOutSeconds);
             var fadeOutMs = phase.ElapsedMilliseconds; phase.Restart();
 
+            // Rewind SpireLens' own record to the same instant the save was
+            // written. Deliberately here: every path that can abort with the
+            // live run untouched is above, and CleanUp below is the point of no
+            // return, so the record and the game commit to the rewind together.
+            if (!RunTracker.RollBackToRoomEntry($"{roomNoun} restart"))
+            {
+                CoreMain.Logger.Error(
+                    "RoomResetter: run record rewind failed after the availability check passed; "
+                    + "aborting so the record cannot double-count this room");
+                await game.Transition.FadeIn(FadeInSeconds);
+                return;
+            }
+            var rollBackMs = phase.ElapsedMilliseconds; phase.Restart();
+
             // Frees RunManager.State so SetUpSavedSingleplayer will accept the
             // reloaded state, and suppresses any further save of the abandoned
             // attempt on the way out.
@@ -249,8 +267,8 @@ public static class RoomResetter
 
             CoreMain.Logger.Info(
                 $"RoomResetter: {roomNoun} restart complete in {total.ElapsedMilliseconds}ms " +
-                $"(fade_out={fadeOutMs}ms, clean_up={cleanUpMs}ms, set_up_saved={setUpMs}ms, " +
-                $"load_run={loadRunMs}ms, fade_in={fadeInMs}ms)");
+                $"(fade_out={fadeOutMs}ms, roll_back={rollBackMs}ms, clean_up={cleanUpMs}ms, " +
+                $"set_up_saved={setUpMs}ms, load_run={loadRunMs}ms, fade_in={fadeInMs}ms)");
         }
         catch (Exception e)
         {
