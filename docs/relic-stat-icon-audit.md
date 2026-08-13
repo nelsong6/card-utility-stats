@@ -121,3 +121,56 @@ The shared vocabulary supplies a readable fallback information description for
 every row. Rows whose meaning depends on attempted versus successful outcomes,
 blocked values, current-combat state, or another special denominator should
 override that fallback with an authored sentence at the call site.
+
+## Faithfulness audit
+
+Every stat-row call site with a literal label was run through
+`RelicStatRowVocabulary.Create` and compared against the concepts its own
+wording mentions: 887 row call sites, 620 literal labels, 459 distinct labels.
+
+### Rule: a multi-word rule needs a matching multi-word symbol
+
+Concept rules are applied in list order and each match removes its span, so an
+earlier rule that spans two concepts suppresses the later rule for the word it
+swallowed. That is correct only when the surviving symbol carries both meanings
+— `strength gained` → `strength_gained`, `block wasted` → `block_wasted`,
+`common potions` → `potion_common`, `max HP` → `max_hp`.
+
+The `taken` rule broke that rule: it spanned `floors? acquired`, so "Floor
+acquired" rendered a lone Taken symbol and silently dropped its Floor icon,
+while the adjacent "Floor activated" row in the same Lizard Tail tooltip kept
+one. The rule now matches only the verb. When adding a multi-word rule, confirm
+a combined symbol exists for the whole phrase.
+
+### Open: the row wording, the symbol, and the hint use different words
+
+These rows are correct in what they *count*; the drift is vocabulary. In each
+case the row says one word, the symbol's glossary label says another, and the
+ⓘ hint repeats the row's word — so a player hovering the symbol reads a term
+they never saw in the row. Counts are distinct labels.
+
+| Row says | Symbol says | Rows |
+|---|---|---:|
+| HP lost | Damage | 8 |
+| triggered / trigger / triggers | Activation | 11 |
+| Commons / common | Card (no `card_common` concept exists) | 9 |
+| events | Unknown room | 4 |
+| acquired | Taken | 4 |
+| shop / shops | Merchant | 5 |
+| HP healed / HP restored | Healing gained | 5 |
+| slain | Kill | 2 |
+| rest site / rest sites | Campfire | 2 |
+
+Two of these are internal contradictions rather than synonyms. `card_common` is
+absent while `card_rare` and `card_uncommon` exist, so "Commons picked" and
+"Cards picked" render identically. And the map legend already says "Merchants
+visited" and "Rest sites visited" in the same tooltips whose symbols are
+labelled Merchant and Campfire, while relic rows elsewhere say "Shops skipped".
+
+### Open: authored hints that never say what their symbols assert
+
+Ten rows pass an authored `fullDescription` whose sentence never uses the word
+its symbols stand for — for example "Common Attacks taken" hinting "Common
+Attacks selected from Splash", or Girya's "Lift" carrying an Activation symbol
+in a sentence that only says "successful Lift". The symbols are right; the
+sentences should reuse their words.

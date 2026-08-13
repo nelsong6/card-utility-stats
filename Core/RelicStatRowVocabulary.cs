@@ -152,9 +152,11 @@ internal static class RelicStatRowVocabulary
         Rule("energy", @"\benergy\b"),
         Rule("elite", @"\belites?\b", true),
         Rule("exhaust", @"\bexhaust(?:ed|ing|s)?\b"),
-        Rule(
-            "taken",
-            @"\bfloors?\s+acquired\b|(?<!not\s)\b(?:acquired|taken)\b"),
+        // Match only the verb. Spanning "floor acquired" as one phrase would
+        // consume the floor scope along with it, and there is no combined
+        // symbol to carry that meaning — the row would silently lose its floor
+        // icon while the neighboring "Floor activated" row kept one.
+        Rule("taken", @"(?<!not\s)\b(?:acquired|taken)\b"),
         Rule("floor", @"\bfloors?\b", true),
         Rule("fruit_juice", @"\bfruit\s+juices?\b"),
         Rule("glam", @"\bglam\b"),

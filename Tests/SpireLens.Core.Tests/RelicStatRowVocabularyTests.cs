@@ -234,7 +234,12 @@ public class RelicStatRowVocabularyTests
     [InlineData(
         "Floor acquired",
         "",
-        "taken",
+        "floor,taken",
+        "")]
+    [InlineData(
+        "Floor activated",
+        "",
+        "floor,activation",
         "")]
     [InlineData(
         "Curses acquired",
