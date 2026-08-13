@@ -1,0 +1,40 @@
+{
+  "run_id": "eternal-feather-deck-size-fixture",
+  "started_at": "2026-08-09T18:00:00Z",
+  "updated_at": "2026-08-09T18:40:00Z",
+  "character": "CHAR.IRONCLAD",
+  "ascension": 8,
+  "floor_reached": 16,
+  "outcome": "in_progress",
+  "game_start_time": 1786413600,
+  "aggregates": {},
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.ETERNAL_FEATHER": {
+      "activations": 3,
+      "total_healing_attempted": 27,
+      "total_healing_restored": 15,
+      "total_healing_lost": 12,
+      "eternal_feather_healing_activations": [
+        {
+          "floor": 7,
+          "hp_restored": 9
+        },
+        {
+          "floor": 14,
+          "hp_restored": 0
+        },
+        {
+          "floor": 16,
+          "hp_restored": 6
+        }
+      ],
+      "eternal_feather_deck_cards_total": 62,
+      "eternal_feather_deck_cards_samples": 3
+    }
+  },
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {},
+  "def_counters": {}
+}

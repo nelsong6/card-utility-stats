@@ -2950,6 +2950,8 @@ public static class RunTracker
         target.TotalHealingLost += source.TotalHealingLost;
         MergeHealingLostReasonsInto(target, source);
         MergeEternalFeatherHealingActivations(target, source);
+        target.EternalFeatherDeckCardsTotal += source.EternalFeatherDeckCardsTotal;
+        target.EternalFeatherDeckCardsSamples += source.EternalFeatherDeckCardsSamples;
         target.MeatOnTheBonePreTriggerHpMissingTotal +=
             source.MeatOnTheBonePreTriggerHpMissingTotal;
         target.MeatOnTheBonePreTriggerHpBelowHalfTotal +=
@@ -17286,11 +17288,15 @@ public static class RunTracker
     }
 
     /// <summary>
-    /// Record Eternal Feather's rest-site activation and attempted heal. This
-    /// happens outside combat, so the aggregate is written directly to the
-    /// committed run data instead of the pending combat buffer.
+    /// Record Eternal Feather's rest-site activation, attempted heal, and the
+    /// deck size the game sized that heal from. This happens outside combat, so
+    /// the aggregate is written directly to the committed run data instead of
+    /// the pending combat buffer.
     /// </summary>
-    public static void RecordEternalFeatherTrigger(Creature healedCreature, decimal attemptedHealing)
+    public static void RecordEternalFeatherTrigger(
+        Creature healedCreature,
+        decimal attemptedHealing,
+        int deckCards)
     {
         RecordRelicHealingTrigger(
             EternalFeatherRelicId,
@@ -17299,6 +17305,13 @@ public static class RunTracker
             nameof(RecordEternalFeatherTrigger),
             forceDirectRunPersistence: true,
             allowZeroAttempt: true,
+            configureAggregate: agg =>
+            {
+                if (deckCards < 0) return;
+
+                agg.EternalFeatherDeckCardsTotal += deckCards;
+                agg.EternalFeatherDeckCardsSamples++;
+            },
             recordEternalFeatherActivation: true);
     }
 

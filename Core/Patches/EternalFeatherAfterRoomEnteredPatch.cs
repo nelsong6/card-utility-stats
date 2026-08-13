@@ -28,7 +28,10 @@ public static class EternalFeatherAfterRoomEnteredPatch
             int healUnits = deckCards / cardsPerHeal;
             decimal attemptedHealing = __instance.DynamicVars.Heal.BaseValue * healUnits;
 
-            RunTracker.RecordEternalFeatherTrigger(__instance.Owner.Creature, attemptedHealing);
+            RunTracker.RecordEternalFeatherTrigger(
+                __instance.Owner.Creature,
+                attemptedHealing,
+                deckCards);
         }
         catch (Exception e)
         {
