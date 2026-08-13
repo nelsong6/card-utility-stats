@@ -1762,6 +1762,21 @@ Resolve the old Candy option before reroll clears `_cards`, then register the
 new Candy-tagged result after repopulation. Inner card-screen Skip is not
 terminal and must preserve the pending snapshot.
 
+Prismatic Gem and Dingy Rug are pool-shape relics, not per-option relics, so
+neither appears in any `CardCreationResult.ModifyingRelics`. Their offered side
+comes from `Hook.TryModifyCardRewardOptions`, which reports the final visible
+option list for every reward generated while the relic is held — deliberately
+meta, because another modifier may have contributed the same option. Read each
+option's pool from `CardModel.Pool` (`IsColorless` first, then the pool id with
+its `_CARD_POOL` suffix stripped) so the key survives display-name changes. The
+taken side reuses the same `CardReward._cards` removal truth as Wing Charm:
+snapshot every visible option with its pool when the selection opens, and treat
+a result missing at terminal resolution as taken. Because both relics observe
+the whole option list rather than one tagged option, a player holding both is
+credited on both, and the two counters are independent — an offer recorded at
+generation time can never be assumed taken, and old runs that predate the taken
+counter read as zero taken rather than as zero offers.
+
 Silver Crucible's first, second, and third reward numbers are generation order,
 not click order. `CardReward.Populate` runs before the outer rewards page is
 shown, and `SilverCrucible.AfterModifyingCardRewardOptions` synchronously

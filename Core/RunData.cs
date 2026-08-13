@@ -2084,9 +2084,10 @@ public class RelicAggregate
     // the offered-card signature used to rebind a live reward after hot reload.
     public List<OrreryRewardAggregate> OrreryRewards { get; set; } = new();
 
-    // Observed card reward options by card pool while Prismatic Gem is owned.
-    // This is intentionally meta: other reward modifiers may also affect the
-    // final options. Used by Prismatic Gem.
+    // Observed card reward options by card pool while Prismatic Gem is owned,
+    // paired with how many of those options the player actually took. This is
+    // intentionally meta: other reward modifiers may also affect the final
+    // options. Used by Prismatic Gem and Dingy Rug.
     public Dictionary<string, CardRewardCategoryAggregate> CardRewardCategories { get; set; } = new();
 
     // Specific cards granted by relic-owned effects. Used by Hefty Tablet to
@@ -2115,6 +2116,10 @@ public class CardRewardCategoryAggregate
 {
     public string DisplayName { get; set; } = "";
     public int Count { get; set; }
+    // Options from this pool that actually left the reward screen and entered
+    // the deck. Additive: runs recorded before this field default to zero, so
+    // an old run reads as "offered, taken unknown" rather than "none taken".
+    public int Taken { get; set; }
 }
 
 public class RelicCardAggregate

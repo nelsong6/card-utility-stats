@@ -60,7 +60,7 @@ public class PrismaticGemStatsTests
             CardRewardsAffected = 2,
             CardRewardCategories =
             {
-                ["defect"] = new CardRewardCategoryAggregate { DisplayName = "Defect", Count = 3 },
+                ["defect"] = new CardRewardCategoryAggregate { DisplayName = "Defect", Count = 3, Taken = 1 },
                 ["colorless"] = new CardRewardCategoryAggregate { DisplayName = "Colorless", Count = 1 },
             },
         };
@@ -70,6 +70,7 @@ public class PrismaticGemStatsTests
         Assert.Contains("energy_generated", json);
         Assert.Contains("card_rewards_affected", json);
         Assert.Contains("card_reward_categories", json);
+        Assert.Contains("\"taken\"", json);
 
         var restored = JsonSerializer.Deserialize<RunData>(json, SerializerOptions);
 
@@ -78,8 +79,10 @@ public class PrismaticGemStatsTests
         Assert.Equal(4, agg.EnergyGenerated);
         Assert.Equal(2, agg.CardRewardsAffected);
         Assert.Equal(3, agg.CardRewardCategories["defect"].Count);
+        Assert.Equal(1, agg.CardRewardCategories["defect"].Taken);
         Assert.Equal("Defect", agg.CardRewardCategories["defect"].DisplayName);
         Assert.Equal(1, agg.CardRewardCategories["colorless"].Count);
+        Assert.Equal(0, agg.CardRewardCategories["colorless"].Taken);
         Assert.Equal("Colorless", agg.CardRewardCategories["colorless"].DisplayName);
     }
 
@@ -96,8 +99,8 @@ public class PrismaticGemStatsTests
                 ["silent"] = new CardRewardCategoryAggregate { DisplayName = "Silent", Count = 2 },
                 ["regent"] = new CardRewardCategoryAggregate { DisplayName = "Regent", Count = 3 },
                 ["necrobinder"] = new CardRewardCategoryAggregate { DisplayName = "Necrobinder", Count = 4 },
-                ["defect"] = new CardRewardCategoryAggregate { DisplayName = "Defect", Count = 5 },
-                ["colorless"] = new CardRewardCategoryAggregate { DisplayName = "Colorless", Count = 6 },
+                ["defect"] = new CardRewardCategoryAggregate { DisplayName = "Defect", Count = 5, Taken = 2 },
+                ["colorless"] = new CardRewardCategoryAggregate { DisplayName = "Colorless", Count = 6, Taken = 1 },
             },
         };
 
@@ -108,20 +111,21 @@ public class PrismaticGemStatsTests
         Assert.Contains("[b]4[/b]", body);
         Assert.Contains("Card rewards affected", body);
         Assert.Contains("[b]2[/b]", body);
-        Assert.Contains("Ironclad cards offered", body);
-        Assert.Contains("Silent cards offered", body);
-        Assert.Contains("Regent cards offered", body);
-        Assert.Contains("Necrobinder cards offered", body);
-        Assert.Contains("Defect cards offered", body);
-        Assert.Contains("Colorless cards offered", body);
+        Assert.Contains("Ironclad cards offered/taken", body);
+        Assert.Contains("Silent cards offered/taken", body);
+        Assert.Contains("Regent cards offered/taken", body);
+        Assert.Contains("Necrobinder cards offered/taken", body);
+        Assert.Contains("Defect cards offered/taken", body);
+        Assert.Contains("Colorless cards offered/taken", body);
         Assert.Contains(StatConceptGlossary.RenderHintedGlyph("card"), body);
         Assert.Contains(StatConceptGlossary.RenderHintedGlyph("offered"), body);
+        Assert.Contains(StatConceptGlossary.RenderHintedGlyph("taken"), body);
         Assert.DoesNotContain("Defect rewards", body);
         Assert.DoesNotContain("Colorless rewards", body);
-        Assert.Contains("[b]1[/b]", body);
-        Assert.Contains("[b]3[/b]", body);
-        Assert.Contains("[b]5[/b]", body);
-        Assert.Contains("[b]6[/b]", body);
+        Assert.Contains("[b]1/0[/b]", body);
+        Assert.Contains("[b]3/0[/b]", body);
+        Assert.Contains("[b]5/2[/b]", body);
+        Assert.Contains("[b]6/1[/b]", body);
     }
 
     [Fact]
@@ -130,12 +134,13 @@ public class PrismaticGemStatsTests
         var body = (string)(BuildPrismaticGemBodyMethod.Invoke(null, new object?[] { new RelicAggregate() })
             ?? throw new InvalidOperationException("BuildPrismaticGemBodyBBCode returned null."));
 
-        Assert.Contains("Ironclad cards offered", body);
-        Assert.Contains("Silent cards offered", body);
-        Assert.Contains("Regent cards offered", body);
-        Assert.Contains("Necrobinder cards offered", body);
-        Assert.Contains("Defect cards offered", body);
-        Assert.Contains("Colorless cards offered", body);
+        Assert.Contains("Ironclad cards offered/taken", body);
+        Assert.Contains("Silent cards offered/taken", body);
+        Assert.Contains("Regent cards offered/taken", body);
+        Assert.Contains("Necrobinder cards offered/taken", body);
+        Assert.Contains("Defect cards offered/taken", body);
+        Assert.Contains("Colorless cards offered/taken", body);
+        Assert.Contains("[b]0/0[/b]", body);
     }
 
     [Fact]
@@ -145,16 +150,47 @@ public class PrismaticGemStatsTests
         {
             CardRewardCategories =
             {
-                ["defect_card_pool"] = new CardRewardCategoryAggregate { DisplayName = "defect", Count = 2 },
-                ["defect"] = new CardRewardCategoryAggregate { DisplayName = "Defect", Count = 3 },
+                ["defect_card_pool"] = new CardRewardCategoryAggregate
+                {
+                    DisplayName = "defect",
+                    Count = 2,
+                    Taken = 1,
+                },
+                ["defect"] = new CardRewardCategoryAggregate { DisplayName = "Defect", Count = 3, Taken = 2 },
             },
         };
 
         var body = (string)(BuildPrismaticGemBodyMethod.Invoke(null, new object?[] { agg })
             ?? throw new InvalidOperationException("BuildPrismaticGemBodyBBCode returned null."));
 
-        Assert.Contains("Defect cards offered", body);
-        Assert.Contains("[b]5[/b]", body);
+        Assert.Contains("Defect cards offered/taken", body);
+        Assert.Contains("[b]5/3[/b]", body);
+    }
+
+    [Fact]
+    public void RecordCardPoolRelicTaken_CreditsTakenWithoutInventingOffers()
+    {
+        var agg = new RelicAggregate
+        {
+            CardRewardCategories =
+            {
+                ["defect"] = new CardRewardCategoryAggregate { DisplayName = "Defect", Count = 3 },
+            },
+        };
+
+        RunTracker.RecordCardPoolRelicTakenForTest(
+            agg,
+            new[]
+            {
+                new CardRewardCategoryObservation("defect", "Defect"),
+                new CardRewardCategoryObservation("colorless", "Colorless"),
+            });
+
+        Assert.Equal(3, agg.CardRewardCategories["defect"].Count);
+        Assert.Equal(1, agg.CardRewardCategories["defect"].Taken);
+        Assert.Equal(0, agg.CardRewardCategories["colorless"].Count);
+        Assert.Equal(1, agg.CardRewardCategories["colorless"].Taken);
+        Assert.Equal("Colorless", agg.CardRewardCategories["colorless"].DisplayName);
     }
 
     [Fact]
@@ -185,5 +221,36 @@ public class PrismaticGemStatsTests
         Assert.Equal(3, agg.EnergyGenerated);
         Assert.Equal(0, agg.CardRewardsAffected);
         Assert.Empty(agg.CardRewardCategories);
+    }
+
+    [Fact]
+    public void RunData_CardRewardCategoryWithoutTaken_DeserializesWithZeroDefault()
+    {
+        const string json = """
+            {
+              "run_id": "test",
+              "started_at": "2026-01-01T00:00:00Z",
+              "updated_at": "2026-01-01T00:00:00Z",
+              "outcome": "in_progress",
+              "aggregates": {},
+              "events": [],
+              "instance_numbers_by_def": {},
+              "def_counters": {},
+              "relic_aggregates": {
+                "RELIC.PRISMATIC_GEM": {
+                  "card_reward_categories": {
+                    "defect": { "display_name": "Defect", "count": 3 }
+                  }
+                }
+              }
+            }
+            """;
+
+        var run = JsonSerializer.Deserialize<RunData>(json, SerializerOptions);
+
+        Assert.NotNull(run);
+        var category = run!.RelicAggregates[PrismaticGemRelicId].CardRewardCategories["defect"];
+        Assert.Equal(3, category.Count);
+        Assert.Equal(0, category.Taken);
     }
 }

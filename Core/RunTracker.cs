@@ -204,6 +204,7 @@ public static class RunTracker
     private static readonly Dictionary<CardReward, PendingFresnelLensReward> _fresnelLensRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, PendingSilkenTressReward> _silkenTressRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, PendingWingCharmReward> _wingCharmRewards = new(ReferenceEqualityComparer.Instance);
+    private static readonly Dictionary<CardReward, PendingCardPoolRelicReward> _cardPoolRelicRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, PendingLastingCandyReward> _lastingCandyRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, PendingSilverCrucibleReward> _silverCrucibleRewards = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<CardReward, PendingOrreryReward> _orreryRewards = new(ReferenceEqualityComparer.Instance);
@@ -1749,6 +1750,7 @@ public static class RunTracker
         _fresnelLensRewards.Clear();
         _silkenTressRewards.Clear();
         _wingCharmRewards.Clear();
+        _cardPoolRelicRewards.Clear();
         _lastingCandyRewards.Clear();
         _silverCrucibleRewards.Clear();
         _orreryRewards.Clear();
@@ -10245,8 +10247,8 @@ public static class RunTracker
     private const string BronzeScalesRelicId = "RELIC.BRONZE_SCALES";
     private const string HornCleatRelicId = "RELIC.HORN_CLEAT";
     private const string CaptainsWheelRelicId = "RELIC.CAPTAINS_WHEEL";
-    private const string PrismaticGemRelicId = "RELIC.PRISMATIC_GEM";
-    private const string DingyRugRelicId = "RELIC.DINGY_RUG";
+    internal const string PrismaticGemRelicId = "RELIC.PRISMATIC_GEM";
+    internal const string DingyRugRelicId = "RELIC.DINGY_RUG";
     private const string PumpkinCandleRelicId = "RELIC.PUMPKIN_CANDLE";
     private const string SpikedGauntletsRelicId = "RELIC.SPIKED_GAUNTLETS";
     private const string SealOfGoldRelicId = "RELIC.SEAL_OF_GOLD";
@@ -27849,6 +27851,103 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Snapshot the visible card-reward options, by pool, while Prismatic Gem
+    /// or Dingy Rug is held. The offered side of those pool rows is counted
+    /// when the options are generated; this snapshot is what later turns the
+    /// same rows into an observed offered/taken pair. The same reward can be
+    /// reopened, so an existing snapshot is preserved until a terminal
+    /// selection, outer skip, or reroll resolves it.
+    /// </summary>
+    public static void NoteCardPoolRelicRewardOpened(CardReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!IsTrackedPlayer(reward.Player)) return;
+                if (_cardPoolRelicRewards.ContainsKey(reward)) return;
+
+                var pending = PendingCardPoolRelicReward.FromReward(reward);
+                if (pending.RelicIds.Count == 0 || pending.Options.Count == 0) return;
+
+                _cardPoolRelicRewards[reward] = pending;
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"NoteCardPoolRelicRewardOpened failed: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Resolve the snapshotted pool options against CardReward's remaining
+    /// result objects. A result disappears only once its card has actually
+    /// entered the deck, so the pool counts credited here are cards taken, not
+    /// cards clicked.
+    /// </summary>
+    public static void RecordCardPoolRelicRewardResolved(CardReward reward)
+    {
+        if (reward == null) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!_cardPoolRelicRewards.Remove(reward, out var pending)) return;
+                if (!IsTrackedPlayer(reward.Player)) return;
+
+                var remaining = new HashSet<CardCreationResult>(
+                    reward._cards,
+                    ReferenceEqualityComparer.Instance);
+                var taken = pending.Options
+                    .Where(option => !remaining.Contains(option.Result))
+                    .Select(option => option.Category)
+                    .ToList();
+                if (taken.Count == 0) return;
+
+                foreach (var relicId in pending.RelicIds)
+                {
+                    var agg = GetOrCreateCurrentRunRelicAggregateLocked(relicId);
+                    RecordCardPoolRelicTakenForTest(agg, taken);
+                }
+
+                RefreshCurrentRunMetadataLocked();
+                SaveCurrentRun();
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordCardPoolRelicRewardResolved failed: {e.Message}");
+            }
+        }
+    }
+
+    public static void CancelCardPoolRelicReward(CardReward reward)
+    {
+        if (reward == null) return;
+        lock (_lock)
+            _cardPoolRelicRewards.Remove(reward);
+    }
+
+    internal static void RecordCardPoolRelicTakenForTest(
+        RelicAggregate agg,
+        IEnumerable<CardRewardCategoryObservation>? takenCategories)
+    {
+        if (agg == null || takenCategories == null) return;
+
+        foreach (var category in takenCategories)
+        {
+            AddCardRewardCategory(
+                agg.CardRewardCategories,
+                category.Key,
+                category.DisplayName,
+                count: 0,
+                taken: 1);
+        }
+    }
+
+    /// <summary>
     /// Arm the flag that attributes player block gains to Cloak Clasp.
     /// Called from <see cref="Patches.CloakClaspBeforeTurnEndPatch"/> when
     /// Cloak Clasp's end-of-turn hook fires on the player's side. The registry
@@ -32153,8 +32252,13 @@ public static class RunTracker
 
         foreach (var kvp in source)
         {
-            if (kvp.Value.Count <= 0) continue;
-            AddCardRewardCategory(target, kvp.Key, kvp.Value.DisplayName, kvp.Value.Count);
+            if (kvp.Value.Count <= 0 && kvp.Value.Taken <= 0) continue;
+            AddCardRewardCategory(
+                target,
+                kvp.Key,
+                kvp.Value.DisplayName,
+                kvp.Value.Count,
+                kvp.Value.Taken);
         }
     }
 
@@ -32162,9 +32266,10 @@ public static class RunTracker
         Dictionary<string, CardRewardCategoryAggregate> categories,
         string key,
         string displayName,
-        int count)
+        int count,
+        int taken = 0)
     {
-        if (count <= 0 || string.IsNullOrWhiteSpace(key)) return;
+        if ((count <= 0 && taken <= 0) || string.IsNullOrWhiteSpace(key)) return;
 
         if (!categories.TryGetValue(key, out var agg))
         {
@@ -32180,7 +32285,8 @@ public static class RunTracker
             agg.DisplayName = string.IsNullOrWhiteSpace(displayName) ? ToDisplayName(key) : displayName;
         }
 
-        agg.Count += count;
+        if (count > 0) agg.Count += count;
+        if (taken > 0) agg.Taken += taken;
     }
 
     private static void MergeRelicCardsGranted(
@@ -37033,6 +37139,56 @@ internal sealed class PendingWingCharmReward
                 pending.Options.Add(new PendingWingCharmOption(
                     option,
                     card.Rarity));
+            }
+            catch
+            {
+            }
+        }
+
+        return pending;
+    }
+}
+
+internal sealed record PendingCardPoolRelicOption(
+    CardCreationResult Result,
+    CardRewardCategoryObservation Category);
+
+/// <summary>
+/// The visible options of one card reward, tagged with the pool each option
+/// came from, plus the card-pool relics held by the reward's player when it
+/// opened. Both relics observe the same options, so a player holding both is
+/// credited on both.
+/// </summary>
+internal sealed class PendingCardPoolRelicReward
+{
+    public List<PendingCardPoolRelicOption> Options { get; } = new();
+    public List<string> RelicIds { get; } = new();
+
+    public static PendingCardPoolRelicReward FromReward(CardReward? reward)
+    {
+        var pending = new PendingCardPoolRelicReward();
+        if (reward == null) return pending;
+
+        var relics = reward.Player?.Relics;
+        if (relics == null) return pending;
+        if (relics.Any(relic => relic is PrismaticGem))
+            pending.RelicIds.Add(RunTracker.PrismaticGemRelicId);
+        if (relics.Any(relic => relic is DingyRug))
+            pending.RelicIds.Add(RunTracker.DingyRugRelicId);
+        if (pending.RelicIds.Count == 0) return pending;
+
+        foreach (var option in reward._cards)
+        {
+            try
+            {
+                if (option?.Card == null) continue;
+
+                var category = Patches
+                    .HookTryModifyCardRewardOptionsPrismaticGemPatch
+                    .ToCategory(option.Card);
+                if (string.IsNullOrWhiteSpace(category.Key)) continue;
+
+                pending.Options.Add(new PendingCardPoolRelicOption(option, category));
             }
             catch
             {
