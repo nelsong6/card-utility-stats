@@ -692,6 +692,10 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds Orichalcum's leftover-Block shortfall: undercut turns, the missed-Block
   total scored against the relic's own trigger amount, and the zero-inclusive
   held turn/combat denominators for its two averages.
+- `mercury-hourglass-relic-run.json`
+  Adds Mercury Hourglass's zero-inclusive held combat denominator alongside its
+  raw per-turn-start activation count, which together back its per-combat
+  activation and damage averages.
 
 Why these exist:
 

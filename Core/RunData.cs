@@ -1616,6 +1616,11 @@ public class RelicAggregate
     // Hourglass, and Forgotten Soul.
     public int TotalTargets { get; set; }
 
+    // Mercury Hourglass held-period denominator. Activations count every
+    // owner turn-start trigger, so this zero-inclusive combat count is what
+    // its per-combat averages divide by.
+    public int MercuryHourglassCombats { get; set; }
+
     // Letter Opener tracking. TotalDamageAttempted stores the attempted AoE
     // damage, TotalTargets stores live enemy targets at activation time, and
     // these fields provide average denominators plus turn-end charge buckets.

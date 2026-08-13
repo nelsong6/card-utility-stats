@@ -1,0 +1,34 @@
+{
+  "run_id": "mercury-hourglass-relic-fixture",
+  "started_at": "2026-08-12T18:00:00Z",
+  "updated_at": "2026-08-12T18:24:00Z",
+  "outcome": "in_progress",
+  "floor_reached": 11,
+  "aggregates": {
+    "CARD.STRIKE_NECROBINDER#1": {
+      "initial_upgrade_level": 0
+    }
+  },
+  "events": [],
+  "relic_aggregates": {
+    "RELIC.MERCURY_HOURGLASS": {
+      "activations": 9,
+      "total_damage_attempted": 54,
+      "total_damage_dealt": 44,
+      "total_damage_blocked": 6,
+      "total_damage_overkill": 4,
+      "kills": 2,
+      "total_targets": 18,
+      "mercury_hourglass_combats": 3
+    }
+  },
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.STRIKE_NECROBINDER": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.STRIKE_NECROBINDER": 1
+  }
+}

@@ -1101,7 +1101,7 @@ observed from the successful `PowerReceivedEntry`; later turns come from
 turn/combat denominators under the power ID, and project them on every Danse
 Macabre card rather than assigning later power behavior to one physical copy.
 
-For relics that emit damage commands, prefer the relic-owned callback plus the resolved `CreatureCmd.Damage` result. Mercury Hourglass arms from `MercuryHourglass.AfterPlayerTurnStart`, records the actual multi-target damage split from the command result on each turn, and counts the combat once so damage per combat is not confused with damage per turn-start trigger.
+For relics that emit damage commands, prefer the relic-owned callback plus the resolved `CreatureCmd.Damage` result. Mercury Hourglass arms from `MercuryHourglass.AfterPlayerTurnStart` and records the actual multi-target damage split from the command result on each turn. Every armed turn start is one activation; the per-combat averages divide by a separate zero-inclusive held-combat denominator (`MercuryHourglassCombats`, counted from the shared held-combat baseline pass) rather than by the activation count.
 
 Screaming Flagon follows the same observed-result pattern from its owner-specific
 `BeforeSideTurnEnd` callback. Mirror the callback's participating-owner and

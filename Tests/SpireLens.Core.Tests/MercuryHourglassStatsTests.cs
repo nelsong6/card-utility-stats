@@ -28,13 +28,14 @@ public class MercuryHourglassStatsTests
         var run = new RunData();
         run.RelicAggregates[MercuryHourglassRelicId] = new RelicAggregate
         {
-            Activations = 2,
+            Activations = 6,
             TotalDamageAttempted = 33,
             TotalDamageDealt = 26,
             TotalDamageBlocked = 4,
             TotalDamageOverkill = 3,
             TotalTargets = 7,
             Kills = 1,
+            MercuryHourglassCombats = 2,
         };
 
         var json = JsonSerializer.Serialize(run, SerializerOptions);
@@ -47,18 +48,20 @@ public class MercuryHourglassStatsTests
         Assert.Contains("total_damage_overkill", json);
         Assert.Contains("total_targets", json);
         Assert.Contains("kills", json);
+        Assert.Contains("mercury_hourglass_combats", json);
 
         var restored = JsonSerializer.Deserialize<RunData>(json, SerializerOptions);
 
         Assert.NotNull(restored);
         var agg = restored!.RelicAggregates[MercuryHourglassRelicId];
-        Assert.Equal(2, agg.Activations);
+        Assert.Equal(6, agg.Activations);
         Assert.Equal(33, agg.TotalDamageAttempted);
         Assert.Equal(26, agg.TotalDamageDealt);
         Assert.Equal(4, agg.TotalDamageBlocked);
         Assert.Equal(3, agg.TotalDamageOverkill);
         Assert.Equal(7, agg.TotalTargets);
         Assert.Equal(1, agg.Kills);
+        Assert.Equal(2, agg.MercuryHourglassCombats);
     }
 
     [Fact]
@@ -87,27 +90,45 @@ public class MercuryHourglassStatsTests
     {
         var body = BuildBody(new RelicAggregate
         {
-            Activations = 2,
+            Activations = 6,
             TotalDamageAttempted = 33,
-            TotalDamageDealt = 25,
+            TotalDamageDealt = 24,
             TotalDamageBlocked = 5,
             TotalDamageOverkill = 3,
             TotalTargets = 4,
             Kills = 1,
+            MercuryHourglassCombats = 3,
         });
 
-        Assert.Contains("Combats triggered", body);
+        Assert.Contains("owner turn starts where Mercury Hourglass fired", body);
+        Assert.DoesNotContain("Combats triggered", body);
         Assert.Contains("Damage attempted", body);
         Assert.Contains("Damage dealt", body);
         Assert.Contains("Damage blocked", body);
         Assert.Contains("Overkill", body);
         Assert.Contains("Kills", body);
         Assert.Contains(StatConceptGlossary.RenderHintedGlyph("targets_hit"), body);
-        Assert.Contains("Damage per combat", body);
-        Assert.Contains("[b]2[/b]", body);
+        Assert.Contains("Avg damage per combat", body);
+        Assert.Contains("Avg activations per combat", body);
+        Assert.Contains("[b]6[/b]", body);
         Assert.Contains("[b]33[/b]", body);
-        Assert.Contains("[b]25[/b]", body);
-        Assert.Contains("[b]12.5[/b]", body);
+        Assert.Contains("[b]24[/b]", body);
+        Assert.Contains("[b]8[/b]", body);
+        Assert.Contains("[b]2[/b]", body);
+    }
+
+    [Fact]
+    public void RelicTooltip_MercuryHourglassPerCombatRows_ZeroWithoutHeldCombats()
+    {
+        var body = BuildBody(new RelicAggregate
+        {
+            Activations = 4,
+            TotalDamageDealt = 12,
+        });
+
+        Assert.Contains("Avg damage per combat", body);
+        Assert.Contains("Avg activations per combat", body);
+        Assert.Contains("[b]0[/b]", body);
     }
 
     private static string BuildBody(RelicAggregate agg)
