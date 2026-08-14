@@ -696,6 +696,10 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds Mercury Hourglass's zero-inclusive held combat denominator alongside its
   raw per-turn-start activation count, which together back its per-combat
   activation and damage averages.
+- `ice-cream-relic-run.json`
+  Adds Ice Cream's conserved-Energy total — the pool the start-of-turn reset
+  would have discarded — and the zero-inclusive held turn/combat denominators
+  for its two averages.
 
 Why these exist:
 
