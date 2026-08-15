@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
 using HarmonyLib;
+using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Entities.Cards;
+using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Models;
 
 namespace SpireLens.Core.Patches;
@@ -66,6 +69,29 @@ public static class DiscoveryStatsPatch
         catch
         {
             return 0;
+        }
+    }
+}
+
+/// <summary>
+/// Counts the options on the choose-a-card screen Discovery awaits before it
+/// discounts a pick. Discovery enters this shared command from its own resolve,
+/// so the resolving-card guard tells its screen apart from every other caller's
+/// and the offers land on the same physical card the pick does.
+/// </summary>
+[HarmonyPatch(typeof(CardSelectCmd), nameof(CardSelectCmd.FromChooseACardScreen))]
+public static class DiscoveryChooseACardScreenPatch
+{
+    [HarmonyPrefix]
+    public static void Prefix(IReadOnlyList<CardModel> cards, Player player)
+    {
+        try
+        {
+            RunTracker.RecordDiscoveryCardsOffered(cards, player);
+        }
+        catch (Exception e)
+        {
+            CoreMain.LogDebug($"DiscoveryChooseACardScreenPatch.Prefix failed: {e.Message}");
         }
     }
 }

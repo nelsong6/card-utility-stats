@@ -465,6 +465,14 @@ card, classify that card, and measure its effective energy cost before and
 after the call. A null/skip result never reaches this boundary and does not
 count as a pick.
 
+The same resolving-card guard also identifies Discovery's own screen at the
+`FromChooseACardScreen` prefix, where the option list is still the exact set the
+player is about to choose from. Counting those options there gives the picks a
+real denominator without a selection window: Discovery enters the command
+synchronously from its own resolve, so Toolbox, Hefty Tablet, Lead Paperweight,
+and every other caller of the shared screen stay unclaimed. The prefix needs no
+postfix — the pick is already observed downstream at `SetToFreeThisTurn`.
+
 Debt applies its curse effect from the owner-specific
 `Debt.OnTurnEndInHand(PlayerChoiceContext)` callback. Its intended loss is the
 card's `Gold` dynamic var, but Debt clamps the amount passed to

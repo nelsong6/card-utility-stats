@@ -27,6 +27,13 @@ public class DiscoveryStatsTests
     {
         var agg = new CardAggregate();
 
+        Assert.Equal(0, agg.DiscoveryCardsOffered);
+        Assert.Equal(0, agg.DiscoveryCommonCardsOffered);
+        Assert.Equal(0, agg.DiscoveryUncommonCardsOffered);
+        Assert.Equal(0, agg.DiscoveryRareCardsOffered);
+        Assert.Equal(0, agg.DiscoveryAttacksOffered);
+        Assert.Equal(0, agg.DiscoverySkillsOffered);
+        Assert.Equal(0, agg.DiscoveryPowersOffered);
         Assert.Equal(0, agg.DiscoveryCardsPicked);
         Assert.Equal(0, agg.DiscoveryCommonCardsPicked);
         Assert.Equal(0, agg.DiscoveryUncommonCardsPicked);
@@ -46,6 +53,13 @@ public class DiscoveryStatsTests
         var json = JsonSerializer.Serialize(run, RunStorage.Options);
         var restored = JsonSerializer.Deserialize<RunData>(json, RunStorage.Options);
 
+        Assert.Contains("\"discovery_cards_offered\"", json);
+        Assert.Contains("\"discovery_common_cards_offered\"", json);
+        Assert.Contains("\"discovery_uncommon_cards_offered\"", json);
+        Assert.Contains("\"discovery_rare_cards_offered\"", json);
+        Assert.Contains("\"discovery_attacks_offered\"", json);
+        Assert.Contains("\"discovery_skills_offered\"", json);
+        Assert.Contains("\"discovery_powers_offered\"", json);
         Assert.Contains("\"discovery_cards_picked\"", json);
         Assert.Contains("\"discovery_common_cards_picked\"", json);
         Assert.Contains("\"discovery_uncommon_cards_picked\"", json);
@@ -57,6 +71,30 @@ public class DiscoveryStatsTests
         Assert.NotNull(restored);
 
         AssertRepresentativeAggregate(restored!.Aggregates[$"{DiscoveryCardId}#1"]);
+    }
+
+    [Fact]
+    public void RunTracker_DiscoveryOffers_CountEveryOptionByRarityAndType()
+    {
+        var agg = new CardAggregate();
+
+        RunTracker.RecordDiscoveryCardOfferedForTest(
+            agg, CardRarity.Common, CardType.Attack);
+        RunTracker.RecordDiscoveryCardOfferedForTest(
+            agg, CardRarity.Common, CardType.Skill);
+        RunTracker.RecordDiscoveryCardOfferedForTest(
+            agg, CardRarity.Uncommon, CardType.Power);
+        RunTracker.RecordDiscoveryCardOfferedForTest(
+            agg, CardRarity.Rare, CardType.Attack);
+
+        Assert.Equal(4, agg.DiscoveryCardsOffered);
+        Assert.Equal(2, agg.DiscoveryCommonCardsOffered);
+        Assert.Equal(1, agg.DiscoveryUncommonCardsOffered);
+        Assert.Equal(1, agg.DiscoveryRareCardsOffered);
+        Assert.Equal(2, agg.DiscoveryAttacksOffered);
+        Assert.Equal(1, agg.DiscoverySkillsOffered);
+        Assert.Equal(1, agg.DiscoveryPowersOffered);
+        Assert.Equal(0, agg.DiscoveryCardsPicked);
     }
 
     [Fact]
@@ -95,6 +133,13 @@ public class DiscoveryStatsTests
             {
                 [$"{DiscoveryCardId}#1"] = new()
                 {
+                    DiscoveryCardsOffered = 6,
+                    DiscoveryCommonCardsOffered = 3,
+                    DiscoveryUncommonCardsOffered = 2,
+                    DiscoveryRareCardsOffered = 1,
+                    DiscoveryAttacksOffered = 3,
+                    DiscoverySkillsOffered = 2,
+                    DiscoveryPowersOffered = 1,
                     DiscoveryCardsPicked = 2,
                     DiscoveryCommonCardsPicked = 1,
                     DiscoveryUncommonCardsPicked = 1,
@@ -104,6 +149,13 @@ public class DiscoveryStatsTests
                 },
                 [$"{DiscoveryCardId}#2"] = new()
                 {
+                    DiscoveryCardsOffered = 9,
+                    DiscoveryCommonCardsOffered = 5,
+                    DiscoveryUncommonCardsOffered = 3,
+                    DiscoveryRareCardsOffered = 1,
+                    DiscoveryAttacksOffered = 3,
+                    DiscoverySkillsOffered = 5,
+                    DiscoveryPowersOffered = 1,
                     DiscoveryCardsPicked = 3,
                     DiscoveryCommonCardsPicked = 1,
                     DiscoveryUncommonCardsPicked = 1,
@@ -115,6 +167,7 @@ public class DiscoveryStatsTests
                 },
                 ["CARD.NEUTRALIZE#1"] = new()
                 {
+                    DiscoveryCardsOffered = 99,
                     DiscoveryCardsPicked = 99,
                     DiscoveryEnergyDiscountTotal = 99,
                 },
@@ -122,7 +175,14 @@ public class DiscoveryStatsTests
             DiscoveryCardId);
 
         Assert.NotNull(pooled);
-        Assert.Equal(5, pooled!.DiscoveryCardsPicked);
+        Assert.Equal(15, pooled!.DiscoveryCardsOffered);
+        Assert.Equal(8, pooled.DiscoveryCommonCardsOffered);
+        Assert.Equal(5, pooled.DiscoveryUncommonCardsOffered);
+        Assert.Equal(2, pooled.DiscoveryRareCardsOffered);
+        Assert.Equal(6, pooled.DiscoveryAttacksOffered);
+        Assert.Equal(7, pooled.DiscoverySkillsOffered);
+        Assert.Equal(2, pooled.DiscoveryPowersOffered);
+        Assert.Equal(5, pooled.DiscoveryCardsPicked);
         Assert.Equal(2, pooled.DiscoveryCommonCardsPicked);
         Assert.Equal(2, pooled.DiscoveryUncommonCardsPicked);
         Assert.Equal(1, pooled.DiscoveryRareCardsPicked);
@@ -133,39 +193,71 @@ public class DiscoveryStatsTests
     }
 
     [Fact]
-    public void DiscoveryTooltip_FullViewShowsPickBreakdownAndAverageDiscount()
+    public void DiscoveryTooltip_FullViewPairsEveryOfferBucketWithItsPicks()
     {
         var sb = new StringBuilder();
 
         AppendDiscoveryStats(sb, CreateRepresentativeAggregate(), compact: false);
         var body = sb.ToString();
 
-        Assert.Contains("Cards picked", body);
-        Assert.Contains("commons picked", body);
-        Assert.Contains("uncommons picked", body);
-        Assert.Contains("rares picked", body);
-        Assert.Contains("Attacks picked", body);
-        Assert.Contains("Skills picked", body);
-        Assert.Contains("Powers picked", body);
+        Assert.Contains("Cards offered/picked", body);
+        Assert.Contains("Commons offered/picked", body);
+        Assert.Contains("Uncommons offered/picked", body);
+        Assert.Contains("Rares offered/picked", body);
+        Assert.Contains("Attacks offered/picked", body);
+        Assert.Contains("Skills offered/picked", body);
+        Assert.Contains("Powers offered/picked", body);
+        Assert.Contains("[b]15/5[/b]", body);
+        Assert.Contains("[b]8/2[/b]", body);
+        Assert.Contains("[b]5/2[/b]", body);
+        Assert.Contains("[b]2/1[/b]", body);
+        Assert.Contains("[b]6/2[/b]", body);
+        Assert.Contains("[b]7/2[/b]", body);
         Assert.Contains("avg discount of picked card", body);
         Assert.Contains("[b]1.4[/b]", body);
     }
 
+    /// <summary>
+    /// Older runs carry picks without offers. The pair still has to read as a
+    /// pick count against an unobserved denominator rather than going missing.
+    /// </summary>
     [Fact]
-    public void DiscoveryTooltip_CompactViewKeepsOnlyTotalCardsPicked()
+    public void DiscoveryTooltip_RunWithoutObservedOffers_StillReportsPicks()
+    {
+        var agg = CreateRepresentativeAggregate();
+        agg.DiscoveryCardsOffered = 0;
+        agg.DiscoveryCommonCardsOffered = 0;
+        agg.DiscoveryUncommonCardsOffered = 0;
+        agg.DiscoveryRareCardsOffered = 0;
+        agg.DiscoveryAttacksOffered = 0;
+        agg.DiscoverySkillsOffered = 0;
+        agg.DiscoveryPowersOffered = 0;
+        var sb = new StringBuilder();
+
+        AppendDiscoveryStats(sb, agg, compact: false);
+        var body = sb.ToString();
+
+        Assert.Contains("[b]0/5[/b]", body);
+        Assert.Contains("[b]0/2[/b]", body);
+        Assert.Contains("[b]0/1[/b]", body);
+    }
+
+    [Fact]
+    public void DiscoveryTooltip_CompactViewKeepsOnlyTheOfferedPickedTotal()
     {
         var sb = new StringBuilder();
 
         AppendDiscoveryStats(sb, CreateRepresentativeAggregate(), compact: true);
         var body = sb.ToString();
 
-        Assert.Contains("Cards picked", body);
-        Assert.DoesNotContain("commons picked", body);
-        Assert.DoesNotContain("uncommons picked", body);
-        Assert.DoesNotContain("rares picked", body);
-        Assert.DoesNotContain("Attacks picked", body);
-        Assert.DoesNotContain("Skills picked", body);
-        Assert.DoesNotContain("Powers picked", body);
+        Assert.Contains("Cards offered/picked", body);
+        Assert.Contains("[b]15/5[/b]", body);
+        Assert.DoesNotContain("Commons offered/picked", body);
+        Assert.DoesNotContain("Uncommons offered/picked", body);
+        Assert.DoesNotContain("Rares offered/picked", body);
+        Assert.DoesNotContain("Attacks offered/picked", body);
+        Assert.DoesNotContain("Skills offered/picked", body);
+        Assert.DoesNotContain("Powers offered/picked", body);
         Assert.DoesNotContain("avg discount of picked card", body);
     }
 
@@ -175,7 +267,14 @@ public class DiscoveryStatsTests
         var agg = JsonSerializer.Deserialize<CardAggregate>("{}", RunStorage.Options);
 
         Assert.NotNull(agg);
-        Assert.Equal(0, agg!.DiscoveryCardsPicked);
+        Assert.Equal(0, agg!.DiscoveryCardsOffered);
+        Assert.Equal(0, agg.DiscoveryCommonCardsOffered);
+        Assert.Equal(0, agg.DiscoveryUncommonCardsOffered);
+        Assert.Equal(0, agg.DiscoveryRareCardsOffered);
+        Assert.Equal(0, agg.DiscoveryAttacksOffered);
+        Assert.Equal(0, agg.DiscoverySkillsOffered);
+        Assert.Equal(0, agg.DiscoveryPowersOffered);
+        Assert.Equal(0, agg.DiscoveryCardsPicked);
         Assert.Equal(0, agg.DiscoveryCommonCardsPicked);
         Assert.Equal(0, agg.DiscoveryUncommonCardsPicked);
         Assert.Equal(0, agg.DiscoveryRareCardsPicked);
@@ -188,6 +287,13 @@ public class DiscoveryStatsTests
     private static CardAggregate CreateRepresentativeAggregate() =>
         new()
         {
+            DiscoveryCardsOffered = 15,
+            DiscoveryCommonCardsOffered = 8,
+            DiscoveryUncommonCardsOffered = 5,
+            DiscoveryRareCardsOffered = 2,
+            DiscoveryAttacksOffered = 6,
+            DiscoverySkillsOffered = 7,
+            DiscoveryPowersOffered = 2,
             DiscoveryCardsPicked = 5,
             DiscoveryCommonCardsPicked = 2,
             DiscoveryUncommonCardsPicked = 2,
@@ -200,6 +306,13 @@ public class DiscoveryStatsTests
 
     private static void AssertRepresentativeAggregate(CardAggregate agg)
     {
+        Assert.Equal(15, agg.DiscoveryCardsOffered);
+        Assert.Equal(8, agg.DiscoveryCommonCardsOffered);
+        Assert.Equal(5, agg.DiscoveryUncommonCardsOffered);
+        Assert.Equal(2, agg.DiscoveryRareCardsOffered);
+        Assert.Equal(6, agg.DiscoveryAttacksOffered);
+        Assert.Equal(7, agg.DiscoverySkillsOffered);
+        Assert.Equal(2, agg.DiscoveryPowersOffered);
         Assert.Equal(5, agg.DiscoveryCardsPicked);
         Assert.Equal(2, agg.DiscoveryCommonCardsPicked);
         Assert.Equal(2, agg.DiscoveryUncommonCardsPicked);

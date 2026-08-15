@@ -9905,6 +9905,88 @@ public static class RunTracker
     }
 
     /// <summary>
+    /// Record every option on the choose-a-card screen Discovery is awaiting.
+    /// The same resolving-card guard the pick uses keeps Toolbox, Hefty
+    /// Tablet, Lead Paperweight, and every other caller of the shared screen
+    /// out, so these offers are the exact denominator for the pick that the
+    /// following SetToFreeThisTurn call observes.
+    /// </summary>
+    internal static void RecordDiscoveryCardsOffered(
+        IReadOnlyList<CardModel>? cards,
+        Player? player)
+    {
+        if (cards == null || cards.Count == 0) return;
+
+        lock (_lock)
+        {
+            try
+            {
+                if (!ShouldTrackCardStatsDuringCombatLocked()) return;
+
+                var sourceCard = FindCurrentlyResolvingCardPlay()?.Card;
+                if (sourceCard is not Discovery) return;
+                var owner = sourceCard.Owner;
+                if (owner == null || !IsTrackedPlayer(owner)) return;
+                if (player != null && !ReferenceEquals(player, owner)) return;
+                if (!IsTrackedCard(sourceCard)) return;
+
+                _pendingCombat ??= new PendingCombat();
+                var instanceId = GetOrAssignInstanceId(Canonical(sourceCard));
+                var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
+                foreach (var card in cards)
+                {
+                    if (card == null) continue;
+                    AccumulateDiscoveryCardOffered(agg, card.Rarity, card.Type);
+                }
+            }
+            catch (Exception e)
+            {
+                CoreMain.LogDebug($"RecordDiscoveryCardsOffered failed: {e.Message}");
+            }
+        }
+    }
+
+    private static void AccumulateDiscoveryCardOffered(
+        CardAggregate agg,
+        CardRarity rarity,
+        CardType type)
+    {
+        agg.DiscoveryCardsOffered++;
+
+        switch (rarity)
+        {
+            case CardRarity.Common:
+                agg.DiscoveryCommonCardsOffered++;
+                break;
+            case CardRarity.Uncommon:
+                agg.DiscoveryUncommonCardsOffered++;
+                break;
+            case CardRarity.Rare:
+                agg.DiscoveryRareCardsOffered++;
+                break;
+        }
+
+        switch (type)
+        {
+            case CardType.Attack:
+                agg.DiscoveryAttacksOffered++;
+                break;
+            case CardType.Skill:
+                agg.DiscoverySkillsOffered++;
+                break;
+            case CardType.Power:
+                agg.DiscoveryPowersOffered++;
+                break;
+        }
+    }
+
+    internal static void RecordDiscoveryCardOfferedForTest(
+        CardAggregate agg,
+        CardRarity rarity,
+        CardType type)
+        => AccumulateDiscoveryCardOffered(agg, rarity, type);
+
+    /// <summary>
     /// Record the picked card after Discovery makes it free. The discount is
     /// the observed effective energy-cost reduction across that exact call.
     /// </summary>
@@ -36651,6 +36733,13 @@ public static class RunTracker
         target.JackSkillsAdded += source.JackSkillsAdded;
         target.JackPowersAdded += source.JackPowersAdded;
         target.JackAddedCardCostTotal += source.JackAddedCardCostTotal;
+        target.DiscoveryCardsOffered += source.DiscoveryCardsOffered;
+        target.DiscoveryCommonCardsOffered += source.DiscoveryCommonCardsOffered;
+        target.DiscoveryUncommonCardsOffered += source.DiscoveryUncommonCardsOffered;
+        target.DiscoveryRareCardsOffered += source.DiscoveryRareCardsOffered;
+        target.DiscoveryAttacksOffered += source.DiscoveryAttacksOffered;
+        target.DiscoverySkillsOffered += source.DiscoverySkillsOffered;
+        target.DiscoveryPowersOffered += source.DiscoveryPowersOffered;
         target.DiscoveryCardsPicked += source.DiscoveryCardsPicked;
         target.DiscoveryCommonCardsPicked += source.DiscoveryCommonCardsPicked;
         target.DiscoveryUncommonCardsPicked += source.DiscoveryUncommonCardsPicked;

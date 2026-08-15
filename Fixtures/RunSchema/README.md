@@ -696,6 +696,10 @@ New fixtures added going forward do not need a `v*-` prefix.
   Adds Mercury Hourglass's zero-inclusive held combat denominator alongside its
   raw per-turn-start activation count, which together back its per-combat
   activation and damage averages.
+- `discovery-cards-offered-run.json`
+  Adds Discovery's observed choose-a-card options as the denominator for its
+  existing pick counters, split by rarity and card type. Runs written before
+  the offer counters existed keep only the picks, which read as zero offered.
 
 Why these exist:
 

@@ -499,6 +499,16 @@ public class CardAggregate
     // discount and counts only non-null selections from Discovery's own
     // choose-card screen. The discount is the selected card's observed
     // effective energy-cost reduction when Discovery makes it free.
+    // The Offered counters are the pick counters' denominators: every option
+    // on the screens this physical Discovery opened, so each pick bucket can
+    // be read against what the card actually put in front of the player.
+    public int DiscoveryCardsOffered { get; set; }
+    public int DiscoveryCommonCardsOffered { get; set; }
+    public int DiscoveryUncommonCardsOffered { get; set; }
+    public int DiscoveryRareCardsOffered { get; set; }
+    public int DiscoveryAttacksOffered { get; set; }
+    public int DiscoverySkillsOffered { get; set; }
+    public int DiscoveryPowersOffered { get; set; }
     public int DiscoveryCardsPicked { get; set; }
     public int DiscoveryCommonCardsPicked { get; set; }
     public int DiscoveryUncommonCardsPicked { get; set; }

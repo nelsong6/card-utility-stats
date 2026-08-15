@@ -1464,15 +1464,50 @@ public static class CardHoverShowPatch
     {
         if (card is not Discovery && !IsCardId(card, "CARD.DISCOVERY")) return;
 
-        Row3(sb, "Cards picked", agg.DiscoveryCardsPicked.ToString(), "");
+        OfferedPickedRow(
+            sb,
+            ["all", "card"],
+            agg.DiscoveryCardsOffered,
+            agg.DiscoveryCardsPicked,
+            "Cards offered/picked — every option Discovery put on a choose-a-card screen, and how many of them were picked. Runs recorded before offers were observed read as zero offered.");
         if (compact) return;
 
-        Row3(sb, "commons picked", agg.DiscoveryCommonCardsPicked.ToString(), "");
-        Row3(sb, "uncommons picked", agg.DiscoveryUncommonCardsPicked.ToString(), "");
-        Row3(sb, "rares picked", agg.DiscoveryRareCardsPicked.ToString(), "");
-        Row3(sb, "Attacks picked", agg.DiscoveryAttacksPicked.ToString(), "");
-        Row3(sb, "Skills picked", agg.DiscoverySkillsPicked.ToString(), "");
-        Row3(sb, "Powers picked", agg.DiscoveryPowersPicked.ToString(), "");
+        OfferedPickedRow(
+            sb,
+            ["card"],
+            agg.DiscoveryCommonCardsOffered,
+            agg.DiscoveryCommonCardsPicked,
+            "Commons offered/picked from Discovery's choose-a-card screens.");
+        OfferedPickedRow(
+            sb,
+            ["card_uncommon"],
+            agg.DiscoveryUncommonCardsOffered,
+            agg.DiscoveryUncommonCardsPicked,
+            "Uncommons offered/picked from Discovery's choose-a-card screens.");
+        OfferedPickedRow(
+            sb,
+            ["card_rare"],
+            agg.DiscoveryRareCardsOffered,
+            agg.DiscoveryRareCardsPicked,
+            "Rares offered/picked from Discovery's choose-a-card screens.");
+        OfferedPickedRow(
+            sb,
+            ["attack"],
+            agg.DiscoveryAttacksOffered,
+            agg.DiscoveryAttacksPicked,
+            "Attacks offered/picked from Discovery's choose-a-card screens.");
+        OfferedPickedRow(
+            sb,
+            ["skill"],
+            agg.DiscoverySkillsOffered,
+            agg.DiscoverySkillsPicked,
+            "Skills offered/picked from Discovery's choose-a-card screens.");
+        OfferedPickedRow(
+            sb,
+            ["power"],
+            agg.DiscoveryPowersOffered,
+            agg.DiscoveryPowersPicked,
+            "Powers offered/picked from Discovery's choose-a-card screens.");
 
         var averageDiscount = agg.DiscoveryCardsPicked <= 0
             ? 0m
@@ -1482,6 +1517,30 @@ public static class CardHoverShowPatch
             GetEnergyStatLabel("avg discount of picked card"),
             FormatDecimal(averageDiscount),
             "");
+    }
+
+    /// <summary>
+    /// One row for an offer bucket and the subset of it the player picked. The
+    /// two numbers only mean anything next to each other, so they share a row
+    /// instead of costing the tooltip two.
+    /// </summary>
+    private static void OfferedPickedRow(
+        StringBuilder sb,
+        IReadOnlyList<string> itemConceptIds,
+        int offered,
+        int picked,
+        string fullDescription)
+    {
+        var presentation = StatsTooltip.CreateStatRowPresentation(
+            string.Empty,
+            fullDescription,
+            [.. itemConceptIds, "offered", "taken"]);
+        StatsTooltip.AppendScalarStatRow(
+            sb,
+            presentation,
+            $"{Math.Max(0, offered)}/{Math.Max(0, picked)}",
+            "",
+            labelColor: "#e0e0e0");
     }
 
     private static void AppendAllForOneStats(

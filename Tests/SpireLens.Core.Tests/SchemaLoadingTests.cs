@@ -548,6 +548,39 @@ public class SchemaLoadingTests
         Assert.Equal(2, cardAgg.DiscoverySkillsPicked);
         Assert.Equal(1, cardAgg.DiscoveryPowersPicked);
         Assert.Equal(7, cardAgg.DiscoveryEnergyDiscountTotal);
+        Assert.Equal(0, cardAgg.DiscoveryCardsOffered);
+    }
+
+    [Fact]
+    public void HistoricalLoad_AcceptsDiscoveryCardsOfferedFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("discovery-cards-offered-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        Assert.True(loaded.HasPerInstanceIdentity);
+        Assert.Null(loaded.CompatibilityNote);
+        AssertDiscoveryOfferedFixture(loaded.Data.Aggregates["CARD.DISCOVERY#1"]);
+    }
+
+    private static void AssertDiscoveryOfferedFixture(CardAggregate cardAgg)
+    {
+        Assert.Equal(15, cardAgg.DiscoveryCardsOffered);
+        Assert.Equal(8, cardAgg.DiscoveryCommonCardsOffered);
+        Assert.Equal(5, cardAgg.DiscoveryUncommonCardsOffered);
+        Assert.Equal(2, cardAgg.DiscoveryRareCardsOffered);
+        Assert.Equal(6, cardAgg.DiscoveryAttacksOffered);
+        Assert.Equal(7, cardAgg.DiscoverySkillsOffered);
+        Assert.Equal(2, cardAgg.DiscoveryPowersOffered);
+        Assert.Equal(5, cardAgg.DiscoveryCardsPicked);
+        Assert.Equal(2, cardAgg.DiscoveryCommonCardsPicked);
+        Assert.Equal(2, cardAgg.DiscoveryUncommonCardsPicked);
+        Assert.Equal(1, cardAgg.DiscoveryRareCardsPicked);
+        Assert.Equal(2, cardAgg.DiscoveryAttacksPicked);
+        Assert.Equal(2, cardAgg.DiscoverySkillsPicked);
+        Assert.Equal(1, cardAgg.DiscoveryPowersPicked);
+        Assert.Equal(7, cardAgg.DiscoveryEnergyDiscountTotal);
     }
 
     [Fact]
@@ -1591,6 +1624,17 @@ public class SchemaLoadingTests
         Assert.Equal(2, cardAgg.DiscoverySkillsPicked);
         Assert.Equal(1, cardAgg.DiscoveryPowersPicked);
         Assert.Equal(7, cardAgg.DiscoveryEnergyDiscountTotal);
+        Assert.Equal(0, cardAgg.DiscoveryCardsOffered);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsDiscoveryCardsOfferedFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("discovery-cards-offered-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertDiscoveryOfferedFixture(resumed!.Aggregates["CARD.DISCOVERY#1"]);
     }
 
     [Fact]

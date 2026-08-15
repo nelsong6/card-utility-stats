@@ -1,0 +1,46 @@
+{
+  "run_id": "discovery-cards-offered-fixture",
+  "started_at": "2026-08-15T18:00:00Z",
+  "updated_at": "2026-08-15T18:26:00Z",
+  "character": "SILENT",
+  "ascension": 7,
+  "floor_reached": 14,
+  "outcome": "in_progress",
+  "game_start_time": 1786752000,
+  "aggregates": {
+    "CARD.DISCOVERY#1": {
+      "combats_in_deck": 4,
+      "plays": 8,
+      "times_drawn": 9,
+      "discovery_cards_offered": 15,
+      "discovery_common_cards_offered": 8,
+      "discovery_uncommon_cards_offered": 5,
+      "discovery_rare_cards_offered": 2,
+      "discovery_attacks_offered": 6,
+      "discovery_skills_offered": 7,
+      "discovery_powers_offered": 2,
+      "discovery_cards_picked": 5,
+      "discovery_common_cards_picked": 2,
+      "discovery_uncommon_cards_picked": 2,
+      "discovery_rare_cards_picked": 1,
+      "discovery_attacks_picked": 2,
+      "discovery_skills_picked": 2,
+      "discovery_powers_picked": 1,
+      "discovery_energy_discount_total": 7,
+      "floor_added": 6,
+      "initial_upgrade_level": 0
+    }
+  },
+  "events": [],
+  "relic_aggregates": {},
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.DISCOVERY": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.DISCOVERY": 1
+  }
+}
