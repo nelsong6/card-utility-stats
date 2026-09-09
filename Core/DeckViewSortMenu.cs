@@ -45,6 +45,9 @@ internal static class DeckViewSortMenu
     private const string RichTextFontSizeName = "normal_font_size";
     private const string HoverTipScenePath = "res://scenes/ui/hover_tip.tscn";
     private const int FallbackFontSize = 21;
+    private const float RowWidth = 320f;
+    private const float RowHeight = 44f;
+    private const float GlyphSlotWidth = 26f;
 
     private static NCardViewSortButton? _trigger;
     private static NCardViewSortButton? _anchor;
@@ -384,14 +387,22 @@ internal static class DeckViewSortMenu
         return panel;
     }
 
+    /// <summary>
+    /// Both option groups. Every row has the same three-slot geometry — check,
+    /// label, direction — so selecting something changes which glyphs are
+    /// visible and never how wide a row is or where its text sits.
+    /// </summary>
     private static void AddOptionRows(Node parent, Font? font, int fontSize)
     {
+        var active = DeckViewSpireLensSort.ActiveMetric;
+
         AddRow(
             parent,
             font,
             fontSize,
             "Off — use the game's sort",
-            DeckViewSpireLensSort.ActiveMetric == null,
+            selected: active == null,
+            direction: null,
             () =>
             {
                 DeckViewSpireLensSort.Clear("sort menu");
@@ -402,17 +413,90 @@ internal static class DeckViewSortMenu
         foreach (var metric in DeckViewSpireLensSort.Metrics)
         {
             var chosen = metric;
-            var active = DeckViewSpireLensSort.IsActive(chosen);
-            var label = active
-                ? $"{chosen.Label}  {(DeckViewSpireLensSort.Descending ? "highest first" : "lowest first")}"
-                : chosen.Label;
+            var selected = DeckViewSpireLensSort.IsActive(chosen);
 
-            AddRow(parent, font, fontSize, label, active, () =>
-            {
-                DeckViewSpireLensSort.Select(chosen, "sort menu");
-                Close();
-            });
+            AddRow(
+                parent,
+                font,
+                fontSize,
+                chosen.Label,
+                selected,
+                // Only the active metric shows an arrow, because only it has a
+                // direction. Picking it again flips that direction.
+                direction: selected ? DeckViewSpireLensSort.Descending : null,
+                () =>
+                {
+                    DeckViewSpireLensSort.Select(chosen, "sort menu");
+                    Close();
+                });
         }
+    }
+
+    private static void AddRow(
+        Node parent,
+        Font? font,
+        int fontSize,
+        string text,
+        bool selected,
+        bool? direction,
+        Action onPressed)
+    {
+        var row = new Button
+        {
+            Flat = true,
+            FocusMode = Control.FocusModeEnum.None,
+            CustomMinimumSize = new Vector2(RowWidth, RowHeight),
+            MouseDefaultCursorShape = Control.CursorShape.PointingHand,
+        };
+        row.Pressed += onPressed;
+        parent.AddChild(row);
+
+        // The button owns the hit area and stays textless; the visuals ride on
+        // top in fixed slots. Keeping the glyphs out of the button's own label
+        // is what stops the text sliding as selection moves between rows.
+        var layout = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+        layout.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        layout.AddThemeConstantOverride("separation", 10);
+        row.AddChild(layout);
+
+        layout.AddChild(NewSlot(
+            selected ? "✓" : string.Empty,
+            font,
+            fontSize,
+            GlyphSlotWidth,
+            HorizontalAlignment.Center));
+
+        var label = NewSlot(text, font, fontSize, 0f, HorizontalAlignment.Left);
+        label.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        layout.AddChild(label);
+
+        layout.AddChild(NewSlot(
+            direction switch { true => "↓", false => "↑", null => string.Empty },
+            font,
+            fontSize,
+            GlyphSlotWidth,
+            HorizontalAlignment.Center));
+    }
+
+    private static Label NewSlot(
+        string text,
+        Font? font,
+        int fontSize,
+        float minWidth,
+        HorizontalAlignment alignment)
+    {
+        var label = new Label
+        {
+            Text = text,
+            HorizontalAlignment = alignment,
+            VerticalAlignment = VerticalAlignment.Center,
+            CustomMinimumSize = new Vector2(minWidth, 0f),
+            SizeFlagsVertical = Control.SizeFlags.ExpandFill,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+        };
+        label.AddThemeFontSizeOverride("font_size", fontSize);
+        if (font != null) label.AddThemeFontOverride(LabelFontName, font);
+        return label;
     }
 
     private static Font? ResolveFont(Control description, Control? title)
@@ -434,31 +518,6 @@ internal static class DeckViewSortMenu
         if (_menuLayer != null && GodotObject.IsInstanceValid(_menuLayer))
             _menuLayer.QueueFree();
         _menuLayer = null;
-    }
-
-    private static void AddRow(
-        Node parent,
-        Font? font,
-        int fontSize,
-        string text,
-        bool active,
-        Action onPressed)
-    {
-        var row = new Button
-        {
-            // A leading marker rather than a separate indicator node: the row
-            // stays one control, so hit area and label cannot drift apart.
-            Text = active ? $"• {text}" : $"   {text}",
-            Flat = true,
-            Alignment = HorizontalAlignment.Left,
-            FocusMode = Control.FocusModeEnum.None,
-            CustomMinimumSize = new Vector2(320f, 44f),
-            MouseDefaultCursorShape = Control.CursorShape.PointingHand,
-        };
-        row.AddThemeFontSizeOverride("font_size", fontSize);
-        if (font != null) row.AddThemeFontOverride(LabelFontName, font);
-        row.Pressed += onPressed;
-        parent.AddChild(row);
     }
 
     private static StyleBoxFlat NewOpaquePanelStyle()
