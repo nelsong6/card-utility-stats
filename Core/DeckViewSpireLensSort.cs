@@ -23,12 +23,16 @@ internal sealed class DeckSortMetric
         string id,
         string label,
         string group,
-        Func<CardAggregate, double> select)
+        Func<CardAggregate, double> select,
+        Func<CardAggregate, double>? tieBreak = null,
+        Func<CardAggregate, string>? display = null)
     {
         Id = id;
         Label = label;
         Group = group;
         Select = select;
+        TieBreak = tieBreak;
+        Display = display;
     }
 
     internal string Id { get; }
@@ -43,6 +47,20 @@ internal sealed class DeckSortMetric
     /// than integer so per-play averages are orderable at full precision.
     /// </summary>
     internal Func<CardAggregate, double> Select { get; }
+
+    /// <summary>
+    /// Second sort key, for metrics whose primary can legitimately tie across
+    /// many cards. Damage per energy uses it: every card that never spent
+    /// energy scores the same unrankable "infinity", so they are ordered
+    /// against each other by total damage instead of by whatever order the
+    /// game happened to hand us.
+    /// </summary>
+    internal Func<CardAggregate, double>? TieBreak { get; }
+
+    /// <summary>
+    /// Overrides the printed value when the number alone would mislead.
+    /// </summary>
+    internal Func<CardAggregate, string>? Display { get; }
 }
 
 /// <summary>
@@ -98,14 +116,26 @@ internal static class DeckViewSpireLensSort
         new DeckSortMetric("avg_damage", "Avg damage per play", GroupDamage,
             agg => agg.Plays > 0 ? (double)agg.TotalEffective / agg.Plays : 0d),
         // Damage bought per energy paid, using energy actually spent rather
-        // than printed cost, so discounts and cost modifiers count. A card
-        // that spent no energy at all is credited its full damage rather than
-        // being scored zero and buried: free damage is the best kind, and
-        // dividing by nothing would either crash or rank it last.
+        // than printed cost, so discounts and cost modifiers count.
+        //
+        // Cards that never spent energy cannot be divided at all, so they are
+        // not given a fake ratio: they sort above every card that did pay,
+        // ranked against each other by total damage, and print their damage
+        // over a zero-cost orb rather than a number that would read as a
+        // ratio. "Never spent energy" is a claim about this run, not about the
+        // card's printed cost — a card played only while discounted lands here
+        // too, which is the more interesting fact.
         new DeckSortMetric("damage_per_energy", "Damage per energy", GroupDamage,
-            agg => agg.TotalEnergySpent > 0
-                ? (double)agg.TotalEffective / agg.TotalEnergySpent
-                : agg.TotalEffective),
+            agg => agg.TotalEffective <= 0
+                // No damage means nothing to rate, and must NOT read as
+                // infinite efficiency — otherwise every card that was never
+                // played would head the ranking.
+                ? 0d
+                : agg.TotalEnergySpent > 0
+                    ? (double)agg.TotalEffective / agg.TotalEnergySpent
+                    : double.PositiveInfinity,
+            tieBreak: agg => agg.TotalEffective,
+            display: FormatDamagePerEnergy),
         new DeckSortMetric("kills", "Kills", GroupDamage,
             agg => agg.Kills),
 
@@ -232,11 +262,17 @@ internal static class DeckViewSpireLensSort
                 if (qualifying.Count > 0) scored = qualifying;
 
                 // OrderBy is stable, so equal values keep the game's order.
-                screen._cards = (Descending
-                        ? scored.OrderByDescending(entry => entry.Value)
-                        : scored.OrderBy(entry => entry.Value))
-                    .Select(entry => entry.Card)
-                    .ToList();
+                var ordered = Descending
+                    ? scored.OrderByDescending(entry => entry.Value)
+                    : scored.OrderBy(entry => entry.Value);
+                if (metric.TieBreak != null)
+                {
+                    ordered = Descending
+                        ? ordered.ThenByDescending(entry => TieBreakFor(entry.Card, metric, historical))
+                        : ordered.ThenByDescending(entry => TieBreakFor(entry.Card, metric, historical));
+                }
+
+                screen._cards = ordered.Select(entry => entry.Card).ToList();
             }
 
             PinUnsortedHead(screen);
@@ -274,7 +310,10 @@ internal static class DeckViewSpireLensSort
         var value = ValueFor(card, metric, IsHistoricalCard(card));
         if (value <= 0d) return false;
 
-        caption = $"{metric.Label}: {FormatValue(value)}";
+        var aggregate = ResolveAggregate(card, IsHistoricalCard(card));
+        caption = metric.Display != null && aggregate != null
+            ? $"{metric.Label}: {metric.Display(aggregate)}"
+            : $"{metric.Label}: {FormatValue(value)}";
         return true;
     }
 
@@ -297,6 +336,24 @@ internal static class DeckViewSpireLensSort
     private static bool IsHistoricalCard(CardModel card)
         => RunHistoryStatsContext.TryGetHistoricalDeckAggregate(card, out _);
 
+    /// <summary>
+    /// "12.4" when energy was paid; "593 / 0<orb>" when none ever was. The orb
+    /// is the game's own character-coloured energy icon, the same one its card
+    /// text uses, so the line reads as card text rather than as a mod string.
+    /// </summary>
+    private static double TieBreakFor(CardModel card, DeckSortMetric metric, bool historical)
+    {
+        var aggregate = ResolveAggregate(card, historical);
+        return aggregate == null || metric.TieBreak == null ? 0d : metric.TieBreak(aggregate);
+    }
+
+    private static string FormatDamagePerEnergy(CardAggregate agg)
+        => agg.TotalEnergySpent > 0
+            ? FormatValue((double)agg.TotalEffective / agg.TotalEnergySpent)
+            : $"{agg.TotalEffective} / 0{StatEnergyIcon.RenderInline(EnergyIconSize)}";
+
+    private const int EnergyIconSize = 20;
+
     internal static void Reset()
     {
         ActiveMetric = null;
@@ -304,20 +361,22 @@ internal static class DeckViewSpireLensSort
         ForgetSnapshot();
     }
 
+    internal static CardAggregate? ResolveAggregate(CardModel card, bool historical)
+    {
+        if (historical)
+        {
+            RunHistoryStatsContext.TryGetHistoricalDeckAggregate(card, out var archived);
+            return archived;
+        }
+
+        return RunTracker.GetEffectiveAggregate(card);
+    }
+
     private static double ValueFor(CardModel card, DeckSortMetric metric, bool historical)
     {
         try
         {
-            CardAggregate? aggregate;
-            if (historical)
-            {
-                RunHistoryStatsContext.TryGetHistoricalDeckAggregate(card, out aggregate);
-            }
-            else
-            {
-                aggregate = RunTracker.GetEffectiveAggregate(card);
-            }
-
+            var aggregate = ResolveAggregate(card, historical);
             return aggregate == null ? 0d : metric.Select(aggregate);
         }
         catch (Exception e)
