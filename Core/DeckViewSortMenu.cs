@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using Godot;
 using MegaCrit.Sts2.addons.mega_text;
 using MegaCrit.Sts2.Core.Assets;
@@ -59,10 +58,12 @@ internal static class DeckViewSortMenu
     // dropdown reads as part of the same surface rather than as stock Godot UI.
     private static Font? _rowFont;
 
-    // Which sections the player has collapsed. Session state: the menu
-    // is a view preference, and it reopens often enough that remembering
-    // across a restart is not worth a Loader bridge method.
-    private static readonly HashSet<string> _collapsedGroups = new(StringComparer.Ordinal);
+    // The one section currently open, or null for all closed. An accordion
+    // rather than independent toggles: the metric list is heading for roughly
+    // every tracked stat, so the menu has to stay one section tall no matter
+    // how long it gets. Session state — a view preference is not worth a
+    // Loader bridge method, which a Core hot reload could not add anyway.
+    private static string? _expandedGroup;
 
     /// <summary>
     /// Add the trigger to the sort row. Safe to call repeatedly — each call
@@ -394,18 +395,19 @@ internal static class DeckViewSortMenu
     }
 
     /// <summary>
-    /// "Off" pinned at the top, then one collapsible section per metric group.
-    /// Every row — header or option — has the same three-slot geometry, so
-    /// expanding, collapsing or selecting changes which glyphs are visible and
-    /// never a row's width or where its text sits.
+    /// "Off" pinned at the top, then one collapsible section per metric group,
+    /// at most one of them open. Every row — header or option — has the same
+    /// three-slot geometry, so expanding, collapsing or selecting changes which
+    /// glyphs are visible and never a row's width or where its text sits.
+    ///
+    /// Sections start closed. The trigger button already names the active
+    /// metric and shows its direction, so a closed menu is not a menu with an
+    /// invisible selection — and the section you last opened is remembered, so
+    /// the metric you are actually using is one click away.
     /// </summary>
     private static void AddOptionRows(Node parent, Font? font, int fontSize)
     {
         var active = DeckViewSpireLensSort.ActiveMetric;
-
-        // The active metric must never be hidden behind a collapsed header, or
-        // the menu would open showing no selection at all.
-        if (active != null) _collapsedGroups.Remove(active.Group);
 
         AddRow(
             parent,
@@ -424,15 +426,17 @@ internal static class DeckViewSortMenu
         foreach (var group in DeckViewSpireLensSort.Groups)
         {
             var name = group;
-            var collapsed = _collapsedGroups.Contains(name);
+            var expanded = string.Equals(name, _expandedGroup, StringComparison.Ordinal);
 
-            AddHeaderRow(parent, font, fontSize, name, collapsed, () =>
+            AddHeaderRow(parent, font, fontSize, name, collapsed: !expanded, () =>
             {
-                if (!_collapsedGroups.Remove(name)) _collapsedGroups.Add(name);
+                // Opening a section closes whichever one was open. Clicking the
+                // open section closes it and leaves the menu at headers only.
+                _expandedGroup = expanded ? null : name;
                 Reopen();
             });
 
-            if (collapsed) continue;
+            if (!expanded) continue;
 
             foreach (var metric in DeckViewSpireLensSort.Metrics)
             {
