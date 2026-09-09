@@ -1,0 +1,683 @@
+using System;
+using Godot;
+using MegaCrit.Sts2.addons.mega_text;
+using MegaCrit.Sts2.Core.Assets;
+using MegaCrit.Sts2.Core.Nodes.CommonUi;
+using MegaCrit.Sts2.Core.Nodes.GodotExtensions;
+using MegaCrit.Sts2.Core.Nodes.Screens;
+
+namespace SpireLens.Core;
+
+/// <summary>
+/// The SpireLens entry in the deck view's sort row: a fifth sort button, and a
+/// dropdown listing the SpireLens metrics the deck can be ordered by.
+///
+/// The trigger is a duplicate of the game's own <c>NCardViewSortButton</c>, so
+/// it inherits the row's font, plate art, text placement, hover tweens and
+/// direction arrow rather than approximating them. Duplicating that node has
+/// two known traps, both handled below:
+///
+///   - <c>_Ready</c> resolves %ButtonImage / %Label / %Image through
+///     scene-unique names, which resolve against a node's <c>Owner</c>.
+///     <c>Duplicate()</c> does not reliably carry that relationship, so the
+///     clone would otherwise resolve to the ORIGINAL sorter's nodes and drive
+///     its visuals. Owner and unique-name flags are restored before insertion.
+///   - Materials are Resources and are shared by reference across a
+///     duplicate, so the clone's hover tweens would mutate the original
+///     button's shader. The clone gets its own material instance.
+///
+/// Both are the same traps documented on the tickbox clone in
+/// <see cref="Patches.ViewStatsInjectorPatch"/>.
+///
+/// The dropdown itself is built from the game's own hover-tip scene — the
+/// plate card and relic tips use — hosted in its own high CanvasLayer, like
+/// <see cref="SpireLensOptionsMenu"/>, so it draws above the card grid without
+/// depending on where the sort row sits in the screen's child order.
+/// </summary>
+internal static class DeckViewSortMenu
+{
+    private const string TriggerName = "SpireLensSorter";
+    private const string LayerName = "SpireLensDeckSortMenu";
+    private const int MenuLayer = 999;
+    private const string IdleLabel = "SpireLens";
+    private const string LabelFontName = "font";
+    private const string RichTextFontName = "normal_font";
+    private const string RichTextFontSizeName = "normal_font_size";
+    private const string HoverTipScenePath = "res://scenes/ui/hover_tip.tscn";
+    private const int FallbackFontSize = 21;
+    private const float RowWidth = 320f;
+    private const float RowHeight = 44f;
+    private const float GlyphSlotWidth = 26f;
+
+    private static NCardViewSortButton? _trigger;
+    private static NCardViewSortButton? _anchor;
+    private static NDeckViewScreen? _screen;
+    private static CanvasLayer? _menuLayer;
+
+    // The sort row's own font, lifted off the anchor sorter's MegaLabel so the
+    // dropdown reads as part of the same surface rather than as stock Godot UI.
+    private static Font? _rowFont;
+
+    // The one section currently open, or null for all closed. An accordion
+    // rather than independent toggles: the metric list is heading for roughly
+    // every tracked stat, so the menu has to stay one section tall no matter
+    // how long it gets. Session state — a view preference is not worth a
+    // Loader bridge method, which a Core hot reload could not add anyway.
+    private static string? _expandedGroup;
+
+    // The deck screen's own bottom line, captured before we append the sort
+    // sentence to it so Clear can put it back exactly.
+    private static string? _baseBottomLabelText;
+
+    /// <summary>The sort row's font, for overlays that want to match it.</summary>
+    internal static Font? RowFont => _rowFont;
+
+    /// <summary>
+    /// Add the trigger to the sort row. Safe to call repeatedly — each call
+    /// clears whatever the previous screen or Core load left behind. Injected
+    /// on both the in-run deck view and the run-history deck viewer.
+    /// </summary>
+    internal static void Inject(NDeckViewScreen screen)
+    {
+        try
+        {
+            Teardown();
+
+            var anchor = screen._alphabetSorter;
+            if (anchor == null || !GodotObject.IsInstanceValid(anchor))
+            {
+                CoreMain.Logger.Warn(
+                    "DeckViewSortMenu: alphabetical sorter not found — scene structure may have changed.");
+                return;
+            }
+
+            var parent = anchor.GetParent();
+            if (parent == null) return;
+
+            RemoveStale(parent);
+
+            // Default flags copy structure and scripts; runtime .Connect()
+            // handlers are per-instance and are not carried over, so the clone
+            // starts with none of the game's sort wiring.
+            var clone = (NCardViewSortButton)anchor.Duplicate();
+            clone.Name = TriggerName;
+
+            GiveCloneItsOwnMaterial(clone);
+
+            // Owner first, then the unique-name flags: setting the flag is
+            // what registers a child in its owner's unique-node table, and
+            // _Ready reads that table during AddChild below.
+            SetOwnerRecursive(clone, clone);
+            CopyUniqueNameFlags(anchor, clone);
+
+            parent.AddChild(clone);
+            _trigger = clone;
+            _anchor = anchor;
+            _screen = screen;
+
+            clone.Connect(
+                NClickableControl.SignalName.Released,
+                Callable.From<NButton>(OnTriggerReleased));
+
+            // SetLabel/SetHue both touch fields resolved in _Ready, so they
+            // have to come after AddChild.
+            clone.SetLabel(LabelText());
+            SyncArrow();
+            if (screen._bg?.Material is ShaderMaterial hue)
+                clone.SetHue(hue);
+
+            WireFocusNeighbours(screen, anchor, clone);
+            AttachCaptionSweeper(screen);
+            _rowFont = anchor._label?.GetThemeFont(LabelFontName);
+            _baseBottomLabelText = screen._bottomLabel?.Text;
+            RefreshSortCaption();
+
+            CoreMain.Logger.Info(
+                $"DeckViewSortMenu: injected sort trigger (parent={parent.GetType().Name}, "
+                + $"historical={RunHistoryDeckViewer.IsHistoricalDeckViewer(screen)})");
+        }
+        catch (Exception e)
+        {
+            CoreMain.Logger.Error($"DeckViewSortMenu.Inject failed: {e}");
+        }
+    }
+
+    /// <summary>Called by CoreMain.Shutdown, and before each re-injection.</summary>
+    internal static void Teardown()
+    {
+        Close();
+
+        // The game wired the alphabetical sorter's right neighbour to itself
+        // as the end of the row; put that back before our node disappears.
+        if (_anchor != null && GodotObject.IsInstanceValid(_anchor))
+            _anchor.FocusNeighborRight = _anchor.GetPath();
+
+        if (_trigger != null && GodotObject.IsInstanceValid(_trigger))
+            _trigger.QueueFree();
+
+        _trigger = null;
+        _anchor = null;
+        _screen = null;
+        _rowFont = null;
+        _baseBottomLabelText = null;
+    }
+
+    /// <summary>
+    /// State the active sort on the deck screen's own bottom line. The per-card
+    /// captions name the metric but cannot express direction, and this is the
+    /// game's existing text surface, so it lands in any full-screen capture
+    /// without inventing another overlay.
+    /// </summary>
+    internal static void RefreshSortCaption()
+    {
+        try
+        {
+            if (_screen == null || !GodotObject.IsInstanceValid(_screen)) return;
+            var label = _screen._bottomLabel;
+            if (label == null || !GodotObject.IsInstanceValid(label)) return;
+
+            _baseBottomLabelText ??= label.Text;
+            var metric = DeckViewSpireLensSort.ActiveMetric;
+            label.Text = metric == null
+                ? _baseBottomLabelText
+                : $"{_baseBottomLabelText}    SpireLens — sorted by {metric.Label.ToLowerInvariant()}, "
+                  + $"{(DeckViewSpireLensSort.Descending ? "highest" : "lowest")} first";
+        }
+        catch (Exception e)
+        {
+            CoreMain.Logger.Warn($"DeckViewSortMenu: sort caption update failed: {e.Message}");
+        }
+    }
+
+    /// <summary>Re-render the trigger's label and arrow after a state change.</summary>
+    internal static void RefreshButtonText()
+    {
+        if (_trigger == null || !GodotObject.IsInstanceValid(_trigger)) return;
+
+        _trigger.SetLabel(LabelText());
+        SyncArrow();
+    }
+
+    /// <summary>
+    /// Re-render the deck on the screen this trigger belongs to. The in-run
+    /// deck view and the run-history viewer are different instances, so this
+    /// cannot go through the injector's live-deck reference.
+    /// </summary>
+    internal static void RefreshDeckView()
+    {
+        try
+        {
+            if (_screen != null && GodotObject.IsInstanceValid(_screen))
+                _screen.DisplayCards();
+        }
+        catch (Exception e)
+        {
+            CoreMain.Logger.Error($"DeckViewSortMenu re-render failed: {e.Message}");
+        }
+    }
+
+    private static string LabelText()
+        => DeckViewSpireLensSort.ActiveMetric?.Label ?? IdleLabel;
+
+    private static void OnTriggerReleased(NButton button)
+    {
+        // NCardViewSortButton.OnRelease flips IsDescending on every click and
+        // the arrow follows it. Ours is a menu trigger, not a direction
+        // toggle, so put the arrow back on the real sort direction.
+        SyncArrow();
+        Toggle();
+    }
+
+    private static void SyncArrow()
+    {
+        if (_trigger == null || !GodotObject.IsInstanceValid(_trigger)) return;
+        _trigger.IsDescending = DeckViewSpireLensSort.Descending;
+    }
+
+    private static void GiveCloneItsOwnMaterial(Node clone)
+    {
+        if (FindChildByName(clone, "ButtonImage") is CanvasItem { Material: not null } image)
+            image.Material = (Material)image.Material.Duplicate();
+    }
+
+    private static void WireFocusNeighbours(
+        NDeckViewScreen screen,
+        Control anchor,
+        Control clone)
+    {
+        // NDeckViewScreen._Ready wires the four stock sorters into a row and
+        // never saw ours, so the trigger would be unreachable by controller.
+        var below = screen._grid?.DefaultFocusedControl;
+        clone.FocusNeighborLeft = anchor.GetPath();
+        clone.FocusNeighborRight = clone.GetPath();
+        clone.FocusNeighborTop = clone.GetPath();
+        clone.FocusNeighborBottom = below != null ? below.GetPath() : clone.GetPath();
+        anchor.FocusNeighborRight = clone.GetPath();
+    }
+
+    private static void SetOwnerRecursive(Node node, Node owner)
+    {
+        for (var i = 0; i < node.GetChildCount(); i++)
+        {
+            var child = node.GetChild(i);
+            child.Owner = owner;
+            SetOwnerRecursive(child, owner);
+        }
+    }
+
+    private static void CopyUniqueNameFlags(Node source, Node clone)
+    {
+        var count = Math.Min(source.GetChildCount(), clone.GetChildCount());
+        for (var i = 0; i < count; i++)
+        {
+            var sourceChild = source.GetChild(i);
+            var cloneChild = clone.GetChild(i);
+            cloneChild.UniqueNameInOwner = sourceChild.UniqueNameInOwner;
+            CopyUniqueNameFlags(sourceChild, cloneChild);
+        }
+    }
+
+    private static Node? FindChildByName(Node parent, string name)
+    {
+        for (var i = 0; i < parent.GetChildCount(); i++)
+        {
+            var child = parent.GetChild(i);
+            if (string.Equals(child.Name.ToString(), name, StringComparison.Ordinal))
+                return child;
+
+            var found = FindChildByName(child, name);
+            if (found != null) return found;
+        }
+
+        return null;
+    }
+
+    private const string SweeperName = "SpireLensCaptionSweeper";
+
+    /// <summary>
+    /// A small repeating timer, parented to the deck view so it dies with it,
+    /// that re-captions the grid's holders. The grid recycles holders during
+    /// scrolling without going through any method we hook, so captions have to
+    /// be swept rather than pushed.
+    /// </summary>
+    private static void AttachCaptionSweeper(NDeckViewScreen screen)
+    {
+        if (screen.GetNodeOrNull<Godot.Timer>(SweeperName) != null) return;
+
+        var timer = new Godot.Timer
+        {
+            Name = SweeperName,
+            WaitTime = 0.2,
+            Autostart = true,
+            OneShot = false,
+        };
+        timer.Timeout += () =>
+        {
+            if (GodotObject.IsInstanceValid(screen))
+                Patches.DeckCardSortStatBadge.RefreshAll(screen);
+        };
+        screen.AddChild(timer);
+    }
+
+    private static void RemoveStale(Node parent)
+    {
+        for (var i = parent.GetChildCount() - 1; i >= 0; i--)
+        {
+            var child = parent.GetChild(i);
+            if (!string.Equals(child.Name.ToString(), TriggerName, StringComparison.Ordinal))
+                continue;
+
+            parent.RemoveChild(child);
+            child.QueueFree();
+        }
+    }
+
+    private static void Toggle()
+    {
+        if (IsOpen) Close();
+        else Open();
+    }
+
+    private static bool IsOpen => _menuLayer != null && GodotObject.IsInstanceValid(_menuLayer);
+
+    private static void Open()
+    {
+        if (Engine.GetMainLoop() is not SceneTree tree) return;
+        if (_trigger == null || !GodotObject.IsInstanceValid(_trigger)) return;
+
+        var layer = new CanvasLayer { Name = LayerName, Layer = MenuLayer };
+        tree.Root.AddChild(layer);
+        _menuLayer = layer;
+
+        // Invisible full-screen catcher: clicking anywhere outside the panel
+        // dismisses, which is what a dropdown is expected to do.
+        var blocker = new Control { MouseFilter = Control.MouseFilterEnum.Stop };
+        blocker.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        blocker.GuiInput += evt =>
+        {
+            if (evt is InputEventMouseButton { Pressed: true }) Close();
+        };
+        layer.AddChild(blocker);
+
+        var panel = BuildTipPanel() ?? BuildFallbackPanel();
+        blocker.AddChild(panel);
+        panel.ResetSize();
+
+        // The blocker is anchored full-rect at the layer origin, so its local
+        // coordinates are viewport coordinates — the trigger's global rect
+        // drops straight in.
+        var triggerRect = _trigger.GetGlobalRect();
+        panel.Position = new Vector2(triggerRect.Position.X, triggerRect.End.Y + 4f);
+    }
+
+    /// <summary>
+    /// Build the dropdown out of the game's own hover-tip scene — the plate
+    /// card and relic tips use — so the menu reads as part of the game rather
+    /// than as a mod overlay. Its shape (probed 2026-09-09):
+    ///
+    ///   HoverTip (MarginContainer)
+    ///     Shadow (NinePatchRect)   res://images/ui/hover_tip.png
+    ///     Bg     (NinePatchRect)   same
+    ///     TextContainer (MarginContainer)
+    ///       VBoxContainer
+    ///         HBoxContainer > %Title (MegaLabel), %Icon (TextureRect)
+    ///         %Description (MegaRichTextLabel)
+    ///
+    /// The title slot carries our header, the icon and description are hidden,
+    /// and the option rows go into the same VBox the description sits in — so
+    /// plate, shadow, margins and fonts all come from the game.
+    ///
+    /// Returns null if the scene no longer matches, leaving the caller to fall
+    /// back rather than opening an empty menu.
+    /// </summary>
+    private static Control? BuildTipPanel()
+    {
+        try
+        {
+            var tip = PreloadManager.Cache
+                .GetScene(HoverTipScenePath)
+                .Instantiate<Control>(PackedScene.GenEditState.Disabled);
+
+            var description = tip.GetNodeOrNull<MegaRichTextLabel>("%Description");
+            var rows = description?.GetParent();
+            if (description == null || rows == null)
+            {
+                CoreMain.Logger.Warn(
+                    "DeckViewSortMenu: hover-tip scene shape changed; using the fallback plate.");
+                tip.QueueFree();
+                return null;
+            }
+
+            tip.MouseFilter = Control.MouseFilterEnum.Stop;
+
+            var title = tip.GetNodeOrNull<MegaLabel>("%Title");
+            title?.SetTextAutoSize("Sort deck by");
+
+            if (tip.GetNodeOrNull<Control>("%Icon") is { } icon)
+                icon.Visible = false;
+
+            // Hidden, not freed: a hidden control stops contributing its 300px
+            // minimum width, so the plate sizes to our rows instead.
+            description.Visible = false;
+
+            AddOptionRows(rows, ResolveFont(description, title), ResolveFontSize(description));
+            return tip;
+        }
+        catch (Exception e)
+        {
+            CoreMain.Logger.Warn($"DeckViewSortMenu: hover-tip plate unavailable: {e.Message}");
+            return null;
+        }
+    }
+
+    private static Control BuildFallbackPanel()
+    {
+        var panel = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Stop };
+        panel.AddThemeStyleboxOverride("panel", NewOpaquePanelStyle());
+
+        var margin = new MarginContainer();
+        margin.AddThemeConstantOverride("margin_left", 18);
+        margin.AddThemeConstantOverride("margin_right", 18);
+        margin.AddThemeConstantOverride("margin_top", 14);
+        margin.AddThemeConstantOverride("margin_bottom", 14);
+        panel.AddChild(margin);
+
+        var rows = new VBoxContainer();
+        rows.AddThemeConstantOverride("separation", 6);
+        margin.AddChild(rows);
+
+        var header = new Label
+        {
+            Text = "Sort deck by",
+            Modulate = new Color(0.72f, 0.8f, 0.92f),
+        };
+        header.AddThemeFontSizeOverride("font_size", 20);
+        if (_rowFont != null) header.AddThemeFontOverride(LabelFontName, _rowFont);
+        rows.AddChild(header);
+
+        AddOptionRows(rows, _rowFont, FallbackFontSize);
+        return panel;
+    }
+
+    /// <summary>
+    /// "Off" pinned at the top, then one collapsible section per metric group,
+    /// at most one of them open. Every row — header or option — has the same
+    /// three-slot geometry, so expanding, collapsing or selecting changes which
+    /// glyphs are visible and never a row's width or where its text sits.
+    ///
+    /// Sections start closed. The trigger button already names the active
+    /// metric and shows its direction, so a closed menu is not a menu with an
+    /// invisible selection — and the section you last opened is remembered, so
+    /// the metric you are actually using is one click away.
+    /// </summary>
+    private static void AddOptionRows(Node parent, Font? font, int fontSize)
+    {
+        var active = DeckViewSpireLensSort.ActiveMetric;
+
+        AddRow(
+            parent,
+            font,
+            fontSize,
+            "Off — use the game's sort",
+            selected: active == null,
+            direction: null,
+            () =>
+            {
+                DeckViewSpireLensSort.Clear("sort menu");
+                Close();
+                RefreshDeckView();
+            });
+
+        foreach (var group in DeckViewSpireLensSort.Groups)
+        {
+            var name = group;
+            var expanded = string.Equals(name, _expandedGroup, StringComparison.Ordinal);
+
+            AddHeaderRow(parent, font, fontSize, name, collapsed: !expanded, () =>
+            {
+                // Opening a section closes whichever one was open. Clicking the
+                // open section closes it and leaves the menu at headers only.
+                _expandedGroup = expanded ? null : name;
+                Reopen();
+            });
+
+            if (!expanded) continue;
+
+            foreach (var metric in DeckViewSpireLensSort.Metrics)
+            {
+                if (!string.Equals(metric.Group, name, StringComparison.Ordinal)) continue;
+
+                var chosen = metric;
+                var selected = DeckViewSpireLensSort.IsActive(chosen);
+
+                AddRow(
+                    parent,
+                    font,
+                    fontSize,
+                    chosen.Label,
+                    selected,
+                    // Only the active metric shows an arrow, because only it
+                    // has a direction. Picking it again flips that direction.
+                    direction: selected ? DeckViewSpireLensSort.Descending : null,
+                    () =>
+                    {
+                        DeckViewSpireLensSort.Select(chosen, "sort menu");
+                        Close();
+                    });
+            }
+        }
+    }
+
+    /// <summary>
+    /// Rebuild the open menu in place after a section is expanded or
+    /// collapsed. Toggling a header is not a selection, so unlike every other
+    /// row it must leave the menu on screen.
+    /// </summary>
+    private static void Reopen()
+    {
+        Close();
+        Open();
+    }
+
+    private static void AddHeaderRow(
+        Node parent,
+        Font? font,
+        int fontSize,
+        string text,
+        bool collapsed,
+        Action onPressed)
+    {
+        var row = BuildRowButton(onPressed);
+        parent.AddChild(row);
+
+        var layout = BuildRowLayout(row);
+        layout.AddChild(NewSlot(
+            collapsed ? "▸" : "▾",
+            font,
+            fontSize,
+            GlyphSlotWidth,
+            HorizontalAlignment.Center));
+
+        var label = NewSlot(text, font, fontSize, 0f, HorizontalAlignment.Left);
+        label.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        // Subdued so the headers read as structure rather than as choices.
+        label.Modulate = new Color(0.72f, 0.8f, 0.92f);
+        layout.AddChild(label);
+
+        layout.AddChild(NewSlot(string.Empty, font, fontSize, GlyphSlotWidth, HorizontalAlignment.Center));
+    }
+
+    private static void AddRow(
+        Node parent,
+        Font? font,
+        int fontSize,
+        string text,
+        bool selected,
+        bool? direction,
+        Action onPressed)
+    {
+        var row = BuildRowButton(onPressed);
+        parent.AddChild(row);
+
+        var layout = BuildRowLayout(row);
+
+        layout.AddChild(NewSlot(
+            selected ? "✓" : string.Empty,
+            font,
+            fontSize,
+            GlyphSlotWidth,
+            HorizontalAlignment.Center));
+
+        var label = NewSlot(text, font, fontSize, 0f, HorizontalAlignment.Left);
+        label.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        layout.AddChild(label);
+
+        layout.AddChild(NewSlot(
+            direction switch { true => "↓", false => "↑", null => string.Empty },
+            font,
+            fontSize,
+            GlyphSlotWidth,
+            HorizontalAlignment.Center));
+    }
+
+    private static Button BuildRowButton(Action onPressed)
+    {
+        var row = new Button
+        {
+            Flat = true,
+            FocusMode = Control.FocusModeEnum.None,
+            CustomMinimumSize = new Vector2(RowWidth, RowHeight),
+            MouseDefaultCursorShape = Control.CursorShape.PointingHand,
+        };
+        row.Pressed += onPressed;
+        return row;
+    }
+
+    /// <summary>
+    /// The button owns the hit area and stays textless; the visuals ride on
+    /// top in fixed slots. Keeping the glyphs out of the button's own label is
+    /// what stops text sliding as selection moves between rows.
+    /// </summary>
+    private static HBoxContainer BuildRowLayout(Button row)
+    {
+        var layout = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+        layout.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        layout.AddThemeConstantOverride("separation", 10);
+        row.AddChild(layout);
+        return layout;
+    }
+
+    private static Label NewSlot(
+        string text,
+        Font? font,
+        int fontSize,
+        float minWidth,
+        HorizontalAlignment alignment)
+    {
+        var label = new Label
+        {
+            Text = text,
+            HorizontalAlignment = alignment,
+            VerticalAlignment = VerticalAlignment.Center,
+            CustomMinimumSize = new Vector2(minWidth, 0f),
+            SizeFlagsVertical = Control.SizeFlags.ExpandFill,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+        };
+        label.AddThemeFontSizeOverride("font_size", fontSize);
+        if (font != null) label.AddThemeFontOverride(LabelFontName, font);
+        return label;
+    }
+
+    private static Font? ResolveFont(Control description, Control? title)
+    {
+        if (description.HasThemeFont(RichTextFontName))
+            return description.GetThemeFont(RichTextFontName);
+        if (title != null && title.HasThemeFont(LabelFontName))
+            return title.GetThemeFont(LabelFontName);
+        return _rowFont;
+    }
+
+    private static int ResolveFontSize(Control description)
+        => description.HasThemeFontSize(RichTextFontSizeName)
+            ? description.GetThemeFontSize(RichTextFontSizeName)
+            : FallbackFontSize;
+
+    private static void Close()
+    {
+        if (_menuLayer != null && GodotObject.IsInstanceValid(_menuLayer))
+            _menuLayer.QueueFree();
+        _menuLayer = null;
+    }
+
+    private static StyleBoxFlat NewOpaquePanelStyle()
+    {
+        var style = new StyleBoxFlat
+        {
+            BgColor = new Color(0.07f, 0.07f, 0.09f, 1f),
+            BorderColor = new Color(0.46f, 0.42f, 0.34f, 1f),
+        };
+        style.SetBorderWidthAll(2);
+        style.SetCornerRadiusAll(6);
+        return style;
+    }
+}

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using Godot;
@@ -54,6 +55,31 @@ internal static class RunHistoryStatsContext
             if (!string.IsNullOrWhiteSpace(keys[i]))
                 HistoricalDeckKeys[cards[i]] = keys[i]!;
         }
+    }
+
+    /// <summary>
+    /// Archived aggregate for one card in the historical deck viewer. Keyed by
+    /// CardModel reference, not by position, so callers are free to reorder
+    /// what the viewer displays without desyncing the mapping.
+    /// </summary>
+    public static bool TryGetHistoricalDeckAggregate(
+        CardModel card,
+        [NotNullWhen(true)] out CardAggregate? aggregate)
+    {
+        aggregate = null;
+        if (_historicalDeckViewer == null
+            || !GodotObject.IsInstanceValid(_historicalDeckViewer)
+            || !HistoricalDeckKeys.TryGetValue(card, out var key))
+        {
+            return false;
+        }
+
+        var run = EnsureLoaded()?.Data;
+        if (run == null || !run.Aggregates.TryGetValue(key, out var found))
+            return false;
+
+        aggregate = found;
+        return true;
     }
 
     public static void ClearHistoricalDeckViewer()

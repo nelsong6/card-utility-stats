@@ -283,6 +283,7 @@ public static class ViewStatsInjectorPatch
             CoreMain.Logger.Info("ViewStatsInjector: re-injecting into already-open deck view after hot reload");
             LastInjectedDeckView = deckView;
             Inject(deckView);
+            DeckViewSortMenu.Inject(deckView);
         }
         catch (Exception e)
         {
@@ -321,6 +322,7 @@ public static class ViewStatsInjectorPatch
         if (_injectedClones.Count > 0)
             CoreMain.Logger.Info($"ViewStatsInjector: {_injectedClones.Count} cloned containers queued for removal");
         _injectedClones.Clear();
+        DeckViewSortMenu.Teardown();
         LastInjectedTickbox = null;
         LastInjectedShowCardsNotInDeckTickbox = null;
         LastInjectedEnemyStatsTickbox = null;
@@ -335,7 +337,15 @@ public static class ViewStatsInjectorPatch
         // we validate semantics per-screen — e.g. Compendium stats would need
         // lifetime aggregation (#2).
         if (__instance is not NDeckViewScreen deckView) return;
-        if (RunHistoryDeckViewer.IsHistoricalDeckViewer(deckView)) return;
+
+        // The run-history viewer reuses this screen type. The tickboxes below
+        // are live-run controls and stay out of it, but the sort menu belongs
+        // on both surfaces — it reads archived numbers there.
+        if (RunHistoryDeckViewer.IsHistoricalDeckViewer(deckView))
+        {
+            DeckViewSortMenu.Inject(deckView);
+            return;
+        }
 
         // Remember the active deck view so OnStatsToggled can trigger a
         // live re-render (switch card collections instantly on toggle).
@@ -343,6 +353,8 @@ public static class ViewStatsInjectorPatch
 
         try { Inject(__instance); }
         catch (Exception e) { CoreMain.Logger.Error($"ViewStatsInjector failed: {e}"); }
+
+        DeckViewSortMenu.Inject(deckView);
     }
 
     private static void Inject(NCardsViewScreen screen)
@@ -550,7 +562,7 @@ public static class ViewStatsInjectorPatch
         SetShowCardsNotInDeckEnabled(tickbox.IsTicked, "deck-view checkbox");
     }
 
-    private static void RefreshDeckView()
+    internal static void RefreshDeckView()
     {
         try
         {

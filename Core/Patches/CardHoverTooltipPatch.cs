@@ -484,6 +484,21 @@ public static class CardHoverShowPatch
             // Avg intended intentionally omitted pending issue #15.
             Row3(sb, "Total damage", agg.TotalEffective.ToString(), "");
             Row3(sb, "Avg effective", $"{avgEffective:F1}", "");
+            // Damage bought per energy actually paid. A card that never spent
+            // energy cannot be divided, so it shows its damage over a zero-cost
+            // orb rather than a ratio — the same shape the deck-view sort uses,
+            // so hovering a card corroborates what you sorted by.
+            if (agg.TotalEffective > 0)
+            {
+                Row3(
+                    sb,
+                    "Damage per energy",
+                    agg.TotalEnergySpent > 0
+                        ? $"{(float)agg.TotalEffective / agg.TotalEnergySpent:F1}"
+                        : $"{agg.TotalEffective} / 0{StatEnergyIcon.RenderInline(18)}",
+                    "");
+            }
+
             _ = avgIntended;  // still computed above; silence unused warning
 
             // Clarify 0 damage for attacks that played without dealing any:
@@ -2793,6 +2808,13 @@ public static class CardHoverShowPatch
         try
         {
             if (agg.Plays <= 0) return false;
+            // A card that was played and never cost anything is interesting on
+            // its own, whatever its printed cost says. The comparison below
+            // treats a 0-cost card as unremarkable (0 spent == 0 expected), but
+            // "spent nothing all run" is exactly the evidence behind its rank
+            // when the deck is sorted by damage per energy — so the rows that
+            // would back that up must not be suppressed.
+            if (agg.TotalEnergySpent == 0) return true;
             int expectedPerPlay = card.EnergyCost.GetWithModifiers(CostModifiers.None);
             if (expectedPerPlay < 0) return true;  // X-cost / negative sentinel — show if played
             return agg.TotalEnergySpent != expectedPerPlay * agg.Plays;
