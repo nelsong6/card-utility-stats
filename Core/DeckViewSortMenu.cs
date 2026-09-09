@@ -1,5 +1,7 @@
 using System;
 using Godot;
+using MegaCrit.Sts2.addons.mega_text;
+using MegaCrit.Sts2.Core.Assets;
 using MegaCrit.Sts2.Core.Nodes.CommonUi;
 using MegaCrit.Sts2.Core.Nodes.GodotExtensions;
 using MegaCrit.Sts2.Core.Nodes.Screens;
@@ -27,7 +29,8 @@ namespace SpireLens.Core;
 /// Both are the same traps documented on the tickbox clone in
 /// <see cref="Patches.ViewStatsInjectorPatch"/>.
 ///
-/// The dropdown itself lives in its own high CanvasLayer, like
+/// The dropdown itself is built from the game's own hover-tip scene — the
+/// plate card and relic tips use — hosted in its own high CanvasLayer, like
 /// <see cref="SpireLensOptionsMenu"/>, so it draws above the card grid without
 /// depending on where the sort row sits in the screen's child order.
 /// </summary>
@@ -38,6 +41,10 @@ internal static class DeckViewSortMenu
     private const int MenuLayer = 999;
     private const string IdleLabel = "SpireLens";
     private const string LabelFontName = "font";
+    private const string RichTextFontName = "normal_font";
+    private const string RichTextFontSizeName = "normal_font_size";
+    private const string HoverTipScenePath = "res://scenes/ui/hover_tip.tscn";
+    private const int FallbackFontSize = 21;
 
     private static NCardViewSortButton? _trigger;
     private static NCardViewSortButton? _anchor;
@@ -277,11 +284,81 @@ internal static class DeckViewSortMenu
         };
         layer.AddChild(blocker);
 
-        var panel = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Stop };
-        // The default panel stylebox is translucent, which put the card grid
-        // straight through the menu text. Override it with a solid plate.
-        panel.AddThemeStyleboxOverride("panel", NewOpaquePanelStyle());
+        var panel = BuildTipPanel() ?? BuildFallbackPanel();
         blocker.AddChild(panel);
+        panel.ResetSize();
+
+        // The blocker is anchored full-rect at the layer origin, so its local
+        // coordinates are viewport coordinates — the trigger's global rect
+        // drops straight in.
+        var triggerRect = _trigger.GetGlobalRect();
+        panel.Position = new Vector2(triggerRect.Position.X, triggerRect.End.Y + 4f);
+    }
+
+    /// <summary>
+    /// Build the dropdown out of the game's own hover-tip scene — the plate
+    /// card and relic tips use — so the menu reads as part of the game rather
+    /// than as a mod overlay. Its shape (probed 2026-09-09):
+    ///
+    ///   HoverTip (MarginContainer)
+    ///     Shadow (NinePatchRect)   res://images/ui/hover_tip.png
+    ///     Bg     (NinePatchRect)   same
+    ///     TextContainer (MarginContainer)
+    ///       VBoxContainer
+    ///         HBoxContainer > %Title (MegaLabel), %Icon (TextureRect)
+    ///         %Description (MegaRichTextLabel)
+    ///
+    /// The title slot carries our header, the icon and description are hidden,
+    /// and the option rows go into the same VBox the description sits in — so
+    /// plate, shadow, margins and fonts all come from the game.
+    ///
+    /// Returns null if the scene no longer matches, leaving the caller to fall
+    /// back rather than opening an empty menu.
+    /// </summary>
+    private static Control? BuildTipPanel()
+    {
+        try
+        {
+            var tip = PreloadManager.Cache
+                .GetScene(HoverTipScenePath)
+                .Instantiate<Control>(PackedScene.GenEditState.Disabled);
+
+            var description = tip.GetNodeOrNull<MegaRichTextLabel>("%Description");
+            var rows = description?.GetParent();
+            if (description == null || rows == null)
+            {
+                CoreMain.Logger.Warn(
+                    "DeckViewSortMenu: hover-tip scene shape changed; using the fallback plate.");
+                tip.QueueFree();
+                return null;
+            }
+
+            tip.MouseFilter = Control.MouseFilterEnum.Stop;
+
+            var title = tip.GetNodeOrNull<MegaLabel>("%Title");
+            title?.SetTextAutoSize("Sort deck by");
+
+            if (tip.GetNodeOrNull<Control>("%Icon") is { } icon)
+                icon.Visible = false;
+
+            // Hidden, not freed: a hidden control stops contributing its 300px
+            // minimum width, so the plate sizes to our rows instead.
+            description.Visible = false;
+
+            AddOptionRows(rows, ResolveFont(description, title), ResolveFontSize(description));
+            return tip;
+        }
+        catch (Exception e)
+        {
+            CoreMain.Logger.Warn($"DeckViewSortMenu: hover-tip plate unavailable: {e.Message}");
+            return null;
+        }
+    }
+
+    private static Control BuildFallbackPanel()
+    {
+        var panel = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Stop };
+        panel.AddThemeStyleboxOverride("panel", NewOpaquePanelStyle());
 
         var margin = new MarginContainer();
         margin.AddThemeConstantOverride("margin_left", 18);
@@ -294,10 +371,25 @@ internal static class DeckViewSortMenu
         rows.AddThemeConstantOverride("separation", 6);
         margin.AddChild(rows);
 
-        rows.AddChild(NewLabel("Sort deck by", 20, new Color(0.72f, 0.8f, 0.92f)));
+        var header = new Label
+        {
+            Text = "Sort deck by",
+            Modulate = new Color(0.72f, 0.8f, 0.92f),
+        };
+        header.AddThemeFontSizeOverride("font_size", 20);
+        if (_rowFont != null) header.AddThemeFontOverride(LabelFontName, _rowFont);
+        rows.AddChild(header);
 
+        AddOptionRows(rows, _rowFont, FallbackFontSize);
+        return panel;
+    }
+
+    private static void AddOptionRows(Node parent, Font? font, int fontSize)
+    {
         AddRow(
-            rows,
+            parent,
+            font,
+            fontSize,
             "Off — use the game's sort",
             DeckViewSpireLensSort.ActiveMetric == null,
             () =>
@@ -315,19 +407,27 @@ internal static class DeckViewSortMenu
                 ? $"{chosen.Label}  {(DeckViewSpireLensSort.Descending ? "highest first" : "lowest first")}"
                 : chosen.Label;
 
-            AddRow(rows, label, active, () =>
+            AddRow(parent, font, fontSize, label, active, () =>
             {
                 DeckViewSpireLensSort.Select(chosen, "sort menu");
                 Close();
             });
         }
-
-        // The blocker is anchored full-rect at the layer origin, so its local
-        // coordinates are viewport coordinates — the trigger's global rect
-        // drops straight in.
-        var triggerRect = _trigger.GetGlobalRect();
-        panel.Position = new Vector2(triggerRect.Position.X, triggerRect.End.Y + 8f);
     }
+
+    private static Font? ResolveFont(Control description, Control? title)
+    {
+        if (description.HasThemeFont(RichTextFontName))
+            return description.GetThemeFont(RichTextFontName);
+        if (title != null && title.HasThemeFont(LabelFontName))
+            return title.GetThemeFont(LabelFontName);
+        return _rowFont;
+    }
+
+    private static int ResolveFontSize(Control description)
+        => description.HasThemeFontSize(RichTextFontSizeName)
+            ? description.GetThemeFontSize(RichTextFontSizeName)
+            : FallbackFontSize;
 
     private static void Close()
     {
@@ -336,7 +436,13 @@ internal static class DeckViewSortMenu
         _menuLayer = null;
     }
 
-    private static void AddRow(VBoxContainer parent, string text, bool active, Action onPressed)
+    private static void AddRow(
+        Node parent,
+        Font? font,
+        int fontSize,
+        string text,
+        bool active,
+        Action onPressed)
     {
         var row = new Button
         {
@@ -346,21 +452,13 @@ internal static class DeckViewSortMenu
             Flat = true,
             Alignment = HorizontalAlignment.Left,
             FocusMode = Control.FocusModeEnum.None,
-            CustomMinimumSize = new Vector2(360f, 46f),
+            CustomMinimumSize = new Vector2(320f, 44f),
             MouseDefaultCursorShape = Control.CursorShape.PointingHand,
         };
-        row.AddThemeFontSizeOverride("font_size", 21);
-        if (_rowFont != null) row.AddThemeFontOverride(LabelFontName, _rowFont);
+        row.AddThemeFontSizeOverride("font_size", fontSize);
+        if (font != null) row.AddThemeFontOverride(LabelFontName, font);
         row.Pressed += onPressed;
         parent.AddChild(row);
-    }
-
-    private static Label NewLabel(string text, int fontSize, Color modulate)
-    {
-        var label = new Label { Text = text, Modulate = modulate };
-        label.AddThemeFontSizeOverride("font_size", fontSize);
-        if (_rowFont != null) label.AddThemeFontOverride(LabelFontName, _rowFont);
-        return label;
     }
 
     private static StyleBoxFlat NewOpaquePanelStyle()
