@@ -61,6 +61,7 @@ internal static class DeckCardSortStatBadge
 {
     private const string BadgeName = "SpireLensSortStat";
     private const string BadgeMeta = "spirelens_caption";
+    private const string CaptionMarker = "\u200B\n";
     // The card's own local geometry, read off the live scene: the frame is
     // 300x422 centred on the holder origin, the body text panel spans
     // y -22..181, and the description label's box ends at y 173. The caption
@@ -77,9 +78,6 @@ internal static class DeckCardSortStatBadge
     private const string RichTextFontSizeName = "normal_font_size";
     private const string RichTextColorName = "default_color";
     private const int FallbackFontSize = 18;
-
-    private static Font? _italicFont;
-    private static Font? _italicBaseFont;
 
     internal static void Update(NCardHolder? holder, CardModel? card)
         => Schedule(holder, card, readFromHolder: false);
@@ -132,29 +130,26 @@ internal static class DeckCardSortStatBadge
             if (holder.IsQueuedForDeletion()
                 || holder.Name.ToString().Contains("-OLD", StringComparison.Ordinal))
             {
-                var dying = ResolveBadge(holder);
-                if (dying != null) dying.Visible = false;
+                RemoveLegacyLabels(holder);
                 return;
             }
 
             var effectiveCard = readFromHolder ? holder.CardModel : card;
-            var badge = ResolveBadge(holder);
+            RemoveLegacyLabels(holder);
 
+            var description = holder.CardNode?
+                .GetNodeOrNull<MegaRichTextLabel>("CardContainer/DescriptionLabel");
+            if (description == null) return;
+
+            var baseText = StripCaption(description.Text);
             if (!ShouldCaption(holder, effectiveCard, out var text))
             {
-                if (badge != null) badge.Visible = false;
+                if (!string.Equals(description.Text, baseText, StringComparison.Ordinal))
+                    description.SetTextAutoSize(baseText);
                 return;
             }
 
-            badge ??= Create(holder);
-            // Reassert placement every time rather than only at creation: a
-            // badge built by a previous Core load survives the reload on its
-            // holder and is reused, so it would otherwise keep that load's
-            // geometry for the rest of the session.
-            ApplyGeometry(badge);
-            badge.Text = text;
-            ApplyCardTextStyle(holder, badge);
-            badge.Visible = true;
+            description.SetTextAutoSize($"{baseText}{CaptionMarker}[i]{text}[/i]");
         }
         catch (Exception e)
         {
@@ -163,22 +158,33 @@ internal static class DeckCardSortStatBadge
     }
 
     /// <summary>
-    /// Re-caption every holder currently in a grid.
+    /// Our line lives INSIDE the card's own description label rather than in a
+    /// label of our own floating over the card.
     ///
-    /// The per-holder hooks cover cards being assigned, but the grid also
-    /// RECYCLES holders while scrolling without going through either of them,
-    /// which left a holder showing the previous card's number — a Skill
-    /// captioned with an Attack's damage. Rather than patch the grid's
-    /// internals (a new Harmony target, and a game-update liability), the deck
-    /// view sweeps its own holders: at ~40 cards this is trivial work, and it
-    /// cannot be out of step with however the grid decides to reuse them.
+    /// A separate label has to guess where the card's text ends, and cards
+    /// carry wildly different amounts of it — so a fixed position either
+    /// collides with a wordy card or leaves a gap under a terse one. The
+    /// description label is a MegaRichTextLabel with AutoSizeEnabled and a
+    /// font range of 8..100: it already shrinks its contents to fit its box.
+    /// Appending to it means our line is measured and scaled with the card's
+    /// own text, by the game's own logic, instead of competing with it.
+    ///
+    /// The marker makes the append idempotent. The game rewrites this label on
+    /// every visual update and upgrade-preview swap, and our sweep runs five
+    /// times a second, so the line must be strippable and re-appendable
+    /// without ever stacking up. A zero-width space keeps the marker invisible
+    /// if it somehow survives into rendered text.
+    /// </summary>
+    /// <summary>
+    /// Re-caption every holder currently in a grid. The grid recycles holders
+    /// while scrolling without going through the per-holder hooks, so captions
+    /// have to be swept rather than pushed.
     /// </summary>
     internal static void RefreshAll(Node? root)
     {
         if (root == null || !GodotObject.IsInstanceValid(root)) return;
-
         try { RefreshRecursive(root); }
-        catch (Exception e) { CoreMain.LogDebug($"DeckCardSortStatBadge.RefreshAll failed: {e.Message}"); }
+        catch (Exception e) { CoreMain.LogDebug($"RefreshAll failed: {e.Message}"); }
     }
 
     private static void RefreshRecursive(Node node)
@@ -190,56 +196,36 @@ internal static class DeckCardSortStatBadge
             RefreshRecursive(node.GetChild(i));
     }
 
-    /// <summary>
-    /// Find this holder's caption, tolerating anything a previous Core load
-    /// left behind.
-    ///
-    /// Earlier builds made the caption a PanelContainer under the same name.
-    /// A typed lookup skips those, so Create would add a fresh Label, Godot
-    /// would rename it to dodge the collision, and the next sweep would do it
-    /// again — stacking a new label five times a second. Match on name alone,
-    /// keep the first usable Label, and free every other claimant so a holder
-    /// converges on exactly one caption however it was left.
-    /// </summary>
-    /// <summary>
-    /// Find this holder's caption and make sure it is the only one.
-    ///
-    /// Identify by POSITION IN THE TREE, not by name or marker. Godot renames
-    /// a colliding child to forms like "@Label@125030", so every name- or
-    /// meta-based test missed labels left by earlier Core loads, and a fresh
-    /// one was added each reload — three stacked labels on one card, each
-    /// showing a different run's number. The game keeps its own labels inside
-    /// the NCard subtree, so a Label parented DIRECTLY to a card holder is
-    /// always ours, whatever it ended up being called.
-    /// </summary>
-    private static Label? ResolveBadge(NCardHolder holder)
+    private static string StripCaption(string? text)
     {
-        Label? found = null;
+        if (string.IsNullOrEmpty(text)) return string.Empty;
 
+        var marker = text.IndexOf(CaptionMarker, StringComparison.Ordinal);
+        return marker < 0 ? text : text[..marker];
+    }
+
+    /// <summary>
+    /// Clear captions drawn the old way — a Label parented straight to the
+    /// holder — including any left by an earlier Core load in this session.
+    /// </summary>
+    private static void RemoveLegacyLabels(NCardHolder holder)
+    {
         for (var i = holder.GetChildCount() - 1; i >= 0; i--)
         {
             var child = holder.GetChild(i);
-
-            var isOurs = child is Label
-                || child.HasMeta(BadgeMeta)
-                || child.Name.ToString().Contains(BadgeName, StringComparison.Ordinal);
-            if (!isOurs) continue;
-
-            if (child is Label label && found == null)
+            if (child is not Label
+                && !child.HasMeta(BadgeMeta)
+                && !child.Name.ToString().Contains(BadgeName, StringComparison.Ordinal))
             {
-                found = label;
                 continue;
             }
 
             holder.RemoveChild(child);
             child.QueueFree();
         }
-
-        if (found != null) found.Name = BadgeName;
-        return found;
     }
 
-    private static bool ShouldCaption(NCardHolder holder, CardModel? card, out string text)
+        private static bool ShouldCaption(NCardHolder holder, CardModel? card, out string text)
     {
         text = string.Empty;
         if (card == null) return false;
@@ -255,103 +241,9 @@ internal static class DeckCardSortStatBadge
         return DeckViewSpireLensSort.TryGetCaption(card, out text);
     }
 
-    private static Label Create(NCardHolder holder)
-    {
-        var caption = new Label
-        {
-            Name = BadgeName,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center,
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-            ZIndex = 20,
-            // Shrink rather than overflow the card on the longest metric names.
-            TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis,
-        };
-        caption.SetMeta(BadgeMeta, true);
-        ApplyGeometry(caption);
-        ApplyCardTextStyle(holder, caption);
-        holder.AddChild(caption);
-        return caption;
-    }
-
-    /// <summary>
-    /// Draw the caption as the card's own body text rather than as a mod chip:
-    /// the font, size and colour are lifted off that card's DescriptionLabel,
-    /// slanted to mark it as ours. Copying the live node beats hardcoding,
-    /// because the card's text style varies with rarity and border.
-    ///
-    /// The game's own description text is deliberately not touched. It is
-    /// regenerated on every visual update and upgrade-preview swap, so an
-    /// appended line would be wiped or duplicated depending on ordering, and a
-    /// long description plus our line would overflow the label's box and shrink
-    /// the actual card text. A sibling label in the empty space below it gets
-    /// the same look with none of that.
-    /// </summary>
-    private static void ApplyCardTextStyle(NCardHolder holder, Label caption)
-    {
-        var description = holder.CardNode?
-            .GetNodeOrNull<MegaRichTextLabel>("CardContainer/DescriptionLabel");
-
-        var font = description != null && description.HasThemeFont(RichTextFontName)
-            ? description.GetThemeFont(RichTextFontName)
-            : null;
-        var size = description != null && description.HasThemeFontSize(RichTextFontSizeName)
-            ? description.GetThemeFontSize(RichTextFontSizeName)
-            : FallbackFontSize;
-
-        if (ResolveItalicFont(font) is { } italic)
-            caption.AddThemeFontOverride(LabelFontName, italic);
-        caption.AddThemeFontSizeOverride(LabelFontSizeName, size);
-
-        var colour = description != null && description.HasThemeColor(RichTextColorName)
-            ? description.GetThemeColor(RichTextColorName)
-            : new Color(0.13f, 0.11f, 0.09f, 1f);
-        caption.AddThemeColorOverride(LabelColorName, colour);
-    }
-
-    /// <summary>
-    /// Explicit placement, NOT anchors. Both the holder and the NCard inside it
-    /// report size (0,0): a card is drawn in centred local coordinates — its
-    /// frame spans x -150..150, y -211..211 — rather than being laid out as a
-    /// sized Control. Anchoring to that empty rect resolves to a NEGATIVE width
-    /// and an invisible badge, which is why the first cut never showed. (The
-    /// meta-power badge anchors the same way and escapes only because its
-    /// offsets happen to come out positive.)
-    /// </summary>
-    private static void ApplyGeometry(Control badge)
-    {
-        badge.SetAnchorsPreset(Control.LayoutPreset.TopLeft);
-        badge.Position = new Vector2(-BannerWidth / 2f, BannerTop);
-        badge.Size = new Vector2(BannerWidth, BannerHeight);
-    }
-
-    /// <summary>
+            /// <summary>
     /// The game's fonts ship no italic face, so slant has to be synthesised by
     /// shearing the base font. Cached against the font it was derived from, so
     /// a font change rebuilds it and ordinary redraws do not.
     /// </summary>
-    private static Font? ResolveItalicFont(Font? baseFont)
-    {
-        baseFont ??= DeckViewSortMenu.RowFont;
-        if (baseFont == null) return null;
-        if (_italicFont != null && ReferenceEquals(baseFont, _italicBaseFont))
-            return _italicFont;
-
-        _italicBaseFont = baseFont;
-        _italicFont = new FontVariation
-        {
-            BaseFont = baseFont,
-            VariationTransform = new Transform2D(
-                new Vector2(1f, 0f),
-                new Vector2(-0.2f, 1f),
-                Vector2.Zero),
-        };
-        return _italicFont;
-    }
-
-    internal static void ResetFontCache()
-    {
-        _italicFont = null;
-        _italicBaseFont = null;
-    }
-}
+        }

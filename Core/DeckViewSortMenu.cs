@@ -129,7 +129,6 @@ internal static class DeckViewSortMenu
             WireFocusNeighbours(screen, anchor, clone);
             AttachCaptionSweeper(screen);
             _rowFont = anchor._label?.GetThemeFont(LabelFontName);
-            Patches.DeckCardSortStatBadge.ResetFontCache();
             _baseBottomLabelText = screen._bottomLabel?.Text;
             RefreshSortCaption();
 
@@ -161,7 +160,6 @@ internal static class DeckViewSortMenu
         _screen = null;
         _rowFont = null;
         _baseBottomLabelText = null;
-        Patches.DeckCardSortStatBadge.ResetFontCache();
     }
 
     /// <summary>
