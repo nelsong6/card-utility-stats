@@ -37,11 +37,16 @@ internal static class DeckViewSortMenu
     private const string LayerName = "SpireLensDeckSortMenu";
     private const int MenuLayer = 999;
     private const string IdleLabel = "SpireLens";
+    private const string LabelFontName = "font";
 
     private static NCardViewSortButton? _trigger;
     private static NCardViewSortButton? _anchor;
     private static NDeckViewScreen? _screen;
     private static CanvasLayer? _menuLayer;
+
+    // The sort row's own font, lifted off the anchor sorter's MegaLabel so the
+    // dropdown reads as part of the same surface rather than as stock Godot UI.
+    private static Font? _rowFont;
 
     /// <summary>
     /// Add the trigger to the sort row. Safe to call repeatedly — each call
@@ -98,6 +103,7 @@ internal static class DeckViewSortMenu
                 clone.SetHue(hue);
 
             WireFocusNeighbours(screen, anchor, clone);
+            _rowFont = anchor._label?.GetThemeFont(LabelFontName);
 
             CoreMain.Logger.Info(
                 $"DeckViewSortMenu: injected sort trigger (parent={parent.GetType().Name}, "
@@ -125,6 +131,7 @@ internal static class DeckViewSortMenu
         _trigger = null;
         _anchor = null;
         _screen = null;
+        _rowFont = null;
     }
 
     /// <summary>Re-render the trigger's label and arrow after a state change.</summary>
@@ -271,6 +278,9 @@ internal static class DeckViewSortMenu
         layer.AddChild(blocker);
 
         var panel = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Stop };
+        // The default panel stylebox is translucent, which put the card grid
+        // straight through the menu text. Override it with a solid plate.
+        panel.AddThemeStyleboxOverride("panel", NewOpaquePanelStyle());
         blocker.AddChild(panel);
 
         var margin = new MarginContainer();
@@ -312,11 +322,6 @@ internal static class DeckViewSortMenu
             });
         }
 
-        rows.AddChild(NewLabel(
-            "Pick the active metric again to flip the direction.",
-            16,
-            new Color(0.68f, 0.68f, 0.7f)));
-
         // The blocker is anchored full-rect at the layer origin, so its local
         // coordinates are viewport coordinates — the trigger's global rect
         // drops straight in.
@@ -345,6 +350,7 @@ internal static class DeckViewSortMenu
             MouseDefaultCursorShape = Control.CursorShape.PointingHand,
         };
         row.AddThemeFontSizeOverride("font_size", 21);
+        if (_rowFont != null) row.AddThemeFontOverride(LabelFontName, _rowFont);
         row.Pressed += onPressed;
         parent.AddChild(row);
     }
@@ -353,6 +359,19 @@ internal static class DeckViewSortMenu
     {
         var label = new Label { Text = text, Modulate = modulate };
         label.AddThemeFontSizeOverride("font_size", fontSize);
+        if (_rowFont != null) label.AddThemeFontOverride(LabelFontName, _rowFont);
         return label;
+    }
+
+    private static StyleBoxFlat NewOpaquePanelStyle()
+    {
+        var style = new StyleBoxFlat
+        {
+            BgColor = new Color(0.07f, 0.07f, 0.09f, 1f),
+            BorderColor = new Color(0.46f, 0.42f, 0.34f, 1f),
+        };
+        style.SetBorderWidthAll(2);
+        style.SetCornerRadiusAll(6);
+        return style;
     }
 }
