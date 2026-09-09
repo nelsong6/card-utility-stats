@@ -61,6 +61,13 @@ internal static class DeckCardSortStatBadge
     private const string BadgeName = "SpireLensSortStat";
     private const int FontSize = 13;
 
+    // The card's own local geometry, read off the live scene: the frame is
+    // 300x422 centred on the holder origin, and the description text ends at
+    // y 173. The banner sits below that and inside the frame's bottom edge.
+    private const float BannerWidth = 268f;
+    private const float BannerTop = 176f;
+    private const float BannerHeight = 30f;
+
     private static Font? _italicFont;
     private static Font? _italicBaseFont;
 
@@ -100,6 +107,11 @@ internal static class DeckCardSortStatBadge
             }
 
             badge ??= Create(holder);
+            // Reassert placement every time rather than only at creation: a
+            // badge built by a previous Core load survives the reload on its
+            // holder and is reused, so it would otherwise keep that load's
+            // geometry for the rest of the session.
+            ApplyGeometry(badge);
             badge.GetNodeOrNull<Label>("Value")?.Set(Label.PropertyName.Text, text);
             badge.Visible = true;
         }
@@ -132,17 +144,8 @@ internal static class DeckCardSortStatBadge
             Name = BadgeName,
             MouseFilter = Control.MouseFilterEnum.Ignore,
             ZIndex = 20,
-            // A banner along the card's lower edge: the widest run of space on
-            // the card, and clear of the top-right meta-power badge.
-            AnchorLeft = 0f,
-            AnchorRight = 1f,
-            AnchorTop = 1f,
-            AnchorBottom = 1f,
-            OffsetLeft = 10f,
-            OffsetRight = -10f,
-            OffsetTop = -42f,
-            OffsetBottom = -14f,
         };
+        ApplyGeometry(badge);
 
         // Near-opaque plate rather than plain text over art: the caption has to
         // stay readable in a screenshot and through stream compression, over
@@ -181,6 +184,22 @@ internal static class DeckCardSortStatBadge
         badge.AddChild(label);
         holder.AddChild(badge);
         return badge;
+    }
+
+    /// <summary>
+    /// Explicit placement, NOT anchors. Both the holder and the NCard inside it
+    /// report size (0,0): a card is drawn in centred local coordinates — its
+    /// frame spans x -150..150, y -211..211 — rather than being laid out as a
+    /// sized Control. Anchoring to that empty rect resolves to a NEGATIVE width
+    /// and an invisible badge, which is why the first cut never showed. (The
+    /// meta-power badge anchors the same way and escapes only because its
+    /// offsets happen to come out positive.)
+    /// </summary>
+    private static void ApplyGeometry(Control badge)
+    {
+        badge.SetAnchorsPreset(Control.LayoutPreset.TopLeft);
+        badge.Position = new Vector2(-BannerWidth / 2f, BannerTop);
+        badge.Size = new Vector2(BannerWidth, BannerHeight);
     }
 
     /// <summary>
