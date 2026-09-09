@@ -81,50 +81,47 @@ internal static class DeckCardSortStatBadge
     private static Font? _italicBaseFont;
 
     internal static void Update(NCardHolder? holder, CardModel? card)
-        => Update(holder, card, readFromHolder: false, allowRetry: true);
+        => Schedule(holder, card, readFromHolder: false);
 
     /// <summary>
-    /// Resolve the card from the holder at decision time rather than trusting
-    /// a value captured earlier. NGridCardHolder.CardModel returns _baseCard,
-    /// which Create assigns in UpdateCardModel AFTER it calls SetCard — so at
-    /// the SetCard postfix the holder still reports its PREVIOUS card. Holders
-    /// come from a shared NodePool, so that stale card is often from an
-    /// entirely different screen, and captioning it looks up the wrong run's
-    /// numbers (or none at all).
+    /// Resolve the card from the holder rather than from the caller. At the
+    /// SetCard postfix the holder still reports its PREVIOUS card:
+    /// NGridCardHolder.CardModel returns _baseCard, which Create assigns in
+    /// UpdateCardModel AFTER SetCard returns.
     /// </summary>
     internal static void UpdateFromHolder(NCardHolder? holder)
-        => Update(holder, null, readFromHolder: true, allowRetry: true);
+        => Schedule(holder, null, readFromHolder: true);
 
-    private static void Update(
-        NCardHolder? holder,
-        CardModel? card,
-        bool readFromHolder,
-        bool allowRetry)
+    /// <summary>
+    /// Always settle a frame late, and re-read everything then.
+    ///
+    /// Two things are false at postfix time and true by the next idle frame,
+    /// and the grid hits both: a holder fresh from the NodePool has not been
+    /// parented yet (so the deck-view ancestor test would say "not a deck
+    /// view"), and a holder being recycled in place has not had _baseCard
+    /// updated yet (so it still reports the card it displayed before). The
+    /// second is why scrolling used to leave the previous card's number on a
+    /// recycled holder — a Skill captioned with an Attack's damage.
+    ///
+    /// InitGrid parents the holder and Create updates the model inside the
+    /// same frame, so one deferred hop is enough for both.
+    /// </summary>
+    private static void Schedule(NCardHolder? holder, CardModel? card, bool readFromHolder)
+    {
+        if (holder == null || !GodotObject.IsInstanceValid(holder)) return;
+
+        var pendingHolder = holder;
+        var pendingCard = card;
+        var pendingRead = readFromHolder;
+        Callable.From(() => Apply(pendingHolder, pendingCard, pendingRead)).CallDeferred();
+    }
+
+    private static void Apply(NCardHolder? holder, CardModel? card, bool readFromHolder)
     {
         if (holder == null || !GodotObject.IsInstanceValid(holder)) return;
 
         try
         {
-            // Grid holders are pooled and are populated BEFORE they are
-            // parented: NGridCardHolder.Create pulls one from the node pool and
-            // calls SetCard on it, and InitGrid only adds it to the scroll
-            // container afterwards. ShouldCaption reads ancestors to tell a
-            // deck grid from the combat hand, and a detached holder has none —
-            // so deciding now would suppress the caption on every card of the
-            // first render. Wait for it to land, exactly once.
-            if (allowRetry && !holder.IsInsideTree())
-            {
-                var pendingHolder = holder;
-                var pendingCard = card;
-                var pendingReadFromHolder = readFromHolder;
-                holder.Connect(
-                    Node.SignalName.TreeEntered,
-                    Callable.From(() => Update(
-                        pendingHolder, pendingCard, pendingReadFromHolder, allowRetry: false)),
-                    (uint)GodotObject.ConnectFlags.OneShot);
-                return;
-            }
-
             var effectiveCard = readFromHolder ? holder.CardModel : card;
             var badge = holder.GetNodeOrNull<Label>(BadgeName);
 
@@ -146,8 +143,36 @@ internal static class DeckCardSortStatBadge
         }
         catch (Exception e)
         {
-            CoreMain.LogDebug($"DeckCardSortStatBadge.Update failed: {e.Message}");
+            CoreMain.LogDebug($"DeckCardSortStatBadge.Apply failed: {e.Message}");
         }
+    }
+
+    /// <summary>
+    /// Re-caption every holder currently in a grid.
+    ///
+    /// The per-holder hooks cover cards being assigned, but the grid also
+    /// RECYCLES holders while scrolling without going through either of them,
+    /// which left a holder showing the previous card's number — a Skill
+    /// captioned with an Attack's damage. Rather than patch the grid's
+    /// internals (a new Harmony target, and a game-update liability), the deck
+    /// view sweeps its own holders: at ~40 cards this is trivial work, and it
+    /// cannot be out of step with however the grid decides to reuse them.
+    /// </summary>
+    internal static void RefreshAll(Node? root)
+    {
+        if (root == null || !GodotObject.IsInstanceValid(root)) return;
+
+        try { RefreshRecursive(root); }
+        catch (Exception e) { CoreMain.LogDebug($"DeckCardSortStatBadge.RefreshAll failed: {e.Message}"); }
+    }
+
+    private static void RefreshRecursive(Node node)
+    {
+        if (node is NGridCardHolder holder)
+            Apply(holder, null, readFromHolder: true);
+
+        for (var i = 0; i < node.GetChildCount(); i++)
+            RefreshRecursive(node.GetChild(i));
     }
 
     private static bool ShouldCaption(NCardHolder holder, CardModel? card, out string text)

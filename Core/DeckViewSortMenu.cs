@@ -127,6 +127,7 @@ internal static class DeckViewSortMenu
                 clone.SetHue(hue);
 
             WireFocusNeighbours(screen, anchor, clone);
+            AttachCaptionSweeper(screen);
             _rowFont = anchor._label?.GetThemeFont(LabelFontName);
             Patches.DeckCardSortStatBadge.ResetFontCache();
             _baseBottomLabelText = screen._bottomLabel?.Text;
@@ -291,6 +292,33 @@ internal static class DeckViewSortMenu
         }
 
         return null;
+    }
+
+    private const string SweeperName = "SpireLensCaptionSweeper";
+
+    /// <summary>
+    /// A small repeating timer, parented to the deck view so it dies with it,
+    /// that re-captions the grid's holders. The grid recycles holders during
+    /// scrolling without going through any method we hook, so captions have to
+    /// be swept rather than pushed.
+    /// </summary>
+    private static void AttachCaptionSweeper(NDeckViewScreen screen)
+    {
+        if (screen.GetNodeOrNull<Godot.Timer>(SweeperName) != null) return;
+
+        var timer = new Godot.Timer
+        {
+            Name = SweeperName,
+            WaitTime = 0.2,
+            Autostart = true,
+            OneShot = false,
+        };
+        timer.Timeout += () =>
+        {
+            if (GodotObject.IsInstanceValid(screen))
+                Patches.DeckCardSortStatBadge.RefreshAll(screen);
+        };
+        screen.AddChild(timer);
     }
 
     private static void RemoveStale(Node parent)
