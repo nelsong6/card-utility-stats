@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Godot;
 using MegaCrit.Sts2.addons.mega_text;
 using MegaCrit.Sts2.Core.Assets;
@@ -57,6 +58,11 @@ internal static class DeckViewSortMenu
     // The sort row's own font, lifted off the anchor sorter's MegaLabel so the
     // dropdown reads as part of the same surface rather than as stock Godot UI.
     private static Font? _rowFont;
+
+    // Which sections the player has collapsed. Session state: the menu
+    // is a view preference, and it reopens often enough that remembering
+    // across a restart is not worth a Loader bridge method.
+    private static readonly HashSet<string> _collapsedGroups = new(StringComparer.Ordinal);
 
     /// <summary>
     /// Add the trigger to the sort row. Safe to call repeatedly — each call
@@ -388,13 +394,18 @@ internal static class DeckViewSortMenu
     }
 
     /// <summary>
-    /// Both option groups. Every row has the same three-slot geometry — check,
-    /// label, direction — so selecting something changes which glyphs are
-    /// visible and never how wide a row is or where its text sits.
+    /// "Off" pinned at the top, then one collapsible section per metric group.
+    /// Every row — header or option — has the same three-slot geometry, so
+    /// expanding, collapsing or selecting changes which glyphs are visible and
+    /// never a row's width or where its text sits.
     /// </summary>
     private static void AddOptionRows(Node parent, Font? font, int fontSize)
     {
         var active = DeckViewSpireLensSort.ActiveMetric;
+
+        // The active metric must never be hidden behind a collapsed header, or
+        // the menu would open showing no selection at all.
+        if (active != null) _collapsedGroups.Remove(active.Group);
 
         AddRow(
             parent,
@@ -410,26 +421,81 @@ internal static class DeckViewSortMenu
                 RefreshDeckView();
             });
 
-        foreach (var metric in DeckViewSpireLensSort.Metrics)
+        foreach (var group in DeckViewSpireLensSort.Groups)
         {
-            var chosen = metric;
-            var selected = DeckViewSpireLensSort.IsActive(chosen);
+            var name = group;
+            var collapsed = _collapsedGroups.Contains(name);
 
-            AddRow(
-                parent,
-                font,
-                fontSize,
-                chosen.Label,
-                selected,
-                // Only the active metric shows an arrow, because only it has a
-                // direction. Picking it again flips that direction.
-                direction: selected ? DeckViewSpireLensSort.Descending : null,
-                () =>
-                {
-                    DeckViewSpireLensSort.Select(chosen, "sort menu");
-                    Close();
-                });
+            AddHeaderRow(parent, font, fontSize, name, collapsed, () =>
+            {
+                if (!_collapsedGroups.Remove(name)) _collapsedGroups.Add(name);
+                Reopen();
+            });
+
+            if (collapsed) continue;
+
+            foreach (var metric in DeckViewSpireLensSort.Metrics)
+            {
+                if (!string.Equals(metric.Group, name, StringComparison.Ordinal)) continue;
+
+                var chosen = metric;
+                var selected = DeckViewSpireLensSort.IsActive(chosen);
+
+                AddRow(
+                    parent,
+                    font,
+                    fontSize,
+                    chosen.Label,
+                    selected,
+                    // Only the active metric shows an arrow, because only it
+                    // has a direction. Picking it again flips that direction.
+                    direction: selected ? DeckViewSpireLensSort.Descending : null,
+                    () =>
+                    {
+                        DeckViewSpireLensSort.Select(chosen, "sort menu");
+                        Close();
+                    });
+            }
         }
+    }
+
+    /// <summary>
+    /// Rebuild the open menu in place after a section is expanded or
+    /// collapsed. Toggling a header is not a selection, so unlike every other
+    /// row it must leave the menu on screen.
+    /// </summary>
+    private static void Reopen()
+    {
+        Close();
+        Open();
+    }
+
+    private static void AddHeaderRow(
+        Node parent,
+        Font? font,
+        int fontSize,
+        string text,
+        bool collapsed,
+        Action onPressed)
+    {
+        var row = BuildRowButton(onPressed);
+        parent.AddChild(row);
+
+        var layout = BuildRowLayout(row);
+        layout.AddChild(NewSlot(
+            collapsed ? "▸" : "▾",
+            font,
+            fontSize,
+            GlyphSlotWidth,
+            HorizontalAlignment.Center));
+
+        var label = NewSlot(text, font, fontSize, 0f, HorizontalAlignment.Left);
+        label.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        // Subdued so the headers read as structure rather than as choices.
+        label.Modulate = new Color(0.72f, 0.8f, 0.92f);
+        layout.AddChild(label);
+
+        layout.AddChild(NewSlot(string.Empty, font, fontSize, GlyphSlotWidth, HorizontalAlignment.Center));
     }
 
     private static void AddRow(
@@ -441,23 +507,10 @@ internal static class DeckViewSortMenu
         bool? direction,
         Action onPressed)
     {
-        var row = new Button
-        {
-            Flat = true,
-            FocusMode = Control.FocusModeEnum.None,
-            CustomMinimumSize = new Vector2(RowWidth, RowHeight),
-            MouseDefaultCursorShape = Control.CursorShape.PointingHand,
-        };
-        row.Pressed += onPressed;
+        var row = BuildRowButton(onPressed);
         parent.AddChild(row);
 
-        // The button owns the hit area and stays textless; the visuals ride on
-        // top in fixed slots. Keeping the glyphs out of the button's own label
-        // is what stops the text sliding as selection moves between rows.
-        var layout = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
-        layout.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
-        layout.AddThemeConstantOverride("separation", 10);
-        row.AddChild(layout);
+        var layout = BuildRowLayout(row);
 
         layout.AddChild(NewSlot(
             selected ? "✓" : string.Empty,
@@ -476,6 +529,33 @@ internal static class DeckViewSortMenu
             fontSize,
             GlyphSlotWidth,
             HorizontalAlignment.Center));
+    }
+
+    private static Button BuildRowButton(Action onPressed)
+    {
+        var row = new Button
+        {
+            Flat = true,
+            FocusMode = Control.FocusModeEnum.None,
+            CustomMinimumSize = new Vector2(RowWidth, RowHeight),
+            MouseDefaultCursorShape = Control.CursorShape.PointingHand,
+        };
+        row.Pressed += onPressed;
+        return row;
+    }
+
+    /// <summary>
+    /// The button owns the hit area and stays textless; the visuals ride on
+    /// top in fixed slots. Keeping the glyphs out of the button's own label is
+    /// what stops text sliding as selection moves between rows.
+    /// </summary>
+    private static HBoxContainer BuildRowLayout(Button row)
+    {
+        var layout = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+        layout.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        layout.AddThemeConstantOverride("separation", 10);
+        row.AddChild(layout);
+        return layout;
     }
 
     private static Label NewSlot(

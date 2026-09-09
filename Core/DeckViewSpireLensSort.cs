@@ -18,10 +18,15 @@ namespace SpireLens.Core;
 /// </summary>
 internal sealed class DeckSortMetric
 {
-    internal DeckSortMetric(string id, string label, Func<CardAggregate, long> select)
+    internal DeckSortMetric(
+        string id,
+        string label,
+        string group,
+        Func<CardAggregate, double> select)
     {
         Id = id;
         Label = label;
+        Group = group;
         Select = select;
     }
 
@@ -29,8 +34,14 @@ internal sealed class DeckSortMetric
 
     internal string Label { get; }
 
-    /// <summary>Value to order by. Untracked cards score 0 and trail.</summary>
-    internal Func<CardAggregate, long> Select { get; }
+    /// <summary>Section this metric is listed under in the sort menu.</summary>
+    internal string Group { get; }
+
+    /// <summary>
+    /// Value to order by. Untracked cards score 0 and trail. Double rather
+    /// than integer so per-play averages are orderable at full precision.
+    /// </summary>
+    internal Func<CardAggregate, double> Select { get; }
 }
 
 /// <summary>
@@ -59,13 +70,64 @@ internal sealed class DeckSortMetric
 /// </summary>
 internal static class DeckViewSpireLensSort
 {
+    internal const string GroupDamage = "Damage";
+    internal const string GroupDefense = "Defense";
+    internal const string GroupCost = "Cost";
+    internal const string GroupFlow = "Flow";
+
+    /// <summary>Section order in the menu.</summary>
+    internal static readonly IReadOnlyList<string> Groups =
+        new[] { GroupDamage, GroupDefense, GroupCost, GroupFlow };
+
+    /// <summary>
+    /// Every metric mirrors a row the card tooltip already prints, so a number
+    /// you sorted by and a number you hovered to read never disagree.
+    /// </summary>
     internal static readonly IReadOnlyList<DeckSortMetric> Metrics = new[]
     {
-        // "Total damage" here is exactly the row the card tooltip prints under
-        // that name: effective damage, i.e. HP this physical card actually
-        // removed across the run. Block and overkill waste are excluded, which
-        // is what players mean by "this card has done X damage".
-        new DeckSortMetric("total_damage", "Total damage", agg => agg.TotalEffective),
+        // "Total damage" is exactly the tooltip row of that name: effective
+        // damage, i.e. HP this physical card actually removed across the run.
+        // Block and overkill waste are excluded, which is what players mean by
+        // "this card has done X damage".
+        new DeckSortMetric("total_damage", "Total damage", GroupDamage,
+            agg => agg.TotalEffective),
+        // Total damage rewards whatever you drew most. This is the tooltip's
+        // "Avg effective", which separates a consistent workhorse from a card
+        // that only looks big because it came up a lot.
+        new DeckSortMetric("avg_damage", "Avg damage per play", GroupDamage,
+            agg => agg.Plays > 0 ? (double)agg.TotalEffective / agg.Plays : 0d),
+        new DeckSortMetric("kills", "Kills", GroupDamage,
+            agg => agg.Kills),
+
+        // Block generated, and the part of it that actually ate damage. The
+        // gap between the two is block you paid for and never used.
+        new DeckSortMetric("block_gained", "Block gained", GroupDefense,
+            agg => agg.TotalBlockGained),
+        new DeckSortMetric("block_absorbed", "Block absorbed", GroupDefense,
+            agg => agg.TotalBlockEffective),
+
+        // What the card charged you: energy actually paid (not printed cost),
+        // and HP spent on itself.
+        new DeckSortMetric("energy_spent", "Energy spent", GroupCost,
+            agg => agg.TotalEnergySpent),
+        new DeckSortMetric("hp_lost", "HP lost", GroupCost,
+            agg => agg.TotalHpLost),
+
+        new DeckSortMetric("times_played", "Times played", GroupFlow,
+            agg => agg.Plays),
+        new DeckSortMetric("times_drawn", "Times drawn", GroupFlow,
+            agg => agg.TimesDrawn),
+        // Clamped at zero: a card can be played without being drawn (summoned
+        // straight to hand, played off the draw pile), which would otherwise
+        // score negative. Unplayable curses and statuses top this list by
+        // construction, since their Plays is always 0 — that is precisely the
+        // dead weight the metric exists to surface, so they are not excluded.
+        new DeckSortMetric("drawn_not_played", "Drawn, not played", GroupFlow,
+            agg => Math.Max(0, agg.TimesDrawn - agg.Plays)),
+        // Cards this card CAUSED to be drawn — distinct from "Times drawn",
+        // which is how often the card itself reached hand.
+        new DeckSortMetric("cards_drawn", "Cards drawn", GroupFlow,
+            agg => agg.TimesCardsDrawn),
     };
 
     internal static DeckSortMetric? ActiveMetric { get; private set; }
@@ -171,7 +233,7 @@ internal static class DeckViewSpireLensSort
         ForgetSnapshot();
     }
 
-    private static long ValueFor(CardModel card, DeckSortMetric metric, bool historical)
+    private static double ValueFor(CardModel card, DeckSortMetric metric, bool historical)
     {
         try
         {
@@ -185,12 +247,12 @@ internal static class DeckViewSpireLensSort
                 aggregate = RunTracker.GetEffectiveAggregate(card);
             }
 
-            return aggregate == null ? 0L : metric.Select(aggregate);
+            return aggregate == null ? 0d : metric.Select(aggregate);
         }
         catch (Exception e)
         {
             CoreMain.Logger.Warn($"DeckViewSpireLensSort: value lookup failed: {e.Message}");
-            return 0L;
+            return 0d;
         }
     }
 
