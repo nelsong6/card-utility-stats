@@ -1,53 +1,57 @@
 using System;
 using Godot;
+using MegaCrit.Sts2.Core.Nodes.CommonUi;
+using MegaCrit.Sts2.Core.Nodes.GodotExtensions;
 using MegaCrit.Sts2.Core.Nodes.Screens;
 
 namespace SpireLens.Core;
 
 /// <summary>
-/// The SpireLens entry in the deck view's sort row: a trigger button injected
-/// alongside the game's four sorters, and a dropdown listing the SpireLens
-/// metrics the deck can be ordered by.
+/// The SpireLens entry in the deck view's sort row: a fifth sort button, and a
+/// dropdown listing the SpireLens metrics the deck can be ordered by.
 ///
-/// Why a plain Godot control instead of a cloned <c>NCardViewSortButton</c>:
-/// the game's sort buttons resolve %ButtonImage / %Label / %Image through
-/// scene-unique names and share a ShaderMaterial with whatever they were
-/// duplicated from. A clone that gets either wrong drives the ORIGINAL
-/// button's visuals — the same trap documented on the tickbox clone in
-/// <see cref="Patches.ViewStatsInjectorPatch"/>. The deck view already carries
-/// a plain injected Button (the SpireLens menu shortcut), so this follows the
-/// surface that is known to render here rather than the one that is easy to
-/// break invisibly.
+/// The trigger is a duplicate of the game's own <c>NCardViewSortButton</c>, so
+/// it inherits the row's font, plate art, text placement, hover tweens and
+/// direction arrow rather than approximating them. Duplicating that node has
+/// two known traps, both handled below:
 ///
-/// The dropdown lives in its own high CanvasLayer, like
+///   - <c>_Ready</c> resolves %ButtonImage / %Label / %Image through
+///     scene-unique names, which resolve against a node's <c>Owner</c>.
+///     <c>Duplicate()</c> does not reliably carry that relationship, so the
+///     clone would otherwise resolve to the ORIGINAL sorter's nodes and drive
+///     its visuals. Owner and unique-name flags are restored before insertion.
+///   - Materials are Resources and are shared by reference across a
+///     duplicate, so the clone's hover tweens would mutate the original
+///     button's shader. The clone gets its own material instance.
+///
+/// Both are the same traps documented on the tickbox clone in
+/// <see cref="Patches.ViewStatsInjectorPatch"/>.
+///
+/// The dropdown itself lives in its own high CanvasLayer, like
 /// <see cref="SpireLensOptionsMenu"/>, so it draws above the card grid without
 /// depending on where the sort row sits in the screen's child order.
 /// </summary>
 internal static class DeckViewSortMenu
 {
-    private const string ButtonName = "SpireLensSortButton";
+    private const string TriggerName = "SpireLensSorter";
     private const string LayerName = "SpireLensDeckSortMenu";
     private const int MenuLayer = 999;
-    private const float SlotGap = 16f;
-    private const float FallbackSlotWidth = 220f;
+    private const string IdleLabel = "SpireLens";
 
-    private static Button? _button;
+    private static NCardViewSortButton? _trigger;
+    private static NCardViewSortButton? _anchor;
+    private static NDeckViewScreen? _screen;
     private static CanvasLayer? _menuLayer;
 
     /// <summary>
-    /// Inject the trigger button into the sort row. Safe to call repeatedly —
-    /// each call tears down whatever the previous screen or Core load left
-    /// behind first.
+    /// Add the trigger to the sort row. Safe to call repeatedly — each call
+    /// clears whatever the previous screen or Core load left behind. Injected
+    /// on both the in-run deck view and the run-history deck viewer.
     /// </summary>
     internal static void Inject(NDeckViewScreen screen)
     {
         try
         {
-            // The run-history deck viewer reuses this same screen type, but its
-            // pile is a historical reconstruction; ordering it by the LIVE
-            // run's aggregates would be quietly wrong.
-            if (RunHistoryDeckViewer.IsHistoricalDeckViewer(screen)) return;
-
             Teardown();
 
             var anchor = screen._alphabetSorter;
@@ -63,28 +67,41 @@ internal static class DeckViewSortMenu
 
             RemoveStale(parent);
 
-            var button = new Button
-            {
-                Name = ButtonName,
-                Text = ButtonText(),
-                FocusMode = Control.FocusModeEnum.None,
-                MouseDefaultCursorShape = Control.CursorShape.PointingHand,
-                CustomMinimumSize = new Vector2(SlotWidth(anchor), 56f),
-            };
-            button.AddThemeFontSizeOverride("font_size", 20);
-            button.Pressed += Toggle;
-            parent.AddChild(button);
-            _button = button;
+            // Default flags copy structure and scripts; runtime .Connect()
+            // handlers are per-instance and are not carried over, so the clone
+            // starts with none of the game's sort wiring.
+            var clone = (NCardViewSortButton)anchor.Duplicate();
+            clone.Name = TriggerName;
 
-            // A Container parent lays its own children out; a plain Control
-            // parent does not, so step one slot to the right of the last
-            // sorter ourselves. Sorter positions come from the loaded scene,
-            // not from a layout pass, so they are valid this early.
-            if (parent is not Container)
-                button.Position = anchor.Position + new Vector2(SlotStep(screen, anchor), 0f);
+            GiveCloneItsOwnMaterial(clone);
+
+            // Owner first, then the unique-name flags: setting the flag is
+            // what registers a child in its owner's unique-node table, and
+            // _Ready reads that table during AddChild below.
+            SetOwnerRecursive(clone, clone);
+            CopyUniqueNameFlags(anchor, clone);
+
+            parent.AddChild(clone);
+            _trigger = clone;
+            _anchor = anchor;
+            _screen = screen;
+
+            clone.Connect(
+                NClickableControl.SignalName.Released,
+                Callable.From<NButton>(OnTriggerReleased));
+
+            // SetLabel/SetHue both touch fields resolved in _Ready, so they
+            // have to come after AddChild.
+            clone.SetLabel(LabelText());
+            SyncArrow();
+            if (screen._bg?.Material is ShaderMaterial hue)
+                clone.SetHue(hue);
+
+            WireFocusNeighbours(screen, anchor, clone);
 
             CoreMain.Logger.Info(
-                $"DeckViewSortMenu: injected sort trigger (parent={parent.GetType().Name})");
+                $"DeckViewSortMenu: injected sort trigger (parent={parent.GetType().Name}, "
+                + $"historical={RunHistoryDeckViewer.IsHistoricalDeckViewer(screen)})");
         }
         catch (Exception e)
         {
@@ -97,51 +114,120 @@ internal static class DeckViewSortMenu
     {
         Close();
 
-        if (_button != null && GodotObject.IsInstanceValid(_button))
-            _button.QueueFree();
-        _button = null;
+        // The game wired the alphabetical sorter's right neighbour to itself
+        // as the end of the row; put that back before our node disappears.
+        if (_anchor != null && GodotObject.IsInstanceValid(_anchor))
+            _anchor.FocusNeighborRight = _anchor.GetPath();
+
+        if (_trigger != null && GodotObject.IsInstanceValid(_trigger))
+            _trigger.QueueFree();
+
+        _trigger = null;
+        _anchor = null;
+        _screen = null;
     }
 
-    /// <summary>Re-render the trigger label after the sort state changes.</summary>
+    /// <summary>Re-render the trigger's label and arrow after a state change.</summary>
     internal static void RefreshButtonText()
     {
-        if (_button == null || !GodotObject.IsInstanceValid(_button)) return;
-        _button.Text = ButtonText();
-    }
+        if (_trigger == null || !GodotObject.IsInstanceValid(_trigger)) return;
 
-    private static string ButtonText()
-    {
-        var metric = DeckViewSpireLensSort.ActiveMetric;
-        return metric == null
-            ? "SpireLens  v"
-            : $"{metric.Label} {DirectionGlyph()}  v";
-    }
-
-    private static string DirectionGlyph()
-        => DeckViewSpireLensSort.Descending ? "↓" : "↑";
-
-    private static float SlotWidth(Control anchor)
-    {
-        var width = anchor.Size.X;
-        return width > 1f ? width : FallbackSlotWidth;
+        _trigger.SetLabel(LabelText());
+        SyncArrow();
     }
 
     /// <summary>
-    /// Distance from one sorter slot to the next, measured from the two
-    /// rightmost sorters so the injected button lands on the same rhythm as
-    /// the row it joins. Falls back to the anchor's own width when the scene
-    /// gives us no usable step.
+    /// Re-render the deck on the screen this trigger belongs to. The in-run
+    /// deck view and the run-history viewer are different instances, so this
+    /// cannot go through the injector's live-deck reference.
     /// </summary>
-    private static float SlotStep(NDeckViewScreen screen, Control anchor)
+    internal static void RefreshDeckView()
     {
-        var previous = screen._costSorter;
-        if (previous != null && GodotObject.IsInstanceValid(previous))
+        try
         {
-            var step = anchor.Position.X - previous.Position.X;
-            if (step > 1f) return step;
+            if (_screen != null && GodotObject.IsInstanceValid(_screen))
+                _screen.DisplayCards();
+        }
+        catch (Exception e)
+        {
+            CoreMain.Logger.Error($"DeckViewSortMenu re-render failed: {e.Message}");
+        }
+    }
+
+    private static string LabelText()
+        => DeckViewSpireLensSort.ActiveMetric?.Label ?? IdleLabel;
+
+    private static void OnTriggerReleased(NButton button)
+    {
+        // NCardViewSortButton.OnRelease flips IsDescending on every click and
+        // the arrow follows it. Ours is a menu trigger, not a direction
+        // toggle, so put the arrow back on the real sort direction.
+        SyncArrow();
+        Toggle();
+    }
+
+    private static void SyncArrow()
+    {
+        if (_trigger == null || !GodotObject.IsInstanceValid(_trigger)) return;
+        _trigger.IsDescending = DeckViewSpireLensSort.Descending;
+    }
+
+    private static void GiveCloneItsOwnMaterial(Node clone)
+    {
+        if (FindChildByName(clone, "ButtonImage") is CanvasItem { Material: not null } image)
+            image.Material = (Material)image.Material.Duplicate();
+    }
+
+    private static void WireFocusNeighbours(
+        NDeckViewScreen screen,
+        Control anchor,
+        Control clone)
+    {
+        // NDeckViewScreen._Ready wires the four stock sorters into a row and
+        // never saw ours, so the trigger would be unreachable by controller.
+        var below = screen._grid?.DefaultFocusedControl;
+        clone.FocusNeighborLeft = anchor.GetPath();
+        clone.FocusNeighborRight = clone.GetPath();
+        clone.FocusNeighborTop = clone.GetPath();
+        clone.FocusNeighborBottom = below != null ? below.GetPath() : clone.GetPath();
+        anchor.FocusNeighborRight = clone.GetPath();
+    }
+
+    private static void SetOwnerRecursive(Node node, Node owner)
+    {
+        for (var i = 0; i < node.GetChildCount(); i++)
+        {
+            var child = node.GetChild(i);
+            child.Owner = owner;
+            SetOwnerRecursive(child, owner);
+        }
+    }
+
+    private static void CopyUniqueNameFlags(Node source, Node clone)
+    {
+        var count = Math.Min(source.GetChildCount(), clone.GetChildCount());
+        for (var i = 0; i < count; i++)
+        {
+            var sourceChild = source.GetChild(i);
+            var cloneChild = clone.GetChild(i);
+            cloneChild.UniqueNameInOwner = sourceChild.UniqueNameInOwner;
+            CopyUniqueNameFlags(sourceChild, cloneChild);
+        }
+    }
+
+    private static Node? FindChildByName(Node parent, string name)
+    {
+        for (var i = 0; i < parent.GetChildCount(); i++)
+        {
+            var child = parent.GetChild(i);
+            if (string.Equals(child.Name.ToString(), name, StringComparison.Ordinal))
+                return child;
+
+            var found = FindChildByName(child, name);
+            if (found != null) return found;
         }
 
-        return SlotWidth(anchor) + SlotGap;
+        return null;
     }
 
     private static void RemoveStale(Node parent)
@@ -149,7 +235,7 @@ internal static class DeckViewSortMenu
         for (var i = parent.GetChildCount() - 1; i >= 0; i--)
         {
             var child = parent.GetChild(i);
-            if (!string.Equals(child.Name.ToString(), ButtonName, StringComparison.Ordinal))
+            if (!string.Equals(child.Name.ToString(), TriggerName, StringComparison.Ordinal))
                 continue;
 
             parent.RemoveChild(child);
@@ -168,7 +254,7 @@ internal static class DeckViewSortMenu
     private static void Open()
     {
         if (Engine.GetMainLoop() is not SceneTree tree) return;
-        if (_button == null || !GodotObject.IsInstanceValid(_button)) return;
+        if (_trigger == null || !GodotObject.IsInstanceValid(_trigger)) return;
 
         var layer = new CanvasLayer { Name = LayerName, Layer = MenuLayer };
         tree.Root.AddChild(layer);
@@ -208,7 +294,7 @@ internal static class DeckViewSortMenu
             {
                 DeckViewSpireLensSort.Clear("sort menu");
                 Close();
-                Patches.ViewStatsInjectorPatch.RefreshDeckView();
+                RefreshDeckView();
             });
 
         foreach (var metric in DeckViewSpireLensSort.Metrics)
@@ -216,7 +302,7 @@ internal static class DeckViewSortMenu
             var chosen = metric;
             var active = DeckViewSpireLensSort.IsActive(chosen);
             var label = active
-                ? $"{chosen.Label}  {DirectionGlyph()} {(DeckViewSpireLensSort.Descending ? "highest first" : "lowest first")}"
+                ? $"{chosen.Label}  {(DeckViewSpireLensSort.Descending ? "highest first" : "lowest first")}"
                 : chosen.Label;
 
             AddRow(rows, label, active, () =>
@@ -234,7 +320,7 @@ internal static class DeckViewSortMenu
         // The blocker is anchored full-rect at the layer origin, so its local
         // coordinates are viewport coordinates — the trigger's global rect
         // drops straight in.
-        var triggerRect = _button.GetGlobalRect();
+        var triggerRect = _trigger.GetGlobalRect();
         panel.Position = new Vector2(triggerRect.Position.X, triggerRect.End.Y + 8f);
     }
 
@@ -250,8 +336,7 @@ internal static class DeckViewSortMenu
         var row = new Button
         {
             // A leading marker rather than a separate indicator node: the row
-            // stays one control, so keyboard/mouse hit areas cannot drift
-            // apart from the label.
+            // stays one control, so hit area and label cannot drift apart.
             Text = active ? $"• {text}" : $"   {text}",
             Flat = true,
             Alignment = HorizontalAlignment.Left,

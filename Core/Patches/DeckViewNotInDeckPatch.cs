@@ -41,7 +41,14 @@ public static class DeckViewNotInDeckPatch
             // The run-history viewer uses the same native deck screen, but its
             // pile is an exact reconstruction of that historical final deck.
             // Never append cards from the current/live RunTracker to it.
-            if (RunHistoryDeckViewer.IsHistoricalDeckViewer(__instance)) return;
+            if (RunHistoryDeckViewer.IsHistoricalDeckViewer(__instance))
+            {
+                // Still never append live-run cards here — but the archived
+                // deck can be ordered, and DeckViewSpireLensSort reads its
+                // numbers from the archived run for this screen.
+                DeckViewSpireLensSort.Apply(__instance);
+                return;
+            }
 
             if (ViewStatsInjectorPatch.ShowCardsNotInDeckEnabled)
             {

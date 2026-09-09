@@ -99,7 +99,7 @@ internal static class DeckViewSpireLensSort
         CoreMain.Logger.Info(
             $"Deck sort set to {metric.Id} {(Descending ? "descending" : "ascending")} ({source})");
         DeckViewSortMenu.RefreshButtonText();
-        ViewStatsInjectorPatch.RefreshDeckView();
+        DeckViewSortMenu.RefreshDeckView();
     }
 
     /// <summary>Stand down and let the game's own sorting govern again.</summary>
@@ -134,6 +134,11 @@ internal static class DeckViewSpireLensSort
                 return;
             }
 
+            // The run-history viewer reuses this screen type over a rebuilt
+            // historical deck, so its numbers must come from the archived run
+            // rather than from whatever run is live now.
+            var historical = RunHistoryDeckViewer.IsHistoricalDeckViewer(screen);
+
             var cards = screen._cards;
             if (cards != null && cards.Count > 1)
             {
@@ -141,8 +146,8 @@ internal static class DeckViewSpireLensSort
                 // the game gave us. Untracked cards score 0 and land at the
                 // far end rather than disappearing.
                 screen._cards = (Descending
-                        ? cards.OrderByDescending(card => ValueFor(card, metric))
-                        : cards.OrderBy(card => ValueFor(card, metric)))
+                        ? cards.OrderByDescending(card => ValueFor(card, metric, historical))
+                        : cards.OrderBy(card => ValueFor(card, metric, historical)))
                     .ToList();
             }
 
@@ -166,11 +171,20 @@ internal static class DeckViewSpireLensSort
         ForgetSnapshot();
     }
 
-    private static long ValueFor(CardModel card, DeckSortMetric metric)
+    private static long ValueFor(CardModel card, DeckSortMetric metric, bool historical)
     {
         try
         {
-            var aggregate = RunTracker.GetEffectiveAggregate(card);
+            CardAggregate? aggregate;
+            if (historical)
+            {
+                RunHistoryStatsContext.TryGetHistoricalDeckAggregate(card, out aggregate);
+            }
+            else
+            {
+                aggregate = RunTracker.GetEffectiveAggregate(card);
+            }
+
             return aggregate == null ? 0L : metric.Select(aggregate);
         }
         catch (Exception e)
