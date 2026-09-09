@@ -7014,6 +7014,48 @@ public class SchemaLoadingTests
         Assert.Equal(3, relic.GremlinHornCombats);
     }
 
+    [Fact]
+    public void HistoricalLoad_AcceptsExhaustedOtherCardTypesFixture()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("exhausted-other-card-types-run.json"));
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.SupportsResume);
+        AssertExhaustedOtherCardTypesFixture(
+            loaded.Data.Aggregates["CARD.FIEND_FIRE#1"]);
+    }
+
+    [Fact]
+    public void ResumableLoad_AcceptsExhaustedOtherCardTypesFixture()
+    {
+        var resumed = RunStorage.LoadResumable(
+            FixturePath("exhausted-other-card-types-run.json"));
+
+        Assert.NotNull(resumed);
+        AssertExhaustedOtherCardTypesFixture(
+            resumed!.Aggregates["CARD.FIEND_FIRE#1"]);
+    }
+
+    [Fact]
+    public void HistoricalLoad_DefaultsExhaustedOtherCardTypesForOlderFixtures()
+    {
+        var loaded = RunStorage.LoadHistorical(
+            FixturePath("v4-per-instance-effects-exhaust-run.json"));
+
+        Assert.NotNull(loaded);
+        var agg = loaded!.Data.Aggregates["CARD.NECROBINDER_POWER#1"];
+        Assert.Equal(0, agg.TimesExhaustedOtherCurses);
+        Assert.Equal(0, agg.TimesExhaustedOtherStatusCards);
+    }
+
+    private static void AssertExhaustedOtherCardTypesFixture(CardAggregate cardAgg)
+    {
+        Assert.Equal(7, cardAgg.TimesExhaustedOtherCards);
+        Assert.Equal(2, cardAgg.TimesExhaustedOtherCurses);
+        Assert.Equal(3, cardAgg.TimesExhaustedOtherStatusCards);
+    }
+
     private static void AssertSplashFixture(CardAggregate cardAgg)
     {
         Assert.Equal(6, cardAgg.SplashAttacksTaken);

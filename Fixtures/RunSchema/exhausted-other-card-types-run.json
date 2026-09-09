@@ -1,0 +1,34 @@
+{
+  "run_id": "exhausted-other-card-types-fixture",
+  "started_at": "2026-09-08T18:00:00Z",
+  "updated_at": "2026-09-08T18:22:00Z",
+  "character": "IRONCLAD",
+  "ascension": 9,
+  "floor_reached": 21,
+  "outcome": "in_progress",
+  "game_start_time": 1789232400,
+  "aggregates": {
+    "CARD.FIEND_FIRE#1": {
+      "combats_in_deck": 4,
+      "plays": 3,
+      "times_drawn": 5,
+      "times_exhausted_other_cards": 7,
+      "times_exhausted_other_curses": 2,
+      "times_exhausted_other_status_cards": 3,
+      "floor_added": 6,
+      "initial_upgrade_level": 0
+    }
+  },
+  "events": [],
+  "relic_aggregates": {},
+  "enemy_aggregates": {},
+  "meta_stats": {},
+  "instance_numbers_by_def": {
+    "CARD.FIEND_FIRE": [
+      1
+    ]
+  },
+  "def_counters": {
+    "CARD.FIEND_FIRE": 1
+  }
+}

@@ -536,7 +536,15 @@ public static class CardHoverShowPatch
         // Exhausted other cards — Havoc-style side-effect stat. Only
         // shown for cards that have actually caused an exhaust.
         if (agg.TimesExhaustedOtherCards > 0)
+        {
             Row3(sb, "Exhausted others", agg.TimesExhaustedOtherCards.ToString(), "");
+            // Subset rows, only when the run actually produced them — a
+            // Havoc that never ate a curse says nothing about curses.
+            if (agg.TimesExhaustedOtherCurses > 0)
+                Row3(sb, "of which curses", agg.TimesExhaustedOtherCurses.ToString(), "");
+            if (agg.TimesExhaustedOtherStatusCards > 0)
+                Row3(sb, "of which status cards", agg.TimesExhaustedOtherStatusCards.ToString(), "");
+        }
 
         // How often THIS card itself got exhausted. Full-view only; useful
         // for exhaust-tag cards and ephemeral generated cards, but not worth

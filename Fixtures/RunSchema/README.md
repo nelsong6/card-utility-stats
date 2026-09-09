@@ -697,6 +697,10 @@ New fixtures added going forward do not need a `v*-` prefix.
   raw per-turn-start activation count, which together back its per-combat
   activation and damage averages.
 
+- `exhausted-other-card-types-run.json`
+  Adds the curse and status-card subsets of the per-card "exhausted others"
+  count, so exhaust-enabler cards can say what kind of card they removed.
+
 Why these exist:
 
 - new shape work should be validated against real checked-in examples, not memory

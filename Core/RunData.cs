@@ -605,6 +605,15 @@ public class CardAggregate
     // — different signal, different meaning.
     public int TimesExhaustedOtherCards { get; set; }
 
+    // Type breakdown of the exhausts above. Subsets of
+    // TimesExhaustedOtherCards, not extra events: a curse exhausted by
+    // Fiend Fire increments both the total and TimesExhaustedOtherCurses.
+    // Kept separate because "exhausted 4 others" reads very differently
+    // when those others were curses or statuses (deck cleaning) rather
+    // than live cards (a real cost). Rendered only when non-zero.
+    public int TimesExhaustedOtherCurses { get; set; }
+    public int TimesExhaustedOtherStatusCards { get; set; }
+
     // M3g2: How often THIS card itself got exhausted, regardless of cause.
     // Useful for exhaust-tag cards, ephemeral generated cards, and effects
     // that consume a card from hand/discard. Shown only when > 0 on the

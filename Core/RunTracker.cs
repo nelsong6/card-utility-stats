@@ -34217,6 +34217,13 @@ public static class RunTracker
                 var instanceId = GetOrAssignInstanceId(causingPlay.Card);
                 var agg = GetOrCreateAggregate(_pendingCombat, instanceId);
                 agg.TimesExhaustedOtherCards++;
+                // Classify the exhausted card, not the causer. Curse and
+                // Status are the two types worth splitting out — an exhaust
+                // that removed a Burn is deck cleaning, not a card cost.
+                if (exhaustedCard.Type == CardType.Curse)
+                    agg.TimesExhaustedOtherCurses++;
+                else if (exhaustedCard.Type == CardType.Status)
+                    agg.TimesExhaustedOtherStatusCards++;
             }
             catch (Exception e)
             {
@@ -36688,6 +36695,9 @@ public static class RunTracker
         target.TimesPlacedOnTopFromHand += source.TimesPlacedOnTopFromHand;
         target.TimesPlacedOnTopFromDiscard += source.TimesPlacedOnTopFromDiscard;
         target.TimesExhaustedOtherCards += source.TimesExhaustedOtherCards;
+        target.TimesExhaustedOtherCurses += source.TimesExhaustedOtherCurses;
+        target.TimesExhaustedOtherStatusCards +=
+            source.TimesExhaustedOtherStatusCards;
         target.TimesExhausted += source.TimesExhausted;
         target.TotalHpLost += source.TotalHpLost;
         target.TotalMaxHpLost += source.TotalMaxHpLost;
