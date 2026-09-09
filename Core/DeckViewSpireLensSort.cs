@@ -97,6 +97,15 @@ internal static class DeckViewSpireLensSort
         // that only looks big because it came up a lot.
         new DeckSortMetric("avg_damage", "Avg damage per play", GroupDamage,
             agg => agg.Plays > 0 ? (double)agg.TotalEffective / agg.Plays : 0d),
+        // Damage bought per energy paid, using energy actually spent rather
+        // than printed cost, so discounts and cost modifiers count. A card
+        // that spent no energy at all is credited its full damage rather than
+        // being scored zero and buried: free damage is the best kind, and
+        // dividing by nothing would either crash or rank it last.
+        new DeckSortMetric("damage_per_energy", "Damage per energy", GroupDamage,
+            agg => agg.TotalEnergySpent > 0
+                ? (double)agg.TotalEffective / agg.TotalEnergySpent
+                : agg.TotalEffective),
         new DeckSortMetric("kills", "Kills", GroupDamage,
             agg => agg.Kills),
 
