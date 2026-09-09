@@ -204,14 +204,29 @@ internal static class DeckViewSpireLensSort
             var historical = RunHistoryDeckViewer.IsHistoricalDeckViewer(screen);
 
             var cards = screen._cards;
-            if (cards != null && cards.Count > 1)
+            if (cards != null && cards.Count > 0)
             {
-                // OrderBy is stable, so cards with equal values keep the order
-                // the game gave us. Untracked cards score 0 and land at the
-                // far end rather than disappearing.
+                var scored = cards
+                    .Select(card => (Card: card, Value: ValueFor(card, metric, historical)))
+                    .ToList();
+
+                // Show only the cards this metric actually says something
+                // about. Sorting by damage across a whole deck buries the five
+                // cards you care about under twenty Skills tied at zero; for
+                // Total damage this leaves the attacks (plus anything that
+                // genuinely dealt damage, like a Skill's poison).
+                //
+                // Unless nothing qualifies — an empty deck view reads as a
+                // broken screen, so a run with no data for this metric keeps
+                // showing the whole deck.
+                var qualifying = scored.Where(entry => entry.Value > 0d).ToList();
+                if (qualifying.Count > 0) scored = qualifying;
+
+                // OrderBy is stable, so equal values keep the game's order.
                 screen._cards = (Descending
-                        ? cards.OrderByDescending(card => ValueFor(card, metric, historical))
-                        : cards.OrderBy(card => ValueFor(card, metric, historical)))
+                        ? scored.OrderByDescending(entry => entry.Value)
+                        : scored.OrderBy(entry => entry.Value))
+                    .Select(entry => entry.Card)
                     .ToList();
             }
 

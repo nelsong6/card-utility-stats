@@ -60,6 +60,7 @@ internal static class DeckCardSortStatClearPatch
 internal static class DeckCardSortStatBadge
 {
     private const string BadgeName = "SpireLensSortStat";
+    private const string BadgeMeta = "spirelens_caption";
     // The card's own local geometry, read off the live scene: the frame is
     // 300x422 centred on the holder origin, the body text panel spans
     // y -22..181, and the description label's box ends at y 173. The caption
@@ -122,8 +123,22 @@ internal static class DeckCardSortStatBadge
 
         try
         {
+            // A holder the grid has discarded keeps rendering until Godot
+            // actually frees it. InitGrid renames those to "...-OLD" and queue
+            // frees them, so a rebuilt grid briefly draws the previous set
+            // underneath the new one — same card art, but the caption it was
+            // last given. That is the doubled text: two labels on two holders
+            // at the same position, not two labels on one holder.
+            if (holder.IsQueuedForDeletion()
+                || holder.Name.ToString().Contains("-OLD", StringComparison.Ordinal))
+            {
+                var dying = ResolveBadge(holder);
+                if (dying != null) dying.Visible = false;
+                return;
+            }
+
             var effectiveCard = readFromHolder ? holder.CardModel : card;
-            var badge = holder.GetNodeOrNull<Label>(BadgeName);
+            var badge = ResolveBadge(holder);
 
             if (!ShouldCaption(holder, effectiveCard, out var text))
             {
@@ -175,6 +190,55 @@ internal static class DeckCardSortStatBadge
             RefreshRecursive(node.GetChild(i));
     }
 
+    /// <summary>
+    /// Find this holder's caption, tolerating anything a previous Core load
+    /// left behind.
+    ///
+    /// Earlier builds made the caption a PanelContainer under the same name.
+    /// A typed lookup skips those, so Create would add a fresh Label, Godot
+    /// would rename it to dodge the collision, and the next sweep would do it
+    /// again — stacking a new label five times a second. Match on name alone,
+    /// keep the first usable Label, and free every other claimant so a holder
+    /// converges on exactly one caption however it was left.
+    /// </summary>
+    /// <summary>
+    /// Find this holder's caption and make sure it is the only one.
+    ///
+    /// Identify by POSITION IN THE TREE, not by name or marker. Godot renames
+    /// a colliding child to forms like "@Label@125030", so every name- or
+    /// meta-based test missed labels left by earlier Core loads, and a fresh
+    /// one was added each reload — three stacked labels on one card, each
+    /// showing a different run's number. The game keeps its own labels inside
+    /// the NCard subtree, so a Label parented DIRECTLY to a card holder is
+    /// always ours, whatever it ended up being called.
+    /// </summary>
+    private static Label? ResolveBadge(NCardHolder holder)
+    {
+        Label? found = null;
+
+        for (var i = holder.GetChildCount() - 1; i >= 0; i--)
+        {
+            var child = holder.GetChild(i);
+
+            var isOurs = child is Label
+                || child.HasMeta(BadgeMeta)
+                || child.Name.ToString().Contains(BadgeName, StringComparison.Ordinal);
+            if (!isOurs) continue;
+
+            if (child is Label label && found == null)
+            {
+                found = label;
+                continue;
+            }
+
+            holder.RemoveChild(child);
+            child.QueueFree();
+        }
+
+        if (found != null) found.Name = BadgeName;
+        return found;
+    }
+
     private static bool ShouldCaption(NCardHolder holder, CardModel? card, out string text)
     {
         text = string.Empty;
@@ -203,6 +267,7 @@ internal static class DeckCardSortStatBadge
             // Shrink rather than overflow the card on the longest metric names.
             TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis,
         };
+        caption.SetMeta(BadgeMeta, true);
         ApplyGeometry(caption);
         ApplyCardTextStyle(holder, caption);
         holder.AddChild(caption);
