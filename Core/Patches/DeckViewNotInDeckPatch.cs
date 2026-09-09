@@ -43,17 +43,23 @@ public static class DeckViewNotInDeckPatch
             // Never append cards from the current/live RunTracker to it.
             if (RunHistoryDeckViewer.IsHistoricalDeckViewer(__instance)) return;
 
-            if (!ViewStatsInjectorPatch.ShowCardsNotInDeckEnabled) return;
+            if (ViewStatsInjectorPatch.ShowCardsNotInDeckEnabled)
+            {
+                var notInDeckCards = RunTracker.GetCardsNotInDeckView(
+                    ViewStatsInjectorPatch.ShowAllMetaCardsInNotInDeckView);
+                __instance._cards = SelectCardsForView(
+                    __instance._cards,
+                    notInDeckCards,
+                    showCardsNotInDeck: true);
 
-            var notInDeckCards = RunTracker.GetCardsNotInDeckView(
-                ViewStatsInjectorPatch.ShowAllMetaCardsInNotInDeckView);
-            __instance._cards = SelectCardsForView(
-                __instance._cards,
-                notInDeckCards,
-                showCardsNotInDeck: true);
+                CoreMain.LogDebug(
+                    $"DeckViewNotInDeck: displaying {__instance._cards.Count} cards not in deck");
+            }
 
-            CoreMain.LogDebug(
-                $"DeckViewNotInDeck: displaying {__instance._cards.Count} cards not in deck");
+            // Which cards, then in what order. Both mutate _cards, so they
+            // share this one prefix rather than racing as two — Harmony does
+            // not guarantee an order between prefixes on the same method.
+            DeckViewSpireLensSort.Apply(__instance);
         }
         catch (Exception e)
         {
