@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using Godot;
 using MegaCrit.Sts2.Core.Models;
@@ -173,6 +174,7 @@ internal static class DeckViewSpireLensSort
         ForgetSnapshot();
         CoreMain.Logger.Info($"Deck sort cleared ({source})");
         DeckViewSortMenu.RefreshButtonText();
+        DeckViewSortMenu.RefreshSortCaption();
     }
 
     /// <summary>
@@ -215,6 +217,7 @@ internal static class DeckViewSpireLensSort
 
             PinUnsortedHead(screen);
             TakeSnapshot(screen);
+            DeckViewSortMenu.RefreshSortCaption();
 
             CoreMain.LogDebug(
                 $"DeckViewSpireLensSort: ordered {screen._cards?.Count ?? 0} cards by " +
@@ -225,6 +228,50 @@ internal static class DeckViewSpireLensSort
             CoreMain.Logger.Error($"DeckViewSpireLensSort.Apply failed: {e.Message}");
         }
     }
+
+    /// <summary>
+    /// Caption for one card in the deck grid: the metric's full name and this
+    /// card's value, e.g. "Total damage: 432". The name is repeated on every
+    /// card on purpose — a screenshot or a stream frame carries no memory of
+    /// which sort was chosen, so a bare number would be unreadable out of
+    /// context.
+    ///
+    /// False when no SpireLens sort is active, or when the card scored zero:
+    /// on a deck sorted by damage that is every Skill, Power and Curse, and
+    /// captioning two dozen cards with "0" buries the ones that did work.
+    /// </summary>
+    internal static bool TryGetCaption(CardModel card, out string caption)
+    {
+        caption = string.Empty;
+
+        var metric = ActiveMetric;
+        if (metric == null) return false;
+
+        var value = ValueFor(card, metric, IsHistoricalCard(card));
+        if (value <= 0d) return false;
+
+        caption = $"{metric.Label}: {FormatValue(value)}";
+        return true;
+    }
+
+    /// <summary>
+    /// Per-play averages need a decimal; counts must not show one. Deciding on
+    /// the value rather than on a per-metric flag keeps whole-numbered averages
+    /// reading as "12" instead of "12.0".
+    /// </summary>
+    private static string FormatValue(double value)
+        => Math.Abs(value - Math.Round(value)) < 0.05d
+            ? value.ToString("F0", CultureInfo.InvariantCulture)
+            : value.ToString("F1", CultureInfo.InvariantCulture);
+
+    /// <summary>
+    /// A card belongs to the archived run exactly when the run-history viewer
+    /// is open and holds a key for it. That map is cleared when the viewer
+    /// closes, and its cards are freshly built CardModels that can never
+    /// collide with the live deck's, so this needs no screen reference.
+    /// </summary>
+    private static bool IsHistoricalCard(CardModel card)
+        => RunHistoryStatsContext.TryGetHistoricalDeckAggregate(card, out _);
 
     internal static void Reset()
     {

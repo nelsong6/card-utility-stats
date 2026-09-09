@@ -65,6 +65,13 @@ internal static class DeckViewSortMenu
     // Loader bridge method, which a Core hot reload could not add anyway.
     private static string? _expandedGroup;
 
+    // The deck screen's own bottom line, captured before we append the sort
+    // sentence to it so Clear can put it back exactly.
+    private static string? _baseBottomLabelText;
+
+    /// <summary>The sort row's font, for overlays that want to match it.</summary>
+    internal static Font? RowFont => _rowFont;
+
     /// <summary>
     /// Add the trigger to the sort row. Safe to call repeatedly — each call
     /// clears whatever the previous screen or Core load left behind. Injected
@@ -121,6 +128,9 @@ internal static class DeckViewSortMenu
 
             WireFocusNeighbours(screen, anchor, clone);
             _rowFont = anchor._label?.GetThemeFont(LabelFontName);
+            Patches.DeckCardSortStatBadge.ResetFontCache();
+            _baseBottomLabelText = screen._bottomLabel?.Text;
+            RefreshSortCaption();
 
             CoreMain.Logger.Info(
                 $"DeckViewSortMenu: injected sort trigger (parent={parent.GetType().Name}, "
@@ -149,6 +159,35 @@ internal static class DeckViewSortMenu
         _anchor = null;
         _screen = null;
         _rowFont = null;
+        _baseBottomLabelText = null;
+        Patches.DeckCardSortStatBadge.ResetFontCache();
+    }
+
+    /// <summary>
+    /// State the active sort on the deck screen's own bottom line. The per-card
+    /// captions name the metric but cannot express direction, and this is the
+    /// game's existing text surface, so it lands in any full-screen capture
+    /// without inventing another overlay.
+    /// </summary>
+    internal static void RefreshSortCaption()
+    {
+        try
+        {
+            if (_screen == null || !GodotObject.IsInstanceValid(_screen)) return;
+            var label = _screen._bottomLabel;
+            if (label == null || !GodotObject.IsInstanceValid(label)) return;
+
+            _baseBottomLabelText ??= label.Text;
+            var metric = DeckViewSpireLensSort.ActiveMetric;
+            label.Text = metric == null
+                ? _baseBottomLabelText
+                : $"{_baseBottomLabelText}    SpireLens — sorted by {metric.Label.ToLowerInvariant()}, "
+                  + $"{(DeckViewSpireLensSort.Descending ? "highest" : "lowest")} first";
+        }
+        catch (Exception e)
+        {
+            CoreMain.Logger.Warn($"DeckViewSortMenu: sort caption update failed: {e.Message}");
+        }
     }
 
     /// <summary>Re-render the trigger's label and arrow after a state change.</summary>
