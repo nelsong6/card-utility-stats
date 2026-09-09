@@ -8,6 +8,7 @@ using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Nodes.Cards;
 using MegaCrit.Sts2.Core.Nodes.Cards.Holders;
 using MegaCrit.Sts2.Core.Nodes.Screens;
+using MegaCrit.Sts2.addons.mega_text;
 
 namespace SpireLens.Core.Patches;
 
@@ -45,7 +46,7 @@ internal static class DeckCardSortStatSetPatch
 {
     [HarmonyPostfix]
     public static void Postfix(NCardHolder __instance)
-        => DeckCardSortStatBadge.Update(__instance, __instance.CardModel);
+        => DeckCardSortStatBadge.UpdateFromHolder(__instance);
 }
 
 [HarmonyPatch(typeof(NCardHolder), nameof(NCardHolder.Clear))]
@@ -59,22 +60,44 @@ internal static class DeckCardSortStatClearPatch
 internal static class DeckCardSortStatBadge
 {
     private const string BadgeName = "SpireLensSortStat";
-    private const int FontSize = 13;
-
     // The card's own local geometry, read off the live scene: the frame is
     // 300x422 centred on the holder origin, and the description text ends at
     // y 173. The banner sits below that and inside the frame's bottom edge.
     private const float BannerWidth = 268f;
-    private const float BannerTop = 176f;
-    private const float BannerHeight = 30f;
+    private const float BannerTop = 172f;
+    private const float BannerHeight = 36f;
+
+    private const string LabelFontName = "font";
+    private const string LabelFontSizeName = "font_size";
+    private const string LabelColorName = "font_color";
+    private const string RichTextFontName = "normal_font";
+    private const string RichTextFontSizeName = "normal_font_size";
+    private const string RichTextColorName = "default_color";
+    private const int FallbackFontSize = 18;
 
     private static Font? _italicFont;
     private static Font? _italicBaseFont;
 
     internal static void Update(NCardHolder? holder, CardModel? card)
-        => Update(holder, card, allowRetry: true);
+        => Update(holder, card, readFromHolder: false, allowRetry: true);
 
-    private static void Update(NCardHolder? holder, CardModel? card, bool allowRetry)
+    /// <summary>
+    /// Resolve the card from the holder at decision time rather than trusting
+    /// a value captured earlier. NGridCardHolder.CardModel returns _baseCard,
+    /// which Create assigns in UpdateCardModel AFTER it calls SetCard — so at
+    /// the SetCard postfix the holder still reports its PREVIOUS card. Holders
+    /// come from a shared NodePool, so that stale card is often from an
+    /// entirely different screen, and captioning it looks up the wrong run's
+    /// numbers (or none at all).
+    /// </summary>
+    internal static void UpdateFromHolder(NCardHolder? holder)
+        => Update(holder, null, readFromHolder: true, allowRetry: true);
+
+    private static void Update(
+        NCardHolder? holder,
+        CardModel? card,
+        bool readFromHolder,
+        bool allowRetry)
     {
         if (holder == null || !GodotObject.IsInstanceValid(holder)) return;
 
@@ -91,16 +114,19 @@ internal static class DeckCardSortStatBadge
             {
                 var pendingHolder = holder;
                 var pendingCard = card;
+                var pendingReadFromHolder = readFromHolder;
                 holder.Connect(
                     Node.SignalName.TreeEntered,
-                    Callable.From(() => Update(pendingHolder, pendingCard, allowRetry: false)),
+                    Callable.From(() => Update(
+                        pendingHolder, pendingCard, pendingReadFromHolder, allowRetry: false)),
                     (uint)GodotObject.ConnectFlags.OneShot);
                 return;
             }
 
-            var badge = holder.GetNodeOrNull<PanelContainer>(BadgeName);
+            var effectiveCard = readFromHolder ? holder.CardModel : card;
+            var badge = holder.GetNodeOrNull<Label>(BadgeName);
 
-            if (!ShouldCaption(holder, card, out var text))
+            if (!ShouldCaption(holder, effectiveCard, out var text))
             {
                 if (badge != null) badge.Visible = false;
                 return;
@@ -112,7 +138,8 @@ internal static class DeckCardSortStatBadge
             // holder and is reused, so it would otherwise keep that load's
             // geometry for the rest of the session.
             ApplyGeometry(badge);
-            badge.GetNodeOrNull<Label>("Value")?.Set(Label.PropertyName.Text, text);
+            badge.Text = text;
+            ApplyCardTextStyle(holder, badge);
             badge.Visible = true;
         }
         catch (Exception e)
@@ -137,53 +164,57 @@ internal static class DeckCardSortStatBadge
         return DeckViewSpireLensSort.TryGetCaption(card, out text);
     }
 
-    private static PanelContainer Create(NCardHolder holder)
+    private static Label Create(NCardHolder holder)
     {
-        var badge = new PanelContainer
+        var caption = new Label
         {
             Name = BadgeName,
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-            ZIndex = 20,
-        };
-        ApplyGeometry(badge);
-
-        // Near-opaque plate rather than plain text over art: the caption has to
-        // stay readable in a screenshot and through stream compression, over
-        // whatever the card happens to look like underneath.
-        badge.AddThemeStyleboxOverride("panel", new StyleBoxFlat
-        {
-            BgColor = new Color(0.03f, 0.03f, 0.05f, 0.86f),
-            BorderColor = new Color(0.62f, 0.58f, 0.48f, 0.9f),
-            BorderWidthLeft = 1,
-            BorderWidthTop = 1,
-            BorderWidthRight = 1,
-            BorderWidthBottom = 1,
-            CornerRadiusTopLeft = 4,
-            CornerRadiusTopRight = 4,
-            CornerRadiusBottomLeft = 4,
-            CornerRadiusBottomRight = 4,
-        });
-
-        var label = new Label
-        {
-            Name = "Value",
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
             MouseFilter = Control.MouseFilterEnum.Ignore,
+            ZIndex = 20,
             // Shrink rather than overflow the card on the longest metric names.
             TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis,
         };
-        label.AddThemeFontSizeOverride("font_size", FontSize);
-        if (ResolveItalicFont() is { } italic)
-            label.AddThemeFontOverride("font", italic);
-        label.AddThemeColorOverride("font_color", new Color(0.96f, 0.94f, 0.86f, 1f));
-        label.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.95f));
-        label.AddThemeConstantOverride("shadow_offset_x", 1);
-        label.AddThemeConstantOverride("shadow_offset_y", 1);
+        ApplyGeometry(caption);
+        ApplyCardTextStyle(holder, caption);
+        holder.AddChild(caption);
+        return caption;
+    }
 
-        badge.AddChild(label);
-        holder.AddChild(badge);
-        return badge;
+    /// <summary>
+    /// Draw the caption as the card's own body text rather than as a mod chip:
+    /// the font, size and colour are lifted off that card's DescriptionLabel,
+    /// slanted to mark it as ours. Copying the live node beats hardcoding,
+    /// because the card's text style varies with rarity and border.
+    ///
+    /// The game's own description text is deliberately not touched. It is
+    /// regenerated on every visual update and upgrade-preview swap, so an
+    /// appended line would be wiped or duplicated depending on ordering, and a
+    /// long description plus our line would overflow the label's box and shrink
+    /// the actual card text. A sibling label in the empty space below it gets
+    /// the same look with none of that.
+    /// </summary>
+    private static void ApplyCardTextStyle(NCardHolder holder, Label caption)
+    {
+        var description = holder.CardNode?
+            .GetNodeOrNull<MegaRichTextLabel>("CardContainer/DescriptionLabel");
+
+        var font = description != null && description.HasThemeFont(RichTextFontName)
+            ? description.GetThemeFont(RichTextFontName)
+            : null;
+        var size = description != null && description.HasThemeFontSize(RichTextFontSizeName)
+            ? description.GetThemeFontSize(RichTextFontSizeName)
+            : FallbackFontSize;
+
+        if (ResolveItalicFont(font) is { } italic)
+            caption.AddThemeFontOverride(LabelFontName, italic);
+        caption.AddThemeFontSizeOverride(LabelFontSizeName, size);
+
+        var colour = description != null && description.HasThemeColor(RichTextColorName)
+            ? description.GetThemeColor(RichTextColorName)
+            : new Color(0.13f, 0.11f, 0.09f, 1f);
+        caption.AddThemeColorOverride(LabelColorName, colour);
     }
 
     /// <summary>
@@ -207,9 +238,9 @@ internal static class DeckCardSortStatBadge
     /// shearing the base font. Cached against the font it was derived from, so
     /// a font change rebuilds it and ordinary redraws do not.
     /// </summary>
-    private static Font? ResolveItalicFont()
+    private static Font? ResolveItalicFont(Font? baseFont)
     {
-        var baseFont = DeckViewSortMenu.RowFont;
+        baseFont ??= DeckViewSortMenu.RowFont;
         if (baseFont == null) return null;
         if (_italicFont != null && ReferenceEquals(baseFont, _italicBaseFont))
             return _italicFont;
