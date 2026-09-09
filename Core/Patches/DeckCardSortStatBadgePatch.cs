@@ -61,11 +61,13 @@ internal static class DeckCardSortStatBadge
 {
     private const string BadgeName = "SpireLensSortStat";
     // The card's own local geometry, read off the live scene: the frame is
-    // 300x422 centred on the holder origin, and the description text ends at
-    // y 173. The banner sits below that and inside the frame's bottom edge.
-    private const float BannerWidth = 268f;
-    private const float BannerTop = 172f;
-    private const float BannerHeight = 36f;
+    // 300x422 centred on the holder origin, the body text panel spans
+    // y -22..181, and the description label's box ends at y 173. The caption
+    // sits on the body itself, low in the text panel and under the card's own
+    // text, rather than on the frame's bottom rim.
+    private const float BannerWidth = 250f;
+    private const float BannerTop = 140f;
+    private const float BannerHeight = 32f;
 
     private const string LabelFontName = "font";
     private const string LabelFontSizeName = "font_size";
