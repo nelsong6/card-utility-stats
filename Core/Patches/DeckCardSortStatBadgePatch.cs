@@ -61,7 +61,8 @@ internal static class DeckCardSortStatBadge
 {
     private const string BadgeName = "SpireLensSortStat";
     private const string BadgeMeta = "spirelens_caption";
-    private const string CaptionMarker = "\u200B\n";
+    private const string CaptionMarker = "\u200B";
+    private const string CenterClose = "[/center]";
     // The card's own local geometry, read off the live scene: the frame is
     // 300x422 centred on the holder origin, the body text panel spans
     // y -22..181, and the description label's box ends at y 173. The caption
@@ -149,7 +150,7 @@ internal static class DeckCardSortStatBadge
                 return;
             }
 
-            description.SetTextAutoSize($"{baseText}{CaptionMarker}[i]{text}[/i]");
+            description.SetTextAutoSize(WithCaption(baseText, text));
         }
         catch (Exception e)
         {
@@ -196,12 +197,39 @@ internal static class DeckCardSortStatBadge
             RefreshRecursive(node.GetChild(i));
     }
 
+    /// <summary>
+    /// Insert our line INSIDE the card's centre block.
+    ///
+    /// The card's description is BBCode of the form
+    /// "[center]Deal 7 damage twice.[/center]", and the label's own
+    /// HorizontalAlignment is Left — the centring comes entirely from that
+    /// tag. Appending after the closing tag therefore drops the line out of
+    /// the centred block and left-aligns it. No markup of our own either: an
+    /// [i] tag makes Godot switch to the theme's italics font, which is a
+    /// different typeface from the card's. Inside the block and unstyled, the
+    /// line is simply another line of card text.
+    /// </summary>
+    private static string WithCaption(string baseText, string caption)
+    {
+        var segment = $"{CaptionMarker}\n{caption}";
+        var close = baseText.LastIndexOf(CenterClose, StringComparison.Ordinal);
+        return close < 0 ? baseText + segment : baseText.Insert(close, segment);
+    }
+
+    /// <summary>
+    /// Remove a previously inserted line, restoring the card's own text
+    /// exactly. The segment runs from the marker to the closing centre tag it
+    /// was inserted before.
+    /// </summary>
     private static string StripCaption(string? text)
     {
         if (string.IsNullOrEmpty(text)) return string.Empty;
 
         var marker = text.IndexOf(CaptionMarker, StringComparison.Ordinal);
-        return marker < 0 ? text : text[..marker];
+        if (marker < 0) return text;
+
+        var close = text.IndexOf(CenterClose, marker, StringComparison.Ordinal);
+        return close < 0 ? text[..marker] : text.Remove(marker, close - marker);
     }
 
     /// <summary>
