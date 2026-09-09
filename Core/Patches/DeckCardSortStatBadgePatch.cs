@@ -65,11 +65,32 @@ internal static class DeckCardSortStatBadge
     private static Font? _italicBaseFont;
 
     internal static void Update(NCardHolder? holder, CardModel? card)
+        => Update(holder, card, allowRetry: true);
+
+    private static void Update(NCardHolder? holder, CardModel? card, bool allowRetry)
     {
-        if (holder == null) return;
+        if (holder == null || !GodotObject.IsInstanceValid(holder)) return;
 
         try
         {
+            // Grid holders are pooled and are populated BEFORE they are
+            // parented: NGridCardHolder.Create pulls one from the node pool and
+            // calls SetCard on it, and InitGrid only adds it to the scroll
+            // container afterwards. ShouldCaption reads ancestors to tell a
+            // deck grid from the combat hand, and a detached holder has none —
+            // so deciding now would suppress the caption on every card of the
+            // first render. Wait for it to land, exactly once.
+            if (allowRetry && !holder.IsInsideTree())
+            {
+                var pendingHolder = holder;
+                var pendingCard = card;
+                holder.Connect(
+                    Node.SignalName.TreeEntered,
+                    Callable.From(() => Update(pendingHolder, pendingCard, allowRetry: false)),
+                    (uint)GodotObject.ConnectFlags.OneShot);
+                return;
+            }
+
             var badge = holder.GetNodeOrNull<PanelContainer>(BadgeName);
 
             if (!ShouldCaption(holder, card, out var text))
